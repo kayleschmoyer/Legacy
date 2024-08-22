@@ -10,7 +10,6 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
-  "nxCloudAccessToken": "YTVmMmUzNWUtNzdkZi00NjFjLTg0NzMtN2FmYjI5YzEzNTU4fHJlYWQtd3JpdGU=",
   "plugins": [
     {
       "plugin": "@nx/react-native/plugin",
