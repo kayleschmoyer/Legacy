@@ -6,5 +6,26 @@
   "tags": [],
   "implicitDependencies": ["app"],
   "// targets": "to see all targets run: nx show project app-e2e --web",
-  "targets": {}
+  "targets": {
+    "build-android": {
+      "executor": "@nx/detox:build",
+      "options": {
+        "detoxConfiguration": "android.emu.debug"
+      }
+    },
+    "build-ios": {
+      "executor": "@nx/detox:build",
+      "options": {
+        "detoxConfiguration": "ios.sim.debug"
+      }
+    },
+
+    "build": {
+      "executor": "nx:noop",
+      "dependsOn": [
+        "build-android",
+        "build-ios"
+      ]
+    }
+  }
 }

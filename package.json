@@ -2,7 +2,11 @@
   "name": "@legacy-sports/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "format": "nx run-many -t format",
+    "lint": "nx run-many -t lint",
+    "start": "nx start app"
+  },
   "private": true,
   "dependencies": {
     "react": "18.2.0",
