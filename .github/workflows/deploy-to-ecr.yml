@@ -37,6 +37,10 @@ jobs:
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Sts GetCallerIdentity
+        run: |
+          aws sts get-caller-identity
+
       - name: Build docker image
         run: docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG lambdas/stats_lambda
 
