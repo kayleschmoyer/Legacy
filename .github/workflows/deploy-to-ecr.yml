@@ -7,14 +7,14 @@ on:
   pull_request:
 
 env:
-  AWS_REGION : "us-east-1"
+  AWS_REGION: 'us-east-1'
   ECR_REPOSITORY: bkrupa/lambdas
   IMAGE_TAG: ${{ github.sha }}
 
-# Permission can be added at job level or workflow level    
+# Permission can be added at job level or workflow level
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
 
 jobs:
   build:
@@ -66,5 +66,3 @@ jobs:
           aws lambda update-function-code \
               --function-name ${FUNCTION_NAME} \
               --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      

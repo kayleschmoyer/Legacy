@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "defaultBase": "master",
+  "defaultBase": "main",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -51,6 +51,6 @@
         "testTargetName": "test"
       }
     },
-     "@nxlv/python"
+    "@nxlv/python"
   ]
 }
