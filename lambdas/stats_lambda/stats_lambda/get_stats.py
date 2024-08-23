@@ -52,8 +52,8 @@ def get_game_logs(player_id: str, year: int) -> pd.DataFrame:
 
 def lambda_handler(event, context):
     print(f"event {event}") # debug print
-    body = json.loads(event.get('body'))
     
+    body = json.loads(event.get('body'))
     game_date = body.get('game_date')
     fname = body.get('first_name')
     lname = body.get('last_name')
