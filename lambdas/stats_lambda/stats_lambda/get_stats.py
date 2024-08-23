@@ -1,5 +1,4 @@
-import re
-from pybaseball import playerid_lookup
+
 import datetime
 import json
 import pandas as pd
@@ -95,11 +94,7 @@ def lambda_handler(event, context):
 
     date: datetime.datetime = datetime.date.fromisoformat(game_date)
 
-    player = playerid_lookup(lname, fname)
-
-    player_id = player["key_bbref"][0]
-
-    logs = get_game_logs(player_id=player_id, year=date.year)
+    logs = get_game_logs(player_id="mantlmi01", year=date.year)
 
     query = f"Date.str.match('{date.strftime("%b")} {date.day}( \\\\(\\\\d+\\\\))?$')"
     log = logs.query(query)
