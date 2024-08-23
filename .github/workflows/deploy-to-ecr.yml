@@ -1,0 +1,43 @@
+name: Deploy to ECR
+
+# Controls when the workflow will run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION : "us-east-1"
+
+# Permission can be added at job level or workflow level    
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
+jobs:
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: <arn:aws:iam::111122223333:role/GitHubAction-AssumeRoleWithAction> #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: 176661590736.dkr.ecr.us-east-1.amazonaws.com
+          ECR_REPOSITORY: bkrupa/lambdas
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG "{{defaultContext}}:lambdas/stats_lambda"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
