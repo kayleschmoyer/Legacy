@@ -67,7 +67,8 @@ def lambda_handler(event, context):
 
     logs = get_game_logs(player_id=player_id, year=date.year)
 
-    query = f"Date.str.match('^{date.strftime("%b")} {date.day}( {re.escape('(')}\d+{re.escape(')')})?$')"
+
+    query = f"Date.str.match('{date.strftime("%b")} {date.day}( \\\\(\\\\d+\\\\))?$')"
     log = logs.query(query)
 
 
