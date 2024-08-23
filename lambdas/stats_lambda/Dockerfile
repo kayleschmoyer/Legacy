@@ -20,4 +20,4 @@ RUN poetry install --only=main --no-interaction --no-ansi
 COPY stats_lambda/get_stats.py ${LAMBDA_TASK_ROOT}
 
 # Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
-CMD [ "get_stats.handler" ]
+CMD [ "get_stats.lambda_handler" ]
