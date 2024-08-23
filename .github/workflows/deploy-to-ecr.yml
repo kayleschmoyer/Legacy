@@ -58,4 +58,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+      - name: update lambda image
+        env:
+          FUNCTION_NAME: baseball-game-logs
+        run: |
+          aws lambda update-function-code \
+              --function-name ${FUNCTION_NAME} \
+              --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
       
