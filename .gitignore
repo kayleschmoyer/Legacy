@@ -56,5 +56,9 @@ npm-debug.*
 web-build/
 cache/
 
+# poetry
+.cache
+__pycache__
+
 
 apps/app-e2e/artifacts

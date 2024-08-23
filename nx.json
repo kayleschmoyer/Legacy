@@ -50,6 +50,7 @@
         "startTargetName": "start",
         "testTargetName": "test"
       }
-    }
+    },
+     "@nxlv/python"
   ]
 }
