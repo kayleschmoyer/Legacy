@@ -1,11 +1,9 @@
 name: Deploy to ECR
 
 # Controls when the workflow will run
-
 on:
   push:
     branches: [main]
-  pull_request:
 
 env:
   AWS_REGION : "us-east-1"
