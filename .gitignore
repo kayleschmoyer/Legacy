@@ -58,6 +58,8 @@ cache/
 
 # poetry
 .cache
+.env
+.venv
 __pycache__
 
 
