@@ -1,6 +1,7 @@
 import re
 from pybaseball import playerid_lookup
 import datetime
+import json
 import pandas as pd
 
 from pybaseball.datasources.bref import BRefSession
@@ -51,7 +52,7 @@ def get_game_logs(player_id: str, year: int) -> pd.DataFrame:
 
 def lambda_handler(event, context):
     print(f"event {event}") # debug print
-    body = event.get('body-json')
+    body = json.loads(event.get('body'))
     
     game_date = body.get('game_date')
     fname = body.get('first_name')
