@@ -9,8 +9,7 @@ def run():
                 "body": json.dumps(
                     {
                         "game_date": "1957-06-02",
-                        "first_name": "mickey",
-                        "last_name": "mantle",
+                        "player_id": "mantlmi01"
                     }
                 )
             },

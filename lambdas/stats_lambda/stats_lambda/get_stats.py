@@ -88,13 +88,12 @@ def lambda_handler(event, context):
 
     body = json.loads(event.get("body"))
     game_date = body.get("game_date")
-    fname = body.get("first_name")
-    lname = body.get("last_name")
-    print(f"Fetching stats for {fname} {lname} on date {game_date}")
+    player_id = body.get("player_id")
+    print(f"Fetching stats for {player_id} on date {game_date}")
 
     date: datetime.datetime = datetime.date.fromisoformat(game_date)
 
-    logs = get_game_logs(player_id="mantlmi01", year=date.year)
+    logs = get_game_logs(player_id=player_id, year=date.year)
 
     query = f"Date.str.match('{date.strftime("%b")} {date.day}( \\\\(\\\\d+\\\\))?$')"
     log = logs.query(query)
@@ -110,5 +109,5 @@ def lambda_handler(event, context):
             "Access-Control-Allow-Methods": "*",
             "Access-Control-Allow-Headers": "*",
         },
-        "body": result,
+        "body": json.dumps(result),
     }
