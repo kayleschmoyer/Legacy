@@ -61,6 +61,7 @@ jobs:
       - name: update lambda image
         env:
           FUNCTION_NAME: baseball-game-logs
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws lambda update-function-code \
               --function-name ${FUNCTION_NAME} \
