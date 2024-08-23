@@ -38,7 +38,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login with Docker
-        run: docker login -u AWS -p $(aws ecr get-login-password --region the-region-you-are-in) 176661590736.dkr.ecr.us-east-1.amazonaws.com
+        run: docker login -u AWS -p $(aws ecr get-login-password --region $AWS_REGION) 176661590736.dkr.ecr.us-east-1.amazonaws.com
 
       - name: Sts GetCallerIdentity
         run: |
