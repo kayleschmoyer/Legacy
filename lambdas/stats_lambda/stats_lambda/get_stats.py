@@ -1,9 +1,9 @@
-import json
-from pybaseball import season_game_logs, playerid_lookup
+from pybaseball import playerid_lookup
 import datetime
 import pandas as pd
 
 from pybaseball.datasources.bref import BRefSession
+from pybaseball.playerid_lookup import cache
 from bs4 import BeautifulSoup
 
 session = BRefSession()
@@ -53,7 +53,6 @@ def lambda_handler(event, context):
     print(f"event {event}") # debug print
     body = event.get('body-json')
     
-    
     game_date = body.get('game_date')
     fname = body.get('first_name')
     lname = body.get('last_name')
@@ -68,7 +67,7 @@ def lambda_handler(event, context):
 
     logs = get_game_logs(player_id=player_id, year=date.year)
 
-    query = f"Date.str.match('^{date.strftime("%b")} {date.day}(\s\(\d\))?$')"
+    query = f"Date.str.match('^{date.strftime("%b")} {date.day}( \(\d\))?$')"
     log = logs.query(query)
 
 
