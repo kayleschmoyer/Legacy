@@ -1,9 +1,9 @@
+import re
 from pybaseball import playerid_lookup
 import datetime
 import pandas as pd
 
 from pybaseball.datasources.bref import BRefSession
-from pybaseball.playerid_lookup import cache
 from bs4 import BeautifulSoup
 
 session = BRefSession()
@@ -67,9 +67,21 @@ def lambda_handler(event, context):
 
     logs = get_game_logs(player_id=player_id, year=date.year)
 
-    query = f"Date.str.match('^{date.strftime("%b")} {date.day}( \(\d\))?$')"
+    query = f"Date.str.match('^{date.strftime("%b")} {date.day}( {re.escape('(')}\d+{re.escape(')')})?$')"
     log = logs.query(query)
 
 
-    return log.to_dict()
+    result = log.to_dict()
+
+    print(result)
+
+    return {
+            'statusCode': 200,
+            'headers': {
+               'Access-Control-Allow-Origin': '*',
+               'Access-Control-Allow-Methods': '*',
+               'Access-Control-Allow-Headers': '*'
+            },
+            'body': result
+        }
    
