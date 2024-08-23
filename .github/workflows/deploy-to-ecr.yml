@@ -9,9 +9,8 @@ on:
 
 env:
   AWS_REGION : "us-east-1"
-  ECR_REGISTRY: 176661590736.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPOSITORY: bkrupa/lambdas
-  IMAGE_TAG: latest
+  IMAGE_TAG: ${{ github.sha }}
 
 # Permission can be added at job level or workflow level    
 permissions:
@@ -46,9 +45,13 @@ jobs:
           aws sts get-caller-identity
 
       - name: Build docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG lambdas/stats_lambda
 
       - name: Push docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       
