@@ -86,6 +86,16 @@ def get_game_logs(player_id: str, year: int) -> pd.DataFrame:
 def lambda_handler(event, context):
     print(f"event {event}")  # debug print
 
+    if event.get('httpMethod') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+               'Access-Control-Allow-Origin': '*',
+               'Access-Control-Allow-Methods': '*',
+               'Access-Control-Allow-Headers': '*'
+            },
+        }
+
     body = json.loads(event.get("body"))
     game_date = body.get("game_date")
     player_id = body.get("player_id")
