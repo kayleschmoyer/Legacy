@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "defaultBase": "master",
+  "defaultBase": "main",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -15,7 +15,6 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
-  "nxCloudAccessToken": "YWFhNGUwMWEtNTQxYS00MDNkLTg0NjUtYzI2ZWZhODAzYTgzfHJlYWQtd3JpdGU=",
   "plugins": [
     {
       "plugin": "@nx/expo/plugin",
@@ -49,6 +48,21 @@
         "buildTargetName": "build",
         "startTargetName": "start",
         "testTargetName": "test"
+      }
+    },
+    "@nxlv/python",
+    {
+      "plugin": "@nx/react-native/plugin",
+      "options": {
+        "startTargetName": "start",
+        "upgradeTargetName": "update",
+        "bundleTargetName": "bundle",
+        "podInstallTargetName": "pod-install",
+        "runIosTargetName": "run-ios",
+        "runAndroidTargetName": "run-android",
+        "buildIosTargetName": "build-ios",
+        "buildAndroidTargetName": "build-android",
+        "syncDepsTargetName": "sync-deps"
       }
     }
   ]

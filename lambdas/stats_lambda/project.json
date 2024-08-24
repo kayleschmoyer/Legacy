@@ -1,0 +1,86 @@
+{
+  "name": "stats_lambda",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "lambdas/stats_lambda/stats_lambda",
+  "targets": {
+    "lock": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "poetry lock --no-update",
+        "cwd": "stats_lambda"
+      }
+    },
+    "add": {
+      "executor": "@nxlv/python:add",
+      "options": {}
+    },
+    "update": {
+      "executor": "@nxlv/python:update",
+      "options": {}
+    },
+    "remove": {
+      "executor": "@nxlv/python:remove",
+      "options": {}
+    },
+    "build": {
+      "executor": "@nxlv/python:build",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "outputPath": "stats_lambda/dist",
+        "publish": false,
+        "lockedVersions": true,
+        "bundleLocalDependencies": true
+      }
+    },
+    "install": {
+      "executor": "@nxlv/python:install",
+      "options": {
+        "silent": false,
+        "args": "",
+        "cacheDir": ".cache/pypoetry",
+        "verbose": false,
+        "debug": false
+      }
+    },
+    "lint": {
+      "executor": "@nxlv/python:flake8",
+      "options": {
+        "outputFile": "reports/stats_lambda/pylint.txt"
+      }
+    },
+    "test": {
+      "executor": "@nxlv/python:run-commands",
+      "outputs": [
+        "{workspaceRoot}/reports/stats_lambda/unittests",
+        "{workspaceRoot}/coverage/stats_lambda"
+      ],
+      "options": {
+        "command": "poetry run pytest tests/",
+        "cwd": "lambdas/stats_lambda"
+      }
+    },
+    "start": {
+      "executor": "@nxlv/python:run-commands",
+      "options": {
+        "command": "poetry run stats_lambda",
+        "cwd": "lambdas/stats_lambda"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "lambdas/stats_lambda",
+        "command": "poetry run black stats_lambda tests"
+      }
+    },
+    "lint:fix": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "lambdas/stats_lambda",
+        "command": "autopep8 --in-place --recursive stats_lambda tests"
+      }
+    }
+  },
+  "tags": []
+}

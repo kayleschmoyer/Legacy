@@ -1,0 +1,69 @@
+name: Deploy to ECR
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lambdas/stats_lambda/**'
+
+env:
+  AWS_REGION: 'us-east-1'
+  ECR_REPOSITORY: bkrupa/lambdas
+  IMAGE_TAG: ${{ github.sha }}
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Sts GetCallerIdentity
+        run: |
+          aws sts get-caller-identity
+
+      - name: Build docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest lambdas/stats_lambda
+
+      - name: Push docker image SHA
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Push docker image latest
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: update lambda image
+        env:
+          FUNCTION_NAME: baseball-game-logs
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          aws lambda update-function-code \
+              --function-name ${FUNCTION_NAME} \
+              --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:latest

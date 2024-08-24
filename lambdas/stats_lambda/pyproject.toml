@@ -1,0 +1,43 @@
+[tool.coverage.run]
+branch = true
+source = [ "stats_lambda" ]
+
+[tool.coverage.report]
+exclude_lines = ['if TYPE_CHECKING:']
+show_missing = true
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report html:'../coverage/stats_lambda/html' --cov-report xml:'../coverage/stats_lambda/coverage.xml' --html='../reports/stats_lambda/unittests/html/index.html' --junitxml='../reports/stats_lambda/unittests/junit.xml'"
+
+[tool.poetry]
+name = "stats_lambda"
+version = "1.0.0"
+description = "An aws lambda that reads from the statcast API."
+authors = [ ]
+license = 'Proprietary'
+readme = 'README.md'
+
+  [[tool.poetry.packages]]
+  include = "stats_lambda"
+
+  [tool.poetry.dependencies]
+  python = ">=3.9,<3.13"
+  pybaseball = {git = "https://github.com/jldbc/pybaseball.git"}
+  bs4 = "^0.0.2"
+  pandas = "^2.2.2"
+
+  [tool.poetry.group.dev.dependencies]
+  autopep8 = "2.0.2"
+  flake8 = "^7.1.1"
+  pytest = "7.3.1"
+  pytest-sugar = "0.9.7"
+  pytest-cov = "4.1.0"
+  pytest-html = "3.2.0"
+  black = "^24.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+stats_lambda = "stats_lambda.get_stats_test:run"
