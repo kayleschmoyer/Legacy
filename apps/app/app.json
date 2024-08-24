@@ -28,6 +28,7 @@
       "bundler": "metro"
     },
     "plugins": [
+      "expo-router",
       [
         "@config-plugins/detox",
         {
