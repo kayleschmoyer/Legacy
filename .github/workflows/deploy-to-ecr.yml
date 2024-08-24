@@ -4,7 +4,8 @@ name: Deploy to ECR
 on:
   push:
     branches: [main]
-  pull_request:
+    paths:
+      - 'lambdas/stats_lambda/**'
 
 env:
   AWS_REGION: 'us-east-1'
