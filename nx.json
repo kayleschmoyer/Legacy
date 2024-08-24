@@ -15,7 +15,6 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
-  "nxCloudAccessToken": "YWFhNGUwMWEtNTQxYS00MDNkLTg0NjUtYzI2ZWZhODAzYTgzfHJlYWQtd3JpdGU=",
   "plugins": [
     {
       "plugin": "@nx/expo/plugin",
@@ -51,6 +50,20 @@
         "testTargetName": "test"
       }
     },
-    "@nxlv/python"
+    "@nxlv/python",
+    {
+      "plugin": "@nx/react-native/plugin",
+      "options": {
+        "startTargetName": "start",
+        "upgradeTargetName": "update",
+        "bundleTargetName": "bundle",
+        "podInstallTargetName": "pod-install",
+        "runIosTargetName": "run-ios",
+        "runAndroidTargetName": "run-android",
+        "buildIosTargetName": "build-ios",
+        "buildAndroidTargetName": "build-android",
+        "syncDepsTargetName": "sync-deps"
+      }
+    }
   ]
 }

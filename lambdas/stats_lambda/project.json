@@ -73,6 +73,13 @@
         "cwd": "lambdas/stats_lambda",
         "command": "poetry run black stats_lambda tests"
       }
+    },
+    "lint:fix": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "lambdas/stats_lambda",
+        "command": "autopep8 --in-place --recursive stats_lambda tests"
+      }
     }
   },
   "tags": []

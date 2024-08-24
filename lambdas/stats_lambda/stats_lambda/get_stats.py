@@ -10,7 +10,7 @@ session = BRefSession()
 
 
 def read_from_bref(bref_id: str, year: int):
-    url = f"https://www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}"
+    url = f'https://www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}'
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
@@ -90,9 +90,9 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'headers': {
-               'Access-Control-Allow-Origin': '*',
-               'Access-Control-Allow-Methods': '*',
-               'Access-Control-Allow-Headers': '*'
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': '*',
+                'Access-Control-Allow-Headers': '*'
             },
         }
 
@@ -105,7 +105,7 @@ def lambda_handler(event, context):
 
     logs = get_game_logs(player_id=player_id, year=date.year)
 
-    query = f"Date.str.match('{date.strftime("%b")} {date.day}( \\\\(\\\\d+\\\\))?$')"
+    query = f"Date.str.match('{date.strftime("%b")} {date.day}((\\\\d+\\\\))?$')"
     log = logs.query(query)
 
     result = log.to_dict()

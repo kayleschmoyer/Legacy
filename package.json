@@ -40,6 +40,7 @@
     "@nx/expo": "19.6.2",
     "@nx/jest": "19.6.2",
     "@nx/js": "19.6.2",
+    "@nx/react-native": "^19.6.2",
     "@nx/workspace": "19.6.2",
     "@nxlv/python": "^19.0.2",
     "@swc-node/register": "~1.9.1",

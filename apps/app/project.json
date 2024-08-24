@@ -12,6 +12,21 @@
         "cwd": "apps/app",
         "command": "npm ci"
       }
+    },
+    // https://github.com/expo/eas-cli/issues/1300#issuecomment-1681581790
+    "build-android": {
+      "dependsOn": ["run-android"],
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/app",
+        "command": "npx react-native build-android --mode=release"
+      }
+    },
+    "run-android": {
+      "executor": "@nx/react-native:run-android"
+    },
+    "build": {
+      "dependsOn": ["prebuild", "build-android"]
     }
   }
 }
