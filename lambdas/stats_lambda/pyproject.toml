@@ -25,6 +25,7 @@ readme = 'README.md'
   pybaseball = {git = "https://github.com/jldbc/pybaseball.git"}
   bs4 = "^0.0.2"
   pandas = "^2.2.2"
+  pylint = "^3.2.6"
 
   [tool.poetry.group.dev.dependencies]
   autopep8 = "2.0.2"

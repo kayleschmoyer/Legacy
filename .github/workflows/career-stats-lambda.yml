@@ -1,0 +1,98 @@
+name: Career Stats Lambda
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lambdas/stats_lambda/**'
+  pull_request:
+
+env:
+  AWS_REGION: 'us-east-1'
+  IMAGE_TAG: ${{ github.sha }}
+  FUNCTION_NAME: career-stats-lambda
+  WORKING_DIRECTORY: lambdas/career_stats_lambda
+  SRC_DIRECTORY: career_stats_lambda
+
+defaults:
+  run:
+    working-directory: .
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  build:
+    name: Deply Career Stats Lambda
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Python Version
+        id: full-python-version
+        run: echo "version=$(python --version)" >> "$GITHUB_OUTPUT"  
+          
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sts GetCallerIdentity
+        run: aws sts get-caller-identity
+
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Set up cache
+        uses: actions/cache@v2
+        id: cached-poetry-dependencies
+        with:
+          path: ${{env.WORKING_DIRECTORY}}/.venv
+          key: ${{ env.FUNCTION_NAME }}-venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install Dependencies
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --only main --sync
+
+      - name: Create distro directory
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: mkdir -p /tmp/dist/${{ env.FUNCTION_NAME }}
+
+      - name: Copy dependencies
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: cp --recursive .venv/lib/python*/site-packages/* /tmp/dist/${{ env.FUNCTION_NAME }}
+      
+      - name: Copy source
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: cp -v --recursive ${{ env.SRC_DIRECTORY }}/* /tmp/dist/${{ env.FUNCTION_NAME }}
+
+      - name: Zip package
+        working-directory: /tmp/dist/${{ env.FUNCTION_NAME }}
+        id: create-zip
+        env:
+          FILENAME: /tmp/dist/deploy-${{ env.FUNCTION_NAME }}.zip
+        run: |
+          zip -r ${{ env.FILENAME }} .
+          echo "filename=${{ env.FILENAME }}" >> "$GITHUB_OUTPUT"  
+          
+      - name: Update lambda image
+        run: |
+          aws lambda update-function-code \
+            --function-name ${FUNCTION_NAME} \
+            --zip-file fileb://${{ steps.create-zip.outputs.filename }}

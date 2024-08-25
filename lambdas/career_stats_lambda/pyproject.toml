@@ -1,0 +1,38 @@
+[tool.coverage.run]
+branch = true
+source = [ "career_stats_lambda" ]
+
+[tool.coverage.report]
+exclude_lines = ['if TYPE_CHECKING:']
+show_missing = true
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report html:'../../coverage/lambdas/career_stats_lambda/html' --cov-report xml:'../../coverage/lambdas/career_stats_lambda/coverage.xml' --html='../../reports/lambdas/career_stats_lambda/unittests/html/index.html' --junitxml='../../reports/lambdas/career_stats_lambda/unittests/junit.xml'"
+
+[tool.poetry]
+name = "lambdas"
+version = "1.0.0"
+description = "A lambda for retrieving career stats"
+authors = [ ]
+license = 'Proprietary'
+readme = 'README.md'
+
+  [[tool.poetry.packages]]
+  include = "career_stats_lambda"
+
+  [tool.poetry.dependencies]
+  python = ">=3.9,<3.13"
+  bs4 = "^0.0.2"
+  pylint = "^3.2.6"
+
+  [tool.poetry.group.dev.dependencies]
+  autopep8 = "2.0.2"
+  flake8 = "6.0.0"
+  pytest = "7.3.1"
+  pytest-sugar = "0.9.7"
+  pytest-cov = "4.1.0"
+  pytest-html = "3.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

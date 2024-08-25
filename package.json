@@ -5,7 +5,9 @@
   "scripts": {
     "format": "nx run-many -t format",
     "lint": "nx run-many -t lint",
-    "start": "nx start app"
+    "lint:fix": "nx run-many -t lint:fix",
+    "start": "nx start app",
+    "create-python-project": "nx generate @nxlv/python:poetry-project"
   },
   "private": true,
   "dependencies": {

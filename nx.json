@@ -15,6 +15,9 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
+  "@nxlv/python:poetry-project": {
+    "projectNameAndRootFormat": "as-provided"
+  },
   "plugins": [
     {
       "plugin": "@nx/expo/plugin",

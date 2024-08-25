@@ -10,7 +10,7 @@ session = BRefSession()
 
 
 def read_from_bref(bref_id: str, year: int):
-    url = f'https://www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}'
+    url = f'https: //www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}'
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
