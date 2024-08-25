@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'lambdas/career_stats_lambda/**'
+      - lambdas/career_stats_lambda/**
 
 env:
   AWS_REGION: 'us-east-1'
