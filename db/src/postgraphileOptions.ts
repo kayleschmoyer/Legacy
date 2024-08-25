@@ -4,11 +4,12 @@ import { Options } from 'postgraphile';
  * Have to disable SSL in order for postgraphile to be able to connect
  * https://stackoverflow.com/questions/76899023/rds-while-connection-error-no-pg-hba-conf-entry-for-host
  */
-
 export const options: Options = {
   dynamicJson: true,
   cors: true,
-  externalUrlBase: `/`,
+  graphiql: false,
+  graphqlRoute: '/graphql',
+  externalUrlBase: `/${process.env.AWS_STAGE}`,
 
   // If consuming JWT:
   // jwtSecret: process.env.JWT_SECRET || String(Math.random()),
@@ -18,9 +19,10 @@ export const options: Options = {
   /* If you want to enable GraphiQL, you must use `externalUrlBase` so PostGraphile
    * knows where to tell the browser to find the assets.  Doing this is
    * strongly discouraged, you should use an external GraphQL client instead.
-   */
-  graphiql: true,
-  enhanceGraphiql: true,
-  graphqlRoute: '/',
-  graphiqlRoute: '/graphiql',
+
+    graphiql: true,
+    enhanceGraphiql: true,
+    graphqlRoute: '/',
+    graphiqlRoute: '/graphiql',
+  */
 };

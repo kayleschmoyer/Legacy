@@ -1,0 +1,52 @@
+name: Deploy to ECR
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'db/**'
+  pull_request:
+
+env:
+  AWS_REGION: us-east-1
+  AWS_SERVICE_NAME: legacy-sports-gql
+  AWS_STAGE: dev
+  AWS_VPC_SECURITY_GROUP_IDS: sg-0dfaa86fd5569fa0c
+  AWS_VPC_SUBNET_IDS: subnet-0a46f9507bdc73d20,subnet-0534497c68d611afc,subnet-054ba96f45a38e3a2,subnet-01f58f22e9ffdfb04,subnet-031d24899cb105d13,subnet-09314bc89e0a85b16
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}?ssl=true
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get RDS Secret
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            , rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+          parse-json-secrets: false
+
+      - name: Print Environment Variables
+        run: |
+          printenv
