@@ -1,0 +1,8 @@
+query Users{
+  allUsers{
+    nodes{
+      id
+      username
+    }
+  }
+}

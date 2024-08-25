@@ -15,12 +15,17 @@
     "@expo/metro-runtime": "~3.2.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/stack": "^6.4.1",
+    "aws-serverless-express": "^3.4.0",
+    "bufferutil": "^4.0.8",
+    "cors": "^2.8.5",
     "expo": "~51.0.8",
     "expo-constants": "~16.0.2",
     "expo-linking": "~6.3.1",
     "expo-router": "~3.5.23",
     "expo-splash-screen": "~0.27.4",
     "expo-status-bar": "~1.12.1",
+    "pg": "^8.12.0",
+    "postgraphile": "^4.13.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.1",
@@ -31,7 +36,8 @@
     "react-native-table-component": "^1.2.2",
     "react-native-web": "~0.19.10",
     "react-router-native": "^6.26.1",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "utf-8-validate": "^5.0.10"
   },
   "devDependencies": {
     "@config-plugins/detox": "~8.0.0",
@@ -51,10 +57,13 @@
     "@testing-library/jest-dom": "~6.4.2",
     "@testing-library/jest-native": "~5.4.3",
     "@testing-library/react-native": "~12.5.0",
+    "@types/aws-serverless-express": "^3.3.9",
+    "@types/cors": "^2.8.17",
     "@types/jest": "^29.5.12",
-    "@types/node": "18.16.9",
+    "@types/node": "^18.16.9",
     "@types/react": "~18.2.45",
     "@types/react-native-table-component": "^1.2.8",
+    "@types/webpack": "^5.28.5",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
     "babel-jest": "^29.7.0",
@@ -74,7 +83,10 @@
     "prettier": "^2.6.2",
     "react-test-renderer": "18.2.0",
     "ts-jest": "^29.1.0",
-    "ts-node": "10.9.1",
-    "typescript": "~5.5.2"
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.1",
+    "typescript": "~5.5.2",
+    "webpack": "^5.94.0",
+    "webpack-cli": "^5.1.4"
   }
 }
