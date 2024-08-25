@@ -10,7 +10,7 @@ export default function ViewCareerStats(): JSX.Element {
 
   const getGameLog = async () => {
     const response = await fetch(
-      'https://du558s1u2m.execute-api.us-east-1.amazonaws.com/default/career-stats-lambda',
+      'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
       {
         method: 'POST',
         headers: {
