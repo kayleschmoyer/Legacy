@@ -36,3 +36,6 @@ readme = 'README.md'
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+career_stats_lambda = "test_harness.run:run"
