@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Button, ScrollView, Text, TextInput, View } from 'react-native';
+import { Button, ScrollView, Text, TextInput } from 'react-native';
 import {Table, Row} from 'react-native-table-component'
 
-export default function ViewStats(): JSX.Element {
+export default function ViewGameLogs(): JSX.Element {
   const [player, setPlayer] = React.useState('');
   const [date, setDate] = React.useState('');
   const [data, setData] = React.useState<
@@ -10,9 +10,8 @@ export default function ViewStats(): JSX.Element {
   >(undefined);
   const [stats, setStats] = React.useState<Array<string>>([]);
 
-  const getData = async () => {
+  const getGameLog = async () => {
     const response = await fetch(
-      // 'https://apigateway.us-east-1.amazonaws.com/restapis/e57xg24kgi/resources/6m11ap/methods/POST',
       'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
       {
         method: 'POST',
@@ -59,7 +58,7 @@ export default function ViewStats(): JSX.Element {
 
       <TextInput value={player} onChangeText={setPlayer}></TextInput>
       <TextInput value={date} onChangeText={setDate}></TextInput>
-      <Button onPress={getData} title="Get Player Data" />
+      <Button onPress={getGameLog} title="Get Player Data" />
 
       {data ? (
         <Table>
