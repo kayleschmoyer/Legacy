@@ -25,6 +25,7 @@ readme = 'README.md'
   bs4 = "^0.0.2"
   pylint = "^3.2.6"
   requests = "^2.32.3"
+  lxml = "^5.3.0"
 
   [tool.poetry.group.dev.dependencies]
   autopep8 = "2.0.2"
