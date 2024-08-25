@@ -24,6 +24,7 @@ readme = 'README.md'
   python = ">=3.9,<3.13"
   bs4 = "^0.0.2"
   pylint = "^3.2.6"
+  requests = "^2.32.3"
 
   [tool.poetry.group.dev.dependencies]
   autopep8 = "2.0.2"
