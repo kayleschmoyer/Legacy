@@ -15,7 +15,7 @@ def read_from_bref(bref_id: str):
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
-    return BeautifulSoup(s, features="lxml")
+    return BeautifulSoup(s, "html.parser")
 
 def get_table(soup: BeautifulSoup, table_id: str):
     table = soup.find("table", {"id": table_id})
@@ -32,7 +32,7 @@ def get_table(soup: BeautifulSoup, table_id: str):
         if table_id not in text:
             continue
 
-        soup2 = BeautifulSoup(text, features="lxml")
+        soup2 = BeautifulSoup(text, "html.parser")
         table = get_table(soup2, table_id)
 
         if table is not None:
