@@ -10,7 +10,7 @@ export const options: Options = {
   graphiql: false,
   graphqlRoute: '/graphql',
   externalUrlBase: `/${process.env.AWS_STAGE}`,
-
+  
   // If consuming JWT:
   // jwtSecret: process.env.JWT_SECRET || String(Math.random()),
   // If generating JWT:

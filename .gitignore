@@ -136,3 +136,6 @@ yarn-error.log
 
 # testing
 /coverage
+
+# Serverless
+.serverless

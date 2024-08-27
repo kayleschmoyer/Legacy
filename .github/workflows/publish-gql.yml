@@ -1,4 +1,4 @@
-name: Deploy to ECR
+name: Publish GQL
 
 # Controls when the workflow will run
 on:
@@ -6,16 +6,21 @@ on:
     branches: [main]
     paths:
       - 'db/**'
-  pull_request:
+      - .github/workflows/publish-gql.yml
 
 env:
   AWS_REGION: us-east-1
   AWS_SERVICE_NAME: legacy-sports-gql
   AWS_STAGE: dev
-  AWS_VPC_SECURITY_GROUP_IDS: sg-0dfaa86fd5569fa0c
-  AWS_VPC_SUBNET_IDS: subnet-0a46f9507bdc73d20,subnet-0534497c68d611afc,subnet-054ba96f45a38e3a2,subnet-01f58f22e9ffdfb04,subnet-031d24899cb105d13,subnet-09314bc89e0a85b16
-  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}?ssl=true
-
+  AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2
+  AWS_VPC_SUBNET_IDS: subnet-0a46f9507bdc73d20,subnet-0534497c68d611afc,subnet-054ba96f45a38e3a2,subnet-031d24899cb105d13,subnet-01f58f22e9ffdfb04,subnet-09314bc89e0a85b16
+  CERTIFICATE_FILE: aws-certs.pem
+  CERTIFICATE_URL: https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem
+  DATABASE_SCHEMAS: public
+  INSTALLED_CERT_LOCATION: /usr/local/share/ca-certificates/aws-certs.crt
+  POSTGRES_PASSWORD:
+  POSTGRES_USERNAME:
+  RDS_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
 # Permission can be added at job level or workflow level
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -33,6 +38,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set Certificate File Name
+        id: get-certificate-file-name
+        run: echo "value=$(pwd)/${{ env.CERTIFICATE_FILE }}" >> "$GITHUB_OUTPUT" 
+
+      # Cache node_modules
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install NPM Packages
+        run: npm ci --legacy-peer-deps
+
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v1.7.0
         with:
@@ -40,13 +59,58 @@ jobs:
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Download AWS Certs
+        run: wget -O ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.CERTIFICATE_URL }}
+
+      - name: Install AWS Certs
+        run: sudo cp ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.INSTALLED_CERT_LOCATION }}
+
+      - name: Test Cert
+        run: openssl x509 -in ${{ env.INSTALLED_CERT_LOCATION }} -text -noout
+
+      - name: Update Certs
+        run: sudo VERBOSE=1 update-ca-certificates -v
+
       - name: Get RDS Secret
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
-            , rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
-          parse-json-secrets: false
+            POSTGRES, rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+          parse-json-secrets: true
 
-      - name: Print Environment Variables
+      - name: Create Serverless Package
+        working-directory: db
+        env:
+          DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.get-certificate-file-name.outputs.value }}
+        run: npx serverless package
+
+      - name: Build
+        run: npx nx build db
+
+      - name: Make the Cache
+        env:
+          DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.get-certificate-file-name.outputs.value }}
+        working-directory: db
+        run: npm run make-cache
+
+      - name: Bundle
+        working-directory: db/dist
+        run: find . -type f  -not -name '*.js.map' | zip -Xqr@ ../lambda.zip
+
+      - name: Make Serverless Directory
+        working-directory: db
+        run: mkdir -p .serverless
+
+      - name: Move Zip to Serverless
+        working-directory: db
+        run: mv lambda.zip .serverless/graphql.zip
+
+      - name: Update zip SHA
+        working-directory: db
         run: |
-          printenv
+          SHA=$(openssl dgst -sha256 -binary .serverless/graphql.zip | openssl enc -base64 | sed -e "s#/#\\\/#g")
+          sed -i "s/\"CodeSha256\": \".*\"/\"CodeSha256\": \"${SHA}\"/g" .serverless/*.json
+
+      - name: Deploy Lambda
+        working-directory: db
+        run: npx serverless deploy -p .serverless

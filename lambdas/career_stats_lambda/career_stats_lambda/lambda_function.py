@@ -10,21 +10,23 @@ NUMERIC_STATS: Final = [
     'G', 'PA', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'batting_avg', 'onbase_perc', 'slugging_perc', 'onbase_plus_slugging', 'onbase_plus_slugging_plus', 'TB', 'GIDP', 'HBP', 'SH', 'SF', 'IBB'
 ]
 
+
 def read_from_bref(bref_id: str):
-    url = f"https://www.baseball-reference.com/players/{bref_id[0]}/{bref_id}.shtml#all_standard_fielding"
+    url = f"https: //www.baseball-reference.com/players/{bref_id[0]}/{bref_id}.shtml#all_standard_fielding"
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
     return BeautifulSoup(s, "html.parser")
+
 
 def get_table(soup: BeautifulSoup, table_id: str):
     table = soup.find("table", {"id": table_id})
 
     if table is not None:
         return table
-    
+
     # The table may be stored in a comment. Check for it
-    comments = soup.find_all(text=lambda text:isinstance(text, Comment))
+    comments = soup.find_all(text=lambda text: isinstance(text, Comment))
 
     for comment in comments:
         text: str = comment.string
@@ -37,11 +39,13 @@ def get_table(soup: BeautifulSoup, table_id: str):
 
         if table is not None:
             return table
-        
+
     return None
+
 
 def get_table_footer(table: Tag | NavigableString | None):
     return table.find("tfoot")
+
 
 def parse_row(row: Tag | NavigableString | None):
     cols = row.find_all("td")
@@ -52,8 +56,9 @@ def parse_row(row: Tag | NavigableString | None):
         stat = col['data-stat']
         text = col.text.strip()
         stats[stat] = float(text) if stat in NUMERIC_STATS and text != '' else text
-    
+
     return stats
+
 
 def parse_table(table):
     if table is None:
@@ -64,9 +69,11 @@ def parse_table(table):
     data = parse_row(row)
     return data
 
+
 def get_batting_stats(soup: BeautifulSoup):
     batting_stats = get_table(soup, "batting_standard")
     return parse_table(batting_stats)
+
 
 def get_fielding_stats(soup: BeautifulSoup):
     fielding_stats = get_table(soup, 'standard_fielding')
@@ -75,10 +82,10 @@ def get_fielding_stats(soup: BeautifulSoup):
         return None
 
     footer = get_table_footer(fielding_stats)
-    
+
     # Fielding stats are formatted differently
     for row in footer.find_all('tr'):
-        cell = row.find_next(attrs={"data-stat" : "pos"})
+        cell = row.find_next(attrs={"data-stat": "pos"})
 
         if cell.text.strip() != 'TOT':
             continue
@@ -88,9 +95,11 @@ def get_fielding_stats(soup: BeautifulSoup):
 
     return None
 
+
 def get_pitching_stats(soup: BeautifulSoup):
     pitching_stats = get_table(soup, 'pitching_standard')
     return parse_table(pitching_stats)
+
 
 def get_career_stats(player_id: str):
     soup = read_from_bref(player_id)
@@ -98,8 +107,9 @@ def get_career_stats(player_id: str):
     return {
         "batting": get_batting_stats(soup),
         "pitching": get_pitching_stats(soup),
-        "fielding": get_fielding_stats(soup),        
+        "fielding": get_fielding_stats(soup),
     }
+
 
 def lambda_handler(event, context):
     print(f"event {event}")  # debug print

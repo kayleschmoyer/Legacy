@@ -10,7 +10,7 @@ show_missing = true
 addopts = "--cov --cov-report html:'../../coverage/lambdas/career_stats_lambda/html' --cov-report xml:'../../coverage/lambdas/career_stats_lambda/coverage.xml' --html='../../reports/lambdas/career_stats_lambda/unittests/html/index.html' --junitxml='../../reports/lambdas/career_stats_lambda/unittests/junit.xml'"
 
 [tool.poetry]
-name = "lambdas"
+name = "career_stats_lambda"
 version = "1.0.0"
 description = "A lambda for retrieving career stats"
 authors = [ ]

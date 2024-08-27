@@ -66,8 +66,8 @@
     "lint:fix": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "lambdas/stats_lambda",
-        "command": "autopep8 --in-place --recursive stats_lambda tests"
+        "cwd": "lambdas/career_stats_lambda",
+        "command": "poetry run autopep8 --in-place --recursive career_stats_lambda tests"
       }
     }
   },

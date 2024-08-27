@@ -9,6 +9,9 @@ const config: webpack.Configuration = {
     filename: 'index.js',
     libraryTarget: 'commonjs',
   },
+  entry: {
+    index: './src/index.ts',
+  },
   mode: 'production',
   target: 'node',
   module: {
@@ -25,33 +28,35 @@ const config: webpack.Configuration = {
   },
   plugins: [
     // Prevent loading pg-native (in a weird, backwards kind of way!)
-    ...[
-      new webpack.DefinePlugin({
-        'process.env.NODE_ENV': '"production"',
-        'process.env.POSTGRAPHILE_ENV': '"production"',
-        'process.env.NODE_PG_FORCE_NATIVE': JSON.stringify('1'),
-        ...(postgraphileOptions.graphiql
-          ? null
-          : {
-              'process.env.POSTGRAPHILE_OMIT_ASSETS': '"1"',
-            }),
-      }),
-      new webpack.NormalModuleReplacementPlugin(
-        /pg\/lib\/native\/index\.js$/,
-        '../client.js'
-      ),
-    ],
+    // ...[
+    //   new webpack.DefinePlugin({
+    //     'process.env.NODE_ENV': '"production"',
+    //     'process.env.POSTGRAPHILE_ENV': '"production"',
+    //     'process.env.NODE_PG_FORCE_NATIVE': JSON.stringify('1'),
+    //     ...(postgraphileOptions.graphiql
+    //       ? null
+    //       : {
+    //           'process.env.POSTGRAPHILE_OMIT_ASSETS': '"1"',
+    //         }),
+    //   }),
+    //   new webpack.NormalModuleReplacementPlugin(
+    //     /pg\/lib\/native\/index\.js$/,
+    //     '../client.js'
+    //   ),
+    // ],
+
+    new webpack.IgnorePlugin({ resourceRegExp: /^pg-native$/}),
 
     // Omit websocket functionality from postgraphile:
     new webpack.NormalModuleReplacementPlugin(
       /postgraphile\/build\/postgraphile\/http\/subscriptions\.js$/,
-      `${__dirname}/src/postgraphile-http-subscriptions.js`
+      `${__dirname}/mocks/postgraphile-http-subscriptions.js`
     ),
 
     // Just in case you install express:
     new webpack.NormalModuleReplacementPlugin(
       /express\/lib\/view\.js$/,
-      `${__dirname}/src/express-lib-view.js`
+      `${__dirname}/mocks/express-lib-view.js`
     ),
   ],
   node: {

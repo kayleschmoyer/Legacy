@@ -1,4 +1,5 @@
 service: ${env:AWS_SERVICE_NAME}
+configValidationMode: error
 
 plugins:
   - serverless-content-encoding
@@ -10,19 +11,9 @@ custom:
 package:
   individually: true
 
-vpc:
-  securityGroupIds:
-    "Fn::Split":
-      - ","
-      - ${env:AWS_VPC_SECURITY_GROUP_IDS}
-  subnetIds:
-    "Fn::Split":
-      - ","
-      - ${env:AWS_VPC_SUBNET_IDS}
-
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: nodejs20.x
   deploymentBucket:
     name: ${env:AWS_SERVICE_NAME}
   region: ${env:AWS_REGION}
@@ -31,14 +22,26 @@ provider:
 functions:
   graphql:
     handler: index.handler # Actual handler substituted in during deploy script
+    timeout: 60 # optional, in seconds, default is 6
     events:
       - http:
           method: post
           path: graphql
           cors: true
           integration: lambda-proxy
+    vpc:
+      securityGroupIds:
+        "Fn::Split":
+          - ","
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS}
+      subnetIds:
+        "Fn::Split":
+          - ","
+          - ${env:AWS_VPC_SUBNET_IDS}
     environment:
-      DATABASE_URL: ${env:DATABASE_URL}
-      DATABASE_SCHEMAS: ${env:DATABASE_SCHEMAS}
-      JWT_SECRET: ${env:JWT_SECRET}
-      JWT_PG_TYPE_IDENTIFIER: ${env:JWT_PG_TYPE_IDENTIFIER}
+      CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+      DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+      # DATABASE_URL: ${env:DATABASE_URL}
+      # DATABASE_SCHEMAS: ${env:DATABASE_SCHEMAS}
+      # JWT_SECRET: ${env:JWT_SECRET}
+      # JWT_PG_TYPE_IDENTIFIER: ${env:JWT_PG_TYPE_IDENTIFIER}

@@ -1,6 +1,6 @@
 {
   "name": "stats_lambda",
-  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "lambdas/stats_lambda/stats_lambda",
   "targets": {
@@ -78,7 +78,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "lambdas/stats_lambda",
-        "command": "autopep8 --in-place --recursive stats_lambda tests"
+        "command": "poetry run autopep8 --in-place --recursive stats_lambda tests"
       }
     }
   },
