@@ -67,19 +67,24 @@
         "cwd": "lambdas/stats_lambda"
       }
     },
-    "format": {
+    "lint:fix:black": {
       "executor": "nx:run-commands",
       "options": {
         "cwd": "lambdas/stats_lambda",
         "command": "poetry run black stats_lambda tests"
       }
     },
-    "lint:fix": {
+    "lint:fix:autopep8": {
       "executor": "nx:run-commands",
+      "dependsOn": ["lint:fix:black"],
       "options": {
         "cwd": "lambdas/stats_lambda",
         "command": "poetry run autopep8 --in-place --recursive stats_lambda tests"
       }
+    },
+    "lint:fix": {
+      "executor": "",
+      "dependsOn": ["lint:fix:autopep8", "lint:fix:black"]
     }
   },
   "tags": []

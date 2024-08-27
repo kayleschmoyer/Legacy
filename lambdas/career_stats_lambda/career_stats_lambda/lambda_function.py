@@ -7,7 +7,30 @@ from bs4 import BeautifulSoup, Tag, NavigableString, Comment
 session = requests.session()
 
 NUMERIC_STATS: Final = [
-    'G', 'PA', 'AB', 'R', 'H', '2B', '3B', 'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'batting_avg', 'onbase_perc', 'slugging_perc', 'onbase_plus_slugging', 'onbase_plus_slugging_plus', 'TB', 'GIDP', 'HBP', 'SH', 'SF', 'IBB'
+    "G",
+    "PA",
+    "AB",
+    "R",
+    "H",
+    "2B",
+    "3B",
+    "HR",
+    "RBI",
+    "SB",
+    "CS",
+    "BB",
+    "SO",
+    "batting_avg",
+    "onbase_perc",
+    "slugging_perc",
+    "onbase_plus_slugging",
+    "onbase_plus_slugging_plus",
+    "TB",
+    "GIDP",
+    "HBP",
+    "SH",
+    "SF",
+    "IBB",
 ]
 
 
@@ -53,9 +76,9 @@ def parse_row(row: Tag | NavigableString | None):
     stats = {}
 
     for col in cols:
-        stat = col['data-stat']
+        stat = col["data-stat"]
         text = col.text.strip()
-        stats[stat] = float(text) if stat in NUMERIC_STATS and text != '' else text
+        stats[stat] = float(text) if stat in NUMERIC_STATS and text != "" else text
 
     return stats
 
@@ -76,7 +99,7 @@ def get_batting_stats(soup: BeautifulSoup):
 
 
 def get_fielding_stats(soup: BeautifulSoup):
-    fielding_stats = get_table(soup, 'standard_fielding')
+    fielding_stats = get_table(soup, "standard_fielding")
 
     if fielding_stats is None:
         return None
@@ -84,10 +107,10 @@ def get_fielding_stats(soup: BeautifulSoup):
     footer = get_table_footer(fielding_stats)
 
     # Fielding stats are formatted differently
-    for row in footer.find_all('tr'):
+    for row in footer.find_all("tr"):
         cell = row.find_next(attrs={"data-stat": "pos"})
 
-        if cell.text.strip() != 'TOT':
+        if cell.text.strip() != "TOT":
             continue
 
         data = parse_row(row)
@@ -97,7 +120,7 @@ def get_fielding_stats(soup: BeautifulSoup):
 
 
 def get_pitching_stats(soup: BeautifulSoup):
-    pitching_stats = get_table(soup, 'pitching_standard')
+    pitching_stats = get_table(soup, "pitching_standard")
     return parse_table(pitching_stats)
 
 
@@ -114,13 +137,13 @@ def get_career_stats(player_id: str):
 def lambda_handler(event, context):
     print(f"event {event}")  # debug print
 
-    if event.get('httpMethod') == 'OPTIONS':
+    if event.get("httpMethod") == "OPTIONS":
         return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': '*',
-                'Access-Control-Allow-Headers': '*'
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
             },
         }
 

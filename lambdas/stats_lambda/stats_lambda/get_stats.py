@@ -1,4 +1,3 @@
-
 import datetime
 import json
 import pandas as pd
@@ -10,7 +9,7 @@ session = BRefSession()
 
 
 def read_from_bref(bref_id: str, year: int):
-    url = f'https: //www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}'
+    url = f"https: //www.baseball-reference.com/players/gl.fcgi?id={bref_id}&t=b&year={year}"
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
@@ -86,13 +85,13 @@ def get_game_logs(player_id: str, year: int) -> pd.DataFrame:
 def lambda_handler(event, context):
     print(f"event {event}")  # debug print
 
-    if event.get('httpMethod') == 'OPTIONS':
+    if event.get("httpMethod") == "OPTIONS":
         return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': '*',
-                'Access-Control-Allow-Headers': '*'
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
             },
         }
 

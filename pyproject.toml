@@ -1,0 +1,39 @@
+[tool.nx]
+autoActivate = true
+
+[tool.poetry]
+name = "@legacy-sports/source"
+version = "1.0.0"
+description = ""
+authors = [ ]
+license = "Proprietary"
+readme = "README.md"
+package-mode = false
+
+  [tool.poetry.dependencies]
+  python = ">=3.9,<3.13"
+  bs4 = "^0.0.2"
+  pandas = "^2.2.2"
+  pylint = "^3.2.6"
+  requests = "^2.32.3"
+
+    [tool.poetry.dependencies.pybaseball]
+    git = "https://github.com/jldbc/pybaseball.git"
+
+    [tool.poetry.dependencies.career_stats_lambda]
+    path = "lambdas/career_stats_lambda"
+    develop = true
+
+    [tool.poetry.dependencies.stats_lambda]
+    path = "lambdas/stats_lambda"
+    develop = true
+
+
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.1.1"
+autopep8 = "^2.3.1"
+black = "^24.8.0"
+
+[build-system]
+requires = [ "poetry-core==1.1.0" ]
+build-backend = "poetry.core.masonry.api"
