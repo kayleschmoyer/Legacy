@@ -9,8 +9,6 @@ on:
       - lambdas/career_stats_lambda/**
 
 env:
-  AWS_REGION: 'us-east-1'
-  IMAGE_TAG: ${{ github.sha }}
   FUNCTION_NAME: career-stats-lambda
   WORKING_DIRECTORY: lambdas/career_stats_lambda
   SRC_DIRECTORY: career_stats_lambda
@@ -45,8 +43,6 @@ jobs:
       - name: Setup AWS
         uses: ./.github/workflows/setup-aws
         id: setup-aws
-        with:
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Create distro directory
         run: mkdir -p /tmp/dist/${{ env.FUNCTION_NAME }}

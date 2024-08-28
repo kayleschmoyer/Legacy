@@ -1,11 +1,11 @@
 import datetime
 import json
 import pandas as pd
+import requests
 
-from pybaseball.datasources.bref import BRefSession
 from bs4 import BeautifulSoup
 
-session = BRefSession()
+session = requests.session()
 
 
 def read_from_bref(bref_id: str, year: int):

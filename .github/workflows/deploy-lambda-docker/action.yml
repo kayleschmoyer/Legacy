@@ -1,0 +1,34 @@
+name: Deploy Lambda (Docker)
+
+inputs:
+  ecr-registry:
+    required: true
+    type: string
+  src-directory:
+    required: true
+    type: string
+  function-name:
+    required: true
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build docker image
+        env:
+          ECR_REGISTRY: ${{ inputs.ecr-registry }}
+        run: docker build -t ${{ inputs.ecr-registry }}/$ECR_REPOSITORY:$IMAGE_TAG -t ${{ inputs.ecr-registry }}/$ECR_REPOSITORY:latest ${{ inputs.src-directory }}
+
+      - name: Push docker image SHA
+        run: docker push ${{ inputs.ecr-registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Push docker image latest
+        run: docker push ${{ inputs.ecr-registry }}/$ECR_REPOSITORY:latest
+
+      - name: update lambda image
+        env:
+          FUNCTION_NAME: ${{ env.FUNCTION_NAME }}
+        run: |
+          aws lambda update-function-code \
+              --function-name ${{ inputs.function-name }} \
+              --image-uri ${{ inputs.ecr-registry}}/$ECR_REPOSITORY:latest

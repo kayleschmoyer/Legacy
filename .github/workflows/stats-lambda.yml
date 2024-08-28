@@ -1,4 +1,4 @@
-name: Deploy to ECR
+name: Deploy Stats Lambda
 
 # Controls when the workflow will run
 on:
@@ -9,8 +9,7 @@ on:
       - 'lambdas/stats_lambda/**'
 
 env:
-  AWS_REGION: 'us-east-1'
-  ECR_REPOSITORY: bkrupa/lambdas
+  ECR_REPOSITORY: game-logs-lambda
   IMAGE_TAG: ${{ github.sha }}
 
 # Permission can be added at job level or workflow level
@@ -39,8 +38,6 @@ jobs:
       - name: Setup AWS
         uses: ./.github/workflows/setup-aws
         id: setup-aws
-        with:
-          aws-region: ${{ env.AWS_REGION }}
 
 
       - name: Build docker image

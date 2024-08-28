@@ -4,6 +4,7 @@ inputs:
   aws-region:
     required: true
     type: string
+    default: us-east-1
   certificate-url:
     required: true
     type: string

@@ -19,9 +19,6 @@ package-mode = false
   pytest-cov = "^5.0.0"
   pytest-html = "^4.1.1"
 
-    [tool.poetry.dependencies.pybaseball]
-    git = "https://github.com/jldbc/pybaseball.git"
-
     [tool.poetry.dependencies.career_stats_lambda]
     path = "lambdas/career_stats_lambda"
     develop = true
