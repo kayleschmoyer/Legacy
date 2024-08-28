@@ -39,6 +39,8 @@ jobs:
 
       - name: Setup Python
         uses: ./.github/workflows/setup-python
+        with:
+          include-dev: false
 
       - name: Setup AWS
         uses: ./.github/workflows/setup-aws

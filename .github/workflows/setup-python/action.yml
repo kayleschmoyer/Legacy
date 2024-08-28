@@ -1,5 +1,11 @@
 name: Setup Python
 
+inputs:
+  include-dev:
+    required: true
+    type: boolean
+    default: true
+
 runs:
   using: "composite"
   steps:
@@ -25,9 +31,21 @@ runs:
       id: cached-poetry-dependencies
       with:
         path: .venv
-        key: root-venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+        key: root-venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}-with-dev:${{ inputs.include-dev}}
 
     - name: Install Poetry Dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && 
       shell: bash
       run: poetry install
+
+    - name: Install Poetry Dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && inputs.include-dev
+      shell: bash
+      run: poetry install
+
+    - name: Install Poetry Dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && !inputs.include-dev
+      shell: bash
+      run: poetry install --only main --sync
+
+    
