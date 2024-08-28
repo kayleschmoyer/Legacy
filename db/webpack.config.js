@@ -1,8 +1,8 @@
-import * as path from 'path';
-import * as webpack from 'webpack';
-import * as TerserPlugin from 'terser-webpack-plugin';
+const path = require('path');
+const webpack = require('webpack');
+const TerserPlugin = require('terser-webpack-plugin');
 
-const config: webpack.Configuration = {
+const config = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
@@ -26,7 +26,7 @@ const config: webpack.Configuration = {
     extensions: ['.tsx', '.ts', '.js'],
   },
   plugins: [
-    new webpack.IgnorePlugin({ resourceRegExp: /^pg-native$/}),
+    new webpack.IgnorePlugin({ resourceRegExp: /^pg-native$/ }),
 
     // Omit websocket functionality from postgraphile:
     new webpack.NormalModuleReplacementPlugin(
@@ -56,4 +56,4 @@ const config: webpack.Configuration = {
   },
 };
 
-export default config;
+module.exports=config;

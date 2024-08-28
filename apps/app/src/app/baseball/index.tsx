@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity, View, Modal, TextInput, Alert } from 'react-native';
+import {
+  Text,
+  StyleSheet,
+  ScrollView,
+  ImageBackground,
+  TouchableOpacity,
+  View,
+  Modal,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 
 type RootStackParamList = {
@@ -53,7 +63,10 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
 
       {/* Invite Friends */}
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.gradientButton} onPress={openInviteModal}>
+        <TouchableOpacity
+          style={styles.gradientButton}
+          onPress={openInviteModal}
+        >
           <Text style={styles.buttonText}>Invite Friends</Text>
         </TouchableOpacity>
       </View>
@@ -61,7 +74,10 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       {/* League management section */}
       <Text style={styles.sectionTitle}>Manage Your Leagues</Text>
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.gradientButton} onPress={openDraftModal}>
+        <TouchableOpacity
+          style={styles.gradientButton}
+          onPress={openDraftModal}
+        >
           <Text style={styles.buttonText}>Create New League</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.gradientButton}>
@@ -72,11 +88,31 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       {/* Current Leagues Section */}
       <Text style={styles.sectionTitle}>Your Current Leagues</Text>
       <View style={styles.leagueSection}>
-        <TouchableOpacity onPress={() => navigation.navigate('LeagueHome', { leagueName: 'All-Star League' })}>
-          <Text style={styles.leagueText}><span role="img" aria-label="trophy">🏆</span> All-Star League - 3rd Place</Text>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('LeagueHome', { leagueName: 'All-Star League' })
+          }
+        >
+          <Text style={styles.leagueText}>
+            <span role="img" aria-label="trophy">
+              🏆
+            </span>{' '}
+            All-Star League - 3rd Place
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('LeagueHome', { leagueName: 'Legends Fantasy League' })}>
-          <Text style={styles.leagueText}><span role="img" aria-label="trophy">🏆</span> Legends Fantasy League - 1st Place</Text>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('LeagueHome', {
+              leagueName: 'Legends Fantasy League',
+            })
+          }
+        >
+          <Text style={styles.leagueText}>
+            <span role="img" aria-label="trophy">
+              🏆
+            </span>{' '}
+            Legends Fantasy League - 1st Place
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -90,7 +126,9 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
         <View style={styles.modalContainer}>
           <View style={styles.modalContentDark}>
             <Text style={styles.modalTitle}>Invite Friends</Text>
-            <Text style={styles.modalSubtitle}>Enter an email address or phone number</Text>
+            <Text style={styles.modalSubtitle}>
+              Enter an email address or phone number
+            </Text>
 
             <TextInput
               style={styles.input}
@@ -109,7 +147,10 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={closeInviteModal} style={styles.modalCancelButton}>
+              <TouchableOpacity
+                onPress={closeInviteModal}
+                style={styles.modalCancelButton}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -136,7 +177,10 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
             <TouchableOpacity style={styles.draftButton}>
               <Text style={styles.draftButtonText}>Legacy Draft</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={closeDraftModal} style={styles.closeModalButton}>
+            <TouchableOpacity
+              onPress={closeDraftModal}
+              style={styles.closeModalButton}
+            >
               <Text style={styles.closeModalText}>Close</Text>
             </TouchableOpacity>
           </View>

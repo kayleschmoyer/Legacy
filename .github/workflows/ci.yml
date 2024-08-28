@@ -34,7 +34,6 @@ jobs:
 
       - uses: nrwl/nx-set-shas@v4
 
-      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
       - name: "Lint"
         run: npx nx affected -t lint
       - name: "Build"

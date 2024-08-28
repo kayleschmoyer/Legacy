@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Text, 
-    TextInput, 
-    StyleSheet, 
-    TouchableOpacity, 
-    KeyboardAvoidingView, 
-    Platform,
-    Animated,
-    ActivityIndicator
+import {
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
 
 const Login: React.FC = () => {
@@ -41,12 +41,10 @@ const Login: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      
-
       <Text style={styles.title}>Welcome to Legacy Sports!</Text>
 
       <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
@@ -56,7 +54,7 @@ const Login: React.FC = () => {
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
-          autoCapitalize="none" 
+          autoCapitalize="none"
         />
         <TextInput
           style={styles.input}
@@ -66,18 +64,26 @@ const Login: React.FC = () => {
           onChangeText={setPassword}
         />
 
-        {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
+        {errorMessage ? (
+          <Text style={styles.errorMessage}>{errorMessage}</Text>
+        ) : null}
 
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginButtonText}>Login</Text>
         </TouchableOpacity>
 
-        {isLoading && <ActivityIndicator size="large" color="blue" style={styles.loadingIndicator} />} 
+        {isLoading && (
+          <ActivityIndicator
+            size="large"
+            color="blue"
+            style={styles.loadingIndicator}
+          />
+        )}
 
         <TouchableOpacity style={styles.registerLinkContainer}>
           <Text style={styles.registerLinkText}>
             Don't have an account?{' '}
-            <Text style={styles.registerLink}>Register here</Text> 
+            <Text style={styles.registerLink}>Register here</Text>
           </Text>
         </TouchableOpacity>
       </Animated.View>

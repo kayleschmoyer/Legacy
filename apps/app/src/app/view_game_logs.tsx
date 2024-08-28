@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Button, ScrollView, Text, TextInput } from 'react-native';
-import {Table, Row} from 'react-native-table-component'
+import { Table, Row } from 'react-native-table-component';
 
 export default function ViewGameLogs(): JSX.Element {
   const [player, setPlayer] = React.useState('');
@@ -22,7 +22,6 @@ export default function ViewGameLogs(): JSX.Element {
         body: JSON.stringify({
           game_date: date,
           player_id: player,
-
         }),
       }
     );
@@ -63,8 +62,6 @@ export default function ViewGameLogs(): JSX.Element {
       {data ? (
         <Table>
           <Row data={stats} />
-
-
 
           {Object.keys(data).map((gameId) => (
             <Row key={gameId} data={stats.map((s) => data[gameId][s])}></Row>
