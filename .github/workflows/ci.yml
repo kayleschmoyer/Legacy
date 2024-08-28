@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - apps/**
+      - db/**
+      - lambdas/**
+      - package-lock.json
+      - poetry.lock
   pull_request:
 
 permissions:
