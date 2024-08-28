@@ -60,6 +60,10 @@ jobs:
       - name: Build
         run: npx nx build db
 
+      - name: Make Cache Directory
+        working-directory: db
+        run: mkdir -p dist
+
       - name: Make the Cache
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.setup-aws.outputs.cert-file }}
