@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build:
-    name: Deply Career Stats Lambda
+    name: Deploy Career Stats Lambda
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
