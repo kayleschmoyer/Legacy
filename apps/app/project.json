@@ -6,7 +6,6 @@
   "tags": [],
   "// targets": "to see all targets run: nx show project app --web",
   "targets": {
-    // https://github.com/expo/eas-cli/issues/1300#issuecomment-1681581790
     "build-android": {
       "dependsOn": ["run-android"],
       "executor": "nx:run-commands",

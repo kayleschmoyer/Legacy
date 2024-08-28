@@ -4,9 +4,6 @@
   "private": true,
   "main": "expo-router/entry",
   "dependencies": {
-    "expo": "~51.0.28",
-    "react": "18.2.0",
-    "react-native": "0.74.5"
   },
   "scripts": {
     "eas-build-pre-install": "cd ../../ && node tools/scripts/eas-build-pre-install.mjs . apps/app && cp package-lock.json apps/app",

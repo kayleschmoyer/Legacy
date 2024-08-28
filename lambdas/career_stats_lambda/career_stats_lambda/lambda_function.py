@@ -35,7 +35,7 @@ NUMERIC_STATS: Final = [
 
 
 def read_from_bref(bref_id: str):
-    url = f"https: //www.baseball-reference.com/players/{bref_id[0]}/{bref_id}.shtml#all_standard_fielding"
+    url = f"https://www.baseball-reference.com/players/{bref_id[0]}/{bref_id}.shtml#all_standard_fielding"
     s = session.get(url).content
     # a workaround to avoid beautiful soup applying the wrong encoding
     s = s.decode("utf-8")
