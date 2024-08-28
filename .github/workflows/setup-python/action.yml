@@ -39,12 +39,12 @@ runs:
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && inputs.include-dev }}
+      if: ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && inputs.include-dev == 'true' }}
       shell: bash
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && !inputs.include-dev }}
+      if: ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && inputs.include-dev == 'false' }}
       shell: bash
       run: poetry install --only main --sync
 
