@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Image
+    name: Deploy GraphQL Lambda
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
