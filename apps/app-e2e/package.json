@@ -1,0 +1,11 @@
+{
+  "name": "app-e2e",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "format": "prettier . --write"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

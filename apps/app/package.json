@@ -3,13 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "main": "expo-router/entry",
-  "dependencies": {
-  },
+  "dependencies": {},
   "scripts": {
     "eas-build-pre-install": "cd ../../ && node tools/scripts/eas-build-pre-install.mjs . apps/app && cp package-lock.json apps/app",
     "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/app",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "format": "prettier . --write"
   },
   "devDependencies": {}
 }

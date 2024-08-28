@@ -11,7 +11,7 @@ export function createApplication(dbUsername: string, dbPassword: string): expre
   const app = express();
   // const router = express.Router();
 
-  app.use(cors());
+  
   app.use(express.json());
   // router.use(express.urlencoded({ extended: true }));
 
@@ -30,6 +30,8 @@ export function createApplication(dbUsername: string, dbPassword: string): expre
       }
     )
   );
+
+  app.use(cors());
 
   return app;
 }

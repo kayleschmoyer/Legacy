@@ -8,6 +8,7 @@ on:
     paths:
       - 'db/**'
       - .github/workflows/publish-gql.yml
+  pull_request:
 
 env:
   AWS_REGION: us-east-1
