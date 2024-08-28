@@ -5,8 +5,12 @@ inputs:
     required: true
     type: string
 outputs:
-  ecr-registry: ${{ steps.login-ecr.outputs.registry }}
-  cert-file: ${{ steps.get-certificate-file-name.outputs.value }}
+  ecr-registry: 
+    description: "The ECR registry that was signed in to."
+    value: ${{ steps.login-ecr.outputs.registry }}
+  cert-file: 
+    description: "The file path for the AWS Cert .pem file."
+    value: ${{ steps.get-certificate-file-name.outputs.value }}
 
 env:
   CERTIFICATE_FILE: aws-certs.pem
