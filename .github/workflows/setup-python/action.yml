@@ -37,16 +37,11 @@ runs:
         key: root-venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}-${{ inputs.build-type }}
 
     - name: Install Poetry Dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true' && 
+      if: inputs.build-type == 'development' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       shell: bash
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: ${{ inputs.build-type == 'development' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: poetry install
-
-    - name: Install Poetry Dependencies
-      if: ${{ inputs.build-type == 'deploy' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' }}
+      if: inputs.build-type == 'deploy' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' 
       shell: bash
       run: poetry install --only main --sync
