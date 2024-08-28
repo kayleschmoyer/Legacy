@@ -49,13 +49,3 @@ runs:
         ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.include-dev == 'false' }}
       shell: bash
       run: poetry install --only main --sync
-
-    
-
-      - run: |
-    if echo ${{ steps.cache-venv.outputs.cache-hit }} | grep -c "true"
-    then
-      echo "Cache hit - skipping dependency installation"
-    else
-      poetry install --no-interaction --no-root
-    fi
