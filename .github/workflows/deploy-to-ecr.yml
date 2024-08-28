@@ -29,40 +29,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+      - name: Setup Python
+        uses: ./.github/workflows/setup-python
+
+
+      - name: Setup AWS
+        uses: ./.github/workflows/setup-aws
+        id: setup-aws
         with:
-          role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Sts GetCallerIdentity
-        run: |
-          aws sts get-caller-identity
 
       - name: Build docker image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: ${{ steps.setup-aws.outputs.ecr-registry }}
         run: docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest lambdas/stats_lambda
 
       - name: Push docker image SHA
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: ${{ steps.setup-aws.outputs.ecr-registry }}
         run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Push docker image latest
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: ${{ steps.setup-aws.outputs.ecr-registry }}
         run: docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: update lambda image
         env:
           FUNCTION_NAME: baseball-game-logs
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: ${{ steps.setup-aws.outputs.ecr-registry }}
         run: |
           aws lambda update-function-code \
               --function-name ${FUNCTION_NAME} \

@@ -1,7 +1,6 @@
 import * as path from 'path';
 import * as webpack from 'webpack';
 import * as TerserPlugin from 'terser-webpack-plugin';
-import { options as postgraphileOptions } from './src/postgraphileOptions';
 
 const config: webpack.Configuration = {
   output: {
@@ -27,24 +26,6 @@ const config: webpack.Configuration = {
     extensions: ['.tsx', '.ts', '.js'],
   },
   plugins: [
-    // Prevent loading pg-native (in a weird, backwards kind of way!)
-    // ...[
-    //   new webpack.DefinePlugin({
-    //     'process.env.NODE_ENV': '"production"',
-    //     'process.env.POSTGRAPHILE_ENV': '"production"',
-    //     'process.env.NODE_PG_FORCE_NATIVE': JSON.stringify('1'),
-    //     ...(postgraphileOptions.graphiql
-    //       ? null
-    //       : {
-    //           'process.env.POSTGRAPHILE_OMIT_ASSETS': '"1"',
-    //         }),
-    //   }),
-    //   new webpack.NormalModuleReplacementPlugin(
-    //     /pg\/lib\/native\/index\.js$/,
-    //     '../client.js'
-    //   ),
-    // ],
-
     new webpack.IgnorePlugin({ resourceRegExp: /^pg-native$/}),
 
     // Omit websocket functionality from postgraphile:

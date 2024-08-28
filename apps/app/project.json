@@ -18,8 +18,22 @@
     "run-android": {
       "executor": "@nx/react-native:run-android"
     },
+    "build-ios": {
+      "dependsOn": ["run-ios"],
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/app",
+        "command": "npx react-native build-ios --mode=release"
+      }
+    },
+    "run-ios": {
+      "executor": "@nx/react-native:run-ios"
+    },
     "build": {
-      "dependsOn": ["prebuild", "build-android"]
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo 'Builds will be run in other workers.'"
+      }
     }
   }
 }

@@ -14,17 +14,17 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Cache node_modules
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+      - name: Setup NPM
+        uses: ./.github/workflows/setup-npm
+      
+      - name: Setup Python
+        uses: ./.github/workflows/setup-python
 
-      - run: npm ci --legacy-peer-deps
       - uses: nrwl/nx-set-shas@v4
 
       # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
@@ -34,3 +34,44 @@ jobs:
         run: npx nx affected -t build
       - name: "Test"
         run: npx nx affected -t test
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup NPM
+        uses: ./.github/workflows/setup-npm
+
+      - uses: nrwl/nx-set-shas@v4
+
+      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
+      - name: "Build Image"
+        run: npx nx build-ios app
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '21'
+
+
+      - name: Setup NPM
+        uses: ./.github/workflows/setup-npm
+
+      - uses: nrwl/nx-set-shas@v4
+
+      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
+      - name: "Build Image"
+        run: npx nx build-android app

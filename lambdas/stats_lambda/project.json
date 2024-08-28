@@ -27,7 +27,7 @@
       "executor": "@nxlv/python:build",
       "outputs": ["{projectRoot}/dist"],
       "options": {
-        "outputPath": "stats_lambda/dist",
+        "outputPath": "{projectRoot}/dist",
         "publish": false,
         "lockedVersions": true,
         "bundleLocalDependencies": true

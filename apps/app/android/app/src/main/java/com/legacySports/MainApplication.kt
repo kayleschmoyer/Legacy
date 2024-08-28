@@ -1,4 +1,4 @@
-package com.legacy_sports
+package com.legacySports
 
 import android.app.Application
 import android.content.res.Configuration

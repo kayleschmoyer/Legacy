@@ -1,0 +1,53 @@
+name: Setup AWS
+
+inputs:
+  aws-region:
+    required: true
+    type: string
+outputs:
+  ecr-registry: ${{ steps.login-ecr.outputs.registry }}
+  cert-file: ${{ steps.get-certificate-file-name.outputs.value }}
+
+env:
+  CERTIFICATE_FILE: aws-certs.pem
+  CERTIFICATE_URL: https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem
+  INSTALLED_CERT_LOCATION: /usr/local/share/ca-certificates/aws-certs.crt
+
+runs:
+  using: "composite"
+  steps:
+    - name: configure aws credentials
+      uses: aws-actions/configure-aws-credentials@v1.7.0
+      with:
+        role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
+        role-session-name: GitHub_to_AWS_via_FederatedOIDC
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Sts GetCallerIdentity
+      shell: bash
+      run: aws sts get-caller-identity
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set Certificate File Name
+      id: get-certificate-file-name
+      shell: bash
+      run: echo "value=$(pwd)/${{ env.CERTIFICATE_FILE }}" >> "$GITHUB_OUTPUT" 
+
+    - name: Download AWS Certs
+      shell: bash
+      run: wget -O ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.CERTIFICATE_URL }}
+
+    - name: Install AWS Certs
+      shell: bash
+      run: sudo cp ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.INSTALLED_CERT_LOCATION }}
+
+    - name: Test Cert
+      shell: bash
+      run: openssl x509 -in ${{ env.INSTALLED_CERT_LOCATION }} -text -noout
+
+    - name: Update Certs
+      shell: bash
+      run: sudo VERBOSE=1 update-ca-certificates -v

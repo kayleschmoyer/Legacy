@@ -109,12 +109,12 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.legacy_sports'
+    namespace 'com.legacySports'
     defaultConfig {
         // detox-plugin-default-config
         testBuildType System.getProperty('testBuildType', 'debug')
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        applicationId 'com.legacy_sports'
+        applicationId 'com.legacySports'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

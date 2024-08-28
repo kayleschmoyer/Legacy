@@ -18,6 +18,8 @@ license = "Proprietary"
 readme = "README.md"
 group = { }
 
+  [tool.poetry.dependencies]
+
   [[tool.poetry.packages]]
   include = "stats_lambda"
 

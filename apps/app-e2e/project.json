@@ -6,5 +6,30 @@
   "tags": [],
   "implicitDependencies": ["app"],
   "// targets": "to see all targets run: nx show project app-e2e --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo 'E2E build done in another job.'"
+      }
+    },
+    "test-ios": {
+      "executor": "@nx/detox:test",
+      "options": {
+        "detoxConfiguration": "ios.sim.release"
+      }
+    },
+    "test-android": {
+      "executor": "@nx/detox:test",
+      "options": {
+        "detoxConfiguration": "android.emu.release"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo 'E2E tests are run in separate executors.'"
+      }
+    }
+  }
 }
