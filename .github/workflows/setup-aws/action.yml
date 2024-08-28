@@ -25,6 +25,9 @@ outputs:
   cert-file: 
     description: "The file path for the AWS Cert .pem file."
     value: ${{ steps.get-certificate-file-name.outputs.value }}
+  installed-cert-location:
+    description: "The location that the cert file was installed."
+    value: ${{ inputs.installed-cert-location }}
 
 runs:
   using: "composite"

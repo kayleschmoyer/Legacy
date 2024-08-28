@@ -16,7 +16,6 @@ env:
   AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2
   AWS_VPC_SUBNET_IDS: subnet-0a46f9507bdc73d20,subnet-0534497c68d611afc,subnet-054ba96f45a38e3a2,subnet-031d24899cb105d13,subnet-01f58f22e9ffdfb04,subnet-09314bc89e0a85b16
   DATABASE_SCHEMAS: public
-  INSTALLED_CERT_LOCATION: /usr/local/share/ca-certificates/aws-certs.crt
   POSTGRES_PASSWORD:
   POSTGRES_USERNAME:
   RDS_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
@@ -66,7 +65,7 @@ jobs:
 
       - name: Make the Cache
         env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.setup-aws.outputs.cert-file }}
+          DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.setup-aws.outputs.installed-cert-location }}
         working-directory: db
         run: npm run make-cache
 
