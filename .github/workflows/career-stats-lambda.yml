@@ -47,11 +47,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Create distro directory
-        working-directory: ${{ env.WORKING_DIRECTORY }}
         run: mkdir -p /tmp/dist/${{ env.FUNCTION_NAME }}
 
       - name: Copy dependencies
-        working-directory: ${{ env.WORKING_DIRECTORY }}
         run: cp --recursive .venv/lib/python*/site-packages/* /tmp/dist/${{ env.FUNCTION_NAME }}
       
       - name: Copy source
