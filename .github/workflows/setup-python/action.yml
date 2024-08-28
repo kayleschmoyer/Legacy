@@ -42,11 +42,11 @@ runs:
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.build-type == 'development'
+      if: ${{ inputs.build-type == 'development' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' }}
       shell: bash
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.build-type == 'deploy'
+      if: ${{ inputs.build-type == 'deploy' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' }}
       shell: bash
       run: poetry install --only main --sync
