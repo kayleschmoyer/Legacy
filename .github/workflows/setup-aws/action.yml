@@ -4,6 +4,19 @@ inputs:
   aws-region:
     required: true
     type: string
+  certificate-url:
+    required: true
+    type: string
+    default: https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem
+  certificate-file:
+    required: true
+    type: string
+    default: aws-certs.pem
+  installed-cert-location:
+    required: true
+    type: string
+    default: /usr/local/share/ca-certificates/aws-certs.crt 
+
 outputs:
   ecr-registry: 
     description: "The ECR registry that was signed in to."
@@ -11,11 +24,6 @@ outputs:
   cert-file: 
     description: "The file path for the AWS Cert .pem file."
     value: ${{ steps.get-certificate-file-name.outputs.value }}
-
-env:
-  CERTIFICATE_FILE: aws-certs.pem
-  CERTIFICATE_URL: https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem
-  INSTALLED_CERT_LOCATION: /usr/local/share/ca-certificates/aws-certs.crt
 
 runs:
   using: "composite"
@@ -42,15 +50,15 @@ runs:
 
     - name: Download AWS Certs
       shell: bash
-      run: wget -O ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.CERTIFICATE_URL }}
+      run: wget -O ${{ inputs.certificate-file }} ${{ inputs.certificate-url }}
 
     - name: Install AWS Certs
       shell: bash
-      run: sudo cp ${{ steps.get-certificate-file-name.outputs.value }} ${{ env.INSTALLED_CERT_LOCATION }}
+      run: sudo cp ${{ inputs.certificate-file }} ${{ inputs.installed-cert-location }}
 
     - name: Test Cert
       shell: bash
-      run: openssl x509 -in ${{ env.INSTALLED_CERT_LOCATION }} -text -noout
+      run: openssl x509 -in ${{ inputs.installed-cert-location }} -text -noout
 
     - name: Update Certs
       shell: bash
