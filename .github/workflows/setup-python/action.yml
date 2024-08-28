@@ -1,10 +1,13 @@
 name: Setup Python
 
 inputs:
-  include-dev:
+  build-type:
     required: true
-    type: boolean
-    default: true
+    type: choice
+    options: 
+    - deploy
+    - development
+    default: development
 
 runs:
   using: "composite"
@@ -39,13 +42,11 @@ runs:
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: |
-        ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.include-dev == 'true' }}
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.include-dev == 'development'
       shell: bash
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: |
-        ${{ steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.include-dev == 'false' }}
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'  && inputs.include-dev == 'deploy'
       shell: bash
       run: poetry install --only main --sync

@@ -32,6 +32,8 @@ jobs:
 
       - name: Setup Python
         uses: ./.github/workflows/setup-python
+        with:
+          build-type: deploy
 
 
       - name: Setup AWS

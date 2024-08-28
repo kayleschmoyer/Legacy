@@ -40,7 +40,7 @@ jobs:
       - name: Setup Python
         uses: ./.github/workflows/setup-python
         with:
-          include-dev: false
+          build-type: deploy
 
       - name: Setup AWS
         uses: ./.github/workflows/setup-aws
