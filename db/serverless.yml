@@ -15,9 +15,20 @@ provider:
   name: aws
   runtime: nodejs20.x
   deploymentBucket:
-    name: ${env:AWS_SERVICE_NAME}
+    name: legacy-sports-lambdas
   region: ${env:AWS_REGION}
   stage: ${env:AWS_STAGE}
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Resource:
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1-EDjfvm
+          Action:
+            - secretsmanager:GetResourcePolicy
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DescribeSecret
+            - secretsmanager:ListSecretVersionIds
 
 functions:
   graphql:
@@ -31,12 +42,12 @@ functions:
           integration: lambda-proxy
     vpc:
       securityGroupIds:
-        "Fn::Split":
-          - ","
+        'Fn::Split':
+          - ','
           - ${env:AWS_VPC_SECURITY_GROUP_IDS}
       subnetIds:
-        "Fn::Split":
-          - ","
+        'Fn::Split':
+          - ','
           - ${env:AWS_VPC_SUBNET_IDS}
     environment:
       CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1

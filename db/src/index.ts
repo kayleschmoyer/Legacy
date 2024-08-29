@@ -1,28 +1,30 @@
-import {configure} from '@codegenie/serverless-express'
-import { createApplication} from './app';
+import { configure } from '@codegenie/serverless-express';
+import { createApplication } from './app';
 import { APIGatewayEvent, Context, Callback } from 'aws-lambda';
 import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 
-
-
 async function retrieveSecretParameterValue(
   client: SecretsManagerClient,
-  secret_name: string
+  secret_name: string,
 ): Promise<string | undefined> {
   const response = await client.send(
     new GetSecretValueCommand({
       SecretId: secret_name,
       VersionStage: 'AWSCURRENT', // VersionStage defaults to AWSCURRENT if unspecified
-    })
+    }),
   );
 
   return response.SecretString;
 }
 
-export const handler = async (event: APIGatewayEvent, context: Context, callback: Callback ) => {
+export const handler = async (
+  event: APIGatewayEvent,
+  context: Context,
+  callback: Callback,
+) => {
   console.log(event);
 
   const credsPath = process.env['CREDS_PATH'];
@@ -54,13 +56,11 @@ export const handler = async (event: APIGatewayEvent, context: Context, callback
   console.log('Creating Server');
   const app = createApplication(dbUsername, dbPassword);
 
-  console.log(`postgres://${dbUsername}:****@${process.env['DB_HOST']}:5432/postgres`)
-
   console.log('Proxying Request');
 
   const expressHandler = configure({
     app: app,
-  }); 
+  });
 
   return await expressHandler(event, context, callback);
 };

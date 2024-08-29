@@ -7,16 +7,19 @@ const schemas = process.env.DATABASE_SCHEMAS
   ? process.env.DATABASE_SCHEMAS.split(',')
   : ['public'];
 
-export function createApplication(dbUsername: string, dbPassword: string): express.Application {
+export function createApplication(
+  dbUsername: string,
+  dbPassword: string,
+): express.Application {
   const app = express();
   // const router = express.Router();
 
-  
+  app.use(cors());
   app.use(express.json());
   // router.use(express.urlencoded({ extended: true }));
 
   app.use((req, res, next) => {
-    console.log({req, res});
+    console.log({ req, res });
     next();
   });
 
@@ -27,11 +30,9 @@ export function createApplication(dbUsername: string, dbPassword: string): expre
       {
         ...options,
         readCache: `${__dirname}/postgraphile.cache`,
-      }
-    )
+      },
+    ),
   );
-
-  app.use(cors());
 
   return app;
 }
