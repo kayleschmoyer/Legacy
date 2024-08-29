@@ -5,10 +5,11 @@ import { createGraphiQLFetcher } from '@graphiql/toolkit';
 import { explorerPlugin } from '@graphiql/plugin-explorer';
 import { GraphiQL } from 'graphiql';
 import 'graphiql/graphiql.css';
+import '@graphiql/plugin-explorer/dist/style.css';
 import './main.css';
 
 const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
+  document.getElementById('root') as HTMLElement,
 );
 
 const fetcher = createGraphiQLFetcher({
@@ -20,5 +21,5 @@ const plugins = [explorerPlugin()];
 root.render(
   <StrictMode>
     <GraphiQL fetcher={fetcher} plugins={plugins} />
-  </StrictMode>
+  </StrictMode>,
 );

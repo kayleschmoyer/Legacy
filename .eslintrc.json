@@ -4,6 +4,18 @@
   "plugins": ["@nx"],
   "overrides": [
     {
+      "files": ["*.tsx", "*.jsx"],
+      "rules": {
+        "react/self-closing-comp": [
+          "error",
+          {
+          "component": true,
+          "html": true
+          }
+        ]
+      }
+    },
+    {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
       "rules": {
         "@nx/enforce-module-boundaries": [

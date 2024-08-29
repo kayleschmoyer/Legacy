@@ -2,10 +2,15 @@
   "name": "graphql-explorer",
   "version": "1.0.0",
   "main": "main.tsx",
-  "scripts": {
-    "format": "prettier . --write"
-  },
+  "scripts": {},
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "@graphiql/plugin-explorer": "^3.2.2",
+    "graphiql": "^3.7.1",
+    "graphql": "^15.9.0",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0"
+  }
 }
