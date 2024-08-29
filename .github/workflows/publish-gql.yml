@@ -8,7 +8,6 @@ on:
     paths:
       - 'db/**'
       - .github/workflows/publish-gql.yml
-  pull_request:
 
 env:
   AWS_REGION: us-east-1
@@ -51,15 +50,6 @@ jobs:
             POSTGRES, rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
           parse-json-secrets: true
 
-      - name: Create Serverless Package
-        working-directory: db
-        env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USERNAME }}:${{ env.POSTGRES_PASSWORD }}@${{env.RDS_HOST}}:5432/postgres?ssl=true&sslrootcert=${{ steps.setup-aws.outputs.cert-file }}
-        run: npx serverless package
-
-      - name: Build
-        run: npx nx build db
-
       - name: Make Cache Directory
         working-directory: db
         run: mkdir -p dist
@@ -70,24 +60,8 @@ jobs:
         working-directory: db
         run: npm run make-cache
 
-      - name: Bundle
-        working-directory: db/dist
-        run: find . -type f  -not -name '*.js.map' | zip -Xqr@ ../lambda.zip
-
-      - name: Make Serverless Directory
-        working-directory: db
-        run: mkdir -p .serverless
-
-      - name: Move Zip to Serverless
-        working-directory: db
-        run: mv lambda.zip .serverless/graphql.zip
-
-      - name: Update zip SHA
-        working-directory: db
-        run: |
-          SHA=$(openssl dgst -sha256 -binary .serverless/graphql.zip | openssl enc -base64 | sed -e "s#/#\\\/#g")
-          sed -i "s/\"CodeSha256\": \".*\"/\"CodeSha256\": \"${SHA}\"/g" .serverless/*.json
-
       - name: Deploy Lambda
-        working-directory: db
-        run: npx serverless deploy -p .serverless
+        uses: ./.github/workflows/deploy-serverless-lambda
+        with:
+          name: graphql
+          lambda-directory: db

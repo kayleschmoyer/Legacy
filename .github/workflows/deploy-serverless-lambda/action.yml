@@ -1,0 +1,44 @@
+name: Deploy Serverless Lambda
+
+inputs:
+  lambda-directory:
+    required: true
+    type: string
+  name:
+    required: true
+    type: string
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create Serverless Package
+      working-directory: ${{ inputs.lambda-directory }}
+      shell: bash
+      run: npx serverless package
+
+    - name: LS Serverless dir
+      working-directory: ${{ inputs.lambda-directory }}
+      shell: bash
+      run: ls .serverless
+
+    - name: Build
+      working-directory: ${{ inputs.lambda-directory }}
+      shell: bash
+      run: npx nx build
+
+    - name: Bundle
+      working-directory: ${{ inputs.lambda-directory }}/dist
+      shell: bash
+      run: find . -type f  -not -name '*.js.map' | zip -Xqr@ ../.serverless/${{ inputs.name }}.zip
+
+    - name: Update zip SHA
+      working-directory: ${{ inputs.lambda-directory }}
+      shell: bash
+      run: |
+        SHA=$(openssl dgst -sha256 -binary .serverless/${{ inputs.name }}.zip | openssl enc -base64 | sed -e "s#/#\\\/#g")
+        sed -i "s/\"CodeSha256\": \".*\"/\"CodeSha256\": \"${SHA}\"/g" .serverless/*.json
+
+    - name: Deploy Lambda
+      working-directory: ${{ inputs.lambda-directory }}
+      shell: bash
+      run: npx serverless deploy -p .serverless
