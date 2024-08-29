@@ -1,0 +1,28 @@
+fragment User on User {
+  id
+  email
+  createdAt
+  about
+  isAdmin
+  name
+  username
+}
+
+query GetUserByEmail($email: String!) {
+  userByEmail(email: $email) {
+    ...User
+  }
+}
+
+query GetUserById($id: Int!) {
+  userById(id: $id) {
+    ...User
+  }
+}
+mutation CreateUser($input: CreateUserInput!) {
+  createUser(input: $input) {
+    user {
+      ...User
+    }
+  }
+}

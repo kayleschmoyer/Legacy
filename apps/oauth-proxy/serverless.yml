@@ -1,0 +1,55 @@
+service: ${env:AWS_SERVICE_NAME}
+configValidationMode: error
+
+plugins:
+  - serverless-content-encoding
+
+custom:
+  contentEncoding:
+    minimumCompressionSize: 0
+
+package:
+  individually: true
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  deploymentBucket:
+    name: legacy-sports-lambdas
+  region: ${env:AWS_REGION}
+  stage: ${env:AWS_STAGE}
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Resource:
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/jwt-secret-key-JfEOgt
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/google-oauth-client-secret-Ux78d7
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/oauth-proxy/cookie-secret-I5LUyn
+          Action:
+            - secretsmanager:GetResourcePolicy
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DescribeSecret
+            - secretsmanager:ListSecretVersionIds
+
+functions:
+  oauth-proxy:
+    handler: index.handler # Actual handler substituted in during deploy script
+    timeout: 60 # optional, in seconds, default is 6
+    events:
+      - http:
+          method: post
+          path: auth/google/refresh-token
+          cors: true
+          integration: lambda-proxy
+      - http:
+          method: post
+          path: auth/google
+          cors: true
+          integration: lambda-proxy
+    environment:
+      CLIENT_ID: 1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com
+      CLIENT_SECRET_PATH: dev/google-oauth-client-secret
+      JWT_SECRET_KEY_PATH: dev/jwt-secret-key
+      COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
+      GRAPHQL_HOST: https://gc63i18mdi.execute-api.us-east-1.amazonaws.com/dev/graphql

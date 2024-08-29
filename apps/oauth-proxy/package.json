@@ -1,0 +1,13 @@
+{
+  "name": "@legacy-sports/db",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "webpack",
+    "make-cache": "ts-node src/makeCache",
+    "lint:fix": "eslint --fix",
+    "codegen-db": "graphql-codegen --config codegen.ts"
+  },
+  "private": true,
+  "dependencies": {}
+}

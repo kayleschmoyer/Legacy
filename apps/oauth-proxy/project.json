@@ -1,0 +1,8 @@
+{
+  "name": "oauth-proxy",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/oauth-proxy",
+  "projectType": "application",
+  "tags": [],
+  "targets": {}
+}
