@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
-  Text,
-  StyleSheet,
+  Alert,
+  Modal,
   ScrollView,
-  ImageBackground,
+  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
   View,
-  Modal,
-  TextInput,
-  Alert,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
+import { ImageBackground } from 'expo-image';
 
 type RootStackParamList = {
   LeagueHome: { leagueName: string };
@@ -19,8 +19,6 @@ type RootStackParamList = {
 interface BaseballHomeProps {
   navigation: NavigationProp<RootStackParamList>;
 }
-
-const bannerImage = require('../../../assets/baseball-banner.jpg');
 
 export default function BaseballHome({ navigation }: BaseballHomeProps) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -53,7 +51,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
     <ScrollView contentContainerStyle={styles.container}>
       {/* Hero section */}
       <ImageBackground
-        source={bannerImage}
+        source="baseball-banner.jpg"
         style={styles.bannerImage}
         imageStyle={{ borderRadius: 15, opacity: 0.2 }}
       >

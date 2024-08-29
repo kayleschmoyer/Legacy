@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, ScrollView } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 
 export default function BaseballHome() {
   return (

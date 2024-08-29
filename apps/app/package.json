@@ -2,14 +2,15 @@
   "name": "app",
   "version": "0.0.1",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "src/index.ts",
   "dependencies": {},
   "scripts": {
     "eas-build-pre-install": "cd ../../ && node tools/scripts/eas-build-pre-install.mjs . apps/app && cp package-lock.json apps/app",
     "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/app",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "format": "prettier . --write"
+    "codegen-db": "graphql-codegen --config codegen.ts",
+    "lint:fix": "eslint --fix"
   },
   "devDependencies": {}
 }

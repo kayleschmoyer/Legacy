@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
+  ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
-  Animated,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
 } from 'react-native';
+import { router } from 'expo-router';
+import { useAuthHandlers } from '../common/auth/AuthHooks';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(
+    undefined,
+  );
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -25,19 +26,20 @@ const Login: React.FC = () => {
     }).start();
   }, [fadeAnim]);
 
-  const handleLogin = async () => {
-    setIsLoading(true);
-
-    try {
-      // TODO: Implement authentication logic here
-      console.log('Login successful!');
-      // Navigate to the main app screen after successful login
-    } catch (error) {
-      console.error('Login failed:', error);
-      setErrorMessage('Login failed. Please check your credentials.');
-    } finally {
+  const { googleLogin } = useAuthHandlers({
+    onSuccess: () => {
       setIsLoading(false);
-    }
+      router.navigate('/');
+    },
+    onFailure: (err) => {
+      setIsLoading(false);
+      setErrorMessage(err);
+    },
+  });
+
+  const onLogin = () => {
+    setIsLoading(true);
+    googleLogin();
   };
 
   return (
@@ -48,27 +50,11 @@ const Login: React.FC = () => {
       <Text style={styles.title}>Welcome to Legacy Sports!</Text>
 
       <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
         {errorMessage ? (
           <Text style={styles.errorMessage}>{errorMessage}</Text>
         ) : null}
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+        <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
           <Text style={styles.loginButtonText}>Login</Text>
         </TouchableOpacity>
 
@@ -79,13 +65,6 @@ const Login: React.FC = () => {
             style={styles.loadingIndicator}
           />
         )}
-
-        <TouchableOpacity style={styles.registerLinkContainer}>
-          <Text style={styles.registerLinkText}>
-            Don't have an account?{' '}
-            <Text style={styles.registerLink}>Register here</Text>
-          </Text>
-        </TouchableOpacity>
       </Animated.View>
     </KeyboardAvoidingView>
   );

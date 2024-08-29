@@ -1,16 +1,16 @@
 import React from 'react';
 import {
-  View,
+  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
+  View,
 } from 'react-native';
 import { Link } from 'expo-router';
 
 const sports = [
-  { name: 'Football', route: '/football' },
-  { name: 'Baseball', route: '/baseball' },
+  { name: 'Football', route: 'football' },
+  { name: 'Baseball', route: 'baseball' },
 ];
 
 export default function Home() {

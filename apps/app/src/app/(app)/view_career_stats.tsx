@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Button, ScrollView, Text, TextInput } from 'react-native';
-import { Table, Row } from 'react-native-table-component';
+import { Row, Table } from 'react-native-table-component';
 
 export default function ViewCareerStats(): JSX.Element {
   const [player, setPlayer] = React.useState('');
@@ -20,7 +20,7 @@ export default function ViewCareerStats(): JSX.Element {
         body: JSON.stringify({
           player_id: player,
         }),
-      }
+      },
     );
 
     const result = await response.json();
@@ -31,27 +31,27 @@ export default function ViewCareerStats(): JSX.Element {
     <ScrollView>
       <Text>Retrieve career stats for a player</Text>
 
-      <TextInput value={player} onChangeText={setPlayer}></TextInput>
+      <TextInput value={player} onChangeText={setPlayer} />
       <Button onPress={getGameLog} title="Get Player Data" />
 
       {data?.batting ? (
         <Table>
           <Row data={Object.keys(data.batting)} />
-          <Row data={Object.values(data.batting)}></Row>
+          <Row data={Object.values(data.batting)} />
         </Table>
       ) : null}
 
       {data?.pitching ? (
         <Table>
           <Row data={Object.keys(data.pitching)} />
-          <Row data={Object.values(data.pitching)}></Row>
+          <Row data={Object.values(data.pitching)} />
         </Table>
       ) : null}
 
       {data?.fielding ? (
         <Table>
           <Row data={Object.keys(data.fielding)} />
-          <Row data={Object.values(data.fielding)}></Row>
+          <Row data={Object.values(data.fielding)} />
         </Table>
       ) : null}
     </ScrollView>

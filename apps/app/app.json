@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "App",
-    "slug": "app",
+    "slug": "fantasy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -30,12 +30,25 @@
       "bundler": "metro"
     },
     "plugins": [
+      "expo-font",
+      [
+        "expo-asset",
+        {
+          "assets": ["./assets/*.jpg", "./assets/*.png"]
+        }
+      ],
       "expo-router",
       [
         "@config-plugins/detox",
         {
           "skipProguard": false,
           "subdomains": ["10.0.2.2", "localhost"]
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.legacy-sports-433915"
         }
       ]
     ]
