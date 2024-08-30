@@ -8,8 +8,8 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
-import { useAuthHandlers } from '../common/auth/AuthHooks';
 import { useRouter } from 'expo-router';
+import { useAuthHandlers } from '../common/auth/AuthHooks';
 
 const Login: React.FC = () => {
   const router = useRouter();

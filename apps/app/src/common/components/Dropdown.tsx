@@ -1,14 +1,14 @@
-import { Adapt, FontSizeTokens, Select, Sheet, YStack, getFontSize } from "tamagui"
+import { Adapt, FontSizeTokens, getFontSize, Select, Sheet, YStack } from "tamagui"
 import {Check, ChevronDown, ChevronUp} from '@tamagui/lucide-icons'
 import { LinearGradient } from 'tamagui/linear-gradient'
 
 export interface DropdownItem{
   text: string;
-  value: string | number;
+  value: string;
 }
 
 export interface DropdownProperties{
-  value: string | number;
+  value: string;
   onChange(value: string): void;
   native?: boolean;
   items: readonly Readonly<DropdownItem>[];

@@ -5,8 +5,6 @@ import {
   Form,
   Input,
   Spinner,
-  ThemeParsed,
-  useTheme,
   View,
   XStack,
   YStack,
@@ -22,10 +20,10 @@ import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
 
 const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
-  { text: '6', value: 6 },
-  { text: '8', value: 8 },
-  { text: '10', value: 10 },
-  { text: '12', value: 12 },
+  { text: '6', value: "6" },
+  { text: '8', value: "8" },
+  { text: '10', value: "10" },
+  { text: '12', value:"12" },
 ]);
 
 export interface CreateLeagueModalProps {
@@ -64,8 +62,8 @@ export default function CreateLeagueModal(
     }
   }, [error]);
 
-  const onNumberOfTeamsChanged = (v: number | string) => {
-    const numVal = typeof v === 'number' ? v : parseInt(v, 10);
+  const onNumberOfTeamsChanged = (v: string) => {
+    const numVal = parseInt(v, 10);
 
     if (isNaN(numVal)) {
       return;
@@ -104,7 +102,7 @@ export default function CreateLeagueModal(
                   onChangeText={setLeagueName}
                 />
                 <Dropdown
-                  value={numberOfTeams}
+                  value={numberOfTeams.toString()}
                   onChange={onNumberOfTeamsChanged}
                   items={DROPDOWN_TEAM_COUNT_ITEMS}
                 />

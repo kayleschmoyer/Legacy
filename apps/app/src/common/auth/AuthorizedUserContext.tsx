@@ -1,7 +1,7 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
-import { CurrentUserInfo, useCurrentUserInfo } from './AuthHooks';
 import { Text } from 'react-native';
 import { Redirect } from 'expo-router';
+import { CurrentUserInfo, useCurrentUserInfo } from './AuthHooks';
 import { LoadingPanel } from '../components/LoadingPanel';
 
 export const AUTHORIZED_CONTEXT = createContext<null | CurrentUserInfo>(null);
