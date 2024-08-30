@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import { ImageBackground } from 'expo-image';
+import CreateLeagueModal from '../../../features/leagues/CreateLeagueModeal';
 
 type RootStackParamList = {
   LeagueHome: { leagueName: string };
@@ -27,7 +28,6 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const openDraftModal = () => setModalVisible(true);
-  const closeDraftModal = () => setModalVisible(false);
 
   const openInviteModal = () => setInviteModalVisible(true);
   const closeInviteModal = () => setInviteModalVisible(false);
@@ -157,33 +157,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       </Modal>
 
       {/* Draft Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={closeDraftModal}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContentDark}>
-            <Text style={styles.modalTitle}>Select Draft Type</Text>
-            <TouchableOpacity style={styles.draftButton}>
-              <Text style={styles.draftButtonText}>Blind Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.draftButton}>
-              <Text style={styles.draftButtonText}>Normal Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.draftButton}>
-              <Text style={styles.draftButtonText}>Legacy Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={closeDraftModal}
-              style={styles.closeModalButton}
-            >
-              <Text style={styles.closeModalText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <CreateLeagueModal open={modalVisible} onOpenChange={setModalVisible} />
     </ScrollView>
   );
 }

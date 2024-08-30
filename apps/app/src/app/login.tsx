@@ -8,10 +8,11 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
-import { router } from 'expo-router';
 import { useAuthHandlers } from '../common/auth/AuthHooks';
+import { useRouter } from 'expo-router';
 
 const Login: React.FC = () => {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     undefined,
@@ -29,7 +30,7 @@ const Login: React.FC = () => {
   const { googleLogin } = useAuthHandlers({
     onSuccess: () => {
       setIsLoading(false);
-      router.navigate('/');
+      router.replace('/');
     },
     onFailure: (err) => {
       setIsLoading(false);

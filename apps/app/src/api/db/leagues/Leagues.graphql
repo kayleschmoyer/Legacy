@@ -1,0 +1,43 @@
+fragment League on League {
+  id
+  name
+  owner
+}
+
+fragment LeagueMember on LeagueMember {
+  leagueId
+  permissionLevel
+  teamId
+  userId
+  userByUserId {
+    ...User
+  }
+}
+
+fragment LeaguesWithTeamsAndMembers on League {
+  ...League
+  leagueMembersByLeagueId {
+    nodes {
+      ...LeagueMember
+    }
+  }
+  teamsByLeagueId {
+    nodes {
+      ...Team
+    }
+  }
+}
+
+query GetLeagueById($id: Int!) {
+  leagueById(id: $id) {
+    ...LeaguesWithTeamsAndMembers
+  }
+}
+
+mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
+  createLeagueAndTeams(input: $input) {
+    league {
+      ...LeaguesWithTeamsAndMembers
+    }
+  }
+}

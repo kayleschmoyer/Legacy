@@ -1,20 +1,35 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Drawer } from 'expo-router/drawer';
 import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
   DrawerItem,
-  DrawerItemList,
 } from '@react-navigation/drawer';
 import { Separator } from 'tamagui';
+import { LeagueIdHeader } from './baseball/league/[leagueId]';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
+import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
+
+interface Route {
+  title: string;
+  route: string;
+}
+
+const ROUTES = Object.freeze<Route[]>([
+  { title: 'Home', route: '/' },
+  { title: 'View Game Logs', route: 'view_game_logs' },
+  { title: 'View Career Stats', route: 'view_career_stats' },
+  { title: 'Baseball', route: 'baseball' },
+  { title: 'Football', route: 'football' },
+]);
 
 function CustomDrawerContent(props: DrawerContentComponentProps): JSX.Element {
+  const router = useRouter();
   const { logout } = useAuthHandlers();
 
   const doLogout = () => {
@@ -23,7 +38,14 @@ function CustomDrawerContent(props: DrawerContentComponentProps): JSX.Element {
 
   return (
     <DrawerContentScrollView>
-      <DrawerItemList {...props} />
+      {ROUTES.map((r) => (
+        <DrawerItem
+          key={r.route}
+          label={r.title}
+          onPress={() => router.navigate(r.route)}
+        />
+      ))}
+
       <Separator />
       <DrawerItem label="Logout" onPress={doLogout} />
     </DrawerContentScrollView>
@@ -48,50 +70,24 @@ export default function Layout() {
 
   // This layout can be deferred because it's not the root layout.
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Drawer drawerContent={CustomDrawerContent}>
-        <Drawer.Screen
-          name="index"
-          options={{
-            drawerLabel: 'Home',
-            title: '',
-          }}
-        />
+    <AuthorizedUserContextProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Drawer drawerContent={CustomDrawerContent}>
+          <Drawer.Screen
+            name="index"
+            options={{
+              drawerLabel: 'Home',
+              title: '',
+            }}
+          />
 
-        <Drawer.Screen
-          name="view_game_logs"
-          options={{
-            drawerLabel: 'View Game Logs',
-          }}
-        />
-        <Drawer.Screen
-          name="view_career_stats"
-          options={{
-            drawerLabel: 'View Career Stats',
-          }}
-        />
-
-        <Drawer.Screen
-          name="football/index"
-          options={{
-            drawerLabel: 'Football',
-          }}
-        />
-
-        <Drawer.Screen
-          name="baseball/index"
-          options={{
-            drawerLabel: 'Baseball',
-          }}
-        />
-
-        <Drawer.Screen
-          name="/logout"
-          options={{
-            drawerLabel: 'Logout',
-          }}
-        />
-      </Drawer>
-    </GestureHandlerRootView>
+          <Drawer.Screen name="view_game_logs" />
+          <Drawer.Screen name="view_career_stats" />
+          <Drawer.Screen name="football/index" options={{title: 'Football Home'}} />
+          <Drawer.Screen name="baseball/index" options={{title: 'Baseball Home'}} />
+          <Drawer.Screen name="baseball/league/[leagueId]" options={{ headerTitle: LeagueIdHeader }} />
+        </Drawer>
+      </GestureHandlerRootView>
+    </AuthorizedUserContextProvider>
   );
 }

@@ -7,14 +7,13 @@ import {
   UseGoogleLoginOptionsAuthCodeFlow,
 } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import Toast from 'react-native-toast-message';
 import {
   getGenericPassword,
   resetGenericPassword,
   setGenericPassword,
 } from 'react-native-keychain';
 import { Platform } from 'react-native';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { GoogleJwtContents } from '../../login/GoogleJwtContents';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import {
@@ -131,6 +130,7 @@ async function resetToken(): Promise<void> {
 }
 
 function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
+  const router = useRouter();
   const onSuccess = callbacks?.onSuccess;
   const onFailure = callbacks?.onFailure;
 
@@ -171,7 +171,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     // Clear all secrets
     await resetToken();
 
-    router.navigate('/');
+    router.replace('/');
   }, []);
 
   const googleLogin = useGoogleLogin({

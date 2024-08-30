@@ -1,7 +1,6 @@
 fragment User on User {
   id
   email
-  createdAt
   about
   isAdmin
   name
