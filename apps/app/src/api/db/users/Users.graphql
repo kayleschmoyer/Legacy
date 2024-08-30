@@ -13,6 +13,18 @@ query GetUserByEmail($email: String!) {
   }
 }
 
+query GetLeaguesForUser($id: Int!) {
+  userById(id: $id) {
+    leagueMembersByUserId {
+      nodes {
+        leagueByLeagueId {
+          ...League
+        }
+      }
+    }
+  }
+}
+
 query GetUserById($id: Int!) {
   userById(id: $id) {
     ...User

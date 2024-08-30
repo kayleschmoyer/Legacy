@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import { ImageBackground } from 'expo-image';
+
+import { Link } from 'expo-router';
+import { Spinner } from 'tamagui';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModeal';
+import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { useGetLeaguesForUserQuery } from '../../../api/db/users/Users.generated';
 
 type RootStackParamList = {
   LeagueHome: { leagueName: string };
@@ -26,6 +31,13 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const userInfo = useAuthorizedUserInfo();
+
+  const { data, loading: loadingLeagues } = useGetLeaguesForUserQuery({
+    variables: {
+      id: userInfo.internalInfo.id,
+    },
+  });
 
   const openDraftModal = () => setModalVisible(true);
 
@@ -46,6 +58,8 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       setEmailOrPhone('');
     }, 2000);
   };
+
+  const leagues = data?.userById?.leagueMembersByUserId.nodes;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -86,32 +100,26 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       {/* Current Leagues Section */}
       <Text style={styles.sectionTitle}>Your Current Leagues</Text>
       <View style={styles.leagueSection}>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('LeagueHome', { leagueName: 'All-Star League' })
-          }
-        >
-          <Text style={styles.leagueText}>
-            <span role="img" aria-label="trophy">
-              🏆
-            </span>{' '}
-            All-Star League - 3rd Place
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('LeagueHome', {
-              leagueName: 'Legends Fantasy League',
-            })
-          }
-        >
-          <Text style={styles.leagueText}>
-            <span role="img" aria-label="trophy">
-              🏆
-            </span>{' '}
-            Legends Fantasy League - 1st Place
-          </Text>
-        </TouchableOpacity>
+        {loadingLeagues ? (
+          <Spinner />
+        ) : !leagues ? (
+          <Text>Could not retrieve leagues.</Text>
+        ) : (
+          leagues.map((l) => (
+            <Link
+              href={{
+                pathname: './league/[leagueId]',
+                params: {
+                  leagueId: l?.leagueByLeagueId?.id,
+                },
+              }}
+              asChild={true}
+              key={l?.leagueByLeagueId?.id}
+            >
+              <Text style={styles.leagueText}>{l?.leagueByLeagueId?.name}</Text>
+            </Link>
+          ))
+        )}
       </View>
 
       {/* Invite Friends Modal */}

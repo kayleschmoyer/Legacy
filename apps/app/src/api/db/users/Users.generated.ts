@@ -39,6 +39,39 @@ export type GetUserByEmailSuspenseQueryHookResult = ReturnType<typeof useGetUser
 export type GetUserByEmailQueryResult = Apollo.QueryResult<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>;
 
 /**
+ * __useGetLeaguesForUserQuery__
+ *
+ * To run a query within a React component, call `useGetLeaguesForUserQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeaguesForUserQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeaguesForUserQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetLeaguesForUserQuery(baseOptions: Apollo.QueryHookOptions<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables> & ({ variables: Types.GetLeaguesForUserQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>(Operations.GetLeaguesForUser, options);
+      }
+export function useGetLeaguesForUserLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>(Operations.GetLeaguesForUser, options);
+        }
+export function useGetLeaguesForUserSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>(Operations.GetLeaguesForUser, options);
+        }
+export type GetLeaguesForUserQueryHookResult = ReturnType<typeof useGetLeaguesForUserQuery>;
+export type GetLeaguesForUserLazyQueryHookResult = ReturnType<typeof useGetLeaguesForUserLazyQuery>;
+export type GetLeaguesForUserSuspenseQueryHookResult = ReturnType<typeof useGetLeaguesForUserSuspenseQuery>;
+export type GetLeaguesForUserQueryResult = Apollo.QueryResult<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>;
+
+/**
  * __useGetUserByIdQuery__
  *
  * To run a query within a React component, call `useGetUserByIdQuery` and pass it any options that fit your needs.
