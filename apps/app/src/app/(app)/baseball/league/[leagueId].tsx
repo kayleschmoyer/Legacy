@@ -89,9 +89,9 @@ export default function LeagueId(): JSX.Element {
 
 export function LeagueIdHeader(props: HeaderTitleProps): JSX.Element {
   const { leagueId } = useGlobalSearchParams<{ leagueId: string }>();
-
+  
   const numLeagueId = parseInt(leagueId, 10);
-
+ 
   const { data } = useGetLeagueByIdQuery({
     variables: {
       id: numLeagueId,

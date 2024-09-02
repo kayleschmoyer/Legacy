@@ -1,0 +1,28 @@
+fragment LeagueMessage on LeagueMessage {
+  leagueId
+  messageText
+  timestamp
+  user {
+    id
+    username
+  }
+}
+
+query GetMessagesForLeague(
+  $orderBy: [LeagueMessagesOrderBy!]
+  $condition: LeagueMessageCondition!
+) {
+  leagueMessages(orderBy: $orderBy, condition: $condition) {
+    nodes {
+      ...LeagueMessage
+    }
+  }
+}
+
+mutation SendLeagueMessage($input: CreateLeagueMessageInput!) {
+  createLeagueMessage(input: $input) {
+    leagueMessage {
+      ...LeagueMessage
+    }
+  }
+}
