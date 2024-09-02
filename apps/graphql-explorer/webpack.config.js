@@ -1,8 +1,13 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { NxReactWebpackPlugin } = require('@nx/react/webpack-plugin');
 const { join } = require('path');
+const {EnvironmentPlugin} = require('webpack');
+const { applyBaseConfig } = require('../../webpack.config.base');
+const {config} = require('dotenv');
 
-module.exports = {
+config();
+
+module.exports = applyBaseConfig({
   output: {
     path: join(__dirname, '../../dist/apps/graphql-explorer'),
   },
@@ -10,6 +15,7 @@ module.exports = {
     port: 4200,
   },
   plugins: [
+    new EnvironmentPlugin(['GRAPHQL_HOST']),
     new NxAppWebpackPlugin({
       tsConfig: './tsconfig.app.json',
       compiler: 'babel',
@@ -27,4 +33,4 @@ module.exports = {
       // svgr: false
     }),
   ],
-};
+});

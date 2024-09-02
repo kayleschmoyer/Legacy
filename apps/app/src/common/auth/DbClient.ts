@@ -3,13 +3,11 @@ import {
   InMemoryCache,
   NormalizedCacheObject,
 } from '@apollo/client/core';
+import {getEnvVarRequired} from '@legacy-sports/env-utilities';
 import {
   EnvironmentVariable,
-  getEnvVarRequired,
 } from '../EnvironmentVariables';
 import {
-  CreateUser,
-  GetUserByEmail,
   GetUserById,
   UserFragment,
 } from '../../api/db/graphql.generated';
@@ -34,6 +32,6 @@ export class DbClient {
       },
     });
 
-    return response.data.userById;
+    return response.data.user;
   }
 }

@@ -1,5 +1,4 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
-import { Text } from 'react-native';
 import { Redirect } from 'expo-router';
 import { CurrentUserInfo, useCurrentUserInfo } from './AuthHooks';
 import { LoadingPanel } from '../components/LoadingPanel';

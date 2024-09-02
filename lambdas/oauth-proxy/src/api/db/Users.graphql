@@ -15,7 +15,7 @@ query GetUserByEmail($email: String!) {
 }
 
 query GetUserById($id: Int!) {
-  userById(id: $id) {
+  user(id: $id) {
     ...User
   }
 }

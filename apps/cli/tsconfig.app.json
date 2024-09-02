@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "types": ["node"]
+  },
+  "files": [],
+  "exclude": [
+    "jest.config.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "src/test-setup.ts"
+  ],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "../../lib/bref-client/src/BRefSession.ts"]
+}

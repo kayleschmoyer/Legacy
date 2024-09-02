@@ -34,12 +34,8 @@ jobs:
 
       - uses: nrwl/nx-set-shas@v4
 
-      - name: "Lint"
-        run: npx nx affected -t lint
-      - name: "Build"
-        run: npx nx affected -t build
-      - name: "Test"
-        run: npx nx affected -t test
+      - name: "NX Actions"
+        run: npx nx affected -t lint build test
 
   build-ios:
     if: ${{ vars.BUILD_IOS == 'true' }}

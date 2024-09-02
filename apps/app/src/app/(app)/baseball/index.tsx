@@ -14,7 +14,7 @@ import { ImageBackground } from 'expo-image';
 
 import { Link } from 'expo-router';
 import { Spinner } from 'tamagui';
-import CreateLeagueModal from '../../../features/leagues/CreateLeagueModeal';
+import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetLeaguesForUserQuery } from '../../../api/db/users/Users.generated';
 
@@ -59,7 +59,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
     }, 2000);
   };
 
-  const leagues = data?.userById?.leagueMembersByUserId.nodes;
+  const leagues = data?.user?.leagueMembers.nodes;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -110,13 +110,13 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
               href={{
                 pathname: './league/[leagueId]',
                 params: {
-                  leagueId: l?.leagueByLeagueId?.id,
+                  leagueId: l?.league?.id,
                 },
               }}
               asChild={true}
-              key={l?.leagueByLeagueId?.id}
+              key={l?.league?.id}
             >
-              <Text style={styles.leagueText}>{l?.leagueByLeagueId?.name}</Text>
+              <Text style={styles.leagueText}>{l?.league?.name}</Text>
             </Link>
           ))
         )}

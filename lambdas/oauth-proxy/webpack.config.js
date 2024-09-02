@@ -1,8 +1,9 @@
 const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
+const { applyBaseConfig } = require('../../webpack.config.base');
 
-const config = {
+const config = applyBaseConfig({
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
@@ -46,6 +47,6 @@ const config = {
       }),
     ],
   },
-};
+});
 
 module.exports = config;

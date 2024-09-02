@@ -19,7 +19,7 @@ runs:
       id: cached-npm-dependencies
       with:
         path: node_modules
-        key: root-node_modules-${{ runner.os }}-${{ steps.full-node-version.outputs.version }}-${{ hashFiles('**/package-lock.json') }}
+        key: root-node_modules-${{ runner.os }}-${{ steps.full-node-version.outputs.version }}-${{ hashFiles('package-lock.json') }}
 
     - name: Install NPM Dependencies
       if: steps.cached-npm-dependencies.outputs.cache-hit != 'true'

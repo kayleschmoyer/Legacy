@@ -24,7 +24,7 @@ runs:
     - name: Build
       working-directory: ${{ inputs.lambda-directory }}
       shell: bash
-      run: npx nx build
+      run: npx nx --verbose build
 
     - name: Bundle
       working-directory: ${{ inputs.lambda-directory }}/dist

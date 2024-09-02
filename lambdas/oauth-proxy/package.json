@@ -4,7 +4,6 @@
   "license": "MIT",
   "scripts": {
     "build": "webpack",
-    "make-cache": "ts-node src/makeCache",
     "lint:fix": "eslint --fix",
     "codegen-db": "graphql-codegen --config codegen.ts"
   },

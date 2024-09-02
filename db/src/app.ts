@@ -2,6 +2,12 @@ import * as cors from 'cors';
 import * as express from 'express';
 import postgraphile from 'postgraphile';
 import { options } from './postgraphileOptions';
+import {
+  getEnvVarOptional,
+  getEnvVarRequired,
+} from '@legacy-sports/env-utilities';
+import { EnvironmentVariable } from './Environment';
+import { readFileSync } from 'fs';
 
 const schemas = process.env.DATABASE_SCHEMAS
   ? process.env.DATABASE_SCHEMAS.split(',')
@@ -17,14 +23,32 @@ export function createApplication(
   app.use(cors());
   app.use(express.json());
 
-  app.use((req, res, next) => {
-    console.log({ req, res });
-    next();
-  });
+  app.use(
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      console.log({ req, res });
+      next();
+    },
+  );
+
+  const certFile = getEnvVarOptional(EnvironmentVariable.DB_CERT_LOCATION);
 
   app.use(
     postgraphile(
-      `postgres://${dbUsername}:${dbPassword}@${process.env['DB_HOST']}:5432/postgres`,
+      {
+        user: dbUsername,
+        password: dbPassword,
+        host: getEnvVarRequired(EnvironmentVariable.DB_HOST),
+        ssl:
+          certFile === undefined
+            ? undefined
+            : {
+                ca: readFileSync(certFile).toString(),
+              },
+      },
       schemas,
       {
         ...options,

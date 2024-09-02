@@ -1,0 +1,62 @@
+import htmlParser, { HTMLElement, CommentNode, Node } from 'node-html-parser';
+
+function checkChildrenForTable(
+  node: Node,
+  tableId: string,
+): HTMLElement | null {
+  let table = null;
+
+  if (node instanceof CommentNode) {
+    const commentBody = htmlParser(node.text);
+
+    table = commentBody.getElementById(tableId);
+
+    if (table !== null) {
+      return table;
+    }
+  }
+
+  for (const n of node.childNodes) {
+    table = checkChildrenForTable(n, tableId);
+    if (table !== null) {
+      return table;
+    }
+  }
+
+  return table;
+}
+
+export function getTable(root: HTMLElement, tableId: string): HTMLElement | null {
+  const table = root.getElementById(tableId);
+
+  if (table !== null) {
+    return table;
+  }
+
+  return checkChildrenForTable(root, tableId);
+}
+
+export function getTableFooter(table: HTMLElement): HTMLElement | undefined {
+  return table.getElementsByTagName('tfoot')[0];
+}
+
+export type RowParser<T> = (row: HTMLElement) => T;
+
+export function parseTable<T extends object>(
+  table: HTMLElement | null,
+  parser: RowParser<T>
+): T | null {
+  if (table === null) {
+    return null;
+  }
+
+  const footer = getTableFooter(table);
+  const row = footer?.getElementsByTagName('tr')[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const data = parser(row);
+  return data;
+}

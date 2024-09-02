@@ -14,11 +14,11 @@ import {
 } from 'react-native-keychain';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import {getEnvVarRequired} from '@legacy-sports/env-utilities';
 import { GoogleJwtContents } from '../../login/GoogleJwtContents';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import {
   EnvironmentVariable,
-  getEnvVarRequired,
 } from '../EnvironmentVariables';
 
 export interface AuthHandlers {

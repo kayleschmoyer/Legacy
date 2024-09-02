@@ -4,6 +4,7 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
+
 /**
  * __useGetUserByEmailQuery__
  *
@@ -20,59 +21,22 @@ const defaultOptions = {} as const;
  *   },
  * });
  */
-export function useGetUserByEmailQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  > &
-    (
-      | { variables: Types.GetUserByEmailQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  >(Operations.GetUserByEmail, options);
-}
-export function useGetUserByEmailLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  >(Operations.GetUserByEmail, options);
-}
-export function useGetUserByEmailSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    Types.GetUserByEmailQuery,
-    Types.GetUserByEmailQueryVariables
-  >(Operations.GetUserByEmail, options);
-}
-export type GetUserByEmailQueryHookResult = ReturnType<
-  typeof useGetUserByEmailQuery
->;
-export type GetUserByEmailLazyQueryHookResult = ReturnType<
-  typeof useGetUserByEmailLazyQuery
->;
-export type GetUserByEmailSuspenseQueryHookResult = ReturnType<
-  typeof useGetUserByEmailSuspenseQuery
->;
-export type GetUserByEmailQueryResult = Apollo.QueryResult<
-  Types.GetUserByEmailQuery,
-  Types.GetUserByEmailQueryVariables
->;
+export function useGetUserByEmailQuery(baseOptions: Apollo.QueryHookOptions<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables> & ({ variables: Types.GetUserByEmailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>(Operations.GetUserByEmail, options);
+      }
+export function useGetUserByEmailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>(Operations.GetUserByEmail, options);
+        }
+export function useGetUserByEmailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>(Operations.GetUserByEmail, options);
+        }
+export type GetUserByEmailQueryHookResult = ReturnType<typeof useGetUserByEmailQuery>;
+export type GetUserByEmailLazyQueryHookResult = ReturnType<typeof useGetUserByEmailLazyQuery>;
+export type GetUserByEmailSuspenseQueryHookResult = ReturnType<typeof useGetUserByEmailSuspenseQuery>;
+export type GetUserByEmailQueryResult = Apollo.QueryResult<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>;
 
 /**
  * __useGetUserByIdQuery__
@@ -90,61 +54,23 @@ export type GetUserByEmailQueryResult = Apollo.QueryResult<
  *   },
  * });
  */
-export function useGetUserByIdQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  > &
-    (
-      | { variables: Types.GetUserByIdQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  >(Operations.GetUserById, options);
-}
-export function useGetUserByIdLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  >(Operations.GetUserById, options);
-}
-export function useGetUserByIdSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    Types.GetUserByIdQuery,
-    Types.GetUserByIdQueryVariables
-  >(Operations.GetUserById, options);
-}
+export function useGetUserByIdQuery(baseOptions: Apollo.QueryHookOptions<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables> & ({ variables: Types.GetUserByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>(Operations.GetUserById, options);
+      }
+export function useGetUserByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>(Operations.GetUserById, options);
+        }
+export function useGetUserByIdSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>(Operations.GetUserById, options);
+        }
 export type GetUserByIdQueryHookResult = ReturnType<typeof useGetUserByIdQuery>;
-export type GetUserByIdLazyQueryHookResult = ReturnType<
-  typeof useGetUserByIdLazyQuery
->;
-export type GetUserByIdSuspenseQueryHookResult = ReturnType<
-  typeof useGetUserByIdSuspenseQuery
->;
-export type GetUserByIdQueryResult = Apollo.QueryResult<
-  Types.GetUserByIdQuery,
-  Types.GetUserByIdQueryVariables
->;
-export type CreateUserMutationFn = Apollo.MutationFunction<
-  Types.CreateUserMutation,
-  Types.CreateUserMutationVariables
->;
+export type GetUserByIdLazyQueryHookResult = ReturnType<typeof useGetUserByIdLazyQuery>;
+export type GetUserByIdSuspenseQueryHookResult = ReturnType<typeof useGetUserByIdSuspenseQuery>;
+export type GetUserByIdQueryResult = Apollo.QueryResult<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>;
+export type CreateUserMutationFn = Apollo.MutationFunction<Types.CreateUserMutation, Types.CreateUserMutationVariables>;
 
 /**
  * __useCreateUserMutation__
@@ -163,24 +89,10 @@ export type CreateUserMutationFn = Apollo.MutationFunction<
  *   },
  * });
  */
-export function useCreateUserMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    Types.CreateUserMutation,
-    Types.CreateUserMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    Types.CreateUserMutation,
-    Types.CreateUserMutationVariables
-  >(Operations.CreateUser, options);
-}
-export type CreateUserMutationHookResult = ReturnType<
-  typeof useCreateUserMutation
->;
-export type CreateUserMutationResult =
-  Apollo.MutationResult<Types.CreateUserMutation>;
-export type CreateUserMutationOptions = Apollo.BaseMutationOptions<
-  Types.CreateUserMutation,
-  Types.CreateUserMutationVariables
->;
+export function useCreateUserMutation(baseOptions?: Apollo.MutationHookOptions<Types.CreateUserMutation, Types.CreateUserMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<Types.CreateUserMutation, Types.CreateUserMutationVariables>(Operations.CreateUser, options);
+      }
+export type CreateUserMutationHookResult = ReturnType<typeof useCreateUserMutation>;
+export type CreateUserMutationResult = Apollo.MutationResult<Types.CreateUserMutation>;
+export type CreateUserMutationOptions = Apollo.BaseMutationOptions<Types.CreateUserMutation, Types.CreateUserMutationVariables>;

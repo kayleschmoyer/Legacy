@@ -14,10 +14,10 @@ query GetUserByEmail($email: String!) {
 }
 
 query GetLeaguesForUser($id: Int!) {
-  userById(id: $id) {
-    leagueMembersByUserId {
+  user(id: $id) {
+    leagueMembers {
       nodes {
-        leagueByLeagueId {
+        league {
           ...League
         }
       }
@@ -26,7 +26,7 @@ query GetLeaguesForUser($id: Int!) {
 }
 
 query GetUserById($id: Int!) {
-  userById(id: $id) {
+  user(id: $id) {
     ...User
   }
 }

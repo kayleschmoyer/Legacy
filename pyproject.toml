@@ -14,10 +14,7 @@ package-mode = false
   python = ">=3.9,<3.13"
   bs4 = "^0.0.2"
   pandas = "^2.2.2"
-  pylint = "^3.2.6"
   requests = "^2.32.3"
-  pytest-cov = "^5.0.0"
-  pytest-html = "^4.1.1"
 
     [tool.poetry.dependencies.career_stats_lambda]
     path = "lambdas/career_stats_lambda"
@@ -34,6 +31,9 @@ autopep8 = "^2.3.1"
 black = "^24.8.0"
 poetry-plugin-export = "^1.8.0"
 pytest = "^8.3.2"
+pylint = "^3.2.7"
+pytest-cov = "^5.0.0"
+pytest-html = "^4.1.1"
 
 [build-system]
 requires = [ "poetry-core==1.1.0" ]

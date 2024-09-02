@@ -1,6 +1,7 @@
 import { configure } from '@codegenie/serverless-express';
 import { createApplication } from './app';
 import { APIGatewayEvent, Context, Callback } from 'aws-lambda';
+import {getEnvVarRequired} from '@legacy-sports/env-utilities';
 import {
   GetSecretValueCommand,
   SecretsManagerClient,
@@ -30,16 +31,6 @@ async function retrieveSecretParameterValue(
   }
 
   return response.SecretString;
-}
-
-function getEnvVarRequired(envVar: EnvironmentVariable): string {
-  const value = process.env[envVar];
-
-  if (value === undefined) {
-    throw new Error(`${envVar} is undefined!`);
-  }
-
-  return value;
 }
 
 export const handler = async (

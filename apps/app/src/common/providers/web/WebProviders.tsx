@@ -1,8 +1,8 @@
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { PropsWithChildren } from 'react';
+import {getEnvVarRequired} from '@legacy-sports/env-utilities';
 import {
   EnvironmentVariable,
-  getEnvVarRequired,
 } from '../../EnvironmentVariables';
 
 export function WebProviders({ children }: PropsWithChildren): JSX.Element {

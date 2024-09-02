@@ -19,7 +19,7 @@ function TeamName(props: TeamNameProps): JSX.Element {
   const { team, leagueData, standing } = props;
 
   const owner = useMemo(() => {
-    const member = leagueData.leagueMembersByLeagueId.nodes.find(
+    const member = leagueData.leagueMembers.nodes.find(
       (m) => m?.teamId === team.id,
     );
 
@@ -27,8 +27,8 @@ function TeamName(props: TeamNameProps): JSX.Element {
       return undefined;
     }
 
-    return member.userByUserId?.username;
-  }, [leagueData.leagueMembersByLeagueId, team.id]);
+    return member.user?.username;
+  }, [leagueData.leagueMembers, team.id]);
 
   return (
     <XStack>
@@ -68,7 +68,7 @@ export default function LeagueId(): JSX.Element {
     return <Spinner />;
   }
 
-  const league = data?.leagueById;
+  const league = data?.league;
   if (!league) {
     return <Text>Could not find league with id {leagueId}</Text>;
   }
@@ -77,7 +77,7 @@ export default function LeagueId(): JSX.Element {
     <View alignSelf="center">
       <H3>Standings</H3>
       <YStack maxWidth={500}>
-        {league.teamsByLeagueId.nodes.map((t, idx) =>
+        {league.teams.nodes.map((t, idx) =>
           t ? (
             <TeamName key={t.id} team={t} standing={idx} leagueData={league} />
           ) : null,
@@ -99,7 +99,7 @@ export function LeagueIdHeader(props: HeaderTitleProps): JSX.Element {
     skip: isNaN(numLeagueId),
   });
 
-  return <H3>{data ? data.leagueById?.name : null}</H3>;
+  return <H3>{data ? data.league?.name : null}</H3>;
 }
 
 const styles = StyleSheet.create({

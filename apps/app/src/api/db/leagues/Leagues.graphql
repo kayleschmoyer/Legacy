@@ -9,19 +9,19 @@ fragment LeagueMember on LeagueMember {
   permissionLevel
   teamId
   userId
-  userByUserId {
+  user {
     ...User
   }
 }
 
 fragment LeaguesWithTeamsAndMembers on League {
   ...League
-  leagueMembersByLeagueId {
+  leagueMembers {
     nodes {
       ...LeagueMember
     }
   }
-  teamsByLeagueId {
+  teams {
     nodes {
       ...Team
     }
@@ -29,7 +29,7 @@ fragment LeaguesWithTeamsAndMembers on League {
 }
 
 query GetLeagueById($id: Int!) {
-  leagueById(id: $id) {
+  league(id: $id) {
     ...LeaguesWithTeamsAndMembers
   }
 }

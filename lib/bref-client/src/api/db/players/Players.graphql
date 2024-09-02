@@ -1,0 +1,31 @@
+fragment Player on Player {
+  brefId
+  id
+  name
+}
+
+mutation BulkCreatePlayers($input: CreatePlayersInput!) {
+  createPlayers(input: $input) {
+    players {
+      ...Player
+    }
+  }
+}
+
+query GetPlayerByBrefId($brefId: String!) {
+  playerByBrefId(brefId: $brefId) {
+    ...Player
+  }
+}
+
+query GetAllPlayers($after: Cursor) {
+  players(after: $after) {
+    nodes {
+      ...Player
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
