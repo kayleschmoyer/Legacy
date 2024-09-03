@@ -52,4 +52,4 @@ functions:
       CLIENT_SECRET_PATH: dev/google-oauth-client-secret
       JWT_SECRET_KEY_PATH: dev/jwt-secret-key
       COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
-      GRAPHQL_HOST: https://gc63i18mdi.execute-api.us-east-1.amazonaws.com/dev/graphql
+      GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
