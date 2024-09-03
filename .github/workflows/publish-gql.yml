@@ -18,7 +18,10 @@ env:
   DATABASE_SCHEMAS: public
   POSTGRES_PASSWORD:
   POSTGRES_USERNAME:
-  RDS_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+  # Point to the RDS instance directly during publish
+  DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+
+  
 # Permission can be added at job level or workflow level
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -60,7 +63,7 @@ jobs:
 
       - name: Make the Cache
         env:
-          DB_HOST: ${{env.RDS_HOST}}
+          DB_HOST: ${{env.DB_HOST}}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_USER: ${{ env.POSTGRES_USERNAME }}
           DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}

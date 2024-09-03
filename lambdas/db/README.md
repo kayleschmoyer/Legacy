@@ -6,3 +6,8 @@ https://github.com/nodejs/node-gyp#on-windows -> https://visualstudio.microsoft.
 ```
 Install Visual C++ Build Environment: For Visual Studio 2019 or later, use the Desktop development with C++ workload from Visual Studio Community. For a version older than Visual Studio 2019, install Visual Studio Build Tools with the Visual C++ build tools option.
 ```
+
+
+Connecting to the RDS Proxy:
+https://itnext.io/work-with-aws-rds-proxy-9d7e09668080
+https://forum.serverless.com/t/how-to-configure-database-proxy-rds-in-serverless-yml/11410/2

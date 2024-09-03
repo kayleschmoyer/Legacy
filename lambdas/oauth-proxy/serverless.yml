@@ -34,7 +34,7 @@ provider:
 
 functions:
   proxy:
-    handler: index.handler # Actual handler substituted in during deploy script
+    handler: dist/index.handler # Actual handler substituted in during deploy script
     timeout: 30 # optional, in seconds, default is 6
     events:
       - http:

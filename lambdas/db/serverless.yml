@@ -21,18 +21,28 @@ provider:
   iam:
     role:
       statements:
-        - Effect: 'Allow'
-          Resource:
-            - arn:aws:secretsmanager:us-east-1:176661590736:secret:rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1-EDjfvm
+        - Effect: Allow
           Action:
             - secretsmanager:GetResourcePolicy
             - secretsmanager:GetSecretValue
             - secretsmanager:DescribeSecret
             - secretsmanager:ListSecretVersionIds
+          Resource:
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1-??????
+    
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetRandomPassword
+            - secretsmanager:ListSecrets
+          Resource: "*"
+          
+        - Action: rds-db:connect
+          Resource: "arn:aws:rds-db:us-east-1:176661590736:dbuser:prx-003725417019c48c4/*"
+          Effect: Allow
 
 functions:
   graphql:
-    handler: index.handler # Actual handler substituted in during deploy script
+    handler: dist/index.handler # Actual handler substituted in during deploy script
     timeout: 30 # optional, in seconds, default is 6
     events:
       - http:
@@ -44,14 +54,15 @@ functions:
       securityGroupIds:
         'Fn::Split':
           - ','
-          - ${env:AWS_VPC_SECURITY_GROUP_IDS}
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS, ''}
       subnetIds:
         'Fn::Split':
           - ','
-          - ${env:AWS_VPC_SUBNET_IDS}
+          - ${env:AWS_VPC_SUBNET_IDS, ''}
     environment:
       CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
-      DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
       # DATABASE_URL: ${env:DATABASE_URL}
       # DATABASE_SCHEMAS: ${env:DATABASE_SCHEMAS}
       # JWT_SECRET: ${env:JWT_SECRET}
