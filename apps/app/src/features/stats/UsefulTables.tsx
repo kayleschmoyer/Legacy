@@ -44,7 +44,7 @@ export function PitchingStatsTableWithData(): JSX.Element {
   const { data, loading } = useGetCareerPitchingStatsQuery({
     variables: {
       first: 25,
-      orderBy: CareerPitchingsOrderBy.WDesc,
+      orderBy: CareerPitchingsOrderBy.ErAsc,
     },
   });
 

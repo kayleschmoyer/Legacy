@@ -42,6 +42,7 @@ fragment CareerPitchingStats on CareerPitching {
   bk
   cg
   er
+  era
   g
   gf
   gs
@@ -50,6 +51,7 @@ fragment CareerPitchingStats on CareerPitching {
   hr
   ibb
   l
+  outRate
   outsRecorded
   r
   sho

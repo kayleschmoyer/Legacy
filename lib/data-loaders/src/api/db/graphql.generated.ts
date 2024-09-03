@@ -487,6 +487,7 @@ export type CareerPitching = {
   bk?: Maybe<Scalars['BigInt']['output']>;
   cg?: Maybe<Scalars['BigInt']['output']>;
   er?: Maybe<Scalars['BigInt']['output']>;
+  era?: Maybe<Scalars['BigFloat']['output']>;
   g?: Maybe<Scalars['BigInt']['output']>;
   gf?: Maybe<Scalars['BigInt']['output']>;
   gs?: Maybe<Scalars['BigInt']['output']>;
@@ -495,6 +496,7 @@ export type CareerPitching = {
   hr?: Maybe<Scalars['BigInt']['output']>;
   ibb?: Maybe<Scalars['BigInt']['output']>;
   l?: Maybe<Scalars['BigInt']['output']>;
+  outRate?: Maybe<Scalars['BigInt']['output']>;
   outsRecorded?: Maybe<Scalars['BigInt']['output']>;
   /** Reads a single `Player` that is related to this `CareerPitching`. */
   player?: Maybe<Player>;
@@ -522,6 +524,8 @@ export type CareerPitchingCondition = {
   cg?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `er` field. */
   er?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `era` field. */
+  era?: InputMaybe<Scalars['BigFloat']['input']>;
   /** Checks for equality with the object’s `g` field. */
   g?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `gf` field. */
@@ -538,6 +542,8 @@ export type CareerPitchingCondition = {
   ibb?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `l` field. */
   l?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `outRate` field. */
+  outRate?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `outsRecorded` field. */
   outsRecorded?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `playerId` field. */
@@ -588,6 +594,8 @@ export enum CareerPitchingsOrderBy {
   BkDesc = 'BK_DESC',
   CgAsc = 'CG_ASC',
   CgDesc = 'CG_DESC',
+  EraAsc = 'ERA_ASC',
+  EraDesc = 'ERA_DESC',
   ErAsc = 'ER_ASC',
   ErDesc = 'ER_DESC',
   GfAsc = 'GF_ASC',
@@ -609,6 +617,8 @@ export enum CareerPitchingsOrderBy {
   Natural = 'NATURAL',
   OutsRecordedAsc = 'OUTS_RECORDED_ASC',
   OutsRecordedDesc = 'OUTS_RECORDED_DESC',
+  OutRateAsc = 'OUT_RATE_ASC',
+  OutRateDesc = 'OUT_RATE_DESC',
   PlayerIdAsc = 'PLAYER_ID_ASC',
   PlayerIdDesc = 'PLAYER_ID_DESC',
   RAsc = 'R_ASC',
@@ -5834,13 +5844,14 @@ export type CareerFieldingsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CareerPitchingKeySpecifier = ('battersFaced' | 'bb' | 'bk' | 'cg' | 'er' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hr' | 'ibb' | 'l' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'sho' | 'so' | 'sv' | 'w' | 'wp' | CareerPitchingKeySpecifier)[];
+export type CareerPitchingKeySpecifier = ('battersFaced' | 'bb' | 'bk' | 'cg' | 'er' | 'era' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hr' | 'ibb' | 'l' | 'outRate' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'sho' | 'so' | 'sv' | 'w' | 'wp' | CareerPitchingKeySpecifier)[];
 export type CareerPitchingFieldPolicy = {
 	battersFaced?: FieldPolicy<any> | FieldReadFunction<any>,
 	bb?: FieldPolicy<any> | FieldReadFunction<any>,
 	bk?: FieldPolicy<any> | FieldReadFunction<any>,
 	cg?: FieldPolicy<any> | FieldReadFunction<any>,
 	er?: FieldPolicy<any> | FieldReadFunction<any>,
+	era?: FieldPolicy<any> | FieldReadFunction<any>,
 	g?: FieldPolicy<any> | FieldReadFunction<any>,
 	gf?: FieldPolicy<any> | FieldReadFunction<any>,
 	gs?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -5849,6 +5860,7 @@ export type CareerPitchingFieldPolicy = {
 	hr?: FieldPolicy<any> | FieldReadFunction<any>,
 	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
 	l?: FieldPolicy<any> | FieldReadFunction<any>,
+	outRate?: FieldPolicy<any> | FieldReadFunction<any>,
 	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
 	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerId?: FieldPolicy<any> | FieldReadFunction<any>,

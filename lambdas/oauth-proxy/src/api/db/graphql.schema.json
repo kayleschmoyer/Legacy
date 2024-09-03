@@ -2544,6 +2544,18 @@
             "deprecationReason": null
           },
           {
+            "name": "era",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "BigFloat",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "g",
             "description": null,
             "args": [],
@@ -2629,6 +2641,18 @@
           },
           {
             "name": "l",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "BigInt",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "outRate",
             "description": null,
             "args": [],
             "type": {
@@ -2820,6 +2844,18 @@
             "deprecationReason": null
           },
           {
+            "name": "era",
+            "description": "Checks for equality with the object’s `era` field.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "BigFloat",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "g",
             "description": "Checks for equality with the object’s `g` field.",
             "type": {
@@ -2906,6 +2942,18 @@
           {
             "name": "l",
             "description": "Checks for equality with the object’s `l` field.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "BigInt",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "outRate",
+            "description": "Checks for equality with the object’s `outRate` field.",
             "type": {
               "kind": "SCALAR",
               "name": "BigInt",
@@ -3195,6 +3243,18 @@
             "deprecationReason": null
           },
           {
+            "name": "ERA_ASC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ERA_DESC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "ER_ASC",
             "description": null,
             "isDeprecated": false,
@@ -3316,6 +3376,18 @@
           },
           {
             "name": "OUTS_RECORDED_DESC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "OUT_RATE_ASC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "OUT_RATE_DESC",
             "description": null,
             "isDeprecated": false,
             "deprecationReason": null
