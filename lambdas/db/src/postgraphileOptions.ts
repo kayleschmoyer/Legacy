@@ -33,6 +33,9 @@ export const options: PostGraphileOptions = {
     'routine',
   ],
   showErrorStack: true,
+  graphileBuildOptions: {
+    orderByNullsLast: true,
+  }
 
   // If consuming JWT:
   // jwtSecret: process.env.JWT_SECRET || String(Math.random()),
