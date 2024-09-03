@@ -13,7 +13,7 @@ import {
   GetAllPlayersQuery,
   PlayerFragment,
 } from '../api/db/graphql.generated';
-import {LOGGER} from '@legacy-sports/logging'
+import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
@@ -96,8 +96,6 @@ export async function handleLoadCareerStats(
     } else {
       await loadCareerStats(client, player.brefId);
     }
-
-    break;
   }
 
   LOGGER.info(`Created ${players.length} players`);

@@ -43,10 +43,16 @@ export type Scalars = {
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
   BigFloat: { input: any; output: any; }
+  BigInt: { input: string; output: string; }
   Cursor: { input: string; output: string; }
   Date: { input: any; output: any; }
   Datetime: { input: string; output: string; }
 };
+
+export enum AccessLevel {
+  Admin = 'ADMIN',
+  None = 'NONE'
+}
 
 /** All input for the `bulkUpdateStats` mutation. */
 export type BulkUpdateStatsInput = {
@@ -72,6 +78,516 @@ export type BulkUpdateStatsPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
+
+export type CareerBatting = {
+  __typename?: 'CareerBatting';
+  ab?: Maybe<Scalars['BigInt']['output']>;
+  bb?: Maybe<Scalars['BigInt']['output']>;
+  cs?: Maybe<Scalars['BigInt']['output']>;
+  doubles?: Maybe<Scalars['BigInt']['output']>;
+  g?: Maybe<Scalars['BigInt']['output']>;
+  gidp?: Maybe<Scalars['BigInt']['output']>;
+  h?: Maybe<Scalars['BigInt']['output']>;
+  hbp?: Maybe<Scalars['BigInt']['output']>;
+  hr?: Maybe<Scalars['BigInt']['output']>;
+  ibb?: Maybe<Scalars['BigInt']['output']>;
+  pa?: Maybe<Scalars['BigInt']['output']>;
+  /** Reads a single `Player` that is related to this `CareerBatting`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  r?: Maybe<Scalars['BigInt']['output']>;
+  rbi?: Maybe<Scalars['BigInt']['output']>;
+  sb?: Maybe<Scalars['BigInt']['output']>;
+  sh?: Maybe<Scalars['BigInt']['output']>;
+  so?: Maybe<Scalars['BigInt']['output']>;
+  tb?: Maybe<Scalars['BigInt']['output']>;
+  triples?: Maybe<Scalars['BigInt']['output']>;
+};
+
+/**
+ * A condition to be used against `CareerBatting` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type CareerBattingCondition = {
+  /** Checks for equality with the object’s `ab` field. */
+  ab?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `bb` field. */
+  bb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `cs` field. */
+  cs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `doubles` field. */
+  doubles?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `gidp` field. */
+  gidp?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `h` field. */
+  h?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `hbp` field. */
+  hbp?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `hr` field. */
+  hr?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `ibb` field. */
+  ibb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `pa` field. */
+  pa?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `r` field. */
+  r?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `rbi` field. */
+  rbi?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `sb` field. */
+  sb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `sh` field. */
+  sh?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `so` field. */
+  so?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `tb` field. */
+  tb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `triples` field. */
+  triples?: InputMaybe<Scalars['BigInt']['input']>;
+};
+
+/** A connection to a list of `CareerBatting` values. */
+export type CareerBattingsConnection = {
+  __typename?: 'CareerBattingsConnection';
+  /** A list of edges which contains the `CareerBatting` and cursor to aid in pagination. */
+  edges: Array<CareerBattingsEdge>;
+  /** A list of `CareerBatting` objects. */
+  nodes: Array<Maybe<CareerBatting>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `CareerBatting` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `CareerBatting` edge in the connection. */
+export type CareerBattingsEdge = {
+  __typename?: 'CareerBattingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `CareerBatting` at the end of the edge. */
+  node?: Maybe<CareerBatting>;
+};
+
+/** Methods to use when ordering `CareerBatting`. */
+export enum CareerBattingsOrderBy {
+  AbAsc = 'AB_ASC',
+  AbDesc = 'AB_DESC',
+  BbAsc = 'BB_ASC',
+  BbDesc = 'BB_DESC',
+  CsAsc = 'CS_ASC',
+  CsDesc = 'CS_DESC',
+  DoublesAsc = 'DOUBLES_ASC',
+  DoublesDesc = 'DOUBLES_DESC',
+  GidpAsc = 'GIDP_ASC',
+  GidpDesc = 'GIDP_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  HbpAsc = 'HBP_ASC',
+  HbpDesc = 'HBP_DESC',
+  HrAsc = 'HR_ASC',
+  HrDesc = 'HR_DESC',
+  HAsc = 'H_ASC',
+  HDesc = 'H_DESC',
+  IbbAsc = 'IBB_ASC',
+  IbbDesc = 'IBB_DESC',
+  Natural = 'NATURAL',
+  PaAsc = 'PA_ASC',
+  PaDesc = 'PA_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  RbiAsc = 'RBI_ASC',
+  RbiDesc = 'RBI_DESC',
+  RAsc = 'R_ASC',
+  RDesc = 'R_DESC',
+  SbAsc = 'SB_ASC',
+  SbDesc = 'SB_DESC',
+  ShAsc = 'SH_ASC',
+  ShDesc = 'SH_DESC',
+  SoAsc = 'SO_ASC',
+  SoDesc = 'SO_DESC',
+  TbAsc = 'TB_ASC',
+  TbDesc = 'TB_DESC',
+  TriplesAsc = 'TRIPLES_ASC',
+  TriplesDesc = 'TRIPLES_DESC'
+}
+
+export type CareerFielding = {
+  __typename?: 'CareerFielding';
+  a?: Maybe<Scalars['BigInt']['output']>;
+  cg?: Maybe<Scalars['BigInt']['output']>;
+  chances?: Maybe<Scalars['Float']['output']>;
+  cs?: Maybe<Scalars['BigInt']['output']>;
+  dpDef?: Maybe<Scalars['BigInt']['output']>;
+  eDef?: Maybe<Scalars['BigInt']['output']>;
+  g?: Maybe<Scalars['BigInt']['output']>;
+  gs?: Maybe<Scalars['BigInt']['output']>;
+  innDef?: Maybe<Scalars['Float']['output']>;
+  pickoffs?: Maybe<Scalars['BigInt']['output']>;
+  /** Reads a single `Player` that is related to this `CareerFielding`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  po?: Maybe<Scalars['BigInt']['output']>;
+  pos?: Maybe<Scalars['String']['output']>;
+  sb?: Maybe<Scalars['BigInt']['output']>;
+  wp?: Maybe<Scalars['BigInt']['output']>;
+};
+
+export type CareerFieldingByPo = {
+  __typename?: 'CareerFieldingByPo';
+  a?: Maybe<Scalars['BigInt']['output']>;
+  cg?: Maybe<Scalars['BigInt']['output']>;
+  chances?: Maybe<Scalars['Float']['output']>;
+  cs?: Maybe<Scalars['BigInt']['output']>;
+  dpDef?: Maybe<Scalars['BigInt']['output']>;
+  eDef?: Maybe<Scalars['BigInt']['output']>;
+  g?: Maybe<Scalars['BigInt']['output']>;
+  gs?: Maybe<Scalars['BigInt']['output']>;
+  innDef?: Maybe<Scalars['Float']['output']>;
+  pickoffs?: Maybe<Scalars['BigInt']['output']>;
+  /** Reads a single `Player` that is related to this `CareerFieldingByPo`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  po?: Maybe<Scalars['BigInt']['output']>;
+  pos?: Maybe<Scalars['String']['output']>;
+  sb?: Maybe<Scalars['BigInt']['output']>;
+  wp?: Maybe<Scalars['BigInt']['output']>;
+};
+
+/**
+ * A condition to be used against `CareerFieldingByPo` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type CareerFieldingByPoCondition = {
+  /** Checks for equality with the object’s `a` field. */
+  a?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `cg` field. */
+  cg?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `chances` field. */
+  chances?: InputMaybe<Scalars['Float']['input']>;
+  /** Checks for equality with the object’s `cs` field. */
+  cs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `dpDef` field. */
+  dpDef?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `eDef` field. */
+  eDef?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `gs` field. */
+  gs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `innDef` field. */
+  innDef?: InputMaybe<Scalars['Float']['input']>;
+  /** Checks for equality with the object’s `pickoffs` field. */
+  pickoffs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `po` field. */
+  po?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `pos` field. */
+  pos?: InputMaybe<Scalars['String']['input']>;
+  /** Checks for equality with the object’s `sb` field. */
+  sb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `wp` field. */
+  wp?: InputMaybe<Scalars['BigInt']['input']>;
+};
+
+/** A connection to a list of `CareerFieldingByPo` values. */
+export type CareerFieldingByPosConnection = {
+  __typename?: 'CareerFieldingByPosConnection';
+  /** A list of edges which contains the `CareerFieldingByPo` and cursor to aid in pagination. */
+  edges: Array<CareerFieldingByPosEdge>;
+  /** A list of `CareerFieldingByPo` objects. */
+  nodes: Array<Maybe<CareerFieldingByPo>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `CareerFieldingByPo` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `CareerFieldingByPo` edge in the connection. */
+export type CareerFieldingByPosEdge = {
+  __typename?: 'CareerFieldingByPosEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `CareerFieldingByPo` at the end of the edge. */
+  node?: Maybe<CareerFieldingByPo>;
+};
+
+/** Methods to use when ordering `CareerFieldingByPo`. */
+export enum CareerFieldingByPosOrderBy {
+  AAsc = 'A_ASC',
+  ADesc = 'A_DESC',
+  CgAsc = 'CG_ASC',
+  CgDesc = 'CG_DESC',
+  ChancesAsc = 'CHANCES_ASC',
+  ChancesDesc = 'CHANCES_DESC',
+  CsAsc = 'CS_ASC',
+  CsDesc = 'CS_DESC',
+  DpDefAsc = 'DP_DEF_ASC',
+  DpDefDesc = 'DP_DEF_DESC',
+  EDefAsc = 'E_DEF_ASC',
+  EDefDesc = 'E_DEF_DESC',
+  GsAsc = 'GS_ASC',
+  GsDesc = 'GS_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  InnDefAsc = 'INN_DEF_ASC',
+  InnDefDesc = 'INN_DEF_DESC',
+  Natural = 'NATURAL',
+  PickoffsAsc = 'PICKOFFS_ASC',
+  PickoffsDesc = 'PICKOFFS_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PosAsc = 'POS_ASC',
+  PosDesc = 'POS_DESC',
+  PoAsc = 'PO_ASC',
+  PoDesc = 'PO_DESC',
+  SbAsc = 'SB_ASC',
+  SbDesc = 'SB_DESC',
+  WpAsc = 'WP_ASC',
+  WpDesc = 'WP_DESC'
+}
+
+/**
+ * A condition to be used against `CareerFielding` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type CareerFieldingCondition = {
+  /** Checks for equality with the object’s `a` field. */
+  a?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `cg` field. */
+  cg?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `chances` field. */
+  chances?: InputMaybe<Scalars['Float']['input']>;
+  /** Checks for equality with the object’s `cs` field. */
+  cs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `dpDef` field. */
+  dpDef?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `eDef` field. */
+  eDef?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `gs` field. */
+  gs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `innDef` field. */
+  innDef?: InputMaybe<Scalars['Float']['input']>;
+  /** Checks for equality with the object’s `pickoffs` field. */
+  pickoffs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `po` field. */
+  po?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `pos` field. */
+  pos?: InputMaybe<Scalars['String']['input']>;
+  /** Checks for equality with the object’s `sb` field. */
+  sb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `wp` field. */
+  wp?: InputMaybe<Scalars['BigInt']['input']>;
+};
+
+/** A connection to a list of `CareerFielding` values. */
+export type CareerFieldingsConnection = {
+  __typename?: 'CareerFieldingsConnection';
+  /** A list of edges which contains the `CareerFielding` and cursor to aid in pagination. */
+  edges: Array<CareerFieldingsEdge>;
+  /** A list of `CareerFielding` objects. */
+  nodes: Array<Maybe<CareerFielding>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `CareerFielding` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `CareerFielding` edge in the connection. */
+export type CareerFieldingsEdge = {
+  __typename?: 'CareerFieldingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `CareerFielding` at the end of the edge. */
+  node?: Maybe<CareerFielding>;
+};
+
+/** Methods to use when ordering `CareerFielding`. */
+export enum CareerFieldingsOrderBy {
+  AAsc = 'A_ASC',
+  ADesc = 'A_DESC',
+  CgAsc = 'CG_ASC',
+  CgDesc = 'CG_DESC',
+  ChancesAsc = 'CHANCES_ASC',
+  ChancesDesc = 'CHANCES_DESC',
+  CsAsc = 'CS_ASC',
+  CsDesc = 'CS_DESC',
+  DpDefAsc = 'DP_DEF_ASC',
+  DpDefDesc = 'DP_DEF_DESC',
+  EDefAsc = 'E_DEF_ASC',
+  EDefDesc = 'E_DEF_DESC',
+  GsAsc = 'GS_ASC',
+  GsDesc = 'GS_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  InnDefAsc = 'INN_DEF_ASC',
+  InnDefDesc = 'INN_DEF_DESC',
+  Natural = 'NATURAL',
+  PickoffsAsc = 'PICKOFFS_ASC',
+  PickoffsDesc = 'PICKOFFS_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PosAsc = 'POS_ASC',
+  PosDesc = 'POS_DESC',
+  PoAsc = 'PO_ASC',
+  PoDesc = 'PO_DESC',
+  SbAsc = 'SB_ASC',
+  SbDesc = 'SB_DESC',
+  WpAsc = 'WP_ASC',
+  WpDesc = 'WP_DESC'
+}
+
+export type CareerPitching = {
+  __typename?: 'CareerPitching';
+  battersFaced?: Maybe<Scalars['BigInt']['output']>;
+  bb?: Maybe<Scalars['BigInt']['output']>;
+  bk?: Maybe<Scalars['BigInt']['output']>;
+  cg?: Maybe<Scalars['BigInt']['output']>;
+  er?: Maybe<Scalars['BigInt']['output']>;
+  g?: Maybe<Scalars['BigInt']['output']>;
+  gf?: Maybe<Scalars['BigInt']['output']>;
+  gs?: Maybe<Scalars['BigInt']['output']>;
+  h?: Maybe<Scalars['BigInt']['output']>;
+  hbp?: Maybe<Scalars['BigInt']['output']>;
+  hr?: Maybe<Scalars['BigInt']['output']>;
+  ibb?: Maybe<Scalars['BigInt']['output']>;
+  l?: Maybe<Scalars['BigInt']['output']>;
+  outsRecorded?: Maybe<Scalars['BigInt']['output']>;
+  /** Reads a single `Player` that is related to this `CareerPitching`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  r?: Maybe<Scalars['BigInt']['output']>;
+  sho?: Maybe<Scalars['BigInt']['output']>;
+  so?: Maybe<Scalars['BigInt']['output']>;
+  sv?: Maybe<Scalars['BigInt']['output']>;
+  w?: Maybe<Scalars['BigInt']['output']>;
+  wp?: Maybe<Scalars['BigInt']['output']>;
+};
+
+/**
+ * A condition to be used against `CareerPitching` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type CareerPitchingCondition = {
+  /** Checks for equality with the object’s `battersFaced` field. */
+  battersFaced?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `bb` field. */
+  bb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `bk` field. */
+  bk?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `cg` field. */
+  cg?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `er` field. */
+  er?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `gf` field. */
+  gf?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `gs` field. */
+  gs?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `h` field. */
+  h?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `hbp` field. */
+  hbp?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `hr` field. */
+  hr?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `ibb` field. */
+  ibb?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `l` field. */
+  l?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `outsRecorded` field. */
+  outsRecorded?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `r` field. */
+  r?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `sho` field. */
+  sho?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `so` field. */
+  so?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `sv` field. */
+  sv?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `w` field. */
+  w?: InputMaybe<Scalars['BigInt']['input']>;
+  /** Checks for equality with the object’s `wp` field. */
+  wp?: InputMaybe<Scalars['BigInt']['input']>;
+};
+
+/** A connection to a list of `CareerPitching` values. */
+export type CareerPitchingsConnection = {
+  __typename?: 'CareerPitchingsConnection';
+  /** A list of edges which contains the `CareerPitching` and cursor to aid in pagination. */
+  edges: Array<CareerPitchingsEdge>;
+  /** A list of `CareerPitching` objects. */
+  nodes: Array<Maybe<CareerPitching>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `CareerPitching` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `CareerPitching` edge in the connection. */
+export type CareerPitchingsEdge = {
+  __typename?: 'CareerPitchingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `CareerPitching` at the end of the edge. */
+  node?: Maybe<CareerPitching>;
+};
+
+/** Methods to use when ordering `CareerPitching`. */
+export enum CareerPitchingsOrderBy {
+  BattersFacedAsc = 'BATTERS_FACED_ASC',
+  BattersFacedDesc = 'BATTERS_FACED_DESC',
+  BbAsc = 'BB_ASC',
+  BbDesc = 'BB_DESC',
+  BkAsc = 'BK_ASC',
+  BkDesc = 'BK_DESC',
+  CgAsc = 'CG_ASC',
+  CgDesc = 'CG_DESC',
+  ErAsc = 'ER_ASC',
+  ErDesc = 'ER_DESC',
+  GfAsc = 'GF_ASC',
+  GfDesc = 'GF_DESC',
+  GsAsc = 'GS_ASC',
+  GsDesc = 'GS_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  HbpAsc = 'HBP_ASC',
+  HbpDesc = 'HBP_DESC',
+  HrAsc = 'HR_ASC',
+  HrDesc = 'HR_DESC',
+  HAsc = 'H_ASC',
+  HDesc = 'H_DESC',
+  IbbAsc = 'IBB_ASC',
+  IbbDesc = 'IBB_DESC',
+  LAsc = 'L_ASC',
+  LDesc = 'L_DESC',
+  Natural = 'NATURAL',
+  OutsRecordedAsc = 'OUTS_RECORDED_ASC',
+  OutsRecordedDesc = 'OUTS_RECORDED_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  RAsc = 'R_ASC',
+  RDesc = 'R_DESC',
+  ShoAsc = 'SHO_ASC',
+  ShoDesc = 'SHO_DESC',
+  SoAsc = 'SO_ASC',
+  SoDesc = 'SO_DESC',
+  SvAsc = 'SV_ASC',
+  SvDesc = 'SV_DESC',
+  WpAsc = 'WP_ASC',
+  WpDesc = 'WP_DESC',
+  WAsc = 'W_ASC',
+  WDesc = 'W_DESC'
+}
 
 /** All input for the create `Draft` mutation. */
 export type CreateDraftInput = {
@@ -442,6 +958,8 @@ export type CreateSeasonPitchingPayload = {
    * unchanged and unused. May be used by a client to track mutations.
    */
   clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Player` that is related to this `SeasonPitching`. */
+  player?: Maybe<Player>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** The `SeasonPitching` that was created by this mutation. */
@@ -848,7 +1366,6 @@ export type DeleteSeasonBattingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   season: Scalars['String']['input'];
   team: Scalars['String']['input'];
@@ -897,7 +1414,6 @@ export type DeleteSeasonFieldingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   pos: Scalars['String']['input'];
   season: Scalars['String']['input'];
@@ -947,7 +1463,6 @@ export type DeleteSeasonPitchingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   season: Scalars['String']['input'];
   team: Scalars['String']['input'];
@@ -962,6 +1477,8 @@ export type DeleteSeasonPitchingPayload = {
    */
   clientMutationId?: Maybe<Scalars['String']['output']>;
   deletedSeasonPitchingNodeId?: Maybe<Scalars['ID']['output']>;
+  /** Reads a single `Player` that is related to this `SeasonPitching`. */
+  player?: Maybe<Player>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** The `SeasonPitching` that was deleted by this mutation. */
@@ -2339,14 +2856,68 @@ export type PgAttributesEdge = {
 export type Player = Node & {
   __typename?: 'Player';
   brefId: Scalars['String']['output'];
+  /** Reads and enables pagination through a set of `CareerBatting`. */
+  careerBattings: CareerBattingsConnection;
+  /** Reads and enables pagination through a set of `CareerFieldingByPo`. */
+  careerFieldingByPos: CareerFieldingByPosConnection;
+  /** Reads and enables pagination through a set of `CareerFielding`. */
+  careerFieldings: CareerFieldingsConnection;
+  /** Reads and enables pagination through a set of `CareerPitching`. */
+  careerPitchings: CareerPitchingsConnection;
   id: Scalars['Int']['output'];
-  name?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
   /** Reads and enables pagination through a set of `SeasonBatting`. */
   seasonBattings: SeasonBattingsConnection;
   /** Reads and enables pagination through a set of `SeasonFielding`. */
   seasonFieldings: SeasonFieldingsConnection;
+  /** Reads and enables pagination through a set of `SeasonPitching`. */
+  seasonPitchings: SeasonPitchingsConnection;
+};
+
+
+export type PlayerCareerBattingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerBattingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerBattingsOrderBy>>;
+};
+
+
+export type PlayerCareerFieldingByPosArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerFieldingByPoCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
+};
+
+
+export type PlayerCareerFieldingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerFieldingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerFieldingsOrderBy>>;
+};
+
+
+export type PlayerCareerPitchingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerPitchingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerPitchingsOrderBy>>;
 };
 
 
@@ -2371,6 +2942,17 @@ export type PlayerSeasonFieldingsArgs = {
   orderBy?: InputMaybe<Array<SeasonFieldingsOrderBy>>;
 };
 
+
+export type PlayerSeasonPitchingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<SeasonPitchingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<SeasonPitchingsOrderBy>>;
+};
+
 /** A condition to be used against `Player` object types. All fields are tested for equality and combined with a logical ‘and.’ */
 export type PlayerCondition = {
   /** Checks for equality with the object’s `brefId` field. */
@@ -2385,7 +2967,7 @@ export type PlayerCondition = {
 export type PlayerInput = {
   brefId: Scalars['String']['input'];
   id?: InputMaybe<Scalars['Int']['input']>;
-  name?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
 };
 
 /** Represents an update to a `Player`. Fields that are set will be updated. */
@@ -2433,6 +3015,14 @@ export enum PlayersOrderBy {
 /** The root query type which gives access points into the data universe. */
 export type Query = Node & {
   __typename?: 'Query';
+  /** Reads and enables pagination through a set of `CareerBatting`. */
+  careerBattings?: Maybe<CareerBattingsConnection>;
+  /** Reads and enables pagination through a set of `CareerFieldingByPo`. */
+  careerFieldingByPos?: Maybe<CareerFieldingByPosConnection>;
+  /** Reads and enables pagination through a set of `CareerFielding`. */
+  careerFieldings?: Maybe<CareerFieldingsConnection>;
+  /** Reads and enables pagination through a set of `CareerPitching`. */
+  careerPitchings?: Maybe<CareerPitchingsConnection>;
   draft?: Maybe<Draft>;
   /** Reads a single `Draft` using its globally unique `ID`. */
   draftByNodeId?: Maybe<Draft>;
@@ -2504,6 +3094,56 @@ export type Query = Node & {
   userByUsername?: Maybe<User>;
   /** Reads and enables pagination through a set of `User`. */
   users?: Maybe<UsersConnection>;
+  /** Reads and enables pagination through a set of `UsersInternal`. */
+  usersInternals?: Maybe<UsersInternalsConnection>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryCareerBattingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerBattingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerBattingsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryCareerFieldingByPosArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerFieldingByPoCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryCareerFieldingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerFieldingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerFieldingsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryCareerPitchingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<CareerPitchingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<CareerPitchingsOrderBy>>;
 };
 
 
@@ -2686,7 +3326,6 @@ export type QueryPlayersArgs = {
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonBattingArgs = {
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   season: Scalars['String']['input'];
   team: Scalars['String']['input'];
@@ -2713,7 +3352,6 @@ export type QuerySeasonBattingsArgs = {
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonFieldingArgs = {
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   pos: Scalars['String']['input'];
   season: Scalars['String']['input'];
@@ -2741,7 +3379,6 @@ export type QuerySeasonFieldingsArgs = {
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonPitchingArgs = {
-  lgId: Scalars['String']['input'];
   playerId: Scalars['Int']['input'];
   season: Scalars['String']['input'];
   team: Scalars['String']['input'];
@@ -2832,6 +3469,18 @@ export type QueryUsersArgs = {
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
 };
 
+
+/** The root query type which gives access points into the data universe. */
+export type QueryUsersInternalsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<UsersInternalCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<UsersInternalsOrderBy>>;
+};
+
 export type SeasonBatting = Node & {
   __typename?: 'SeasonBatting';
   ab?: Maybe<Scalars['Int']['output']>;
@@ -2846,7 +3495,7 @@ export type SeasonBatting = Node & {
   hbp?: Maybe<Scalars['Int']['output']>;
   hr?: Maybe<Scalars['Int']['output']>;
   ibb?: Maybe<Scalars['Int']['output']>;
-  lgId: Scalars['String']['output'];
+  lgId?: Maybe<Scalars['String']['output']>;
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
   onbasePerc?: Maybe<Scalars['Float']['output']>;
@@ -2951,7 +3600,7 @@ export type SeasonBattingInput = {
   hbp?: InputMaybe<Scalars['Int']['input']>;
   hr?: InputMaybe<Scalars['Int']['input']>;
   ibb?: InputMaybe<Scalars['Int']['input']>;
-  lgId: Scalars['String']['input'];
+  lgId?: InputMaybe<Scalars['String']['input']>;
   onbasePerc?: InputMaybe<Scalars['Float']['input']>;
   onbasePlusSlugging?: InputMaybe<Scalars['Float']['input']>;
   onbasePlusSluggingPlus?: InputMaybe<Scalars['Float']['input']>;
@@ -3111,7 +3760,7 @@ export type SeasonFielding = Node & {
   gOfParts?: Maybe<Scalars['Int']['output']>;
   gs?: Maybe<Scalars['Int']['output']>;
   innDef?: Maybe<Scalars['Float']['output']>;
-  lgId: Scalars['String']['output'];
+  lgId?: Maybe<Scalars['String']['output']>;
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
   pickoffs?: Maybe<Scalars['Int']['output']>;
@@ -3210,7 +3859,7 @@ export type SeasonFieldingInput = {
   gOfParts?: InputMaybe<Scalars['Int']['input']>;
   gs?: InputMaybe<Scalars['Int']['input']>;
   innDef?: InputMaybe<Scalars['Float']['input']>;
-  lgId: Scalars['String']['input'];
+  lgId?: InputMaybe<Scalars['String']['input']>;
   pickoffs?: InputMaybe<Scalars['Int']['input']>;
   playerId: Scalars['Int']['input'];
   po?: InputMaybe<Scalars['Int']['input']>;
@@ -3365,9 +4014,12 @@ export type SeasonPitching = Node & {
   ibb?: Maybe<Scalars['Int']['output']>;
   ip?: Maybe<Scalars['Float']['output']>;
   l?: Maybe<Scalars['Int']['output']>;
-  lgId: Scalars['String']['output'];
+  lgId?: Maybe<Scalars['String']['output']>;
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
+  outsRecorded?: Maybe<Scalars['Int']['output']>;
+  /** Reads a single `Player` that is related to this `SeasonPitching`. */
+  player?: Maybe<Player>;
   playerId: Scalars['Int']['output'];
   r?: Maybe<Scalars['Int']['output']>;
   season: Scalars['String']['output'];
@@ -3432,6 +4084,8 @@ export type SeasonPitchingCondition = {
   l?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `lgId` field. */
   lgId?: InputMaybe<Scalars['String']['input']>;
+  /** Checks for equality with the object’s `outsRecorded` field. */
+  outsRecorded?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `playerId` field. */
   playerId?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `r` field. */
@@ -3483,7 +4137,8 @@ export type SeasonPitchingInput = {
   ibb?: InputMaybe<Scalars['Int']['input']>;
   ip?: InputMaybe<Scalars['Float']['input']>;
   l?: InputMaybe<Scalars['Int']['input']>;
-  lgId: Scalars['String']['input'];
+  lgId?: InputMaybe<Scalars['String']['input']>;
+  outsRecorded?: InputMaybe<Scalars['Int']['input']>;
   playerId: Scalars['Int']['input'];
   r?: InputMaybe<Scalars['Int']['input']>;
   season: Scalars['String']['input'];
@@ -3523,6 +4178,7 @@ export type SeasonPitchingPatch = {
   ip?: InputMaybe<Scalars['Float']['input']>;
   l?: InputMaybe<Scalars['Int']['input']>;
   lgId?: InputMaybe<Scalars['String']['input']>;
+  outsRecorded?: InputMaybe<Scalars['Int']['input']>;
   playerId?: InputMaybe<Scalars['Int']['input']>;
   r?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['String']['input']>;
@@ -3607,6 +4263,8 @@ export enum SeasonPitchingsOrderBy {
   LAsc = 'L_ASC',
   LDesc = 'L_DESC',
   Natural = 'NATURAL',
+  OutsRecordedAsc = 'OUTS_RECORDED_ASC',
+  OutsRecordedDesc = 'OUTS_RECORDED_DESC',
   PlayerIdAsc = 'PLAYER_ID_ASC',
   PlayerIdDesc = 'PLAYER_ID_DESC',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
@@ -4165,7 +4823,6 @@ export type UpdateSeasonBattingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   /** An object where the defined keys will be set on the `SeasonBatting` being updated. */
   patch: SeasonBattingPatch;
   playerId: Scalars['Int']['input'];
@@ -4217,7 +4874,6 @@ export type UpdateSeasonFieldingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   /** An object where the defined keys will be set on the `SeasonFielding` being updated. */
   patch: SeasonFieldingPatch;
   playerId: Scalars['Int']['input'];
@@ -4270,7 +4926,6 @@ export type UpdateSeasonPitchingInput = {
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  lgId: Scalars['String']['input'];
   /** An object where the defined keys will be set on the `SeasonPitching` being updated. */
   patch: SeasonPitchingPatch;
   playerId: Scalars['Int']['input'];
@@ -4286,6 +4941,8 @@ export type UpdateSeasonPitchingPayload = {
    * unchanged and unused. May be used by a client to track mutations.
    */
   clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Player` that is related to this `SeasonPitching`. */
+  player?: Maybe<Player>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** The `SeasonPitching` that was updated by this mutation. */
@@ -4679,7 +5336,6 @@ export type UpsertSeasonBattingPayloadSeasonBattingEdgeArgs = {
 
 /** Where conditions for the upsert `SeasonBatting` mutation. */
 export type UpsertSeasonBattingWhere = {
-  lgId?: InputMaybe<Scalars['String']['input']>;
   playerId?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -4716,7 +5372,6 @@ export type UpsertSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
 
 /** Where conditions for the upsert `SeasonFielding` mutation. */
 export type UpsertSeasonFieldingWhere = {
-  lgId?: InputMaybe<Scalars['String']['input']>;
   playerId?: InputMaybe<Scalars['Int']['input']>;
   pos?: InputMaybe<Scalars['String']['input']>;
   season?: InputMaybe<Scalars['String']['input']>;
@@ -4736,6 +5391,8 @@ export type UpsertSeasonPitchingPayload = {
   __typename?: 'UpsertSeasonPitchingPayload';
   /** The exact same `clientMutationId` that was provided in the mutation input, unchanged and unused. May be used by a client to track mutations. */
   clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Player` that is related to this `SeasonPitching`. */
+  player?: Maybe<Player>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** The `SeasonPitching` that was upserted by this mutation. */
@@ -4752,7 +5409,6 @@ export type UpsertSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
 
 /** Where conditions for the upsert `SeasonPitching` mutation. */
 export type UpsertSeasonPitchingWhere = {
-  lgId?: InputMaybe<Scalars['String']['input']>;
   playerId?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -4958,6 +5614,64 @@ export type UsersEdge = {
   node?: Maybe<User>;
 };
 
+export type UsersInternal = {
+  __typename?: 'UsersInternal';
+  accessLevel?: Maybe<AccessLevel>;
+  email?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  username?: Maybe<Scalars['String']['output']>;
+};
+
+/**
+ * A condition to be used against `UsersInternal` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type UsersInternalCondition = {
+  /** Checks for equality with the object’s `accessLevel` field. */
+  accessLevel?: InputMaybe<AccessLevel>;
+  /** Checks for equality with the object’s `email` field. */
+  email?: InputMaybe<Scalars['String']['input']>;
+  /** Checks for equality with the object’s `id` field. */
+  id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `username` field. */
+  username?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** A connection to a list of `UsersInternal` values. */
+export type UsersInternalsConnection = {
+  __typename?: 'UsersInternalsConnection';
+  /** A list of edges which contains the `UsersInternal` and cursor to aid in pagination. */
+  edges: Array<UsersInternalsEdge>;
+  /** A list of `UsersInternal` objects. */
+  nodes: Array<Maybe<UsersInternal>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `UsersInternal` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `UsersInternal` edge in the connection. */
+export type UsersInternalsEdge = {
+  __typename?: 'UsersInternalsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `UsersInternal` at the end of the edge. */
+  node?: Maybe<UsersInternal>;
+};
+
+/** Methods to use when ordering `UsersInternal`. */
+export enum UsersInternalsOrderBy {
+  AccessLevelAsc = 'ACCESS_LEVEL_ASC',
+  AccessLevelDesc = 'ACCESS_LEVEL_DESC',
+  EmailAsc = 'EMAIL_ASC',
+  EmailDesc = 'EMAIL_DESC',
+  IdAsc = 'ID_ASC',
+  IdDesc = 'ID_DESC',
+  Natural = 'NATURAL',
+  UsernameAsc = 'USERNAME_ASC',
+  UsernameDesc = 'USERNAME_DESC'
+}
+
 /** Methods to use when ordering `User`. */
 export enum UsersOrderBy {
   AboutAsc = 'ABOUT_ASC',
@@ -4986,6 +5700,140 @@ export type BulkUpdateStatsPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	players?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerBattingKeySpecifier = ('ab' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'pa' | 'player' | 'playerId' | 'r' | 'rbi' | 'sb' | 'sh' | 'so' | 'tb' | 'triples' | CareerBattingKeySpecifier)[];
+export type CareerBattingFieldPolicy = {
+	ab?: FieldPolicy<any> | FieldReadFunction<any>,
+	bb?: FieldPolicy<any> | FieldReadFunction<any>,
+	cs?: FieldPolicy<any> | FieldReadFunction<any>,
+	doubles?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gidp?: FieldPolicy<any> | FieldReadFunction<any>,
+	h?: FieldPolicy<any> | FieldReadFunction<any>,
+	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
+	hr?: FieldPolicy<any> | FieldReadFunction<any>,
+	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
+	pa?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	r?: FieldPolicy<any> | FieldReadFunction<any>,
+	rbi?: FieldPolicy<any> | FieldReadFunction<any>,
+	sb?: FieldPolicy<any> | FieldReadFunction<any>,
+	sh?: FieldPolicy<any> | FieldReadFunction<any>,
+	so?: FieldPolicy<any> | FieldReadFunction<any>,
+	tb?: FieldPolicy<any> | FieldReadFunction<any>,
+	triples?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerBattingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerBattingsConnectionKeySpecifier)[];
+export type CareerBattingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerBattingsEdgeKeySpecifier = ('cursor' | 'node' | CareerBattingsEdgeKeySpecifier)[];
+export type CareerBattingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingKeySpecifier)[];
+export type CareerFieldingFieldPolicy = {
+	a?: FieldPolicy<any> | FieldReadFunction<any>,
+	cg?: FieldPolicy<any> | FieldReadFunction<any>,
+	chances?: FieldPolicy<any> | FieldReadFunction<any>,
+	cs?: FieldPolicy<any> | FieldReadFunction<any>,
+	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gs?: FieldPolicy<any> | FieldReadFunction<any>,
+	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	po?: FieldPolicy<any> | FieldReadFunction<any>,
+	pos?: FieldPolicy<any> | FieldReadFunction<any>,
+	sb?: FieldPolicy<any> | FieldReadFunction<any>,
+	wp?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingByPoKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingByPoKeySpecifier)[];
+export type CareerFieldingByPoFieldPolicy = {
+	a?: FieldPolicy<any> | FieldReadFunction<any>,
+	cg?: FieldPolicy<any> | FieldReadFunction<any>,
+	chances?: FieldPolicy<any> | FieldReadFunction<any>,
+	cs?: FieldPolicy<any> | FieldReadFunction<any>,
+	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gs?: FieldPolicy<any> | FieldReadFunction<any>,
+	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	po?: FieldPolicy<any> | FieldReadFunction<any>,
+	pos?: FieldPolicy<any> | FieldReadFunction<any>,
+	sb?: FieldPolicy<any> | FieldReadFunction<any>,
+	wp?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingByPosConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingByPosConnectionKeySpecifier)[];
+export type CareerFieldingByPosConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingByPosEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingByPosEdgeKeySpecifier)[];
+export type CareerFieldingByPosEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingsConnectionKeySpecifier)[];
+export type CareerFieldingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerFieldingsEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingsEdgeKeySpecifier)[];
+export type CareerFieldingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerPitchingKeySpecifier = ('battersFaced' | 'bb' | 'bk' | 'cg' | 'er' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hr' | 'ibb' | 'l' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'sho' | 'so' | 'sv' | 'w' | 'wp' | CareerPitchingKeySpecifier)[];
+export type CareerPitchingFieldPolicy = {
+	battersFaced?: FieldPolicy<any> | FieldReadFunction<any>,
+	bb?: FieldPolicy<any> | FieldReadFunction<any>,
+	bk?: FieldPolicy<any> | FieldReadFunction<any>,
+	cg?: FieldPolicy<any> | FieldReadFunction<any>,
+	er?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gf?: FieldPolicy<any> | FieldReadFunction<any>,
+	gs?: FieldPolicy<any> | FieldReadFunction<any>,
+	h?: FieldPolicy<any> | FieldReadFunction<any>,
+	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
+	hr?: FieldPolicy<any> | FieldReadFunction<any>,
+	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
+	l?: FieldPolicy<any> | FieldReadFunction<any>,
+	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	r?: FieldPolicy<any> | FieldReadFunction<any>,
+	sho?: FieldPolicy<any> | FieldReadFunction<any>,
+	so?: FieldPolicy<any> | FieldReadFunction<any>,
+	sv?: FieldPolicy<any> | FieldReadFunction<any>,
+	w?: FieldPolicy<any> | FieldReadFunction<any>,
+	wp?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerPitchingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerPitchingsConnectionKeySpecifier)[];
+export type CareerPitchingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CareerPitchingsEdgeKeySpecifier = ('cursor' | 'node' | CareerPitchingsEdgeKeySpecifier)[];
+export type CareerPitchingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type CreateDraftPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftEdge' | 'league' | 'query' | CreateDraftPayloadKeySpecifier)[];
 export type CreateDraftPayloadFieldPolicy = {
@@ -5067,9 +5915,10 @@ export type CreateSeasonFieldingPayloadFieldPolicy = {
 	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CreateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | CreateSeasonPitchingPayloadKeySpecifier)[];
+export type CreateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | CreateSeasonPitchingPayloadKeySpecifier)[];
 export type CreateSeasonPitchingPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
@@ -5164,10 +6013,11 @@ export type DeleteSeasonFieldingPayloadFieldPolicy = {
 	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type DeleteSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'deletedSeasonPitchingNodeId' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | DeleteSeasonPitchingPayloadKeySpecifier)[];
+export type DeleteSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'deletedSeasonPitchingNodeId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | DeleteSeasonPitchingPayloadKeySpecifier)[];
 export type DeleteSeasonPitchingPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletedSeasonPitchingNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
@@ -5441,14 +6291,19 @@ export type PgAttributesEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type PlayerKeySpecifier = ('brefId' | 'id' | 'name' | 'nodeId' | 'seasonBattings' | 'seasonFieldings' | PlayerKeySpecifier)[];
+export type PlayerKeySpecifier = ('brefId' | 'careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'id' | 'name' | 'nodeId' | 'seasonBattings' | 'seasonFieldings' | 'seasonPitchings' | PlayerKeySpecifier)[];
 export type PlayerFieldPolicy = {
 	brefId?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
 	id?: FieldPolicy<any> | FieldReadFunction<any>,
 	name?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>
+	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type PlayersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PlayersConnectionKeySpecifier)[];
 export type PlayersConnectionFieldPolicy = {
@@ -5462,8 +6317,12 @@ export type PlayersEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type QueryKeySpecifier = ('draft' | 'draftByNodeId' | 'draftTeam' | 'draftTeamByDraftIdAndDraftOrder' | 'draftTeamByNodeId' | 'draftTeams' | 'drafts' | 'getColumnsForType' | 'league' | 'leagueByNodeId' | 'leagueMember' | 'leagueMemberByNodeId' | 'leagueMembers' | 'leagueMessage' | 'leagueMessageByNodeId' | 'leagueMessages' | 'leagues' | 'node' | 'nodeId' | 'player' | 'playerByBrefId' | 'playerByNodeId' | 'players' | 'query' | 'seasonBatting' | 'seasonBattingByNodeId' | 'seasonBattings' | 'seasonFielding' | 'seasonFieldingByNodeId' | 'seasonFieldings' | 'seasonPitching' | 'seasonPitchingByNodeId' | 'seasonPitchings' | 'team' | 'teamByIdAndLeagueId' | 'teamByNodeId' | 'teams' | 'user' | 'userByEmail' | 'userByNodeId' | 'userByUsername' | 'users' | QueryKeySpecifier)[];
+export type QueryKeySpecifier = ('careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'draft' | 'draftByNodeId' | 'draftTeam' | 'draftTeamByDraftIdAndDraftOrder' | 'draftTeamByNodeId' | 'draftTeams' | 'drafts' | 'getColumnsForType' | 'league' | 'leagueByNodeId' | 'leagueMember' | 'leagueMemberByNodeId' | 'leagueMembers' | 'leagueMessage' | 'leagueMessageByNodeId' | 'leagueMessages' | 'leagues' | 'node' | 'nodeId' | 'player' | 'playerByBrefId' | 'playerByNodeId' | 'players' | 'query' | 'seasonBatting' | 'seasonBattingByNodeId' | 'seasonBattings' | 'seasonFielding' | 'seasonFieldingByNodeId' | 'seasonFieldings' | 'seasonPitching' | 'seasonPitchingByNodeId' | 'seasonPitchings' | 'team' | 'teamByIdAndLeagueId' | 'teamByNodeId' | 'teams' | 'user' | 'userByEmail' | 'userByNodeId' | 'userByUsername' | 'users' | 'usersInternals' | QueryKeySpecifier)[];
 export type QueryFieldPolicy = {
+	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -5505,7 +6364,8 @@ export type QueryFieldPolicy = {
 	userByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
 	userByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	userByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
-	users?: FieldPolicy<any> | FieldReadFunction<any>
+	users?: FieldPolicy<any> | FieldReadFunction<any>,
+	usersInternals?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type SeasonBattingKeySpecifier = ('ab' | 'awardSummary' | 'battingAvg' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'lgId' | 'nodeId' | 'onbasePerc' | 'onbasePlusSlugging' | 'onbasePlusSluggingPlus' | 'pa' | 'player' | 'playerId' | 'posSeason' | 'r' | 'rbi' | 'sb' | 'season' | 'sf' | 'sh' | 'sluggingPerc' | 'so' | 'tb' | 'team' | 'triples' | SeasonBattingKeySpecifier)[];
 export type SeasonBattingFieldPolicy = {
@@ -5599,7 +6459,7 @@ export type SeasonFieldingsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type SeasonPitchingKeySpecifier = ('awardSummary' | 'basesOnBallsPerNine' | 'battersFaced' | 'bb' | 'bk' | 'cg' | 'earnedRunAvg' | 'earnedRunAvgPlus' | 'er' | 'fip' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hitsPerNine' | 'homeRunsPerNine' | 'hr' | 'ibb' | 'ip' | 'l' | 'lgId' | 'nodeId' | 'playerId' | 'r' | 'season' | 'sho' | 'so' | 'strikeoutsPerBaseOnBalls' | 'strikeoutsPerNine' | 'sv' | 'team' | 'w' | 'whip' | 'winLossPerc' | 'wp' | SeasonPitchingKeySpecifier)[];
+export type SeasonPitchingKeySpecifier = ('awardSummary' | 'basesOnBallsPerNine' | 'battersFaced' | 'bb' | 'bk' | 'cg' | 'earnedRunAvg' | 'earnedRunAvgPlus' | 'er' | 'fip' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hitsPerNine' | 'homeRunsPerNine' | 'hr' | 'ibb' | 'ip' | 'l' | 'lgId' | 'nodeId' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'season' | 'sho' | 'so' | 'strikeoutsPerBaseOnBalls' | 'strikeoutsPerNine' | 'sv' | 'team' | 'w' | 'whip' | 'winLossPerc' | 'wp' | SeasonPitchingKeySpecifier)[];
 export type SeasonPitchingFieldPolicy = {
 	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
 	basesOnBallsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -5624,6 +6484,8 @@ export type SeasonPitchingFieldPolicy = {
 	l?: FieldPolicy<any> | FieldReadFunction<any>,
 	lgId?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
 	r?: FieldPolicy<any> | FieldReadFunction<any>,
 	season?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -5738,9 +6600,10 @@ export type UpdateSeasonFieldingPayloadFieldPolicy = {
 	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpdateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpdateSeasonPitchingPayloadKeySpecifier)[];
+export type UpdateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpdateSeasonPitchingPayloadKeySpecifier)[];
 export type UpdateSeasonPitchingPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
@@ -5827,9 +6690,10 @@ export type UpsertSeasonFieldingPayloadFieldPolicy = {
 	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpsertSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpsertSeasonPitchingPayloadKeySpecifier)[];
+export type UpsertSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpsertSeasonPitchingPayloadKeySpecifier)[];
 export type UpsertSeasonPitchingPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
@@ -5880,10 +6744,77 @@ export type UsersEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
+export type UsersInternalKeySpecifier = ('accessLevel' | 'email' | 'id' | 'username' | UsersInternalKeySpecifier)[];
+export type UsersInternalFieldPolicy = {
+	accessLevel?: FieldPolicy<any> | FieldReadFunction<any>,
+	email?: FieldPolicy<any> | FieldReadFunction<any>,
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	username?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UsersInternalsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | UsersInternalsConnectionKeySpecifier)[];
+export type UsersInternalsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UsersInternalsEdgeKeySpecifier = ('cursor' | 'node' | UsersInternalsEdgeKeySpecifier)[];
+export type UsersInternalsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
 export type StrictTypedTypePolicies = {
 	BulkUpdateStatsPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | BulkUpdateStatsPayloadKeySpecifier | (() => undefined | BulkUpdateStatsPayloadKeySpecifier),
 		fields?: BulkUpdateStatsPayloadFieldPolicy,
+	},
+	CareerBatting?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerBattingKeySpecifier | (() => undefined | CareerBattingKeySpecifier),
+		fields?: CareerBattingFieldPolicy,
+	},
+	CareerBattingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerBattingsConnectionKeySpecifier | (() => undefined | CareerBattingsConnectionKeySpecifier),
+		fields?: CareerBattingsConnectionFieldPolicy,
+	},
+	CareerBattingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerBattingsEdgeKeySpecifier | (() => undefined | CareerBattingsEdgeKeySpecifier),
+		fields?: CareerBattingsEdgeFieldPolicy,
+	},
+	CareerFielding?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingKeySpecifier | (() => undefined | CareerFieldingKeySpecifier),
+		fields?: CareerFieldingFieldPolicy,
+	},
+	CareerFieldingByPo?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPoKeySpecifier | (() => undefined | CareerFieldingByPoKeySpecifier),
+		fields?: CareerFieldingByPoFieldPolicy,
+	},
+	CareerFieldingByPosConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPosConnectionKeySpecifier | (() => undefined | CareerFieldingByPosConnectionKeySpecifier),
+		fields?: CareerFieldingByPosConnectionFieldPolicy,
+	},
+	CareerFieldingByPosEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPosEdgeKeySpecifier | (() => undefined | CareerFieldingByPosEdgeKeySpecifier),
+		fields?: CareerFieldingByPosEdgeFieldPolicy,
+	},
+	CareerFieldingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingsConnectionKeySpecifier | (() => undefined | CareerFieldingsConnectionKeySpecifier),
+		fields?: CareerFieldingsConnectionFieldPolicy,
+	},
+	CareerFieldingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingsEdgeKeySpecifier | (() => undefined | CareerFieldingsEdgeKeySpecifier),
+		fields?: CareerFieldingsEdgeFieldPolicy,
+	},
+	CareerPitching?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerPitchingKeySpecifier | (() => undefined | CareerPitchingKeySpecifier),
+		fields?: CareerPitchingFieldPolicy,
+	},
+	CareerPitchingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerPitchingsConnectionKeySpecifier | (() => undefined | CareerPitchingsConnectionKeySpecifier),
+		fields?: CareerPitchingsConnectionFieldPolicy,
+	},
+	CareerPitchingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerPitchingsEdgeKeySpecifier | (() => undefined | CareerPitchingsEdgeKeySpecifier),
+		fields?: CareerPitchingsEdgeFieldPolicy,
 	},
 	CreateDraftPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CreateDraftPayloadKeySpecifier | (() => undefined | CreateDraftPayloadKeySpecifier),
@@ -6232,6 +7163,18 @@ export type StrictTypedTypePolicies = {
 	UsersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UsersEdgeKeySpecifier | (() => undefined | UsersEdgeKeySpecifier),
 		fields?: UsersEdgeFieldPolicy,
+	},
+	UsersInternal?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UsersInternalKeySpecifier | (() => undefined | UsersInternalKeySpecifier),
+		fields?: UsersInternalFieldPolicy,
+	},
+	UsersInternalsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UsersInternalsConnectionKeySpecifier | (() => undefined | UsersInternalsConnectionKeySpecifier),
+		fields?: UsersInternalsConnectionFieldPolicy,
+	},
+	UsersInternalsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UsersInternalsEdgeKeySpecifier | (() => undefined | UsersInternalsEdgeKeySpecifier),
+		fields?: UsersInternalsEdgeFieldPolicy,
 	}
 };
 export type TypedTypePolicies = StrictTypedTypePolicies & TypePolicies;

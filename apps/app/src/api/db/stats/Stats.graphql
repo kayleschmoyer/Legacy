@@ -1,0 +1,105 @@
+fragment CareerBattingStats on CareerBatting {
+  ab
+  bb
+  cs
+  doubles
+  g
+  gidp
+  h
+  hbp
+  hr
+  ibb
+  pa
+  r
+  rbi
+  sb
+  sh
+  so
+  tb
+  triples
+}
+
+fragment CareerFieldingStats on CareerFielding {
+  a
+  cg
+  chances
+  cs
+  dpDef
+  eDef
+  g
+  gs
+  innDef
+  pickoffs
+  po
+  pos
+  sb
+  wp
+}
+
+fragment CareerPitchingStats on CareerPitching {
+  battersFaced
+  bb
+  bk
+  cg
+  er
+  g
+  gf
+  gs
+  h
+  hbp
+  hr
+  ibb
+  l
+  outsRecorded
+  r
+  sho
+  so
+  sv
+  w
+  wp
+}
+
+fragment CareerBattingStatsWithPlayer on CareerBatting {
+  ...CareerBattingStats
+  player {
+    ...Player
+  }
+}
+
+fragment CareerPitchingStatsWithPlayer on CareerPitching {
+  ...CareerPitchingStats
+  player {
+    ...Player
+  }
+}
+
+fragment CareerFieldingStatsWithPlayer on CareerFielding {
+  ...CareerFieldingStats
+  player {
+    ...Player
+  }
+}
+
+query GetCareerBattingStats($orderBy: [CareerBattingsOrderBy!], $first: Int) {
+  careerBattings(orderBy: $orderBy, first: $first) {
+    nodes {
+      ...CareerBattingStatsWithPlayer
+    }
+  }
+}
+
+query GetCareerFieldingStats($orderBy: [CareerFieldingsOrderBy!], $first: Int) {
+  careerFieldings(orderBy: $orderBy, first: $first) {
+    nodes {
+      ...CareerFieldingStatsWithPlayer
+    }
+  }
+}
+
+query GetCareerPitchingStats($orderBy: [CareerPitchingsOrderBy!], $first: Int) {
+  careerPitchings(orderBy: $orderBy, first: $first) {
+    nodes {
+      ...CareerPitchingStatsWithPlayer
+    }
+  }
+}

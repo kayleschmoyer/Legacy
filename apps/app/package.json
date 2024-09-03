@@ -13,7 +13,7 @@
     "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/app",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "codegen-db": "graphql-codegen --config codegen.ts",
+    "codegen-db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "lint:fix": "eslint --fix"
   },
   "devDependencies": {}

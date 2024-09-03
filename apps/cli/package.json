@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "codegen-db": "graphql-codegen --config codegen.ts"
+    "codegen-db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts"
   },
   "author": "",
   "license": "ISC",

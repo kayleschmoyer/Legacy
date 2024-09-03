@@ -5,7 +5,7 @@
     "tslib": "^2.3.0"
   },
   "scripts": {
-    "codegen-db": "graphql-codegen --config codegen.ts"
+    "codegen-db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts"
   },
   "type": "commonjs",
   "main": "./src/index.ts",
