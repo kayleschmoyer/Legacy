@@ -26,7 +26,7 @@ provider:
 functions:
   load-career:
     handler: dist/load-career.handler # Actual handler substituted in during deploy script
-    timeout: 30 # optional, in seconds, default is 6
+    timeout: 60 # optional, in seconds, default is 6
     events:
       - sqs: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
     environment:
