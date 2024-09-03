@@ -31,7 +31,7 @@ jobs:
   build:
     name: Deploy GraphQL Lambda
     concurrency:
-      group: staging_environment
+      group: ${{ github.workflow }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
 

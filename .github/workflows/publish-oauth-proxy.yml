@@ -23,7 +23,7 @@ jobs:
   build:
     name: Deploy OAuth Proxy Lambda
     concurrency:
-      group: staging_environment
+      group: ${{ github.workflow }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
 
