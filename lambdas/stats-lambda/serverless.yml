@@ -28,6 +28,9 @@ functions:
     handler: dist/load-career.handler # Actual handler substituted in during deploy script
     timeout: 60 # optional, in seconds, default is 6
     events:
-      - sqs: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
+      - sqs: 
+          arn: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
+          maximumConcurrency: 1
+
     environment:
       GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
