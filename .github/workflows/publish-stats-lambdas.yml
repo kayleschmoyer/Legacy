@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'lambdas/stats-lambda'
+      - 'lambdas/stats-lambda/**'
       - .github/workflows/publish-stats-lambda.yml
 
 env:
