@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'db/**'
+      - 'lambdas/db/**'
       - .github/workflows/publish-gql.yml
 
 env:
@@ -51,8 +51,12 @@ jobs:
           parse-json-secrets: true
 
       - name: Make Cache Directory
-        working-directory: db
+        working-directory: lambdas/db
         run: mkdir -p dist
+
+      - name: Echo NX Version
+        working-directory: lambdas/db
+        run: echo $(npx nx --version)
 
       - name: Make the Cache
         env:
@@ -60,11 +64,10 @@ jobs:
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_USER: ${{ env.POSTGRES_USERNAME }}
           DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
-        working-directory: db
+        working-directory: lambdas/db
         run: npm run make-cache
 
       - name: Deploy Lambda
         uses: ./.github/workflows/deploy-serverless-lambda
         with:
-          name: graphql
-          lambda-directory: db
+          lambda-directory: lambdas/db

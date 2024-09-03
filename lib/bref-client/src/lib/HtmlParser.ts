@@ -36,27 +36,13 @@ export function getTable(root: HTMLElement, tableId: string): HTMLElement | null
   return checkChildrenForTable(root, tableId);
 }
 
+export function getTableBody(table: HTMLElement): HTMLElement | undefined {
+  return table.getElementsByTagName('tbody')[0];
+}
+
 export function getTableFooter(table: HTMLElement): HTMLElement | undefined {
   return table.getElementsByTagName('tfoot')[0];
 }
 
-export type RowParser<T> = (row: HTMLElement) => T;
+export type RowParser<T> = (row: HTMLElement) => T | null;
 
-export function parseTable<T extends object>(
-  table: HTMLElement | null,
-  parser: RowParser<T>
-): T | null {
-  if (table === null) {
-    return null;
-  }
-
-  const footer = getTableFooter(table);
-  const row = footer?.getElementsByTagName('tr')[0];
-
-  if (!row) {
-    return null;
-  }
-
-  const data = parser(row);
-  return data;
-}

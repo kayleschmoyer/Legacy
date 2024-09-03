@@ -11,6 +11,7 @@ import {
 } from './api/db/graphql.generated';
 import { sign } from 'jsonwebtoken';
 import { jwtDecode } from 'jwt-decode';
+import { LOGGER } from '@legacy-sports/logging';
 
 export interface LegacySportsJwt {
   id: number;
@@ -105,7 +106,7 @@ async function createUser(
 
     return checkForErrorMutation(response).createUser?.user;
   } catch (err) {
-    console.log('Failed to create user');
+    LOGGER.error('Failed to create user');
     throw err;
   }
 }

@@ -4,5 +4,14 @@
   "sourceRoot": "lambdas/oauth-proxy",
   "projectType": "application",
   "tags": [],
-  "targets": {}
+  "targets": {
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "npx serverless package",
+        "cwd": "lambdas/stats-lambda"
+      }
+    }
+  }
 }

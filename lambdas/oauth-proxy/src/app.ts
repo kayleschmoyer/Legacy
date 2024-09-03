@@ -5,6 +5,7 @@ import * as cookieParser from 'cookie-parser';
 import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 import { getUserJwt } from './Users';
 import fetch from 'cross-fetch';
+import { LOGGER } from '@legacy-sports/logging';
 
 const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
 
@@ -27,7 +28,7 @@ export function createApplication(
   app.use(cookieParser(cookieSecret));
 
   app.use((req, res, next) => {
-    console.log({ req, res });
+    LOGGER.debug({ req, res });
     next();
   });
 

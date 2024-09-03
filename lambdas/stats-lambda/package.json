@@ -1,0 +1,12 @@
+{
+  "name": "@legacy-sports/load-stats-lambda",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "webpack",
+    "lint:fix": "eslint --fix",
+    "codegen-db": "graphql-codegen --config codegen.ts"
+  },
+  "private": true,
+  "dependencies": {}
+}

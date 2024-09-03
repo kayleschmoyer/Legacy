@@ -1,4 +1,3 @@
-
 import { Argv } from 'yargs';
 import {
   ApolloClient,
@@ -6,18 +5,38 @@ import {
   InMemoryCache,
   NormalizedCacheObject,
 } from '@apollo/client';
+import { loadCareerStats } from '@legacy-sports/data-loaders';
+import { BatchHttpLink } from '@apollo/client/link/batch-http';
+import axios from 'axios';
 import {
-  BulkUpdateStats,
-  BulkUpdateStatsInput,
   GetAllPlayers,
   GetAllPlayersQuery,
   PlayerFragment,
 } from '../api/db/graphql.generated';
-import {getCareerStats} from '@legacy-sports/bref-client';
+import {LOGGER} from '@legacy-sports/logging'
+import { getEnvVarRequired } from '@legacy-sports/env-utilities';
+import { EnvironmentVariable } from '../EnvironmentVariable';
 
 export const loadCareerStatsCommandBuilder = (argv: Argv) =>
-  argv.usage('load-career-stats');
+  argv
+    .usage('load-career-stats')
+    .option('remote', {
+      type: 'boolean',
+      default: true,
+    })
+    .demand('remote');
 
+type ArgsType<T> = T extends Argv<infer P> ? P : never;
+
+async function insertIntoSqs(playerId: string): Promise<void> {
+  const sqsHost = getEnvVarRequired(EnvironmentVariable.LOAD_STATS_SQS_HOST);
+
+  await axios.post(sqsHost, { playerId: playerId });
+}
+
+type HandleLoadCareerStatsArgs = ArgsType<
+  ReturnType<typeof loadCareerStatsCommandBuilder>
+>;
 
 async function fetchAllPlayers(
   client: ApolloClient<NormalizedCacheObject>,
@@ -53,45 +72,33 @@ async function fetchAllPlayers(
   return result;
 }
 
-export async function handleLoadCareerStats(): Promise<void> {
-  console.log('Loading Player Stats');
+export async function handleLoadCareerStats(
+  args: HandleLoadCareerStatsArgs,
+): Promise<void> {
+  LOGGER.debug('Loading Player Stats');
+  const gqlHost = getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST);
 
   const client = new ApolloClient({
-    uri: process.env.GRAPHQL_HOST,
+    link: new BatchHttpLink({
+      uri: gqlHost,
+      batchMax: 5,
+      batchInterval: 20,
+    }),
     cache: new InMemoryCache(),
   });
 
   const players = await fetchAllPlayers(client);
 
   for (const player of players) {
-    console.log(`Importing ${player.name}`);
-    const stats = await getCareerStats(player);
-
-    const input: BulkUpdateStatsInput = {
-      battingStats: [],
-      fieldingStats: [],
-      pitchingStats: [],
-    };
-
-    if (stats.batting) {
-      input.battingStats.push(stats.batting);
+    LOGGER.info(`Loading Player ${player.brefId}`);
+    if (args.remote) {
+      await insertIntoSqs(player.brefId);
+    } else {
+      await loadCareerStats(client, player.brefId);
     }
 
-    if (stats.fielding) {
-      input.fieldingStats.push(stats.fielding);
-    }
-
-    if (stats.pitching) {
-      input.pitchingStats.push(stats.pitching);
-    }
-
-    await client.mutate({
-      mutation: BulkUpdateStats,
-      variables: {
-        input: input,
-      },
-    });
+    break;
   }
 
-  console.log(`Created ${players.length} players`);
+  LOGGER.info(`Created ${players.length} players`);
 }

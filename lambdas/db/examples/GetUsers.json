@@ -1,0 +1,3 @@
+{
+  "query": "query Users{allUsers{nodes{username}}}"
+}

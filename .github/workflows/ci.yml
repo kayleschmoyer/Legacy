@@ -7,8 +7,8 @@ on:
       - main
     paths:
       - apps/**
-      - db/**
       - lambdas/**
+      - lib/**
       - package-lock.json
       - poetry.lock
   pull_request:

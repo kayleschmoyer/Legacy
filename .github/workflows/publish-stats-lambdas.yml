@@ -1,0 +1,48 @@
+name: Publish Load Stats Lambda
+
+# Controls when the workflow will run
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lambdas/stats-lambda'
+      - .github/workflows/publish-stats-lambda.yml
+
+env:
+  AWS_REGION: us-east-1
+  AWS_SERVICE_NAME: legacy-sports-stats-lambda
+  AWS_STAGE: dev
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  build:
+    name: Deploy Load Stats Lambda
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup NPM
+        uses: ./.github/workflows/setup-npm
+
+      - name: Setup AWS
+        uses: ./.github/workflows/setup-aws
+        id: setup-aws
+
+      - name: Make Cache Directory
+        working-directory: lambdas/stats-lambda
+        run: mkdir -p dist
+
+      - name: Deploy Lambda
+        uses: ./.github/workflows/deploy-serverless-lambda
+        with:
+          lambda-directory: lambdas/stats-lambda

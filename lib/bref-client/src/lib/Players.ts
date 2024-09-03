@@ -1,5 +1,6 @@
 import htmlParser from 'node-html-parser';
 import {getPlayers as getPlayersFromBref} from './BRefSession';
+import { LOGGER } from '@legacy-sports/logging';
 
 
 const BREF_CODE_GROUP = 'brefId';
@@ -36,8 +37,8 @@ export async function getPlayers(letter: Letter): Promise<PlayerInfo[]>{
       const brefCode = match?.groups ? match.groups[BREF_CODE_GROUP] : null;
 
       if (brefCode === null) {
-        console.error(`Could Not Match`);
-        console.log({
+        LOGGER.error(`Could Not Match`);
+        LOGGER.debug({
           href: anchor.getAttribute('href'),
           regex: BREF_URL_REGEX,
         });

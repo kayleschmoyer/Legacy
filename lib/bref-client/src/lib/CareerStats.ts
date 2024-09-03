@@ -1,83 +1,90 @@
-import { getTable, getTableFooter, parseTable } from "./HtmlParser";
-import htmlParser, {HTMLElement} from 'node-html-parser'
-import {getCareerStats as getCareerStatsFromBref} from './BRefSession';
-import { CareerBatting, CareerFielding, CareerPitching, PlayerFragment } from "../api/db/graphql.generated";
+import { getTable, getTableBody, RowParser } from './HtmlParser';
+import htmlParser, { HTMLElement } from 'node-html-parser';
+import { getCareerStats as getCareerStatsFromBref } from './BRefSession';
+import {
+  PlayerFragment,
+  SeasonBatting,
+  SeasonFielding,
+  SeasonPitching,
+} from '../api/db/graphql.generated';
+import { LOGGER } from '@legacy-sports/logging';
 
 const StatMapping: Record<
   string,
-  keyof CareerBatting | keyof CareerFielding | keyof CareerPitching
+  keyof SeasonBatting | keyof SeasonFielding | keyof SeasonPitching
 > = {
-  '2B': '_2B',
-  '3B': '_3B',
+  '2B': 'doubles',
+  '3B': 'triples',
   A: 'a',
   AB: 'ab',
-  award_summary: 'awardSummary',
-  bases_on_balls_per_nine: 'basesOnBallsPerNine',
-  batters_faced: 'battersFaced',
-  batting_avg: 'battingAvg',
+  AWARD_SUMMARY: 'awardSummary',
+  BASES_ON_BALLS_PER_NINE: 'basesOnBallsPerNine',
+  BATTERS_FACED: 'battersFaced',
+  BATTING_AVG: 'battingAvg',
   BB: 'bb',
   BK: 'bk',
-  caught_stealing_perc_lg: 'caughtStealingPercLg',
-  caught_stealing_perc: 'caughtStealingPerc',
+  CAUGHT_STEALING_PERC_LG: 'caughtStealingPercLg',
+  CAUGHT_STEALING_PERC: 'caughtStealingPerc',
   CG: 'cg',
-  chances: 'chances',
+  CHANCES: 'chances',
   CS: 'cs',
-  DP_def: 'dpDef',
-  E_def: 'eDef',
-  earned_run_avg_plus: 'earnedRunAvgPlus',
-  earned_run_avg: 'earnedRunAvg',
+  DP_DEF: 'dpDef',
+  E_DEF: 'eDef',
+  EARNED_RUN_AVG_PLUS: 'earnedRunAvgPlus',
+  EARNED_RUN_AVG: 'earnedRunAvg',
   ER: 'er',
-  fielding_perc_lg: 'fieldingPercLg',
-  fielding_perc: 'fieldingPerc',
-  fip: 'fip',
-  G_of_parts: 'gOfParts',
+  FIELDING_PERC_LG: 'fieldingPercLg',
+  FIELDING_PERC: 'fieldingPerc',
+  FIP: 'fip',
+  G_OF_PARTS: 'gOfParts',
   G: 'g',
   GF: 'gf',
   GIDP: 'gidp',
   GS: 'gs',
   H: 'h',
   HBP: 'hbp',
-  hits_per_nine: 'hitsPerNine',
-  home_runs_per_nine: 'homeRunsPerNine',
+  HITS_PER_NINE: 'hitsPerNine',
+  HOME_RUNS_PER_NINE: 'homeRunsPerNine',
   HR: 'hr',
   IBB: 'ibb',
-  Inn_def: 'innDef',
+  INN_DEF: 'innDef',
   IP: 'ip',
   L: 'l',
-  lg_ID: 'lgId',
-  onbase_perc: 'onbasePerc',
-  onbase_plus_slugging_plus: 'onbasePlusSluggingPlus',
-  onbase_plus_slugging: 'onbasePlusSlugging',
+  LG_ID: 'lgId',
+  ONBASE_PERC: 'onbasePerc',
+  ONBASE_PLUS_SLUGGING_PLUS: 'onbasePlusSluggingPlus',
+  ONBASE_PLUS_SLUGGING: 'onbasePlusSlugging',
   PA: 'pa',
-  pickoffs: 'pickoffs',
+  PICKOFFS: 'pickoffs',
   PO: 'po',
-  pos_season: 'posSeason',
+  POS: 'pos',
+  POS_SEASON: 'posSeason',
   R: 'r',
-  range_factor_per_game_lg: 'rangeFactorPerGameLg',
-  range_factor_per_game: 'rangeFactorPerGame',
-  range_factor_per_nine_lg: 'rangeFactorPerNineLg',
-  range_factor_per_nine: 'rangeFactorPerNine',
+  RANGE_FACTOR_PER_GAME_LG: 'rangeFactorPerGameLg',
+  RANGE_FACTOR_PER_GAME: 'rangeFactorPerGame',
+  RANGE_FACTOR_PER_NINE_LG: 'rangeFactorPerNineLg',
+  RANGE_FACTOR_PER_NINE: 'rangeFactorPerNine',
   RBI: 'rbi',
   SB: 'sb',
   SF: 'sf',
   SH: 'sh',
   SHO: 'sho',
-  slugging_perc: 'sluggingPerc',
+  SLUGGING_PERC: 'sluggingPerc',
   SO: 'so',
-  strikeouts_per_base_on_balls: 'strikeoutsPerBaseOnBalls',
-  strikeouts_per_nine: 'strikeoutsPerNine',
+  STRIKEOUTS_PER_BASE_ON_BALLS: 'strikeoutsPerBaseOnBalls',
+  STRIKEOUTS_PER_NINE: 'strikeoutsPerNine',
   SV: 'sv',
   TB: 'tb',
+  TEAM_ID: 'team',
   W: 'w',
-  whip: 'whip',
-  win_loss_perc: 'winLossPerc',
+  WHIP: 'whip',
+  WIN_LOSS_PERC: 'winLossPerc',
   WP: 'wp',
+  YEAR_ID: 'season',
 };
 
 const NUMERIC_STATS = Object.freeze(
-  new Set<keyof CareerBatting | keyof CareerFielding | keyof CareerPitching>([
-    '_2B',
-    '_3B',
+  new Set<keyof SeasonBatting | keyof SeasonFielding | keyof SeasonPitching>([
     'a',
     'ab',
     'basesOnBallsPerNine',
@@ -87,10 +94,11 @@ const NUMERIC_STATS = Object.freeze(
     'bk',
     'caughtStealingPerc',
     'caughtStealingPercLg',
-    'caughtStealingPercLg', 
+    'caughtStealingPercLg',
     'cg',
     'chances',
     'cs',
+    'doubles',
     'dpDef',
     'earnedRunAvg',
     'earnedRunAvgPlus',
@@ -136,22 +144,28 @@ const NUMERIC_STATS = Object.freeze(
     'strikeoutsPerNine',
     'sv',
     'tb',
+    'triples',
     'w',
     'whip',
     'winLossPerc',
-    'wp'
+    'wp',
   ]),
 );
 
-
-function parseRow<T extends object>(row: HTMLElement, playerId: number): T {
+function parseRow<T extends object>(
+  row: HTMLElement,
+  playerId: number,
+): T | null {
+  const headers = row.getElementsByTagName('th');
   const cols = row.getElementsByTagName('td');
+
+  const allCells = headers.concat(cols);
 
   const stats: T = {
     playerId: playerId,
   } as T;
 
-  for (const col of cols) {
+  for (const col of allCells) {
     const stat = col.getAttribute('data-stat');
 
     if (stat === undefined) {
@@ -160,9 +174,10 @@ function parseRow<T extends object>(row: HTMLElement, playerId: number): T {
 
     const text = col.text.trim();
 
-    const statField = StatMapping[stat];
+    const statField = StatMapping[stat.toUpperCase()];
 
     if (!statField) {
+      LOGGER.debug(`Skipping field ${stat}`);
       continue;
     }
 
@@ -171,62 +186,80 @@ function parseRow<T extends object>(row: HTMLElement, playerId: number): T {
     });
   }
 
+  if (!('team' in stats) || stats.team === null || stats.team === 'TOT') {
+    return null;
+  }
+
   return stats;
 }
 
+export function parseTable<T extends object>(
+  table: HTMLElement | null,
+  parser: RowParser<T>,
+): T[] {
+  if (table === null) {
+    return [];
+  }
 
-function getBattingStats(
-  root: HTMLElement,
-  playerId: number,
-): CareerBatting | null {
+  const body = getTableBody(table);
+
+  if (body === undefined) {
+    return [];
+  }
+
+  const result: T[] = [];
+
+  for (const row of body.getElementsByTagName('tr')) {
+    const record = parser(row);
+    if (record !== null) {
+      result.push(record);
+    }
+  }
+
+  return result;
+}
+
+function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
   const battingStats = getTable(root, 'batting_standard');
-  return parseTable<CareerBatting>(battingStats, (r) => parseRow(r, playerId));
+  return parseTable<SeasonBatting>(battingStats, (r) => {
+    const s = parseRow<SeasonBatting & { pos?: string }>(r, playerId);
+
+    if (s !== null) {
+      // Remove the position field, the batting stats pos looks like 9H/8
+      delete s['pos'];
+    }
+
+    return s;
+  });
 }
 
 function getFieldingStats(
   root: HTMLElement,
   playerId: number,
-): CareerFielding | null {
+): SeasonFielding[] {
   const fieldingStats = getTable(root, 'standard_fielding');
-
-  if (fieldingStats === null) {
-    return null;
-  }
-
-  const footer = getTableFooter(fieldingStats);
-
-  if (!footer) {
-    return null;
-  }
-
-  // Fielding stats are formatted differently
-  for (const row of footer.getElementsByTagName('tr')) {
-    const cell = row.querySelector('[data-stat="pos"]');
-
-    if (cell === null) {
-      continue;
-    }
-
-    if (cell.text.trim() != 'TOT') {
-      continue;
-    }
-
-    const data = parseRow<CareerFielding>(row, playerId);
-    return data;
-  }
-
-  return null;
+  return parseTable<SeasonFielding>(fieldingStats, (r) =>
+    parseRow(r, playerId),
+  );
 }
 
 function getPitchingStats(
   root: HTMLElement,
   playerId: number,
-): CareerPitching | null {
+): SeasonPitching[] {
   const pitchingStats = getTable(root, 'pitching_standard');
   return parseTable(pitchingStats, (r) => parseRow(r, playerId));
 }
 
-export async function getCareerStats(player: PlayerFragment) {
+export interface CareerStats {
+  batting: SeasonBatting[];
+  pitching: SeasonPitching[];
+  fielding: SeasonFielding[];
+}
+
+export async function getCareerStats(
+  player: PlayerFragment,
+): Promise<CareerStats> {
   const html = await getCareerStatsFromBref(player.brefId);
   const root = htmlParser(html, {
     comment: true,

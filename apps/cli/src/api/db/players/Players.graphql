@@ -12,12 +12,6 @@ mutation BulkCreatePlayers($input: CreatePlayersInput!) {
   }
 }
 
-query GetPlayerByBrefId($brefId: String!) {
-  playerByBrefId(brefId: $brefId) {
-    ...Player
-  }
-}
-
 query GetAllPlayers($after: Cursor) {
   players(after: $after) {
     nodes {

@@ -1,0 +1,33 @@
+service: legacy-sports-stats-lambda
+configValidationMode: error
+
+plugins:
+  - serverless-content-encoding
+
+custom:
+  contentEncoding:
+    minimumCompressionSize: 0
+
+package:
+  exclude:
+    - ./**
+  include:
+    - dist/**
+  individually: true
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  deploymentBucket:
+    name: legacy-sports-lambdas
+  region: ${env:AWS_REGION, 'us-east-1'}
+  stage: ${env:AWS_STAGE, 'dev'}
+
+functions:
+  load-career:
+    handler: dist/load-career.handler # Actual handler substituted in during deploy script
+    timeout: 30 # optional, in seconds, default is 6
+    events:
+      - sqs: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
+    environment:
+      GRAPHQL_HOST: https://gc63i18mdi.execute-api.us-east-1.amazonaws.com/dev/graphql

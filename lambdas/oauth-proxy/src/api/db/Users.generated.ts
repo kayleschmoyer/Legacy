@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as Types from './graphql.generated';
 
 import * as Operations from '../graphql.generated';

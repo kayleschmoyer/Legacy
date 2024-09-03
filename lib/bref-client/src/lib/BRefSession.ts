@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {LOGGER} from '@legacy-sports/logging'
 
 const MAX_REQUESTS_PER_MINUTE = 10;
 
@@ -12,7 +13,7 @@ export async function getFromBaseballReference(
 
     const sleepLength = (60 * 1000) / MAX_REQUESTS_PER_MINUTE - delta;
     if (sleepLength > 0) {
-      console.log(`Sleeping ${sleepLength}`);
+      LOGGER.debug(`Sleeping ${sleepLength}`);
       await new Promise((res) => setTimeout(res, sleepLength));
     }
   }

@@ -1,4 +1,4 @@
-service: ${env:AWS_SERVICE_NAME}
+service: legacy-sports-oauth-proxy
 configValidationMode: error
 
 plugins:
@@ -16,8 +16,8 @@ provider:
   runtime: nodejs20.x
   deploymentBucket:
     name: legacy-sports-lambdas
-  region: ${env:AWS_REGION}
-  stage: ${env:AWS_STAGE}
+  region: ${env:AWS_REGION, 'us-east-1'}
+  stage: ${env:AWS_STAGE, 'dev'}
   iam:
     role:
       statements:
@@ -33,9 +33,9 @@ provider:
             - secretsmanager:ListSecretVersionIds
 
 functions:
-  oauth-proxy:
+  proxy:
     handler: index.handler # Actual handler substituted in during deploy script
-    timeout: 60 # optional, in seconds, default is 6
+    timeout: 30 # optional, in seconds, default is 6
     events:
       - http:
           method: post

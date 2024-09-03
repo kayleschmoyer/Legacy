@@ -12,17 +12,6 @@ package-mode = false
 
   [tool.poetry.dependencies]
   python = ">=3.9,<3.13"
-  bs4 = "^0.0.2"
-  pandas = "^2.2.2"
-  requests = "^2.32.3"
-
-    [tool.poetry.dependencies.career_stats_lambda]
-    path = "lambdas/career_stats_lambda"
-    develop = true
-
-    [tool.poetry.dependencies.stats_lambda]
-    path = "lambdas/stats_lambda"
-    develop = true
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,5 +1,5 @@
 {
-  "name": "@legacy-sports/db",
+  "name": "@legacy-sports/oauth-proxy",
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {

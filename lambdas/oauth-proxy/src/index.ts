@@ -6,6 +6,7 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
+import { LOGGER } from '@legacy-sports/logging';
 
 enum EnvironmentVariable {
   CLIENT_SECRET_PATH = 'CLIENT_SECRET_PATH',
@@ -38,7 +39,7 @@ export const handler = async (
   context: Context,
   callback: Callback,
 ) => {
-  console.log(event);
+  LOGGER.debug(event);
 
   const clientSecretPath = getEnvVarRequired(
     EnvironmentVariable.CLIENT_SECRET_PATH,
@@ -58,7 +59,7 @@ export const handler = async (
     region: 'us-east-1',
   });
 
-  console.log(`Loading AWS Secrets Manager values from ${clientSecretPath}`);
+  LOGGER.debug(`Loading AWS Secrets Manager values from ${clientSecretPath}`);
   const clientSecret = await retrieveSecretParameterValue(
     client,
     clientSecretPath,
@@ -69,10 +70,10 @@ export const handler = async (
     cookieSecretPath,
   );
 
-  console.log('Creating Server');
+  LOGGER.debug('Creating Server');
   const app = createApplication(clientId, clientSecret, jwtKey, cookieSecret, graphqlHost);
 
-  console.log('Proxying Request');
+  LOGGER.debug('Proxying Request');
 
   const expressHandler = configure({
     app: app,

@@ -8,6 +8,7 @@ import {
   handleLoadCareerStats,
   loadCareerStatsCommandBuilder,
 } from './commands/loadCareerStats';
+import { LOGGER } from '@legacy-sports/logging';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -23,7 +24,13 @@ async function run(): Promise<void> {
     .parse();
 }
 
-run().catch((err) => {
-  console.error(err);
+run().catch((err: unknown) => {
+  if (err instanceof Error) {
+    LOGGER.error(err.message);
+    LOGGER.debug(JSON.stringify(err));
+    LOGGER.debug(err.stack);
+  } else if (typeof err === 'string') {
+    LOGGER.error(err);
+  }
   process.exit(1);
 });

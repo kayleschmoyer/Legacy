@@ -1,0 +1,9 @@
+{
+  "name": "data-loaders",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/data-loaders/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project data-loaders --web",
+  "targets": {}
+}

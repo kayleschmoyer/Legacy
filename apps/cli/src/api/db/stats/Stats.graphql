@@ -1,8 +1,0 @@
-mutation BulkUpdateStats($input: BulkUpdateStatsInput!) {
-  bulkUpdateStats(input: $input) {
-    players {
-      id
-      name
-    }
-  }
-}

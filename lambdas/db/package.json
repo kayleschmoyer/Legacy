@@ -1,0 +1,15 @@
+{
+  "name": "@legacy-sports/db",
+  "version": "0.0.0",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "webpack",
+    "make-cache": "ts-node -r tsconfig-paths/register src/makeCache",
+    "lint:fix": "eslint --fix"
+  },
+  "private": true,
+  "dependencies": {
+    "nx": "^17.3.2"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "logging",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/logging/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project logging --web",
+  "targets": {}
+}

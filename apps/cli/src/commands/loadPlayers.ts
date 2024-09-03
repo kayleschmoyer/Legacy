@@ -1,8 +1,8 @@
 import { Argv } from 'yargs';
-import htmlParser from 'node-html-parser';
 import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { BulkCreatePlayers, CreatePlayerInputRecordInput } from '../api/db/graphql.generated';
 import {getPlayers, Letter} from '@legacy-sports/bref-client';
+import { LOGGER } from '@legacy-sports/logging';
 
 export const loadPlayersCommandBuilder = (argv: Argv) =>
   argv
@@ -13,11 +13,11 @@ export const loadPlayersCommandBuilder = (argv: Argv) =>
 export async function handleLoadPlayers(): Promise<void> {
   const players: CreatePlayerInputRecordInput[] = [];
 
-  console.log('Loading Players');
+  LOGGER.debug('Loading Players');
 
   for (let i = 0; i < 26; i++) {
     const letter = String.fromCharCode(97 + i);
-    console.log(`Loading Letter ${letter}`)
+    LOGGER.debug(`Loading Letter ${letter}`)
     const letterPlayers = await getPlayers(letter as Letter);
     players.push(...letterPlayers);
   }
@@ -40,5 +40,5 @@ export async function handleLoadPlayers(): Promise<void> {
     });
   }
 
-  console.log(`Created ${players.length} players`);
+  LOGGER.info(`Created ${players.length} players`);
 }
