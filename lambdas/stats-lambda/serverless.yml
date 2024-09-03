@@ -30,7 +30,7 @@ functions:
     events:
       - sqs: 
           arn: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
-          maximumConcurrency: 1
+          maximumConcurrency: 2
 
     environment:
       GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
