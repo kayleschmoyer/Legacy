@@ -30,4 +30,4 @@ functions:
     events:
       - sqs: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
     environment:
-      GRAPHQL_HOST: https://gc63i18mdi.execute-api.us-east-1.amazonaws.com/dev/graphql
+      GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
