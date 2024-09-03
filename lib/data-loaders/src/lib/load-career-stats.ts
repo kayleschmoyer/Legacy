@@ -22,7 +22,6 @@ async function upsertFieldingSeason(
         where: {
           playerId: stats.playerId,
           team: stats.team,
-          lgId: stats.lgId,
           season: stats.season,
           pos: stats.pos,
         },
@@ -49,7 +48,6 @@ async function upsertBattingSeason(
         where: {
           playerId: stats.playerId,
           team: stats.team,
-          lgId: stats.lgId,
           season: stats.season,
         },
         input: {
@@ -75,7 +73,6 @@ async function upsertPitchingSeason(
         where: {
           playerId: stats.playerId,
           team: stats.team,
-          lgId: stats.lgId,
           season: stats.season,
         },
         input: {
