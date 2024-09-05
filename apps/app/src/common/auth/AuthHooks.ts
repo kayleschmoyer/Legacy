@@ -14,12 +14,13 @@ import {
 } from 'react-native-keychain';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import {getEnvVarRequired} from '@legacy-sports/env-utilities';
+import {
+  getEnvVarOptional,
+  getEnvVarRequired,
+} from '@legacy-sports/env-utilities';
 import { GoogleJwtContents } from '../../login/GoogleJwtContents';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
-import {
-  EnvironmentVariable,
-} from '../EnvironmentVariables';
+import { EnvironmentVariable } from '../EnvironmentVariables';
 
 export interface AuthHandlers {
   googleLogin(): void;
@@ -206,8 +207,23 @@ const refreshJwt = memoizeOne(async (keychainLastUpdate: number) => {
   storeToken(tokenResponse.data);
 });
 
+const LOCAL_USER: CurrentUserInfo = {
+  googleInfo: {} as GoogleJwtContents,
+  internalInfo: {
+    id: -1,
+    email: null,
+    username: 'LOCAL USER',
+    isAdmin: false,
+    about: null,
+  },
+};
+
 export function useCurrentUserInfo(): AsyncHookResult<CurrentUserInfo | null> {
   return useAsyncHook(async () => {
+    if (getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH) === 'true') {
+      return LOCAL_USER;
+    }
+
     let jwt = await getJwt();
 
     // JWT Expired, but we can try to refresh
