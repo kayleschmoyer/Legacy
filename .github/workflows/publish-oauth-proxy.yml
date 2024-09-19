@@ -3,11 +3,11 @@ name: Publish OAuth Proxy
 # Controls when the workflow will run
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'lambdas/oauth-proxy/**'
-      - .github/workflows/publish-oauth-proxy.yml
+  #push:
+  #  branches: [main]
+  #  paths:
+  #    - 'lambdas/oauth-proxy/**'
+  #    - .github/workflows/publish-oauth-proxy.yml
 
 env:
   AWS_REGION: us-east-1
