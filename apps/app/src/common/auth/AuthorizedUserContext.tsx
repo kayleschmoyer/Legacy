@@ -1,9 +1,9 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
 import { Redirect } from 'expo-router';
-import { CurrentUserInfo, useCurrentUserInfo } from './AuthHooks';
+import { LegacySportsJwt, useCurrentUserInfo } from './AuthHooks';
 import { LoadingPanel } from '../components/LoadingPanel';
 
-export const AUTHORIZED_CONTEXT = createContext<null | CurrentUserInfo>(null);
+export const AUTHORIZED_CONTEXT = createContext<null | LegacySportsJwt>(null);
 
 export function AuthorizedUserContextProvider({
   children,
@@ -25,12 +25,12 @@ export function AuthorizedUserContextProvider({
   );
 }
 
-export function useAuthorizedUserInfo(): CurrentUserInfo {
+export function useAuthorizedUserInfo(): LegacySportsJwt {
   const value = useContext(AUTHORIZED_CONTEXT);
 
   if (value === null) {
     throw new Error(
-      'This component must be rendered inside an AuthorizedUserContextProvider',
+      'This component must be rendered inside an AuthorizedUserContextProvider'
     );
   }
 

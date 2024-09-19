@@ -33,22 +33,35 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1E1E1E',
+    flexGrow: 1,
+    justifyContent: 'center',
     padding: 20,
   },
   heading: {
+    color: '#FFFFFF',
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 20,
   },
-  subHeading: {
-    fontSize: 18,
-    color: '#BBBBBB',
+  sportCard: {
+    alignItems: 'center',
+    backgroundColor: '#292929',
+    borderRadius: 12,
     marginBottom: 20,
+    padding: 20,
+    width: '45%',
+  },
+  sportImage: {
+    height: 100,
+    marginBottom: 10,
+    width: 100,
+  },
+  sportName: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '600',
   },
   sportsContainer: {
     flexDirection: 'row',
@@ -56,22 +69,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
   },
-  sportCard: {
-    backgroundColor: '#292929',
-    borderRadius: 12,
-    width: '45%',
+  subHeading: {
+    color: '#BBBBBB',
+    fontSize: 18,
     marginBottom: 20,
-    padding: 20,
-    alignItems: 'center',
-  },
-  sportImage: {
-    width: 100,
-    height: 100,
-    marginBottom: 10,
-  },
-  sportName: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    fontWeight: '600',
   },
 });

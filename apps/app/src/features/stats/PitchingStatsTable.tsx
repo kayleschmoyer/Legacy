@@ -1,8 +1,6 @@
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
-import {
-  CareerPitchingStatsWithPlayerFragment,
-} from '../../api/db/graphql.generated';
+import { CareerPitchingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
 
 const TABLE_HEADER = [
   'Player',
@@ -33,7 +31,7 @@ export interface PitchingStatsTableProps {
 }
 
 export function PitchingStatsTable(
-  props: PitchingStatsTableProps,
+  props: PitchingStatsTableProps
 ): JSX.Element {
   const { stats } = props;
 
@@ -64,7 +62,12 @@ export function PitchingStatsTable(
   }, [stats]);
 
   return (
-    <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
+    <Table
+      borderStyle={{
+        borderColor: '#c8e1ff',
+        borderWidth: 2,
+      }}
+    >
       <Row data={TABLE_HEADER} />
       <Rows data={data} />
     </Table>

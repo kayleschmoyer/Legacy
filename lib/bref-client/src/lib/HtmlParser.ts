@@ -1,10 +1,10 @@
-import htmlParser, { HTMLElement, CommentNode, Node } from 'node-html-parser';
+import htmlParser, { CommentNode, HTMLElement, Node } from 'node-html-parser';
 
 function checkChildrenForTable(
   node: Node,
-  tableId: string,
+  tableId: string
 ): HTMLElement | null {
-  let table = null;
+  let table: HTMLElement | null = null;
 
   if (node instanceof CommentNode) {
     const commentBody = htmlParser(node.text);
@@ -26,7 +26,10 @@ function checkChildrenForTable(
   return table;
 }
 
-export function getTable(root: HTMLElement, tableId: string): HTMLElement | null {
+export function getTable(
+  root: HTMLElement,
+  tableId: string
+): HTMLElement | null {
   const table = root.getElementById(tableId);
 
   if (table !== null) {
@@ -45,4 +48,3 @@ export function getTableFooter(table: HTMLElement): HTMLElement | undefined {
 }
 
 export type RowParser<T> = (row: HTMLElement) => T | null;
-

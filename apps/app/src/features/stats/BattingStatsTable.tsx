@@ -1,4 +1,3 @@
-
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
 import { CareerBattingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
@@ -57,7 +56,12 @@ export function BattingStatsTable(props: BattingStatsTableProps): JSX.Element {
   }, [stats]);
 
   return (
-    <Table borderStyle={{borderWidth: 2, borderColor: '#c8e1ff'}}>
+    <Table
+      borderStyle={{
+        borderColor: '#c8e1ff',
+        borderWidth: 2,
+      }}
+    >
       <Row data={TABLE_HEADER} />
       <Rows data={data} />
     </Table>

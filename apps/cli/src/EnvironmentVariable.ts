@@ -1,4 +1,5 @@
-export enum EnvironmentVariable{
+export enum EnvironmentVariable {
+  DB_CERT_PATH = 'DB_CERT_PATH',
   GRAPHQL_HOST = 'GRAPHQL_HOST',
   LOAD_STATS_SQS_HOST = 'LOAD_STATS_SQS_HOST',
 }

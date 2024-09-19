@@ -1,138 +1,49 @@
-import { Adapt, FontSizeTokens, getFontSize, Select, Sheet, YStack } from "tamagui"
-import {Check, ChevronDown, ChevronUp} from '@tamagui/lucide-icons'
-import { LinearGradient } from 'tamagui/linear-gradient'
+import { IndexPath, Select, SelectItem } from '@ui-kitten/components';
+import { useEffect, useState } from 'react';
 
-export interface DropdownItem{
+export interface DropdownItem {
   text: string;
   value: string;
 }
 
-export interface DropdownProperties{
+export interface DropdownProperties {
   value: string;
-  onChange(value: string): void;
-  native?: boolean;
+  onChange: (value: string) => void;
   items: readonly Readonly<DropdownItem>[];
-  label?: string;
-  size?: FontSizeTokens;
 }
 
-export function Dropdown(props: DropdownProperties): JSX.Element{
-  const {value, onChange, native, items, label, size} = props;
+export function Dropdown(props: DropdownProperties): JSX.Element {
+  const { value, onChange, items } = props;
 
-  return ( <Select value={value} onValueChange={onChange} disablePreventBodyScroll >
-    <Select.Trigger width={220} iconAfter={ChevronDown}>
-      <Select.Value placeholder="Something" />
-    </Select.Trigger>
+  const [selectedIndex, setSelectedIndex] = useState<
+    IndexPath | IndexPath[] | undefined
+  >();
 
-    <Adapt platform="touch">
-      <Sheet
-        native={native}
-        modal
-        dismissOnSnapToBottom
-        animationConfig={{
-          type: 'spring',
-          damping: 20,
-          mass: 1.2,
-          stiffness: 250,
-        }}
-      >
-        <Sheet.Frame>
-          <Sheet.ScrollView>
-            <Adapt.Contents />
-          </Sheet.ScrollView>
-        </Sheet.Frame>
-        <Sheet.Overlay
-          animation="lazy"
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-        />
-      </Sheet>
-    </Adapt>
+  useEffect(() => {
+    const idx = items.findIndex((i) => value === i.value);
 
-    <Select.Content zIndex={200000}>
-      <Select.ScrollUpButton
-        alignItems="center"
-        justifyContent="center"
-        position="relative"
-        width="100%"
-        height="$3"
-      >
-        <YStack zIndex={10}>
-          <ChevronUp size={20} />
-        </YStack>
-        <LinearGradient
-          start={[0, 0]}
-          end={[0, 1]}
-          fullscreen
-          colors={['$background', 'transparent']}
-          borderRadius="$4"
-        />
-      </Select.ScrollUpButton>
+    if (idx !== -1) {
+      setSelectedIndex(new IndexPath(idx));
+    }
+  }, [value, items]);
 
-      <Select.Viewport
-        // to do animations:
-        // animation="quick"
-        // animateOnly={['transform', 'opacity']}
-        // enterStyle={{ o: 0, y: -10 }}
-        // exitStyle={{ o: 0, y: 10 }}
-        minWidth={200}
-      >
-        <Select.Group>
-          ({label ? <Select.Label>Fruits</Select.Label> : null})
-          {/* for longer lists memoizing these is useful */}
-          {
-              items.map((item, i) => {
-                return (
-                  <Select.Item
-                    index={i}
-                    key={item.value}
-                    value={item.value}
-                  >
-                    <Select.ItemText>{item.text}</Select.ItemText>
-                    <Select.ItemIndicator marginLeft="auto">
-                      <Check size={16} />
-                    </Select.ItemIndicator>
-                  </Select.Item>
-                )
-              })}
-        </Select.Group>
-        {/* Native gets an extra icon */}
-        {props.native && (
-          <YStack
-            position="absolute"
-            right={0}
-            top={0}
-            bottom={0}
-            alignItems="center"
-            justifyContent="center"
-            width={'$4'}
-            pointerEvents="none"
-          >
-            <ChevronDown
-              size={getFontSize((size) ?? '$true')}
-            />
-          </YStack>
-        )}
-      </Select.Viewport>
+  const internalOnChange = (idx: IndexPath | IndexPath[]) => {
+    if (Array.isArray(idx)) {
+      throw new Error('Multi select not supported currently');
+    }
 
-      <Select.ScrollDownButton
-        alignItems="center"
-        justifyContent="center"
-        position="relative"
-        width="100%"
-        height="$3"
-      >
-        <YStack zIndex={10}>
-          <ChevronDown size={20} />
-        </YStack>
-        <LinearGradient
-          start={[0, 0]}
-          end={[0, 1]}
-          fullscreen
-          colors={['transparent', '$background']}
-          borderRadius="$4"
-        />
-      </Select.ScrollDownButton>
-    </Select.Content>
-  </Select>)
+    const item = items[idx.row];
+
+    if (item) {
+      onChange(item.value);
+    }
+  };
+
+  return (
+    <Select selectedIndex={selectedIndex} onSelect={internalOnChange}>
+      {items.map((i) => (
+        <SelectItem title={i.text} />
+      ))}
+    </Select>
+  );
 }

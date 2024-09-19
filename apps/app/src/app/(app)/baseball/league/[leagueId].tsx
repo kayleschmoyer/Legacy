@@ -1,17 +1,17 @@
 import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
-import {  H3, Label, Spinner, Text, View, XStack, YStack } from 'tamagui';
 import { useMemo } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Spinner, Text } from '@ui-kitten/components';
 import {
-  LeaguesWithTeamsAndMembersFragment,
+  LeagueFragment,
   TeamFragment,
 } from '../../../../api/db/graphql.generated';
 import { useGetLeagueByIdQuery } from '../../../../api/db/leagues/Leagues.generated';
 
 interface TeamNameProps {
   team: TeamFragment;
-  leagueData: LeaguesWithTeamsAndMembersFragment;
+  leagueData: LeagueFragment;
   standing: number;
 }
 
@@ -19,8 +19,8 @@ function TeamName(props: TeamNameProps): JSX.Element {
   const { team, leagueData, standing } = props;
 
   const owner = useMemo(() => {
-    const member = leagueData.leagueMembers.nodes.find(
-      (m) => m?.teamId === team.id,
+    const member = leagueData.leagueMembers?.nodes.find(
+      (m) => m?.teamId === team.id
     );
 
     if (!member) {
@@ -31,24 +31,12 @@ function TeamName(props: TeamNameProps): JSX.Element {
   }, [leagueData.leagueMembers, team.id]);
 
   return (
-    <XStack>
-      <Label style={styles.teamCell} flexShrink={1}>
-        {standing}
-      </Label>
-      <Label style={styles.teamCell} textAlign="left" flexShrink={1}>
-        {team.name}
-      </Label>
-      <Label
-        style={{ ...styles.teamCell, verticalAlign: 'super', fontSize: 10 }}
-        textAlign="left"
-        flex={1}
-      >
-        {owner || ''}
-      </Label>
-      <Label style={styles.teamCell} flexShrink={1}>
-        0-0
-      </Label>
-    </XStack>
+    <View>
+      <Text style={styles.teamCell}>{standing}</Text>
+      <Text style={styles.teamCell}>{team.name}</Text>
+      <Text style={styles.teamCell}>{owner || ''}</Text>
+      <Text style={styles.teamCell}>0-0</Text>
+    </View>
   );
 }
 
@@ -58,10 +46,10 @@ export default function LeagueId(): JSX.Element {
   const numLeagueId = parseInt(leagueId, 10);
 
   const { data, loading } = useGetLeagueByIdQuery({
+    skip: isNaN(numLeagueId),
     variables: {
       id: numLeagueId,
     },
-    skip: isNaN(numLeagueId),
   });
 
   if (loading) {
@@ -74,32 +62,32 @@ export default function LeagueId(): JSX.Element {
   }
 
   return (
-    <View alignSelf="center">
-      <H3>Standings</H3>
-      <YStack maxWidth={500}>
-        {league.teams.nodes.map((t, idx) =>
+    <View>
+      <Text category="h3">Standings</Text>
+      <View>
+        {league.teams?.nodes.map((t, idx) =>
           t ? (
             <TeamName key={t.id} team={t} standing={idx} leagueData={league} />
-          ) : null,
+          ) : null
         )}
-      </YStack>
+      </View>
     </View>
   );
 }
 
 export function LeagueIdHeader(props: HeaderTitleProps): JSX.Element {
   const { leagueId } = useGlobalSearchParams<{ leagueId: string }>();
-  
+
   const numLeagueId = parseInt(leagueId, 10);
- 
+
   const { data } = useGetLeagueByIdQuery({
+    skip: isNaN(numLeagueId),
     variables: {
       id: numLeagueId,
     },
-    skip: isNaN(numLeagueId),
   });
 
-  return <H3>{data ? data.league?.name : null}</H3>;
+  return <Text category="h3">{data ? data.league?.name : ''}</Text>;
 }
 
 const styles = StyleSheet.create({

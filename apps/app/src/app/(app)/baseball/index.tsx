@@ -13,7 +13,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { ImageBackground } from 'expo-image';
 
 import { Link } from 'expo-router';
-import { Spinner } from 'tamagui';
+import { Spinner } from '@ui-kitten/components';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetLeaguesForUserQuery } from '../../../api/db/users/Users.generated';
@@ -35,7 +35,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
 
   const { data, loading: loadingLeagues } = useGetLeaguesForUserQuery({
     variables: {
-      id: userInfo.internalInfo.id,
+      id: userInfo.id,
     },
   });
 
@@ -108,10 +108,10 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
           leagues.map((l) => (
             <Link
               href={{
-                pathname: './league/[leagueId]',
                 params: {
                   leagueId: l?.league?.id,
                 },
+                pathname: './league/[leagueId]',
               }}
               asChild={true}
               key={l?.league?.id}
@@ -171,61 +171,20 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#0D0D0D',
-    padding: 20,
-    width: '100%',
-  },
-  heading: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#FF8C00',
-    textAlign: 'center',
-    marginTop: 40,
-  },
-  subHeading: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginTop: 10,
-    textShadowColor: '#000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
   bannerImage: {
-    width: '100%',
+    alignItems: 'center',
+    borderRadius: 15,
     height: 180,
     justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 30,
-    borderRadius: 15,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF4500',
-    marginVertical: 15,
+    width: '100%',
   },
   buttonGroup: {
+    color: '#FF8C00',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
-    color: '#FF8C00',
     width: '100%',
-  },
-  gradientButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: '#FF4500',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-    marginHorizontal: 5,
   },
   buttonText: {
     color: '#FFFFFF',
@@ -233,11 +192,74 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  closeModalButton: {
+    backgroundColor: '#555',
+    borderRadius: 10,
+    marginTop: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  closeModalText: {
+    color: '#FFF',
+    fontSize: 16,
+  },
+  container: {
+    backgroundColor: '#0D0D0D',
+    flexGrow: 1,
+    padding: 20,
+    width: '100%',
+  },
+  draftButton: {
+    alignItems: 'center',
+    backgroundColor: '#FF4500',
+    borderRadius: 10,
+    marginBottom: 15,
+    paddingHorizontal: 25,
+    paddingVertical: 15,
+    width: '100%',
+  },
+  draftButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  gradientButton: {
+    backgroundColor: '#FF4500',
+    borderRadius: 10,
+    elevation: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      height: 4,
+      width: 0,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  heading: {
+    color: '#FF8C00',
+    fontSize: 30,
+    fontWeight: 'bold',
+    marginTop: 40,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: '#333',
+    borderRadius: 10,
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginBottom: 20,
+    padding: 15,
+    width: '100%',
+  },
   leagueSection: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 10,
     marginVertical: 20,
     padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#1E1E1E',
   },
   leagueText: {
     color: '#FF8C00',
@@ -245,51 +267,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  longList: {
+    marginTop: 10,
+    paddingBottom: 50,
+  },
+  modalButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-  },
-  modalContentDark: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 20,
-    padding: 30,
-    width: '90%',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 10,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#CCCCCC',
-    marginBottom: 20,
-  },
-  input: {
-    width: '100%',
-    padding: 15,
+    backgroundColor: '#FF8C00',
     borderRadius: 10,
-    backgroundColor: '#333',
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 20,
+    flex: 1,
+    marginRight: 10,
+    paddingVertical: 15,
   },
   modalButtonGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-  },
-  modalButton: {
-    flex: 1,
-    backgroundColor: '#FF8C00',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginRight: 10,
   },
   modalButtonText: {
     color: '#FFF',
@@ -297,55 +290,68 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalCancelButton: {
-    flex: 1,
-    backgroundColor: '#555',
-    paddingVertical: 15,
-    borderRadius: 10,
     alignItems: 'center',
+    backgroundColor: '#555',
+    borderRadius: 10,
+    flex: 1,
+    paddingVertical: 15,
   },
   modalCancelText: {
     color: '#FFF',
     fontSize: 16,
   },
-  draftButton: {
-    backgroundColor: '#FF4500',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 10,
-    marginBottom: 15,
-    width: '100%',
+  modalContainer: {
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    flex: 1,
+    justifyContent: 'center',
   },
-  draftButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+  modalContentDark: {
+    alignItems: 'center',
+    backgroundColor: '#1E1E1E',
+    borderRadius: 20,
+    padding: 30,
+    width: '90%',
   },
-  closeModalButton: {
-    backgroundColor: '#555',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 15,
-  },
-  closeModalText: {
-    color: '#FFF',
+  modalSubtitle: {
+    color: '#CCCCCC',
     fontSize: 16,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
   placeholder: {
-    marginVertical: 5,
-    height: 50,
     backgroundColor: '#333',
     borderRadius: 10,
+    height: 50,
+    marginVertical: 5,
   },
   placeholderText: {
-    fontSize: 14,
     color: '#888',
-    textAlign: 'center',
+    fontSize: 14,
     marginVertical: 10,
+    textAlign: 'center',
   },
-  longList: {
+  sectionTitle: {
+    color: '#FF4500',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 15,
+  },
+  subHeading: {
+    color: '#FFFFFF',
+    fontSize: 18,
     marginTop: 10,
-    paddingBottom: 50,
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowOffset: {
+      height: 1,
+      width: 1,
+    },
+    textShadowRadius: 3,
   },
 });

@@ -1,8 +1,6 @@
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
-import {
-  CareerFieldingStatsWithPlayerFragment,
-} from '../../api/db/graphql.generated';
+import { CareerFieldingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
 
 const TABLE_HEADER = [
   'Player',
@@ -27,7 +25,7 @@ export interface FieldingStatsTableProps {
 }
 
 export function FieldingStatsTable(
-  props: FieldingStatsTableProps,
+  props: FieldingStatsTableProps
 ): JSX.Element {
   const { stats } = props;
 
@@ -52,7 +50,12 @@ export function FieldingStatsTable(
   }, [stats]);
 
   return (
-    <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
+    <Table
+      borderStyle={{
+        borderColor: '#c8e1ff',
+        borderWidth: 2,
+      }}
+    >
       <Row data={TABLE_HEADER} />
       <Rows data={data} />
     </Table>

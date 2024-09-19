@@ -5,7 +5,8 @@
   "scripts": {
     "build": "webpack",
     "lint:fix": "eslint --fix",
-    "codegen-db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts"
+    "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+    "codegen": "npm run codegen:db"
   },
   "private": true,
   "dependencies": {}

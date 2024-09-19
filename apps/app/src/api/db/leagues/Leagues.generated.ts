@@ -19,6 +19,9 @@ const defaultOptions = {} as const;
  * const { data, loading, error } = useGetLeagueByIdQuery({
  *   variables: {
  *      id: // value for 'id'
+ *      withMembers: // value for 'withMembers'
+ *      withTeams: // value for 'withTeams'
+ *      withMatchup: // value for 'withMatchup'
  *   },
  * });
  */
@@ -30,8 +33,8 @@ export function useGetLeagueByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOpti
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>(Operations.GetLeagueById, options);
         }
-export function useGetLeagueByIdSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
+export function useGetLeagueByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>(Operations.GetLeagueById, options);
         }
 export type GetLeagueByIdQueryHookResult = ReturnType<typeof useGetLeagueByIdQuery>;
@@ -54,6 +57,9 @@ export type CreateLeagueMutationFn = Apollo.MutationFunction<Types.CreateLeagueM
  * const [createLeagueMutation, { data, loading, error }] = useCreateLeagueMutation({
  *   variables: {
  *      input: // value for 'input'
+ *      withMembers: // value for 'withMembers'
+ *      withTeams: // value for 'withTeams'
+ *      withMatchup: // value for 'withMatchup'
  *   },
  * });
  */
@@ -64,3 +70,36 @@ export function useCreateLeagueMutation(baseOptions?: Apollo.MutationHookOptions
 export type CreateLeagueMutationHookResult = ReturnType<typeof useCreateLeagueMutation>;
 export type CreateLeagueMutationResult = Apollo.MutationResult<Types.CreateLeagueMutation>;
 export type CreateLeagueMutationOptions = Apollo.BaseMutationOptions<Types.CreateLeagueMutation, Types.CreateLeagueMutationVariables>;
+
+/**
+ * __useGetPositionsForLeagueQuery__
+ *
+ * To run a query within a React component, call `useGetPositionsForLeagueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPositionsForLeagueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPositionsForLeagueQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetPositionsForLeagueQuery(baseOptions: Apollo.QueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables> & ({ variables: Types.GetPositionsForLeagueQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
+      }
+export function useGetPositionsForLeagueLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
+        }
+export function useGetPositionsForLeagueSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
+        }
+export type GetPositionsForLeagueQueryHookResult = ReturnType<typeof useGetPositionsForLeagueQuery>;
+export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<typeof useGetPositionsForLeagueLazyQuery>;
+export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<typeof useGetPositionsForLeagueSuspenseQuery>;
+export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>;

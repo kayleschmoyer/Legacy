@@ -1,6 +1,6 @@
 {
   "root": true,
-  "ignorePatterns": ["**/*"],
+  "ignorePatterns": ["**/*", "dist", "node_modules"],
   "plugins": ["@nx"],
   "overrides": [
     {
@@ -9,8 +9,8 @@
         "react/self-closing-comp": [
           "error",
           {
-          "component": true,
-          "html": true
+            "component": true,
+            "html": true
           }
         ]
       }
@@ -35,8 +35,34 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
-      "extends": ["plugin:@nx/typescript"],
-      "rules": {}
+      "extends": [
+        "plugin:@nx/typescript",
+        "plugin:@typescript-eslint/recommended-type-checked"
+      ],
+      "plugins": ["eslint-plugin-import"],
+      "rules": {
+        "sort-keys": ["error", "asc", { "allowLineSeparatedGroups": true }],
+        "sort-imports": [
+          "error",
+          {
+            "ignoreCase": true,
+            "ignoreDeclarationSort": true
+          }
+        ],
+        "import/order": [
+          1,
+          {
+            "groups": [
+              "external",
+              "builtin",
+              "internal",
+              "sibling",
+              "parent",
+              "index"
+            ]
+          }
+        ]
+      }
     },
     {
       "files": ["*.js", "*.jsx"],

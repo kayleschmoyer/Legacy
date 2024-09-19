@@ -1,5 +1,10 @@
-fragment Player on Player{
+fragment Player on Player {
   id
   name
   brefId
+}
+
+fragment PlayerEligiblePosition on PlayerEligiblePosition {
+  playerId
+  position
 }

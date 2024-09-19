@@ -1,0 +1,16 @@
+{
+  "name": "@legacy-sports/db-client",
+  "version": "1.0.0",
+  "description": "This library was generated with [Nx](https://nx.dev).",
+  "main": "index.js",
+  "scripts": {
+    "create-migration:public": "drizzle-kit generate --config drizzle.config.public.ts",
+    "create-migration:internal": "drizzle-kit generate --config drizzle.config.internal.ts",
+    "codegen:schema:internal": "drizzle-kit introspect --config drizzle.config.internal.ts",
+    "codegen:schema:public": "drizzle-kit introspect --config drizzle.config.public.ts",
+    "codegen": "npm run codegen:schema:internal && npm run codegen:schema:public"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

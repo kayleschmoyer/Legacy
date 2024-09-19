@@ -2,6 +2,20 @@ fragment League on League {
   id
   name
   owner
+  currentMatchup
+  leagueMembers @include(if: $withMembers) {
+    nodes {
+      ...LeagueMember
+    }
+  }
+  matchupByCurrentMatchup @include(if: $withMatchup) {
+    ...Matchup
+  }
+  teams @include(if: $withTeams) {
+    nodes {
+      ...Team
+    }
+  }
 }
 
 fragment LeagueMember on LeagueMember {
@@ -14,30 +28,40 @@ fragment LeagueMember on LeagueMember {
   }
 }
 
-fragment LeaguesWithTeamsAndMembers on League {
-  ...League
-  leagueMembers {
-    nodes {
-      ...LeagueMember
-    }
-  }
-  teams {
-    nodes {
-      ...Team
-    }
-  }
+fragment LeaguePosition on LeaguePosition {
+  id
+  leagueId
+  positionType
 }
 
-query GetLeagueById($id: Int!) {
+query GetLeagueById(
+  $id: Int!
+  $withMembers: Boolean = false
+  $withTeams: Boolean = false
+  $withMatchup: Boolean = false
+) {
   league(id: $id) {
-    ...LeaguesWithTeamsAndMembers
+    ...League
   }
 }
 
-mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
+mutation CreateLeague(
+  $input: CreateLeagueAndTeamsInput!
+  $withMembers: Boolean = false
+  $withTeams: Boolean = false
+  $withMatchup: Boolean = false
+) {
   createLeagueAndTeams(input: $input) {
     league {
-      ...LeaguesWithTeamsAndMembers
+      ...League
+    }
+  }
+}
+
+query GetPositionsForLeague($leagueId: Int!) {
+  leaguePositions(condition: { leagueId: $leagueId }) {
+    nodes {
+      ...LeaguePosition
     }
   }
 }

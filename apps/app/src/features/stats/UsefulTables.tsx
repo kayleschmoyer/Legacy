@@ -1,15 +1,19 @@
-import { Spinner, Text } from 'tamagui';
+import { Spinner, Text } from '@ui-kitten/components';
+import { useMemo } from 'react';
+import { BattingStatsTable } from './BattingStatsTable';
+import { PitchingStatsTable } from './PitchingStatsTable';
+import { FieldingStatsTable } from './FieldingStatsTable';
+import {
+  useGetCareerBattingStatsQuery,
+  useGetCareerFieldingStatsQuery,
+  useGetCareerPitchingStatsQuery,
+} from '../../api/db/stats/Stats.generated';
 import {
   CareerBattingsOrderBy,
   CareerBattingStatsWithPlayerFragment,
   CareerFieldingsOrderBy,
   CareerPitchingsOrderBy,
 } from '../../api/db/graphql.generated';
-import { useGetCareerBattingStatsQuery, useGetCareerFieldingStatsQuery, useGetCareerPitchingStatsQuery } from '../../api/db/stats/Stats.generated';
-import { BattingStatsTable } from './BattingStatsTable';
-import { useMemo } from 'react';
-import { PitchingStatsTable } from './PitchingStatsTable';
-import { FieldingStatsTable } from './FieldingStatsTable';
 
 export function BattingStatsTableWithData(): JSX.Element {
   const { data, loading } = useGetCareerBattingStatsQuery({
@@ -25,7 +29,7 @@ export function BattingStatsTableWithData(): JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats],
+    [stats]
   );
 
   if (loading) {
@@ -39,7 +43,6 @@ export function BattingStatsTableWithData(): JSX.Element {
   return <BattingStatsTable stats={filteredStats} />;
 }
 
-
 export function PitchingStatsTableWithData(): JSX.Element {
   const { data, loading } = useGetCareerPitchingStatsQuery({
     variables: {
@@ -52,7 +55,7 @@ export function PitchingStatsTableWithData(): JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats],
+    [stats]
   );
 
   if (loading) {
@@ -66,7 +69,6 @@ export function PitchingStatsTableWithData(): JSX.Element {
   return <PitchingStatsTable stats={filteredStats} />;
 }
 
-
 export function FieldingStatsTableWithData(): JSX.Element {
   const { data, loading } = useGetCareerFieldingStatsQuery({
     variables: {
@@ -79,7 +81,7 @@ export function FieldingStatsTableWithData(): JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats],
+    [stats]
   );
 
   if (loading) {

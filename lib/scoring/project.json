@@ -1,0 +1,9 @@
+{
+  "name": "scoring",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/scoring/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project scoring --web",
+  "targets": {}
+}

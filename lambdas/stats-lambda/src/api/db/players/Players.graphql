@@ -1,7 +1,0 @@
-query GetPlayerByBrefId($brefId: String!) {
-  playerByBrefId(brefId: $brefId) {
-    id
-    name
-    brefId
-  }
-}

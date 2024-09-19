@@ -6,11 +6,23 @@ const { applyBaseConfig } = require('../../webpack.config.base');
 const config = applyBaseConfig({
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'index.js',
+    filename: '[name].js',
     libraryTarget: 'commonjs',
   },
   entry: {
-    index: './src/index.ts',
+    google: path.resolve(__dirname, 'src/handlers/Google'),
+    local: path.resolve(__dirname, 'src/handlers/Local'),
+  },
+  externals: {
+    pg: true,
+    'pg-hstore': true,
+    '@sequelize/mysql': true,
+    '@sequelize/db2': true,
+    '@sequelize/db2-ibmi': true,
+    '@sequelize/sqlite3': true,
+    '@sequelize/mssql': true,
+    '@sequelize/mariadb': true,
+    '@sequelize/snowflake': true,
   },
   mode: 'production',
   target: 'node',
@@ -25,12 +37,17 @@ const config = applyBaseConfig({
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
+    fallback: {
+      fs: false,
+      os: false,
+      path: false,
+    },
   },
   plugins: [
     // Just in case you install express:
     new webpack.NormalModuleReplacementPlugin(
       /express\/lib\/view\.js$/,
-      `${__dirname}/mocks/express-lib-view.js`,
+      `${__dirname}/mocks/express-lib-view.js`
     ),
   ],
   node: {

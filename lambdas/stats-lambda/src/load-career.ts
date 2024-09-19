@@ -1,58 +1,53 @@
-import {
-  ApolloClient,
-  InMemoryCache,
-  NormalizedCacheObject,
-} from '@apollo/client';
-import { SQSEvent } from 'aws-lambda';
-import { BatchHttpLink } from '@apollo/client/link/batch-http';
-import { getEnvVarRequired } from '@legacy-sports/env-utilities';
-import { GetPlayerByBrefId } from './api/db/graphql.generated';
+import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
+import memoizeOne from 'memoize-one';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
-import {LOGGER} from '@legacy-sports/logging'
-import fetch from 'cross-fetch';
+import { LOGGER } from '@legacy-sports/logging';
+import { getDbOptions } from '@legacy-sports/utils';
+import {
+  getDbConnection,
+  getPlayerByBrefId,
+  PublicSchema,
+} from '@legacy-sports/db-client';
+import { BaseDbConnection } from 'lib/db-client/src/lib/client/abstract/BaseDbClient';
 
-enum EnvironmentVariable {
-  GRAPHQL_HOST = 'GRAPHQL_HOST',
-}
+const getDb = memoizeOne(async () => {
+  const opts = getDbOptions();
+  const connection = getDbConnection(opts, PublicSchema);
+
+  await connection.initialize();
+
+  return connection;
+});
 
 async function loadPlayer(
-  client: ApolloClient<NormalizedCacheObject>,
-  brefId: string,
+  dbClient: BaseDbConnection<typeof PublicSchema>,
+  brefId: string
 ): Promise<void> {
   LOGGER.debug(`Importing ${brefId}`);
 
-  const response = await client.query({
-    query: GetPlayerByBrefId,
-    variables: {
-      brefId: brefId,
-    },
-  });
-
-  const player = response.data.playerByBrefId;
+  const player = await getPlayerByBrefId(dbClient.db, brefId);
 
   if (!player) {
     throw new Error(`Could not find player ${brefId}`);
   }
 
-  await loadCareerStats(client, player.brefId);
+  await loadCareerStats(dbClient.db, player.brefId);
 }
 
-export const handler = async (event: SQSEvent) => {
+export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   LOGGER.debug(event);
 
-  const gqlHost = getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST);
-
-  const client = new ApolloClient({
-    link: new BatchHttpLink({
-      uri: gqlHost,
-      fetch: fetch,
-    }),
-    cache: new InMemoryCache(),
-  });
+  const dbClient = await getDb();
 
   for (const record of event.Records) {
-    await loadPlayer(client, JSON.parse(record.body));
+    await loadPlayer(dbClient, JSON.parse(record.body) as string);
   }
 
+  await dbClient.close();
+
   LOGGER.debug('done');
+
+  return {
+    batchItemFailures: [],
+  };
 };

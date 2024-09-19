@@ -28,14 +28,14 @@ jobs:
 
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
-      
-      - name: Setup Python
-        uses: ./.github/workflows/setup-python
 
       - uses: nrwl/nx-set-shas@v4
 
-      - name: "NX Actions"
-        run: npx nx affected -t lint build test
+      - name: 'NX Setup'
+        run: npx nx affected -t setup-ci
+
+      - name: 'NX Actions'
+        run: npx nx affected -t lint build test format bundle prebuild
 
   build-ios:
     if: ${{ vars.BUILD_IOS == 'true' }}
@@ -52,10 +52,10 @@ jobs:
       - uses: nrwl/nx-set-shas@v4
 
       # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
-      - name: "Build Image"
+      - name: 'Build Image'
         run: npx nx build-ios app
 
-      - name: "Run Tests"
+      - name: 'Run Tests'
         run: npx nx test-ios app
 
   build-android:
@@ -73,15 +73,14 @@ jobs:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '21'
 
-
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
       - uses: nrwl/nx-set-shas@v4
 
       # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
-      - name: "Build Image"
+      - name: 'Build Image'
         run: npx nx build-android app
 
-      - name: "Run Tests"
+      - name: 'Run Tests'
         run: npx nx test-android app

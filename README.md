@@ -4,10 +4,15 @@
 
 [![Publish GQL](https://github.com/bkrupa/legacy-sports/actions/workflows/publish-gql.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/publish-gql.yml)
 
-
 ## Issues
+
 Do not add composite - causes build error when running
 swc issue - updated to new version of swc
+
+## AWS Config
+
+Enable Lambda access to public internet:
+https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 

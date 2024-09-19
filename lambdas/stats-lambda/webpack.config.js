@@ -10,7 +10,18 @@ const config = applyBaseConfig({
     libraryTarget: 'commonjs',
   },
   entry: {
-    "load-career": './src/load-career.ts',
+    'load-career': './src/load-career.ts',
+  },
+  externals: {
+    pg: true,
+    'pg-hstore': true,
+    '@sequelize/mysql': true,
+    '@sequelize/db2': true,
+    '@sequelize/db2-ibmi': true,
+    '@sequelize/sqlite3': true,
+    '@sequelize/mssql': true,
+    '@sequelize/mariadb': true,
+    '@sequelize/snowflake': true,
   },
   mode: 'production',
   target: 'node',
@@ -30,7 +41,7 @@ const config = applyBaseConfig({
     // Just in case you install express:
     new webpack.NormalModuleReplacementPlugin(
       /express\/lib\/view\.js$/,
-      `${__dirname}/mocks/express-lib-view.js`,
+      `${__dirname}/mocks/express-lib-view.js`
     ),
   ],
   node: {

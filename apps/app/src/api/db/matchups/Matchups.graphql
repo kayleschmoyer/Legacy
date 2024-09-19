@@ -1,0 +1,23 @@
+fragment Matchup on Matchup {
+  id
+  weekNumber
+  leagueId
+  numberOfGames
+}
+
+query GetMatchupStats($matchupId: Int!) {
+  matchupPlayers(condition: { matchupId: $matchupId }) {
+    nodes {
+      playerId
+      aggregateSeasonPitchingByPlayerIdAndSeason {
+        ...AggregateSeasonPitchingStats
+      }
+      aggregateSeasonFieldingByPlayerIdAndSeason {
+        ...AggregateSeasonFieldingStats
+      }
+      aggregateSeasonBattingByPlayerIdAndSeason {
+        ...AggregateSeasonBattingStats
+      }
+    }
+  }
+}

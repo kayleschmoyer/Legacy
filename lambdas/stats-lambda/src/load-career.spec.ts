@@ -1,5 +1,5 @@
 describe('load-stats-lambda', () => {
-  it('runs', async () => {
+  it('runs', () => {
     expect(true).toBe(true);
   });
 });

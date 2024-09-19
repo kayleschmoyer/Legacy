@@ -30,8 +30,8 @@ export function useGetUserByEmailLazyQuery(baseOptions?: Apollo.LazyQueryHookOpt
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>(Operations.GetUserByEmail, options);
         }
-export function useGetUserByEmailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
+export function useGetUserByEmailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<Types.GetUserByEmailQuery, Types.GetUserByEmailQueryVariables>(Operations.GetUserByEmail, options);
         }
 export type GetUserByEmailQueryHookResult = ReturnType<typeof useGetUserByEmailQuery>;
@@ -52,6 +52,9 @@ export type GetUserByEmailQueryResult = Apollo.QueryResult<Types.GetUserByEmailQ
  * const { data, loading, error } = useGetLeaguesForUserQuery({
  *   variables: {
  *      id: // value for 'id'
+ *      withMembers: // value for 'withMembers'
+ *      withMatchup: // value for 'withMatchup'
+ *      withTeams: // value for 'withTeams'
  *   },
  * });
  */
@@ -63,8 +66,8 @@ export function useGetLeaguesForUserLazyQuery(baseOptions?: Apollo.LazyQueryHook
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>(Operations.GetLeaguesForUser, options);
         }
-export function useGetLeaguesForUserSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
+export function useGetLeaguesForUserSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<Types.GetLeaguesForUserQuery, Types.GetLeaguesForUserQueryVariables>(Operations.GetLeaguesForUser, options);
         }
 export type GetLeaguesForUserQueryHookResult = ReturnType<typeof useGetLeaguesForUserQuery>;
@@ -96,8 +99,8 @@ export function useGetUserByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOption
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>(Operations.GetUserById, options);
         }
-export function useGetUserByIdSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
+export function useGetUserByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<Types.GetUserByIdQuery, Types.GetUserByIdQueryVariables>(Operations.GetUserById, options);
         }
 export type GetUserByIdQueryHookResult = ReturnType<typeof useGetUserByIdQuery>;

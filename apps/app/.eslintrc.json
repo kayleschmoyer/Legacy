@@ -1,28 +1,6 @@
 {
   "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
   "ignorePatterns": ["!**/*", ".expo", "web-build", "cache", "dist"],
-  "rules": {
-    "sort-imports": [
-      "error",
-      {
-        "ignoreCase": true,
-        "ignoreDeclarationSort": true
-      }
-    ],
-    "import/order": [
-      1,
-      {
-        "groups": [
-          "external",
-          "builtin",
-          "internal",
-          "sibling",
-          "parent",
-          "index"
-        ]
-      }
-    ]
-  },
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
@@ -30,17 +8,14 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
+      "parserOptions": {
+        "project": ["tsconfig.*?.json"]
+      },
       "rules": {}
     },
     {
       "files": ["*.js", "*.jsx"],
       "rules": {}
-    },
-    {
-      "files": ["*.ts", "*.tsx"],
-      "rules": {
-        "@typescript-eslint/no-var-requires": "off"
-      }
     }
   ]
 }

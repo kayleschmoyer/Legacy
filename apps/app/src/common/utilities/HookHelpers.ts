@@ -1,4 +1,5 @@
-import { DependencyList, useEffect, useState } from 'react';
+import { getMessageFromError } from '@legacy-sports/utils';
+import { useEffect, useState } from 'react';
 
 export interface AsyncHookResult<T> {
   loading: boolean;
@@ -7,33 +8,30 @@ export interface AsyncHookResult<T> {
 }
 
 export function useAsyncHook<T>(
-  promiseCreator: () => Promise<T>,
-  dependencies: DependencyList,
+  promiseCreator: () => Promise<T>
 ): AsyncHookResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const awaitPromise = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const result = await promiseCreator();
+    promiseCreator()
+      .then((result) => {
         setData(result);
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err);
-        } else if (typeof err === 'string') {
-          setError(new Error(err));
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    awaitPromise();
-  }, [setData, setLoading, setError, ...dependencies]);
+      })
+      .catch((err) => {
+        const message = getMessageFromError(err);
+        setError(new Error(message));
+      })
+      .finally(() => setLoading(false));
+  }, [setData, setLoading, setError, promiseCreator]);
 
-  return { data, loading, error };
+  return {
+    data,
+    error,
+    loading,
+  };
 }

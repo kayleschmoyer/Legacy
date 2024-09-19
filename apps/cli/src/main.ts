@@ -1,5 +1,7 @@
+import './.startup';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { logError } from '@legacy-sports/utils';
 import {
   handleLoadPlayers,
   loadPlayersCommandBuilder,
@@ -8,7 +10,18 @@ import {
   handleLoadCareerStats,
   loadCareerStatsCommandBuilder,
 } from './commands/loadCareerStats';
-import { LOGGER } from '@legacy-sports/logging';
+import {
+  computeScoringCommandBuilder,
+  handleComputeScoring,
+} from './commands/computeScoring';
+import {
+  runMigrations,
+  runMigrationsCommandBuilder,
+} from './commands/runMigrations';
+import {
+  createMatchupCommandBuilder,
+  handleCreateMatchup,
+} from './commands/createMatchup';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -17,7 +30,20 @@ async function run(): Promise<void> {
       'load-career-stats',
       '',
       loadCareerStatsCommandBuilder,
-      handleLoadCareerStats,
+      handleLoadCareerStats
+    )
+    .command(
+      'compute-scoring',
+      '',
+      computeScoringCommandBuilder,
+      handleComputeScoring
+    )
+    .command('run-migrations', '', runMigrationsCommandBuilder, runMigrations)
+    .command(
+      'create-matchup',
+      'Creates the matchup records for players in the matchup',
+      createMatchupCommandBuilder,
+      handleCreateMatchup
     )
     .demandCommand()
     .help()
@@ -25,12 +51,6 @@ async function run(): Promise<void> {
 }
 
 run().catch((err: unknown) => {
-  if (err instanceof Error) {
-    LOGGER.error(err.message);
-    LOGGER.debug(JSON.stringify(err));
-    LOGGER.debug(err.stack);
-  } else if (typeof err === 'string') {
-    LOGGER.error(err);
-  }
+  logError(err);
   process.exit(1);
 });

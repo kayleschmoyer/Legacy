@@ -1,30 +1,23 @@
 import { Argv } from 'yargs';
-import {
-  ApolloClient,
-  ApolloQueryResult,
-  InMemoryCache,
-  NormalizedCacheObject,
-} from '@apollo/client';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
-import { BatchHttpLink } from '@apollo/client/link/batch-http';
 import axios from 'axios';
-import {
-  GetAllPlayers,
-  GetAllPlayersQuery,
-  PlayerFragment,
-} from '../api/db/graphql.generated';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
+import {
+  getPlayersOnTeams,
+  runWithPublicClient,
+} from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 export const loadCareerStatsCommandBuilder = (argv: Argv) =>
   argv
     .usage('load-career-stats')
     .option('remote', {
+      default: false,
       type: 'boolean',
-      default: true,
     })
-    .demand('remote');
+    .demandOption('remote');
 
 type ArgsType<T> = T extends Argv<infer P> ? P : never;
 
@@ -38,65 +31,33 @@ type HandleLoadCareerStatsArgs = ArgsType<
   ReturnType<typeof loadCareerStatsCommandBuilder>
 >;
 
-async function fetchAllPlayers(
-  client: ApolloClient<NormalizedCacheObject>,
-): Promise<PlayerFragment[]> {
-  let cursor = null;
-  let hasNext = true;
-  const result: PlayerFragment[] = [];
+export async function handleLoadCareerStats(
+  args: HandleLoadCareerStatsArgs
+): Promise<void> {
+  LOGGER.debug('Loading Player Stats');
 
-  let response: ApolloQueryResult<GetAllPlayersQuery>;
+  const opts = getDbOptions();
 
-  while (hasNext) {
-    response = await client.query({
-      query: GetAllPlayers,
-      variables: {
-        after: cursor,
-      },
-    });
+  await runWithPublicClient(opts, async (db) => {
+    const players = await getPlayersOnTeams(db);
 
-    const players = response.data.players?.nodes;
+    const errors = [];
 
-    if (players) {
-      for (const player of players) {
-        if (player) {
-          result.push(player);
+    for (const player of players) {
+      LOGGER.info(`Loading Player ${player.brefId}`);
+      try {
+        if (args.remote) {
+          await insertIntoSqs(player.brefId);
+        } else {
+          await loadCareerStats(db, player.brefId);
         }
+      } catch (err) {
+        LOGGER.error(err);
+        errors.push(err);
       }
     }
 
-    cursor = response.data.players?.pageInfo.endCursor;
-    hasNext = !!response.data.players?.pageInfo.hasNextPage;
-  }
-
-  return result;
-}
-
-export async function handleLoadCareerStats(
-  args: HandleLoadCareerStatsArgs,
-): Promise<void> {
-  LOGGER.debug('Loading Player Stats');
-  const gqlHost = getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST);
-
-  const client = new ApolloClient({
-    link: new BatchHttpLink({
-      uri: gqlHost,
-      batchMax: 5,
-      batchInterval: 20,
-    }),
-    cache: new InMemoryCache(),
+    LOGGER.info(`Created ${players.length} players`);
+    LOGGER.error(errors);
   });
-
-  const players = await fetchAllPlayers(client);
-
-  for (const player of players) {
-    LOGGER.info(`Loading Player ${player.brefId}`);
-    if (args.remote) {
-      await insertIntoSqs(player.brefId);
-    } else {
-      await loadCareerStats(client, player.brefId);
-    }
-  }
-
-  LOGGER.info(`Created ${players.length} players`);
 }

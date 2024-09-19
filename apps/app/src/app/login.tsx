@@ -15,26 +15,26 @@ const Login: React.FC = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
-    undefined,
+    undefined
   );
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: 1,
       duration: 500,
+      toValue: 1,
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
 
   const { googleLogin } = useAuthHandlers({
-    onSuccess: () => {
-      setIsLoading(false);
-      router.replace('/');
-    },
     onFailure: (err) => {
       setIsLoading(false);
       setErrorMessage(err);
+    },
+    onSuccess: () => {
+      setIsLoading(false);
+      router.replace('/');
     },
   });
 
@@ -73,43 +73,49 @@ const Login: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
   },
-  logo: {
-    width: 200,
-    height: 200,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
+  errorMessage: {
+    color: 'red',
+    marginTop: 10,
   },
   formContainer: {
     width: '100%',
   },
   input: {
-    width: '100%',
-    height: 40,
-    borderWidth: 1,
     borderColor: 'gray',
+    borderWidth: 1,
+    height: 40,
     marginBottom: 10,
     paddingHorizontal: 10,
+    width: '100%',
+  },
+  loadingIndicator: {
+    marginTop: 20,
   },
   loginButton: {
     backgroundColor: 'green',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
     borderRadius: 5,
     marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   loginButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  logo: {
+    height: 200,
+    marginBottom: 20,
+    width: 200,
+  },
+  registerLink: {
+    color: 'blue',
+    textDecorationLine: 'underline',
   },
   registerLinkContainer: {
     marginTop: 15,
@@ -117,16 +123,10 @@ const styles = StyleSheet.create({
   registerLinkText: {
     fontSize: 16,
   },
-  registerLink: {
-    color: 'blue',
-    textDecorationLine: 'underline',
-  },
-  errorMessage: {
-    color: 'red',
-    marginTop: 10,
-  },
-  loadingIndicator: {
-    marginTop: 20,
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 30,
   },
 });
 

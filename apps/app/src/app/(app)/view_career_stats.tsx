@@ -1,6 +1,8 @@
+import axios from 'axios';
 import * as React from 'react';
 import { Button, ScrollView, Text, TextInput } from 'react-native';
 import { Row, Table } from 'react-native-table-component';
+import { handleError } from '../../common/utilities/ErrorHandler';
 
 export default function ViewCareerStats(): JSX.Element {
   const [player, setPlayer] = React.useState('');
@@ -8,23 +10,18 @@ export default function ViewCareerStats(): JSX.Element {
     Record<string, Record<string, string | number>> | undefined
   >(undefined);
 
-  const getGameLog = async () => {
-    const response = await fetch(
-      'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
-      {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+  const getGameLog = () => {
+    axios
+      .post<Record<string, Record<string, string | number>>>(
+        'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
+        {
           player_id: player,
-        }),
-      },
-    );
-
-    const result = await response.json();
-    setData(result);
+        }
+      )
+      .then((r) => {
+        setData(r.data);
+      })
+      .catch(handleError);
   };
 
   return (

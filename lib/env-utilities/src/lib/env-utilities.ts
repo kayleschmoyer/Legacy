@@ -9,8 +9,16 @@ export function getEnvVarRequired<T extends string>(envVar: T): string {
 }
 
 export function getEnvVarOptional<T extends string>(
-  envVar: T,
+  envVar: T
 ): string | undefined {
   const value = process.env[envVar];
   return value;
+}
+
+export function getEnvVarWithDefault<T extends string>(
+  envVar: T,
+  defaultValue: string
+): string {
+  const result = getEnvVarOptional(envVar);
+  return result === undefined ? defaultValue : result;
 }

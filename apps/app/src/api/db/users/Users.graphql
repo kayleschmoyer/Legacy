@@ -1,9 +1,6 @@
 fragment User on User {
   id
   email
-  about
-  isAdmin
-  name
   username
 }
 
@@ -13,7 +10,12 @@ query GetUserByEmail($email: String!) {
   }
 }
 
-query GetLeaguesForUser($id: Int!) {
+query GetLeaguesForUser(
+  $id: Int!
+  $withMembers: Boolean = false
+  $withMatchup: Boolean = false
+  $withTeams: Boolean = false
+) {
   user(id: $id) {
     leagueMembers {
       nodes {

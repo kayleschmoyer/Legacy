@@ -1,11 +1,11 @@
-import { SafeAreaView, StyleSheet, TouchableOpacity } from 'react-native';
-import {  Text, View } from 'tamagui';
-import {  useState } from 'react';
+import { SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Text } from '@ui-kitten/components';
 import {
   BattingStatsTableWithData,
   FieldingStatsTableWithData,
   PitchingStatsTableWithData,
-} from 'apps/app/src/features/stats/UsefulTables';
+} from '../../../features/stats/UsefulTables';
 
 enum TableView {
   BATTING,
@@ -47,19 +47,19 @@ export default function Players(): JSX.Element {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: 'lightcyan',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopColor: '#333333',
-    borderTopWidth: 1,
+    flex: 1,
   },
   tab: {
-    height: 50,
-    flex: 1,
     alignItems: 'center',
+    flex: 1,
+    height: 50,
     justifyContent: 'center',
+  },
+  tabBar: {
+    borderTopColor: '#333333',
+    borderTopWidth: 1,
+    flexDirection: 'row',
   },
   tabText: {
     color: 'darkblue',

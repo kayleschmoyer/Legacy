@@ -1,13 +1,13 @@
-import { getTable, getTableBody, RowParser } from './HtmlParser';
 import htmlParser, { HTMLElement } from 'node-html-parser';
-import { getCareerStats as getCareerStatsFromBref } from './BRefSession';
+import { LOGGER } from '@legacy-sports/logging';
 import {
-  PlayerFragment,
+  Player,
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
-} from '../api/db/graphql.generated';
-import { LOGGER } from '@legacy-sports/logging';
+} from '@legacy-sports/db-client';
+import { getCareerStats as getCareerStatsFromBref } from './BRefSession';
+import { getTable, getTableBody, RowParser } from './HtmlParser';
 
 const StatMapping: Record<
   string,
@@ -23,24 +23,24 @@ const StatMapping: Record<
   BATTING_AVG: 'battingAvg',
   BB: 'bb',
   BK: 'bk',
-  CAUGHT_STEALING_PERC_LG: 'caughtStealingPercLg',
   CAUGHT_STEALING_PERC: 'caughtStealingPerc',
+  CAUGHT_STEALING_PERC_LG: 'caughtStealingPercLg',
   CG: 'cg',
   CHANCES: 'chances',
   CS: 'cs',
   DP_DEF: 'dpDef',
-  E_DEF: 'eDef',
-  EARNED_RUN_AVG_PLUS: 'earnedRunAvgPlus',
   EARNED_RUN_AVG: 'earnedRunAvg',
+  EARNED_RUN_AVG_PLUS: 'earnedRunAvgPlus',
   ER: 'er',
-  FIELDING_PERC_LG: 'fieldingPercLg',
+  E_DEF: 'eDef',
   FIELDING_PERC: 'fieldingPerc',
+  FIELDING_PERC_LG: 'fieldingPercLg',
   FIP: 'fip',
-  G_OF_PARTS: 'gOfParts',
   G: 'g',
   GF: 'gf',
   GIDP: 'gidp',
   GS: 'gs',
+  G_OF_PARTS: 'gOfParts',
   H: 'h',
   HBP: 'hbp',
   HITS_PER_NINE: 'hitsPerNine',
@@ -52,18 +52,18 @@ const StatMapping: Record<
   L: 'l',
   LG_ID: 'lgId',
   ONBASE_PERC: 'onbasePerc',
-  ONBASE_PLUS_SLUGGING_PLUS: 'onbasePlusSluggingPlus',
   ONBASE_PLUS_SLUGGING: 'onbasePlusSlugging',
+  ONBASE_PLUS_SLUGGING_PLUS: 'onbasePlusSluggingPlus',
   PA: 'pa',
   PICKOFFS: 'pickoffs',
   PO: 'po',
   POS: 'pos',
   POS_SEASON: 'posSeason',
   R: 'r',
-  RANGE_FACTOR_PER_GAME_LG: 'rangeFactorPerGameLg',
   RANGE_FACTOR_PER_GAME: 'rangeFactorPerGame',
-  RANGE_FACTOR_PER_NINE_LG: 'rangeFactorPerNineLg',
+  RANGE_FACTOR_PER_GAME_LG: 'rangeFactorPerGameLg',
   RANGE_FACTOR_PER_NINE: 'rangeFactorPerNine',
+  RANGE_FACTOR_PER_NINE_LG: 'rangeFactorPerNineLg',
   RBI: 'rbi',
   SB: 'sb',
   SF: 'sf',
@@ -149,20 +149,27 @@ const NUMERIC_STATS = Object.freeze(
     'whip',
     'winLossPerc',
     'wp',
-  ]),
+  ])
 );
 
 function parseRow<T extends object>(
   row: HTMLElement,
-  playerId: number,
+  playerId: number
 ): T | null {
   const headers = row.getElementsByTagName('th');
   const cols = row.getElementsByTagName('td');
 
   const allCells = headers.concat(cols);
 
+  const yearCell = allCells.find(
+    (c) => c.getAttribute('data-stat') === 'year_ID'
+  );
+
+  const rowId = yearCell?.getAttribute('csk');
+
   const stats: T = {
     playerId: playerId,
+    rowId: !rowId ? yearCell?.text : rowId,
   } as T;
 
   for (const col of allCells) {
@@ -181,8 +188,24 @@ function parseRow<T extends object>(
       continue;
     }
 
+    let value: string | number | null = text === '' ? null : text;
+
+    if (NUMERIC_STATS.has(statField) && value !== null) {
+      if (value === 'inf') {
+        value = null;
+      } else {
+        value = parseFloat(text);
+
+        if (isNaN(value)) {
+          throw new Error(
+            `Unable to parse field ${statField}: ${text} is not a number`
+          );
+        }
+      }
+    }
+
     Object.assign(stats, {
-      [statField]: NUMERIC_STATS.has(statField) ? parseFloat(text) : text,
+      [statField]: value,
     });
   }
 
@@ -195,7 +218,7 @@ function parseRow<T extends object>(
 
 export function parseTable<T extends object>(
   table: HTMLElement | null,
-  parser: RowParser<T>,
+  parser: RowParser<T>
 ): T[] {
   if (table === null) {
     return [];
@@ -235,17 +258,17 @@ function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
 
 function getFieldingStats(
   root: HTMLElement,
-  playerId: number,
+  playerId: number
 ): SeasonFielding[] {
   const fieldingStats = getTable(root, 'standard_fielding');
   return parseTable<SeasonFielding>(fieldingStats, (r) =>
-    parseRow(r, playerId),
+    parseRow(r, playerId)
   );
 }
 
 function getPitchingStats(
   root: HTMLElement,
-  playerId: number,
+  playerId: number
 ): SeasonPitching[] {
   const pitchingStats = getTable(root, 'pitching_standard');
   return parseTable(pitchingStats, (r) => parseRow(r, playerId));
@@ -257,9 +280,7 @@ export interface CareerStats {
   fielding: SeasonFielding[];
 }
 
-export async function getCareerStats(
-  player: PlayerFragment,
-): Promise<CareerStats> {
+export async function getCareerStats(player: Player): Promise<CareerStats> {
   const html = await getCareerStatsFromBref(player.brefId);
   const root = htmlParser(html, {
     comment: true,
@@ -267,7 +288,7 @@ export async function getCareerStats(
 
   return {
     batting: getBattingStats(root, player.id),
-    pitching: getPitchingStats(root, player.id),
     fielding: getFieldingStats(root, player.id),
+    pitching: getPitchingStats(root, player.id),
   };
 }

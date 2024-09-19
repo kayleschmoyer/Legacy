@@ -8,10 +8,13 @@ import 'graphiql/graphiql.css';
 import '@graphiql/plugin-explorer/dist/style.css';
 import './main.css';
 
+const rootEl = document.getElementById('root');
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement,
-);
+if (rootEl === null) {
+  throw new Error('Could not find root element');
+}
+
+const root = ReactDOM.createRoot(rootEl);
 
 // Can't do this dynamically because webpack doesn't bind dynamic vars
 const GRAPHQL_HOST = process.env.GRAPHQL_HOST || '';
@@ -25,5 +28,5 @@ const plugins = [explorerPlugin()];
 root.render(
   <StrictMode>
     <GraphiQL fetcher={fetcher} plugins={plugins} />
-  </StrictMode>,
+  </StrictMode>
 );

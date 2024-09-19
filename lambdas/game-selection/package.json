@@ -1,0 +1,11 @@
+{
+  "name": "@legacy-sports/game-selection",
+  "version": "1.0.0",
+  "main": "webpack.config.js",
+  "scripts": {
+    "dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/dev.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

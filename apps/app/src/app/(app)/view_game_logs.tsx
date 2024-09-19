@@ -1,6 +1,8 @@
+import axios from 'axios';
 import * as React from 'react';
 import { Button, ScrollView, Text, TextInput } from 'react-native';
 import { Row, Table } from 'react-native-table-component';
+import { handleError } from '../../common/utilities/ErrorHandler';
 
 export default function ViewGameLogs(): JSX.Element {
   const [player, setPlayer] = React.useState('');
@@ -10,45 +12,38 @@ export default function ViewGameLogs(): JSX.Element {
   >(undefined);
   const [stats, setStats] = React.useState<Array<string>>([]);
 
-  const getGameLog = async () => {
-    const response = await fetch(
-      'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
-      {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+  const getGameLog = () => {
+    axios
+      .post<Record<string, Record<string, string | number>>>(
+        'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
+        {
           game_date: date,
           player_id: player,
-        }),
-      },
-    );
+        }
+      )
+      .then((response) => {
+        const serverData = response.data;
 
-    const serverData: Record<
-      string,
-      Record<string, string | number>
-    > = await response.json();
+        const games: Record<string, Record<string, string | number>> = {};
+        const gameStats: Set<string> = new Set();
 
-    const games: Record<string, Record<string, string | number>> = {};
-    const gameStats: Set<string> = new Set();
+        for (const key of Object.keys(serverData)) {
+          gameStats.add(key);
+          const statData = serverData[key];
 
-    for (const key of Object.keys(serverData)) {
-      gameStats.add(key);
-      const statData = serverData[key];
+          for (const gameNum of Object.keys(statData)) {
+            if (!(gameNum in games)) {
+              games[gameNum] = {};
+            }
 
-      for (const gameNum of Object.keys(statData)) {
-        if (!(gameNum in games)) {
-          games[gameNum] = {};
+            games[gameNum][key] = statData[gameNum];
+          }
         }
 
-        games[gameNum][key] = statData[gameNum];
-      }
-    }
-
-    setData(games);
-    setStats(Array.from(gameStats));
+        setData(games);
+        setStats(Array.from(gameStats));
+      })
+      .catch(handleError);
   };
 
   return (

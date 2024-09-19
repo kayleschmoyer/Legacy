@@ -1,26 +1,26 @@
-import { configure } from '@codegenie/serverless-express';
-import { createApplication } from './app';
-import { APIGatewayEvent, Context, Callback } from 'aws-lambda';
-import { getDbCreds } from './DbCredentials';
+import { createServer, proxy } from 'aws-serverless-express';
+import { APIGatewayEvent, Callback, Context } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
+import memoizeOne from 'memoize-one';
+import { createApplication } from './app';
+
+const getServer = memoizeOne(async () => {
+  const app = await createApplication();
+
+  const server = createServer(app);
+  return server;
+});
 
 export const handler = async (
   event: APIGatewayEvent,
   context: Context,
-  callback: Callback,
+  callback: Callback
 ) => {
   LOGGER.debug(event);
 
-  const { dbUsername, dbPassword } = await getDbCreds();
-
-  LOGGER.debug('Creating Server');
-  const app = createApplication(dbUsername, dbPassword);
+  const server = await getServer();
 
   LOGGER.debug('Proxying Request');
 
-  const expressHandler = configure({
-    app: app,
-  });
-
-  return await expressHandler(event, context, callback);
+  proxy(server, event, context, 'CALLBACK', callback);
 };

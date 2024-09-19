@@ -1,5 +1,5 @@
 import PgSimplifyInflectorPlugin from '@graphile-contrib/pg-simplify-inflector';
-import { PostGraphileOptions } from 'postgraphile';
+import { Plugin, PostGraphileOptions } from 'postgraphile';
 import { PgMutationUpsertPlugin } from 'postgraphile-upsert-plugin';
 
 /**
@@ -7,12 +7,8 @@ import { PgMutationUpsertPlugin } from 'postgraphile-upsert-plugin';
  * https://stackoverflow.com/questions/76899023/rds-while-connection-error-no-pg-hba-conf-entry-for-host
  */
 export const options: PostGraphileOptions = {
-  appendPlugins: [PgSimplifyInflectorPlugin, PgMutationUpsertPlugin],
+  appendPlugins: [PgSimplifyInflectorPlugin as Plugin, PgMutationUpsertPlugin],
   dynamicJson: true,
-  graphiql: false,
-  graphqlRoute: '/graphql',
-  externalUrlBase: `/${process.env['AWS_STAGE']}`,
-  legacyRelations: 'omit',
   enableQueryBatching: true,
   extendedErrors: [
     'severity',
@@ -32,11 +28,10 @@ export const options: PostGraphileOptions = {
     'line',
     'routine',
   ],
-  showErrorStack: true,
+  externalUrlBase: `/${process.env['AWS_STAGE']}`,
   graphileBuildOptions: {
     orderByNullsLast: true,
-  }
-
+  },
   // If consuming JWT:
   // jwtSecret: process.env.JWT_SECRET || String(Math.random()),
   // If generating JWT:
@@ -45,10 +40,13 @@ export const options: PostGraphileOptions = {
   /* If you want to enable GraphiQL, you must use `externalUrlBase` so PostGraphile
    * knows where to tell the browser to find the assets.  Doing this is
    * strongly discouraged, you should use an external GraphQL client instead.
-
-    graphiql: true,
+     graphiql: true,
     enhanceGraphiql: true,
     graphqlRoute: '/',
     graphiqlRoute: '/graphiql',
   */
+  graphiql: false,
+  graphqlRoute: '/graphql',
+  legacyRelations: 'omit',
+  showErrorStack: true,
 };

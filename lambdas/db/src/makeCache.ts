@@ -1,45 +1,32 @@
 // This script is called from scripts/generate-cache
-import { readFileSync } from 'fs';
-import { Pool } from 'pg';
-import { createPostGraphileSchema } from 'postgraphile';
-import { options } from './postgraphileOptions';
-import { config } from 'dotenv';
-import {
-  getEnvVarOptional,
-  getEnvVarRequired,
-} from '@legacy-sports/env-utilities';
-import { EnvironmentVariable } from './Environment';
+import './.startup';
 import { LOGGER } from '@legacy-sports/logging';
+import { PgDbConnection, PublicSchema } from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
+import { createPostGraphileSchema } from 'postgraphile';
+import { resolve } from 'path';
+import { options } from './postgraphileOptions';
 
-config();
+async function main(): Promise<void> {
+  LOGGER.debug('Making DB Cache');
 
-const schemas = process.env['DATABASE_SCHEMAS']
-  ? process.env['DATABASE_SCHEMAS'].split(',')
-  : ['app_public'];
+  const opts = getDbOptions();
 
-const certLocation = getEnvVarOptional(EnvironmentVariable.DB_CERT_LOCATION);
+  const certPath = 'dbCertPath' in opts ? opts.dbCertPath : undefined;
 
-async function main() {
-  const pgPool = new Pool({
-    host: getEnvVarRequired(EnvironmentVariable.DB_HOST),
-    password: getEnvVarRequired(EnvironmentVariable.DB_PASSWORD),
-    user: getEnvVarRequired(EnvironmentVariable.DB_USER),
-    ssl:
-      certLocation === undefined
-        ? undefined
-        : {
-            ca: readFileSync(certLocation).toString(),
-          },
-  });
-  await createPostGraphileSchema(pgPool, schemas, {
+  const db = new PgDbConnection(certPath, PublicSchema);
+  await db.initialize();
+
+  await createPostGraphileSchema(db.client, ['public'], {
     ...options,
     readCache: undefined,
-    writeCache: `${__dirname}/../dist/postgraphile.cache`,
+    writeCache: resolve(__dirname, '../dist/postgraphile.cache'),
   });
-  await pgPool.end();
+
+  await db.close();
 }
 
-main().then(null, (e) => {
+main().catch((e) => {
   LOGGER.error(e);
   process.exit(1);
 });

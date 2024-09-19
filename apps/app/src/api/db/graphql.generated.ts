@@ -8,12 +8,16 @@ export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: 
 export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
 export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
 export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
-export const LeagueFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}}]}}]} as unknown as DocumentNode<LeagueFragment, unknown>;
-export const UserFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<UserFragment, unknown>;
-export const LeagueMemberFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<LeagueMemberFragment, unknown>;
+export const UserFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<UserFragment, unknown>;
+export const LeagueMemberFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<LeagueMemberFragment, unknown>;
+export const MatchupFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Matchup"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Matchup"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"weekNumber"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"numberOfGames"}}]}}]} as unknown as DocumentNode<MatchupFragment, unknown>;
 export const TeamFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]} as unknown as DocumentNode<TeamFragment, unknown>;
-export const LeaguesWithTeamsAndMembersFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeaguesWithTeamsAndMembers"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]} as unknown as DocumentNode<LeaguesWithTeamsAndMembersFragment, unknown>;
+export const LeagueFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}},{"kind":"Field","name":{"kind":"Name","value":"currentMatchup"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"matchupByCurrentMatchup"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Matchup"}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Matchup"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Matchup"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"weekNumber"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"numberOfGames"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]} as unknown as DocumentNode<LeagueFragment, unknown>;
+export const LeaguePositionFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeaguePosition"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeaguePosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"positionType"}}]}}]} as unknown as DocumentNode<LeaguePositionFragment, unknown>;
 export const LeagueMessageFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMessage"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"messageText"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]}}]} as unknown as DocumentNode<LeagueMessageFragment, unknown>;
+export const AggregateSeasonBattingStatsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonBattingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ab"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"doubles"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gidp"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"pa"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"rbi"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"sh"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"tb"}},{"kind":"Field","name":{"kind":"Name","value":"triples"}}]}}]} as unknown as DocumentNode<AggregateSeasonBattingStatsFragment, unknown>;
+export const AggregateSeasonFieldingStatsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonFieldingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"a"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"chances"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"dpDef"}},{"kind":"Field","name":{"kind":"Name","value":"eDef"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"innDef"}},{"kind":"Field","name":{"kind":"Name","value":"pickoffs"}},{"kind":"Field","name":{"kind":"Name","value":"po"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}}]} as unknown as DocumentNode<AggregateSeasonFieldingStatsFragment, unknown>;
+export const AggregateSeasonPitchingStatsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonPitchingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"battersFaced"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"bk"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"er"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gf"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"l"}},{"kind":"Field","name":{"kind":"Name","value":"outsRecorded"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"sho"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"sv"}},{"kind":"Field","name":{"kind":"Name","value":"w"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}}]} as unknown as DocumentNode<AggregateSeasonPitchingStatsFragment, unknown>;
 export const CareerBattingStatsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerBattingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ab"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"doubles"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gidp"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"pa"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"rbi"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"sh"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"tb"}},{"kind":"Field","name":{"kind":"Name","value":"triples"}}]}}]} as unknown as DocumentNode<CareerBattingStatsFragment, unknown>;
 export const PlayerFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}}]} as unknown as DocumentNode<PlayerFragment, unknown>;
 export const CareerBattingStatsWithPlayerFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerBattingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerBattingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerBattingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ab"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"doubles"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gidp"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"pa"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"rbi"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"sh"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"tb"}},{"kind":"Field","name":{"kind":"Name","value":"triples"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}}]} as unknown as DocumentNode<CareerBattingStatsWithPlayerFragment, unknown>;
@@ -21,38 +25,67 @@ export const CareerPitchingStatsFragmentDoc = {"kind":"Document","definitions":[
 export const CareerPitchingStatsWithPlayerFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerPitchingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerPitchingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerPitchingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"battersFaced"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"bk"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"er"}},{"kind":"Field","name":{"kind":"Name","value":"era"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gf"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"l"}},{"kind":"Field","name":{"kind":"Name","value":"outRate"}},{"kind":"Field","name":{"kind":"Name","value":"outsRecorded"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"sho"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"sv"}},{"kind":"Field","name":{"kind":"Name","value":"w"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}}]} as unknown as DocumentNode<CareerPitchingStatsWithPlayerFragment, unknown>;
 export const CareerFieldingStatsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerFieldingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"a"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"chances"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"dpDef"}},{"kind":"Field","name":{"kind":"Name","value":"eDef"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"innDef"}},{"kind":"Field","name":{"kind":"Name","value":"pickoffs"}},{"kind":"Field","name":{"kind":"Name","value":"po"}},{"kind":"Field","name":{"kind":"Name","value":"pos"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}}]} as unknown as DocumentNode<CareerFieldingStatsFragment, unknown>;
 export const CareerFieldingStatsWithPlayerFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerFieldingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerFieldingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerFieldingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"a"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"chances"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"dpDef"}},{"kind":"Field","name":{"kind":"Name","value":"eDef"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"innDef"}},{"kind":"Field","name":{"kind":"Name","value":"pickoffs"}},{"kind":"Field","name":{"kind":"Name","value":"po"}},{"kind":"Field","name":{"kind":"Name","value":"pos"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}}]} as unknown as DocumentNode<CareerFieldingStatsWithPlayerFragment, unknown>;
-export const GetLeagueById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLeagueById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeaguesWithTeamsAndMembers"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeaguesWithTeamsAndMembers"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}}]} as unknown as DocumentNode<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>;
-export const CreateLeague = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateLeague"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateLeagueAndTeamsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createLeagueAndTeams"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeaguesWithTeamsAndMembers"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeaguesWithTeamsAndMembers"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}}]} as unknown as DocumentNode<CreateLeagueMutation, CreateLeagueMutationVariables>;
+export const TeamMemberFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TeamMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TeamMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"positionId"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}}]}}]} as unknown as DocumentNode<TeamMemberFragment, unknown>;
+export const PlayerEligiblePositionFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PlayerEligiblePosition"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PlayerEligiblePosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}}]}}]} as unknown as DocumentNode<PlayerEligiblePositionFragment, unknown>;
+export const TeamMemberWithPositionsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TeamMemberWithPositions"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TeamMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"TeamMember"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withPositions"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}},{"kind":"Field","name":{"kind":"Name","value":"playerEligiblePositions"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withPositions"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PlayerEligiblePosition"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TeamMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TeamMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"positionId"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PlayerEligiblePosition"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PlayerEligiblePosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}}]}}]} as unknown as DocumentNode<TeamMemberWithPositionsFragment, unknown>;
+export const GetLeagueById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLeagueById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Matchup"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Matchup"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"weekNumber"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"numberOfGames"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}},{"kind":"Field","name":{"kind":"Name","value":"currentMatchup"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"matchupByCurrentMatchup"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Matchup"}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}}]} as unknown as DocumentNode<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>;
+export const CreateLeague = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateLeague"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateLeagueAndTeamsInput"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createLeagueAndTeams"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Matchup"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Matchup"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"weekNumber"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"numberOfGames"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}},{"kind":"Field","name":{"kind":"Name","value":"currentMatchup"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"matchupByCurrentMatchup"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Matchup"}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}}]} as unknown as DocumentNode<CreateLeagueMutation, CreateLeagueMutationVariables>;
+export const GetPositionsForLeague = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPositionsForLeague"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"leagueId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leaguePositions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"condition"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"leagueId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"leagueId"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeaguePosition"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeaguePosition"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeaguePosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"positionType"}}]}}]} as unknown as DocumentNode<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>;
+export const GetMatchupStats = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMatchupStats"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"matchupId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"matchupPlayers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"condition"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"matchupId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"matchupId"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"aggregateSeasonPitchingByPlayerIdAndSeason"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"AggregateSeasonPitchingStats"}}]}},{"kind":"Field","name":{"kind":"Name","value":"aggregateSeasonFieldingByPlayerIdAndSeason"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"AggregateSeasonFieldingStats"}}]}},{"kind":"Field","name":{"kind":"Name","value":"aggregateSeasonBattingByPlayerIdAndSeason"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"AggregateSeasonBattingStats"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonPitchingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"battersFaced"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"bk"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"er"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gf"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"l"}},{"kind":"Field","name":{"kind":"Name","value":"outsRecorded"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"sho"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"sv"}},{"kind":"Field","name":{"kind":"Name","value":"w"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonFieldingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"a"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"chances"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"dpDef"}},{"kind":"Field","name":{"kind":"Name","value":"eDef"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"innDef"}},{"kind":"Field","name":{"kind":"Name","value":"pickoffs"}},{"kind":"Field","name":{"kind":"Name","value":"po"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"AggregateSeasonBattingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"AggregateSeasonBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ab"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"doubles"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gidp"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"pa"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"rbi"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"sh"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"tb"}},{"kind":"Field","name":{"kind":"Name","value":"triples"}}]}}]} as unknown as DocumentNode<GetMatchupStatsQuery, GetMatchupStatsQueryVariables>;
 export const GetMessagesForLeague = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMessagesForLeague"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMessagesOrderBy"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"condition"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMessageCondition"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueMessages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"condition"},"value":{"kind":"Variable","name":{"kind":"Name","value":"condition"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMessage"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMessage"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"messageText"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]}}]} as unknown as DocumentNode<GetMessagesForLeagueQuery, GetMessagesForLeagueQueryVariables>;
 export const SendLeagueMessage = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendLeagueMessage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateLeagueMessageInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createLeagueMessage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueMessage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMessage"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMessage"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMessage"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"messageText"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]}}]} as unknown as DocumentNode<SendLeagueMessageMutation, SendLeagueMessageMutationVariables>;
 export const GetCareerBattingStats = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCareerBattingStats"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBattingsOrderBy"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"careerBattings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerBattingStatsWithPlayer"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerBattingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ab"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"doubles"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gidp"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"pa"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"rbi"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"sh"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"tb"}},{"kind":"Field","name":{"kind":"Name","value":"triples"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerBattingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerBatting"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerBattingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}}]} as unknown as DocumentNode<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>;
 export const GetCareerFieldingStats = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCareerFieldingStats"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFieldingsOrderBy"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"careerFieldings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerFieldingStatsWithPlayer"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerFieldingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"a"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"chances"}},{"kind":"Field","name":{"kind":"Name","value":"cs"}},{"kind":"Field","name":{"kind":"Name","value":"dpDef"}},{"kind":"Field","name":{"kind":"Name","value":"eDef"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"innDef"}},{"kind":"Field","name":{"kind":"Name","value":"pickoffs"}},{"kind":"Field","name":{"kind":"Name","value":"po"}},{"kind":"Field","name":{"kind":"Name","value":"pos"}},{"kind":"Field","name":{"kind":"Name","value":"sb"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerFieldingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerFielding"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerFieldingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}}]} as unknown as DocumentNode<GetCareerFieldingStatsQuery, GetCareerFieldingStatsQueryVariables>;
 export const GetCareerPitchingStats = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCareerPitchingStats"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CareerPitchingsOrderBy"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"careerPitchings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerPitchingStatsWithPlayer"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerPitchingStats"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"battersFaced"}},{"kind":"Field","name":{"kind":"Name","value":"bb"}},{"kind":"Field","name":{"kind":"Name","value":"bk"}},{"kind":"Field","name":{"kind":"Name","value":"cg"}},{"kind":"Field","name":{"kind":"Name","value":"er"}},{"kind":"Field","name":{"kind":"Name","value":"era"}},{"kind":"Field","name":{"kind":"Name","value":"g"}},{"kind":"Field","name":{"kind":"Name","value":"gf"}},{"kind":"Field","name":{"kind":"Name","value":"gs"}},{"kind":"Field","name":{"kind":"Name","value":"h"}},{"kind":"Field","name":{"kind":"Name","value":"hbp"}},{"kind":"Field","name":{"kind":"Name","value":"hr"}},{"kind":"Field","name":{"kind":"Name","value":"ibb"}},{"kind":"Field","name":{"kind":"Name","value":"l"}},{"kind":"Field","name":{"kind":"Name","value":"outRate"}},{"kind":"Field","name":{"kind":"Name","value":"outsRecorded"}},{"kind":"Field","name":{"kind":"Name","value":"r"}},{"kind":"Field","name":{"kind":"Name","value":"sho"}},{"kind":"Field","name":{"kind":"Name","value":"so"}},{"kind":"Field","name":{"kind":"Name","value":"sv"}},{"kind":"Field","name":{"kind":"Name","value":"w"}},{"kind":"Field","name":{"kind":"Name","value":"wp"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareerPitchingStatsWithPlayer"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareerPitching"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareerPitchingStats"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}}]}}]}}]} as unknown as DocumentNode<GetCareerPitchingStatsQuery, GetCareerPitchingStatsQueryVariables>;
-export const GetUserByEmail = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserByEmail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userByEmail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByEmailQuery, GetUserByEmailQueryVariables>;
-export const GetLeaguesForUser = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLeaguesForUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}}]}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}}]}}]} as unknown as DocumentNode<GetLeaguesForUserQuery, GetLeaguesForUserQueryVariables>;
-export const GetUserById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByIdQuery, GetUserByIdQueryVariables>;
-export const CreateUser = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateUserInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
-export type LeagueFragment = { __typename?: 'League', id: number, name: string, owner: number };
+export const GetTeamById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTeamById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"teamId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withPositions"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"team"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"teamId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"teamMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"TeamMemberWithPositions"}}]}}]}},{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TeamMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TeamMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"positionId"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Player"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Player"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"brefId"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"PlayerEligiblePosition"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"PlayerEligiblePosition"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"position"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TeamMemberWithPositions"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"TeamMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"TeamMember"}},{"kind":"Field","name":{"kind":"Name","value":"player"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withPositions"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Player"}},{"kind":"Field","name":{"kind":"Name","value":"playerEligiblePositions"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withPositions"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"PlayerEligiblePosition"}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]} as unknown as DocumentNode<GetTeamByIdQuery, GetTeamByIdQueryVariables>;
+export const UpdateTeamMemberPosition = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTeamMemberPosition"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"teamMemberId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"positionId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTeamMember"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"patch"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"positionId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"positionId"}}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"teamMemberId"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"teamMember"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"playerId"}},{"kind":"Field","name":{"kind":"Name","value":"positionId"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateTeamMemberPositionMutation, UpdateTeamMemberPositionMutationVariables>;
+export const GetUserByEmail = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserByEmail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userByEmail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByEmailQuery, GetUserByEmailQueryVariables>;
+export const GetLeaguesForUser = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLeaguesForUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"BooleanValue","value":false}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"league"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"League"}}]}}]}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"LeagueMember"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"LeagueMember"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"permissionLevel"}},{"kind":"Field","name":{"kind":"Name","value":"teamId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Matchup"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Matchup"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"weekNumber"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"numberOfGames"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"Team"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"Team"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"leagueId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"League"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"League"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"owner"}},{"kind":"Field","name":{"kind":"Name","value":"currentMatchup"}},{"kind":"Field","name":{"kind":"Name","value":"leagueMembers"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMembers"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"LeagueMember"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"matchupByCurrentMatchup"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withMatchup"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Matchup"}}]}},{"kind":"Field","name":{"kind":"Name","value":"teams"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"include"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"if"},"value":{"kind":"Variable","name":{"kind":"Name","value":"withTeams"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"nodes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"Team"}}]}}]}}]}}]} as unknown as DocumentNode<GetLeaguesForUserQuery, GetLeaguesForUserQueryVariables>;
+export const GetUserById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByIdQuery, GetUserByIdQueryVariables>;
+export const CreateUser = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateUserInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
+export type LeagueFragment = { __typename?: 'League', id: number, name: string, owner: number, currentMatchup?: number | null, leagueMembers?: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null } | null> }, matchupByCurrentMatchup?: { __typename?: 'Matchup', id: number, weekNumber: number, leagueId: number, numberOfGames: number } | null, teams?: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } };
 
-export type LeagueMemberFragment = { __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null };
+export type LeagueMemberFragment = { __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null };
 
-export type LeaguesWithTeamsAndMembersFragment = { __typename?: 'League', id: number, name: string, owner: number, leagueMembers: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null } | null> }, teams: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } };
+export type LeaguePositionFragment = { __typename?: 'LeaguePosition', id: number, leagueId: number, positionType: PositionSlot };
 
 export type GetLeagueByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
+  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
+  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
+  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type GetLeagueByIdQuery = { __typename?: 'Query', league?: { __typename?: 'League', id: number, name: string, owner: number, leagueMembers: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null } | null> }, teams: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } } | null };
+export type GetLeagueByIdQuery = { __typename?: 'Query', league?: { __typename?: 'League', id: number, name: string, owner: number, currentMatchup?: number | null, leagueMembers?: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null } | null> }, matchupByCurrentMatchup?: { __typename?: 'Matchup', id: number, weekNumber: number, leagueId: number, numberOfGames: number } | null, teams?: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } } | null };
 
 export type CreateLeagueMutationVariables = Exact<{
   input: CreateLeagueAndTeamsInput;
+  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
+  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
+  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type CreateLeagueMutation = { __typename?: 'Mutation', createLeagueAndTeams?: { __typename?: 'CreateLeagueAndTeamsPayload', league?: { __typename?: 'League', id: number, name: string, owner: number, leagueMembers: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null } | null> }, teams: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } } | null } | null };
+export type CreateLeagueMutation = { __typename?: 'Mutation', createLeagueAndTeams?: { __typename?: 'CreateLeagueAndTeamsPayload', league?: { __typename?: 'League', id: number, name: string, owner: number, currentMatchup?: number | null, leagueMembers?: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null } | null> }, matchupByCurrentMatchup?: { __typename?: 'Matchup', id: number, weekNumber: number, leagueId: number, numberOfGames: number } | null, teams?: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } } | null } | null };
 
-export type LeagueMessageFragment = { __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username: string } | null };
+export type GetPositionsForLeagueQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+
+export type GetPositionsForLeagueQuery = { __typename?: 'Query', leaguePositions?: { __typename?: 'LeaguePositionsConnection', nodes: Array<{ __typename?: 'LeaguePosition', id: number, leagueId: number, positionType: PositionSlot } | null> } | null };
+
+export type MatchupFragment = { __typename?: 'Matchup', id: number, weekNumber: number, leagueId: number, numberOfGames: number };
+
+export type GetMatchupStatsQueryVariables = Exact<{
+  matchupId: Scalars['Int']['input'];
+}>;
+
+
+export type GetMatchupStatsQuery = { __typename?: 'Query', matchupPlayers?: { __typename?: 'MatchupPlayersConnection', nodes: Array<{ __typename?: 'MatchupPlayer', playerId: number, aggregateSeasonPitchingByPlayerIdAndSeason?: { __typename?: 'AggregateSeasonPitching', battersFaced?: number | null, bb?: number | null, bk?: number | null, cg?: number | null, er?: number | null, g?: number | null, gf?: number | null, gs?: number | null, h?: number | null, hbp?: number | null, hr?: number | null, ibb?: number | null, l?: number | null, outsRecorded?: number | null, r?: number | null, sho?: number | null, so?: number | null, sv?: number | null, w?: number | null, wp?: number | null } | null, aggregateSeasonFieldingByPlayerIdAndSeason?: { __typename?: 'AggregateSeasonFielding', a?: number | null, cg?: number | null, chances?: number | null, cs?: number | null, dpDef?: number | null, eDef?: number | null, g?: number | null, gs?: number | null, innDef?: number | null, pickoffs?: number | null, po?: number | null, sb?: number | null, wp?: number | null } | null, aggregateSeasonBattingByPlayerIdAndSeason?: { __typename?: 'AggregateSeasonBatting', ab?: number | null, bb?: number | null, cs?: number | null, doubles?: number | null, g?: number | null, gidp?: number | null, h?: number | null, hbp?: number | null, hr?: number | null, ibb?: number | null, pa?: number | null, r?: number | null, rbi?: number | null, sb?: number | null, sh?: number | null, so?: number | null, tb?: number | null, triples?: number | null } | null } | null> } | null };
+
+export type LeagueMessageFragment = { __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username?: string | null } | null };
 
 export type GetMessagesForLeagueQueryVariables = Exact<{
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy> | LeagueMessagesOrderBy>;
@@ -60,16 +93,24 @@ export type GetMessagesForLeagueQueryVariables = Exact<{
 }>;
 
 
-export type GetMessagesForLeagueQuery = { __typename?: 'Query', leagueMessages?: { __typename?: 'LeagueMessagesConnection', nodes: Array<{ __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username: string } | null } | null> } | null };
+export type GetMessagesForLeagueQuery = { __typename?: 'Query', leagueMessages?: { __typename?: 'LeagueMessagesConnection', nodes: Array<{ __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username?: string | null } | null } | null> } | null };
 
 export type SendLeagueMessageMutationVariables = Exact<{
   input: CreateLeagueMessageInput;
 }>;
 
 
-export type SendLeagueMessageMutation = { __typename?: 'Mutation', createLeagueMessage?: { __typename?: 'CreateLeagueMessagePayload', leagueMessage?: { __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username: string } | null } | null } | null };
+export type SendLeagueMessageMutation = { __typename?: 'Mutation', createLeagueMessage?: { __typename?: 'CreateLeagueMessagePayload', leagueMessage?: { __typename?: 'LeagueMessage', leagueId: number, messageText: string, timestamp?: string | null, user?: { __typename?: 'User', id: number, username?: string | null } | null } | null } | null };
 
 export type PlayerFragment = { __typename?: 'Player', id: number, name: string, brefId: string };
+
+export type PlayerEligiblePositionFragment = { __typename?: 'PlayerEligiblePosition', playerId?: number | null, position?: string | null };
+
+export type AggregateSeasonBattingStatsFragment = { __typename?: 'AggregateSeasonBatting', ab?: number | null, bb?: number | null, cs?: number | null, doubles?: number | null, g?: number | null, gidp?: number | null, h?: number | null, hbp?: number | null, hr?: number | null, ibb?: number | null, pa?: number | null, r?: number | null, rbi?: number | null, sb?: number | null, sh?: number | null, so?: number | null, tb?: number | null, triples?: number | null };
+
+export type AggregateSeasonFieldingStatsFragment = { __typename?: 'AggregateSeasonFielding', a?: number | null, cg?: number | null, chances?: number | null, cs?: number | null, dpDef?: number | null, eDef?: number | null, g?: number | null, gs?: number | null, innDef?: number | null, pickoffs?: number | null, po?: number | null, sb?: number | null, wp?: number | null };
+
+export type AggregateSeasonPitchingStatsFragment = { __typename?: 'AggregateSeasonPitching', battersFaced?: number | null, bb?: number | null, bk?: number | null, cg?: number | null, er?: number | null, g?: number | null, gf?: number | null, gs?: number | null, h?: number | null, hbp?: number | null, hr?: number | null, ibb?: number | null, l?: number | null, outsRecorded?: number | null, r?: number | null, sho?: number | null, so?: number | null, sv?: number | null, w?: number | null, wp?: number | null };
 
 export type CareerBattingStatsFragment = { __typename?: 'CareerBatting', ab?: string | null, bb?: string | null, cs?: string | null, doubles?: string | null, g?: string | null, gidp?: string | null, h?: string | null, hbp?: string | null, hr?: string | null, ibb?: string | null, pa?: string | null, r?: string | null, rbi?: string | null, sb?: string | null, sh?: string | null, so?: string | null, tb?: string | null, triples?: string | null };
 
@@ -109,35 +150,58 @@ export type GetCareerPitchingStatsQuery = { __typename?: 'Query', careerPitching
 
 export type TeamFragment = { __typename?: 'Team', id: number, leagueId: number, name: string };
 
-export type UserFragment = { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string };
+export type TeamMemberFragment = { __typename?: 'TeamMember', id: number, playerId: number, positionId?: number | null, teamId?: number | null };
+
+export type TeamMemberWithPositionsFragment = { __typename?: 'TeamMember', id: number, playerId: number, positionId?: number | null, teamId?: number | null, player?: { __typename?: 'Player', id: number, name: string, brefId: string, playerEligiblePositions?: { __typename?: 'PlayerEligiblePositionsConnection', nodes: Array<{ __typename?: 'PlayerEligiblePosition', playerId?: number | null, position?: string | null } | null> } } | null };
+
+export type GetTeamByIdQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  withPositions?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type GetTeamByIdQuery = { __typename?: 'Query', team?: { __typename?: 'Team', id: number, leagueId: number, name: string, teamMembers: { __typename?: 'TeamMembersConnection', nodes: Array<{ __typename?: 'TeamMember', id: number, playerId: number, positionId?: number | null, teamId?: number | null, player?: { __typename?: 'Player', id: number, name: string, brefId: string, playerEligiblePositions?: { __typename?: 'PlayerEligiblePositionsConnection', nodes: Array<{ __typename?: 'PlayerEligiblePosition', playerId?: number | null, position?: string | null } | null> } } | null } | null> } } | null };
+
+export type UpdateTeamMemberPositionMutationVariables = Exact<{
+  teamMemberId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type UpdateTeamMemberPositionMutation = { __typename?: 'Mutation', updateTeamMember?: { __typename?: 'UpdateTeamMemberPayload', teamMember?: { __typename?: 'TeamMember', id: number, leagueId: number, playerId: number, positionId?: number | null } | null } | null };
+
+export type UserFragment = { __typename?: 'User', id: number, email?: string | null, username?: string | null };
 
 export type GetUserByEmailQueryVariables = Exact<{
   email: Scalars['String']['input'];
 }>;
 
 
-export type GetUserByEmailQuery = { __typename?: 'Query', userByEmail?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null };
+export type GetUserByEmailQuery = { __typename?: 'Query', userByEmail?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null };
 
 export type GetLeaguesForUserQueryVariables = Exact<{
   id: Scalars['Int']['input'];
+  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
+  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
+  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type GetLeaguesForUserQuery = { __typename?: 'Query', user?: { __typename?: 'User', leagueMembers: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', league?: { __typename?: 'League', id: number, name: string, owner: number } | null } | null> } } | null };
+export type GetLeaguesForUserQuery = { __typename?: 'Query', user?: { __typename?: 'User', leagueMembers: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', league?: { __typename?: 'League', id: number, name: string, owner: number, currentMatchup?: number | null, leagueMembers?: { __typename?: 'LeagueMembersConnection', nodes: Array<{ __typename?: 'LeagueMember', leagueId: number, permissionLevel: LeaguePermissionLevel, teamId?: number | null, userId: number, user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null } | null> }, matchupByCurrentMatchup?: { __typename?: 'Matchup', id: number, weekNumber: number, leagueId: number, numberOfGames: number } | null, teams?: { __typename?: 'TeamsConnection', nodes: Array<{ __typename?: 'Team', id: number, leagueId: number, name: string } | null> } } | null } | null> } } | null };
 
 export type GetUserByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
 
 
-export type GetUserByIdQuery = { __typename?: 'Query', user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null };
+export type GetUserByIdQuery = { __typename?: 'Query', user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null };
 
 export type CreateUserMutationVariables = Exact<{
   input: CreateUserInput;
 }>;
 
 
-export type CreateUserMutation = { __typename?: 'Mutation', createUser?: { __typename?: 'CreateUserPayload', user?: { __typename?: 'User', id: number, email: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null } | null };
+export type CreateUserMutation = { __typename?: 'Mutation', createUser?: { __typename?: 'CreateUserPayload', user?: { __typename?: 'User', id: number, email?: string | null, username?: string | null } | null } | null };
 
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
@@ -158,30 +222,454 @@ export enum AccessLevel {
   None = 'NONE'
 }
 
-/** All input for the `bulkUpdateStats` mutation. */
-export type BulkUpdateStatsInput = {
-  battingStats: Array<InputMaybe<UpdateBattingStatsInputRecordInput>>;
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  fieldingStats: Array<InputMaybe<UpdateFieldingStatsInputRecordInput>>;
-  pitchingStats: Array<InputMaybe<UpdatePitchingStatsInputRecordInput>>;
+export type AggregateSeasonBatting = {
+  __typename?: 'AggregateSeasonBatting';
+  ab?: Maybe<Scalars['Int']['output']>;
+  bb?: Maybe<Scalars['Int']['output']>;
+  cs?: Maybe<Scalars['Int']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gidp?: Maybe<Scalars['Int']['output']>;
+  h?: Maybe<Scalars['Int']['output']>;
+  hbp?: Maybe<Scalars['Int']['output']>;
+  hr?: Maybe<Scalars['Int']['output']>;
+  ibb?: Maybe<Scalars['Int']['output']>;
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayersByPlayerIdAndSeason: MatchupPlayersConnection;
+  pa?: Maybe<Scalars['Int']['output']>;
+  /** Reads a single `Player` that is related to this `AggregateSeasonBatting`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  r?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  sb?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  sf?: Maybe<Scalars['Int']['output']>;
+  sh?: Maybe<Scalars['Int']['output']>;
+  so?: Maybe<Scalars['Int']['output']>;
+  tb?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
 };
 
-/** The output of our `bulkUpdateStats` mutation. */
-export type BulkUpdateStatsPayload = {
-  __typename?: 'BulkUpdateStatsPayload';
-  /**
-   * The exact same `clientMutationId` that was provided in the mutation input,
-   * unchanged and unused. May be used by a client to track mutations.
-   */
-  clientMutationId?: Maybe<Scalars['String']['output']>;
-  players?: Maybe<Array<Maybe<Player>>>;
-  /** Our root query field type. Allows us to run any query from our mutation payload. */
-  query?: Maybe<Query>;
+
+export type AggregateSeasonBattingMatchupPlayersByPlayerIdAndSeasonArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
 };
+
+/**
+ * A condition to be used against `AggregateSeasonBatting` object types. All fields
+ * are tested for equality and combined with a logical ‘and.’
+ */
+export type AggregateSeasonBattingCondition = {
+  /** Checks for equality with the object’s `ab` field. */
+  ab?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `bb` field. */
+  bb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `cs` field. */
+  cs?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `doubles` field. */
+  doubles?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `gidp` field. */
+  gidp?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `h` field. */
+  h?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `hbp` field. */
+  hbp?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `hr` field. */
+  hr?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `ibb` field. */
+  ibb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `pa` field. */
+  pa?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `r` field. */
+  r?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `rbi` field. */
+  rbi?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sb` field. */
+  sb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `season` field. */
+  season?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sf` field. */
+  sf?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sh` field. */
+  sh?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `so` field. */
+  so?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `tb` field. */
+  tb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `triples` field. */
+  triples?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A connection to a list of `AggregateSeasonBatting` values. */
+export type AggregateSeasonBattingsConnection = {
+  __typename?: 'AggregateSeasonBattingsConnection';
+  /** A list of edges which contains the `AggregateSeasonBatting` and cursor to aid in pagination. */
+  edges: Array<AggregateSeasonBattingsEdge>;
+  /** A list of `AggregateSeasonBatting` objects. */
+  nodes: Array<Maybe<AggregateSeasonBatting>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `AggregateSeasonBatting` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `AggregateSeasonBatting` edge in the connection. */
+export type AggregateSeasonBattingsEdge = {
+  __typename?: 'AggregateSeasonBattingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `AggregateSeasonBatting` at the end of the edge. */
+  node?: Maybe<AggregateSeasonBatting>;
+};
+
+/** Methods to use when ordering `AggregateSeasonBatting`. */
+export enum AggregateSeasonBattingsOrderBy {
+  AbAsc = 'AB_ASC',
+  AbDesc = 'AB_DESC',
+  BbAsc = 'BB_ASC',
+  BbDesc = 'BB_DESC',
+  CsAsc = 'CS_ASC',
+  CsDesc = 'CS_DESC',
+  DoublesAsc = 'DOUBLES_ASC',
+  DoublesDesc = 'DOUBLES_DESC',
+  GidpAsc = 'GIDP_ASC',
+  GidpDesc = 'GIDP_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  HbpAsc = 'HBP_ASC',
+  HbpDesc = 'HBP_DESC',
+  HrAsc = 'HR_ASC',
+  HrDesc = 'HR_DESC',
+  HAsc = 'H_ASC',
+  HDesc = 'H_DESC',
+  IbbAsc = 'IBB_ASC',
+  IbbDesc = 'IBB_DESC',
+  Natural = 'NATURAL',
+  PaAsc = 'PA_ASC',
+  PaDesc = 'PA_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  RbiAsc = 'RBI_ASC',
+  RbiDesc = 'RBI_DESC',
+  RAsc = 'R_ASC',
+  RDesc = 'R_DESC',
+  SbAsc = 'SB_ASC',
+  SbDesc = 'SB_DESC',
+  SeasonAsc = 'SEASON_ASC',
+  SeasonDesc = 'SEASON_DESC',
+  SfAsc = 'SF_ASC',
+  SfDesc = 'SF_DESC',
+  ShAsc = 'SH_ASC',
+  ShDesc = 'SH_DESC',
+  SoAsc = 'SO_ASC',
+  SoDesc = 'SO_DESC',
+  TbAsc = 'TB_ASC',
+  TbDesc = 'TB_DESC',
+  TriplesAsc = 'TRIPLES_ASC',
+  TriplesDesc = 'TRIPLES_DESC'
+}
+
+export type AggregateSeasonFielding = {
+  __typename?: 'AggregateSeasonFielding';
+  a?: Maybe<Scalars['Int']['output']>;
+  cg?: Maybe<Scalars['Int']['output']>;
+  chances?: Maybe<Scalars['Int']['output']>;
+  cs?: Maybe<Scalars['Int']['output']>;
+  dpDef?: Maybe<Scalars['Int']['output']>;
+  eDef?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  innDef?: Maybe<Scalars['Int']['output']>;
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayersByPlayerIdAndSeason: MatchupPlayersConnection;
+  pickoffs?: Maybe<Scalars['Int']['output']>;
+  /** Reads a single `Player` that is related to this `AggregateSeasonFielding`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  po?: Maybe<Scalars['Int']['output']>;
+  sb?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  wp?: Maybe<Scalars['Int']['output']>;
+};
+
+
+export type AggregateSeasonFieldingMatchupPlayersByPlayerIdAndSeasonArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+/**
+ * A condition to be used against `AggregateSeasonFielding` object types. All
+ * fields are tested for equality and combined with a logical ‘and.’
+ */
+export type AggregateSeasonFieldingCondition = {
+  /** Checks for equality with the object’s `a` field. */
+  a?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `cg` field. */
+  cg?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `chances` field. */
+  chances?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `cs` field. */
+  cs?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `dpDef` field. */
+  dpDef?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `eDef` field. */
+  eDef?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `gs` field. */
+  gs?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `innDef` field. */
+  innDef?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `pickoffs` field. */
+  pickoffs?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `po` field. */
+  po?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sb` field. */
+  sb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `season` field. */
+  season?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `wp` field. */
+  wp?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A connection to a list of `AggregateSeasonFielding` values. */
+export type AggregateSeasonFieldingsConnection = {
+  __typename?: 'AggregateSeasonFieldingsConnection';
+  /** A list of edges which contains the `AggregateSeasonFielding` and cursor to aid in pagination. */
+  edges: Array<AggregateSeasonFieldingsEdge>;
+  /** A list of `AggregateSeasonFielding` objects. */
+  nodes: Array<Maybe<AggregateSeasonFielding>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `AggregateSeasonFielding` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `AggregateSeasonFielding` edge in the connection. */
+export type AggregateSeasonFieldingsEdge = {
+  __typename?: 'AggregateSeasonFieldingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `AggregateSeasonFielding` at the end of the edge. */
+  node?: Maybe<AggregateSeasonFielding>;
+};
+
+/** Methods to use when ordering `AggregateSeasonFielding`. */
+export enum AggregateSeasonFieldingsOrderBy {
+  AAsc = 'A_ASC',
+  ADesc = 'A_DESC',
+  CgAsc = 'CG_ASC',
+  CgDesc = 'CG_DESC',
+  ChancesAsc = 'CHANCES_ASC',
+  ChancesDesc = 'CHANCES_DESC',
+  CsAsc = 'CS_ASC',
+  CsDesc = 'CS_DESC',
+  DpDefAsc = 'DP_DEF_ASC',
+  DpDefDesc = 'DP_DEF_DESC',
+  EDefAsc = 'E_DEF_ASC',
+  EDefDesc = 'E_DEF_DESC',
+  GsAsc = 'GS_ASC',
+  GsDesc = 'GS_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  InnDefAsc = 'INN_DEF_ASC',
+  InnDefDesc = 'INN_DEF_DESC',
+  Natural = 'NATURAL',
+  PickoffsAsc = 'PICKOFFS_ASC',
+  PickoffsDesc = 'PICKOFFS_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PoAsc = 'PO_ASC',
+  PoDesc = 'PO_DESC',
+  SbAsc = 'SB_ASC',
+  SbDesc = 'SB_DESC',
+  SeasonAsc = 'SEASON_ASC',
+  SeasonDesc = 'SEASON_DESC',
+  WpAsc = 'WP_ASC',
+  WpDesc = 'WP_DESC'
+}
+
+export type AggregateSeasonPitching = {
+  __typename?: 'AggregateSeasonPitching';
+  battersFaced?: Maybe<Scalars['Int']['output']>;
+  bb?: Maybe<Scalars['Int']['output']>;
+  bk?: Maybe<Scalars['Int']['output']>;
+  cg?: Maybe<Scalars['Int']['output']>;
+  er?: Maybe<Scalars['Int']['output']>;
+  g?: Maybe<Scalars['Int']['output']>;
+  gf?: Maybe<Scalars['Int']['output']>;
+  gs?: Maybe<Scalars['Int']['output']>;
+  h?: Maybe<Scalars['Int']['output']>;
+  hbp?: Maybe<Scalars['Int']['output']>;
+  hr?: Maybe<Scalars['Int']['output']>;
+  ibb?: Maybe<Scalars['Int']['output']>;
+  l?: Maybe<Scalars['Int']['output']>;
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayersByPlayerIdAndSeason: MatchupPlayersConnection;
+  outsRecorded?: Maybe<Scalars['Int']['output']>;
+  /** Reads a single `Player` that is related to this `AggregateSeasonPitching`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  r?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  sho?: Maybe<Scalars['Int']['output']>;
+  so?: Maybe<Scalars['Int']['output']>;
+  sv?: Maybe<Scalars['Int']['output']>;
+  w?: Maybe<Scalars['Int']['output']>;
+  wp?: Maybe<Scalars['Int']['output']>;
+};
+
+
+export type AggregateSeasonPitchingMatchupPlayersByPlayerIdAndSeasonArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+/**
+ * A condition to be used against `AggregateSeasonPitching` object types. All
+ * fields are tested for equality and combined with a logical ‘and.’
+ */
+export type AggregateSeasonPitchingCondition = {
+  /** Checks for equality with the object’s `battersFaced` field. */
+  battersFaced?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `bb` field. */
+  bb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `bk` field. */
+  bk?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `cg` field. */
+  cg?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `er` field. */
+  er?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `g` field. */
+  g?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `gf` field. */
+  gf?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `gs` field. */
+  gs?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `h` field. */
+  h?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `hbp` field. */
+  hbp?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `hr` field. */
+  hr?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `ibb` field. */
+  ibb?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `l` field. */
+  l?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `outsRecorded` field. */
+  outsRecorded?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `r` field. */
+  r?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `season` field. */
+  season?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sho` field. */
+  sho?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `so` field. */
+  so?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `sv` field. */
+  sv?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `w` field. */
+  w?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `wp` field. */
+  wp?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A connection to a list of `AggregateSeasonPitching` values. */
+export type AggregateSeasonPitchingsConnection = {
+  __typename?: 'AggregateSeasonPitchingsConnection';
+  /** A list of edges which contains the `AggregateSeasonPitching` and cursor to aid in pagination. */
+  edges: Array<AggregateSeasonPitchingsEdge>;
+  /** A list of `AggregateSeasonPitching` objects. */
+  nodes: Array<Maybe<AggregateSeasonPitching>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `AggregateSeasonPitching` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `AggregateSeasonPitching` edge in the connection. */
+export type AggregateSeasonPitchingsEdge = {
+  __typename?: 'AggregateSeasonPitchingsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `AggregateSeasonPitching` at the end of the edge. */
+  node?: Maybe<AggregateSeasonPitching>;
+};
+
+/** Methods to use when ordering `AggregateSeasonPitching`. */
+export enum AggregateSeasonPitchingsOrderBy {
+  BattersFacedAsc = 'BATTERS_FACED_ASC',
+  BattersFacedDesc = 'BATTERS_FACED_DESC',
+  BbAsc = 'BB_ASC',
+  BbDesc = 'BB_DESC',
+  BkAsc = 'BK_ASC',
+  BkDesc = 'BK_DESC',
+  CgAsc = 'CG_ASC',
+  CgDesc = 'CG_DESC',
+  ErAsc = 'ER_ASC',
+  ErDesc = 'ER_DESC',
+  GfAsc = 'GF_ASC',
+  GfDesc = 'GF_DESC',
+  GsAsc = 'GS_ASC',
+  GsDesc = 'GS_DESC',
+  GAsc = 'G_ASC',
+  GDesc = 'G_DESC',
+  HbpAsc = 'HBP_ASC',
+  HbpDesc = 'HBP_DESC',
+  HrAsc = 'HR_ASC',
+  HrDesc = 'HR_DESC',
+  HAsc = 'H_ASC',
+  HDesc = 'H_DESC',
+  IbbAsc = 'IBB_ASC',
+  IbbDesc = 'IBB_DESC',
+  LAsc = 'L_ASC',
+  LDesc = 'L_DESC',
+  Natural = 'NATURAL',
+  OutsRecordedAsc = 'OUTS_RECORDED_ASC',
+  OutsRecordedDesc = 'OUTS_RECORDED_DESC',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  RAsc = 'R_ASC',
+  RDesc = 'R_DESC',
+  SeasonAsc = 'SEASON_ASC',
+  SeasonDesc = 'SEASON_DESC',
+  ShoAsc = 'SHO_ASC',
+  ShoDesc = 'SHO_DESC',
+  SoAsc = 'SO_ASC',
+  SoDesc = 'SO_DESC',
+  SvAsc = 'SV_ASC',
+  SvDesc = 'SV_DESC',
+  WpAsc = 'WP_ASC',
+  WpDesc = 'WP_DESC',
+  WAsc = 'W_ASC',
+  WDesc = 'W_DESC'
+}
 
 export type CareerBatting = {
   __typename?: 'CareerBatting';
@@ -339,8 +827,8 @@ export type CareerFielding = {
   wp?: Maybe<Scalars['BigInt']['output']>;
 };
 
-export type CareerFieldingByPo = {
-  __typename?: 'CareerFieldingByPo';
+export type CareerFieldingByPosition = {
+  __typename?: 'CareerFieldingByPosition';
   a?: Maybe<Scalars['BigInt']['output']>;
   cg?: Maybe<Scalars['BigInt']['output']>;
   chances?: Maybe<Scalars['Float']['output']>;
@@ -351,7 +839,7 @@ export type CareerFieldingByPo = {
   gs?: Maybe<Scalars['BigInt']['output']>;
   innDef?: Maybe<Scalars['Float']['output']>;
   pickoffs?: Maybe<Scalars['BigInt']['output']>;
-  /** Reads a single `Player` that is related to this `CareerFieldingByPo`. */
+  /** Reads a single `Player` that is related to this `CareerFieldingByPosition`. */
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   po?: Maybe<Scalars['BigInt']['output']>;
@@ -361,10 +849,10 @@ export type CareerFieldingByPo = {
 };
 
 /**
- * A condition to be used against `CareerFieldingByPo` object types. All fields are
- * tested for equality and combined with a logical ‘and.’
+ * A condition to be used against `CareerFieldingByPosition` object types. All
+ * fields are tested for equality and combined with a logical ‘and.’
  */
-export type CareerFieldingByPoCondition = {
+export type CareerFieldingByPositionCondition = {
   /** Checks for equality with the object’s `a` field. */
   a?: InputMaybe<Scalars['BigInt']['input']>;
   /** Checks for equality with the object’s `cg` field. */
@@ -397,30 +885,30 @@ export type CareerFieldingByPoCondition = {
   wp?: InputMaybe<Scalars['BigInt']['input']>;
 };
 
-/** A connection to a list of `CareerFieldingByPo` values. */
-export type CareerFieldingByPosConnection = {
-  __typename?: 'CareerFieldingByPosConnection';
-  /** A list of edges which contains the `CareerFieldingByPo` and cursor to aid in pagination. */
-  edges: Array<CareerFieldingByPosEdge>;
-  /** A list of `CareerFieldingByPo` objects. */
-  nodes: Array<Maybe<CareerFieldingByPo>>;
+/** A connection to a list of `CareerFieldingByPosition` values. */
+export type CareerFieldingByPositionsConnection = {
+  __typename?: 'CareerFieldingByPositionsConnection';
+  /** A list of edges which contains the `CareerFieldingByPosition` and cursor to aid in pagination. */
+  edges: Array<CareerFieldingByPositionsEdge>;
+  /** A list of `CareerFieldingByPosition` objects. */
+  nodes: Array<Maybe<CareerFieldingByPosition>>;
   /** Information to aid in pagination. */
   pageInfo: PageInfo;
-  /** The count of *all* `CareerFieldingByPo` you could get from the connection. */
+  /** The count of *all* `CareerFieldingByPosition` you could get from the connection. */
   totalCount: Scalars['Int']['output'];
 };
 
-/** A `CareerFieldingByPo` edge in the connection. */
-export type CareerFieldingByPosEdge = {
-  __typename?: 'CareerFieldingByPosEdge';
+/** A `CareerFieldingByPosition` edge in the connection. */
+export type CareerFieldingByPositionsEdge = {
+  __typename?: 'CareerFieldingByPositionsEdge';
   /** A cursor for use in pagination. */
   cursor?: Maybe<Scalars['Cursor']['output']>;
-  /** The `CareerFieldingByPo` at the end of the edge. */
-  node?: Maybe<CareerFieldingByPo>;
+  /** The `CareerFieldingByPosition` at the end of the edge. */
+  node?: Maybe<CareerFieldingByPosition>;
 };
 
-/** Methods to use when ordering `CareerFieldingByPo`. */
-export enum CareerFieldingByPosOrderBy {
+/** Methods to use when ordering `CareerFieldingByPosition`. */
+export enum CareerFieldingByPositionsOrderBy {
   AAsc = 'A_ASC',
   ADesc = 'A_DESC',
   CgAsc = 'CG_ASC',
@@ -763,8 +1251,6 @@ export type CreateDraftTeamPayload = {
   draftTeam?: Maybe<DraftTeam>;
   /** An edge for our `DraftTeam`. May be used by Relay 1. */
   draftTeamEdge?: Maybe<DraftTeamsEdge>;
-  /** Reads a single `League` that is related to this `DraftTeam`. */
-  league?: Maybe<League>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** Reads a single `Team` that is related to this `DraftTeam`. */
@@ -802,8 +1288,12 @@ export type CreateLeagueAndTeamsPayload = {
   league?: Maybe<League>;
   /** An edge for our `League`. May be used by Relay 1. */
   leagueEdge?: Maybe<LeaguesEdge>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
@@ -889,8 +1379,6 @@ export type CreateLeagueMessagePayload = {
   query?: Maybe<Query>;
   /** Reads a single `User` that is related to this `LeagueMessage`. */
   user?: Maybe<User>;
-  /** Reads a single `LeagueMember` that is related to this `LeagueMessage`. */
-  userLeague?: Maybe<LeagueMember>;
 };
 
 
@@ -911,14 +1399,131 @@ export type CreateLeaguePayload = {
   league?: Maybe<League>;
   /** An edge for our `League`. May be used by Relay 1. */
   leagueEdge?: Maybe<LeaguesEdge>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
 /** The output of our create `League` mutation. */
 export type CreateLeaguePayloadLeagueEdgeArgs = {
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
+};
+
+/** All input for the create `LeaguePosition` mutation. */
+export type CreateLeaguePositionInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `LeaguePosition` to be created by this mutation. */
+  leaguePosition: LeaguePositionInput;
+};
+
+/** The output of our create `LeaguePosition` mutation. */
+export type CreateLeaguePositionPayload = {
+  __typename?: 'CreateLeaguePositionPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `LeaguePosition`. */
+  league?: Maybe<League>;
+  /** The `LeaguePosition` that was created by this mutation. */
+  leaguePosition?: Maybe<LeaguePosition>;
+  /** An edge for our `LeaguePosition`. May be used by Relay 1. */
+  leaguePositionEdge?: Maybe<LeaguePositionsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our create `LeaguePosition` mutation. */
+export type CreateLeaguePositionPayloadLeaguePositionEdgeArgs = {
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+/** All input for the create `Matchup` mutation. */
+export type CreateMatchupInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `Matchup` to be created by this mutation. */
+  matchup: MatchupInput;
+};
+
+/** The output of our create `Matchup` mutation. */
+export type CreateMatchupPayload = {
+  __typename?: 'CreateMatchupPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `Matchup`. */
+  leagueById?: Maybe<League>;
+  /** The `Matchup` that was created by this mutation. */
+  matchup?: Maybe<Matchup>;
+  /** An edge for our `Matchup`. May be used by Relay 1. */
+  matchupEdge?: Maybe<MatchupsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our create `Matchup` mutation. */
+export type CreateMatchupPayloadMatchupEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupsOrderBy>>;
+};
+
+/** All input for the create `MatchupPlayer` mutation. */
+export type CreateMatchupPlayerInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `MatchupPlayer` to be created by this mutation. */
+  matchupPlayer: MatchupPlayerInput;
+};
+
+/** The output of our create `MatchupPlayer` mutation. */
+export type CreateMatchupPlayerPayload = {
+  __typename?: 'CreateMatchupPlayerPayload';
+  /** Reads a single `AggregateSeasonBatting` that is related to this `MatchupPlayer`. */
+  aggregateSeasonBattingByPlayerIdAndSeason?: Maybe<AggregateSeasonBatting>;
+  /** Reads a single `AggregateSeasonFielding` that is related to this `MatchupPlayer`. */
+  aggregateSeasonFieldingByPlayerIdAndSeason?: Maybe<AggregateSeasonFielding>;
+  /** Reads a single `AggregateSeasonPitching` that is related to this `MatchupPlayer`. */
+  aggregateSeasonPitchingByPlayerIdAndSeason?: Maybe<AggregateSeasonPitching>;
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Matchup` that is related to this `MatchupPlayer`. */
+  matchup?: Maybe<Matchup>;
+  /** The `MatchupPlayer` that was created by this mutation. */
+  matchupPlayer?: Maybe<MatchupPlayer>;
+  /** An edge for our `MatchupPlayer`. May be used by Relay 1. */
+  matchupPlayerEdge?: Maybe<MatchupPlayersEdge>;
+  /** Reads a single `Player` that is related to this `MatchupPlayer`. */
+  player?: Maybe<Player>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our create `MatchupPlayer` mutation. */
+export type CreateMatchupPlayerPayloadMatchupPlayerEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
 };
 
 /** All input for the create `Player` mutation. */
@@ -930,12 +1535,6 @@ export type CreatePlayerInput = {
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   /** The `Player` to be created by this mutation. */
   player: PlayerInput;
-};
-
-/** An input for mutations affecting `CreatePlayerInputRecord` */
-export type CreatePlayerInputRecordInput = {
-  brefId?: InputMaybe<Scalars['String']['input']>;
-  name?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** The output of our create `Player` mutation. */
@@ -958,29 +1557,6 @@ export type CreatePlayerPayload = {
 /** The output of our create `Player` mutation. */
 export type CreatePlayerPayloadPlayerEdgeArgs = {
   orderBy?: InputMaybe<Array<PlayersOrderBy>>;
-};
-
-/** All input for the `createPlayers` mutation. */
-export type CreatePlayersInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  playersToCreate: Array<InputMaybe<CreatePlayerInputRecordInput>>;
-};
-
-/** The output of our `createPlayers` mutation. */
-export type CreatePlayersPayload = {
-  __typename?: 'CreatePlayersPayload';
-  /**
-   * The exact same `clientMutationId` that was provided in the mutation input,
-   * unchanged and unused. May be used by a client to track mutations.
-   */
-  clientMutationId?: Maybe<Scalars['String']['output']>;
-  players?: Maybe<Array<Maybe<Player>>>;
-  /** Our root query field type. Allows us to run any query from our mutation payload. */
-  query?: Maybe<Query>;
 };
 
 /** All input for the create `SeasonBatting` mutation. */
@@ -1097,6 +1673,47 @@ export type CreateTeamInput = {
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   /** The `Team` to be created by this mutation. */
   team: TeamInput;
+};
+
+/** All input for the create `TeamMember` mutation. */
+export type CreateTeamMemberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `TeamMember` to be created by this mutation. */
+  teamMember: TeamMemberInput;
+};
+
+/** The output of our create `TeamMember` mutation. */
+export type CreateTeamMemberPayload = {
+  __typename?: 'CreateTeamMemberPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `TeamMember`. */
+  league?: Maybe<League>;
+  /** Reads a single `Player` that is related to this `TeamMember`. */
+  player?: Maybe<Player>;
+  /** Reads a single `LeaguePosition` that is related to this `TeamMember`. */
+  position?: Maybe<LeaguePosition>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+  /** Reads a single `Team` that is related to this `TeamMember`. */
+  team?: Maybe<Team>;
+  /** The `TeamMember` that was created by this mutation. */
+  teamMember?: Maybe<TeamMember>;
+  /** An edge for our `TeamMember`. May be used by Relay 1. */
+  teamMemberEdge?: Maybe<TeamMembersEdge>;
+};
+
+
+/** The output of our create `TeamMember` mutation. */
+export type CreateTeamMemberPayloadTeamMemberEdgeArgs = {
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
 };
 
 /** The output of our create `Team` mutation. */
@@ -1251,8 +1868,6 @@ export type DeleteDraftTeamPayload = {
   draftTeam?: Maybe<DraftTeam>;
   /** An edge for our `DraftTeam`. May be used by Relay 1. */
   draftTeamEdge?: Maybe<DraftTeamsEdge>;
-  /** Reads a single `League` that is related to this `DraftTeam`. */
-  league?: Maybe<League>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** Reads a single `Team` that is related to this `DraftTeam`. */
@@ -1375,8 +1990,6 @@ export type DeleteLeagueMessagePayload = {
   query?: Maybe<Query>;
   /** Reads a single `User` that is related to this `LeagueMessage`. */
   user?: Maybe<User>;
-  /** Reads a single `LeagueMember` that is related to this `LeagueMessage`. */
-  userLeague?: Maybe<LeagueMember>;
 };
 
 
@@ -1398,14 +2011,175 @@ export type DeleteLeaguePayload = {
   league?: Maybe<League>;
   /** An edge for our `League`. May be used by Relay 1. */
   leagueEdge?: Maybe<LeaguesEdge>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
 /** The output of our delete `League` mutation. */
 export type DeleteLeaguePayloadLeagueEdgeArgs = {
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
+};
+
+/** All input for the `deleteLeaguePositionByNodeId` mutation. */
+export type DeleteLeaguePositionByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `LeaguePosition` to be deleted. */
+  nodeId: Scalars['ID']['input'];
+};
+
+/** All input for the `deleteLeaguePosition` mutation. */
+export type DeleteLeaguePositionInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+};
+
+/** The output of our delete `LeaguePosition` mutation. */
+export type DeleteLeaguePositionPayload = {
+  __typename?: 'DeleteLeaguePositionPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  deletedLeaguePositionNodeId?: Maybe<Scalars['ID']['output']>;
+  /** Reads a single `League` that is related to this `LeaguePosition`. */
+  league?: Maybe<League>;
+  /** The `LeaguePosition` that was deleted by this mutation. */
+  leaguePosition?: Maybe<LeaguePosition>;
+  /** An edge for our `LeaguePosition`. May be used by Relay 1. */
+  leaguePositionEdge?: Maybe<LeaguePositionsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our delete `LeaguePosition` mutation. */
+export type DeleteLeaguePositionPayloadLeaguePositionEdgeArgs = {
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+/** All input for the `deleteMatchupByLeagueIdAndWeekNumber` mutation. */
+export type DeleteMatchupByLeagueIdAndWeekNumberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
+};
+
+/** All input for the `deleteMatchupByNodeId` mutation. */
+export type DeleteMatchupByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `Matchup` to be deleted. */
+  nodeId: Scalars['ID']['input'];
+};
+
+/** All input for the `deleteMatchup` mutation. */
+export type DeleteMatchupInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+};
+
+/** The output of our delete `Matchup` mutation. */
+export type DeleteMatchupPayload = {
+  __typename?: 'DeleteMatchupPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  deletedMatchupNodeId?: Maybe<Scalars['ID']['output']>;
+  /** Reads a single `League` that is related to this `Matchup`. */
+  leagueById?: Maybe<League>;
+  /** The `Matchup` that was deleted by this mutation. */
+  matchup?: Maybe<Matchup>;
+  /** An edge for our `Matchup`. May be used by Relay 1. */
+  matchupEdge?: Maybe<MatchupsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our delete `Matchup` mutation. */
+export type DeleteMatchupPayloadMatchupEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupsOrderBy>>;
+};
+
+/** All input for the `deleteMatchupPlayerByNodeId` mutation. */
+export type DeleteMatchupPlayerByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `MatchupPlayer` to be deleted. */
+  nodeId: Scalars['ID']['input'];
+};
+
+/** All input for the `deleteMatchupPlayer` mutation. */
+export type DeleteMatchupPlayerInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+};
+
+/** The output of our delete `MatchupPlayer` mutation. */
+export type DeleteMatchupPlayerPayload = {
+  __typename?: 'DeleteMatchupPlayerPayload';
+  /** Reads a single `AggregateSeasonBatting` that is related to this `MatchupPlayer`. */
+  aggregateSeasonBattingByPlayerIdAndSeason?: Maybe<AggregateSeasonBatting>;
+  /** Reads a single `AggregateSeasonFielding` that is related to this `MatchupPlayer`. */
+  aggregateSeasonFieldingByPlayerIdAndSeason?: Maybe<AggregateSeasonFielding>;
+  /** Reads a single `AggregateSeasonPitching` that is related to this `MatchupPlayer`. */
+  aggregateSeasonPitchingByPlayerIdAndSeason?: Maybe<AggregateSeasonPitching>;
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  deletedMatchupPlayerNodeId?: Maybe<Scalars['ID']['output']>;
+  /** Reads a single `Matchup` that is related to this `MatchupPlayer`. */
+  matchup?: Maybe<Matchup>;
+  /** The `MatchupPlayer` that was deleted by this mutation. */
+  matchupPlayer?: Maybe<MatchupPlayer>;
+  /** An edge for our `MatchupPlayer`. May be used by Relay 1. */
+  matchupPlayerEdge?: Maybe<MatchupPlayersEdge>;
+  /** Reads a single `Player` that is related to this `MatchupPlayer`. */
+  player?: Maybe<Player>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our delete `MatchupPlayer` mutation. */
+export type DeleteMatchupPlayerPayloadMatchupPlayerEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
 };
 
 /** All input for the `deletePlayerByBrefId` mutation. */
@@ -1481,7 +2255,8 @@ export type DeleteSeasonBattingInput = {
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -1530,7 +2305,8 @@ export type DeleteSeasonFieldingInput = {
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   playerId: Scalars['Int']['input'];
   pos: Scalars['String']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -1578,7 +2354,8 @@ export type DeleteSeasonPitchingInput = {
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -1639,6 +2416,58 @@ export type DeleteTeamInput = {
   id: Scalars['Int']['input'];
 };
 
+/** All input for the `deleteTeamMemberByNodeId` mutation. */
+export type DeleteTeamMemberByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `TeamMember` to be deleted. */
+  nodeId: Scalars['ID']['input'];
+};
+
+/** All input for the `deleteTeamMember` mutation. */
+export type DeleteTeamMemberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+};
+
+/** The output of our delete `TeamMember` mutation. */
+export type DeleteTeamMemberPayload = {
+  __typename?: 'DeleteTeamMemberPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  deletedTeamMemberNodeId?: Maybe<Scalars['ID']['output']>;
+  /** Reads a single `League` that is related to this `TeamMember`. */
+  league?: Maybe<League>;
+  /** Reads a single `Player` that is related to this `TeamMember`. */
+  player?: Maybe<Player>;
+  /** Reads a single `LeaguePosition` that is related to this `TeamMember`. */
+  position?: Maybe<LeaguePosition>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+  /** Reads a single `Team` that is related to this `TeamMember`. */
+  team?: Maybe<Team>;
+  /** The `TeamMember` that was deleted by this mutation. */
+  teamMember?: Maybe<TeamMember>;
+  /** An edge for our `TeamMember`. May be used by Relay 1. */
+  teamMemberEdge?: Maybe<TeamMembersEdge>;
+};
+
+
+/** The output of our delete `TeamMember` mutation. */
+export type DeleteTeamMemberPayloadTeamMemberEdgeArgs = {
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
 /** The output of our delete `Team` mutation. */
 export type DeleteTeamPayload = {
   __typename?: 'DeleteTeamPayload';
@@ -1683,16 +2512,6 @@ export type DeleteUserByNodeIdInput = {
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   /** The globally unique `ID` which will identify a single `User` to be deleted. */
   nodeId: Scalars['ID']['input'];
-};
-
-/** All input for the `deleteUserByUsername` mutation. */
-export type DeleteUserByUsernameInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  username: Scalars['String']['input'];
 };
 
 /** All input for the `deleteUser` mutation. */
@@ -1797,8 +2616,6 @@ export type DraftTeam = Node & {
   draft?: Maybe<Draft>;
   draftId: Scalars['Int']['output'];
   draftOrder: Scalars['Int']['output'];
-  /** Reads a single `League` that is related to this `DraftTeam`. */
-  league?: Maybe<League>;
   leagueId: Scalars['Int']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
@@ -1922,8 +2739,7 @@ export enum DraftsOrderBy {
 
 export type League = Node & {
   __typename?: 'League';
-  /** Reads and enables pagination through a set of `DraftTeam`. */
-  draftTeams: DraftTeamsConnection;
+  currentMatchup?: Maybe<Scalars['Int']['output']>;
   /** Reads and enables pagination through a set of `Draft`. */
   drafts: DraftsConnection;
   id: Scalars['Int']['output'];
@@ -1931,23 +2747,23 @@ export type League = Node & {
   leagueMembers: LeagueMembersConnection;
   /** Reads and enables pagination through a set of `LeagueMessage`. */
   leagueMessages: LeagueMessagesConnection;
+  /** Reads and enables pagination through a set of `LeaguePosition`. */
+  leaguePositions: LeaguePositionsConnection;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupById?: Maybe<Matchup>;
+  maxRosterSize: Scalars['Int']['output'];
   name: Scalars['String']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
   owner: Scalars['Int']['output'];
+  /** Reads and enables pagination through a set of `TeamMember`. */
+  teamMembers: TeamMembersConnection;
   /** Reads and enables pagination through a set of `Team`. */
   teams: TeamsConnection;
-};
-
-
-export type LeagueDraftTeamsArgs = {
-  after?: InputMaybe<Scalars['Cursor']['input']>;
-  before?: InputMaybe<Scalars['Cursor']['input']>;
-  condition?: InputMaybe<DraftTeamCondition>;
-  first?: InputMaybe<Scalars['Int']['input']>;
-  last?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
@@ -1984,6 +2800,28 @@ export type LeagueLeagueMessagesArgs = {
 };
 
 
+export type LeagueLeaguePositionsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<LeaguePositionCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+
+export type LeagueTeamMembersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<TeamMemberCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
+
 export type LeagueTeamsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1996,8 +2834,12 @@ export type LeagueTeamsArgs = {
 
 /** A condition to be used against `League` object types. All fields are tested for equality and combined with a logical ‘and.’ */
 export type LeagueCondition = {
+  /** Checks for equality with the object’s `currentMatchup` field. */
+  currentMatchup?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `id` field. */
   id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `maxRosterSize` field. */
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `name` field. */
   name?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `owner` field. */
@@ -2006,7 +2848,9 @@ export type LeagueCondition = {
 
 /** An input for mutations affecting `League` */
 export type LeagueInput = {
+  currentMatchup?: InputMaybe<Scalars['Int']['input']>;
   id?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
   owner: Scalars['Int']['input'];
 };
@@ -2016,8 +2860,6 @@ export type LeagueMember = Node & {
   /** Reads a single `League` that is related to this `LeagueMember`. */
   league?: Maybe<League>;
   leagueId: Scalars['Int']['output'];
-  /** Reads and enables pagination through a set of `LeagueMessage`. */
-  leagueMessagesByUserIdAndLeagueId: LeagueMessagesConnection;
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
   permissionLevel: LeaguePermissionLevel;
@@ -2025,17 +2867,6 @@ export type LeagueMember = Node & {
   /** Reads a single `User` that is related to this `LeagueMember`. */
   user?: Maybe<User>;
   userId: Scalars['Int']['output'];
-};
-
-
-export type LeagueMemberLeagueMessagesByUserIdAndLeagueIdArgs = {
-  after?: InputMaybe<Scalars['Cursor']['input']>;
-  before?: InputMaybe<Scalars['Cursor']['input']>;
-  condition?: InputMaybe<LeagueMessageCondition>;
-  first?: InputMaybe<Scalars['Int']['input']>;
-  last?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
 };
 
 /**
@@ -2119,8 +2950,6 @@ export type LeagueMessage = Node & {
   /** Reads a single `User` that is related to this `LeagueMessage`. */
   user?: Maybe<User>;
   userId: Scalars['Int']['output'];
-  /** Reads a single `LeagueMember` that is related to this `LeagueMessage`. */
-  userLeague?: Maybe<LeagueMember>;
 };
 
 /**
@@ -2199,7 +3028,9 @@ export enum LeagueMessagesOrderBy {
 
 /** Represents an update to a `League`. Fields that are set will be updated. */
 export type LeaguePatch = {
+  currentMatchup?: InputMaybe<Scalars['Int']['input']>;
   id?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   owner?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2207,6 +3038,92 @@ export type LeaguePatch = {
 export enum LeaguePermissionLevel {
   Commissioner = 'COMMISSIONER',
   Owner = 'OWNER'
+}
+
+export type LeaguePosition = Node & {
+  __typename?: 'LeaguePosition';
+  id: Scalars['Int']['output'];
+  /** Reads a single `League` that is related to this `LeaguePosition`. */
+  league?: Maybe<League>;
+  leagueId: Scalars['Int']['output'];
+  /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
+  nodeId: Scalars['ID']['output'];
+  positionType: PositionSlot;
+  /** Reads and enables pagination through a set of `TeamMember`. */
+  teamMembersByPositionId: TeamMembersConnection;
+};
+
+
+export type LeaguePositionTeamMembersByPositionIdArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<TeamMemberCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
+/**
+ * A condition to be used against `LeaguePosition` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type LeaguePositionCondition = {
+  /** Checks for equality with the object’s `id` field. */
+  id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `leagueId` field. */
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `positionType` field. */
+  positionType?: InputMaybe<PositionSlot>;
+};
+
+/** An input for mutations affecting `LeaguePosition` */
+export type LeaguePositionInput = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  positionType: PositionSlot;
+};
+
+/** Represents an update to a `LeaguePosition`. Fields that are set will be updated. */
+export type LeaguePositionPatch = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  positionType?: InputMaybe<PositionSlot>;
+};
+
+/** A connection to a list of `LeaguePosition` values. */
+export type LeaguePositionsConnection = {
+  __typename?: 'LeaguePositionsConnection';
+  /** A list of edges which contains the `LeaguePosition` and cursor to aid in pagination. */
+  edges: Array<LeaguePositionsEdge>;
+  /** A list of `LeaguePosition` objects. */
+  nodes: Array<Maybe<LeaguePosition>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `LeaguePosition` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `LeaguePosition` edge in the connection. */
+export type LeaguePositionsEdge = {
+  __typename?: 'LeaguePositionsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `LeaguePosition` at the end of the edge. */
+  node?: Maybe<LeaguePosition>;
+};
+
+/** Methods to use when ordering `LeaguePosition`. */
+export enum LeaguePositionsOrderBy {
+  IdAsc = 'ID_ASC',
+  IdDesc = 'ID_DESC',
+  LeagueIdAsc = 'LEAGUE_ID_ASC',
+  LeagueIdDesc = 'LEAGUE_ID_DESC',
+  Natural = 'NATURAL',
+  PositionTypeAsc = 'POSITION_TYPE_ASC',
+  PositionTypeDesc = 'POSITION_TYPE_DESC',
+  PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
 }
 
 /** A connection to a list of `League` values. */
@@ -2233,8 +3150,12 @@ export type LeaguesEdge = {
 
 /** Methods to use when ordering `League`. */
 export enum LeaguesOrderBy {
+  CurrentMatchupAsc = 'CURRENT_MATCHUP_ASC',
+  CurrentMatchupDesc = 'CURRENT_MATCHUP_DESC',
   IdAsc = 'ID_ASC',
   IdDesc = 'ID_DESC',
+  MaxRosterSizeAsc = 'MAX_ROSTER_SIZE_ASC',
+  MaxRosterSizeDesc = 'MAX_ROSTER_SIZE_DESC',
   NameAsc = 'NAME_ASC',
   NameDesc = 'NAME_DESC',
   Natural = 'NATURAL',
@@ -2244,10 +3165,200 @@ export enum LeaguesOrderBy {
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
 }
 
+export type Matchup = Node & {
+  __typename?: 'Matchup';
+  id: Scalars['Int']['output'];
+  /** Reads a single `League` that is related to this `Matchup`. */
+  leagueById?: Maybe<League>;
+  leagueId: Scalars['Int']['output'];
+  /** Reads and enables pagination through a set of `League`. */
+  leaguesByCurrentMatchup: LeaguesConnection;
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayers: MatchupPlayersConnection;
+  /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
+  nodeId: Scalars['ID']['output'];
+  numberOfGames: Scalars['Int']['output'];
+  weekNumber: Scalars['Int']['output'];
+};
+
+
+export type MatchupLeaguesByCurrentMatchupArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<LeagueCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
+};
+
+
+export type MatchupMatchupPlayersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+/** A condition to be used against `Matchup` object types. All fields are tested for equality and combined with a logical ‘and.’ */
+export type MatchupCondition = {
+  /** Checks for equality with the object’s `id` field. */
+  id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `leagueId` field. */
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `numberOfGames` field. */
+  numberOfGames?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `weekNumber` field. */
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** An input for mutations affecting `Matchup` */
+export type MatchupInput = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  numberOfGames: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
+};
+
+/** Represents an update to a `Matchup`. Fields that are set will be updated. */
+export type MatchupPatch = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  numberOfGames?: InputMaybe<Scalars['Int']['input']>;
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MatchupPlayer = Node & {
+  __typename?: 'MatchupPlayer';
+  /** Reads a single `AggregateSeasonBatting` that is related to this `MatchupPlayer`. */
+  aggregateSeasonBattingByPlayerIdAndSeason?: Maybe<AggregateSeasonBatting>;
+  /** Reads a single `AggregateSeasonFielding` that is related to this `MatchupPlayer`. */
+  aggregateSeasonFieldingByPlayerIdAndSeason?: Maybe<AggregateSeasonFielding>;
+  /** Reads a single `AggregateSeasonPitching` that is related to this `MatchupPlayer`. */
+  aggregateSeasonPitchingByPlayerIdAndSeason?: Maybe<AggregateSeasonPitching>;
+  id: Scalars['Int']['output'];
+  /** Reads a single `Matchup` that is related to this `MatchupPlayer`. */
+  matchup?: Maybe<Matchup>;
+  matchupId: Scalars['Int']['output'];
+  /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
+  nodeId: Scalars['ID']['output'];
+  /** Reads a single `Player` that is related to this `MatchupPlayer`. */
+  player?: Maybe<Player>;
+  playerId: Scalars['Int']['output'];
+  season: Scalars['Int']['output'];
+};
+
+/**
+ * A condition to be used against `MatchupPlayer` object types. All fields are
+ * tested for equality and combined with a logical ‘and.’
+ */
+export type MatchupPlayerCondition = {
+  /** Checks for equality with the object’s `id` field. */
+  id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `matchupId` field. */
+  matchupId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `season` field. */
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** An input for mutations affecting `MatchupPlayer` */
+export type MatchupPlayerInput = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  matchupId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+};
+
+/** Represents an update to a `MatchupPlayer`. Fields that are set will be updated. */
+export type MatchupPlayerPatch = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  matchupId?: InputMaybe<Scalars['Int']['input']>;
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A connection to a list of `MatchupPlayer` values. */
+export type MatchupPlayersConnection = {
+  __typename?: 'MatchupPlayersConnection';
+  /** A list of edges which contains the `MatchupPlayer` and cursor to aid in pagination. */
+  edges: Array<MatchupPlayersEdge>;
+  /** A list of `MatchupPlayer` objects. */
+  nodes: Array<Maybe<MatchupPlayer>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `MatchupPlayer` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `MatchupPlayer` edge in the connection. */
+export type MatchupPlayersEdge = {
+  __typename?: 'MatchupPlayersEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `MatchupPlayer` at the end of the edge. */
+  node?: Maybe<MatchupPlayer>;
+};
+
+/** Methods to use when ordering `MatchupPlayer`. */
+export enum MatchupPlayersOrderBy {
+  IdAsc = 'ID_ASC',
+  IdDesc = 'ID_DESC',
+  MatchupIdAsc = 'MATCHUP_ID_ASC',
+  MatchupIdDesc = 'MATCHUP_ID_DESC',
+  Natural = 'NATURAL',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
+  SeasonAsc = 'SEASON_ASC',
+  SeasonDesc = 'SEASON_DESC'
+}
+
+/** A connection to a list of `Matchup` values. */
+export type MatchupsConnection = {
+  __typename?: 'MatchupsConnection';
+  /** A list of edges which contains the `Matchup` and cursor to aid in pagination. */
+  edges: Array<MatchupsEdge>;
+  /** A list of `Matchup` objects. */
+  nodes: Array<Maybe<Matchup>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `Matchup` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `Matchup` edge in the connection. */
+export type MatchupsEdge = {
+  __typename?: 'MatchupsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `Matchup` at the end of the edge. */
+  node?: Maybe<Matchup>;
+};
+
+/** Methods to use when ordering `Matchup`. */
+export enum MatchupsOrderBy {
+  IdAsc = 'ID_ASC',
+  IdDesc = 'ID_DESC',
+  LeagueIdAsc = 'LEAGUE_ID_ASC',
+  LeagueIdDesc = 'LEAGUE_ID_DESC',
+  Natural = 'NATURAL',
+  NumberOfGamesAsc = 'NUMBER_OF_GAMES_ASC',
+  NumberOfGamesDesc = 'NUMBER_OF_GAMES_DESC',
+  PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
+  WeekNumberAsc = 'WEEK_NUMBER_ASC',
+  WeekNumberDesc = 'WEEK_NUMBER_DESC'
+}
+
 /** The root mutation type which contains root level fields which mutate data. */
 export type Mutation = {
   __typename?: 'Mutation';
-  bulkUpdateStats?: Maybe<BulkUpdateStatsPayload>;
   /** Creates a single `Draft`. */
   createDraft?: Maybe<CreateDraftPayload>;
   /** Creates a single `DraftTeam`. */
@@ -2259,9 +3370,14 @@ export type Mutation = {
   createLeagueMember?: Maybe<CreateLeagueMemberPayload>;
   /** Creates a single `LeagueMessage`. */
   createLeagueMessage?: Maybe<CreateLeagueMessagePayload>;
+  /** Creates a single `LeaguePosition`. */
+  createLeaguePosition?: Maybe<CreateLeaguePositionPayload>;
+  /** Creates a single `Matchup`. */
+  createMatchup?: Maybe<CreateMatchupPayload>;
+  /** Creates a single `MatchupPlayer`. */
+  createMatchupPlayer?: Maybe<CreateMatchupPlayerPayload>;
   /** Creates a single `Player`. */
   createPlayer?: Maybe<CreatePlayerPayload>;
-  createPlayers?: Maybe<CreatePlayersPayload>;
   /** Creates a single `SeasonBatting`. */
   createSeasonBatting?: Maybe<CreateSeasonBattingPayload>;
   /** Creates a single `SeasonFielding`. */
@@ -2270,6 +3386,8 @@ export type Mutation = {
   createSeasonPitching?: Maybe<CreateSeasonPitchingPayload>;
   /** Creates a single `Team`. */
   createTeam?: Maybe<CreateTeamPayload>;
+  /** Creates a single `TeamMember`. */
+  createTeamMember?: Maybe<CreateTeamMemberPayload>;
   /** Creates a single `User`. */
   createUser?: Maybe<CreateUserPayload>;
   /** Deletes a single `Draft` using a unique key. */
@@ -2294,6 +3412,20 @@ export type Mutation = {
   deleteLeagueMessage?: Maybe<DeleteLeagueMessagePayload>;
   /** Deletes a single `LeagueMessage` using its globally unique id. */
   deleteLeagueMessageByNodeId?: Maybe<DeleteLeagueMessagePayload>;
+  /** Deletes a single `LeaguePosition` using a unique key. */
+  deleteLeaguePosition?: Maybe<DeleteLeaguePositionPayload>;
+  /** Deletes a single `LeaguePosition` using its globally unique id. */
+  deleteLeaguePositionByNodeId?: Maybe<DeleteLeaguePositionPayload>;
+  /** Deletes a single `Matchup` using a unique key. */
+  deleteMatchup?: Maybe<DeleteMatchupPayload>;
+  /** Deletes a single `Matchup` using a unique key. */
+  deleteMatchupByLeagueIdAndWeekNumber?: Maybe<DeleteMatchupPayload>;
+  /** Deletes a single `Matchup` using its globally unique id. */
+  deleteMatchupByNodeId?: Maybe<DeleteMatchupPayload>;
+  /** Deletes a single `MatchupPlayer` using a unique key. */
+  deleteMatchupPlayer?: Maybe<DeleteMatchupPlayerPayload>;
+  /** Deletes a single `MatchupPlayer` using its globally unique id. */
+  deleteMatchupPlayerByNodeId?: Maybe<DeleteMatchupPlayerPayload>;
   /** Deletes a single `Player` using a unique key. */
   deletePlayer?: Maybe<DeletePlayerPayload>;
   /** Deletes a single `Player` using a unique key. */
@@ -2318,14 +3450,16 @@ export type Mutation = {
   deleteTeamByIdAndLeagueId?: Maybe<DeleteTeamPayload>;
   /** Deletes a single `Team` using its globally unique id. */
   deleteTeamByNodeId?: Maybe<DeleteTeamPayload>;
+  /** Deletes a single `TeamMember` using a unique key. */
+  deleteTeamMember?: Maybe<DeleteTeamMemberPayload>;
+  /** Deletes a single `TeamMember` using its globally unique id. */
+  deleteTeamMemberByNodeId?: Maybe<DeleteTeamMemberPayload>;
   /** Deletes a single `User` using a unique key. */
   deleteUser?: Maybe<DeleteUserPayload>;
   /** Deletes a single `User` using a unique key. */
   deleteUserByEmail?: Maybe<DeleteUserPayload>;
   /** Deletes a single `User` using its globally unique id. */
   deleteUserByNodeId?: Maybe<DeleteUserPayload>;
-  /** Deletes a single `User` using a unique key. */
-  deleteUserByUsername?: Maybe<DeleteUserPayload>;
   /** Updates a single `Draft` using a unique key and a patch. */
   updateDraft?: Maybe<UpdateDraftPayload>;
   /** Updates a single `Draft` using its globally unique id and a patch. */
@@ -2348,6 +3482,20 @@ export type Mutation = {
   updateLeagueMessage?: Maybe<UpdateLeagueMessagePayload>;
   /** Updates a single `LeagueMessage` using its globally unique id and a patch. */
   updateLeagueMessageByNodeId?: Maybe<UpdateLeagueMessagePayload>;
+  /** Updates a single `LeaguePosition` using a unique key and a patch. */
+  updateLeaguePosition?: Maybe<UpdateLeaguePositionPayload>;
+  /** Updates a single `LeaguePosition` using its globally unique id and a patch. */
+  updateLeaguePositionByNodeId?: Maybe<UpdateLeaguePositionPayload>;
+  /** Updates a single `Matchup` using a unique key and a patch. */
+  updateMatchup?: Maybe<UpdateMatchupPayload>;
+  /** Updates a single `Matchup` using a unique key and a patch. */
+  updateMatchupByLeagueIdAndWeekNumber?: Maybe<UpdateMatchupPayload>;
+  /** Updates a single `Matchup` using its globally unique id and a patch. */
+  updateMatchupByNodeId?: Maybe<UpdateMatchupPayload>;
+  /** Updates a single `MatchupPlayer` using a unique key and a patch. */
+  updateMatchupPlayer?: Maybe<UpdateMatchupPlayerPayload>;
+  /** Updates a single `MatchupPlayer` using its globally unique id and a patch. */
+  updateMatchupPlayerByNodeId?: Maybe<UpdateMatchupPlayerPayload>;
   /** Updates a single `Player` using a unique key and a patch. */
   updatePlayer?: Maybe<UpdatePlayerPayload>;
   /** Updates a single `Player` using a unique key and a patch. */
@@ -2372,14 +3520,16 @@ export type Mutation = {
   updateTeamByIdAndLeagueId?: Maybe<UpdateTeamPayload>;
   /** Updates a single `Team` using its globally unique id and a patch. */
   updateTeamByNodeId?: Maybe<UpdateTeamPayload>;
+  /** Updates a single `TeamMember` using a unique key and a patch. */
+  updateTeamMember?: Maybe<UpdateTeamMemberPayload>;
+  /** Updates a single `TeamMember` using its globally unique id and a patch. */
+  updateTeamMemberByNodeId?: Maybe<UpdateTeamMemberPayload>;
   /** Updates a single `User` using a unique key and a patch. */
   updateUser?: Maybe<UpdateUserPayload>;
   /** Updates a single `User` using a unique key and a patch. */
   updateUserByEmail?: Maybe<UpdateUserPayload>;
   /** Updates a single `User` using its globally unique id and a patch. */
   updateUserByNodeId?: Maybe<UpdateUserPayload>;
-  /** Updates a single `User` using a unique key and a patch. */
-  updateUserByUsername?: Maybe<UpdateUserPayload>;
   /** Upserts a single `Draft`. */
   upsertDraft?: Maybe<UpsertDraftPayload>;
   /** Upserts a single `DraftTeam`. */
@@ -2390,6 +3540,12 @@ export type Mutation = {
   upsertLeagueMember?: Maybe<UpsertLeagueMemberPayload>;
   /** Upserts a single `LeagueMessage`. */
   upsertLeagueMessage?: Maybe<UpsertLeagueMessagePayload>;
+  /** Upserts a single `LeaguePosition`. */
+  upsertLeaguePosition?: Maybe<UpsertLeaguePositionPayload>;
+  /** Upserts a single `Matchup`. */
+  upsertMatchup?: Maybe<UpsertMatchupPayload>;
+  /** Upserts a single `MatchupPlayer`. */
+  upsertMatchupPlayer?: Maybe<UpsertMatchupPlayerPayload>;
   /** Upserts a single `Player`. */
   upsertPlayer?: Maybe<UpsertPlayerPayload>;
   /** Upserts a single `SeasonBatting`. */
@@ -2400,15 +3556,10 @@ export type Mutation = {
   upsertSeasonPitching?: Maybe<UpsertSeasonPitchingPayload>;
   /** Upserts a single `Team`. */
   upsertTeam?: Maybe<UpsertTeamPayload>;
-  upsertTypeIntoTable?: Maybe<UpsertTypeIntoTablePayload>;
+  /** Upserts a single `TeamMember`. */
+  upsertTeamMember?: Maybe<UpsertTeamMemberPayload>;
   /** Upserts a single `User`. */
   upsertUser?: Maybe<UpsertUserPayload>;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationBulkUpdateStatsArgs = {
-  input: BulkUpdateStatsInput;
 };
 
 
@@ -2449,14 +3600,26 @@ export type MutationCreateLeagueMessageArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
-export type MutationCreatePlayerArgs = {
-  input: CreatePlayerInput;
+export type MutationCreateLeaguePositionArgs = {
+  input: CreateLeaguePositionInput;
 };
 
 
 /** The root mutation type which contains root level fields which mutate data. */
-export type MutationCreatePlayersArgs = {
-  input: CreatePlayersInput;
+export type MutationCreateMatchupArgs = {
+  input: CreateMatchupInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationCreateMatchupPlayerArgs = {
+  input: CreateMatchupPlayerInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationCreatePlayerArgs = {
+  input: CreatePlayerInput;
 };
 
 
@@ -2481,6 +3644,12 @@ export type MutationCreateSeasonPitchingArgs = {
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateTeamArgs = {
   input: CreateTeamInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationCreateTeamMemberArgs = {
+  input: CreateTeamMemberInput;
 };
 
 
@@ -2557,6 +3726,48 @@ export type MutationDeleteLeagueMessageByNodeIdArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteLeaguePositionArgs = {
+  input: DeleteLeaguePositionInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteLeaguePositionByNodeIdArgs = {
+  input: DeleteLeaguePositionByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteMatchupArgs = {
+  input: DeleteMatchupInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteMatchupByLeagueIdAndWeekNumberArgs = {
+  input: DeleteMatchupByLeagueIdAndWeekNumberInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteMatchupByNodeIdArgs = {
+  input: DeleteMatchupByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteMatchupPlayerArgs = {
+  input: DeleteMatchupPlayerInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteMatchupPlayerByNodeIdArgs = {
+  input: DeleteMatchupPlayerByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeletePlayerArgs = {
   input: DeletePlayerInput;
 };
@@ -2629,6 +3840,18 @@ export type MutationDeleteTeamByNodeIdArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteTeamMemberArgs = {
+  input: DeleteTeamMemberInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationDeleteTeamMemberByNodeIdArgs = {
+  input: DeleteTeamMemberByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserArgs = {
   input: DeleteUserInput;
 };
@@ -2643,12 +3866,6 @@ export type MutationDeleteUserByEmailArgs = {
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserByNodeIdArgs = {
   input: DeleteUserByNodeIdInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationDeleteUserByUsernameArgs = {
-  input: DeleteUserByUsernameInput;
 };
 
 
@@ -2715,6 +3932,48 @@ export type MutationUpdateLeagueMessageArgs = {
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueMessageByNodeIdArgs = {
   input: UpdateLeagueMessageByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateLeaguePositionArgs = {
+  input: UpdateLeaguePositionInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateLeaguePositionByNodeIdArgs = {
+  input: UpdateLeaguePositionByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateMatchupArgs = {
+  input: UpdateMatchupInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateMatchupByLeagueIdAndWeekNumberArgs = {
+  input: UpdateMatchupByLeagueIdAndWeekNumberInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateMatchupByNodeIdArgs = {
+  input: UpdateMatchupByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateMatchupPlayerArgs = {
+  input: UpdateMatchupPlayerInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateMatchupPlayerByNodeIdArgs = {
+  input: UpdateMatchupPlayerByNodeIdInput;
 };
 
 
@@ -2791,6 +4050,18 @@ export type MutationUpdateTeamByNodeIdArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateTeamMemberArgs = {
+  input: UpdateTeamMemberInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpdateTeamMemberByNodeIdArgs = {
+  input: UpdateTeamMemberByNodeIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
 };
@@ -2805,12 +4076,6 @@ export type MutationUpdateUserByEmailArgs = {
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserByNodeIdArgs = {
   input: UpdateUserByNodeIdInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationUpdateUserByUsernameArgs = {
-  input: UpdateUserByUsernameInput;
 };
 
 
@@ -2850,6 +4115,27 @@ export type MutationUpsertLeagueMessageArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpsertLeaguePositionArgs = {
+  input: UpsertLeaguePositionInput;
+  where?: InputMaybe<UpsertLeaguePositionWhere>;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpsertMatchupArgs = {
+  input: UpsertMatchupInput;
+  where?: InputMaybe<UpsertMatchupWhere>;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationUpsertMatchupPlayerArgs = {
+  input: UpsertMatchupPlayerInput;
+  where?: InputMaybe<UpsertMatchupPlayerWhere>;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertPlayerArgs = {
   input: UpsertPlayerInput;
   where?: InputMaybe<UpsertPlayerWhere>;
@@ -2885,8 +4171,9 @@ export type MutationUpsertTeamArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
-export type MutationUpsertTypeIntoTableArgs = {
-  input: UpsertTypeIntoTableInput;
+export type MutationUpsertTeamMemberArgs = {
+  input: UpsertTeamMemberInput;
+  where?: InputMaybe<UpsertTeamMemberWhere>;
 };
 
 
@@ -2915,79 +4202,72 @@ export type PageInfo = {
   startCursor?: Maybe<Scalars['Cursor']['output']>;
 };
 
-export type PgAttribute = {
-  __typename?: 'PgAttribute';
-  attacl?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
-  attalign: Scalars['String']['output'];
-  attbyval: Scalars['Boolean']['output'];
-  attcacheoff: Scalars['Int']['output'];
-  attcollation: Scalars['BigFloat']['output'];
-  attcompression: Scalars['String']['output'];
-  attfdwoptions?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
-  attgenerated: Scalars['String']['output'];
-  atthasdef: Scalars['Boolean']['output'];
-  atthasmissing: Scalars['Boolean']['output'];
-  attidentity: Scalars['String']['output'];
-  attinhcount: Scalars['Int']['output'];
-  attisdropped: Scalars['Boolean']['output'];
-  attislocal: Scalars['Boolean']['output'];
-  attlen: Scalars['Int']['output'];
-  attmissingval?: Maybe<Scalars['String']['output']>;
-  attname: Scalars['String']['output'];
-  attndims: Scalars['Int']['output'];
-  attnotnull: Scalars['Boolean']['output'];
-  attnum: Scalars['Int']['output'];
-  attoptions?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
-  attrelid: Scalars['BigFloat']['output'];
-  attstattarget: Scalars['Int']['output'];
-  attstorage: Scalars['String']['output'];
-  atttypid: Scalars['BigFloat']['output'];
-  atttypmod: Scalars['Int']['output'];
-};
-
-/** A connection to a list of `PgAttribute` values. */
-export type PgAttributesConnection = {
-  __typename?: 'PgAttributesConnection';
-  /** A list of edges which contains the `PgAttribute` and cursor to aid in pagination. */
-  edges: Array<PgAttributesEdge>;
-  /** A list of `PgAttribute` objects. */
-  nodes: Array<Maybe<PgAttribute>>;
-  /** Information to aid in pagination. */
-  pageInfo: PageInfo;
-  /** The count of *all* `PgAttribute` you could get from the connection. */
-  totalCount: Scalars['Int']['output'];
-};
-
-/** A `PgAttribute` edge in the connection. */
-export type PgAttributesEdge = {
-  __typename?: 'PgAttributesEdge';
-  /** A cursor for use in pagination. */
-  cursor?: Maybe<Scalars['Cursor']['output']>;
-  /** The `PgAttribute` at the end of the edge. */
-  node?: Maybe<PgAttribute>;
-};
-
 export type Player = Node & {
   __typename?: 'Player';
+  /** Reads and enables pagination through a set of `AggregateSeasonBatting`. */
+  aggregateSeasonBattings: AggregateSeasonBattingsConnection;
+  /** Reads and enables pagination through a set of `AggregateSeasonFielding`. */
+  aggregateSeasonFieldings: AggregateSeasonFieldingsConnection;
+  /** Reads and enables pagination through a set of `AggregateSeasonPitching`. */
+  aggregateSeasonPitchings: AggregateSeasonPitchingsConnection;
   brefId: Scalars['String']['output'];
   /** Reads and enables pagination through a set of `CareerBatting`. */
   careerBattings: CareerBattingsConnection;
-  /** Reads and enables pagination through a set of `CareerFieldingByPo`. */
-  careerFieldingByPos: CareerFieldingByPosConnection;
+  /** Reads and enables pagination through a set of `CareerFieldingByPosition`. */
+  careerFieldingByPositions: CareerFieldingByPositionsConnection;
   /** Reads and enables pagination through a set of `CareerFielding`. */
   careerFieldings: CareerFieldingsConnection;
   /** Reads and enables pagination through a set of `CareerPitching`. */
   careerPitchings: CareerPitchingsConnection;
   id: Scalars['Int']['output'];
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayers: MatchupPlayersConnection;
   name: Scalars['String']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
+  /** Reads and enables pagination through a set of `PlayerEligiblePosition`. */
+  playerEligiblePositions: PlayerEligiblePositionsConnection;
   /** Reads and enables pagination through a set of `SeasonBatting`. */
   seasonBattings: SeasonBattingsConnection;
   /** Reads and enables pagination through a set of `SeasonFielding`. */
   seasonFieldings: SeasonFieldingsConnection;
   /** Reads and enables pagination through a set of `SeasonPitching`. */
   seasonPitchings: SeasonPitchingsConnection;
+  /** Reads and enables pagination through a set of `TeamMember`. */
+  teamMembers: TeamMembersConnection;
+};
+
+
+export type PlayerAggregateSeasonBattingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonBattingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonBattingsOrderBy>>;
+};
+
+
+export type PlayerAggregateSeasonFieldingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonFieldingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonFieldingsOrderBy>>;
+};
+
+
+export type PlayerAggregateSeasonPitchingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonPitchingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonPitchingsOrderBy>>;
 };
 
 
@@ -3002,14 +4282,14 @@ export type PlayerCareerBattingsArgs = {
 };
 
 
-export type PlayerCareerFieldingByPosArgs = {
+export type PlayerCareerFieldingByPositionsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
-  condition?: InputMaybe<CareerFieldingByPoCondition>;
+  condition?: InputMaybe<CareerFieldingByPositionCondition>;
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
+  orderBy?: InputMaybe<Array<CareerFieldingByPositionsOrderBy>>;
 };
 
 
@@ -3032,6 +4312,28 @@ export type PlayerCareerPitchingsArgs = {
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<CareerPitchingsOrderBy>>;
+};
+
+
+export type PlayerMatchupPlayersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+
+export type PlayerPlayerEligiblePositionsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<PlayerEligiblePositionCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<PlayerEligiblePositionsOrderBy>>;
 };
 
 
@@ -3067,6 +4369,17 @@ export type PlayerSeasonPitchingsArgs = {
   orderBy?: InputMaybe<Array<SeasonPitchingsOrderBy>>;
 };
 
+
+export type PlayerTeamMembersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<TeamMemberCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
 /** A condition to be used against `Player` object types. All fields are tested for equality and combined with a logical ‘and.’ */
 export type PlayerCondition = {
   /** Checks for equality with the object’s `brefId` field. */
@@ -3076,6 +4389,56 @@ export type PlayerCondition = {
   /** Checks for equality with the object’s `name` field. */
   name?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type PlayerEligiblePosition = {
+  __typename?: 'PlayerEligiblePosition';
+  /** Reads a single `Player` that is related to this `PlayerEligiblePosition`. */
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+};
+
+/**
+ * A condition to be used against `PlayerEligiblePosition` object types. All fields
+ * are tested for equality and combined with a logical ‘and.’
+ */
+export type PlayerEligiblePositionCondition = {
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `position` field. */
+  position?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** A connection to a list of `PlayerEligiblePosition` values. */
+export type PlayerEligiblePositionsConnection = {
+  __typename?: 'PlayerEligiblePositionsConnection';
+  /** A list of edges which contains the `PlayerEligiblePosition` and cursor to aid in pagination. */
+  edges: Array<PlayerEligiblePositionsEdge>;
+  /** A list of `PlayerEligiblePosition` objects. */
+  nodes: Array<Maybe<PlayerEligiblePosition>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `PlayerEligiblePosition` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `PlayerEligiblePosition` edge in the connection. */
+export type PlayerEligiblePositionsEdge = {
+  __typename?: 'PlayerEligiblePositionsEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `PlayerEligiblePosition` at the end of the edge. */
+  node?: Maybe<PlayerEligiblePosition>;
+};
+
+/** Methods to use when ordering `PlayerEligiblePosition`. */
+export enum PlayerEligiblePositionsOrderBy {
+  Natural = 'NATURAL',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PositionAsc = 'POSITION_ASC',
+  PositionDesc = 'POSITION_DESC'
+}
 
 /** An input for mutations affecting `Player` */
 export type PlayerInput = {
@@ -3126,13 +4489,36 @@ export enum PlayersOrderBy {
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
 }
 
+export enum PositionSlot {
+  C = 'C',
+  Cf = 'CF',
+  Dh = 'DH',
+  If = 'IF',
+  Lf = 'LF',
+  Of = 'OF',
+  Rf = 'RF',
+  Rp = 'RP',
+  Sp = 'SP',
+  Ss = 'SS',
+  Xdh = 'XDH',
+  '1B' = '_1_B',
+  '2B' = '_2_B',
+  '3B' = '_3_B'
+}
+
 /** The root query type which gives access points into the data universe. */
 export type Query = Node & {
   __typename?: 'Query';
+  /** Reads and enables pagination through a set of `AggregateSeasonBatting`. */
+  aggregateSeasonBattings?: Maybe<AggregateSeasonBattingsConnection>;
+  /** Reads and enables pagination through a set of `AggregateSeasonFielding`. */
+  aggregateSeasonFieldings?: Maybe<AggregateSeasonFieldingsConnection>;
+  /** Reads and enables pagination through a set of `AggregateSeasonPitching`. */
+  aggregateSeasonPitchings?: Maybe<AggregateSeasonPitchingsConnection>;
   /** Reads and enables pagination through a set of `CareerBatting`. */
   careerBattings?: Maybe<CareerBattingsConnection>;
-  /** Reads and enables pagination through a set of `CareerFieldingByPo`. */
-  careerFieldingByPos?: Maybe<CareerFieldingByPosConnection>;
+  /** Reads and enables pagination through a set of `CareerFieldingByPosition`. */
+  careerFieldingByPositions?: Maybe<CareerFieldingByPositionsConnection>;
   /** Reads and enables pagination through a set of `CareerFielding`. */
   careerFieldings?: Maybe<CareerFieldingsConnection>;
   /** Reads and enables pagination through a set of `CareerPitching`. */
@@ -3148,8 +4534,6 @@ export type Query = Node & {
   draftTeams?: Maybe<DraftTeamsConnection>;
   /** Reads and enables pagination through a set of `Draft`. */
   drafts?: Maybe<DraftsConnection>;
-  /** Reads and enables pagination through a set of `PgAttribute`. */
-  getColumnsForType?: Maybe<PgAttributesConnection>;
   league?: Maybe<League>;
   /** Reads a single `League` using its globally unique `ID`. */
   leagueByNodeId?: Maybe<League>;
@@ -3163,8 +4547,24 @@ export type Query = Node & {
   leagueMessageByNodeId?: Maybe<LeagueMessage>;
   /** Reads and enables pagination through a set of `LeagueMessage`. */
   leagueMessages?: Maybe<LeagueMessagesConnection>;
+  leaguePosition?: Maybe<LeaguePosition>;
+  /** Reads a single `LeaguePosition` using its globally unique `ID`. */
+  leaguePositionByNodeId?: Maybe<LeaguePosition>;
+  /** Reads and enables pagination through a set of `LeaguePosition`. */
+  leaguePositions?: Maybe<LeaguePositionsConnection>;
   /** Reads and enables pagination through a set of `League`. */
   leagues?: Maybe<LeaguesConnection>;
+  matchup?: Maybe<Matchup>;
+  matchupByLeagueIdAndWeekNumber?: Maybe<Matchup>;
+  /** Reads a single `Matchup` using its globally unique `ID`. */
+  matchupByNodeId?: Maybe<Matchup>;
+  matchupPlayer?: Maybe<MatchupPlayer>;
+  /** Reads a single `MatchupPlayer` using its globally unique `ID`. */
+  matchupPlayerByNodeId?: Maybe<MatchupPlayer>;
+  /** Reads and enables pagination through a set of `MatchupPlayer`. */
+  matchupPlayers?: Maybe<MatchupPlayersConnection>;
+  /** Reads and enables pagination through a set of `Matchup`. */
+  matchups?: Maybe<MatchupsConnection>;
   /** Fetches an object given its globally unique `ID`. */
   node?: Maybe<Node>;
   /** The root query type must be a `Node` to work well with Relay 1 mutations. This just resolves to `query`. */
@@ -3173,6 +4573,8 @@ export type Query = Node & {
   playerByBrefId?: Maybe<Player>;
   /** Reads a single `Player` using its globally unique `ID`. */
   playerByNodeId?: Maybe<Player>;
+  /** Reads and enables pagination through a set of `PlayerEligiblePosition`. */
+  playerEligiblePositions?: Maybe<PlayerEligiblePositionsConnection>;
   /** Reads and enables pagination through a set of `Player`. */
   players?: Maybe<PlayersConnection>;
   /**
@@ -3199,17 +4601,55 @@ export type Query = Node & {
   teamByIdAndLeagueId?: Maybe<Team>;
   /** Reads a single `Team` using its globally unique `ID`. */
   teamByNodeId?: Maybe<Team>;
+  teamMember?: Maybe<TeamMember>;
+  /** Reads a single `TeamMember` using its globally unique `ID`. */
+  teamMemberByNodeId?: Maybe<TeamMember>;
+  /** Reads and enables pagination through a set of `TeamMember`. */
+  teamMembers?: Maybe<TeamMembersConnection>;
   /** Reads and enables pagination through a set of `Team`. */
   teams?: Maybe<TeamsConnection>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
   /** Reads a single `User` using its globally unique `ID`. */
   userByNodeId?: Maybe<User>;
-  userByUsername?: Maybe<User>;
   /** Reads and enables pagination through a set of `User`. */
   users?: Maybe<UsersConnection>;
-  /** Reads and enables pagination through a set of `UsersInternal`. */
-  usersInternals?: Maybe<UsersInternalsConnection>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryAggregateSeasonBattingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonBattingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonBattingsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryAggregateSeasonFieldingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonFieldingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonFieldingsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryAggregateSeasonPitchingsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<AggregateSeasonPitchingCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<AggregateSeasonPitchingsOrderBy>>;
 };
 
 
@@ -3226,14 +4666,14 @@ export type QueryCareerBattingsArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
-export type QueryCareerFieldingByPosArgs = {
+export type QueryCareerFieldingByPositionsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
-  condition?: InputMaybe<CareerFieldingByPoCondition>;
+  condition?: InputMaybe<CareerFieldingByPositionCondition>;
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
+  orderBy?: InputMaybe<Array<CareerFieldingByPositionsOrderBy>>;
 };
 
 
@@ -3319,17 +4759,6 @@ export type QueryDraftsArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
-export type QueryGetColumnsForTypeArgs = {
-  after?: InputMaybe<Scalars['Cursor']['input']>;
-  before?: InputMaybe<Scalars['Cursor']['input']>;
-  first?: InputMaybe<Scalars['Int']['input']>;
-  last?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  typeName: Scalars['String']['input'];
-};
-
-
-/** The root query type which gives access points into the data universe. */
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
 };
@@ -3391,6 +4820,30 @@ export type QueryLeagueMessagesArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
+export type QueryLeaguePositionArgs = {
+  id: Scalars['Int']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryLeaguePositionByNodeIdArgs = {
+  nodeId: Scalars['ID']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryLeaguePositionsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<LeaguePositionCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
 export type QueryLeaguesArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3399,6 +4852,61 @@ export type QueryLeaguesArgs = {
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupArgs = {
+  id: Scalars['Int']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupByLeagueIdAndWeekNumberArgs = {
+  leagueId: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupByNodeIdArgs = {
+  nodeId: Scalars['ID']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupPlayerArgs = {
+  id: Scalars['Int']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupPlayerByNodeIdArgs = {
+  nodeId: Scalars['ID']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupPlayersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupPlayerCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryMatchupsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<MatchupCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<MatchupsOrderBy>>;
 };
 
 
@@ -3427,6 +4935,18 @@ export type QueryPlayerByNodeIdArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
+export type QueryPlayerEligiblePositionsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<PlayerEligiblePositionCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<PlayerEligiblePositionsOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
 export type QueryPlayersArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3441,7 +4961,8 @@ export type QueryPlayersArgs = {
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonBattingArgs = {
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -3468,7 +4989,8 @@ export type QuerySeasonBattingsArgs = {
 export type QuerySeasonFieldingArgs = {
   playerId: Scalars['Int']['input'];
   pos: Scalars['String']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -3494,7 +5016,8 @@ export type QuerySeasonFieldingsArgs = {
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonPitchingArgs = {
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -3537,6 +5060,30 @@ export type QueryTeamByNodeIdArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
+export type QueryTeamMemberArgs = {
+  id: Scalars['Int']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryTeamMemberByNodeIdArgs = {
+  nodeId: Scalars['ID']['input'];
+};
+
+
+/** The root query type which gives access points into the data universe. */
+export type QueryTeamMembersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<TeamMemberCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
+
+/** The root query type which gives access points into the data universe. */
 export type QueryTeamsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3567,12 +5114,6 @@ export type QueryUserByNodeIdArgs = {
 
 
 /** The root query type which gives access points into the data universe. */
-export type QueryUserByUsernameArgs = {
-  username: Scalars['String']['input'];
-};
-
-
-/** The root query type which gives access points into the data universe. */
 export type QueryUsersArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3581,18 +5122,6 @@ export type QueryUsersArgs = {
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
-};
-
-
-/** The root query type which gives access points into the data universe. */
-export type QueryUsersInternalsArgs = {
-  after?: InputMaybe<Scalars['Cursor']['input']>;
-  before?: InputMaybe<Scalars['Cursor']['input']>;
-  condition?: InputMaybe<UsersInternalCondition>;
-  first?: InputMaybe<Scalars['Int']['input']>;
-  last?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Array<UsersInternalsOrderBy>>;
 };
 
 export type SeasonBatting = Node & {
@@ -3622,9 +5151,10 @@ export type SeasonBatting = Node & {
   posSeason?: Maybe<Scalars['String']['output']>;
   r?: Maybe<Scalars['Int']['output']>;
   rbi?: Maybe<Scalars['Int']['output']>;
+  rowId: Scalars['String']['output'];
   sb?: Maybe<Scalars['Int']['output']>;
-  season: Scalars['String']['output'];
-  sf?: Maybe<Scalars['String']['output']>;
+  season: Scalars['Int']['output'];
+  sf?: Maybe<Scalars['Int']['output']>;
   sh?: Maybe<Scalars['Int']['output']>;
   sluggingPerc?: Maybe<Scalars['Float']['output']>;
   so?: Maybe<Scalars['Int']['output']>;
@@ -3680,12 +5210,14 @@ export type SeasonBattingCondition = {
   r?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `rbi` field. */
   rbi?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `rowId` field. */
+  rowId?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `sb` field. */
   sb?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `season` field. */
-  season?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `sf` field. */
-  sf?: InputMaybe<Scalars['String']['input']>;
+  sf?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `sh` field. */
   sh?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `sluggingPerc` field. */
@@ -3723,9 +5255,10 @@ export type SeasonBattingInput = {
   posSeason?: InputMaybe<Scalars['String']['input']>;
   r?: InputMaybe<Scalars['Int']['input']>;
   rbi?: InputMaybe<Scalars['Int']['input']>;
+  rowId: Scalars['String']['input'];
   sb?: InputMaybe<Scalars['Int']['input']>;
-  season: Scalars['String']['input'];
-  sf?: InputMaybe<Scalars['String']['input']>;
+  season: Scalars['Int']['input'];
+  sf?: InputMaybe<Scalars['Int']['input']>;
   sh?: InputMaybe<Scalars['Int']['input']>;
   sluggingPerc?: InputMaybe<Scalars['Float']['input']>;
   so?: InputMaybe<Scalars['Int']['input']>;
@@ -3757,9 +5290,10 @@ export type SeasonBattingPatch = {
   posSeason?: InputMaybe<Scalars['String']['input']>;
   r?: InputMaybe<Scalars['Int']['input']>;
   rbi?: InputMaybe<Scalars['Int']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
   sb?: InputMaybe<Scalars['Int']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
-  sf?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
+  sf?: InputMaybe<Scalars['Int']['input']>;
   sh?: InputMaybe<Scalars['Int']['input']>;
   sluggingPerc?: InputMaybe<Scalars['Float']['input']>;
   so?: InputMaybe<Scalars['Int']['input']>;
@@ -3835,6 +5369,8 @@ export enum SeasonBattingsOrderBy {
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
   RbiAsc = 'RBI_ASC',
   RbiDesc = 'RBI_DESC',
+  RowIdAsc = 'ROW_ID_ASC',
+  RowIdDesc = 'ROW_ID_DESC',
   RAsc = 'R_ASC',
   RDesc = 'R_DESC',
   SbAsc = 'SB_ASC',
@@ -3887,8 +5423,9 @@ export type SeasonFielding = Node & {
   rangeFactorPerGameLg?: Maybe<Scalars['Float']['output']>;
   rangeFactorPerNine?: Maybe<Scalars['Float']['output']>;
   rangeFactorPerNineLg?: Maybe<Scalars['Float']['output']>;
+  rowId: Scalars['String']['output'];
   sb?: Maybe<Scalars['Int']['output']>;
-  season: Scalars['String']['output'];
+  season: Scalars['Int']['output'];
   team: Scalars['String']['output'];
   wp?: Maybe<Scalars['Int']['output']>;
 };
@@ -3946,10 +5483,12 @@ export type SeasonFieldingCondition = {
   rangeFactorPerNine?: InputMaybe<Scalars['Float']['input']>;
   /** Checks for equality with the object’s `rangeFactorPerNineLg` field. */
   rangeFactorPerNineLg?: InputMaybe<Scalars['Float']['input']>;
+  /** Checks for equality with the object’s `rowId` field. */
+  rowId?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `sb` field. */
   sb?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `season` field. */
-  season?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `team` field. */
   team?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `wp` field. */
@@ -3982,8 +5521,9 @@ export type SeasonFieldingInput = {
   rangeFactorPerGameLg?: InputMaybe<Scalars['Float']['input']>;
   rangeFactorPerNine?: InputMaybe<Scalars['Float']['input']>;
   rangeFactorPerNineLg?: InputMaybe<Scalars['Float']['input']>;
+  rowId: Scalars['String']['input'];
   sb?: InputMaybe<Scalars['Int']['input']>;
-  season: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
   wp?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -4014,8 +5554,9 @@ export type SeasonFieldingPatch = {
   rangeFactorPerGameLg?: InputMaybe<Scalars['Float']['input']>;
   rangeFactorPerNine?: InputMaybe<Scalars['Float']['input']>;
   rangeFactorPerNineLg?: InputMaybe<Scalars['Float']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
   sb?: InputMaybe<Scalars['Int']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
   wp?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -4095,6 +5636,8 @@ export enum SeasonFieldingsOrderBy {
   RangeFactorPerNineDesc = 'RANGE_FACTOR_PER_NINE_DESC',
   RangeFactorPerNineLgAsc = 'RANGE_FACTOR_PER_NINE_LG_ASC',
   RangeFactorPerNineLgDesc = 'RANGE_FACTOR_PER_NINE_LG_DESC',
+  RowIdAsc = 'ROW_ID_ASC',
+  RowIdDesc = 'ROW_ID_DESC',
   SbAsc = 'SB_ASC',
   SbDesc = 'SB_DESC',
   SeasonAsc = 'SEASON_ASC',
@@ -4136,7 +5679,8 @@ export type SeasonPitching = Node & {
   player?: Maybe<Player>;
   playerId: Scalars['Int']['output'];
   r?: Maybe<Scalars['Int']['output']>;
-  season: Scalars['String']['output'];
+  rowId: Scalars['String']['output'];
+  season: Scalars['Int']['output'];
   sho?: Maybe<Scalars['Int']['output']>;
   so?: Maybe<Scalars['Int']['output']>;
   strikeoutsPerBaseOnBalls?: Maybe<Scalars['Float']['output']>;
@@ -4204,8 +5748,10 @@ export type SeasonPitchingCondition = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `r` field. */
   r?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `rowId` field. */
+  rowId?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `season` field. */
-  season?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `sho` field. */
   sho?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `so` field. */
@@ -4255,7 +5801,8 @@ export type SeasonPitchingInput = {
   outsRecorded?: InputMaybe<Scalars['Int']['input']>;
   playerId: Scalars['Int']['input'];
   r?: InputMaybe<Scalars['Int']['input']>;
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   sho?: InputMaybe<Scalars['Int']['input']>;
   so?: InputMaybe<Scalars['Int']['input']>;
   strikeoutsPerBaseOnBalls?: InputMaybe<Scalars['Float']['input']>;
@@ -4295,7 +5842,8 @@ export type SeasonPitchingPatch = {
   outsRecorded?: InputMaybe<Scalars['Int']['input']>;
   playerId?: InputMaybe<Scalars['Int']['input']>;
   r?: InputMaybe<Scalars['Int']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   sho?: InputMaybe<Scalars['Int']['input']>;
   so?: InputMaybe<Scalars['Int']['input']>;
   strikeoutsPerBaseOnBalls?: InputMaybe<Scalars['Float']['input']>;
@@ -4383,6 +5931,8 @@ export enum SeasonPitchingsOrderBy {
   PlayerIdDesc = 'PLAYER_ID_DESC',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
+  RowIdAsc = 'ROW_ID_ASC',
+  RowIdDesc = 'ROW_ID_DESC',
   RAsc = 'R_ASC',
   RDesc = 'R_DESC',
   SeasonAsc = 'SEASON_ASC',
@@ -4420,6 +5970,8 @@ export type Team = Node & {
   name: Scalars['String']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
+  /** Reads and enables pagination through a set of `TeamMember`. */
+  teamMembers: TeamMembersConnection;
 };
 
 
@@ -4431,6 +5983,17 @@ export type TeamDraftTeamsByTeamIdAndLeagueIdArgs = {
   last?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
+};
+
+
+export type TeamTeamMembersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<TeamMemberCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
 };
 
 /** A condition to be used against `Team` object types. All fields are tested for equality and combined with a logical ‘and.’ */
@@ -4449,6 +6012,99 @@ export type TeamInput = {
   leagueId: Scalars['Int']['input'];
   name: Scalars['String']['input'];
 };
+
+export type TeamMember = Node & {
+  __typename?: 'TeamMember';
+  id: Scalars['Int']['output'];
+  /** Reads a single `League` that is related to this `TeamMember`. */
+  league?: Maybe<League>;
+  leagueId: Scalars['Int']['output'];
+  /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
+  nodeId: Scalars['ID']['output'];
+  /** Reads a single `Player` that is related to this `TeamMember`. */
+  player?: Maybe<Player>;
+  playerId: Scalars['Int']['output'];
+  /** Reads a single `LeaguePosition` that is related to this `TeamMember`. */
+  position?: Maybe<LeaguePosition>;
+  positionId?: Maybe<Scalars['Int']['output']>;
+  /** Reads a single `Team` that is related to this `TeamMember`. */
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/**
+ * A condition to be used against `TeamMember` object types. All fields are tested
+ * for equality and combined with a logical ‘and.’
+ */
+export type TeamMemberCondition = {
+  /** Checks for equality with the object’s `id` field. */
+  id?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `leagueId` field. */
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `playerId` field. */
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `positionId` field. */
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+  /** Checks for equality with the object’s `teamId` field. */
+  teamId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** An input for mutations affecting `TeamMember` */
+export type TeamMemberInput = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+  teamId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Represents an update to a `TeamMember`. Fields that are set will be updated. */
+export type TeamMemberPatch = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+  teamId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** A connection to a list of `TeamMember` values. */
+export type TeamMembersConnection = {
+  __typename?: 'TeamMembersConnection';
+  /** A list of edges which contains the `TeamMember` and cursor to aid in pagination. */
+  edges: Array<TeamMembersEdge>;
+  /** A list of `TeamMember` objects. */
+  nodes: Array<Maybe<TeamMember>>;
+  /** Information to aid in pagination. */
+  pageInfo: PageInfo;
+  /** The count of *all* `TeamMember` you could get from the connection. */
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A `TeamMember` edge in the connection. */
+export type TeamMembersEdge = {
+  __typename?: 'TeamMembersEdge';
+  /** A cursor for use in pagination. */
+  cursor?: Maybe<Scalars['Cursor']['output']>;
+  /** The `TeamMember` at the end of the edge. */
+  node?: Maybe<TeamMember>;
+};
+
+/** Methods to use when ordering `TeamMember`. */
+export enum TeamMembersOrderBy {
+  IdAsc = 'ID_ASC',
+  IdDesc = 'ID_DESC',
+  LeagueIdAsc = 'LEAGUE_ID_ASC',
+  LeagueIdDesc = 'LEAGUE_ID_DESC',
+  Natural = 'NATURAL',
+  PlayerIdAsc = 'PLAYER_ID_ASC',
+  PlayerIdDesc = 'PLAYER_ID_DESC',
+  PositionIdAsc = 'POSITION_ID_ASC',
+  PositionIdDesc = 'POSITION_ID_DESC',
+  PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
+  TeamIdAsc = 'TEAM_ID_ASC',
+  TeamIdDesc = 'TEAM_ID_DESC'
+}
 
 /** Represents an update to a `Team`. Fields that are set will be updated. */
 export type TeamPatch = {
@@ -4491,37 +6147,6 @@ export enum TeamsOrderBy {
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
 }
-
-/** An input for mutations affecting `UpdateBattingStatsInputRecord` */
-export type UpdateBattingStatsInputRecordInput = {
-  _2B?: InputMaybe<Scalars['Int']['input']>;
-  _3B?: InputMaybe<Scalars['Int']['input']>;
-  ab?: InputMaybe<Scalars['Int']['input']>;
-  awardSummary?: InputMaybe<Scalars['String']['input']>;
-  battingAvg?: InputMaybe<Scalars['Float']['input']>;
-  bb?: InputMaybe<Scalars['Int']['input']>;
-  cs?: InputMaybe<Scalars['Int']['input']>;
-  g?: InputMaybe<Scalars['Int']['input']>;
-  gidp?: InputMaybe<Scalars['Int']['input']>;
-  h?: InputMaybe<Scalars['Int']['input']>;
-  hbp?: InputMaybe<Scalars['Int']['input']>;
-  hr?: InputMaybe<Scalars['Int']['input']>;
-  ibb?: InputMaybe<Scalars['Int']['input']>;
-  onbasePerc?: InputMaybe<Scalars['Float']['input']>;
-  onbasePlusSlugging?: InputMaybe<Scalars['Float']['input']>;
-  onbasePlusSluggingPlus?: InputMaybe<Scalars['Float']['input']>;
-  pa?: InputMaybe<Scalars['Int']['input']>;
-  playerId?: InputMaybe<Scalars['Int']['input']>;
-  posSeason?: InputMaybe<Scalars['String']['input']>;
-  r?: InputMaybe<Scalars['Int']['input']>;
-  rbi?: InputMaybe<Scalars['Int']['input']>;
-  sb?: InputMaybe<Scalars['Int']['input']>;
-  sf?: InputMaybe<Scalars['String']['input']>;
-  sh?: InputMaybe<Scalars['Int']['input']>;
-  sluggingPerc?: InputMaybe<Scalars['Float']['input']>;
-  so?: InputMaybe<Scalars['Int']['input']>;
-  tb?: InputMaybe<Scalars['Int']['input']>;
-};
 
 /** All input for the `updateDraftByNodeId` mutation. */
 export type UpdateDraftByNodeIdInput = {
@@ -4626,8 +6251,6 @@ export type UpdateDraftTeamPayload = {
   draftTeam?: Maybe<DraftTeam>;
   /** An edge for our `DraftTeam`. May be used by Relay 1. */
   draftTeamEdge?: Maybe<DraftTeamsEdge>;
-  /** Reads a single `League` that is related to this `DraftTeam`. */
-  league?: Maybe<League>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** Reads a single `Team` that is related to this `DraftTeam`. */
@@ -4638,36 +6261,6 @@ export type UpdateDraftTeamPayload = {
 /** The output of our update `DraftTeam` mutation. */
 export type UpdateDraftTeamPayloadDraftTeamEdgeArgs = {
   orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
-};
-
-/** An input for mutations affecting `UpdateFieldingStatsInputRecord` */
-export type UpdateFieldingStatsInputRecordInput = {
-  a?: InputMaybe<Scalars['Int']['input']>;
-  awardSummary?: InputMaybe<Scalars['String']['input']>;
-  caughtStealingPerc?: InputMaybe<Scalars['Float']['input']>;
-  caughtStealingPercLg?: InputMaybe<Scalars['Float']['input']>;
-  cg?: InputMaybe<Scalars['Int']['input']>;
-  chances?: InputMaybe<Scalars['Float']['input']>;
-  cs?: InputMaybe<Scalars['Int']['input']>;
-  dpDef?: InputMaybe<Scalars['Int']['input']>;
-  eDef?: InputMaybe<Scalars['Int']['input']>;
-  fieldingPerc?: InputMaybe<Scalars['Float']['input']>;
-  fieldingPercLg?: InputMaybe<Scalars['Float']['input']>;
-  g?: InputMaybe<Scalars['Int']['input']>;
-  gOfParts?: InputMaybe<Scalars['Int']['input']>;
-  gs?: InputMaybe<Scalars['Int']['input']>;
-  innDef?: InputMaybe<Scalars['Float']['input']>;
-  lgId?: InputMaybe<Scalars['String']['input']>;
-  pickoffs?: InputMaybe<Scalars['Int']['input']>;
-  playerId?: InputMaybe<Scalars['Int']['input']>;
-  po?: InputMaybe<Scalars['Int']['input']>;
-  pos?: InputMaybe<Scalars['String']['input']>;
-  rangeFactorPerGame?: InputMaybe<Scalars['Float']['input']>;
-  rangeFactorPerGameLg?: InputMaybe<Scalars['Float']['input']>;
-  rangeFactorPerNine?: InputMaybe<Scalars['Float']['input']>;
-  rangeFactorPerNineLg?: InputMaybe<Scalars['Float']['input']>;
-  sb?: InputMaybe<Scalars['Int']['input']>;
-  wp?: InputMaybe<Scalars['Int']['input']>;
 };
 
 /** All input for the `updateLeagueByNodeId` mutation. */
@@ -4790,8 +6383,6 @@ export type UpdateLeagueMessagePayload = {
   query?: Maybe<Query>;
   /** Reads a single `User` that is related to this `LeagueMessage`. */
   user?: Maybe<User>;
-  /** Reads a single `LeagueMember` that is related to this `LeagueMessage`. */
-  userLeague?: Maybe<LeagueMember>;
 };
 
 
@@ -4812,8 +6403,12 @@ export type UpdateLeaguePayload = {
   league?: Maybe<League>;
   /** An edge for our `League`. May be used by Relay 1. */
   leagueEdge?: Maybe<LeaguesEdge>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
@@ -4822,40 +6417,172 @@ export type UpdateLeaguePayloadLeagueEdgeArgs = {
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
 };
 
-/** An input for mutations affecting `UpdatePitchingStatsInputRecord` */
-export type UpdatePitchingStatsInputRecordInput = {
-  awardSummary?: InputMaybe<Scalars['String']['input']>;
-  basesOnBallsPerNine?: InputMaybe<Scalars['Float']['input']>;
-  battersFaced?: InputMaybe<Scalars['Int']['input']>;
-  bb?: InputMaybe<Scalars['Int']['input']>;
-  bk?: InputMaybe<Scalars['Int']['input']>;
-  cg?: InputMaybe<Scalars['Int']['input']>;
-  earnedRunAvg?: InputMaybe<Scalars['Float']['input']>;
-  earnedRunAvgPlus?: InputMaybe<Scalars['Float']['input']>;
-  er?: InputMaybe<Scalars['Int']['input']>;
-  fip?: InputMaybe<Scalars['Float']['input']>;
-  g?: InputMaybe<Scalars['Int']['input']>;
-  gf?: InputMaybe<Scalars['Int']['input']>;
-  gs?: InputMaybe<Scalars['Int']['input']>;
-  h?: InputMaybe<Scalars['Int']['input']>;
-  hbp?: InputMaybe<Scalars['Int']['input']>;
-  hitsPerNine?: InputMaybe<Scalars['Float']['input']>;
-  homeRunsPerNine?: InputMaybe<Scalars['Float']['input']>;
-  hr?: InputMaybe<Scalars['Int']['input']>;
-  ibb?: InputMaybe<Scalars['Int']['input']>;
-  ip?: InputMaybe<Scalars['Float']['input']>;
-  l?: InputMaybe<Scalars['Int']['input']>;
-  playerId?: InputMaybe<Scalars['Int']['input']>;
-  r?: InputMaybe<Scalars['Int']['input']>;
-  sho?: InputMaybe<Scalars['Int']['input']>;
-  so?: InputMaybe<Scalars['Int']['input']>;
-  strikeoutsPerBaseOnBalls?: InputMaybe<Scalars['Float']['input']>;
-  strikeoutsPerNine?: InputMaybe<Scalars['Float']['input']>;
-  sv?: InputMaybe<Scalars['Int']['input']>;
-  w?: InputMaybe<Scalars['Int']['input']>;
-  whip?: InputMaybe<Scalars['Float']['input']>;
-  winLossPerc?: InputMaybe<Scalars['Float']['input']>;
-  wp?: InputMaybe<Scalars['Int']['input']>;
+/** All input for the `updateLeaguePositionByNodeId` mutation. */
+export type UpdateLeaguePositionByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `LeaguePosition` to be updated. */
+  nodeId: Scalars['ID']['input'];
+  /** An object where the defined keys will be set on the `LeaguePosition` being updated. */
+  patch: LeaguePositionPatch;
+};
+
+/** All input for the `updateLeaguePosition` mutation. */
+export type UpdateLeaguePositionInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+  /** An object where the defined keys will be set on the `LeaguePosition` being updated. */
+  patch: LeaguePositionPatch;
+};
+
+/** The output of our update `LeaguePosition` mutation. */
+export type UpdateLeaguePositionPayload = {
+  __typename?: 'UpdateLeaguePositionPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `LeaguePosition`. */
+  league?: Maybe<League>;
+  /** The `LeaguePosition` that was updated by this mutation. */
+  leaguePosition?: Maybe<LeaguePosition>;
+  /** An edge for our `LeaguePosition`. May be used by Relay 1. */
+  leaguePositionEdge?: Maybe<LeaguePositionsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our update `LeaguePosition` mutation. */
+export type UpdateLeaguePositionPayloadLeaguePositionEdgeArgs = {
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+/** All input for the `updateMatchupByLeagueIdAndWeekNumber` mutation. */
+export type UpdateMatchupByLeagueIdAndWeekNumberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+  /** An object where the defined keys will be set on the `Matchup` being updated. */
+  patch: MatchupPatch;
+  weekNumber: Scalars['Int']['input'];
+};
+
+/** All input for the `updateMatchupByNodeId` mutation. */
+export type UpdateMatchupByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `Matchup` to be updated. */
+  nodeId: Scalars['ID']['input'];
+  /** An object where the defined keys will be set on the `Matchup` being updated. */
+  patch: MatchupPatch;
+};
+
+/** All input for the `updateMatchup` mutation. */
+export type UpdateMatchupInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+  /** An object where the defined keys will be set on the `Matchup` being updated. */
+  patch: MatchupPatch;
+};
+
+/** The output of our update `Matchup` mutation. */
+export type UpdateMatchupPayload = {
+  __typename?: 'UpdateMatchupPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `Matchup`. */
+  leagueById?: Maybe<League>;
+  /** The `Matchup` that was updated by this mutation. */
+  matchup?: Maybe<Matchup>;
+  /** An edge for our `Matchup`. May be used by Relay 1. */
+  matchupEdge?: Maybe<MatchupsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our update `Matchup` mutation. */
+export type UpdateMatchupPayloadMatchupEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupsOrderBy>>;
+};
+
+/** All input for the `updateMatchupPlayerByNodeId` mutation. */
+export type UpdateMatchupPlayerByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `MatchupPlayer` to be updated. */
+  nodeId: Scalars['ID']['input'];
+  /** An object where the defined keys will be set on the `MatchupPlayer` being updated. */
+  patch: MatchupPlayerPatch;
+};
+
+/** All input for the `updateMatchupPlayer` mutation. */
+export type UpdateMatchupPlayerInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+  /** An object where the defined keys will be set on the `MatchupPlayer` being updated. */
+  patch: MatchupPlayerPatch;
+};
+
+/** The output of our update `MatchupPlayer` mutation. */
+export type UpdateMatchupPlayerPayload = {
+  __typename?: 'UpdateMatchupPlayerPayload';
+  /** Reads a single `AggregateSeasonBatting` that is related to this `MatchupPlayer`. */
+  aggregateSeasonBattingByPlayerIdAndSeason?: Maybe<AggregateSeasonBatting>;
+  /** Reads a single `AggregateSeasonFielding` that is related to this `MatchupPlayer`. */
+  aggregateSeasonFieldingByPlayerIdAndSeason?: Maybe<AggregateSeasonFielding>;
+  /** Reads a single `AggregateSeasonPitching` that is related to this `MatchupPlayer`. */
+  aggregateSeasonPitchingByPlayerIdAndSeason?: Maybe<AggregateSeasonPitching>;
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Matchup` that is related to this `MatchupPlayer`. */
+  matchup?: Maybe<Matchup>;
+  /** The `MatchupPlayer` that was updated by this mutation. */
+  matchupPlayer?: Maybe<MatchupPlayer>;
+  /** An edge for our `MatchupPlayer`. May be used by Relay 1. */
+  matchupPlayerEdge?: Maybe<MatchupPlayersEdge>;
+  /** Reads a single `Player` that is related to this `MatchupPlayer`. */
+  player?: Maybe<Player>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our update `MatchupPlayer` mutation. */
+export type UpdateMatchupPlayerPayloadMatchupPlayerEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
 };
 
 /** All input for the `updatePlayerByBrefId` mutation. */
@@ -4940,7 +6667,8 @@ export type UpdateSeasonBattingInput = {
   /** An object where the defined keys will be set on the `SeasonBatting` being updated. */
   patch: SeasonBattingPatch;
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -4992,7 +6720,8 @@ export type UpdateSeasonFieldingInput = {
   patch: SeasonFieldingPatch;
   playerId: Scalars['Int']['input'];
   pos: Scalars['String']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -5043,7 +6772,8 @@ export type UpdateSeasonPitchingInput = {
   /** An object where the defined keys will be set on the `SeasonPitching` being updated. */
   patch: SeasonPitchingPatch;
   playerId: Scalars['Int']['input'];
-  season: Scalars['String']['input'];
+  rowId: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
   team: Scalars['String']['input'];
 };
 
@@ -5109,6 +6839,61 @@ export type UpdateTeamInput = {
   patch: TeamPatch;
 };
 
+/** All input for the `updateTeamMemberByNodeId` mutation. */
+export type UpdateTeamMemberByNodeIdInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The globally unique `ID` which will identify a single `TeamMember` to be updated. */
+  nodeId: Scalars['ID']['input'];
+  /** An object where the defined keys will be set on the `TeamMember` being updated. */
+  patch: TeamMemberPatch;
+};
+
+/** All input for the `updateTeamMember` mutation. */
+export type UpdateTeamMemberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+  /** An object where the defined keys will be set on the `TeamMember` being updated. */
+  patch: TeamMemberPatch;
+};
+
+/** The output of our update `TeamMember` mutation. */
+export type UpdateTeamMemberPayload = {
+  __typename?: 'UpdateTeamMemberPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `TeamMember`. */
+  league?: Maybe<League>;
+  /** Reads a single `Player` that is related to this `TeamMember`. */
+  player?: Maybe<Player>;
+  /** Reads a single `LeaguePosition` that is related to this `TeamMember`. */
+  position?: Maybe<LeaguePosition>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+  /** Reads a single `Team` that is related to this `TeamMember`. */
+  team?: Maybe<Team>;
+  /** The `TeamMember` that was updated by this mutation. */
+  teamMember?: Maybe<TeamMember>;
+  /** An edge for our `TeamMember`. May be used by Relay 1. */
+  teamMemberEdge?: Maybe<TeamMembersEdge>;
+};
+
+
+/** The output of our update `TeamMember` mutation. */
+export type UpdateTeamMemberPayloadTeamMemberEdgeArgs = {
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
 /** The output of our update `Team` mutation. */
 export type UpdateTeamPayload = {
   __typename?: 'UpdateTeamPayload';
@@ -5156,18 +6941,6 @@ export type UpdateUserByNodeIdInput = {
   nodeId: Scalars['ID']['input'];
   /** An object where the defined keys will be set on the `User` being updated. */
   patch: UserPatch;
-};
-
-/** All input for the `updateUserByUsername` mutation. */
-export type UpdateUserByUsernameInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  /** An object where the defined keys will be set on the `User` being updated. */
-  patch: UserPatch;
-  username: Scalars['String']['input'];
 };
 
 /** All input for the `updateUser` mutation. */
@@ -5252,8 +7025,6 @@ export type UpsertDraftTeamPayload = {
   draftTeam?: Maybe<DraftTeam>;
   /** An edge for our `DraftTeam`. May be used by Relay 1. */
   draftTeamEdge?: Maybe<DraftTeamsEdge>;
-  /** Reads a single `League` that is related to this `DraftTeam`. */
-  league?: Maybe<League>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
   /** Reads a single `Team` that is related to this `DraftTeam`. */
@@ -5347,8 +7118,6 @@ export type UpsertLeagueMessagePayload = {
   query?: Maybe<Query>;
   /** Reads a single `User` that is related to this `LeagueMessage`. */
   user?: Maybe<User>;
-  /** Reads a single `LeagueMember` that is related to this `LeagueMessage`. */
-  userLeague?: Maybe<LeagueMember>;
 };
 
 
@@ -5371,8 +7140,12 @@ export type UpsertLeaguePayload = {
   league?: Maybe<League>;
   /** An edge for our `League`. May be used by Relay 1. */
   leagueEdge?: Maybe<LeaguesEdge>;
+  /** Reads a single `Matchup` that is related to this `League`. */
+  matchupByCurrentMatchup?: Maybe<Matchup>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
+  /** Reads a single `User` that is related to this `League`. */
+  userByOwner?: Maybe<User>;
 };
 
 
@@ -5381,9 +7154,121 @@ export type UpsertLeaguePayloadLeagueEdgeArgs = {
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
 };
 
+/** All input for the upsert `LeaguePosition` mutation. */
+export type UpsertLeaguePositionInput = {
+  /** An arbitrary string value with no semantic meaning. Will be included in the payload verbatim. May be used to track mutations by the client. */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `LeaguePosition` to be upserted by this mutation. */
+  leaguePosition: LeaguePositionInput;
+};
+
+/** The output of our upsert `LeaguePosition` mutation. */
+export type UpsertLeaguePositionPayload = {
+  __typename?: 'UpsertLeaguePositionPayload';
+  /** The exact same `clientMutationId` that was provided in the mutation input, unchanged and unused. May be used by a client to track mutations. */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `LeaguePosition`. */
+  league?: Maybe<League>;
+  /** The `LeaguePosition` that was upserted by this mutation. */
+  leaguePosition?: Maybe<LeaguePosition>;
+  /** An edge for our `LeaguePosition`. May be used by Relay 1. */
+  leaguePositionEdge?: Maybe<LeaguePositionsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our upsert `LeaguePosition` mutation. */
+export type UpsertLeaguePositionPayloadLeaguePositionEdgeArgs = {
+  orderBy?: InputMaybe<Array<LeaguePositionsOrderBy>>;
+};
+
+/** Where conditions for the upsert `LeaguePosition` mutation. */
+export type UpsertLeaguePositionWhere = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+};
+
 /** Where conditions for the upsert `League` mutation. */
 export type UpsertLeagueWhere = {
   id?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** All input for the upsert `Matchup` mutation. */
+export type UpsertMatchupInput = {
+  /** An arbitrary string value with no semantic meaning. Will be included in the payload verbatim. May be used to track mutations by the client. */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `Matchup` to be upserted by this mutation. */
+  matchup: MatchupInput;
+};
+
+/** The output of our upsert `Matchup` mutation. */
+export type UpsertMatchupPayload = {
+  __typename?: 'UpsertMatchupPayload';
+  /** The exact same `clientMutationId` that was provided in the mutation input, unchanged and unused. May be used by a client to track mutations. */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `Matchup`. */
+  leagueById?: Maybe<League>;
+  /** The `Matchup` that was upserted by this mutation. */
+  matchup?: Maybe<Matchup>;
+  /** An edge for our `Matchup`. May be used by Relay 1. */
+  matchupEdge?: Maybe<MatchupsEdge>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our upsert `Matchup` mutation. */
+export type UpsertMatchupPayloadMatchupEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupsOrderBy>>;
+};
+
+/** All input for the upsert `MatchupPlayer` mutation. */
+export type UpsertMatchupPlayerInput = {
+  /** An arbitrary string value with no semantic meaning. Will be included in the payload verbatim. May be used to track mutations by the client. */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `MatchupPlayer` to be upserted by this mutation. */
+  matchupPlayer: MatchupPlayerInput;
+};
+
+/** The output of our upsert `MatchupPlayer` mutation. */
+export type UpsertMatchupPlayerPayload = {
+  __typename?: 'UpsertMatchupPlayerPayload';
+  /** Reads a single `AggregateSeasonBatting` that is related to this `MatchupPlayer`. */
+  aggregateSeasonBattingByPlayerIdAndSeason?: Maybe<AggregateSeasonBatting>;
+  /** Reads a single `AggregateSeasonFielding` that is related to this `MatchupPlayer`. */
+  aggregateSeasonFieldingByPlayerIdAndSeason?: Maybe<AggregateSeasonFielding>;
+  /** Reads a single `AggregateSeasonPitching` that is related to this `MatchupPlayer`. */
+  aggregateSeasonPitchingByPlayerIdAndSeason?: Maybe<AggregateSeasonPitching>;
+  /** The exact same `clientMutationId` that was provided in the mutation input, unchanged and unused. May be used by a client to track mutations. */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `Matchup` that is related to this `MatchupPlayer`. */
+  matchup?: Maybe<Matchup>;
+  /** The `MatchupPlayer` that was upserted by this mutation. */
+  matchupPlayer?: Maybe<MatchupPlayer>;
+  /** An edge for our `MatchupPlayer`. May be used by Relay 1. */
+  matchupPlayerEdge?: Maybe<MatchupPlayersEdge>;
+  /** Reads a single `Player` that is related to this `MatchupPlayer`. */
+  player?: Maybe<Player>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
+
+/** The output of our upsert `MatchupPlayer` mutation. */
+export type UpsertMatchupPlayerPayloadMatchupPlayerEdgeArgs = {
+  orderBy?: InputMaybe<Array<MatchupPlayersOrderBy>>;
+};
+
+/** Where conditions for the upsert `MatchupPlayer` mutation. */
+export type UpsertMatchupPlayerWhere = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Where conditions for the upsert `Matchup` mutation. */
+export type UpsertMatchupWhere = {
+  id?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 };
 
 /** All input for the upsert `Player` mutation. */
@@ -5451,7 +7336,8 @@ export type UpsertSeasonBattingPayloadSeasonBattingEdgeArgs = {
 /** Where conditions for the upsert `SeasonBatting` mutation. */
 export type UpsertSeasonBattingWhere = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -5488,7 +7374,8 @@ export type UpsertSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
 export type UpsertSeasonFieldingWhere = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
   pos?: InputMaybe<Scalars['String']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -5524,7 +7411,8 @@ export type UpsertSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
 /** Where conditions for the upsert `SeasonPitching` mutation. */
 export type UpsertSeasonPitchingWhere = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
-  season?: InputMaybe<Scalars['String']['input']>;
+  rowId?: InputMaybe<Scalars['String']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -5534,6 +7422,46 @@ export type UpsertTeamInput = {
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   /** The `Team` to be upserted by this mutation. */
   team: TeamInput;
+};
+
+/** All input for the upsert `TeamMember` mutation. */
+export type UpsertTeamMemberInput = {
+  /** An arbitrary string value with no semantic meaning. Will be included in the payload verbatim. May be used to track mutations by the client. */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  /** The `TeamMember` to be upserted by this mutation. */
+  teamMember: TeamMemberInput;
+};
+
+/** The output of our upsert `TeamMember` mutation. */
+export type UpsertTeamMemberPayload = {
+  __typename?: 'UpsertTeamMemberPayload';
+  /** The exact same `clientMutationId` that was provided in the mutation input, unchanged and unused. May be used by a client to track mutations. */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  /** Reads a single `League` that is related to this `TeamMember`. */
+  league?: Maybe<League>;
+  /** Reads a single `Player` that is related to this `TeamMember`. */
+  player?: Maybe<Player>;
+  /** Reads a single `LeaguePosition` that is related to this `TeamMember`. */
+  position?: Maybe<LeaguePosition>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+  /** Reads a single `Team` that is related to this `TeamMember`. */
+  team?: Maybe<Team>;
+  /** The `TeamMember` that was upserted by this mutation. */
+  teamMember?: Maybe<TeamMember>;
+  /** An edge for our `TeamMember`. May be used by Relay 1. */
+  teamMemberEdge?: Maybe<TeamMembersEdge>;
+};
+
+
+/** The output of our upsert `TeamMember` mutation. */
+export type UpsertTeamMemberPayloadTeamMemberEdgeArgs = {
+  orderBy?: InputMaybe<Array<TeamMembersOrderBy>>;
+};
+
+/** Where conditions for the upsert `TeamMember` mutation. */
+export type UpsertTeamMemberWhere = {
+  id?: InputMaybe<Scalars['Int']['input']>;
 };
 
 /** The output of our upsert `Team` mutation. */
@@ -5561,31 +7489,6 @@ export type UpsertTeamPayloadTeamEdgeArgs = {
 export type UpsertTeamWhere = {
   id?: InputMaybe<Scalars['Int']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
-};
-
-/** All input for the `upsertTypeIntoTable` mutation. */
-export type UpsertTypeIntoTableInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  inputValues: Scalars['String']['input'];
-  pkField: Scalars['String']['input'];
-  tableName: Scalars['String']['input'];
-  typeName: Scalars['String']['input'];
-};
-
-/** The output of our `upsertTypeIntoTable` mutation. */
-export type UpsertTypeIntoTablePayload = {
-  __typename?: 'UpsertTypeIntoTablePayload';
-  /**
-   * The exact same `clientMutationId` that was provided in the mutation input,
-   * unchanged and unused. May be used by a client to track mutations.
-   */
-  clientMutationId?: Maybe<Scalars['String']['output']>;
-  /** Our root query field type. Allows us to run any query from our mutation payload. */
-  query?: Maybe<Query>;
 };
 
 /** All input for the upsert `User` mutation. */
@@ -5619,25 +7522,22 @@ export type UpsertUserPayloadUserEdgeArgs = {
 export type UpsertUserWhere = {
   email?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['Int']['input']>;
-  username?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type User = Node & {
   __typename?: 'User';
-  about?: Maybe<Scalars['String']['output']>;
-  createdAt: Scalars['Datetime']['output'];
-  email: Scalars['String']['output'];
+  accessLevel?: Maybe<AccessLevel>;
+  email?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
-  isAdmin: Scalars['Boolean']['output'];
   /** Reads and enables pagination through a set of `LeagueMember`. */
   leagueMembers: LeagueMembersConnection;
   /** Reads and enables pagination through a set of `LeagueMessage`. */
   leagueMessages: LeagueMessagesConnection;
-  name: Scalars['String']['output'];
+  /** Reads and enables pagination through a set of `League`. */
+  leaguesByOwner: LeaguesConnection;
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
-  updatedAt: Scalars['Datetime']['output'];
-  username: Scalars['String']['output'];
+  username?: Maybe<Scalars['String']['output']>;
 };
 
 
@@ -5662,47 +7562,42 @@ export type UserLeagueMessagesArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
 };
 
+
+export type UserLeaguesByOwnerArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  before?: InputMaybe<Scalars['Cursor']['input']>;
+  condition?: InputMaybe<LeagueCondition>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  last?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
+};
+
 /** A condition to be used against `User` object types. All fields are tested for equality and combined with a logical ‘and.’ */
 export type UserCondition = {
-  /** Checks for equality with the object’s `about` field. */
-  about?: InputMaybe<Scalars['String']['input']>;
-  /** Checks for equality with the object’s `createdAt` field. */
-  createdAt?: InputMaybe<Scalars['Datetime']['input']>;
+  /** Checks for equality with the object’s `accessLevel` field. */
+  accessLevel?: InputMaybe<AccessLevel>;
   /** Checks for equality with the object’s `email` field. */
   email?: InputMaybe<Scalars['String']['input']>;
   /** Checks for equality with the object’s `id` field. */
   id?: InputMaybe<Scalars['Int']['input']>;
-  /** Checks for equality with the object’s `isAdmin` field. */
-  isAdmin?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Checks for equality with the object’s `name` field. */
-  name?: InputMaybe<Scalars['String']['input']>;
-  /** Checks for equality with the object’s `updatedAt` field. */
-  updatedAt?: InputMaybe<Scalars['Datetime']['input']>;
   /** Checks for equality with the object’s `username` field. */
   username?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** An input for mutations affecting `User` */
 export type UserInput = {
-  about?: InputMaybe<Scalars['String']['input']>;
-  createdAt?: InputMaybe<Scalars['Datetime']['input']>;
-  email: Scalars['String']['input'];
-  id?: InputMaybe<Scalars['Int']['input']>;
-  isAdmin?: InputMaybe<Scalars['Boolean']['input']>;
-  name: Scalars['String']['input'];
-  updatedAt?: InputMaybe<Scalars['Datetime']['input']>;
-  username: Scalars['String']['input'];
+  accessLevel?: InputMaybe<AccessLevel>;
+  email?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['Int']['input'];
+  username?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Represents an update to a `User`. Fields that are set will be updated. */
 export type UserPatch = {
-  about?: InputMaybe<Scalars['String']['input']>;
-  createdAt?: InputMaybe<Scalars['Datetime']['input']>;
+  accessLevel?: InputMaybe<AccessLevel>;
   email?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['Int']['input']>;
-  isAdmin?: InputMaybe<Scalars['Boolean']['input']>;
-  name?: InputMaybe<Scalars['String']['input']>;
-  updatedAt?: InputMaybe<Scalars['Datetime']['input']>;
   username?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -5728,53 +7623,8 @@ export type UsersEdge = {
   node?: Maybe<User>;
 };
 
-export type UsersInternal = {
-  __typename?: 'UsersInternal';
-  accessLevel?: Maybe<AccessLevel>;
-  email?: Maybe<Scalars['String']['output']>;
-  id?: Maybe<Scalars['Int']['output']>;
-  username?: Maybe<Scalars['String']['output']>;
-};
-
-/**
- * A condition to be used against `UsersInternal` object types. All fields are
- * tested for equality and combined with a logical ‘and.’
- */
-export type UsersInternalCondition = {
-  /** Checks for equality with the object’s `accessLevel` field. */
-  accessLevel?: InputMaybe<AccessLevel>;
-  /** Checks for equality with the object’s `email` field. */
-  email?: InputMaybe<Scalars['String']['input']>;
-  /** Checks for equality with the object’s `id` field. */
-  id?: InputMaybe<Scalars['Int']['input']>;
-  /** Checks for equality with the object’s `username` field. */
-  username?: InputMaybe<Scalars['String']['input']>;
-};
-
-/** A connection to a list of `UsersInternal` values. */
-export type UsersInternalsConnection = {
-  __typename?: 'UsersInternalsConnection';
-  /** A list of edges which contains the `UsersInternal` and cursor to aid in pagination. */
-  edges: Array<UsersInternalsEdge>;
-  /** A list of `UsersInternal` objects. */
-  nodes: Array<Maybe<UsersInternal>>;
-  /** Information to aid in pagination. */
-  pageInfo: PageInfo;
-  /** The count of *all* `UsersInternal` you could get from the connection. */
-  totalCount: Scalars['Int']['output'];
-};
-
-/** A `UsersInternal` edge in the connection. */
-export type UsersInternalsEdge = {
-  __typename?: 'UsersInternalsEdge';
-  /** A cursor for use in pagination. */
-  cursor?: Maybe<Scalars['Cursor']['output']>;
-  /** The `UsersInternal` at the end of the edge. */
-  node?: Maybe<UsersInternal>;
-};
-
-/** Methods to use when ordering `UsersInternal`. */
-export enum UsersInternalsOrderBy {
+/** Methods to use when ordering `User`. */
+export enum UsersOrderBy {
   AccessLevelAsc = 'ACCESS_LEVEL_ASC',
   AccessLevelDesc = 'ACCESS_LEVEL_DESC',
   EmailAsc = 'EMAIL_ASC',
@@ -5782,38 +7632,120 @@ export enum UsersInternalsOrderBy {
   IdAsc = 'ID_ASC',
   IdDesc = 'ID_DESC',
   Natural = 'NATURAL',
-  UsernameAsc = 'USERNAME_ASC',
-  UsernameDesc = 'USERNAME_DESC'
-}
-
-/** Methods to use when ordering `User`. */
-export enum UsersOrderBy {
-  AboutAsc = 'ABOUT_ASC',
-  AboutDesc = 'ABOUT_DESC',
-  CreatedAtAsc = 'CREATED_AT_ASC',
-  CreatedAtDesc = 'CREATED_AT_DESC',
-  EmailAsc = 'EMAIL_ASC',
-  EmailDesc = 'EMAIL_DESC',
-  IdAsc = 'ID_ASC',
-  IdDesc = 'ID_DESC',
-  IsAdminAsc = 'IS_ADMIN_ASC',
-  IsAdminDesc = 'IS_ADMIN_DESC',
-  NameAsc = 'NAME_ASC',
-  NameDesc = 'NAME_DESC',
-  Natural = 'NATURAL',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
-  UpdatedAtAsc = 'UPDATED_AT_ASC',
-  UpdatedAtDesc = 'UPDATED_AT_DESC',
   UsernameAsc = 'USERNAME_ASC',
   UsernameDesc = 'USERNAME_DESC'
 }
 
-export type BulkUpdateStatsPayloadKeySpecifier = ('clientMutationId' | 'players' | 'query' | BulkUpdateStatsPayloadKeySpecifier)[];
-export type BulkUpdateStatsPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	players?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+export type AggregateSeasonBattingKeySpecifier = ('ab' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'matchupPlayersByPlayerIdAndSeason' | 'pa' | 'player' | 'playerId' | 'r' | 'rbi' | 'sb' | 'season' | 'sf' | 'sh' | 'so' | 'tb' | 'triples' | AggregateSeasonBattingKeySpecifier)[];
+export type AggregateSeasonBattingFieldPolicy = {
+	ab?: FieldPolicy<any> | FieldReadFunction<any>,
+	bb?: FieldPolicy<any> | FieldReadFunction<any>,
+	cs?: FieldPolicy<any> | FieldReadFunction<any>,
+	doubles?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gidp?: FieldPolicy<any> | FieldReadFunction<any>,
+	h?: FieldPolicy<any> | FieldReadFunction<any>,
+	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
+	hr?: FieldPolicy<any> | FieldReadFunction<any>,
+	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayersByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	pa?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	r?: FieldPolicy<any> | FieldReadFunction<any>,
+	rbi?: FieldPolicy<any> | FieldReadFunction<any>,
+	sb?: FieldPolicy<any> | FieldReadFunction<any>,
+	season?: FieldPolicy<any> | FieldReadFunction<any>,
+	sf?: FieldPolicy<any> | FieldReadFunction<any>,
+	sh?: FieldPolicy<any> | FieldReadFunction<any>,
+	so?: FieldPolicy<any> | FieldReadFunction<any>,
+	tb?: FieldPolicy<any> | FieldReadFunction<any>,
+	triples?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonBattingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | AggregateSeasonBattingsConnectionKeySpecifier)[];
+export type AggregateSeasonBattingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonBattingsEdgeKeySpecifier = ('cursor' | 'node' | AggregateSeasonBattingsEdgeKeySpecifier)[];
+export type AggregateSeasonBattingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonFieldingKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'matchupPlayersByPlayerIdAndSeason' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'sb' | 'season' | 'wp' | AggregateSeasonFieldingKeySpecifier)[];
+export type AggregateSeasonFieldingFieldPolicy = {
+	a?: FieldPolicy<any> | FieldReadFunction<any>,
+	cg?: FieldPolicy<any> | FieldReadFunction<any>,
+	chances?: FieldPolicy<any> | FieldReadFunction<any>,
+	cs?: FieldPolicy<any> | FieldReadFunction<any>,
+	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gs?: FieldPolicy<any> | FieldReadFunction<any>,
+	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayersByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	po?: FieldPolicy<any> | FieldReadFunction<any>,
+	sb?: FieldPolicy<any> | FieldReadFunction<any>,
+	season?: FieldPolicy<any> | FieldReadFunction<any>,
+	wp?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonFieldingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | AggregateSeasonFieldingsConnectionKeySpecifier)[];
+export type AggregateSeasonFieldingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonFieldingsEdgeKeySpecifier = ('cursor' | 'node' | AggregateSeasonFieldingsEdgeKeySpecifier)[];
+export type AggregateSeasonFieldingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonPitchingKeySpecifier = ('battersFaced' | 'bb' | 'bk' | 'cg' | 'er' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hr' | 'ibb' | 'l' | 'matchupPlayersByPlayerIdAndSeason' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'season' | 'sho' | 'so' | 'sv' | 'w' | 'wp' | AggregateSeasonPitchingKeySpecifier)[];
+export type AggregateSeasonPitchingFieldPolicy = {
+	battersFaced?: FieldPolicy<any> | FieldReadFunction<any>,
+	bb?: FieldPolicy<any> | FieldReadFunction<any>,
+	bk?: FieldPolicy<any> | FieldReadFunction<any>,
+	cg?: FieldPolicy<any> | FieldReadFunction<any>,
+	er?: FieldPolicy<any> | FieldReadFunction<any>,
+	g?: FieldPolicy<any> | FieldReadFunction<any>,
+	gf?: FieldPolicy<any> | FieldReadFunction<any>,
+	gs?: FieldPolicy<any> | FieldReadFunction<any>,
+	h?: FieldPolicy<any> | FieldReadFunction<any>,
+	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
+	hr?: FieldPolicy<any> | FieldReadFunction<any>,
+	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
+	l?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayersByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	r?: FieldPolicy<any> | FieldReadFunction<any>,
+	season?: FieldPolicy<any> | FieldReadFunction<any>,
+	sho?: FieldPolicy<any> | FieldReadFunction<any>,
+	so?: FieldPolicy<any> | FieldReadFunction<any>,
+	sv?: FieldPolicy<any> | FieldReadFunction<any>,
+	w?: FieldPolicy<any> | FieldReadFunction<any>,
+	wp?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonPitchingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | AggregateSeasonPitchingsConnectionKeySpecifier)[];
+export type AggregateSeasonPitchingsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type AggregateSeasonPitchingsEdgeKeySpecifier = ('cursor' | 'node' | AggregateSeasonPitchingsEdgeKeySpecifier)[];
+export type AggregateSeasonPitchingsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type CareerBattingKeySpecifier = ('ab' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'pa' | 'player' | 'playerId' | 'r' | 'rbi' | 'sb' | 'sh' | 'so' | 'tb' | 'triples' | CareerBattingKeySpecifier)[];
 export type CareerBattingFieldPolicy = {
@@ -5869,8 +7801,8 @@ export type CareerFieldingFieldPolicy = {
 	sb?: FieldPolicy<any> | FieldReadFunction<any>,
 	wp?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CareerFieldingByPoKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingByPoKeySpecifier)[];
-export type CareerFieldingByPoFieldPolicy = {
+export type CareerFieldingByPositionKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingByPositionKeySpecifier)[];
+export type CareerFieldingByPositionFieldPolicy = {
 	a?: FieldPolicy<any> | FieldReadFunction<any>,
 	cg?: FieldPolicy<any> | FieldReadFunction<any>,
 	chances?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -5888,15 +7820,15 @@ export type CareerFieldingByPoFieldPolicy = {
 	sb?: FieldPolicy<any> | FieldReadFunction<any>,
 	wp?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CareerFieldingByPosConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingByPosConnectionKeySpecifier)[];
-export type CareerFieldingByPosConnectionFieldPolicy = {
+export type CareerFieldingByPositionsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingByPositionsConnectionKeySpecifier)[];
+export type CareerFieldingByPositionsConnectionFieldPolicy = {
 	edges?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
 	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
 	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CareerFieldingByPosEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingByPosEdgeKeySpecifier)[];
-export type CareerFieldingByPosEdgeFieldPolicy = {
+export type CareerFieldingByPositionsEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingByPositionsEdgeKeySpecifier)[];
+export type CareerFieldingByPositionsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
@@ -5959,22 +7891,23 @@ export type CreateDraftPayloadFieldPolicy = {
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CreateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | CreateDraftTeamPayloadKeySpecifier)[];
+export type CreateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'query' | 'teamLeague' | CreateDraftTeamPayloadKeySpecifier)[];
 export type CreateDraftTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CreateLeagueAndTeamsPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | CreateLeagueAndTeamsPayloadKeySpecifier)[];
+export type CreateLeagueAndTeamsPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'matchupByCurrentMatchup' | 'query' | 'userByOwner' | CreateLeagueAndTeamsPayloadKeySpecifier)[];
 export type CreateLeagueAndTeamsPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type CreateLeagueMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMember' | 'leagueMemberEdge' | 'query' | 'user' | CreateLeagueMemberPayloadKeySpecifier)[];
 export type CreateLeagueMemberPayloadFieldPolicy = {
@@ -5985,21 +7918,50 @@ export type CreateLeagueMemberPayloadFieldPolicy = {
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CreateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | CreateLeagueMessagePayloadKeySpecifier)[];
+export type CreateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | CreateLeagueMessagePayloadKeySpecifier)[];
 export type CreateLeagueMessagePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type CreateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | CreateLeaguePayloadKeySpecifier)[];
+export type CreateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'matchupByCurrentMatchup' | 'query' | 'userByOwner' | CreateLeaguePayloadKeySpecifier)[];
 export type CreateLeaguePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CreateLeaguePositionPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leaguePosition' | 'leaguePositionEdge' | 'query' | CreateLeaguePositionPayloadKeySpecifier)[];
+export type CreateLeaguePositionPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositionEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CreateMatchupPayloadKeySpecifier = ('clientMutationId' | 'leagueById' | 'matchup' | 'matchupEdge' | 'query' | CreateMatchupPayloadKeySpecifier)[];
+export type CreateMatchupPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueById?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type CreateMatchupPlayerPayloadKeySpecifier = ('aggregateSeasonBattingByPlayerIdAndSeason' | 'aggregateSeasonFieldingByPlayerIdAndSeason' | 'aggregateSeasonPitchingByPlayerIdAndSeason' | 'clientMutationId' | 'matchup' | 'matchupPlayer' | 'matchupPlayerEdge' | 'player' | 'query' | CreateMatchupPlayerPayloadKeySpecifier)[];
+export type CreateMatchupPlayerPayloadFieldPolicy = {
+	aggregateSeasonBattingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type CreatePlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | CreatePlayerPayloadKeySpecifier)[];
@@ -6007,12 +7969,6 @@ export type CreatePlayerPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
-};
-export type CreatePlayersPayloadKeySpecifier = ('clientMutationId' | 'players' | 'query' | CreatePlayersPayloadKeySpecifier)[];
-export type CreatePlayersPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	players?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type CreateSeasonBattingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonBatting' | 'seasonBattingEdge' | CreateSeasonBattingPayloadKeySpecifier)[];
@@ -6039,6 +7995,17 @@ export type CreateSeasonPitchingPayloadFieldPolicy = {
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
+export type CreateTeamMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'player' | 'position' | 'query' | 'team' | 'teamMember' | 'teamMemberEdge' | CreateTeamMemberPayloadKeySpecifier)[];
+export type CreateTeamMemberPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	team?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>
+};
 export type CreateTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | CreateTeamPayloadKeySpecifier)[];
 export type CreateTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6063,14 +8030,13 @@ export type DeleteDraftPayloadFieldPolicy = {
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type DeleteDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'deletedDraftTeamNodeId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | DeleteDraftTeamPayloadKeySpecifier)[];
+export type DeleteDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'deletedDraftTeamNodeId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'query' | 'teamLeague' | DeleteDraftTeamPayloadKeySpecifier)[];
 export type DeleteDraftTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletedDraftTeamNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
 };
@@ -6084,7 +8050,7 @@ export type DeleteLeagueMemberPayloadFieldPolicy = {
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type DeleteLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueMessageNodeId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | DeleteLeagueMessagePayloadKeySpecifier)[];
+export type DeleteLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueMessageNodeId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | DeleteLeagueMessagePayloadKeySpecifier)[];
 export type DeleteLeagueMessagePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletedLeagueMessageNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6092,15 +8058,47 @@ export type DeleteLeagueMessagePayloadFieldPolicy = {
 	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type DeleteLeaguePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueNodeId' | 'league' | 'leagueEdge' | 'query' | DeleteLeaguePayloadKeySpecifier)[];
+export type DeleteLeaguePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueNodeId' | 'league' | 'leagueEdge' | 'matchupByCurrentMatchup' | 'query' | 'userByOwner' | DeleteLeaguePayloadKeySpecifier)[];
 export type DeleteLeaguePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletedLeagueNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type DeleteLeaguePositionPayloadKeySpecifier = ('clientMutationId' | 'deletedLeaguePositionNodeId' | 'league' | 'leaguePosition' | 'leaguePositionEdge' | 'query' | DeleteLeaguePositionPayloadKeySpecifier)[];
+export type DeleteLeaguePositionPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deletedLeaguePositionNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositionEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type DeleteMatchupPayloadKeySpecifier = ('clientMutationId' | 'deletedMatchupNodeId' | 'leagueById' | 'matchup' | 'matchupEdge' | 'query' | DeleteMatchupPayloadKeySpecifier)[];
+export type DeleteMatchupPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deletedMatchupNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueById?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type DeleteMatchupPlayerPayloadKeySpecifier = ('aggregateSeasonBattingByPlayerIdAndSeason' | 'aggregateSeasonFieldingByPlayerIdAndSeason' | 'aggregateSeasonPitchingByPlayerIdAndSeason' | 'clientMutationId' | 'deletedMatchupPlayerNodeId' | 'matchup' | 'matchupPlayer' | 'matchupPlayerEdge' | 'player' | 'query' | DeleteMatchupPlayerPayloadKeySpecifier)[];
+export type DeleteMatchupPlayerPayloadFieldPolicy = {
+	aggregateSeasonBattingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deletedMatchupPlayerNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type DeletePlayerPayloadKeySpecifier = ('clientMutationId' | 'deletedPlayerNodeId' | 'player' | 'playerEdge' | 'query' | DeletePlayerPayloadKeySpecifier)[];
@@ -6138,6 +8136,18 @@ export type DeleteSeasonPitchingPayloadFieldPolicy = {
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
+export type DeleteTeamMemberPayloadKeySpecifier = ('clientMutationId' | 'deletedTeamMemberNodeId' | 'league' | 'player' | 'position' | 'query' | 'team' | 'teamMember' | 'teamMemberEdge' | DeleteTeamMemberPayloadKeySpecifier)[];
+export type DeleteTeamMemberPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deletedTeamMemberNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	team?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>
+};
 export type DeleteTeamPayloadKeySpecifier = ('clientMutationId' | 'deletedTeamNodeId' | 'league' | 'query' | 'team' | 'teamEdge' | DeleteTeamPayloadKeySpecifier)[];
 export type DeleteTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6166,12 +8176,11 @@ export type DraftFieldPolicy = {
 	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type DraftTeamKeySpecifier = ('draft' | 'draftId' | 'draftOrder' | 'league' | 'leagueId' | 'nodeId' | 'teamId' | 'teamLeague' | DraftTeamKeySpecifier)[];
+export type DraftTeamKeySpecifier = ('draft' | 'draftId' | 'draftOrder' | 'leagueId' | 'nodeId' | 'teamId' | 'teamLeague' | DraftTeamKeySpecifier)[];
 export type DraftTeamFieldPolicy = {
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6201,23 +8210,28 @@ export type DraftsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type LeagueKeySpecifier = ('draftTeams' | 'drafts' | 'id' | 'leagueMembers' | 'leagueMessages' | 'name' | 'nodeId' | 'owner' | 'teams' | LeagueKeySpecifier)[];
+export type LeagueKeySpecifier = ('currentMatchup' | 'drafts' | 'id' | 'leagueMembers' | 'leagueMessages' | 'leaguePositions' | 'matchupByCurrentMatchup' | 'matchupById' | 'maxRosterSize' | 'name' | 'nodeId' | 'owner' | 'teamMembers' | 'teams' | 'userByOwner' | LeagueKeySpecifier)[];
 export type LeagueFieldPolicy = {
-	draftTeams?: FieldPolicy<any> | FieldReadFunction<any>,
+	currentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
 	drafts?: FieldPolicy<any> | FieldReadFunction<any>,
 	id?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositions?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupById?: FieldPolicy<any> | FieldReadFunction<any>,
+	maxRosterSize?: FieldPolicy<any> | FieldReadFunction<any>,
 	name?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	owner?: FieldPolicy<any> | FieldReadFunction<any>,
-	teams?: FieldPolicy<any> | FieldReadFunction<any>
+	teamMembers?: FieldPolicy<any> | FieldReadFunction<any>,
+	teams?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type LeagueMemberKeySpecifier = ('league' | 'leagueId' | 'leagueMessagesByUserIdAndLeagueId' | 'nodeId' | 'permissionLevel' | 'teamId' | 'user' | 'userId' | LeagueMemberKeySpecifier)[];
+export type LeagueMemberKeySpecifier = ('league' | 'leagueId' | 'nodeId' | 'permissionLevel' | 'teamId' | 'user' | 'userId' | LeagueMemberKeySpecifier)[];
 export type LeagueMemberFieldPolicy = {
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessagesByUserIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	permissionLevel?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6236,7 +8250,7 @@ export type LeagueMembersEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type LeagueMessageKeySpecifier = ('id' | 'league' | 'leagueId' | 'messageText' | 'nodeId' | 'timestamp' | 'user' | 'userId' | 'userLeague' | LeagueMessageKeySpecifier)[];
+export type LeagueMessageKeySpecifier = ('id' | 'league' | 'leagueId' | 'messageText' | 'nodeId' | 'timestamp' | 'user' | 'userId' | LeagueMessageKeySpecifier)[];
 export type LeagueMessageFieldPolicy = {
 	id?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6245,8 +8259,7 @@ export type LeagueMessageFieldPolicy = {
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	timestamp?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userId?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+	userId?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type LeagueMessagesConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | LeagueMessagesConnectionKeySpecifier)[];
 export type LeagueMessagesConnectionFieldPolicy = {
@@ -6257,6 +8270,27 @@ export type LeagueMessagesConnectionFieldPolicy = {
 };
 export type LeagueMessagesEdgeKeySpecifier = ('cursor' | 'node' | LeagueMessagesEdgeKeySpecifier)[];
 export type LeagueMessagesEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type LeaguePositionKeySpecifier = ('id' | 'league' | 'leagueId' | 'nodeId' | 'positionType' | 'teamMembersByPositionId' | LeaguePositionKeySpecifier)[];
+export type LeaguePositionFieldPolicy = {
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	positionType?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMembersByPositionId?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type LeaguePositionsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | LeaguePositionsConnectionKeySpecifier)[];
+export type LeaguePositionsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type LeaguePositionsEdgeKeySpecifier = ('cursor' | 'node' | LeaguePositionsEdgeKeySpecifier)[];
+export type LeaguePositionsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
@@ -6272,21 +8306,71 @@ export type LeaguesEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type MutationKeySpecifier = ('bulkUpdateStats' | 'createDraft' | 'createDraftTeam' | 'createLeague' | 'createLeagueAndTeams' | 'createLeagueMember' | 'createLeagueMessage' | 'createPlayer' | 'createPlayers' | 'createSeasonBatting' | 'createSeasonFielding' | 'createSeasonPitching' | 'createTeam' | 'createUser' | 'deleteDraft' | 'deleteDraftByNodeId' | 'deleteDraftTeam' | 'deleteDraftTeamByDraftIdAndDraftOrder' | 'deleteDraftTeamByNodeId' | 'deleteLeague' | 'deleteLeagueByNodeId' | 'deleteLeagueMember' | 'deleteLeagueMemberByNodeId' | 'deleteLeagueMessage' | 'deleteLeagueMessageByNodeId' | 'deletePlayer' | 'deletePlayerByBrefId' | 'deletePlayerByNodeId' | 'deleteSeasonBatting' | 'deleteSeasonBattingByNodeId' | 'deleteSeasonFielding' | 'deleteSeasonFieldingByNodeId' | 'deleteSeasonPitching' | 'deleteSeasonPitchingByNodeId' | 'deleteTeam' | 'deleteTeamByIdAndLeagueId' | 'deleteTeamByNodeId' | 'deleteUser' | 'deleteUserByEmail' | 'deleteUserByNodeId' | 'deleteUserByUsername' | 'updateDraft' | 'updateDraftByNodeId' | 'updateDraftTeam' | 'updateDraftTeamByDraftIdAndDraftOrder' | 'updateDraftTeamByNodeId' | 'updateLeague' | 'updateLeagueByNodeId' | 'updateLeagueMember' | 'updateLeagueMemberByNodeId' | 'updateLeagueMessage' | 'updateLeagueMessageByNodeId' | 'updatePlayer' | 'updatePlayerByBrefId' | 'updatePlayerByNodeId' | 'updateSeasonBatting' | 'updateSeasonBattingByNodeId' | 'updateSeasonFielding' | 'updateSeasonFieldingByNodeId' | 'updateSeasonPitching' | 'updateSeasonPitchingByNodeId' | 'updateTeam' | 'updateTeamByIdAndLeagueId' | 'updateTeamByNodeId' | 'updateUser' | 'updateUserByEmail' | 'updateUserByNodeId' | 'updateUserByUsername' | 'upsertDraft' | 'upsertDraftTeam' | 'upsertLeague' | 'upsertLeagueMember' | 'upsertLeagueMessage' | 'upsertPlayer' | 'upsertSeasonBatting' | 'upsertSeasonFielding' | 'upsertSeasonPitching' | 'upsertTeam' | 'upsertTypeIntoTable' | 'upsertUser' | MutationKeySpecifier)[];
+export type MatchupKeySpecifier = ('id' | 'leagueById' | 'leagueId' | 'leaguesByCurrentMatchup' | 'matchupPlayers' | 'nodeId' | 'numberOfGames' | 'weekNumber' | MatchupKeySpecifier)[];
+export type MatchupFieldPolicy = {
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueById?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguesByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayers?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	numberOfGames?: FieldPolicy<any> | FieldReadFunction<any>,
+	weekNumber?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MatchupPlayerKeySpecifier = ('aggregateSeasonBattingByPlayerIdAndSeason' | 'aggregateSeasonFieldingByPlayerIdAndSeason' | 'aggregateSeasonPitchingByPlayerIdAndSeason' | 'id' | 'matchup' | 'matchupId' | 'nodeId' | 'player' | 'playerId' | 'season' | MatchupPlayerKeySpecifier)[];
+export type MatchupPlayerFieldPolicy = {
+	aggregateSeasonBattingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupId?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	season?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MatchupPlayersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | MatchupPlayersConnectionKeySpecifier)[];
+export type MatchupPlayersConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MatchupPlayersEdgeKeySpecifier = ('cursor' | 'node' | MatchupPlayersEdgeKeySpecifier)[];
+export type MatchupPlayersEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MatchupsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | MatchupsConnectionKeySpecifier)[];
+export type MatchupsConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MatchupsEdgeKeySpecifier = ('cursor' | 'node' | MatchupsEdgeKeySpecifier)[];
+export type MatchupsEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type MutationKeySpecifier = ('createDraft' | 'createDraftTeam' | 'createLeague' | 'createLeagueAndTeams' | 'createLeagueMember' | 'createLeagueMessage' | 'createLeaguePosition' | 'createMatchup' | 'createMatchupPlayer' | 'createPlayer' | 'createSeasonBatting' | 'createSeasonFielding' | 'createSeasonPitching' | 'createTeam' | 'createTeamMember' | 'createUser' | 'deleteDraft' | 'deleteDraftByNodeId' | 'deleteDraftTeam' | 'deleteDraftTeamByDraftIdAndDraftOrder' | 'deleteDraftTeamByNodeId' | 'deleteLeague' | 'deleteLeagueByNodeId' | 'deleteLeagueMember' | 'deleteLeagueMemberByNodeId' | 'deleteLeagueMessage' | 'deleteLeagueMessageByNodeId' | 'deleteLeaguePosition' | 'deleteLeaguePositionByNodeId' | 'deleteMatchup' | 'deleteMatchupByLeagueIdAndWeekNumber' | 'deleteMatchupByNodeId' | 'deleteMatchupPlayer' | 'deleteMatchupPlayerByNodeId' | 'deletePlayer' | 'deletePlayerByBrefId' | 'deletePlayerByNodeId' | 'deleteSeasonBatting' | 'deleteSeasonBattingByNodeId' | 'deleteSeasonFielding' | 'deleteSeasonFieldingByNodeId' | 'deleteSeasonPitching' | 'deleteSeasonPitchingByNodeId' | 'deleteTeam' | 'deleteTeamByIdAndLeagueId' | 'deleteTeamByNodeId' | 'deleteTeamMember' | 'deleteTeamMemberByNodeId' | 'deleteUser' | 'deleteUserByEmail' | 'deleteUserByNodeId' | 'updateDraft' | 'updateDraftByNodeId' | 'updateDraftTeam' | 'updateDraftTeamByDraftIdAndDraftOrder' | 'updateDraftTeamByNodeId' | 'updateLeague' | 'updateLeagueByNodeId' | 'updateLeagueMember' | 'updateLeagueMemberByNodeId' | 'updateLeagueMessage' | 'updateLeagueMessageByNodeId' | 'updateLeaguePosition' | 'updateLeaguePositionByNodeId' | 'updateMatchup' | 'updateMatchupByLeagueIdAndWeekNumber' | 'updateMatchupByNodeId' | 'updateMatchupPlayer' | 'updateMatchupPlayerByNodeId' | 'updatePlayer' | 'updatePlayerByBrefId' | 'updatePlayerByNodeId' | 'updateSeasonBatting' | 'updateSeasonBattingByNodeId' | 'updateSeasonFielding' | 'updateSeasonFieldingByNodeId' | 'updateSeasonPitching' | 'updateSeasonPitchingByNodeId' | 'updateTeam' | 'updateTeamByIdAndLeagueId' | 'updateTeamByNodeId' | 'updateTeamMember' | 'updateTeamMemberByNodeId' | 'updateUser' | 'updateUserByEmail' | 'updateUserByNodeId' | 'upsertDraft' | 'upsertDraftTeam' | 'upsertLeague' | 'upsertLeagueMember' | 'upsertLeagueMessage' | 'upsertLeaguePosition' | 'upsertMatchup' | 'upsertMatchupPlayer' | 'upsertPlayer' | 'upsertSeasonBatting' | 'upsertSeasonFielding' | 'upsertSeasonPitching' | 'upsertTeam' | 'upsertTeamMember' | 'upsertUser' | MutationKeySpecifier)[];
 export type MutationFieldPolicy = {
-	bulkUpdateStats?: FieldPolicy<any> | FieldReadFunction<any>,
 	createDraft?: FieldPolicy<any> | FieldReadFunction<any>,
 	createDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	createLeague?: FieldPolicy<any> | FieldReadFunction<any>,
 	createLeagueAndTeams?: FieldPolicy<any> | FieldReadFunction<any>,
 	createLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
 	createLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
+	createLeaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	createMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	createMatchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
 	createPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
-	createPlayers?: FieldPolicy<any> | FieldReadFunction<any>,
 	createSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
 	createSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	createSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	createTeam?: FieldPolicy<any> | FieldReadFunction<any>,
+	createTeamMember?: FieldPolicy<any> | FieldReadFunction<any>,
 	createUser?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteDraft?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6299,6 +8383,13 @@ export type MutationFieldPolicy = {
 	deleteLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteLeaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteLeaguePositionByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteMatchupByLeagueIdAndWeekNumber?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteMatchupByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteMatchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteMatchupPlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletePlayer?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deletePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6311,10 +8402,11 @@ export type MutationFieldPolicy = {
 	deleteTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteTeamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	deleteTeamMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteUser?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
 	deleteUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateDraft?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6326,6 +8418,13 @@ export type MutationFieldPolicy = {
 	updateLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateLeaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateLeaguePositionByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateMatchupByLeagueIdAndWeekNumber?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateMatchupByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateMatchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateMatchupPlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updatePlayer?: FieldPolicy<any> | FieldReadFunction<any>,
 	updatePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updatePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6338,21 +8437,25 @@ export type MutationFieldPolicy = {
 	updateTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateTeamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	updateTeamMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateUser?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
 	updateUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertDraft?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertLeague?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
+	upsertLeaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	upsertMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	upsertMatchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertTypeIntoTable?: FieldPolicy<any> | FieldReadFunction<any>,
+	upsertTeamMember?: FieldPolicy<any> | FieldReadFunction<any>,
 	upsertUser?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type NodeKeySpecifier = ('nodeId' | NodeKeySpecifier)[];
@@ -6366,60 +8469,43 @@ export type PageInfoFieldPolicy = {
 	hasPreviousPage?: FieldPolicy<any> | FieldReadFunction<any>,
 	startCursor?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type PgAttributeKeySpecifier = ('attacl' | 'attalign' | 'attbyval' | 'attcacheoff' | 'attcollation' | 'attcompression' | 'attfdwoptions' | 'attgenerated' | 'atthasdef' | 'atthasmissing' | 'attidentity' | 'attinhcount' | 'attisdropped' | 'attislocal' | 'attlen' | 'attmissingval' | 'attname' | 'attndims' | 'attnotnull' | 'attnum' | 'attoptions' | 'attrelid' | 'attstattarget' | 'attstorage' | 'atttypid' | 'atttypmod' | PgAttributeKeySpecifier)[];
-export type PgAttributeFieldPolicy = {
-	attacl?: FieldPolicy<any> | FieldReadFunction<any>,
-	attalign?: FieldPolicy<any> | FieldReadFunction<any>,
-	attbyval?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcacheoff?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcollation?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcompression?: FieldPolicy<any> | FieldReadFunction<any>,
-	attfdwoptions?: FieldPolicy<any> | FieldReadFunction<any>,
-	attgenerated?: FieldPolicy<any> | FieldReadFunction<any>,
-	atthasdef?: FieldPolicy<any> | FieldReadFunction<any>,
-	atthasmissing?: FieldPolicy<any> | FieldReadFunction<any>,
-	attidentity?: FieldPolicy<any> | FieldReadFunction<any>,
-	attinhcount?: FieldPolicy<any> | FieldReadFunction<any>,
-	attisdropped?: FieldPolicy<any> | FieldReadFunction<any>,
-	attislocal?: FieldPolicy<any> | FieldReadFunction<any>,
-	attlen?: FieldPolicy<any> | FieldReadFunction<any>,
-	attmissingval?: FieldPolicy<any> | FieldReadFunction<any>,
-	attname?: FieldPolicy<any> | FieldReadFunction<any>,
-	attndims?: FieldPolicy<any> | FieldReadFunction<any>,
-	attnotnull?: FieldPolicy<any> | FieldReadFunction<any>,
-	attnum?: FieldPolicy<any> | FieldReadFunction<any>,
-	attoptions?: FieldPolicy<any> | FieldReadFunction<any>,
-	attrelid?: FieldPolicy<any> | FieldReadFunction<any>,
-	attstattarget?: FieldPolicy<any> | FieldReadFunction<any>,
-	attstorage?: FieldPolicy<any> | FieldReadFunction<any>,
-	atttypid?: FieldPolicy<any> | FieldReadFunction<any>,
-	atttypmod?: FieldPolicy<any> | FieldReadFunction<any>
+export type PlayerKeySpecifier = ('aggregateSeasonBattings' | 'aggregateSeasonFieldings' | 'aggregateSeasonPitchings' | 'brefId' | 'careerBattings' | 'careerFieldingByPositions' | 'careerFieldings' | 'careerPitchings' | 'id' | 'matchupPlayers' | 'name' | 'nodeId' | 'playerEligiblePositions' | 'seasonBattings' | 'seasonFieldings' | 'seasonPitchings' | 'teamMembers' | PlayerKeySpecifier)[];
+export type PlayerFieldPolicy = {
+	aggregateSeasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
+	brefId?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldingByPositions?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayers?: FieldPolicy<any> | FieldReadFunction<any>,
+	name?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerEligiblePositions?: FieldPolicy<any> | FieldReadFunction<any>,
+	seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMembers?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type PgAttributesConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PgAttributesConnectionKeySpecifier)[];
-export type PgAttributesConnectionFieldPolicy = {
+export type PlayerEligiblePositionKeySpecifier = ('player' | 'playerId' | 'position' | PlayerEligiblePositionKeySpecifier)[];
+export type PlayerEligiblePositionFieldPolicy = {
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type PlayerEligiblePositionsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PlayerEligiblePositionsConnectionKeySpecifier)[];
+export type PlayerEligiblePositionsConnectionFieldPolicy = {
 	edges?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
 	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
 	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type PgAttributesEdgeKeySpecifier = ('cursor' | 'node' | PgAttributesEdgeKeySpecifier)[];
-export type PgAttributesEdgeFieldPolicy = {
+export type PlayerEligiblePositionsEdgeKeySpecifier = ('cursor' | 'node' | PlayerEligiblePositionsEdgeKeySpecifier)[];
+export type PlayerEligiblePositionsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
-};
-export type PlayerKeySpecifier = ('brefId' | 'careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'id' | 'name' | 'nodeId' | 'seasonBattings' | 'seasonFieldings' | 'seasonPitchings' | PlayerKeySpecifier)[];
-export type PlayerFieldPolicy = {
-	brefId?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type PlayersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PlayersConnectionKeySpecifier)[];
 export type PlayersConnectionFieldPolicy = {
@@ -6433,10 +8519,13 @@ export type PlayersEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type QueryKeySpecifier = ('careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'draft' | 'draftByNodeId' | 'draftTeam' | 'draftTeamByDraftIdAndDraftOrder' | 'draftTeamByNodeId' | 'draftTeams' | 'drafts' | 'getColumnsForType' | 'league' | 'leagueByNodeId' | 'leagueMember' | 'leagueMemberByNodeId' | 'leagueMembers' | 'leagueMessage' | 'leagueMessageByNodeId' | 'leagueMessages' | 'leagues' | 'node' | 'nodeId' | 'player' | 'playerByBrefId' | 'playerByNodeId' | 'players' | 'query' | 'seasonBatting' | 'seasonBattingByNodeId' | 'seasonBattings' | 'seasonFielding' | 'seasonFieldingByNodeId' | 'seasonFieldings' | 'seasonPitching' | 'seasonPitchingByNodeId' | 'seasonPitchings' | 'team' | 'teamByIdAndLeagueId' | 'teamByNodeId' | 'teams' | 'user' | 'userByEmail' | 'userByNodeId' | 'userByUsername' | 'users' | 'usersInternals' | QueryKeySpecifier)[];
+export type QueryKeySpecifier = ('aggregateSeasonBattings' | 'aggregateSeasonFieldings' | 'aggregateSeasonPitchings' | 'careerBattings' | 'careerFieldingByPositions' | 'careerFieldings' | 'careerPitchings' | 'draft' | 'draftByNodeId' | 'draftTeam' | 'draftTeamByDraftIdAndDraftOrder' | 'draftTeamByNodeId' | 'draftTeams' | 'drafts' | 'league' | 'leagueByNodeId' | 'leagueMember' | 'leagueMemberByNodeId' | 'leagueMembers' | 'leagueMessage' | 'leagueMessageByNodeId' | 'leagueMessages' | 'leaguePosition' | 'leaguePositionByNodeId' | 'leaguePositions' | 'leagues' | 'matchup' | 'matchupByLeagueIdAndWeekNumber' | 'matchupByNodeId' | 'matchupPlayer' | 'matchupPlayerByNodeId' | 'matchupPlayers' | 'matchups' | 'node' | 'nodeId' | 'player' | 'playerByBrefId' | 'playerByNodeId' | 'playerEligiblePositions' | 'players' | 'query' | 'seasonBatting' | 'seasonBattingByNodeId' | 'seasonBattings' | 'seasonFielding' | 'seasonFieldingByNodeId' | 'seasonFieldings' | 'seasonPitching' | 'seasonPitchingByNodeId' | 'seasonPitchings' | 'team' | 'teamByIdAndLeagueId' | 'teamByNodeId' | 'teamMember' | 'teamMemberByNodeId' | 'teamMembers' | 'teams' | 'user' | 'userByEmail' | 'userByNodeId' | 'users' | QueryKeySpecifier)[];
 export type QueryFieldPolicy = {
+	aggregateSeasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
 	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
+	careerFieldingByPositions?: FieldPolicy<any> | FieldReadFunction<any>,
 	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
 	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6446,7 +8535,6 @@ export type QueryFieldPolicy = {
 	draftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeams?: FieldPolicy<any> | FieldReadFunction<any>,
 	drafts?: FieldPolicy<any> | FieldReadFunction<any>,
-	getColumnsForType?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6455,12 +8543,23 @@ export type QueryFieldPolicy = {
 	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositionByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositions?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagues?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByLeagueIdAndWeekNumber?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayers?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchups?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
 	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerEligiblePositions?: FieldPolicy<any> | FieldReadFunction<any>,
 	players?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6475,15 +8574,16 @@ export type QueryFieldPolicy = {
 	team?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMembers?: FieldPolicy<any> | FieldReadFunction<any>,
 	teams?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>,
 	userByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
 	userByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	userByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
-	users?: FieldPolicy<any> | FieldReadFunction<any>,
-	usersInternals?: FieldPolicy<any> | FieldReadFunction<any>
+	users?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type SeasonBattingKeySpecifier = ('ab' | 'awardSummary' | 'battingAvg' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'lgId' | 'nodeId' | 'onbasePerc' | 'onbasePlusSlugging' | 'onbasePlusSluggingPlus' | 'pa' | 'player' | 'playerId' | 'posSeason' | 'r' | 'rbi' | 'sb' | 'season' | 'sf' | 'sh' | 'sluggingPerc' | 'so' | 'tb' | 'team' | 'triples' | SeasonBattingKeySpecifier)[];
+export type SeasonBattingKeySpecifier = ('ab' | 'awardSummary' | 'battingAvg' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'lgId' | 'nodeId' | 'onbasePerc' | 'onbasePlusSlugging' | 'onbasePlusSluggingPlus' | 'pa' | 'player' | 'playerId' | 'posSeason' | 'r' | 'rbi' | 'rowId' | 'sb' | 'season' | 'sf' | 'sh' | 'sluggingPerc' | 'so' | 'tb' | 'team' | 'triples' | SeasonBattingKeySpecifier)[];
 export type SeasonBattingFieldPolicy = {
 	ab?: FieldPolicy<any> | FieldReadFunction<any>,
 	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6508,6 +8608,7 @@ export type SeasonBattingFieldPolicy = {
 	posSeason?: FieldPolicy<any> | FieldReadFunction<any>,
 	r?: FieldPolicy<any> | FieldReadFunction<any>,
 	rbi?: FieldPolicy<any> | FieldReadFunction<any>,
+	rowId?: FieldPolicy<any> | FieldReadFunction<any>,
 	sb?: FieldPolicy<any> | FieldReadFunction<any>,
 	season?: FieldPolicy<any> | FieldReadFunction<any>,
 	sf?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6530,7 +8631,7 @@ export type SeasonBattingsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type SeasonFieldingKeySpecifier = ('a' | 'awardSummary' | 'caughtStealingPerc' | 'caughtStealingPercLg' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'fieldingPerc' | 'fieldingPercLg' | 'g' | 'gOfParts' | 'gs' | 'innDef' | 'lgId' | 'nodeId' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'rangeFactorPerGame' | 'rangeFactorPerGameLg' | 'rangeFactorPerNine' | 'rangeFactorPerNineLg' | 'sb' | 'season' | 'team' | 'wp' | SeasonFieldingKeySpecifier)[];
+export type SeasonFieldingKeySpecifier = ('a' | 'awardSummary' | 'caughtStealingPerc' | 'caughtStealingPercLg' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'fieldingPerc' | 'fieldingPercLg' | 'g' | 'gOfParts' | 'gs' | 'innDef' | 'lgId' | 'nodeId' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'rangeFactorPerGame' | 'rangeFactorPerGameLg' | 'rangeFactorPerNine' | 'rangeFactorPerNineLg' | 'rowId' | 'sb' | 'season' | 'team' | 'wp' | SeasonFieldingKeySpecifier)[];
 export type SeasonFieldingFieldPolicy = {
 	a?: FieldPolicy<any> | FieldReadFunction<any>,
 	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6558,6 +8659,7 @@ export type SeasonFieldingFieldPolicy = {
 	rangeFactorPerGameLg?: FieldPolicy<any> | FieldReadFunction<any>,
 	rangeFactorPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
 	rangeFactorPerNineLg?: FieldPolicy<any> | FieldReadFunction<any>,
+	rowId?: FieldPolicy<any> | FieldReadFunction<any>,
 	sb?: FieldPolicy<any> | FieldReadFunction<any>,
 	season?: FieldPolicy<any> | FieldReadFunction<any>,
 	team?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6575,7 +8677,7 @@ export type SeasonFieldingsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type SeasonPitchingKeySpecifier = ('awardSummary' | 'basesOnBallsPerNine' | 'battersFaced' | 'bb' | 'bk' | 'cg' | 'earnedRunAvg' | 'earnedRunAvgPlus' | 'er' | 'fip' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hitsPerNine' | 'homeRunsPerNine' | 'hr' | 'ibb' | 'ip' | 'l' | 'lgId' | 'nodeId' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'season' | 'sho' | 'so' | 'strikeoutsPerBaseOnBalls' | 'strikeoutsPerNine' | 'sv' | 'team' | 'w' | 'whip' | 'winLossPerc' | 'wp' | SeasonPitchingKeySpecifier)[];
+export type SeasonPitchingKeySpecifier = ('awardSummary' | 'basesOnBallsPerNine' | 'battersFaced' | 'bb' | 'bk' | 'cg' | 'earnedRunAvg' | 'earnedRunAvgPlus' | 'er' | 'fip' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hitsPerNine' | 'homeRunsPerNine' | 'hr' | 'ibb' | 'ip' | 'l' | 'lgId' | 'nodeId' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'rowId' | 'season' | 'sho' | 'so' | 'strikeoutsPerBaseOnBalls' | 'strikeoutsPerNine' | 'sv' | 'team' | 'w' | 'whip' | 'winLossPerc' | 'wp' | SeasonPitchingKeySpecifier)[];
 export type SeasonPitchingFieldPolicy = {
 	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
 	basesOnBallsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6604,6 +8706,7 @@ export type SeasonPitchingFieldPolicy = {
 	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
 	r?: FieldPolicy<any> | FieldReadFunction<any>,
+	rowId?: FieldPolicy<any> | FieldReadFunction<any>,
 	season?: FieldPolicy<any> | FieldReadFunction<any>,
 	sho?: FieldPolicy<any> | FieldReadFunction<any>,
 	so?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6628,14 +8731,40 @@ export type SeasonPitchingsEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type TeamKeySpecifier = ('draftTeamsByTeamIdAndLeagueId' | 'id' | 'league' | 'leagueId' | 'name' | 'nodeId' | TeamKeySpecifier)[];
+export type TeamKeySpecifier = ('draftTeamsByTeamIdAndLeagueId' | 'id' | 'league' | 'leagueId' | 'name' | 'nodeId' | 'teamMembers' | TeamKeySpecifier)[];
 export type TeamFieldPolicy = {
 	draftTeamsByTeamIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	id?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
 	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMembers?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type TeamMemberKeySpecifier = ('id' | 'league' | 'leagueId' | 'nodeId' | 'player' | 'playerId' | 'position' | 'positionId' | 'team' | 'teamId' | TeamMemberKeySpecifier)[];
+export type TeamMemberFieldPolicy = {
+	id?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>,
+	positionId?: FieldPolicy<any> | FieldReadFunction<any>,
+	team?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamId?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type TeamMembersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | TeamMembersConnectionKeySpecifier)[];
+export type TeamMembersConnectionFieldPolicy = {
+	edges?: FieldPolicy<any> | FieldReadFunction<any>,
+	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
+	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
+	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type TeamMembersEdgeKeySpecifier = ('cursor' | 'node' | TeamMembersEdgeKeySpecifier)[];
+export type TeamMembersEdgeFieldPolicy = {
+	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
+	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type TeamsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | TeamsConnectionKeySpecifier)[];
 export type TeamsConnectionFieldPolicy = {
@@ -6657,13 +8786,12 @@ export type UpdateDraftPayloadFieldPolicy = {
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpdateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | UpdateDraftTeamPayloadKeySpecifier)[];
+export type UpdateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'query' | 'teamLeague' | UpdateDraftTeamPayloadKeySpecifier)[];
 export type UpdateDraftTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
 };
@@ -6676,21 +8804,50 @@ export type UpdateLeagueMemberPayloadFieldPolicy = {
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpdateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | UpdateLeagueMessagePayloadKeySpecifier)[];
+export type UpdateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | UpdateLeagueMessagePayloadKeySpecifier)[];
 export type UpdateLeagueMessagePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpdateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | UpdateLeaguePayloadKeySpecifier)[];
+export type UpdateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'matchupByCurrentMatchup' | 'query' | 'userByOwner' | UpdateLeaguePayloadKeySpecifier)[];
 export type UpdateLeaguePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpdateLeaguePositionPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leaguePosition' | 'leaguePositionEdge' | 'query' | UpdateLeaguePositionPayloadKeySpecifier)[];
+export type UpdateLeaguePositionPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositionEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpdateMatchupPayloadKeySpecifier = ('clientMutationId' | 'leagueById' | 'matchup' | 'matchupEdge' | 'query' | UpdateMatchupPayloadKeySpecifier)[];
+export type UpdateMatchupPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueById?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpdateMatchupPlayerPayloadKeySpecifier = ('aggregateSeasonBattingByPlayerIdAndSeason' | 'aggregateSeasonFieldingByPlayerIdAndSeason' | 'aggregateSeasonPitchingByPlayerIdAndSeason' | 'clientMutationId' | 'matchup' | 'matchupPlayer' | 'matchupPlayerEdge' | 'player' | 'query' | UpdateMatchupPlayerPayloadKeySpecifier)[];
+export type UpdateMatchupPlayerPayloadFieldPolicy = {
+	aggregateSeasonBattingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type UpdatePlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | UpdatePlayerPayloadKeySpecifier)[];
@@ -6724,6 +8881,17 @@ export type UpdateSeasonPitchingPayloadFieldPolicy = {
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
+export type UpdateTeamMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'player' | 'position' | 'query' | 'team' | 'teamMember' | 'teamMemberEdge' | UpdateTeamMemberPayloadKeySpecifier)[];
+export type UpdateTeamMemberPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	team?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>
+};
 export type UpdateTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | UpdateTeamPayloadKeySpecifier)[];
 export type UpdateTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6747,13 +8915,12 @@ export type UpsertDraftPayloadFieldPolicy = {
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpsertDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | UpsertDraftTeamPayloadKeySpecifier)[];
+export type UpsertDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'query' | 'teamLeague' | UpsertDraftTeamPayloadKeySpecifier)[];
 export type UpsertDraftTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	draft?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
 	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
 };
@@ -6766,21 +8933,50 @@ export type UpsertLeagueMemberPayloadFieldPolicy = {
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
 	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpsertLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | UpsertLeagueMessagePayloadKeySpecifier)[];
+export type UpsertLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | UpsertLeagueMessagePayloadKeySpecifier)[];
 export type UpsertLeagueMessagePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+	user?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpsertLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | UpsertLeaguePayloadKeySpecifier)[];
+export type UpsertLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'matchupByCurrentMatchup' | 'query' | 'userByOwner' | UpsertLeaguePayloadKeySpecifier)[];
 export type UpsertLeaguePayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
 	league?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupByCurrentMatchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	userByOwner?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpsertLeaguePositionPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leaguePosition' | 'leaguePositionEdge' | 'query' | UpsertLeaguePositionPayloadKeySpecifier)[];
+export type UpsertLeaguePositionPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePosition?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguePositionEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpsertMatchupPayloadKeySpecifier = ('clientMutationId' | 'leagueById' | 'matchup' | 'matchupEdge' | 'query' | UpsertMatchupPayloadKeySpecifier)[];
+export type UpsertMatchupPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	leagueById?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>
+};
+export type UpsertMatchupPlayerPayloadKeySpecifier = ('aggregateSeasonBattingByPlayerIdAndSeason' | 'aggregateSeasonFieldingByPlayerIdAndSeason' | 'aggregateSeasonPitchingByPlayerIdAndSeason' | 'clientMutationId' | 'matchup' | 'matchupPlayer' | 'matchupPlayerEdge' | 'player' | 'query' | UpsertMatchupPlayerPayloadKeySpecifier)[];
+export type UpsertMatchupPlayerPayloadFieldPolicy = {
+	aggregateSeasonBattingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonFieldingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	aggregateSeasonPitchingByPlayerIdAndSeason?: FieldPolicy<any> | FieldReadFunction<any>,
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchup?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
+	matchupPlayerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
 	query?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type UpsertPlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | UpsertPlayerPayloadKeySpecifier)[];
@@ -6814,6 +9010,17 @@ export type UpsertSeasonPitchingPayloadFieldPolicy = {
 	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
 	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
+export type UpsertTeamMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'player' | 'position' | 'query' | 'team' | 'teamMember' | 'teamMemberEdge' | UpsertTeamMemberPayloadKeySpecifier)[];
+export type UpsertTeamMemberPayloadFieldPolicy = {
+	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
+	league?: FieldPolicy<any> | FieldReadFunction<any>,
+	player?: FieldPolicy<any> | FieldReadFunction<any>,
+	position?: FieldPolicy<any> | FieldReadFunction<any>,
+	query?: FieldPolicy<any> | FieldReadFunction<any>,
+	team?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMember?: FieldPolicy<any> | FieldReadFunction<any>,
+	teamMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>
+};
 export type UpsertTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | UpsertTeamPayloadKeySpecifier)[];
 export type UpsertTeamPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6822,11 +9029,6 @@ export type UpsertTeamPayloadFieldPolicy = {
 	team?: FieldPolicy<any> | FieldReadFunction<any>,
 	teamEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UpsertTypeIntoTablePayloadKeySpecifier = ('clientMutationId' | 'query' | UpsertTypeIntoTablePayloadKeySpecifier)[];
-export type UpsertTypeIntoTablePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
-};
 export type UpsertUserPayloadKeySpecifier = ('clientMutationId' | 'query' | 'user' | 'userEdge' | UpsertUserPayloadKeySpecifier)[];
 export type UpsertUserPayloadFieldPolicy = {
 	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -6834,18 +9036,15 @@ export type UpsertUserPayloadFieldPolicy = {
 	user?: FieldPolicy<any> | FieldReadFunction<any>,
 	userEdge?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UserKeySpecifier = ('about' | 'createdAt' | 'email' | 'id' | 'isAdmin' | 'leagueMembers' | 'leagueMessages' | 'name' | 'nodeId' | 'updatedAt' | 'username' | UserKeySpecifier)[];
+export type UserKeySpecifier = ('accessLevel' | 'email' | 'id' | 'leagueMembers' | 'leagueMessages' | 'leaguesByOwner' | 'nodeId' | 'username' | UserKeySpecifier)[];
 export type UserFieldPolicy = {
-	about?: FieldPolicy<any> | FieldReadFunction<any>,
-	createdAt?: FieldPolicy<any> | FieldReadFunction<any>,
+	accessLevel?: FieldPolicy<any> | FieldReadFunction<any>,
 	email?: FieldPolicy<any> | FieldReadFunction<any>,
 	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	isAdmin?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>,
 	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
+	leaguesByOwner?: FieldPolicy<any> | FieldReadFunction<any>,
 	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updatedAt?: FieldPolicy<any> | FieldReadFunction<any>,
 	username?: FieldPolicy<any> | FieldReadFunction<any>
 };
 export type UsersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | UsersConnectionKeySpecifier)[];
@@ -6860,29 +9059,42 @@ export type UsersEdgeFieldPolicy = {
 	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
 	node?: FieldPolicy<any> | FieldReadFunction<any>
 };
-export type UsersInternalKeySpecifier = ('accessLevel' | 'email' | 'id' | 'username' | UsersInternalKeySpecifier)[];
-export type UsersInternalFieldPolicy = {
-	accessLevel?: FieldPolicy<any> | FieldReadFunction<any>,
-	email?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	username?: FieldPolicy<any> | FieldReadFunction<any>
-};
-export type UsersInternalsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | UsersInternalsConnectionKeySpecifier)[];
-export type UsersInternalsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
-};
-export type UsersInternalsEdgeKeySpecifier = ('cursor' | 'node' | UsersInternalsEdgeKeySpecifier)[];
-export type UsersInternalsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
-};
 export type StrictTypedTypePolicies = {
-	BulkUpdateStatsPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | BulkUpdateStatsPayloadKeySpecifier | (() => undefined | BulkUpdateStatsPayloadKeySpecifier),
-		fields?: BulkUpdateStatsPayloadFieldPolicy,
+	AggregateSeasonBatting?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonBattingKeySpecifier | (() => undefined | AggregateSeasonBattingKeySpecifier),
+		fields?: AggregateSeasonBattingFieldPolicy,
+	},
+	AggregateSeasonBattingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonBattingsConnectionKeySpecifier | (() => undefined | AggregateSeasonBattingsConnectionKeySpecifier),
+		fields?: AggregateSeasonBattingsConnectionFieldPolicy,
+	},
+	AggregateSeasonBattingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonBattingsEdgeKeySpecifier | (() => undefined | AggregateSeasonBattingsEdgeKeySpecifier),
+		fields?: AggregateSeasonBattingsEdgeFieldPolicy,
+	},
+	AggregateSeasonFielding?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonFieldingKeySpecifier | (() => undefined | AggregateSeasonFieldingKeySpecifier),
+		fields?: AggregateSeasonFieldingFieldPolicy,
+	},
+	AggregateSeasonFieldingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonFieldingsConnectionKeySpecifier | (() => undefined | AggregateSeasonFieldingsConnectionKeySpecifier),
+		fields?: AggregateSeasonFieldingsConnectionFieldPolicy,
+	},
+	AggregateSeasonFieldingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonFieldingsEdgeKeySpecifier | (() => undefined | AggregateSeasonFieldingsEdgeKeySpecifier),
+		fields?: AggregateSeasonFieldingsEdgeFieldPolicy,
+	},
+	AggregateSeasonPitching?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonPitchingKeySpecifier | (() => undefined | AggregateSeasonPitchingKeySpecifier),
+		fields?: AggregateSeasonPitchingFieldPolicy,
+	},
+	AggregateSeasonPitchingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonPitchingsConnectionKeySpecifier | (() => undefined | AggregateSeasonPitchingsConnectionKeySpecifier),
+		fields?: AggregateSeasonPitchingsConnectionFieldPolicy,
+	},
+	AggregateSeasonPitchingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | AggregateSeasonPitchingsEdgeKeySpecifier | (() => undefined | AggregateSeasonPitchingsEdgeKeySpecifier),
+		fields?: AggregateSeasonPitchingsEdgeFieldPolicy,
 	},
 	CareerBatting?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CareerBattingKeySpecifier | (() => undefined | CareerBattingKeySpecifier),
@@ -6900,17 +9112,17 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | CareerFieldingKeySpecifier | (() => undefined | CareerFieldingKeySpecifier),
 		fields?: CareerFieldingFieldPolicy,
 	},
-	CareerFieldingByPo?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPoKeySpecifier | (() => undefined | CareerFieldingByPoKeySpecifier),
-		fields?: CareerFieldingByPoFieldPolicy,
+	CareerFieldingByPosition?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPositionKeySpecifier | (() => undefined | CareerFieldingByPositionKeySpecifier),
+		fields?: CareerFieldingByPositionFieldPolicy,
 	},
-	CareerFieldingByPosConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPosConnectionKeySpecifier | (() => undefined | CareerFieldingByPosConnectionKeySpecifier),
-		fields?: CareerFieldingByPosConnectionFieldPolicy,
+	CareerFieldingByPositionsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPositionsConnectionKeySpecifier | (() => undefined | CareerFieldingByPositionsConnectionKeySpecifier),
+		fields?: CareerFieldingByPositionsConnectionFieldPolicy,
 	},
-	CareerFieldingByPosEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPosEdgeKeySpecifier | (() => undefined | CareerFieldingByPosEdgeKeySpecifier),
-		fields?: CareerFieldingByPosEdgeFieldPolicy,
+	CareerFieldingByPositionsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CareerFieldingByPositionsEdgeKeySpecifier | (() => undefined | CareerFieldingByPositionsEdgeKeySpecifier),
+		fields?: CareerFieldingByPositionsEdgeFieldPolicy,
 	},
 	CareerFieldingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CareerFieldingsConnectionKeySpecifier | (() => undefined | CareerFieldingsConnectionKeySpecifier),
@@ -6956,13 +9168,21 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | CreateLeaguePayloadKeySpecifier | (() => undefined | CreateLeaguePayloadKeySpecifier),
 		fields?: CreateLeaguePayloadFieldPolicy,
 	},
+	CreateLeaguePositionPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CreateLeaguePositionPayloadKeySpecifier | (() => undefined | CreateLeaguePositionPayloadKeySpecifier),
+		fields?: CreateLeaguePositionPayloadFieldPolicy,
+	},
+	CreateMatchupPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CreateMatchupPayloadKeySpecifier | (() => undefined | CreateMatchupPayloadKeySpecifier),
+		fields?: CreateMatchupPayloadFieldPolicy,
+	},
+	CreateMatchupPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CreateMatchupPlayerPayloadKeySpecifier | (() => undefined | CreateMatchupPlayerPayloadKeySpecifier),
+		fields?: CreateMatchupPlayerPayloadFieldPolicy,
+	},
 	CreatePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CreatePlayerPayloadKeySpecifier | (() => undefined | CreatePlayerPayloadKeySpecifier),
 		fields?: CreatePlayerPayloadFieldPolicy,
-	},
-	CreatePlayersPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreatePlayersPayloadKeySpecifier | (() => undefined | CreatePlayersPayloadKeySpecifier),
-		fields?: CreatePlayersPayloadFieldPolicy,
 	},
 	CreateSeasonBattingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CreateSeasonBattingPayloadKeySpecifier | (() => undefined | CreateSeasonBattingPayloadKeySpecifier),
@@ -6975,6 +9195,10 @@ export type StrictTypedTypePolicies = {
 	CreateSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CreateSeasonPitchingPayloadKeySpecifier | (() => undefined | CreateSeasonPitchingPayloadKeySpecifier),
 		fields?: CreateSeasonPitchingPayloadFieldPolicy,
+	},
+	CreateTeamMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | CreateTeamMemberPayloadKeySpecifier | (() => undefined | CreateTeamMemberPayloadKeySpecifier),
+		fields?: CreateTeamMemberPayloadFieldPolicy,
 	},
 	CreateTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | CreateTeamPayloadKeySpecifier | (() => undefined | CreateTeamPayloadKeySpecifier),
@@ -7004,6 +9228,18 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | DeleteLeaguePayloadKeySpecifier | (() => undefined | DeleteLeaguePayloadKeySpecifier),
 		fields?: DeleteLeaguePayloadFieldPolicy,
 	},
+	DeleteLeaguePositionPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | DeleteLeaguePositionPayloadKeySpecifier | (() => undefined | DeleteLeaguePositionPayloadKeySpecifier),
+		fields?: DeleteLeaguePositionPayloadFieldPolicy,
+	},
+	DeleteMatchupPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | DeleteMatchupPayloadKeySpecifier | (() => undefined | DeleteMatchupPayloadKeySpecifier),
+		fields?: DeleteMatchupPayloadFieldPolicy,
+	},
+	DeleteMatchupPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | DeleteMatchupPlayerPayloadKeySpecifier | (() => undefined | DeleteMatchupPlayerPayloadKeySpecifier),
+		fields?: DeleteMatchupPlayerPayloadFieldPolicy,
+	},
 	DeletePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | DeletePlayerPayloadKeySpecifier | (() => undefined | DeletePlayerPayloadKeySpecifier),
 		fields?: DeletePlayerPayloadFieldPolicy,
@@ -7019,6 +9255,10 @@ export type StrictTypedTypePolicies = {
 	DeleteSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | DeleteSeasonPitchingPayloadKeySpecifier | (() => undefined | DeleteSeasonPitchingPayloadKeySpecifier),
 		fields?: DeleteSeasonPitchingPayloadFieldPolicy,
+	},
+	DeleteTeamMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | DeleteTeamMemberPayloadKeySpecifier | (() => undefined | DeleteTeamMemberPayloadKeySpecifier),
+		fields?: DeleteTeamMemberPayloadFieldPolicy,
 	},
 	DeleteTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | DeleteTeamPayloadKeySpecifier | (() => undefined | DeleteTeamPayloadKeySpecifier),
@@ -7080,6 +9320,18 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | LeagueMessagesEdgeKeySpecifier | (() => undefined | LeagueMessagesEdgeKeySpecifier),
 		fields?: LeagueMessagesEdgeFieldPolicy,
 	},
+	LeaguePosition?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | LeaguePositionKeySpecifier | (() => undefined | LeaguePositionKeySpecifier),
+		fields?: LeaguePositionFieldPolicy,
+	},
+	LeaguePositionsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | LeaguePositionsConnectionKeySpecifier | (() => undefined | LeaguePositionsConnectionKeySpecifier),
+		fields?: LeaguePositionsConnectionFieldPolicy,
+	},
+	LeaguePositionsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | LeaguePositionsEdgeKeySpecifier | (() => undefined | LeaguePositionsEdgeKeySpecifier),
+		fields?: LeaguePositionsEdgeFieldPolicy,
+	},
 	LeaguesConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | LeaguesConnectionKeySpecifier | (() => undefined | LeaguesConnectionKeySpecifier),
 		fields?: LeaguesConnectionFieldPolicy,
@@ -7087,6 +9339,30 @@ export type StrictTypedTypePolicies = {
 	LeaguesEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | LeaguesEdgeKeySpecifier | (() => undefined | LeaguesEdgeKeySpecifier),
 		fields?: LeaguesEdgeFieldPolicy,
+	},
+	Matchup?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupKeySpecifier | (() => undefined | MatchupKeySpecifier),
+		fields?: MatchupFieldPolicy,
+	},
+	MatchupPlayer?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupPlayerKeySpecifier | (() => undefined | MatchupPlayerKeySpecifier),
+		fields?: MatchupPlayerFieldPolicy,
+	},
+	MatchupPlayersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupPlayersConnectionKeySpecifier | (() => undefined | MatchupPlayersConnectionKeySpecifier),
+		fields?: MatchupPlayersConnectionFieldPolicy,
+	},
+	MatchupPlayersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupPlayersEdgeKeySpecifier | (() => undefined | MatchupPlayersEdgeKeySpecifier),
+		fields?: MatchupPlayersEdgeFieldPolicy,
+	},
+	MatchupsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupsConnectionKeySpecifier | (() => undefined | MatchupsConnectionKeySpecifier),
+		fields?: MatchupsConnectionFieldPolicy,
+	},
+	MatchupsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | MatchupsEdgeKeySpecifier | (() => undefined | MatchupsEdgeKeySpecifier),
+		fields?: MatchupsEdgeFieldPolicy,
 	},
 	Mutation?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | MutationKeySpecifier | (() => undefined | MutationKeySpecifier),
@@ -7100,21 +9376,21 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | PageInfoKeySpecifier | (() => undefined | PageInfoKeySpecifier),
 		fields?: PageInfoFieldPolicy,
 	},
-	PgAttribute?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributeKeySpecifier | (() => undefined | PgAttributeKeySpecifier),
-		fields?: PgAttributeFieldPolicy,
-	},
-	PgAttributesConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributesConnectionKeySpecifier | (() => undefined | PgAttributesConnectionKeySpecifier),
-		fields?: PgAttributesConnectionFieldPolicy,
-	},
-	PgAttributesEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributesEdgeKeySpecifier | (() => undefined | PgAttributesEdgeKeySpecifier),
-		fields?: PgAttributesEdgeFieldPolicy,
-	},
 	Player?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | PlayerKeySpecifier | (() => undefined | PlayerKeySpecifier),
 		fields?: PlayerFieldPolicy,
+	},
+	PlayerEligiblePosition?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | PlayerEligiblePositionKeySpecifier | (() => undefined | PlayerEligiblePositionKeySpecifier),
+		fields?: PlayerEligiblePositionFieldPolicy,
+	},
+	PlayerEligiblePositionsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | PlayerEligiblePositionsConnectionKeySpecifier | (() => undefined | PlayerEligiblePositionsConnectionKeySpecifier),
+		fields?: PlayerEligiblePositionsConnectionFieldPolicy,
+	},
+	PlayerEligiblePositionsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | PlayerEligiblePositionsEdgeKeySpecifier | (() => undefined | PlayerEligiblePositionsEdgeKeySpecifier),
+		fields?: PlayerEligiblePositionsEdgeFieldPolicy,
 	},
 	PlayersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | PlayersConnectionKeySpecifier | (() => undefined | PlayersConnectionKeySpecifier),
@@ -7168,6 +9444,18 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | TeamKeySpecifier | (() => undefined | TeamKeySpecifier),
 		fields?: TeamFieldPolicy,
 	},
+	TeamMember?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | TeamMemberKeySpecifier | (() => undefined | TeamMemberKeySpecifier),
+		fields?: TeamMemberFieldPolicy,
+	},
+	TeamMembersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | TeamMembersConnectionKeySpecifier | (() => undefined | TeamMembersConnectionKeySpecifier),
+		fields?: TeamMembersConnectionFieldPolicy,
+	},
+	TeamMembersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | TeamMembersEdgeKeySpecifier | (() => undefined | TeamMembersEdgeKeySpecifier),
+		fields?: TeamMembersEdgeFieldPolicy,
+	},
 	TeamsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | TeamsConnectionKeySpecifier | (() => undefined | TeamsConnectionKeySpecifier),
 		fields?: TeamsConnectionFieldPolicy,
@@ -7196,6 +9484,18 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | UpdateLeaguePayloadKeySpecifier | (() => undefined | UpdateLeaguePayloadKeySpecifier),
 		fields?: UpdateLeaguePayloadFieldPolicy,
 	},
+	UpdateLeaguePositionPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpdateLeaguePositionPayloadKeySpecifier | (() => undefined | UpdateLeaguePositionPayloadKeySpecifier),
+		fields?: UpdateLeaguePositionPayloadFieldPolicy,
+	},
+	UpdateMatchupPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpdateMatchupPayloadKeySpecifier | (() => undefined | UpdateMatchupPayloadKeySpecifier),
+		fields?: UpdateMatchupPayloadFieldPolicy,
+	},
+	UpdateMatchupPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpdateMatchupPlayerPayloadKeySpecifier | (() => undefined | UpdateMatchupPlayerPayloadKeySpecifier),
+		fields?: UpdateMatchupPlayerPayloadFieldPolicy,
+	},
 	UpdatePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpdatePlayerPayloadKeySpecifier | (() => undefined | UpdatePlayerPayloadKeySpecifier),
 		fields?: UpdatePlayerPayloadFieldPolicy,
@@ -7211,6 +9511,10 @@ export type StrictTypedTypePolicies = {
 	UpdateSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpdateSeasonPitchingPayloadKeySpecifier | (() => undefined | UpdateSeasonPitchingPayloadKeySpecifier),
 		fields?: UpdateSeasonPitchingPayloadFieldPolicy,
+	},
+	UpdateTeamMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpdateTeamMemberPayloadKeySpecifier | (() => undefined | UpdateTeamMemberPayloadKeySpecifier),
+		fields?: UpdateTeamMemberPayloadFieldPolicy,
 	},
 	UpdateTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpdateTeamPayloadKeySpecifier | (() => undefined | UpdateTeamPayloadKeySpecifier),
@@ -7240,6 +9544,18 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | UpsertLeaguePayloadKeySpecifier | (() => undefined | UpsertLeaguePayloadKeySpecifier),
 		fields?: UpsertLeaguePayloadFieldPolicy,
 	},
+	UpsertLeaguePositionPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpsertLeaguePositionPayloadKeySpecifier | (() => undefined | UpsertLeaguePositionPayloadKeySpecifier),
+		fields?: UpsertLeaguePositionPayloadFieldPolicy,
+	},
+	UpsertMatchupPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpsertMatchupPayloadKeySpecifier | (() => undefined | UpsertMatchupPayloadKeySpecifier),
+		fields?: UpsertMatchupPayloadFieldPolicy,
+	},
+	UpsertMatchupPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpsertMatchupPlayerPayloadKeySpecifier | (() => undefined | UpsertMatchupPlayerPayloadKeySpecifier),
+		fields?: UpsertMatchupPlayerPayloadFieldPolicy,
+	},
 	UpsertPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpsertPlayerPayloadKeySpecifier | (() => undefined | UpsertPlayerPayloadKeySpecifier),
 		fields?: UpsertPlayerPayloadFieldPolicy,
@@ -7256,13 +9572,13 @@ export type StrictTypedTypePolicies = {
 		keyFields?: false | UpsertSeasonPitchingPayloadKeySpecifier | (() => undefined | UpsertSeasonPitchingPayloadKeySpecifier),
 		fields?: UpsertSeasonPitchingPayloadFieldPolicy,
 	},
+	UpsertTeamMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
+		keyFields?: false | UpsertTeamMemberPayloadKeySpecifier | (() => undefined | UpsertTeamMemberPayloadKeySpecifier),
+		fields?: UpsertTeamMemberPayloadFieldPolicy,
+	},
 	UpsertTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpsertTeamPayloadKeySpecifier | (() => undefined | UpsertTeamPayloadKeySpecifier),
 		fields?: UpsertTeamPayloadFieldPolicy,
-	},
-	UpsertTypeIntoTablePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertTypeIntoTablePayloadKeySpecifier | (() => undefined | UpsertTypeIntoTablePayloadKeySpecifier),
-		fields?: UpsertTypeIntoTablePayloadFieldPolicy,
 	},
 	UpsertUserPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UpsertUserPayloadKeySpecifier | (() => undefined | UpsertUserPayloadKeySpecifier),
@@ -7279,18 +9595,6 @@ export type StrictTypedTypePolicies = {
 	UsersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
 		keyFields?: false | UsersEdgeKeySpecifier | (() => undefined | UsersEdgeKeySpecifier),
 		fields?: UsersEdgeFieldPolicy,
-	},
-	UsersInternal?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalKeySpecifier | (() => undefined | UsersInternalKeySpecifier),
-		fields?: UsersInternalFieldPolicy,
-	},
-	UsersInternalsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalsConnectionKeySpecifier | (() => undefined | UsersInternalsConnectionKeySpecifier),
-		fields?: UsersInternalsConnectionFieldPolicy,
-	},
-	UsersInternalsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalsEdgeKeySpecifier | (() => undefined | UsersInternalsEdgeKeySpecifier),
-		fields?: UsersInternalsEdgeFieldPolicy,
 	}
 };
 export type TypedTypePolicies = StrictTypedTypePolicies & TypePolicies;

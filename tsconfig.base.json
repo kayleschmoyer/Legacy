@@ -5,22 +5,25 @@
     "sourceMap": true,
     "declaration": false,
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2020",
+    "target": "es2015",
     "module": "esnext",
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@legacy-sports/codegen-base": ["./codegen.base.ts"],
       "@legacy-sports/bref-client": ["lib/bref-client/src/index.ts"],
+      "@legacy-sports/codegen-base": ["lib/codegen/codegen.base.ts"],
       "@legacy-sports/data-loaders": ["lib/data-loaders/src/index.ts"],
+      "@legacy-sports/db-client": ["lib/db-client/src/index.ts"],
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
-      "@legacy-sports/logging": ["lib/logging/src/index.ts"]
+      "@legacy-sports/logging": ["lib/logging/src/index.ts"],
+      "@legacy-sports/scoring": ["lib/scoring/src/index.ts"],
+      "@legacy-sports/utils": ["lib/utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

@@ -28,9 +28,11 @@ functions:
     handler: dist/load-career.handler # Actual handler substituted in during deploy script
     timeout: 60 # optional, in seconds, default is 6
     events:
-      - sqs: 
+      - sqs:
           arn: arn:aws:sqs:us-east-1:176661590736:load-season-stats.fifo
           maximumConcurrency: 2
 
     environment:
-      GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
+      DB_CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1

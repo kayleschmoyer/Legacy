@@ -18,13 +18,13 @@ import {
   getEnvVarOptional,
   getEnvVarRequired,
 } from '@legacy-sports/env-utilities';
-import { GoogleJwtContents } from '../../login/GoogleJwtContents';
+import { LOGGER } from '@legacy-sports/logging';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 
 export interface AuthHandlers {
-  googleLogin(): void;
-  logout(): void;
+  googleLogin: () => void;
+  logout: () => void;
 }
 
 export interface AuthCallbacks {
@@ -33,8 +33,7 @@ export interface AuthCallbacks {
 }
 
 export interface OAuthProxyTokens {
-  google_token: string;
-  internal_token: string;
+  jwt: string;
 }
 
 export interface LegacySportsJwt {
@@ -43,11 +42,6 @@ export interface LegacySportsJwt {
   username: string;
   isAdmin: boolean;
   about: string | null | undefined;
-}
-
-export interface CurrentUserInfo {
-  googleInfo: GoogleJwtContents;
-  internalInfo: LegacySportsJwt;
 }
 
 export enum Secret {
@@ -59,8 +53,12 @@ let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 
 const SECRET_USERNAME = '';
 
+function useLastUpdateTime(): number {
+  return KEYCHAIN_LAST_UPDATE;
+}
+
 export async function readKeychainValue(
-  secret: Secret,
+  secret: Secret
 ): Promise<string | null> {
   const result = await getGenericPassword({
     service: secret,
@@ -73,40 +71,28 @@ export async function readKeychainValue(
   return result.password;
 }
 
-export async function getJwt(): Promise<CurrentUserInfo | null> {
-  let googleJwt;
-  let internalJwt;
+export async function getJwt(): Promise<LegacySportsJwt | null> {
+  let internalJwt: string | null;
 
   switch (Platform.OS) {
     case 'web':
-      googleJwt = sessionStorage.getItem(Secret.GOOGLE_JWT);
       internalJwt = sessionStorage.getItem(Secret.INTERNAL_JWT);
       break;
     default:
-      googleJwt = await readKeychainValue(Secret.GOOGLE_JWT);
       internalJwt = await readKeychainValue(Secret.INTERNAL_JWT);
       break;
   }
 
-  return googleJwt === null || internalJwt === null
-    ? null
-    : {
-        googleInfo: jwtDecode(googleJwt),
-        internalInfo: jwtDecode(internalJwt),
-      };
+  return internalJwt === null ? null : jwtDecode(internalJwt);
 }
 
 async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
   switch (Platform.OS) {
     case 'web':
-      sessionStorage.setItem(Secret.GOOGLE_JWT, tokens.google_token);
-      sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.internal_token);
+      sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
       break;
     default:
-      await setGenericPassword(SECRET_USERNAME, tokens.google_token, {
-        service: Secret.GOOGLE_JWT,
-      });
-      await setGenericPassword(SECRET_USERNAME, tokens.internal_token, {
+      await setGenericPassword(SECRET_USERNAME, tokens.jwt, {
         service: Secret.INTERNAL_JWT,
       });
       break;
@@ -141,10 +127,10 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     async (response) => {
       const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
       const tokenResponse = await axios.post<OAuthProxyTokens>(
-        `${oauthProxy}/auth/google`,
+        `${oauthProxy}/google/auth`,
         {
           code: response.code,
-        },
+        }
       );
 
       await storeToken(tokenResponse.data);
@@ -153,7 +139,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         onSuccess();
       }
     },
-    [onSuccess],
+    [onSuccess]
   );
 
   const failureHandler = useCallback<
@@ -164,7 +150,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         onFailure(err.error_description);
       }
     },
-    [onFailure],
+    [onFailure]
   );
 
   const logout = useCallback(async () => {
@@ -173,12 +159,12 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     await resetToken();
 
     router.replace('/');
-  }, []);
+  }, [router]);
 
   const googleLogin = useGoogleLogin({
     flow: 'auth-code',
-    onSuccess: successHandler,
     onError: failureHandler,
+    onSuccess: successHandler,
   });
 
   return useMemo(() => {
@@ -201,25 +187,24 @@ export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 const refreshJwt = memoizeOne(async (keychainLastUpdate: number) => {
   const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
   const tokenResponse = await axios.post<OAuthProxyTokens>(
-    `${oauthProxy}/auth/google/refresh`,
-    {},
+    `${oauthProxy}/google/refresh`,
+    {}
   );
-  storeToken(tokenResponse.data);
+  await storeToken(tokenResponse.data);
 });
 
-const LOCAL_USER: CurrentUserInfo = {
-  googleInfo: {} as GoogleJwtContents,
-  internalInfo: {
-    id: -1,
-    email: null,
-    username: 'LOCAL USER',
-    isAdmin: false,
-    about: null,
-  },
+const LOCAL_USER: LegacySportsJwt = {
+  about: null,
+  email: null,
+  id: -1,
+  isAdmin: false,
+  username: 'LOCAL USER',
 };
 
-export function useCurrentUserInfo(): AsyncHookResult<CurrentUserInfo | null> {
-  return useAsyncHook(async () => {
+export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
+  const lastUpdateTime = useLastUpdateTime();
+
+  const runHook = useCallback(async () => {
     if (getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH) === 'true') {
       return LOCAL_USER;
     }
@@ -229,15 +214,17 @@ export function useCurrentUserInfo(): AsyncHookResult<CurrentUserInfo | null> {
     // JWT Expired, but we can try to refresh
     if (jwt === null) {
       try {
-        await refreshJwt(KEYCHAIN_LAST_UPDATE);
+        await refreshJwt(lastUpdateTime);
       } catch (err) {
         // This is okay, we probably don't have one
-        console.log(`Could not refresh jwt: ${err}`);
+        LOGGER.info(`Could not refresh jwt: ${err}`);
       }
 
       jwt = await getJwt();
     }
 
     return jwt;
-  }, [KEYCHAIN_LAST_UPDATE]);
+  }, [lastUpdateTime]);
+
+  return useAsyncHook(runHook);
 }

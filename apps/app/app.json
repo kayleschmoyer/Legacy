@@ -1,10 +1,11 @@
 {
   "expo": {
     "name": "App",
-    "slug": "fantasy",
+    "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "legacysports",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -27,10 +28,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "build": {
+        "babel": {
+          "include": ["@ui-kitten/components"]
+        }
+      }
     },
     "plugins": [
-      "expo-font",
       [
         "expo-asset",
         {
@@ -38,13 +43,6 @@
         }
       ],
       "expo-router",
-      [
-        "@config-plugins/detox",
-        {
-          "skipProguard": false,
-          "subdomains": ["10.0.2.2", "localhost"]
-        }
-      ],
       [
         "@react-native-google-signin/google-signin",
         {

@@ -1,58 +1,39 @@
 import * as React from 'react';
 import { Slot } from 'expo-router';
 import Toast from 'react-native-toast-message';
-
-import { TamaguiProvider } from 'tamagui';
-
-import { useColorScheme } from 'react-native';
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from '@react-navigation/native';
-
-
-import { useFonts } from 'expo-font';
+import { ApplicationProvider } from '@ui-kitten/components';
+import * as eva from '@eva-design/eva';
 import { ApolloProvider } from '@apollo/client';
-import {tamaguiConfig} from '../TamaguiConfig';
+import { useColorScheme } from 'react-native';
 import { LoadingPanel } from '../common/components/LoadingPanel';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { ConditionalProviders } from '../common/ConditionalProviders';
 import { useCurrentUserInfo } from '../common/auth/AuthHooks';
+import { DARK_THEME, LIGHT_THEME } from '../Theme';
 
 function InnerLayout(): JSX.Element {
   const { loading } = useCurrentUserInfo();
-  const [fontsLoaded] = useFonts({
-    Inter: require('@tamagui/font-inter/otf/Inter-Medium.otf'),
-    InterBold: require('@tamagui/font-inter/otf/Inter-Bold.otf'),
-  });
 
-  if (loading || !fontsLoaded) {
+  if (loading) {
     return <LoadingPanel />;
   }
 
-  return (
-    <Slot/>
-  );
+  return <Slot />;
 }
 
 export default function Layout() {
-  const colorScheme = useColorScheme();
   const client = React.useContext(DbClientContext);
+  const color = useColorScheme();
+  const theme = color === 'dark' ? DARK_THEME : LIGHT_THEME;
 
   return (
-    <TamaguiProvider
-      defaultTheme={colorScheme || undefined}
-      config={tamaguiConfig}
-    >
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <ConditionalProviders>
-          <ApolloProvider client={client.apolloClient}>
-            <Toast />
-            <InnerLayout />
-          </ApolloProvider>
-        </ConditionalProviders>
-      </ThemeProvider>
-    </TamaguiProvider>
+    <ApplicationProvider {...eva} theme={theme}>
+      <ConditionalProviders>
+        <ApolloProvider client={client.apolloClient}>
+          <Toast />
+          <InnerLayout />
+        </ApolloProvider>
+      </ConditionalProviders>
+    </ApplicationProvider>
   );
 }

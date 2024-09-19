@@ -2,7 +2,10 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -13,11 +16,11 @@
       "!{projectRoot}/src/test-setup.[jt]s",
       "!{projectRoot}/test-setup.[jt]s"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
+    "sharedGlobals": [
+      "{workspaceRoot}/.github/workflows/ci.yml"
+    ]
   },
-  "@nxlv/python:poetry-project": {
-    "projectNameAndRootFormat": "as-provided"
-  },
+  "parallel": 5,
   "plugins": [
     {
       "plugin": "@nx/expo/plugin",
@@ -34,39 +37,15 @@
       }
     },
     {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    },
-    {
       "plugin": "@nx/jest/plugin",
       "options": {
         "targetName": "test"
-      },
-      "exclude": ["apps/cli-e2e/**/*", "brad-e2e/**/*", "brad-app-e2e/**/*"]
-    },
-    {
-      "plugin": "@nx/detox/plugin",
-      "options": {
-        "buildTargetName": "build",
-        "startTargetName": "start",
-        "testTargetName": "test"
       }
     },
-    "@nxlv/python",
     {
-      "plugin": "@nx/react-native/plugin",
+      "plugin": "@nx/eslint/plugin",
       "options": {
-        "startTargetName": "start",
-        "upgradeTargetName": "update",
-        "bundleTargetName": "bundle",
-        "podInstallTargetName": "pod-install",
-        "runIosTargetName": "run-ios",
-        "runAndroidTargetName": "run-android",
-        "buildIosTargetName": "build-ios",
-        "buildAndroidTargetName": "build-android",
-        "syncDepsTargetName": "sync-deps"
+        "targetName": "lint"
       }
     },
     {
@@ -76,44 +55,18 @@
         "serveTargetName": "serve",
         "previewTargetName": "preview"
       }
-    },
-    {
-      "plugin": "@nx/playwright/plugin",
-      "options": {
-        "targetName": "e2e"
-      }
     }
   ],
-  "generators": {
-    "@nx/react": {
-      "application": {
-        "babel": true,
-        "style": "@emotion/styled",
-        "linter": "eslint",
-        "bundler": "webpack"
-      },
-      "component": {
-        "style": "@emotion/styled"
-      },
-      "library": {
-        "style": "@emotion/styled",
-        "linter": "eslint"
-      }
-    }
-  },
   "targetDefaults": {
     "@nx/esbuild:esbuild": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
-    "@nx/js:tsc": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
-    "e2e-ci--**/*": {
-      "dependsOn": ["^webpack:build"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "default",
+        "^default"
+      ]
     }
   }
 }

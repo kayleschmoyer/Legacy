@@ -10,7 +10,7 @@
       "dependsOn": ["build"],
       "options": {
         "command": "npx serverless package",
-        "cwd": "lambdas/stats-lambda"
+        "cwd": "lambdas/oauth-proxy"
       }
     }
   }

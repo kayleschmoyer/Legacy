@@ -4,17 +4,21 @@
   "private": true,
   "main": "src/index.ts",
   "dependencies": {
-    "expo": "~51.0.28",
-    "react": "18.2.0",
-    "react-native": "0.74.5"
+    "@testing-library/jest-native": "*",
+    "@testing-library/react-native": "*",
+    "metro-config": "*",
+    "react-native": "*",
+    "expo": "*",
+    "react-native-svg": "*",
+    "react-native-web": "*",
+    "react": "18.2.0"
   },
   "scripts": {
-    "eas-build-pre-install": "cd ../../ && node tools/scripts/eas-build-pre-install.mjs . apps/app && cp package-lock.json apps/app",
-    "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/app",
+    "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . app",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "codegen-db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-    "lint:fix": "eslint --fix"
+    "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+    "codegen": "npm run codegen:db"
   },
   "devDependencies": {}
 }

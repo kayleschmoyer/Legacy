@@ -31,8 +31,8 @@ export function useGetMessagesForLeagueLazyQuery(baseOptions?: Apollo.LazyQueryH
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>(Operations.GetMessagesForLeague, options);
         }
-export function useGetMessagesForLeagueSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
+export function useGetMessagesForLeagueSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>(Operations.GetMessagesForLeague, options);
         }
 export type GetMessagesForLeagueQueryHookResult = ReturnType<typeof useGetMessagesForLeagueQuery>;

@@ -2,14 +2,24 @@ service: legacy-sports-oauth-proxy
 configValidationMode: error
 
 plugins:
+  - serverless-better-credentials # as the first plugin
   - serverless-content-encoding
 
 custom:
   contentEncoding:
     minimumCompressionSize: 0
+  betterCredentials:
+    # Use this flag to turn off the plugin entirely, which you may want for certain stages.
+    # Defaults to true.
+    enabled: true
 
 package:
   individually: true
+
+layers:
+  pg:
+    package:
+      artifact: layers/node-pg.zip
 
 provider:
   name: aws
@@ -18,38 +28,152 @@ provider:
     name: legacy-sports-lambdas
   region: ${env:AWS_REGION, 'us-east-1'}
   stage: ${env:AWS_STAGE, 'dev'}
+  tracing:
+    lambda: true
   iam:
     role:
       statements:
-        - Effect: 'Allow'
-          Resource:
-            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/jwt-secret-key-JfEOgt
-            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/google-oauth-client-secret-Ux78d7
-            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/oauth-proxy/cookie-secret-I5LUyn
+        - Effect: Allow
           Action:
             - secretsmanager:GetResourcePolicy
             - secretsmanager:GetSecretValue
             - secretsmanager:DescribeSecret
             - secretsmanager:ListSecretVersionIds
+          Resource:
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1-??????
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/jwt-secret-key-??????
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/google-oauth-client-secret-??????
+            - arn:aws:secretsmanager:us-east-1:176661590736:secret:dev/oauth-proxy/cookie-secret-??????
+
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetRandomPassword
+            - secretsmanager:ListSecrets
+          Resource: '*'
+
+        - Action: rds-db:connect
+          Resource: 'arn:aws:rds-db:us-east-1:176661590736:dbuser:prx-003725417019c48c4/*'
+          Effect: Allow
+
+        - Effect: Allow
+          Action:
+            - iam:CreateServiceLinkedRole
+          Resource:
+            - !Sub arn:aws:iam::176661590736:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway
 
 functions:
-  proxy:
-    handler: dist/index.handler # Actual handler substituted in during deploy script
-    timeout: 30 # optional, in seconds, default is 6
+  google-auth:
+    handler: dist/google.handleGoogleAuth
+    timeout: 30
+    layers:
+      - { Ref: PgLambdaLayer }
     events:
       - http:
           method: post
-          path: auth/google/refresh-token
+          path: google/auth
           cors: true
           integration: lambda-proxy
-      - http:
-          method: post
-          path: auth/google
-          cors: true
-          integration: lambda-proxy
+    vpc:
+      securityGroupIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS, ''}
+      subnetIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SUBNET_IDS, ''}
     environment:
       CLIENT_ID: 1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com
-      CLIENT_SECRET_PATH: dev/google-oauth-client-secret
+      GOOGLE_OAUTH_CLIENT_SECRET_PATH: dev/google-oauth-client-secret
       JWT_SECRET_KEY_PATH: dev/jwt-secret-key
       COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
-      GRAPHQL_HOST: https://uw72jrdjqa.execute-api.us-east-1.amazonaws.com/dev/graphql
+      DB_CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
+      LOG_LEVEL: debug
+
+  google-refresh:
+    handler: dist/google.handleGoogleRefresh
+    timeout: 30
+    layers:
+      - { Ref: PgLambdaLayer }
+    events:
+      - http:
+          method: post
+          path: google/refresh-token
+          cors: true
+          integration: lambda-proxy
+    vpc:
+      securityGroupIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS, ''}
+      subnetIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SUBNET_IDS, ''}
+    environment:
+      CLIENT_ID: 1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com
+      GOOGLE_OAUTH_CLIENT_SECRET_PATH: dev/google-oauth-client-secret
+      JWT_SECRET_KEY_PATH: dev/jwt-secret-key
+      COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
+      DB_CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
+      LOG_LEVEL: debug
+
+  local-register:
+    handler: dist/local.handleRegister
+    timeout: 30
+    layers:
+      - { Ref: PgLambdaLayer }
+    events:
+      - http:
+          method: post
+          path: local/register
+          cors: true
+          integration: lambda-proxy
+    vpc:
+      securityGroupIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS, ''}
+      subnetIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SUBNET_IDS, ''}
+    environment:
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
+      JWT_SECRET_KEY_PATH: dev/jwt-secret-key
+      COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
+      DB_CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+      LOG_LEVEL: debug
+
+  local-login:
+    handler: dist/local.handleLogin
+    timeout: 30
+    layers:
+      - { Ref: PgLambdaLayer }
+    events:
+      - http:
+          method: post
+          path: local/login
+          cors: true
+          integration: lambda-proxy
+    vpc:
+      securityGroupIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SECURITY_GROUP_IDS, ''}
+      subnetIds:
+        'Fn::Split':
+          - ','
+          - ${env:AWS_VPC_SUBNET_IDS, ''}
+    environment:
+      # Use the RDS proxy
+      DB_HOST: legacy-sports-gql-proxy.proxy-cep4b6aynyet.us-east-1.rds.amazonaws.com
+      JWT_SECRET_KEY_PATH: dev/jwt-secret-key
+      COOKIE_SECRET_KEY_PATH: dev/oauth-proxy/cookie-secret
+      DB_CREDS_PATH: rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+      LOG_LEVEL: debug
