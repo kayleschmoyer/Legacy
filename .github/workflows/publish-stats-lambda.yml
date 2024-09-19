@@ -3,11 +3,11 @@ name: Publish Load Stats Lambda
 # Controls when the workflow will run
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'lambdas/stats-lambda/**'
-      - .github/workflows/publish-stats-lambda.yml
+  #push:
+  #  branches: [main]
+  #  paths:
+  #    - 'lambdas/stats-lambda/**'
+  #    - .github/workflows/publish-stats-lambda.yml
 
 env:
   AWS_REGION: us-east-1
