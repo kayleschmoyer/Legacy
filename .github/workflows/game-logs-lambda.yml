@@ -3,10 +3,10 @@ name: Game Logs Lambda
 # Controls when the workflow will run
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - lambdas/stats_lambda/**
+  #push:
+  #  branches: [main]
+  #  paths:
+  #    - lambdas/stats_lambda/**
 
 env:
   FUNCTION_NAME: baseball-game-logs
