@@ -1,10 +1,20 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Dimensions, Picker } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  Picker,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // Get device dimensions
-const { height, width } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-type Player = {
+export type Player = {
   id: number;
   rank: number;
   name: string;
@@ -28,29 +38,180 @@ const defaultLineup: Lineup = {
   '1B': null,
   '2B': null,
   '3B': null,
-  'C': null,
-  'CF': null,
-  'DH': null,
-  'OF1': null,
-  'OF2': null,
-  'OF3': null,
-  'SS': null,
+  C: null,
+  CF: null,
+  DH: null,
+  OF1: null,
+  OF2: null,
+  OF3: null,
+  SS: null,
 };
 
 // Adding more players for the draft pool
 const playersList: Player[] = [
-  { avg: '.342', homeRuns: 714, id: 1, name: 'Babe Ruth', obp: '.474', ops: '1.164', position: 'OF', rank: 1, rbi: 2214, runs: 2174, slg: '.690', stolenBases: 123, team: 'NYY' },
-  { avg: '.366', homeRuns: 117, id: 2, name: 'Ty Cobb', obp: '.433', ops: '.945', position: 'OF', rank: 2, rbi: 1938, runs: 2246, slg: '.512', stolenBases: 897, team: 'DET' },
-  { avg: '.340', homeRuns: 493, id: 3, name: 'Lou Gehrig', obp: '.447', ops: '1.080', position: '1B', rank: 3, rbi: 1995, runs: 1888, slg: '.632', stolenBases: 102, team: 'NYY' },
-  { avg: '.305', homeRuns: 755, id: 4, name: 'Hank Aaron', obp: '.374', ops: '.928', position: 'OF', rank: 4, rbi: 2297, runs: 2174, slg: '.555', stolenBases: 240, team: 'ATL' },
-  { avg: '.302', homeRuns: 660, id: 5, name: 'Willie Mays', obp: '.384', ops: '.941', position: 'OF', rank: 5, rbi: 1903, runs: 2062, slg: '.557', stolenBases: 338, team: 'SFG' },
-  { avg: '.298', homeRuns: 536, id: 6, name: 'Mickey Mantle', obp: '.421', ops: '.977', position: 'CF', rank: 6, rbi: 1509, runs: 1676, slg: '.557', stolenBases: 153, team: 'NYY' },
-  { avg: '.309', homeRuns: 512, id: 7, name: 'Ted Williams', obp: '.482', ops: '1.116', position: 'OF', rank: 7, rbi: 1839, runs: 1798, slg: '.634', stolenBases: 24, team: 'BOS' },
-  { avg: '.301', homeRuns: 452, id: 8, name: 'Carl Yastrzemski', obp: '.379', ops: '.841', position: 'OF', rank: 8, rbi: 1844, runs: 1816, slg: '.462', stolenBases: 168, team: 'BOS' },
-  { avg: '.318', homeRuns: 331, id: 9, name: 'Joe DiMaggio', obp: '.398', ops: '.977', position: 'OF', rank: 9, rbi: 1537, runs: 1390, slg: '.579', stolenBases: 30, team: 'NYY' },
-  { avg: '.307', homeRuns: 268, id: 10, name: 'Duke Snider', obp: '.380', ops: '.919', position: 'OF', rank: 10, rbi: 1333, runs: 1259, slg: '.553', stolenBases: 99, team: 'BRO' },
+  {
+    avg: '.342',
+    homeRuns: 714,
+    id: 1,
+    name: 'Babe Ruth',
+    obp: '.474',
+    ops: '1.164',
+    position: 'OF',
+    rank: 1,
+    rbi: 2214,
+    runs: 2174,
+    slg: '.690',
+    stolenBases: 123,
+    team: 'NYY',
+  },
+  {
+    avg: '.366',
+    homeRuns: 117,
+    id: 2,
+    name: 'Ty Cobb',
+    obp: '.433',
+    ops: '.945',
+    position: 'OF',
+    rank: 2,
+    rbi: 1938,
+    runs: 2246,
+    slg: '.512',
+    stolenBases: 897,
+    team: 'DET',
+  },
+  {
+    avg: '.340',
+    homeRuns: 493,
+    id: 3,
+    name: 'Lou Gehrig',
+    obp: '.447',
+    ops: '1.080',
+    position: '1B',
+    rank: 3,
+    rbi: 1995,
+    runs: 1888,
+    slg: '.632',
+    stolenBases: 102,
+    team: 'NYY',
+  },
+  {
+    avg: '.305',
+    homeRuns: 755,
+    id: 4,
+    name: 'Hank Aaron',
+    obp: '.374',
+    ops: '.928',
+    position: 'OF',
+    rank: 4,
+    rbi: 2297,
+    runs: 2174,
+    slg: '.555',
+    stolenBases: 240,
+    team: 'ATL',
+  },
+  {
+    avg: '.302',
+    homeRuns: 660,
+    id: 5,
+    name: 'Willie Mays',
+    obp: '.384',
+    ops: '.941',
+    position: 'OF',
+    rank: 5,
+    rbi: 1903,
+    runs: 2062,
+    slg: '.557',
+    stolenBases: 338,
+    team: 'SFG',
+  },
+  {
+    avg: '.298',
+    homeRuns: 536,
+    id: 6,
+    name: 'Mickey Mantle',
+    obp: '.421',
+    ops: '.977',
+    position: 'CF',
+    rank: 6,
+    rbi: 1509,
+    runs: 1676,
+    slg: '.557',
+    stolenBases: 153,
+    team: 'NYY',
+  },
+  {
+    avg: '.309',
+    homeRuns: 512,
+    id: 7,
+    name: 'Ted Williams',
+    obp: '.482',
+    ops: '1.116',
+    position: 'OF',
+    rank: 7,
+    rbi: 1839,
+    runs: 1798,
+    slg: '.634',
+    stolenBases: 24,
+    team: 'BOS',
+  },
+  {
+    avg: '.301',
+    homeRuns: 452,
+    id: 8,
+    name: 'Carl Yastrzemski',
+    obp: '.379',
+    ops: '.841',
+    position: 'OF',
+    rank: 8,
+    rbi: 1844,
+    runs: 1816,
+    slg: '.462',
+    stolenBases: 168,
+    team: 'BOS',
+  },
+  {
+    avg: '.318',
+    homeRuns: 331,
+    id: 9,
+    name: 'Joe DiMaggio',
+    obp: '.398',
+    ops: '.977',
+    position: 'OF',
+    rank: 9,
+    rbi: 1537,
+    runs: 1390,
+    slg: '.579',
+    stolenBases: 30,
+    team: 'NYY',
+  },
+  {
+    avg: '.307',
+    homeRuns: 268,
+    id: 10,
+    name: 'Duke Snider',
+    obp: '.380',
+    ops: '.919',
+    position: 'OF',
+    rank: 10,
+    rbi: 1333,
+    runs: 1259,
+    slg: '.553',
+    stolenBases: 99,
+    team: 'BRO',
+  },
   // Add more players as needed
 ];
+
+const POSITION_MAP: { [key: string]: string[] } = {
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['DH'],
+  OF: ['OF1', 'OF2', 'OF3'],
+  SS: ['SS'],
+};
 
 export const DraftBoard: React.FC = () => {
   const [teamRosters, setTeamRosters] = useState<{ [teamId: number]: Lineup }>({
@@ -69,22 +230,11 @@ export const DraftBoard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'draft' | 'roster'>('draft');
   const [isDraftStarted, setIsDraftStarted] = useState(false); // To track draft start
 
-  const positionMap: { [key: string]: string[] } = {
-    '1B': ['1B'],
-    '2B': ['2B'],
-    '3B': ['3B'],
-    'C': ['C'],
-    'CF': ['CF'],
-    'DH': ['DH'],
-    'OF': ['OF1', 'OF2', 'OF3'],
-    'SS': ['SS'],
-  };
-
   const handlePickPlayer = useCallback(
     (player: Player) => {
       const roster = teamRosters[currentTeam];
       if (!roster) return;
-      const availableSlots = positionMap[player.position] || [];
+      const availableSlots = POSITION_MAP[player.position] || [];
       const positionToFill = availableSlots.find((slot) => !roster[slot]);
       if (positionToFill) {
         const updatedRoster = {
@@ -102,7 +252,7 @@ export const DraftBoard: React.FC = () => {
         setIsPicking(false);
       }
     },
-    [currentTeam, draftHistory, players, positionMap, teamRosters]
+    [currentTeam, draftHistory, players, teamRosters]
   );
 
   const autoPickPlayer = useCallback(() => {
@@ -176,7 +326,9 @@ export const DraftBoard: React.FC = () => {
       {/* Timer and Team on the Clock */}
       {isDraftStarted && (
         <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>Team {currentTeam} is on the clock!</Text>
+          <Text style={styles.timerText}>
+            Team {currentTeam} is on the clock!
+          </Text>
           <Text style={styles.timerText}>Time left: {timer}s</Text>
         </View>
       )}
@@ -232,14 +384,16 @@ export const DraftBoard: React.FC = () => {
           {/* Roster */}
           <Text style={styles.rosterTitle}>Team {viewingTeam} Roster</Text>
           <View style={styles.rosterGrid}>
-            {Object.entries(teamRosters[viewingTeam]).map(([position, player]) => (
-              <View key={position} style={styles.rosterSlot}>
-                <Text style={styles.rosterPosition}>{position}</Text>
-                <Text style={styles.rosterPlayer}>
-                  {player ? `${player.name} (${player.position})` : '---'}
-                </Text>
-              </View>
-            ))}
+            {Object.entries(teamRosters[viewingTeam]).map(
+              ([position, player]) => (
+                <View key={position} style={styles.rosterSlot}>
+                  <Text style={styles.rosterPosition}>{position}</Text>
+                  <Text style={styles.rosterPlayer}>
+                    {player ? `${player.name} (${player.position})` : '---'}
+                  </Text>
+                </View>
+              )
+            )}
           </View>
         </ScrollView>
       )}
@@ -249,68 +403,20 @@ export const DraftBoard: React.FC = () => {
 
 // Styles
 const styles = StyleSheet.create({
+  activeTab: {
+    backgroundColor: '#007bff',
+  },
   container: {
     backgroundColor: '#f7f7f7',
     flex: 1,
     padding: 16,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  tabButton: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#ddd',
-    alignItems: 'center',
-    borderRadius: 10,
-    marginHorizontal: 5,
-  },
-  activeTab: {
-    backgroundColor: '#007bff',
-  },
-  tabText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  teamSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 10,
-  },
-  teamSelectorText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   picker: {
     height: 50,
     width: 150,
   },
-  searchInput: {
-    backgroundColor: '#fff',
-    borderColor: '#ccc',
-    borderRadius: 25,
-    borderWidth: 1,
-    fontSize: 16,
-    height: 50,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-  },
-  tableHeaders: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingHorizontal: 16,
-  },
-  rankHeader: {
-    color: '#333',
-    flex: 0.5,
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'left',
+  playerColumn: {
+    flex: 2.5,
   },
   playerHeader: {
     color: '#333',
@@ -319,12 +425,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'left',
   },
-  statHeader: {
+  playerInfo: {
+    color: '#888',
+    fontSize: 12,
+  },
+  playerName: {
     color: '#333',
-    flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
   playerRow: {
     alignItems: 'center',
@@ -340,17 +448,64 @@ const styles = StyleSheet.create({
     flex: 0.5,
     fontSize: 14,
   },
-  playerColumn: {
-    flex: 2.5,
-  },
-  playerName: {
+  rankHeader: {
     color: '#333',
+    flex: 0.5,
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'left',
+  },
+  rosterGrid: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  rosterPlayer: {
+    color: '#555',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  rosterPosition: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  playerInfo: {
-    color: '#888',
-    fontSize: 12,
+  rosterSlot: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    // Adjust width dynamically
+    marginBottom: 8,
+    padding: 16,
+    width: width / 2.3,
+  },
+  rosterTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  searchInput: {
+    backgroundColor: '#fff',
+    borderColor: '#ccc',
+    borderRadius: 25,
+    borderWidth: 1,
+    fontSize: 16,
+    height: 50,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  startDraftButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 10,
+    marginBottom: 16,
+    padding: 16,
+  },
+  startDraftText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   statColumn: {
     color: '#333',
@@ -358,46 +513,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  rosterTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  rosterGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-  },
-  rosterSlot: {
-    width: width / 2.3, // Adjust width dynamically
-    marginBottom: 8,
-    padding: 16,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  rosterPosition: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  rosterPlayer: {
+  statHeader: {
+    color: '#333',
+    flex: 1,
     fontSize: 14,
-    marginTop: 4,
-    color: '#555',
-  },
-  startDraftButton: {
-    backgroundColor: '#007bff',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  startDraftText: {
-    color: '#fff',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  tabButton: {
+    alignItems: 'center',
+    backgroundColor: '#ddd',
+    borderRadius: 10,
+    flex: 1,
+    marginHorizontal: 5,
+    padding: 16,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  tabText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  tableHeaders: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 16,
+  },
+  teamSelector: {
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    flexDirection: 'row',
+    marginBottom: 16,
+    padding: 10,
+  },
+  teamSelectorText: {
     fontSize: 16,
+    fontWeight: 'bold',
   },
   timerContainer: {
     alignItems: 'center',

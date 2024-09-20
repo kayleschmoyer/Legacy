@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 type FilterOption = {
@@ -15,14 +23,20 @@ type SearchBarProps = {
   currentFilters: { [key: string]: string | null };
 };
 
-const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, currentFilters }) => {
+const SearchBar: React.FC<SearchBarProps> = ({
+  value,
+  onSearch,
+  onFilter,
+  currentFilters,
+}) => {
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState<{ [key: string]: string | null }>(currentFilters);
+  const [filters, setFilters] = useState<{ [key: string]: string | null }>(
+    currentFilters
+  );
 
   const filterOptions: FilterOption[] = [
     {
       label: 'Position',
-      value: currentFilters.position || null,
       options: [
         { label: 'All Positions', value: null },
         { label: 'C', value: 'C' },
@@ -33,36 +47,43 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
         { label: 'OF', value: 'OF' },
         { label: 'P', value: 'P' },
       ],
+      value: currentFilters.position || null,
     },
     {
       label: 'Team',
-      value: currentFilters.team || null,
       options: [
         { label: 'All Teams', value: null },
         { label: 'NY Yankees', value: 'NY Yankees' },
         { label: 'LA Dodgers', value: 'LA Dodgers' },
         // Add more teams here
       ],
+      value: currentFilters.team || null,
     },
     {
       label: 'Fantasy Points',
-      value: currentFilters.fantasyPoints || null,
       options: [
         { label: 'Any', value: null },
         { label: '> 300', value: '>300' },
         { label: '> 200', value: '>200' },
         { label: '< 200', value: '<200' },
       ],
+      value: currentFilters.fantasyPoints || null,
     },
   ];
 
-  const handleSearch = useCallback((text: string) => {
-    onSearch(text);
-  }, [onSearch]);
+  const handleSearch = useCallback(
+    (text: string) => {
+      onSearch(text);
+    },
+    [onSearch]
+  );
 
-  const handleFilterChange = useCallback((key: string, value: string | null) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
+  const handleFilterChange = useCallback(
+    (key: string, value: string | null) => {
+      setFilters((prev) => ({ ...prev, [key]: value }));
+    },
+    []
+  );
 
   const applyFilters = useCallback(() => {
     onFilter(filters);
@@ -72,7 +93,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
   const renderFilterOption = ({ item }: { item: FilterOption }) => (
     <View style={styles.filterOptionContainer}>
       <Text style={styles.filterOptionLabel}>{item.label}:</Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.filterOptionButton}
         onPress={() => handleFilterChange(item.label.toLowerCase(), null)}
       >
@@ -82,17 +103,19 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
         data={item.options}
         horizontal
         renderItem={({ item: option }) => (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.filterOption,
-              item.value === option.value ? styles.filterOptionSelected : null
+              item.value === option.value ? styles.filterOptionSelected : null,
             ]}
-            onPress={() => handleFilterChange(item.label.toLowerCase(), option.value)}
+            onPress={() =>
+              handleFilterChange(item.label.toLowerCase(), option.value)
+            }
           >
             <Text style={styles.filterOptionText}>{option.label}</Text>
           </TouchableOpacity>
         )}
-        keyExtractor={item => item.value || 'null'}
+        keyExtractor={(item) => item.value || 'null'}
       />
     </View>
   );
@@ -106,8 +129,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
           value={value}
           onChangeText={handleSearch}
         />
-        <TouchableOpacity 
-          style={styles.filterButton} 
+        <TouchableOpacity
+          style={styles.filterButton}
           onPress={() => setShowFilterModal(true)}
         >
           <MaterialIcons name="filter-list" size={24} color="white" />
@@ -126,17 +149,17 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
             <FlatList
               data={filterOptions}
               renderItem={renderFilterOption}
-              keyExtractor={item => item.label}
+              keyExtractor={(item) => item.label}
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowFilterModal(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.applyButton]} 
+              <TouchableOpacity
+                style={[styles.modalButton, styles.applyButton]}
                 onPress={applyFilters}
               >
                 <Text style={styles.modalButtonText}>Apply</Text>
@@ -150,65 +173,40 @@ const SearchBar: React.FC<SearchBarProps> = ({ value, onSearch, onFilter, curren
 };
 
 const styles = StyleSheet.create({
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#333',
-    borderRadius: 25,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+  applyButton: {
+    backgroundColor: '#007AFF',
   },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    color: '#fff',
-    paddingHorizontal: 10,
+  cancelButton: {
+    backgroundColor: '#666',
   },
   filterButton: {
     padding: 10,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  filterOption: {
+    backgroundColor: '#333',
+    borderRadius: 5,
+    marginRight: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  modalContent: {
-    backgroundColor: '#222',
-    padding: 20,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+  filterOptionButton: {
+    backgroundColor: '#444',
+    borderRadius: 5,
+    marginLeft: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  filterOptionButtonText: {
     color: '#fff',
-    marginBottom: 10,
   },
   filterOptionContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 10,
   },
   filterOptionLabel: {
     color: '#fff',
     marginRight: 10,
-  },
-  filterOptionButton: {
-    backgroundColor: '#444',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    marginLeft: 10,
-  },
-  filterOptionButtonText: {
-    color: '#fff',
-  },
-  filterOption: {
-    backgroundColor: '#333',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    marginRight: 5,
   },
   filterOptionSelected: {
     backgroundColor: '#555',
@@ -216,25 +214,50 @@ const styles = StyleSheet.create({
   filterOptionText: {
     color: '#fff',
   },
+  modalButton: {
+    borderRadius: 5,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
   },
-  modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
+  modalContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  cancelButton: {
-    backgroundColor: '#666',
+  modalContent: {
+    backgroundColor: '#222',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    padding: 20,
   },
-  applyButton: {
-    backgroundColor: '#007AFF',
-  },
-  modalButtonText: {
+  modalTitle: {
     color: '#fff',
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  searchContainer: {
+    alignItems: 'center',
+    backgroundColor: '#333',
+    borderRadius: 25,
+    flexDirection: 'row',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  searchInput: {
+    color: '#fff',
+    flex: 1,
+    height: 40,
+    paddingHorizontal: 10,
   },
 });
 
