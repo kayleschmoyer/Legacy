@@ -2,9 +2,16 @@ import { Column, InferModelFromColumns, View } from 'drizzle-orm';
 import { PgEnum } from 'drizzle-orm/pg-core';
 import { usersInAppInternal } from '../../../drizzle/internal/schema';
 import {
+  aggregateSeasonBatting,
+  aggregateSeasonFielding,
+  aggregateSeasonFieldingByPos,
+  aggregateSeasonPitching,
   careerBatting,
   careerFielding,
   careerPitching,
+  gameBatting,
+  gameFielding,
+  gamePitching,
   leaguePosition,
   matchupPlayers,
   matchups,
@@ -32,6 +39,9 @@ type InferEnumValue<T> = T extends PgEnum<infer TValues>
 export type CareerBatting = InferModelFromView<typeof careerBatting>;
 export type careerFielding = InferModelFromView<typeof careerFielding>;
 export type CareerPitching = InferModelFromView<typeof careerPitching>;
+export type GameBatting = typeof gameBatting.$inferSelect;
+export type GameFielding = typeof gameFielding.$inferSelect;
+export type GamePitching = typeof gamePitching.$inferSelect;
 export type InternalUser = typeof usersInAppInternal.$inferSelect;
 export type Matchup = typeof matchups.$inferSelect;
 export type MatchupPlayer = typeof matchupPlayers.$inferSelect;
@@ -47,6 +57,18 @@ export type CreateMatchupPlayer = typeof matchupPlayers.$inferInsert;
 
 export type PlayerEligiblePosition = InferModelFromView<
   typeof playerEligiblePositions
+>;
+export type AggregateSeasonBatting = InferModelFromView<
+  typeof aggregateSeasonBatting
+>;
+export type AggregateSeasonFielding = InferModelFromView<
+  typeof aggregateSeasonFielding
+>;
+export type AggregateSeasonFieldingByPos = InferModelFromView<
+  typeof aggregateSeasonFieldingByPos
+>;
+export type AggregateSeasonPitching = InferModelFromView<
+  typeof aggregateSeasonPitching
 >;
 export type PlayerPosition = InferEnumValue<typeof playerPosition>;
 export type PositionSlot = InferEnumValue<typeof positionSlot>;

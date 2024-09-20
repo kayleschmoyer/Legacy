@@ -30,6 +30,7 @@ export interface LineupEditorProps {
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly TeamMemberWithPositionsFragment[];
   projections: Record<number, number>;
+  actual: Record<number, number>;
 }
 
 interface EmptySlotData {
@@ -56,6 +57,7 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
     onPlayerMoved,
     projections,
     onPlayerRemoved,
+    actual,
     team,
   } = props;
 
@@ -254,8 +256,10 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
           t.playerId === item.playerId
       );
 
-      const r = humanizeString('value');
-      console.log(r);
+      const projValue = teamMember
+        ? projections[teamMember.playerId]
+        : undefined;
+      const actualValue = teamMember ? actual[teamMember.playerId] : undefined;
 
       return (
         <ListItem
@@ -267,9 +271,21 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
                 : undefined,
           }}
           accessoryRight={() => (
-            <Text>
-              {teamMember?.player
-                ? projections[teamMember.playerId]?.toFixed(2)
+            <Text
+              status={
+                actualValue === undefined
+                  ? 'basic'
+                  : actualValue === projValue
+                  ? 'info'
+                  : actualValue > (projValue || 0)
+                  ? 'success'
+                  : 'danger'
+              }
+            >
+              {actualValue
+                ? `${actualValue.toFixed(2)} (${projValue?.toFixed(2)})`
+                : projValue
+                ? projValue.toFixed(2)
                 : ''}
             </Text>
           )}
@@ -300,6 +316,7 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
       );
     },
     [
+      actual,
       availableRosterSlots,
       onClick,
       projections,

@@ -1,3 +1,51 @@
+fragment MatchupBattingStats on MatchupBatting {
+  ab
+  bb
+  cs
+  doubles
+  gidp
+  h
+  hbp
+  hr
+  ibb
+  pa
+  r
+  rbi
+  sb
+  sh
+  so
+  triples
+}
+
+fragment MatchupFieldingStats on MatchupFielding {
+  a
+  chances
+  dpDef
+  eDef
+  innDef
+  po
+}
+
+fragment MatchupPitchingStats on MatchupPitching {
+  battersFaced
+  bb
+  cg
+  er
+  gf
+  gs
+  h
+  hbp
+  hr
+  ibb
+  l
+  outsRecorded
+  r
+  sho
+  so
+  sv
+  w
+}
+
 fragment AggregateSeasonBattingStats on AggregateSeasonBatting {
   ab
   bb

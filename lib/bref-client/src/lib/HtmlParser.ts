@@ -1,4 +1,4 @@
-import htmlParser, { CommentNode, HTMLElement, Node } from 'node-html-parser';
+import htmlParser, { HTMLElement, Node, NodeType } from 'node-html-parser';
 
 function checkChildrenForTable(
   node: Node,
@@ -6,8 +6,8 @@ function checkChildrenForTable(
 ): HTMLElement | null {
   let table: HTMLElement | null = null;
 
-  if (node instanceof CommentNode) {
-    const commentBody = htmlParser(node.text);
+  if (node.nodeType === NodeType.COMMENT_NODE) {
+    const commentBody = htmlParser(node.text, { comment: true });
 
     table = commentBody.getElementById(tableId);
 

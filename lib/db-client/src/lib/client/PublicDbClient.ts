@@ -3,6 +3,9 @@ import { conflictUpdateAllExcept } from './utils/ConflictUpdateAllExcept';
 import { TakeUniqueOrNull } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
 import {
+  AggregateSeasonBatting,
+  AggregateSeasonFieldingByPos,
+  AggregateSeasonPitching,
   CareerBatting,
   careerFielding,
   CareerPitching,
@@ -238,6 +241,56 @@ export function getSeasonBattingStatsForPlayer(
     .select()
     .from(Schema.seasonBatting)
     .where(eq(Schema.seasonBatting.playerId, playerId));
+}
+
+export function getSeasonBattingStatsForPlayerSeason(
+  db: PublicDb,
+  playerId: number,
+  season: number
+): Promise<AggregateSeasonBatting | null> {
+  return db
+    .select()
+    .from(Schema.aggregateSeasonBatting)
+    .where(
+      and(
+        eq(Schema.aggregateSeasonBatting.playerId, playerId),
+        eq(Schema.aggregateSeasonBatting.season, season)
+      )
+    )
+    .then(TakeUniqueOrNull);
+}
+
+export function getSeasonPitchingStatsForPlayerSeason(
+  db: PublicDb,
+  playerId: number,
+  season: number
+): Promise<AggregateSeasonPitching | null> {
+  return db
+    .select()
+    .from(Schema.aggregateSeasonPitching)
+    .where(
+      and(
+        eq(Schema.aggregateSeasonPitching.playerId, playerId),
+        eq(Schema.aggregateSeasonPitching.season, season)
+      )
+    )
+    .then(TakeUniqueOrNull);
+}
+
+export function getSeasonFieldingStatsForPlayerSeason(
+  db: PublicDb,
+  playerId: number,
+  season: number
+): Promise<AggregateSeasonFieldingByPos[]> {
+  return db
+    .select()
+    .from(Schema.aggregateSeasonFieldingByPos)
+    .where(
+      and(
+        eq(Schema.aggregateSeasonFieldingByPos.playerId, playerId),
+        eq(Schema.aggregateSeasonFieldingByPos.season, season)
+      )
+    );
 }
 
 export function getMissingMatchupRecords(

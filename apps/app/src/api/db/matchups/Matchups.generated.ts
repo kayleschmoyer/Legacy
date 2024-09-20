@@ -19,6 +19,8 @@ const defaultOptions = {} as const;
  * const { data, loading, error } = useGetMatchupStatsQuery({
  *   variables: {
  *      matchupId: // value for 'matchupId'
+ *      withMatchupStats: // value for 'withMatchupStats'
+ *      withProjections: // value for 'withProjections'
  *   },
  * });
  */

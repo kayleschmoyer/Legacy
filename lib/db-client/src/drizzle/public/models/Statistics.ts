@@ -462,3 +462,174 @@ WHERE ((SELECT count(1) AS count
             season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) >
       0
 GROUP BY player_id`);
+
+export const gameBatting = pgTable(
+  'game_batting',
+  {
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    gameNum: integer('game_number').notNull(),
+    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    pa: integer('pa'),
+    ab: integer('ab'),
+    r: integer('r'),
+    h: integer('h'),
+    doubles: integer('doubles'),
+    triples: integer('triples'),
+    hr: integer('hr'),
+    rbi: integer('rbi'),
+    sb: integer('sb'),
+    cs: integer('cs'),
+    bb: integer('bb'),
+    so: integer('so'),
+    gidp: integer('gidp'),
+    hbp: integer('hbp'),
+    sh: integer('sh'),
+    sf: varchar('sf', { length: 10 }),
+    ibb: integer('ibb'),
+  },
+  (table) => {
+    return {};
+  }
+);
+
+export const gamePitching = pgTable(
+  'game_pitching',
+  {
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    gameNum: integer('game_num').notNull(),
+    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    w: integer('w'),
+    l: integer('l'),
+    gs: integer('gs'),
+    gf: integer('gf'),
+    cg: integer('cg'),
+    sho: integer('sho'),
+    sv: integer('sv'),
+    ip: doublePrecision('ip'),
+    h: integer('h'),
+    r: integer('r'),
+    er: integer('er'),
+    hr: integer('hr'),
+    bb: integer('bb'),
+    ibb: integer('ibb'),
+    so: integer('so'),
+    hbp: integer('hbp'),
+    battersFaced: integer('batters_faced'),
+    outsRecorded: integer('outs_recorded').generatedAlwaysAs(
+      sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`
+    ),
+  },
+  (table) => {
+    return {};
+  }
+);
+
+export const gameFielding = pgTable(
+  'game_fielding',
+  {
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    gameNum: integer('game_num').notNull(),
+    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    innDef: doublePrecision('inn_def'),
+    chances: doublePrecision('chances'),
+    po: integer('po'),
+    a: integer('a'),
+    eDef: integer('e_def'),
+    dpDef: integer('dp_def'),
+  },
+  (table) => {
+    return {};
+  }
+);
+
+export const aggregateSeasonPitching = pgView('aggregate_season_pitching', {
+  playerId: integer('player_id').notNull(),
+  season: integer('season').notNull(),
+  w: bigint('w', { mode: 'number' }),
+  l: bigint('l', { mode: 'number' }),
+  g: bigint('g', { mode: 'number' }),
+  gs: bigint('gs', { mode: 'number' }),
+  gf: bigint('gf', { mode: 'number' }),
+  cg: bigint('cg', { mode: 'number' }),
+  sho: bigint('sho', { mode: 'number' }),
+  sv: bigint('sv', { mode: 'number' }),
+  h: bigint('h', { mode: 'number' }),
+  r: bigint('r', { mode: 'number' }),
+  er: bigint('er', { mode: 'number' }),
+  hr: bigint('hr', { mode: 'number' }),
+  bb: bigint('bb', { mode: 'number' }),
+  ibb: bigint('ibb', { mode: 'number' }),
+  so: bigint('so', { mode: 'number' }),
+  hbp: bigint('hbp', { mode: 'number' }),
+  bk: bigint('bk', { mode: 'number' }),
+  wp: bigint('wp', { mode: 'number' }),
+  battersFaced: bigint('batters_faced', { mode: 'number' }),
+  outsRecorded: bigint('outs_recorded', { mode: 'number' }),
+}).as(sql``);
+
+export const aggregateSeasonFielding = pgView('aggregate_season_fielding', {
+  playerId: integer('player_id').notNull(),
+  season: integer('season').notNull(),
+  g: integer('g'),
+  gs: integer('gs'),
+  cg: integer('cg'),
+  innDef: doublePrecision('inn_def'),
+  chances: doublePrecision('chances'),
+  po: integer('po'),
+  a: integer('a'),
+  eDef: integer('e_def'),
+  dpDef: integer('dp_def'),
+  sb: integer('sb'),
+  cs: integer('cs'),
+  pickoffs: integer('pickoffs'),
+  wp: integer('wp'),
+}).as(sql``);
+
+export const aggregateSeasonFieldingByPos = pgView(
+  'aggregate_season_fielding_by_pos',
+  {
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    pos: char('pos', { length: 2 }).notNull(),
+    g: integer('g'),
+    gs: integer('gs'),
+    cg: integer('cg'),
+    innDef: doublePrecision('inn_def'),
+    chances: doublePrecision('chances'),
+    po: integer('po'),
+    a: integer('a'),
+    eDef: integer('e_def'),
+    dpDef: integer('dp_def'),
+    sb: integer('sb'),
+    cs: integer('cs'),
+    pickoffs: integer('pickoffs'),
+    wp: integer('wp'),
+  }
+).as(sql``);
+
+export const aggregateSeasonBatting = pgView('aggregate_season_batting', {
+  playerId: integer('player_id').notNull(),
+  season: integer('season').notNull(),
+  g: integer('g'),
+  pa: integer('pa'),
+  ab: integer('ab'),
+  r: integer('r'),
+  h: integer('h'),
+  doubles: integer('doubles'),
+  triples: integer('triples'),
+  hr: integer('hr'),
+  rbi: integer('rbi'),
+  sb: integer('sb'),
+  cs: integer('cs'),
+  bb: integer('bb'),
+  so: integer('so'),
+  tb: integer('tb'),
+  gidp: integer('gidp'),
+  hbp: integer('hbp'),
+  sh: integer('sh'),
+  sf: varchar('sf', { length: 10 }),
+  ibb: integer('ibb'),
+}).as(sql``);

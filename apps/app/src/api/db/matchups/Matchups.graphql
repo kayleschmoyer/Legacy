@@ -5,18 +5,33 @@ fragment Matchup on Matchup {
   numberOfGames
 }
 
-query GetMatchupStats($matchupId: Int!) {
+query GetMatchupStats(
+  $matchupId: Int!
+  $withMatchupStats: Boolean = false
+  $withProjections: Boolean = false
+) {
   matchupPlayers(condition: { matchupId: $matchupId }) {
     nodes {
       playerId
-      aggregateSeasonPitchingByPlayerIdAndSeason {
+      aggregateSeasonPitchingByPlayerIdAndSeason
+        @include(if: $withProjections) {
         ...AggregateSeasonPitchingStats
       }
-      aggregateSeasonFieldingByPlayerIdAndSeason {
+      aggregateSeasonFieldingByPlayerIdAndSeason
+        @include(if: $withProjections) {
         ...AggregateSeasonFieldingStats
       }
-      aggregateSeasonBattingByPlayerIdAndSeason {
+      aggregateSeasonBattingByPlayerIdAndSeason @include(if: $withProjections) {
         ...AggregateSeasonBattingStats
+      }
+      matchupBatting @include(if: $withMatchupStats) {
+        ...MatchupBattingStats
+      }
+      matchupFielding @include(if: $withMatchupStats) {
+        ...MatchupFieldingStats
+      }
+      matchupPitching @include(if: $withMatchupStats) {
+        ...MatchupPitchingStats
       }
     }
   }

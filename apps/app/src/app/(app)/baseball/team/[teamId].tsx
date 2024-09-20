@@ -4,6 +4,7 @@ import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
   computeAverageScoring,
+  computeScoring,
   DEFAULT_BATTING_SCORING,
   DEFAULT_FIELDING_SCORING,
   DEFAULT_PITCHING_SCORING,
@@ -28,6 +29,7 @@ import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import {
   LeaguePositionFragment,
   MatchupFragment,
+  PositionSlot,
   TeamMemberFragment,
   TeamMemberWithPositionsFragment,
 } from '../../../../api/db/graphql.generated';
@@ -66,6 +68,8 @@ function TabContent(props: TabContentProps): JSX.Element | null {
     skip: !matchup?.id,
     variables: {
       matchupId: matchup?.id || -1,
+      withMatchupStats: true,
+      withProjections: true,
     },
   });
 
@@ -132,6 +136,50 @@ function TabContent(props: TabContentProps): JSX.Element | null {
     return result;
   }, [stats, pitchers, loadingStats]);
 
+  const hittersActual = useMemo(() => {
+    const result: Record<number, number> = {};
+
+    if (loadingStats) {
+      return result;
+    }
+
+    for (const hitter of hitters) {
+      const mp = stats?.matchupPlayers?.nodes.find(
+        (n) => n?.playerId === hitter.playerId
+      );
+
+      let sum = computeScoring(mp?.matchupBatting, DEFAULT_BATTING_SCORING);
+
+      const position = lineupSlots.find((l) => l.id === hitter.positionId);
+      if (position?.positionType !== PositionSlot.Dh) {
+        sum += computeScoring(mp?.matchupFielding, DEFAULT_FIELDING_SCORING);
+      }
+
+      result[hitter.playerId] = sum;
+    }
+    return result;
+  }, [stats, hitters, loadingStats, lineupSlots]);
+
+  const pitchersActual = useMemo(() => {
+    const result: Record<number, number> = {};
+
+    if (loadingStats) {
+      return result;
+    }
+
+    for (const pitcher of pitchers) {
+      const mp = stats?.matchupPlayers?.nodes.find(
+        (n) => n?.playerId === pitcher.playerId
+      );
+
+      result[pitcher.playerId] = computeScoring(
+        mp?.matchupPitching,
+        DEFAULT_PITCHING_SCORING
+      );
+    }
+    return result;
+  }, [stats, pitchers, loadingStats]);
+
   switch (selectedTab) {
     case 'Lineup':
       return (
@@ -142,6 +190,7 @@ function TabContent(props: TabContentProps): JSX.Element | null {
           onPlayerRemoved={onPlayerRemoved}
           projections={hitterProjections}
           team={hitters}
+          actual={hittersActual}
         />
       );
     case 'Rotation':
@@ -153,6 +202,7 @@ function TabContent(props: TabContentProps): JSX.Element | null {
           onPlayerRemoved={onPlayerRemoved}
           projections={pitcherProjections}
           team={pitchers}
+          actual={pitchersActual}
         />
       );
     default:

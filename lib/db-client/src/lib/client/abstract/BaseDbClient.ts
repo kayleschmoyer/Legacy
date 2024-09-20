@@ -1,6 +1,7 @@
 import { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
 import { PgDatabase } from 'drizzle-orm/pg-core';
 import { PgliteQueryResultHKT } from 'drizzle-orm/pglite';
+import { DbClient } from './DbClient';
 
 export type GenericDatabase<TSchema extends Record<string, unknown>> =
   PgDatabase<PgliteQueryResultHKT | NodePgQueryResultHKT, TSchema>;
@@ -12,7 +13,8 @@ export interface InitProperties<TSchema extends Record<string, unknown>> {
 export abstract class BaseDbConnection<
   TSchema extends Record<string, unknown>,
   TInitProperties extends InitProperties<TSchema> = InitProperties<TSchema>
-> {
+> implements DbClient<TSchema>
+{
   private _initProperties: TInitProperties | undefined;
 
   get initProperties(): TInitProperties {

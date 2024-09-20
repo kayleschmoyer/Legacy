@@ -1,13 +1,24 @@
 import htmlParser, { HTMLElement } from 'node-html-parser';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  GameBatting,
+  GameFielding,
+  GamePitching,
   Player,
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
 } from '@legacy-sports/db-client';
-import { getCareerStats as getCareerStatsFromBref } from './BRefSession';
+import {
+  getCareerStats as getCareerStatsFromBref,
+  getGameStats,
+} from './BRefSession';
 import { getTable, getTableBody, RowParser } from './HtmlParser';
+
+const GAME_IDENTIFIER_GROUP = 'gameIdentifier';
+const GAME_IDENTIFIER_REGEX = new RegExp(
+  `^\\/boxes\\/\\w{3}\\/(?<${GAME_IDENTIFIER_GROUP}>\\w{12}).shtml$`
+);
 
 const StatMapping: Record<
   string,
@@ -87,67 +98,40 @@ const NUMERIC_STATS = Object.freeze(
   new Set<keyof SeasonBatting | keyof SeasonFielding | keyof SeasonPitching>([
     'a',
     'ab',
-    'basesOnBallsPerNine',
     'battersFaced',
-    'battingAvg',
     'bb',
     'bk',
-    'caughtStealingPerc',
-    'caughtStealingPercLg',
-    'caughtStealingPercLg',
     'cg',
     'chances',
     'cs',
     'doubles',
     'dpDef',
-    'earnedRunAvg',
-    'earnedRunAvgPlus',
     'eDef',
     'er',
-    'fieldingPerc',
-    'fieldingPercLg',
-    'fip',
     'g',
     'gf',
     'gidp',
-    'gOfParts',
     'gs',
     'h',
     'hbp',
-    'hitsPerNine',
-    'homeRunsPerNine',
     'hr',
     'ibb',
     'innDef',
     'ip',
     'l',
-    'onbasePerc',
-    'onbasePlusSlugging',
-    'onbasePlusSluggingPlus',
     'pa',
     'pickoffs',
     'po',
     'r',
-    'rangeFactorPerGame',
-    'rangeFactorPerGameLg',
-    'rangeFactorPerGameLg',
-    'rangeFactorPerNine',
-    'rangeFactorPerNineLg',
-    'rangeFactorPerNineLg',
     'rbi',
     'sb',
     'sh',
     'sho',
-    'sluggingPerc',
     'so',
-    'strikeoutsPerBaseOnBalls',
-    'strikeoutsPerNine',
     'sv',
     'tb',
     'triples',
     'w',
-    'whip',
-    'winLossPerc',
     'wp',
   ])
 );
@@ -184,7 +168,7 @@ function parseRow<T extends object>(
     const statField = StatMapping[stat.toUpperCase()];
 
     if (!statField) {
-      LOGGER.debug(`Skipping field ${stat}`);
+      LOGGER.trace(`Skipping field ${stat}`);
       continue;
     }
 
@@ -291,4 +275,232 @@ export async function getCareerStats(player: Player): Promise<CareerStats> {
     fielding: getFieldingStats(root, player.id),
     pitching: getPitchingStats(root, player.id),
   };
+}
+
+export async function getGameBattingStats(
+  player: Player,
+  season: number,
+  gameNumber: number
+): Promise<GameBatting | null> {
+  const data = await getGameStats(player.brefId, 'b', season);
+  const root = htmlParser(data);
+
+  const table = getTable(root, 'batting_gamelogs');
+
+  if (table === null) {
+    throw new Error('Could not find Game Batting Stats table');
+  }
+
+  const gameRow = table.getElementsByTagName('tr').find((row) => {
+    const rankerCell = row
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    return rankerCell?.text === gameNumber.toString();
+  });
+
+  if (!gameRow) {
+    throw new Error('Could not find game record');
+  }
+
+  const result = parseRow<GameBatting>(gameRow, player.id);
+
+  if (result === null) {
+    return null;
+  }
+
+  const identifierCell = gameRow
+    .getElementsByTagName('td')
+    .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+
+  const link = identifierCell
+    ?.getElementsByTagName('a')[0]
+    ?.getAttribute('href');
+
+  const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+  result.gameIdentifier = match?.groups
+    ? match.groups[GAME_IDENTIFIER_GROUP]
+    : '';
+  result.season = season;
+  result.gameNum = gameNumber;
+
+  return result;
+}
+
+export async function getGamePitchingStats(
+  player: Player,
+  season: number,
+  gameNumber: number
+): Promise<GamePitching | null> {
+  const data = await getGameStats(player.brefId, 'p', season);
+  const root = htmlParser(data);
+
+  const table = getTable(root, 'pitching_gamelogs');
+
+  if (table === null) {
+    throw new Error('Could not find Game Pitching Stats table');
+  }
+
+  const gameRow = table.getElementsByTagName('tr').find((row) => {
+    const rankerCell = row
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    return rankerCell?.text === gameNumber.toString();
+  });
+
+  if (!gameRow) {
+    throw new Error('Could not find game record');
+  }
+
+  const result = parseRow<GamePitching>(gameRow, player.id);
+
+  if (result === null) {
+    return null;
+  }
+
+  const cells = gameRow.getElementsByTagName('td');
+
+  const identifierCell = cells.find(
+    (cell) => cell.getAttribute('data-stat') === 'date_game'
+  );
+
+  const link = identifierCell
+    ?.getElementsByTagName('a')[0]
+    ?.getAttribute('href');
+
+  const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+  result.gameIdentifier = match?.groups
+    ? match.groups[GAME_IDENTIFIER_GROUP]
+    : '';
+  result.season = season;
+  result.gameNum = gameNumber;
+
+  // Pitching specific stat parsing
+  const decision =
+    cells.find(
+      (cell) => cell.getAttribute('data-stat') === 'player_game_result'
+    )?.text || '';
+
+  if (decision.includes('BW') || decision.startsWith('W')) {
+    result.w = 1;
+  }
+
+  if (decision.includes('BL') || decision.startsWith('L')) {
+    result.l = 1;
+  }
+
+  if (decision.startsWith('S')) {
+    result.sv = 1;
+  }
+
+  const gameSpan =
+    cells.find((cell) => cell.getAttribute('data-stat') === 'player_game_span')
+      ?.text || '';
+
+  if (gameSpan.includes('GS')) {
+    result.gs = 1;
+  } else if (gameSpan.includes('GF')) {
+    result.gf = 1;
+  } else if (gameSpan.includes('CG')) {
+    result.gs = 1;
+    result.gf = 1;
+    result.cg = 1;
+  } else if (gameSpan.includes('SHO')) {
+    result.gs = 1;
+    result.gf = 1;
+    result.cg = 1;
+    result.sho = 1;
+  }
+
+  return result;
+}
+
+export async function getGameFieldingStats(
+  player: Player,
+  season: number,
+  gameNumber: number,
+  pos: string
+): Promise<GameFielding | null> {
+  const data = await getGameStats(player.brefId, 'f', season);
+
+  const root = htmlParser(data, { comment: true });
+
+  let tableId: string;
+
+  switch (pos.trim()) {
+    case 'P':
+      tableId = '_1';
+      break;
+    case 'C':
+      tableId = '_2';
+      break;
+    case '1B':
+      tableId = '_3';
+      break;
+    case '2B':
+      tableId = '_4';
+      break;
+    case '3B':
+      tableId = '_5';
+      break;
+    case 'SS':
+      tableId = '_6';
+      break;
+    case 'LF':
+      tableId = '_7';
+      break;
+    case 'CF':
+      tableId = '_8';
+      break;
+    case 'RF':
+      tableId = '_9';
+      break;
+    default:
+      throw new Error(`Invalid position: ${pos}`);
+  }
+
+  const table = getTable(root, tableId);
+
+  if (table === null) {
+    throw new Error('Could not find Game Fielding Stats table');
+  }
+
+  const gameRow = table.getElementsByTagName('tr').find((row) => {
+    const rankerCell = row
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    return rankerCell?.text === gameNumber.toString();
+  });
+
+  if (!gameRow) {
+    throw new Error('Could not find game record');
+  }
+
+  const result = parseRow<GameFielding>(gameRow, player.id);
+
+  if (result === null) {
+    return null;
+  }
+
+  const identifierCell = gameRow
+    .getElementsByTagName('td')
+    .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+
+  const link = identifierCell
+    ?.getElementsByTagName('a')[0]
+    ?.getAttribute('href');
+
+  const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+  result.gameIdentifier = match?.groups
+    ? match.groups[GAME_IDENTIFIER_GROUP]
+    : '';
+  result.season = season;
+  result.gameNum = gameNumber;
+
+  return result;
 }
