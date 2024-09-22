@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import {
   Dimensions,
-  FlatList,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  FlatList,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { gql, useQuery } from '@apollo/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
+// Get device dimensions
 const { width } = Dimensions.get('window');
 
+// Define GraphQL queries for player stats
 const GET_CAREER_BATTING_STATS = gql`
   query GetCareerBattingStats {
     players {
@@ -73,44 +75,32 @@ export type Player = {
   whip?: string;
 };
 
-type Lineup = {
-  [position: string]: Player | null;
-};
-
-const defaultLineup: Lineup = {
-  '1B': null,
-  '2B': null,
-  '3B': null,
-  C: null,
-  CF: null,
-  DH: null,
-  OF1: null,
-  OF2: null,
-  OF3: null,
-  SS: null,
-  P: null,
-};
-
-const DraftBoard = () => {
+const DraftBoardPage = () => {
   const { data: battingStats, loading: loadingBatting, error: errorBatting } = useQuery(GET_CAREER_BATTING_STATS);
   const { data: pitchingStats, loading: loadingPitching, error: errorPitching } = useQuery(GET_CAREER_PITCHING_STATS);
-
-  if (loadingBatting || loadingPitching) return <Text>Loading...</Text>;
-  if (errorBatting || errorPitching) return <Text>Error loading data</Text>;
-
-  const playersList: Player[] = [
-    ...(battingStats?.players || []),
-    ...(pitchingStats?.players || [])
-  ];
 
   const [selectedTeam, setSelectedTeam] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
 
-  const filteredPlayers = playersList.filter(player => {
+  const playersList = [...(battingStats?.players || []), ...(pitchingStats?.players || [])];
+
+  const filteredPlayers = playersList.filter((player) => {
     const matchesTeam = selectedTeam ? player.team === selectedTeam : true;
     const matchesSearch = player.name.toLowerCase().includes(searchText.toLowerCase());
     return matchesTeam && matchesSearch;
   });
+
+  const storeDraftHistory = async (draftPick: Player) => {
+    // Store draft pick in AsyncStorage
+    try {
+      const draftHistoryString = await AsyncStorage.getItem('draftHistory');
+      let draftHistory = draftHistoryString ? JSON.parse(draftHistoryString) : [];
+      draftHistory.push(draftPick);
+      await AsyncStorage.setItem('draftHistory', JSON.stringify(draftHistory));
+    } catch (error) {
+      console.error('Failed to save draft history', error);
+    }
+  };
 
   return (
     <ScrollView>
@@ -122,7 +112,7 @@ const DraftBoard = () => {
           onChangeText={setSearchText}
         />
         <Picker
-          selectedValue={selectedTeam}
+          selectedValue={selectedTeam ?? undefined}
           style={styles.teamSelector}
           onValueChange={(itemValue: string) => setSelectedTeam(itemValue)}
         >
@@ -132,34 +122,44 @@ const DraftBoard = () => {
         </Picker>
       </View>
 
-      <FlatList
-        data={filteredPlayers}
-        renderItem={({ item }) => (
-          <View style={styles.playerRow}>
-            <Text>{item.rank}. {item.name} ({item.position})</Text>
-            <Text>Team: {item.team}</Text>
-            {item.avg && (
-              <>
-                <Text>Avg: {item.avg}</Text>
-                <Text>HR: {item.homeRuns}</Text>
-                <Text>RBI: {item.rbi}</Text>
-              </>
-            )}
-            {item.era && (
-              <>
-                <Text>Wins: {item.wins}</Text>
-                <Text>Losses: {item.losses}</Text>
-                <Text>ERA: {item.era}</Text>
-                <Text>Strikeouts: {item.strikeouts}</Text>
-              </>
-            )}
-          </View>
-        )}
-        keyExtractor={(item) => item.id.toString()}
-      />
+      <View style={styles.tableContainer}>
+        {/* Table Headers */}
+        <View style={styles.tableRow}>
+          <Text style={styles.tableHeader}>Rank</Text>
+          <Text style={styles.tableHeader}>Name</Text>
+          <Text style={styles.tableHeader}>Position</Text>
+          <Text style={styles.tableHeader}>Team</Text>
+          <Text style={styles.tableHeader}>Stat</Text>
+        </View>
 
-      <TouchableOpacity style={styles.startDraftButton}>
-        <Text style={styles.startDraftText}>Start Draft</Text>
+        {/* Player List */}
+        <FlatList
+          data={filteredPlayers}
+          ListEmptyComponent={<Text style={styles.noData}>No Data Available</Text>} // Show "No Data" if empty
+          renderItem={({ item }) => (
+            <View style={styles.tableRow}>
+              <Text style={styles.tableData}>{item.rank}</Text>
+              <Text style={styles.tableData}>{item.name}</Text>
+              <Text style={styles.tableData}>{item.position}</Text>
+              <Text style={styles.tableData}>{item.team}</Text>
+              {item.avg ? (
+                <Text style={styles.tableData}>{item.avg}</Text>
+              ) : item.era ? (
+                <Text style={styles.tableData}>{item.era}</Text>
+              ) : (
+                <Text style={styles.tableData}>N/A</Text>
+              )}
+            </View>
+          )}
+          keyExtractor={(item) => item.id.toString()}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={styles.saveDraftButton}
+        onPress={() => storeDraftHistory(filteredPlayers[0])} // Save the first player for now
+      >
+        <Text style={styles.saveDraftText}>Save Draft</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -184,21 +184,37 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
   },
-  playerRow: {
+  tableContainer: {
+    marginTop: 20,
+    marginHorizontal: 10,
+  },
+  tableRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 10,
-    marginBottom: 10,
     backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
-  startDraftButton: {
-    backgroundColor: '#007bff',
+  tableHeader: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  tableData: {
+    fontSize: 14,
+  },
+  noData: {
+    textAlign: 'center',
+    marginVertical: 20,
+    color: 'red',
+  },
+  saveDraftButton: {
+    backgroundColor: '#28a745',
     borderRadius: 10,
     marginBottom: 16,
     padding: 16,
   },
-  startDraftText: {
+  saveDraftText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -206,4 +222,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DraftBoard;
+export default DraftBoardPage;

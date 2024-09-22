@@ -72,7 +72,7 @@
     "@expo/metro-config": "~0.18.1",
     "@expo/metro-runtime": "~3.2.1",
     "@graphile-contrib/pg-simplify-inflector": "^6.1.0",
-    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-google-signin/google-signin": "^12.2.1",
     "@react-native-picker/picker": "^2.8.1",
     "@react-navigation/drawer": "^6.7.2",
