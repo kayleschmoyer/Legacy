@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dimensions,
   ScrollView,
@@ -8,15 +8,15 @@ import {
   TouchableOpacity,
   View,
   FlatList,
+  Animated,
+  Easing,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { gql, useQuery } from '@apollo/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Get device dimensions
 const { width } = Dimensions.get('window');
 
-// Define GraphQL queries for player stats
+// GraphQL queries for player stats
 const GET_CAREER_BATTING_STATS = gql`
   query GetCareerBattingStats {
     players {
@@ -54,6 +54,7 @@ const GET_CAREER_PITCHING_STATS = gql`
   }
 `;
 
+// Player type definition
 export type Player = {
   id: number;
   rank: number;
@@ -75,14 +76,65 @@ export type Player = {
   whip?: string;
 };
 
+// Define the valid positions for a baseball team as a type
+type Lineup = {
+  C: Player | null;
+  '1B': Player | null;
+  '2B': Player | null;
+  '3B': Player | null;
+  SS: Player | null;
+  LF: Player | null;
+  CF: Player | null;
+  RF: Player | null;
+  P: Player | null;
+};
+
+// Sample team structure with some bench players
+const defaultTeam = {
+  lineup: {
+    C: null,
+    '1B': null,
+    '2B': null,
+    '3B': null,
+    SS: null,
+    LF: null,
+    CF: null,
+    RF: null,
+    P: null,
+  },
+  bench: [null, null, null], // Bench with 3 empty slots
+};
+
 const DraftBoardPage = () => {
   const { data: battingStats, loading: loadingBatting, error: errorBatting } = useQuery(GET_CAREER_BATTING_STATS);
   const { data: pitchingStats, loading: loadingPitching, error: errorPitching } = useQuery(GET_CAREER_PITCHING_STATS);
 
   const [selectedTeam, setSelectedTeam] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
+  const [view, setView] = useState<'players' | 'team'>('players'); // Switch between views
+  const [currentTeam, setCurrentTeam] = useState<{ lineup: Lineup; bench: (Player | null)[] }>(defaultTeam);
+  const [draftStarted, setDraftStarted] = useState(false);
+  const [timer, setTimer] = useState(30); // 30-second timer
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0); // Track the current player to auto-pick on timer expiry
+  const animatedValue = useState(new Animated.Value(0))[0]; // For the timer animation
+
+  // For draft history scrolling
+  const [draftPicks, setDraftPicks] = useState<Player[]>([]); // To store the list of draft picks
+  const scrollX = useState(new Animated.Value(0))[0]; // Scroll animation value
 
   const playersList = [...(battingStats?.players || []), ...(pitchingStats?.players || [])];
+
+  // Auto-scroll effect for draft history
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(scrollX, {
+        toValue: width * 2, // Arbitrary large value to simulate continuous scrolling
+        duration: 35000, // Time taken for a full scroll (adjusted for readability)
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [scrollX]);
 
   const filteredPlayers = playersList.filter((player) => {
     const matchesTeam = selectedTeam ? player.team === selectedTeam : true;
@@ -90,99 +142,290 @@ const DraftBoardPage = () => {
     return matchesTeam && matchesSearch;
   });
 
-  const storeDraftHistory = async (draftPick: Player) => {
-    // Store draft pick in AsyncStorage
-    try {
-      const draftHistoryString = await AsyncStorage.getItem('draftHistory');
-      let draftHistory = draftHistoryString ? JSON.parse(draftHistoryString) : [];
-      draftHistory.push(draftPick);
-      await AsyncStorage.setItem('draftHistory', JSON.stringify(draftHistory));
-    } catch (error) {
-      console.error('Failed to save draft history', error);
+  // Timer Logic with Animation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (draftStarted && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prevTimer) => prevTimer - 1);
+        if (timer <= 10) {
+          // Animate the timer color and flashing when time is below 10 seconds
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(animatedValue, {
+                toValue: 1,
+                duration: 500,
+                easing: Easing.ease,
+                useNativeDriver: false,
+              }),
+              Animated.timing(animatedValue, {
+                toValue: 0,
+                duration: 500,
+                easing: Easing.ease,
+                useNativeDriver: false,
+              }),
+            ]),
+            { iterations: 3 } // Flash 3 times
+          ).start();
+        }
+      }, 1000);
+    } else if (timer === 0) {
+      handleAutoPick(); // Auto-pick when timer hits 0
     }
+    return () => clearInterval(interval);
+  }, [timer, draftStarted]);
+
+  const handleStartDraft = () => {
+    setDraftStarted(true);
+    setTimer(30); // Reset timer
+    animatedValue.setValue(0); // Reset animation
+  };
+
+  const handleAutoPick = () => {
+    const player = filteredPlayers[currentPlayerIndex % filteredPlayers.length];
+    handleSelectPlayer(player);
+    setCurrentPlayerIndex((prevIndex) => prevIndex + 1); // Move to the next player
+    setTimer(30); // Reset timer for the next user
+  };
+
+  const handleSelectPlayer = (player: Player) => {
+    // Logic to add player to the user's team
+    alert(`Selected Player: ${player.name}`);
+    // Find an empty position and fill it with the selected player
+    const newLineup = { ...currentTeam.lineup };
+    for (const position in newLineup) {
+      if (newLineup[position as keyof Lineup] === null) {
+        newLineup[position as keyof Lineup] = player;
+        break;
+      }
+    }
+    setCurrentTeam({ ...currentTeam, lineup: newLineup });
+    setTimer(30); // Reset timer for the next user
+
+    // Add player to the draft history
+    setDraftPicks((prevPicks) => [...prevPicks, player]);
+  };
+
+  const handleViewChange = (newView: 'players' | 'team') => {
+    setView(newView);
   };
 
   return (
-    <ScrollView>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Player"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        <Picker
-          selectedValue={selectedTeam ?? undefined}
-          style={styles.teamSelector}
-          onValueChange={(itemValue: string) => setSelectedTeam(itemValue)}
-        >
-          <Picker.Item label="All Teams" value={undefined} />
-          <Picker.Item label="Yankees" value="NYY" />
-          <Picker.Item label="Tigers" value="DET" />
-        </Picker>
-      </View>
-
-      <View style={styles.tableContainer}>
-        {/* Table Headers */}
-        <View style={styles.tableRow}>
-          <Text style={styles.tableHeader}>Rank</Text>
-          <Text style={styles.tableHeader}>Name</Text>
-          <Text style={styles.tableHeader}>Position</Text>
-          <Text style={styles.tableHeader}>Team</Text>
-          <Text style={styles.tableHeader}>Stat</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 50 }}>
+        <View style={styles.header}>
+          {/* Tab Navigation */}
+          <TouchableOpacity
+            style={[styles.tab, view === 'players' && styles.activeTab]}
+            onPress={() => handleViewChange('players')}
+          >
+            <Text style={styles.tabText}>Available Players</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, view === 'team' && styles.activeTab]}
+            onPress={() => handleViewChange('team')}
+          >
+            <Text style={styles.tabText}>My Team</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Player List */}
-        <FlatList
-          data={filteredPlayers}
-          ListEmptyComponent={<Text style={styles.noData}>No Data Available</Text>} // Show "No Data" if empty
-          renderItem={({ item }) => (
-            <View style={styles.tableRow}>
-              <Text style={styles.tableData}>{item.rank}</Text>
-              <Text style={styles.tableData}>{item.name}</Text>
-              <Text style={styles.tableData}>{item.position}</Text>
-              <Text style={styles.tableData}>{item.team}</Text>
-              {item.avg ? (
-                <Text style={styles.tableData}>{item.avg}</Text>
-              ) : item.era ? (
-                <Text style={styles.tableData}>{item.era}</Text>
-              ) : (
-                <Text style={styles.tableData}>N/A</Text>
-              )}
+        {/* Search and Start Draft only when "Players" view is active */}
+        {view === 'players' && (
+          <>
+            {/* Modern Search Input */}
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search players by name, team, or position..."
+                value={searchText}
+                onChangeText={(text) => setSearchText(text)}
+              />
             </View>
-          )}
-          keyExtractor={(item) => item.id.toString()}
-        />
-      </View>
 
-      <TouchableOpacity
-        style={styles.saveDraftButton}
-        onPress={() => storeDraftHistory(filteredPlayers[0])} // Save the first player for now
-      >
-        <Text style={styles.saveDraftText}>Save Draft</Text>
-      </TouchableOpacity>
-    </ScrollView>
+            {!draftStarted && (
+              <TouchableOpacity style={styles.startDraftButton} onPress={handleStartDraft}>
+                <Text style={styles.startDraftText}>Start Draft</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        {draftStarted && (
+          <Animated.Text style={[styles.timer, { color: animatedValue.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['#007bff', '#ff0000'], // Changes from blue to red as time decreases
+          }) }]}>
+            Time Left: {timer} seconds
+          </Animated.Text> // Timer display with animation
+        )}
+
+        {view === 'players' ? (
+          <View style={styles.tableContainer}>
+            {/* Player Table */}
+            <View style={styles.tableRow}>
+              <Text style={styles.tableHeader}>Rank</Text>
+              <Text style={styles.tableHeader}>Player Info</Text> {/* Compact Name, Team, Position */}
+              <Text style={styles.tableHeader}>AVG</Text>
+              <Text style={styles.tableHeader}>HR</Text>
+              <Text style={styles.tableHeader}>RBI</Text>
+              <Text style={styles.tableHeader}>Runs</Text>
+              <Text style={styles.tableHeader}>SB</Text>
+              <Text style={styles.tableHeader}>OBP</Text>
+              <Text style={styles.tableHeader}>SLG</Text>
+              <Text style={styles.tableHeader}>OPS</Text>
+              <Text style={styles.tableHeader}>Wins</Text>
+              <Text style={styles.tableHeader}>Losses</Text>
+              <Text style={styles.tableHeader}>ERA</Text>
+              <Text style={styles.tableHeader}>SO</Text>
+              <Text style={styles.tableHeader}>WHIP</Text>
+            </View>
+
+            <FlatList
+              data={filteredPlayers}
+              ListEmptyComponent={<Text style={styles.noData}>No Data Available</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => handleSelectPlayer(item)}>
+                  <View style={styles.tableRow}>
+                    <Text style={styles.tableData}>{item.rank}</Text>
+                    <View style={styles.playerInfoContainer}>
+                      <Text style={styles.playerName}>{item.name}</Text>
+                      <Text style={styles.playerTeam}>{item.team}</Text>
+                      <Text style={styles.playerPosition}>{item.position}</Text>
+                    </View>
+                    {/* Batting stats if available */}
+                    <Text style={styles.tableData}>{item.avg || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.homeRuns || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.rbi || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.runs || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.stolenBases || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.obp || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.slg || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.ops || 'N/A'}</Text>
+                    {/* Pitching stats if available */}
+                    <Text style={styles.tableData}>{item.wins || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.losses || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.era || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.strikeouts || 'N/A'}</Text>
+                    <Text style={styles.tableData}>{item.whip || 'N/A'}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+            />
+          </View>
+        ) : (
+          <View style={styles.teamContainer}>
+            {/* Current Team View */}
+            <Text style={styles.teamTitle}>Current Team Lineup</Text>
+            {Object.keys(currentTeam.lineup).map((position) => (
+              <View
+                key={position}
+                style={[
+                  styles.teamRow,
+                  currentTeam.lineup[position as keyof Lineup] && styles.filledPosition, // Green background if filled
+                ]}
+              >
+                <Text style={styles.teamPosition}>{position}</Text>
+                <Text style={styles.teamPlayer}>
+                  {currentTeam.lineup[position as keyof Lineup]?.name || 'Empty'}
+                </Text>
+              </View>
+            ))}
+            <Text style={styles.benchTitle}>Bench</Text>
+            {currentTeam.bench.map((player, index) => (
+              <View key={index} style={styles.teamRow}>
+                <Text style={styles.teamPlayer}>{player?.name || 'Empty'}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Draft History - Auto-scrolling */}
+      <View style={styles.draftHistoryContainer}>
+  {/* Static "Draft History" Label */}
+  <Text style={styles.draftHistoryLabel}>Draft History:</Text>
+
+  {/* Scrolling picks or message */}
+  <Animated.View
+    style={[
+      styles.draftHistoryScroller,
+      { transform: [{ translateX: scrollX.interpolate({ inputRange: [0, width * 2], outputRange: [0, -width * 2] }) }] },
+    ]}
+  >
+    {draftPicks.length > 0 ? (
+      <View style={styles.scrollWrapper}>
+        {draftPicks.map((pick, index) => (
+          <Text key={index} style={styles.draftHistoryText}>
+            {`Pick ${index + 1}: ${pick.name} - ${pick.team} - ${pick.position}   `}
+          </Text>
+        ))}
+      </View>
+    ) : (
+      <View style={styles.scrollWrapper}>
+        <Text style={styles.draftHistoryText}>
+          {draftStarted ? "No picks yet." : "Draft has not started."}
+        </Text>
+      </View>
+    )}
+  </Animated.View>
+        </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  searchContainer: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+  },
+  tab: {
     padding: 10,
+    backgroundColor: '#808080', // Default tab color
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  activeTab: {
+    backgroundColor: '#28a745', // Active tab color
+  },
+  tabText: {
+    color: '#ffffff', // Set to white for contrast
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  timer: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  startDraftButton: {
+    backgroundColor: '#28a745',
+    borderRadius: 10,
+    padding: 10, // Smaller padding to make the button less prominent
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  startDraftText: {
+    color: '#fff',
+    fontSize: 14, // Smaller font size for subtlety
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  searchContainer: {
+    marginHorizontal: 10,
+    marginBottom: 20,
   },
   searchInput: {
-    backgroundColor: '#fff',
-    borderColor: '#ccc',
-    borderRadius: 25,
-    borderWidth: 1,
-    fontSize: 16,
-    height: 50,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-  },
-  teamSelector: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
     padding: 10,
+    fontSize: 16,
+    elevation: 2, // Shadow for modern feel
+    borderColor: '#ccc',
+    borderWidth: 1,
   },
   tableContainer: {
     marginTop: 20,
@@ -203,23 +446,91 @@ const styles = StyleSheet.create({
   tableData: {
     fontSize: 14,
   },
+  playerInfoContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    paddingLeft: 10,
+  },
+  playerName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  playerTeam: {
+    fontSize: 12,
+    color: '#6c757d',
+  },
+  playerPosition: {
+    fontSize: 12,
+    color: '#6c757d',
+  },
   noData: {
     textAlign: 'center',
     marginVertical: 20,
     color: 'red',
   },
-  saveDraftButton: {
-    backgroundColor: '#28a745',
-    borderRadius: 10,
-    marginBottom: 16,
-    padding: 16,
+  teamContainer: {
+    margin: 10,
+    backgroundColor: '#f2f2f2', // New background color for My Team tab
   },
-  saveDraftText: {
-    color: '#fff',
-    fontSize: 16,
+  teamTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 10,
     textAlign: 'center',
   },
+  teamRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  teamPosition: {
+    fontWeight: 'bold',
+  },
+  teamPlayer: {
+    fontSize: 14,
+  },
+  benchTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  filledPosition: {
+    backgroundColor: '#28a745', // Green background for filled positions
+    color: '#ffffff', // Ensure the text color is white
+  },
+  draftHistoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    paddingVertical: 10,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  draftHistoryLabel: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 10, // Add space between label and scroll
+  },
+  draftHistoryScroller: {
+    flex: 1, // Takes up remaining space
+  },
+  scrollWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  draftHistoryText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
 });
 
 export default DraftBoardPage;
