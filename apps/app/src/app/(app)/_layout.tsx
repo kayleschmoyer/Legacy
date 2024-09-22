@@ -18,6 +18,7 @@ import ViewGameLogs from './view_game_logs';
 import ViewCareerStats from './view_career_stats';
 import FootballHome from './football';
 import BaseballHome from './baseball';
+import DraftBoardPage from './DraftBoardPage';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
 import {
@@ -53,6 +54,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'football',
     title: 'Football',
+  },
+  {
+    route: 'DraftBoardPage',
+    title: 'Draft Board',
   },
 ]);
 
@@ -92,20 +97,14 @@ export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
   const theme = useTheme();
 
-  // You can keep the splash screen open, or render a loading screen like we do here.
   if (loading) {
     return <LoadingPanel />;
   }
 
-  // Only require authentication within the (app) group's layout as users
-  // need to be able to access the (auth) group and sign in again.
   if (!currentUser) {
-    // On web, static rendering will stop here as the user is not authenticated
-    // in the headless Node process that the pages are rendered in.
     return <Redirect href="/login" />;
   }
 
-  // This layout can be deferred because it's not the root layout.
   return (
     <AuthorizedUserContextProvider>
       <GestureHandlerRootView data-testid="gesture-handler" style={{ flex: 1 }}>
@@ -128,7 +127,6 @@ export default function Layout() {
             }}
             component={Home}
           />
-
           <Screen name="view_game_logs" component={ViewGameLogs} />
           <Screen name="view_career_stats" component={ViewCareerStats} />
           <Screen
@@ -150,6 +148,11 @@ export default function Layout() {
             name="baseball/league/[leagueId]"
             options={{ headerTitle: LeagueIdHeader }}
             component={LeagueId}
+          />
+          <Screen
+            name="DraftBoardPage"
+            options={{ title: 'Draft Board' }}
+            component={DraftBoardPage}
           />
         </Navigator>
       </GestureHandlerRootView>
