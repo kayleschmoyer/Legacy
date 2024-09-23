@@ -13,10 +13,8 @@ import {
 } from 'react-native';
 import { gql, useQuery } from '@apollo/client';
 
-// Get device dimensions
 const { width } = Dimensions.get('window');
 
-// GraphQL queries for player stats
 const GET_CAREER_BATTING_STATS = gql`
   query GetCareerBattingStats {
     players {
@@ -54,7 +52,6 @@ const GET_CAREER_PITCHING_STATS = gql`
   }
 `;
 
-// Player type definition
 export type Player = {
   id: number;
   rank: number;
@@ -76,7 +73,6 @@ export type Player = {
   whip?: string;
 };
 
-// Define the valid positions for a baseball team as a type
 type Lineup = {
   C: Player | null;
   '1B': Player | null;
@@ -89,7 +85,6 @@ type Lineup = {
   P: Player | null;
 };
 
-// Sample team structure with some bench players
 const defaultTeam = {
   lineup: {
     C: null,
@@ -102,54 +97,53 @@ const defaultTeam = {
     RF: null,
     P: null,
   },
-  bench: [null, null, null], // Bench with 3 empty slots
+  bench: [null, null, null],
 };
 
 const DraftBoardPage = () => {
-  const { data: battingStats, loading: loadingBatting, error: errorBatting } = useQuery(GET_CAREER_BATTING_STATS);
-  const { data: pitchingStats, loading: loadingPitching, error: errorPitching } = useQuery(GET_CAREER_PITCHING_STATS);
+  const { data: battingStats, loading: loadingBatting } = useQuery(GET_CAREER_BATTING_STATS);
+  const { data: pitchingStats, loading: loadingPitching } = useQuery(GET_CAREER_PITCHING_STATS);
 
   const [selectedTeam, setSelectedTeam] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
-  const [view, setView] = useState<'players' | 'team'>('players'); // Switch between views
+  const [view, setView] = useState<'players' | 'team'>('players');
   const [currentTeam, setCurrentTeam] = useState<{ lineup: Lineup; bench: (Player | null)[] }>(defaultTeam);
   const [draftStarted, setDraftStarted] = useState(false);
-  const [timer, setTimer] = useState(30); // 30-second timer
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0); // Track the current player to auto-pick on timer expiry
-  const animatedValue = useState(new Animated.Value(0))[0]; // For the timer animation
+  const [timer, setTimer] = useState(30);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
+  const [draftPicks, setDraftPicks] = useState<Player[]>([]);
+  const animatedValue = useState(new Animated.Value(0))[0];
+  const scrollX = useState(new Animated.Value(0))[0];
 
-  // For draft history scrolling
-  const [draftPicks, setDraftPicks] = useState<Player[]>([]); // To store the list of draft picks
-  const scrollX = useState(new Animated.Value(0))[0]; // Scroll animation value
+  useEffect(() => {
+    const playersList = [...(battingStats?.players || []), ...(pitchingStats?.players || [])];
+    setAvailablePlayers(playersList);
+  }, [battingStats, pitchingStats]);
 
-  const playersList = [...(battingStats?.players || []), ...(pitchingStats?.players || [])];
-
-  // Auto-scroll effect for draft history
   useEffect(() => {
     Animated.loop(
       Animated.timing(scrollX, {
-        toValue: width * 2, // Arbitrary large value to simulate continuous scrolling
-        duration: 35000, // Time taken for a full scroll (adjusted for readability)
+        toValue: width * 2,
+        duration: 35000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
     ).start();
   }, [scrollX]);
 
-  const filteredPlayers = playersList.filter((player) => {
+  const filteredPlayers = availablePlayers.filter((player) => {
     const matchesTeam = selectedTeam ? player.team === selectedTeam : true;
     const matchesSearch = player.name.toLowerCase().includes(searchText.toLowerCase());
     return matchesTeam && matchesSearch;
   });
 
-  // Timer Logic with Animation
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (draftStarted && timer > 0) {
       interval = setInterval(() => {
         setTimer((prevTimer) => prevTimer - 1);
         if (timer <= 10) {
-          // Animate the timer color and flashing when time is below 10 seconds
           Animated.loop(
             Animated.sequence([
               Animated.timing(animatedValue, {
@@ -165,33 +159,31 @@ const DraftBoardPage = () => {
                 useNativeDriver: false,
               }),
             ]),
-            { iterations: 3 } // Flash 3 times
+            { iterations: 3 }
           ).start();
         }
       }, 1000);
     } else if (timer === 0) {
-      handleAutoPick(); // Auto-pick when timer hits 0
+      handleAutoPick();
     }
     return () => clearInterval(interval);
   }, [timer, draftStarted]);
 
   const handleStartDraft = () => {
     setDraftStarted(true);
-    setTimer(30); // Reset timer
-    animatedValue.setValue(0); // Reset animation
+    setTimer(30);
+    animatedValue.setValue(0);
   };
 
   const handleAutoPick = () => {
     const player = filteredPlayers[currentPlayerIndex % filteredPlayers.length];
     handleSelectPlayer(player);
-    setCurrentPlayerIndex((prevIndex) => prevIndex + 1); // Move to the next player
-    setTimer(30); // Reset timer for the next user
+    setCurrentPlayerIndex((prevIndex) => prevIndex + 1);
+    setTimer(30);
   };
 
   const handleSelectPlayer = (player: Player) => {
-    // Logic to add player to the user's team
     alert(`Selected Player: ${player.name}`);
-    // Find an empty position and fill it with the selected player
     const newLineup = { ...currentTeam.lineup };
     for (const position in newLineup) {
       if (newLineup[position as keyof Lineup] === null) {
@@ -200,10 +192,12 @@ const DraftBoardPage = () => {
       }
     }
     setCurrentTeam({ ...currentTeam, lineup: newLineup });
-    setTimer(30); // Reset timer for the next user
+    setTimer(30);
 
-    // Add player to the draft history
     setDraftPicks((prevPicks) => [...prevPicks, player]);
+
+    // Remove the selected player from available players
+    setAvailablePlayers((prevPlayers) => prevPlayers.filter((p) => p.id !== player.id));
   };
 
   const handleViewChange = (newView: 'players' | 'team') => {
@@ -214,7 +208,6 @@ const DraftBoardPage = () => {
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 50 }}>
         <View style={styles.header}>
-          {/* Tab Navigation */}
           <TouchableOpacity
             style={[styles.tab, view === 'players' && styles.activeTab]}
             onPress={() => handleViewChange('players')}
@@ -229,10 +222,8 @@ const DraftBoardPage = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Search and Start Draft only when "Players" view is active */}
         {view === 'players' && (
           <>
-            {/* Modern Search Input */}
             <View style={styles.searchContainer}>
               <TextInput
                 style={styles.searchInput}
@@ -251,20 +242,26 @@ const DraftBoardPage = () => {
         )}
 
         {draftStarted && (
-          <Animated.Text style={[styles.timer, { color: animatedValue.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['#007bff', '#ff0000'], // Changes from blue to red as time decreases
-          }) }]}>
+          <Animated.Text
+            style={[
+              styles.timer,
+              {
+                color: animatedValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#007bff', '#ff0000'],
+                }),
+              },
+            ]}
+          >
             Time Left: {timer} seconds
-          </Animated.Text> // Timer display with animation
+          </Animated.Text>
         )}
 
         {view === 'players' ? (
           <View style={styles.tableContainer}>
-            {/* Player Table */}
             <View style={styles.tableRow}>
               <Text style={styles.tableHeader}>Rank</Text>
-              <Text style={styles.tableHeader}>Player Info</Text> {/* Compact Name, Team, Position */}
+              <Text style={styles.tableHeader}>Player Info</Text>
               <Text style={styles.tableHeader}>AVG</Text>
               <Text style={styles.tableHeader}>HR</Text>
               <Text style={styles.tableHeader}>RBI</Text>
@@ -292,7 +289,6 @@ const DraftBoardPage = () => {
                       <Text style={styles.playerTeam}>{item.team}</Text>
                       <Text style={styles.playerPosition}>{item.position}</Text>
                     </View>
-                    {/* Batting stats if available */}
                     <Text style={styles.tableData}>{item.avg || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.homeRuns || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.rbi || 'N/A'}</Text>
@@ -301,7 +297,6 @@ const DraftBoardPage = () => {
                     <Text style={styles.tableData}>{item.obp || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.slg || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.ops || 'N/A'}</Text>
-                    {/* Pitching stats if available */}
                     <Text style={styles.tableData}>{item.wins || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.losses || 'N/A'}</Text>
                     <Text style={styles.tableData}>{item.era || 'N/A'}</Text>
@@ -315,15 +310,11 @@ const DraftBoardPage = () => {
           </View>
         ) : (
           <View style={styles.teamContainer}>
-            {/* Current Team View */}
             <Text style={styles.teamTitle}>Current Team Lineup</Text>
             {Object.keys(currentTeam.lineup).map((position) => (
               <View
                 key={position}
-                style={[
-                  styles.teamRow,
-                  currentTeam.lineup[position as keyof Lineup] && styles.filledPosition, // Green background if filled
-                ]}
+                style={[styles.teamRow, currentTeam.lineup[position as keyof Lineup] && styles.filledPosition]}
               >
                 <Text style={styles.teamPosition}>{position}</Text>
                 <Text style={styles.teamPlayer}>
@@ -341,35 +332,32 @@ const DraftBoardPage = () => {
         )}
       </ScrollView>
 
-      {/* Draft History - Auto-scrolling */}
       <View style={styles.draftHistoryContainer}>
-  {/* Static "Draft History" Label */}
-  <Text style={styles.draftHistoryLabel}>Draft History:</Text>
+        <Text style={styles.draftHistoryLabel}>Draft History:</Text>
 
-  {/* Scrolling picks or message */}
-  <Animated.View
-    style={[
-      styles.draftHistoryScroller,
-      { transform: [{ translateX: scrollX.interpolate({ inputRange: [0, width * 2], outputRange: [0, -width * 2] }) }] },
-    ]}
-  >
-    {draftPicks.length > 0 ? (
-      <View style={styles.scrollWrapper}>
-        {draftPicks.map((pick, index) => (
-          <Text key={index} style={styles.draftHistoryText}>
-            {`Pick ${index + 1}: ${pick.name} - ${pick.team} - ${pick.position}   `}
-          </Text>
-        ))}
+        <Animated.View
+          style={[
+            styles.draftHistoryScroller,
+            { transform: [{ translateX: scrollX.interpolate({ inputRange: [0, width * 2], outputRange: [0, -width * 2] }) }] },
+          ]}
+        >
+          {draftPicks.length > 0 ? (
+            <View style={styles.scrollWrapper}>
+              {draftPicks.map((pick, index) => (
+                <Text key={index} style={styles.draftHistoryText}>
+                  {`Pick ${index + 1}: ${pick.name} - ${pick.team} - ${pick.position}   `}
+                </Text>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.scrollWrapper}>
+              <Text style={styles.draftHistoryText}>
+                {draftStarted ? "No picks yet." : "Draft has not started."}
+              </Text>
+            </View>
+          )}
+        </Animated.View>
       </View>
-    ) : (
-      <View style={styles.scrollWrapper}>
-        <Text style={styles.draftHistoryText}>
-          {draftStarted ? "No picks yet." : "Draft has not started."}
-        </Text>
-      </View>
-    )}
-  </Animated.View>
-        </View>
     </View>
   );
 };
@@ -382,16 +370,16 @@ const styles = StyleSheet.create({
   },
   tab: {
     padding: 10,
-    backgroundColor: '#808080', // Default tab color
+    backgroundColor: '#808080',
     borderRadius: 5,
     flex: 1,
     marginHorizontal: 5,
   },
   activeTab: {
-    backgroundColor: '#28a745', // Active tab color
+    backgroundColor: '#28a745',
   },
   tabText: {
-    color: '#ffffff', // Set to white for contrast
+    color: '#ffffff',
     textAlign: 'center',
     fontWeight: 'bold',
   },
@@ -404,13 +392,13 @@ const styles = StyleSheet.create({
   startDraftButton: {
     backgroundColor: '#28a745',
     borderRadius: 10,
-    padding: 10, // Smaller padding to make the button less prominent
+    padding: 10,
     marginBottom: 16,
     textAlign: 'center',
   },
   startDraftText: {
     color: '#fff',
-    fontSize: 14, // Smaller font size for subtlety
+    fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -423,7 +411,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 10,
     fontSize: 16,
-    elevation: 2, // Shadow for modern feel
+    elevation: 2,
     borderColor: '#ccc',
     borderWidth: 1,
   },
@@ -470,7 +458,7 @@ const styles = StyleSheet.create({
   },
   teamContainer: {
     margin: 10,
-    backgroundColor: '#f2f2f2', // New background color for My Team tab
+    backgroundColor: '#f2f2f2',
   },
   teamTitle: {
     fontSize: 18,
@@ -499,8 +487,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   filledPosition: {
-    backgroundColor: '#28a745', // Green background for filled positions
-    color: '#ffffff', // Ensure the text color is white
+    backgroundColor: '#28a745',
+    color: '#ffffff',
   },
   draftHistoryContainer: {
     flexDirection: 'row',
@@ -516,10 +504,10 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
-    marginRight: 10, // Add space between label and scroll
+    marginRight: 10,
   },
   draftHistoryScroller: {
-    flex: 1, // Takes up remaining space
+    flex: 1,
   },
   scrollWrapper: {
     flexDirection: 'row',
@@ -530,7 +518,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  
 });
 
 export default DraftBoardPage;
