@@ -19,6 +19,7 @@ import ViewCareerStats from './view_career_stats';
 import FootballHome from './football';
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
+import FreeAgents from './FreeAgents';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
 import {
@@ -58,6 +59,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'DraftBoardPage',
     title: 'Draft Board',
+  },
+  {
+    route: 'FreeAgents', 
+    title: 'Free Agents',
   },
 ]);
 
@@ -153,6 +158,11 @@ export default function Layout() {
             name="DraftBoardPage"
             options={{ title: 'Draft Board' }}
             component={DraftBoardPage}
+          />
+          <Screen
+            name="FreeAgents"
+            options={{ title: 'Free Agents' }}
+            component={FreeAgents}
           />
         </Navigator>
       </GestureHandlerRootView>
