@@ -89,3 +89,4 @@ Learn more:
 
 ## IDEAS
 Potentially add some sort of Dynasty player build up or a stock market type of thing.
+Mutator ability. So you can choose 1 mutator and apply it to someone. Example would be give double points to someone. You can only use this specific mutation 1 time every year.
