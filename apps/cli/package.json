@@ -6,11 +6,11 @@
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "npm run codegen:db",
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "compute-scoring": "ts-node -r tsconfig-paths/register src/main.ts compute-scoring --",
+    "compute-scoring": "ts-node -r tsconfig-paths/register src/main.ts compute-scoring",
     "run-migrations": "ts-node -r tsconfig-paths/register src/main.ts run-migrations",
     "load-players": "ts-node -r tsconfig-paths/register src/main.ts load-players",
     "load-career-stats": "ts-node -r tsconfig-paths/register src/main.ts load-career-stats",
-    "cli": "node -r ts-node/register -r tsconfig-paths/register src/main.ts --"
+    "cli": "ts-node -r tsconfig-paths/register src/main.ts"
   },
   "author": "",
   "license": "ISC",

@@ -1,5 +1,10 @@
 export enum EnvironmentVariable {
   DB_CERT_PATH = 'DB_CERT_PATH',
+  DB_HOST = 'DB_HOST',
+  DB_NAME = 'DB_NAME',
+  DB_PASSWORD = 'DB_PASSWORD',
+  DB_PORT = 'DB_PORT',
+  DB_USER = 'DB_USER',
   GRAPHQL_HOST = 'GRAPHQL_HOST',
   LOAD_STATS_SQS_HOST = 'LOAD_STATS_SQS_HOST',
 }
