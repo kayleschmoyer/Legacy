@@ -114,3 +114,4 @@ yarn-error.log
 
 /data/**/*
 **/*.log
+.twig/
