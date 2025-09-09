@@ -1,185 +1,311 @@
-# Lambda Deployment Guide
+# Lambda Functions
 
-This guide covers the modern Terraform-based deployment workflow for all Lambda functions in the Legacy Sports application.
+AWS Lambda functions providing the serverless backend for Legacy Sports.
 
-## Prerequisites
+## 🚀 Overview
 
-1. **AWS CLI configured** with appropriate credentials
-2. **Terraform initialized** in the `terraform/` directory
-3. **Node.js and npm** installed
-4. **Nx CLI** available globally or via npx
+The backend consists of multiple Lambda functions handling different aspects of the application:
 
-## Lambda Functions Overview
+| Function | Purpose | Language | Framework |
+|----------|---------|----------|-----------|
+| **GraphQL** | Main API for data queries and mutations | TypeScript | Apollo Server |
+| **OAuth Proxy** | Google OAuth authentication flow | TypeScript | Express.js |
+| **Stats Lambda** | Background statistics processing | TypeScript | Custom |
+| **Game Selection** | Game data management | TypeScript | Custom |
 
-The application includes 4 Lambda functions managed via Terraform:
+## 🏗️ Shared Architecture
 
-| Lambda             | Function Name                      | API Path   | Purpose                        |
-| ------------------ | ---------------------------------- | ---------- | ------------------------------ |
-| **db**             | `legacy-sports-dev-graphql`        | `/graphql` | GraphQL API with Apollo Server |
-| **oauth-proxy**    | `legacy-sports-dev-oauth-proxy`    | `/oauth/*` | OAuth authentication proxy     |
-| **stats-lambda**   | `legacy-sports-dev-stats`          | `/stats/*` | Statistics processing          |
-| **game-selection** | `legacy-sports-dev-game-selection` | `/games/*` | Game selection logic           |
+### Common Features
 
-## Deployment Workflow
-
-### Individual Lambda Deployment
-
-Each lambda supports these Nx commands:
-
-```bash
-# Build and package the lambda
-nx build <lambda-name>
-nx package <lambda-name>
-
-# Plan deployment (see what will change)
-nx deploy:plan <lambda-name>
-
-# Deploy to AWS
-nx deploy <lambda-name>
-
-# Test the deployed endpoint
-nx test-endpoint <lambda-name>
-
-# View CloudWatch logs
-nx logs <lambda-name>
-```
-
-### Examples
-
-```bash
-# Deploy the GraphQL lambda
-nx deploy db
-
-# Deploy OAuth proxy
-nx deploy oauth-proxy
-
-# Deploy stats processing
-nx deploy stats-lambda
-
-# Deploy game selection
-nx deploy game-selection
-```
-
-### Deploy All Lambdas
-
-To deploy all lambdas at once:
-
-```bash
-# Build all lambdas
-nx run-many -t build -p db,oauth-proxy,stats-lambda,game-selection
-
-# Deploy all lambdas
-nx run-many -t deploy -p db,oauth-proxy,stats-lambda,game-selection
-```
-
-## Architecture Details
-
-### Build System
-
-- **Vite 6.3.5** with SSR configuration for Node.js Lambda environment
-- **Complete dependency bundling** (noExternal: true) for reliability
-- **Node.js 20.x** runtime target
-- **CommonJS output** format for Lambda compatibility
-
-### Infrastructure
-
-- **Terraform-managed** infrastructure as code
-- **VPC networking** with private subnets and security groups
-- **API Gateway** with CORS configuration and Lambda proxy integration
-- **CloudWatch** logging with 14-day retention
-- **IAM roles** with least-privilege access policies
-
-### API Gateway Endpoints
-
-All lambdas are accessible through a single API Gateway:
-
-- **Base URL**: `https://{api-id}.execute-api.us-east-1.amazonaws.com/dev`
-- **GraphQL**: `{base-url}/graphql`
-- **OAuth**: `{base-url}/oauth/*`
-- **Stats**: `{base-url}/stats/*`
-- **Games**: `{base-url}/games/*`
-
-## Development Workflow
-
-### Local Development
-
-```bash
-# Run lambda locally for development
-nx serve <lambda-name>
-
-# Run tests
-nx test <lambda-name>
-
-# Lint code
-nx lint <lambda-name>
-```
-
-### Deployment Pipeline
-
-1. **Build**: Vite compiles TypeScript and bundles all dependencies
-2. **Package**: Create deployment ZIP file in `dist/` directory
-3. **Deploy**: Terraform applies infrastructure changes
-4. **Validate**: API Gateway deployment updated to include new version
-
-### Monitoring
-
-```bash
-# View real-time logs
-nx logs <lambda-name>
-
-# Or use AWS CLI directly
-aws logs tail /aws/lambda/legacy-sports-dev-<function-name> --follow --region us-east-1
-```
-
-## Configuration
+- **Runtime**: Node.js 18.x
+- **Deployment**: ZIP packages via Terraform
+- **Monitoring**: CloudWatch logs and metrics
+- **Networking**: VPC with private subnets
+- **Database**: Shared PostgreSQL RDS instance
 
 ### Environment Variables
 
-All lambdas receive these environment variables:
+All functions receive:
+- `DB_HOST`: PostgreSQL connection string
+- `DB_CREDS_SECRET_NAME`: AWS Secrets Manager secret name
+- `AWS_REGION`: Deployment region
+- Function-specific variables
 
-- `DB_HOST`: RDS cluster endpoint
-- `DB_NAME`: Database name
-- `DB_SECRET_ARN`: ARN for database credentials in Secrets Manager
-- `ENVIRONMENT`: Current environment (dev/staging/prod)
-- `AWS_NODEJS_CONNECTION_REUSE_ENABLED`: Connection pooling optimization
+## 📦 Lambda Functions
 
-### Dependencies
+### GraphQL API (`graphql/`)
 
-Key libraries bundled in each lambda:
+The main API serving all data queries and mutations.
 
-- **@nx/vite**: Nx build integration
-- **Vite plugins**: TypeScript paths and Nx monorepo support
-- **Database clients**: Drizzle ORM, node-postgres
-- **AWS SDK**: Native AWS service integration
+**Endpoints**: `/graphql`
+**Method**: POST
+**Features**:
+- Apollo Server with TypeScript
+- Schema-first GraphQL
+- Database connection pooling
+- Authentication middleware
+- Error handling and logging
 
-## Troubleshooting
+**Key Queries**:
+- `getAllPlayers`: Fetch player data
+- `getGameStats`: Game statistics
+- `getSeasonData`: Season information
+
+### OAuth Proxy (`oauth-proxy/`)
+
+Handles Google OAuth authentication flows.
+
+**Endpoints**: `/oauth/*`
+**Methods**: GET, POST
+**Features**:
+- Google OAuth 2.0 integration
+- JWT token management
+- Session handling
+- Secure cookie management
+
+**Flows**:
+- Login initiation
+- OAuth callback handling
+- Token refresh
+- Logout
+
+### Stats Lambda (`stats-lambda/`)
+
+Background processing for statistics and data aggregation.
+
+**Trigger**: SQS queue messages
+**Features**:
+- Batch processing
+- Statistics calculations
+- Data aggregation
+- Performance metrics
+
+### Game Selection (`game-selection/`)
+
+Manages game data and selection logic.
+
+**Endpoints**: `/games`
+**Methods**: GET, POST
+**Features**:
+- Game data retrieval
+- Selection algorithms
+- Cache management
+
+## 🛠️ Development
+
+### Local Development
+
+Each function can be developed and tested locally:
+
+```bash
+# Navigate to function directory
+cd lambdas/graphql
+
+# Install dependencies
+npm install
+
+# Run locally (if supported)
+npm run dev
+
+# Run tests
+npm test
+```
+
+### Shared Dependencies
+
+Common packages are included in a Lambda Layer:
+- Database client libraries
+- Utility functions
+- Shared types and interfaces
+
+### Environment Setup
+
+```bash
+# Set up local environment variables
+cp .env.example .env
+
+# Configure database connection
+# DB_HOST=localhost:5432
+# DB_NAME=legacy_sports_dev
+```
+
+## 🧪 Testing
+
+### Unit Testing
+
+```bash
+# Test specific function
+cd lambdas/graphql
+npm test
+
+# Test with coverage
+npm run test:coverage
+
+# Watch mode
+npm run test:watch
+```
+
+### Integration Testing
+
+```bash
+# Test deployed functions
+npm run test:integration
+
+# Load testing
+npm run test:load
+```
+
+### Local Testing with SAM
+
+```bash
+# Start local API Gateway
+sam local start-api
+
+# Invoke specific function
+sam local invoke GraphQLFunction --event events/test-event.json
+```
+
+## 📦 Deployment
+
+### Automatic Deployment
+
+GitHub Actions handles deployment:
+- **Trigger**: Push to main branch
+- **Build**: Package functions
+- **Deploy**: Update via Terraform
+
+### Manual Deployment
+
+```bash
+# Deploy all functions
+terraform apply
+
+# Deploy specific function
+terraform apply -target=aws_lambda_function.graphql
+
+# Package and deploy manually
+cd lambdas/graphql
+npm run build
+npm run deploy
+```
+
+### Build Process
+
+Each function follows the same build pattern:
+1. TypeScript compilation
+2. Dependency bundling
+3. ZIP package creation
+4. Upload to S3
+5. Lambda function update
+
+## 🔧 Configuration
+
+### Function Configuration
+
+Standard settings across all functions:
+- **Memory**: 256MB (adjustable per function)
+- **Timeout**: 30 seconds (API functions), 5 minutes (processing)
+- **Runtime**: Node.js 18.x
+- **Architecture**: x86_64
+
+### VPC Configuration
+
+All functions run in private subnets:
+- No direct internet access
+- Database access via security groups
+- NAT Gateway for external API calls
+
+### IAM Permissions
+
+Each function has minimal required permissions:
+- VPC network access
+- CloudWatch logging
+- Secrets Manager access
+- Function-specific resources
+
+## 📊 Monitoring
+
+### CloudWatch Metrics
+
+Standard metrics for all functions:
+- Invocation count
+- Duration
+- Error rate
+- Throttles
+
+### Custom Metrics
+
+Application-specific metrics:
+- Database connection time
+- Query performance
+- Authentication success rate
+
+### Logging
+
+Structured logging with:
+- Request/response logging
+- Error details and stack traces
+- Performance timing
+- Business logic events
+
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Build Failures**: Check Vite configuration and dependency compatibility
-2. **Deployment Errors**: Verify Terraform state and AWS permissions
-3. **Runtime Errors**: Check CloudWatch logs for missing dependencies or configuration
+**Cold start performance**:
+- Monitor duration metrics
+- Consider provisioned concurrency
+- Optimize package size
 
-### Debug Commands
+**Database connection issues**:
+- Check VPC configuration
+- Verify security groups
+- Monitor connection pool
 
+**Memory issues**:
+- Monitor memory usage
+- Adjust function memory
+- Profile function execution
+
+### Debugging
+
+**View logs**:
 ```bash
-# Check lambda status
-aws lambda get-function --function-name legacy-sports-dev-<function-name> --region us-east-1
+# Recent logs
+aws logs tail /aws/lambda/legacy-sports-dev-graphql --follow
 
-# Test lambda directly
-aws lambda invoke --function-name legacy-sports-dev-<function-name> --payload '{}' response.json --region us-east-1
-
-# View API Gateway configuration
-aws apigateway get-rest-apis --region us-east-1
+# Error logs only
+aws logs filter-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphql --filter-pattern "ERROR"
 ```
 
-## Migration from Serverless Framework
+**Test function**:
+```bash
+# Direct invocation
+aws lambda invoke --function-name legacy-sports-dev-graphql response.json
 
-This deployment system replaces the previous Serverless Framework setup:
+# Check response
+cat response.json
+```
 
-- ✅ **Terraform**: Infrastructure as code with state management
-- ✅ **Vite**: Modern build system with full dependency bundling
-- ✅ **Nx integration**: Monorepo-aware deployment workflow
-- ✅ **Unified API Gateway**: Single endpoint for all services
+### Performance Optimization
 
-The old `serverless.yml` files have been removed and replaced with Terraform configurations in the `terraform/` directory.
+**Package size**:
+- Use webpack for bundling
+- Exclude dev dependencies
+- Use Lambda layers for shared code
+
+**Runtime performance**:
+- Connection pooling
+- Caching strategies
+- Async/await optimization
+
+## 📚 Resources
+
+- [AWS Lambda Developer Guide](https://docs.aws.amazon.com/lambda/latest/dg/)
+- [Apollo Server Documentation](https://apollographql.com/docs/apollo-server/)
+- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
+- [Lambda Best Practices](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
+
+---
+
+Each Lambda function is designed to be independently deployable and scalable.

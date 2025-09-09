@@ -1,270 +1,266 @@
-# Legacy Sports Terraform Infrastructure
+# Infrastructure & Backend
 
-This directory contains Terraform configuration files to deploy the Legacy Sports application infrastructure on AWS.
+AWS serverless infrastructure managed with Terraform and Lambda functions.
 
-## Architecture Overview
+## 🏗️ Architecture Overview
 
-The infrastructure includes:
-
-- **VPC**: Custom VPC with public and private subnets across 3 availability zones
-- **RDS**: PostgreSQL database with RDS Proxy for connection pooling
-- **Lambda Functions**:
-  - OAuth proxy functions (Google Auth, Local Auth)
-  - GraphQL API function
-  - Stats loading function (SQS-triggered)
-- **API Gateway**: REST API exposing Lambda functions publicly
-- **SQS**: FIFO queue for processing stats loading requests
-- **Secrets Manager**: Secure storage for database credentials, JWT secrets, OAuth secrets
-- **S3**: Bucket for Lambda deployment packages
-- **CloudWatch**: Log groups for Lambda functions
-
-## Prerequisites
-
-1. **AWS CLI** configured with appropriate permissions
-2. **Terraform** >= 1.0 installed
-3. **Lambda deployment packages** built and available:
-   - `oauth-proxy-google.zip`
-   - `oauth-proxy-local.zip`
-   - `graphql.zip`
-   - `stats-lambda.zip`
-   - `node-pg.zip` (Lambda layer)
-
-## Deployment Steps
-
-### 1. Build Lambda Packages
-
-Before deploying, you need to build and package the Lambda functions:
-
-```bash
-# Build OAuth proxy functions
-cd lambdas/oauth-proxy
-npx nx build
-npx serverless package
-cp .serverless/legacy-sports-oauth-proxy.zip ../../terraform/oauth-proxy-google.zip
-cp .serverless/legacy-sports-oauth-proxy.zip ../../terraform/oauth-proxy-local.zip
-
-# Build GraphQL function
-cd ../db
-npx nx build
-npx serverless package
-cp .serverless/legacy-sports-graphql.zip ../../terraform/graphql.zip
-
-# Build Stats lambda
-cd ../stats-lambda
-npx nx build
-npx serverless package
-cp .serverless/legacy-sports-stats-lambda.zip ../../terraform/stats-lambda.zip
-
-# Create node-pg layer (you'll need to create this based on the layers/node-pg directory)
-cd ../layers
-zip -r ../../terraform/node-pg.zip node-pg/
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   API Gateway    │    │   Lambda        │
+│   (Web/Mobile)  │───▶│                  │───▶│   Functions     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │                        │
+                                ▼                        ▼
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │   CloudWatch     │    │   PostgreSQL    │
+                       │   Logs           │    │   RDS           │
+                       └──────────────────┘    └─────────────────┘
 ```
 
-### 2. Configure Variables
+## 🚀 Quick Setup
 
-Update `terraform.tfvars` with your specific configuration:
+### Prerequisites
 
-```hcl
-# Update these values as needed
-aws_region     = "us-east-1"
-environment    = "dev"
-project_name   = "legacy-sports"
+- **AWS CLI**: Configured with appropriate credentials
+- **Terraform**: v1.0+
+- **Node.js**: v18+ (for Lambda functions)
 
-# Database settings
-db_instance_class = "db.t3.micro"  # Use larger instance for production
-db_allocated_storage = 20          # Increase for production
-
-# OAuth settings
-google_oauth_client_id = "your-actual-google-oauth-client-id"
-```
-
-### 3. Deploy Infrastructure
+### Infrastructure Deployment
 
 ```bash
+# Navigate to terraform directory
 cd terraform
 
 # Initialize Terraform
 terraform init
 
-# Review the plan
+# Plan deployment
 terraform plan
 
-# Apply the configuration
+# Apply infrastructure
 terraform apply
 ```
 
-### 4. Post-Deployment Configuration
-
-After deployment, you'll need to:
-
-1. **Update Google OAuth Client Secret**:
-
-   ```bash
-   aws secretsmanager put-secret-value \
-     --secret-id "dev/google-oauth-client-secret" \
-     --secret-string "your-actual-google-oauth-client-secret"
-   ```
-
-2. **Initialize Database Schema**:
-
-   - Connect to the RDS instance using the proxy endpoint
-   - Run the database migration scripts from the `resources/` directory
-
-3. **Update Application Configuration**:
-   - Use the output values to configure your application's environment variables
-
-## Infrastructure Components
-
-### VPC and Networking
-
-- Custom VPC with public and private subnets
-- NAT Gateways for Lambda internet access
-- Security groups for Lambda, RDS, and RDS Proxy
-
-### Database
-
-- PostgreSQL 16.3 RDS instance
-- RDS Proxy for connection pooling and security
-- Encrypted storage with automated backups
-- Performance Insights enabled
-
-### Lambda Functions
-
-- **OAuth Google Auth**: Handles Google OAuth authentication
-- **OAuth Google Refresh**: Handles token refresh
-- **OAuth Local Register**: Handles local user registration
-- **OAuth Local Login**: Handles local user login
-- **GraphQL**: PostGraphile-based GraphQL API
-- **Stats Load Career**: Processes stats loading from SQS
+## 🔧 Infrastructure Components
 
 ### API Gateway
 
-- REST API with CORS enabled
-- Routes for all OAuth and GraphQL endpoints
-- Proper integration with Lambda functions
+Central entry point for all API requests:
+- **Base URL**: `https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev`
+- **Endpoints**:
+  - `/graphql` - GraphQL API
+  - `/oauth` - Authentication
+  - `/stats` - Statistics processing
+  - `/games` - Game selection
 
-### Security
+### Lambda Functions
 
-- All secrets stored in AWS Secrets Manager
-- IAM roles with least privilege access
-- VPC isolation for databases
-- Encrypted storage and data in transit
+| Function | Purpose | Endpoint |
+|----------|---------|----------|
+| **GraphQL** | Main API for data queries | `/graphql` |
+| **OAuth Proxy** | Google OAuth authentication | `/oauth` |
+| **Stats Lambda** | Statistics processing | `/stats` |
+| **Game Selection** | Game data management | `/games` |
 
-## Outputs
+### Database
 
-After deployment, Terraform outputs important values:
+- **Type**: PostgreSQL on AWS RDS
+- **Environment**: Development
+- **Access**: Via Lambda functions only (private subnets)
 
-- **API Gateway URLs**: Base URL and specific endpoint URLs
-- **Database Connection**: RDS Proxy endpoint for secure connections
-- **Secret ARNs**: For accessing stored secrets
-- **SQS Queue**: URL for the stats loading queue
+### Networking
 
-## Monitoring and Logs
+- **VPC**: Custom VPC with public/private subnets
+- **Security Groups**: Restrictive access rules
+- **Subnets**: Separate for Lambda and RDS
 
-- CloudWatch Log Groups for all Lambda functions (14-day retention)
-- RDS Performance Insights enabled
-- CloudWatch metrics for API Gateway, Lambda, and SQS
+## 📦 Lambda Functions
 
-## Cost Considerations
+### GraphQL API (`lambdas/graphql/`)
 
-- **RDS**: Main cost driver - consider db.t3.micro for development
-- **Lambda**: Pay per invocation and duration
-- **NAT Gateway**: Fixed hourly cost + data transfer
-- **API Gateway**: Pay per request
-- **SQS**: Very low cost for messaging
+Main API serving GraphQL queries:
+- Player data queries
+- Statistics aggregation
+- Real-time data updates
 
-## Security Notes
+```bash
+# Deploy GraphQL Lambda
+npm run deploy:graphql
+```
 
-1. **Database**: Only accessible from Lambda functions via RDS Proxy
-2. **Secrets**: All sensitive data stored in Secrets Manager
-3. **VPC**: Lambda functions isolated in private subnets
-4. **IAM**: Least privilege access policies
+### OAuth Proxy (`lambdas/oauth-proxy/`)
 
-## Troubleshooting
+Handles Google OAuth authentication:
+- Login flow management
+- Token refresh
+- Session management
 
-### Lambda Issues
+```bash
+# Deploy OAuth Lambda
+npm run deploy:oauth
+```
 
-- Check CloudWatch logs for function errors
-- Verify VPC configuration and security groups
-- Ensure secrets are properly configured
+### Stats Lambda (`lambdas/stats-lambda/`)
 
-### Database Issues
+Background processing for statistics:
+- Data aggregation
+- Performance calculations
+- Historical data processing
 
-- Verify RDS Proxy is running and accessible
+```bash
+# Deploy Stats Lambda
+npm run deploy:stats
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Set in Terraform and available to all Lambda functions:
+
+```hcl
+# terraform/variables.tf
+variable "environment" {
+  default = "dev"
+}
+
+variable "aws_region" {
+  default = "us-east-1"
+}
+```
+
+### Secrets Management
+
+Sensitive data stored in AWS Secrets Manager:
+- Database credentials
+- OAuth client secrets
+- JWT signing keys
+
+### Database Configuration
+
+PostgreSQL RDS instance with:
+- Automated backups
+- Multi-AZ for production
+- Security group restrictions
+
+## 🧪 Testing
+
+### Local Testing
+
+```bash
+# Test Lambda functions locally
+cd lambdas/graphql
+npm run test:local
+
+# Test with SAM CLI
+sam local start-api
+```
+
+### Integration Testing
+
+```bash
+# Test deployed endpoints
+npm run test:integration
+
+# Health check all endpoints
+npm run health:check
+```
+
+## 📊 Monitoring
+
+### CloudWatch
+
+All Lambda functions automatically log to CloudWatch:
+- Function execution logs
+- Performance metrics
+- Error tracking
+
+### Terraform Outputs
+
+View deployed resource information:
+
+```bash
+cd terraform
+terraform output
+```
+
+Key outputs:
+- `graphql_endpoint`: GraphQL API URL
+- `api_gateway_url`: Base API URL
+- Environment variables summary
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Terraform fails to apply**:
+- Check AWS credentials and permissions
+- Verify region configuration
+- Review state file for conflicts
+
+**Lambda deployment fails**:
+- Check function size limits
+- Verify IAM permissions
+- Review CloudWatch logs
+
+**Database connection issues**:
 - Check security group rules
-- Ensure Lambda has proper IAM permissions for RDS
+- Verify subnet configuration
+- Test from Lambda function
 
-### API Gateway Issues
+### Debugging
 
-- Check Lambda permissions for API Gateway invocation
-- Verify CORS configuration for browser requests
-- Review API Gateway execution logs
+**CloudWatch Logs**:
+```bash
+# View recent logs
+aws logs tail /aws/lambda/legacy-sports-dev-graphql --follow
 
-## Resource Discovery and Management
-
-The deployment scripts include powerful resource discovery functionality to help manage AWS resources that may exist outside of Terraform's control.
-
-### Discovery Features
-
-- **Scan AWS Resources**: Find existing resources that match your project naming patterns
-- **Compare with Terraform**: Identify which resources are managed vs. unmanaged
-- **Import Options**: Automatically or selectively import resources into Terraform state
-- **Report Generation**: Get detailed reports of discovered resources
-
-### Quick Start
-
-#### PowerShell (Windows)
-
-```powershell
-# Discover all unmanaged resources
-.\deploy.ps1 -DiscoverResources
-
-# Discover specific resource types
-.\deploy.ps1 -DiscoverResources -ResourceTypes VPC,Lambda,RDS
-
-# Auto-import discovered resources
-.\deploy.ps1 -DiscoverResources -AutoImport
+# Search specific timeframe
+aws logs filter-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphql --start-time 1609459200000
 ```
 
-#### Bash (Linux/macOS)
+**Function Testing**:
+```bash
+# Invoke function directly
+aws lambda invoke --function-name legacy-sports-dev-graphql response.json
+```
+
+## 🚀 Deployment
+
+### CI/CD Pipeline
+
+GitHub Actions automatically deploy:
+- **Trigger**: Push to main branch
+- **Build**: Package Lambda functions
+- **Deploy**: Update infrastructure
+
+### Manual Deployment
 
 ```bash
-# Discover all unmanaged resources
-./deploy.sh --discover-resources
+# Deploy all infrastructure
+cd terraform
+terraform apply
 
-# Discover specific resource types
-./deploy.sh --discover-resources --resource-types VPC,Lambda,RDS
+# Deploy specific Lambda
+npm run deploy:graphql
 
-# Auto-import discovered resources
-./deploy.sh --discover-resources --auto-import
+# Update environment variables
+terraform apply -target=aws_lambda_function.graphql
 ```
 
-### Supported Resource Types
+### Environment Management
 
-- **VPC**: Virtual Private Cloud resources
-- **Lambda**: Lambda functions
-- **RDS**: Database instances
-- **SQS**: Message queues
-- **S3**: Storage buckets
-- **IAM**: Roles and policies
-- **SecretsManager**: Secret configurations
-- **ApiGateway**: API Gateway REST APIs
+- **Development**: Current setup
+- **Production**: Separate Terraform workspace
+- **Staging**: Optional environment
 
-### Use Cases
+## 📚 Resources
 
-1. **Infrastructure Audit**: Find resources that were created manually
-2. **Migration**: Import existing resources into Terraform management
-3. **Compliance**: Ensure all resources are properly managed
-4. **Cost Control**: Identify and remove unused resources
+- [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- [API Gateway Documentation](https://docs.aws.amazon.com/apigateway/)
+- [PostgreSQL on RDS](https://docs.aws.amazon.com/rds/latest/userguide/CHAP_PostgreSQL.html)
 
-📖 **Detailed Documentation**: See [RESOURCE_DISCOVERY.md](./RESOURCE_DISCOVERY.md) for complete usage guide and examples.
+---
 
-## Cleanup
-
-To destroy the infrastructure:
-
-```bash
-terraform destroy
-```
-
-**Warning**: This will delete all resources including the database. Ensure you have backups if needed.
+For infrastructure issues, check CloudWatch logs and Terraform state.

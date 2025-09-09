@@ -1,92 +1,259 @@
-# Org
+# Legacy Sports
 
-## Build Status
+A modern sports data management platform built with React Native CLI, Next.js web, and AWS serverless backend.
 
-[![Publish GQL](https://github.com/bkrupa/legacy-sports/actions/workflows/publish-gql.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/publish-gql.yml)
+## 🚀 Quick Start
 
-## Issues
+### Prerequisites
 
-Do not add composite - causes build error when running
-swc issue - updated to new version of swc
+- **Node.js**: v18+ (recommended: use [nvm](https://github.com/nvm-sh/nvm))
+- **npm**: Latest version
+- **Git**: Latest version
+- **VS Code**: Recommended IDE with extensions
 
-## AWS Config
+### Initial Setup
 
-Enable Lambda access to public internet:
-https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc-internet.html
+```bash
+# Clone the repository
+git clone https://github.com/bkrupa/legacy-sports.git
+cd legacy-sports
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+# Install dependencies
+npm install
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
-
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/expo?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
-
-## Finish your CI setup
-
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/NAaytUzdhp)
-
-## Run tasks
-
-To run the dev server for your app, use:
-
-```sh
-npx nx serve app
+# Configure Python environment (for backend tools)
+# This tool will guide you through Python setup
+npm run setup:python
 ```
 
-To create a production bundle:
+## 📱 Development
 
-```sh
-npx nx build app
+### Available Applications
+
+| App | Description | Command |
+|-----|-------------|---------|
+| **Mobile App** | React Native CLI app | `npm run app:start` |
+| **Web App** | Next.js web application | `npm run web:start` |
+| **GraphQL Explorer** | API testing interface | `npm run gql:start` |
+
+### Quick Development Commands
+
+```bash
+# Start all development servers
+npm run dev
+
+# Run tests across all projects
+npm test
+
+# Build all projects
+npm run build
+
+# Lint and format code
+npm run lint:fix
+npm run format
 ```
 
-To see all available targets to run for a project, run:
+### Mobile Development
 
-```sh
-npx nx show project app
+```bash
+# Start Metro bundler
+npm run app:start
+
+# Run on Android (requires Android Studio)
+npm run app:android
+
+# Run on iOS (requires Xcode - macOS only)
+npm run app:ios
+
+# Build Android APK
+npm run app:build-android
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+### Web Development
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Start web development server
+npm run web:start
 
-## Add new projects
+# Build for production
+npm run web:build
 
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/expo:app demo
+# Deploy to GitHub Pages (auto-deployed on main branch)
+npm run web:deploy
 ```
 
-To generate a new library, use:
+## 🏗️ Architecture
 
-```sh
-npx nx g @nx/react:lib mylib
+### Monorepo Structure
+
+```
+legacy-sports/
+├── apps/                    # Applications
+│   ├── app/                # React Native mobile app
+│   ├── web/                # Next.js web app
+│   ├── cli/                # Command-line tools
+│   └── graphql-explorer/   # GraphQL API explorer
+├── lib/                    # Shared libraries
+│   ├── shared-components/  # Cross-platform UI components
+│   ├── db-client/         # Database client & migrations
+│   ├── api/               # API utilities
+│   └── utils/             # Common utilities
+├── lambdas/               # AWS Lambda functions
+│   ├── graphql/           # GraphQL API
+│   ├── oauth-proxy/       # Authentication
+│   └── stats-lambda/      # Data processing
+└── terraform/             # Infrastructure as Code
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+### Technology Stack
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+- **Frontend**: React Native CLI, Next.js, Tamagui UI
+- **Backend**: AWS Lambda, API Gateway, PostgreSQL
+- **Tools**: NX Monorepo, TypeScript, GraphQL
+- **CI/CD**: GitHub Actions, Terraform
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## 🔧 Configuration
 
-## Install Nx Console
+### Environment Variables
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+Copy the example environment files and configure:
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Web app configuration
+cp apps/web/.env.example apps/web/.env.local
 
-## Useful links
+# Configure GraphQL endpoint (defaults to dev environment)
+# VITE_GRAPHQL_HOST=https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql
+```
 
-Learn more:
+### GraphQL API
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/expo?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+The application connects to a live GraphQL API hosted on AWS. The endpoint is configured in:
+- `apps/web/src/lib/apollo-client.ts`
+- Environment variable: `VITE_GRAPHQL_HOST`
 
-## IDEAS
-Potentially add some sort of Dynasty player build up or a stock market type of thing.
-Mutator ability. So you can choose 1 mutator and apply it to someone. Example would be give double points to someone. You can only use this specific mutation 1 time every year.
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests for specific project
+npx nx test web
+npx nx test app
+
+# Run tests in watch mode
+npx nx test web --watch
+
+# Run E2E tests
+npx nx e2e web-e2e
+```
+
+## 📦 Building & Deployment
+
+### Web Deployment
+
+The web app automatically deploys to GitHub Pages on pushes to `main`:
+- **URL**: https://bkrupa.github.io/legacy-sports/
+- **Workflow**: `.github/workflows/deploy-web.yml`
+
+### Mobile App Builds
+
+```bash
+# Android APK
+npm run app:build-android
+
+# iOS (macOS only)
+npm run app:build-ios
+```
+
+### Lambda Deployment
+
+AWS Lambda functions are deployed via Terraform:
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+## 🛠️ Development Tools
+
+### NX Commands
+
+```bash
+# View project graph
+npx nx graph
+
+# Run affected tests only
+npx nx affected:test
+
+# Build affected projects
+npx nx affected:build
+
+# Show project details
+npx nx show project web
+```
+
+### Code Quality
+
+```bash
+# Lint all projects
+npm run lint
+
+# Fix lint issues
+npm run lint:fix
+
+# Format code
+npm run format
+
+# Validate package.json standards
+npm run validate:packages
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Metro bundler issues (React Native)**:
+```bash
+# Clear Metro cache
+npx react-native start --reset-cache
+
+# Clean and rebuild
+npm run app:clean
+npm run app:start
+```
+
+**GraphQL connection issues**:
+- Verify the endpoint URL in `apps/web/src/lib/apollo-client.ts`
+- Check AWS Lambda function logs in CloudWatch
+
+**Build errors**:
+```bash
+# Clean all build artifacts
+npm run clean
+
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Getting Help
+
+1. Check the [Issues](https://github.com/bkrupa/legacy-sports/issues) page
+2. Review recent commits for breaking changes
+3. Ensure you're using the correct Node.js version
+4. Verify all prerequisites are installed
+
+## 📚 Additional Resources
+
+- **NX Documentation**: https://nx.dev
+- **React Native**: https://reactnative.dev
+- **Tamagui UI**: https://tamagui.dev
+- **AWS Lambda**: https://docs.aws.amazon.com/lambda/
+
+---
+
+Built with ❤️ using modern development tools and practices.
