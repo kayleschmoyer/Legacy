@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx src/dev.ts",
     "build": "vite build",
-    "test": "jest"
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
   },
   "dependencies": {
     "@pothos/core": "*",
