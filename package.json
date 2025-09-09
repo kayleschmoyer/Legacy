@@ -82,7 +82,7 @@
     "@dataplan/json": "0.0.1-beta.33",
     "@dataplan/pg": "0.0.1-beta.37",
     "@electric-sql/pglite": "^0.2.5",
-    "@envelop/core": "^5.0.0",
+    "@envelop/core": "^5.3.1",
     "@graphile-contrib/pg-simplify-inflector": "^6.1.0",
     "@pothos/core": "^4.9.0",
     "@react-native-community/cli": "~18.0.0",
