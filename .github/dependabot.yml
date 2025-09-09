@@ -1,0 +1,69 @@
+version: 2
+updates:
+  # NPM dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "bkrupa"
+    assignees:
+      - "bkrupa"
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "typescript"
+          - "jest*"
+          - "@jest/*"
+        update-types:
+          - "minor"
+          - "patch"
+      react-native:
+        patterns:
+          - "react-native*"
+          - "@react-native*"
+          - "react"
+          - "react-dom"
+        update-types:
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    reviewers:
+      - "bkrupa"
+    assignees:
+      - "bkrupa"
+    open-pull-requests-limit: 3
+
+  # Docker (if any Dockerfiles exist)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    reviewers:
+      - "bkrupa"
+    assignees:
+      - "bkrupa"
+    open-pull-requests-limit: 2

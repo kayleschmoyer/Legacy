@@ -13,13 +13,25 @@ on:
       - poetry.lock
   pull_request:
 
+# Cancel in-progress runs for the same workflow on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   actions: read
   contents: read
+  pull-requests: read
+
+env:
+  NX_CLOUD_DISTRIBUTED_EXECUTION: false
 
 jobs:
   main:
+    name: Main CI
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,17 +41,21 @@ jobs:
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
-      - uses: nrwl/nx-set-shas@v4
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
 
-      - name: 'NX Setup'
+      - name: Setup CI
         run: npx nx affected -t setup-ci
 
-      - name: 'NX Actions'
+      - name: Run CI Tasks
         run: npx nx affected -t lint build test format bundle prebuild
 
   build-ios:
+    name: Build iOS
     if: ${{ vars.BUILD_IOS == 'true' }}
     runs-on: macos-latest
+    timeout-minutes: 45
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -49,18 +65,21 @@ jobs:
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
-      - uses: nrwl/nx-set-shas@v4
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
 
-      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
-      - name: 'Build Image'
+      - name: Build iOS App
         run: npx nx build-ios app
 
-      - name: 'Run Tests'
+      - name: Test iOS App
         run: npx nx test-ios app
 
   build-android:
+    name: Build Android
     if: ${{ vars.BUILD_ANDROID == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -70,17 +89,18 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin' # See 'Supported distributions' for available options
+          distribution: 'temurin'
           java-version: '21'
+          cache: 'gradle'
 
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
-      - uses: nrwl/nx-set-shas@v4
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
 
-      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
-      - name: 'Build Image'
+      - name: Build Android App
         run: npx nx build-android app
 
-      - name: 'Run Tests'
+      - name: Test Android App
         run: npx nx test-android app

@@ -1,8 +1,20 @@
 name: Setup AWS
+description: Configure AWS credentials and install certificates
 
 inputs:
-  aws-region:
-    required: true
+  aws-    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration
+        role-session-name: GitHub_to_AWS_via_FederatedOIDC
+        aws-region: ${{ inputs.aws-region }}
+        mask-aws-account-id: false
+
+    - name: Verify AWS Identity
+      shell: bash
+      run: |
+        echo "Verifying AWS credentials..."
+        aws sts get-caller-identity   required: true
     type: string
     default: us-east-1
   certificate-url:
@@ -47,23 +59,31 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Set Certificate File Name
+    - name: Set Certificate File Path
       id: get-certificate-file-name
       shell: bash
-      run: echo "value=$(pwd)/${{ env.CERTIFICATE_FILE }}" >> "$GITHUB_OUTPUT" 
+      run: echo "value=$(pwd)/${{ inputs.certificate-file }}" >> "$GITHUB_OUTPUT" 
 
-    - name: Download AWS Certs
+    - name: Download AWS Certificates
       shell: bash
-      run: wget -O ${{ inputs.certificate-file }} ${{ inputs.certificate-url }}
+      run: |
+        echo "Downloading AWS RDS certificate bundle..."
+        wget -O ${{ inputs.certificate-file }} ${{ inputs.certificate-url }}
+        
+    - name: Install AWS Certificates
+      shell: bash
+      run: |
+        echo "Installing certificates to system trust store..."
+        sudo cp ${{ inputs.certificate-file }} ${{ inputs.installed-cert-location }}
 
-    - name: Install AWS Certs
+    - name: Verify Certificate Installation
       shell: bash
-      run: sudo cp ${{ inputs.certificate-file }} ${{ inputs.installed-cert-location }}
+      run: |
+        echo "Verifying certificate installation..."
+        openssl x509 -in ${{ inputs.installed-cert-location }} -text -noout | head -10
 
-    - name: Test Cert
+    - name: Update Certificate Store
       shell: bash
-      run: openssl x509 -in ${{ inputs.installed-cert-location }} -text -noout
-
-    - name: Update Certs
-      shell: bash
-      run: sudo VERBOSE=1 update-ca-certificates -v
+      run: |
+        echo "Updating system certificate store..."
+        sudo update-ca-certificates
