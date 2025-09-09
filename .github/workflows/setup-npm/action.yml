@@ -15,7 +15,7 @@ runs:
       run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
 
     - name: Set up NPM cache
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       id: cached-npm-dependencies
       with:
         path: node_modules
