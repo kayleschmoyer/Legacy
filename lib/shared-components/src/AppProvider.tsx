@@ -54,18 +54,23 @@ const WebLayout = ({
 
   try {
     return (
-      <div
-        className={`app-container ${colorScheme || 'dark'}`}
-        style={{
-          minHeight: '100vh',
-          backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#1E1E1E',
-          color: colorScheme === 'light' ? '#222B45' : '#FFFFFF',
-        }}
+      <TamaguiProvider
+        config={config}
+        defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
-        <ConditionalProviders>
-          <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
-        </ConditionalProviders>
-      </div>
+        <div
+          className={`app-container ${colorScheme || 'dark'}`}
+          style={{
+            minHeight: '100vh',
+            backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#1E1E1E',
+            color: colorScheme === 'light' ? '#222B45' : '#FFFFFF',
+          }}
+        >
+          <ConditionalProviders>
+            <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
+          </ConditionalProviders>
+        </div>
+      </TamaguiProvider>
     );
   } catch (error) {
     console.warn('Failed to load Apollo client:', error);
