@@ -47,11 +47,21 @@ class UniversalLogger implements Logger {
       args.length > 0
         ? ' ' +
           args
-            .map((arg) =>
-              typeof arg === 'object' && arg !== null
-                ? JSON.stringify(arg, null, 2)
-                : String(arg)
-            )
+            .map((arg) => {
+              if (typeof arg === 'string') {
+                return arg;
+              } else if (typeof arg === 'number' || typeof arg === 'boolean') {
+                // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                return String(arg);
+              } else if (typeof arg === 'object' && arg !== null) {
+                return JSON.stringify(arg, null, 2);
+              } else if (arg === null || arg === undefined) {
+                // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                return String(arg);
+              } else {
+                return '[Unknown Type]';
+              }
+            })
             .join(' ')
         : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${formattedArgs}`;
@@ -64,10 +74,10 @@ class UniversalLogger implements Logger {
     if (!logFile) return;
 
     try {
-      // Dynamic imports for Node.js modules to avoid bundling issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-var-requires
+      // Use import() for dynamic imports in Node.js environments
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports  
       const path = require('path') as typeof import('path');
       const fullPath = path.resolve(process.cwd(), logFile);
       const formattedMessage =
@@ -135,9 +145,23 @@ if (isNode && typeof process !== 'undefined') {
   });
 
   process.on('unhandledRejection', (reason) => {
-    LOGGER.error(
-      'Promise rejected',
-      reason instanceof Error ? reason.message : String(reason)
-    );
+    let reasonString: string;
+    if (reason instanceof Error) {
+      reasonString = reason.message;
+    } else if (typeof reason === 'string') {
+      reasonString = reason;
+    } else if (typeof reason === 'number' || typeof reason === 'boolean') {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      reasonString = String(reason);
+    } else if (typeof reason === 'object' && reason !== null) {
+      reasonString = JSON.stringify(reason);
+    } else if (reason === null || reason === undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      reasonString = String(reason);
+    } else {
+      reasonString = '[Unknown rejection reason]';
+    }
+    
+    LOGGER.error('Promise rejected', reasonString);
   });
 }

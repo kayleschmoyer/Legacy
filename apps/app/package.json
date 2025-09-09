@@ -9,19 +9,19 @@
     "start": "react-native start"
   },
   "dependencies": {
-    "@expo/metro-config": "^0.20.17",
-    "expo": "^53.0.22",
-    "expo-router": "~5.1.5",
-    "react": "19.0.0",
-    "react-native": "0.79.5",
-    "react-native-reanimated": "~3.17.4",
-    "expo-image": "~2.4.0"
+    "@expo/metro-config": "*",
+    "expo": "*",
+    "expo-router": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-reanimated": "*",
+    "expo-image": "*"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0",
-    "@babel/preset-env": "^7.25.0",
-    "@babel/runtime": "^7.25.0",
-    "@expo/cli": "^0.24.20",
-    "@types/react": "~19.0.10"
+    "@babel/core": "*",
+    "@babel/preset-env": "*",
+    "@babel/runtime": "*",
+    "@expo/cli": "*",
+    "@types/react": "*"
   }
 }

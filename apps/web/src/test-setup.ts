@@ -37,6 +37,7 @@ jest.mock('react-native', () => {
 
 // Mock React Native SVG
 jest.mock('react-native-svg', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react');
   return {
     Svg: ({ children, ...props }) => React.createElement('svg', props, children),

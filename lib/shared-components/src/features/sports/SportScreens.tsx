@@ -79,29 +79,25 @@ export function SportScreen({
 }
 
 // Specific sport screen implementations
-export interface BaseballScreenProps
-  extends Omit<SportScreenProps, 'sportName'> {}
+export type BaseballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
 export function BaseballScreen(props: BaseballScreenProps): JSX.Element {
   return <SportScreen sportName="Baseball" {...props} />;
 }
 
-export interface FootballScreenProps
-  extends Omit<SportScreenProps, 'sportName'> {}
+export type FootballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
 export function FootballScreen(props: FootballScreenProps): JSX.Element {
   return <SportScreen sportName="Football" {...props} />;
 }
 
-export interface BasketballScreenProps
-  extends Omit<SportScreenProps, 'sportName'> {}
+export type BasketballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
 export function BasketballScreen(props: BasketballScreenProps): JSX.Element {
   return <SportScreen sportName="Basketball" {...props} />;
 }
 
-export interface HockeyScreenProps
-  extends Omit<SportScreenProps, 'sportName'> {}
+export type HockeyScreenProps = Omit<SportScreenProps, 'sportName'>;
 
 export function HockeyScreen(props: HockeyScreenProps): JSX.Element {
   return <SportScreen sportName="Hockey" {...props} />;

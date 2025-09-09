@@ -9,18 +9,18 @@ let getEnvVarRequired: any = () => '';
 let LOGGER: any = { error: () => {}, warn: () => {}, info: () => {} };
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const envUtilities = require('@legacy-sports/env-utilities');
   getEnvVarRequired = envUtilities.getEnvVarRequired;
-} catch (error) {
+} catch {
   // Fallback for test environment
 }
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const logging = require('@legacy-sports/logging');
   LOGGER = logging.LOGGER;
-} catch (error) {
+} catch {
   // Fallback for test environment
 }
 
@@ -28,9 +28,9 @@ try {
 let keychainModule: any = null;
 if (Platform.OS !== 'web') {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     keychainModule = require('react-native-keychain');
-  } catch (error) {
+  } catch {
     // Keychain not available, will use fallback
   }
 }

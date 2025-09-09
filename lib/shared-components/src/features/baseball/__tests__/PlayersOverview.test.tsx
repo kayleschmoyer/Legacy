@@ -4,8 +4,10 @@ import { PlayersOverview, TableView } from '../PlayersOverview';
 
 // Mock the UsefulTables components
 jest.mock('../../stats/UsefulTables', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const React = require('react');
   const { Text } = require('react-native');
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   return {
     BattingStatsTableWithData: () =>

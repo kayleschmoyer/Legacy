@@ -4,7 +4,8 @@
     "!**/*",
     "**/vite.config.*.timestamp*",
     "**/vitest.config.*.timestamp*",
-    "mocks/**"
+    "mocks/**",
+    "src/__mocks__/**/*.js"
   ],
   "parserOptions": {
     "project": ["./tsconfig.json", "./tsconfig.app.json"]

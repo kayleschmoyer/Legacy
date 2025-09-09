@@ -2,7 +2,7 @@
   "name": "@legacy-sports/bref-client",
   "version": "0.0.1",
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "*"
   },
   "scripts": {
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",

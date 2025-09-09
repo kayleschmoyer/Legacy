@@ -44,7 +44,7 @@ export class PgDbConnection<
         options.ssl = {
           ca: readFileSync(this.dbCertPath).toString(),
         };
-      } catch (error) {
+      } catch {
         // If cert file can't be read, fall back to basic SSL for AWS RDS
         options.ssl = {
           rejectUnauthorized: false,
