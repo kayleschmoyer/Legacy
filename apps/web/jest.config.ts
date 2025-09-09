@@ -11,11 +11,16 @@ export default {
   moduleNameMapper: {
     '^react-native$': 'react-native-web',
     '^react-native-svg$': 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js',
-    '^@react-native-picker/picker$': '<rootDir>/src/__mocks__/react-native-picker.js',
-    '^@react-navigation/native$': '<rootDir>/src/__mocks__/@react-navigation/native.js',
-    '^@react-navigation/drawer$': '<rootDir>/src/__mocks__/@react-navigation/drawer.js',
-    '^@react-navigation/stack$': '<rootDir>/src/__mocks__/@react-navigation/stack.js',
-    '^@tamagui/lucide-icons$': '<rootDir>/src/__mocks__/tamagui-lucide-icons.js',
+    '^@react-native-picker/picker$':
+      '<rootDir>/src/__mocks__/react-native-picker.js',
+    '^@react-navigation/native$':
+      '<rootDir>/src/__mocks__/@react-navigation/native.js',
+    '^@react-navigation/drawer$':
+      '<rootDir>/src/__mocks__/@react-navigation/drawer.js',
+    '^@react-navigation/stack$':
+      '<rootDir>/src/__mocks__/@react-navigation/stack.js',
+    '^@tamagui/lucide-icons$':
+      '<rootDir>/src/__mocks__/tamagui-lucide-icons.js',
     '^@tamagui/config/v4$': '<rootDir>/src/__mocks__/@tamagui/config/v4.js',
     '^@tamagui/(.*)$': '<rootDir>/src/__mocks__/tamagui.js',
   },

@@ -2,8 +2,8 @@
 
 /**
  * NX Workspace Dependency Validation Script
- * 
- * This script ensures that all projects in the workspace are using dependencies 
+ *
+ * This script ensures that all projects in the workspace are using dependencies
  * from the root package.json rather than maintaining their own versions.
  */
 
@@ -17,10 +17,10 @@ console.log('🔍 Validating workspace dependency management...\n');
 // Find all package.json files recursively
 function findPackageJsonFiles(dir, files = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  
+
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
-    
+
     if (entry.isDirectory()) {
       // Skip node_modules, dist, .nx, etc.
       if (!['node_modules', 'dist', '.nx', '.git'].includes(entry.name)) {
@@ -31,21 +31,29 @@ function findPackageJsonFiles(dir, files = []) {
       files.push(path.relative(rootPath, fullPath));
     }
   }
-  
+
   return files;
 }
 
 const packageJsonFiles = findPackageJsonFiles(rootPath);
 
-console.log(`Found ${packageJsonFiles.length} workspace package.json files to validate`);
-console.log('Files:', packageJsonFiles.slice(0, 10), packageJsonFiles.length > 10 ? '...' : '');
+console.log(
+  `Found ${packageJsonFiles.length} workspace package.json files to validate`,
+);
+console.log(
+  'Files:',
+  packageJsonFiles.slice(0, 10),
+  packageJsonFiles.length > 10 ? '...' : '',
+);
 
 // Get root package.json dependencies
 const rootPackageJsonPath = path.join(rootPath, 'package.json');
-const rootPackageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf8'));
+const rootPackageJson = JSON.parse(
+  fs.readFileSync(rootPackageJsonPath, 'utf8'),
+);
 const rootDeps = {
-  ...rootPackageJson.dependencies || {},
-  ...rootPackageJson.devDependencies || {}
+  ...(rootPackageJson.dependencies || {}),
+  ...(rootPackageJson.devDependencies || {}),
 };
 
 let issueCount = 0;
@@ -55,38 +63,41 @@ for (const file of packageJsonFiles) {
   const fullPath = path.join(rootPath, file);
   projectCount++;
   const projectName = path.dirname(file);
-  
+
   try {
     const packageJson = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
-    
+
     // Check dependencies
     const dependencies = packageJson.dependencies || {};
     const devDependencies = packageJson.devDependencies || {};
-    
+
     let hasIssues = false;
-    
+
     for (const [dep, version] of Object.entries(dependencies)) {
       if (rootDeps[dep] && version !== '*') {
         if (!hasIssues) {
           console.log(`\n📁 ${projectName}:`);
           hasIssues = true;
         }
-        console.log(`  ⚠️  Dependency "${dep}" should use "*" but has "${version}"`);
+        console.log(
+          `  ⚠️  Dependency "${dep}" should use "*" but has "${version}"`,
+        );
         issueCount++;
       }
     }
-    
+
     for (const [dep, version] of Object.entries(devDependencies)) {
       if (rootDeps[dep] && version !== '*') {
         if (!hasIssues) {
           console.log(`\n📁 ${projectName}:`);
           hasIssues = true;
         }
-        console.log(`  ⚠️  DevDependency "${dep}" should use "*" but has "${version}"`);
+        console.log(
+          `  ⚠️  DevDependency "${dep}" should use "*" but has "${version}"`,
+        );
         issueCount++;
       }
     }
-    
   } catch (error) {
     console.log(`❌ Error reading ${file}: ${error.message}`);
   }

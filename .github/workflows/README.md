@@ -5,18 +5,20 @@ This repository provides reusable actions for managing NPM dependencies in GitHu
 ## Available Actions
 
 ### 1. `setup-npm` - Complete Node.js and NPM Setup
+
 **Use when:** You need both Node.js setup and dependency installation.
 
 ```yaml
 - name: Setup NPM
   uses: ./.github/workflows/setup-npm
   with:
-    node-version: '20'  # optional, defaults to '20'
-    working-directory: '.'  # optional, defaults to '.'
-    skip-cache: 'false'  # optional, defaults to 'false'
+    node-version: '20' # optional, defaults to '20'
+    working-directory: '.' # optional, defaults to '.'
+    skip-cache: 'false' # optional, defaults to 'false'
 ```
 
 ### 2. `install-dependencies` - Core Dependency Installation
+
 **Use when:** You need maximum control over dependency installation with caching.
 
 ```yaml
@@ -28,25 +30,27 @@ This repository provides reusable actions for managing NPM dependencies in GitHu
 - name: Install Dependencies
   uses: ./.github/workflows/install-dependencies
   with:
-    cache-prefix: 'my-app'  # optional
-    working-directory: './my-app'  # optional
-    skip-cache: 'false'  # optional
+    cache-prefix: 'my-app' # optional
+    working-directory: './my-app' # optional
+    skip-cache: 'false' # optional
 ```
 
 ### 3. `install-npm-deps` - Dependencies Only
+
 **Use when:** Node.js is already configured and you just need to install dependencies.
 
 ```yaml
 - name: Install NPM Dependencies
   uses: ./.github/workflows/install-npm-deps
   with:
-    working-directory: './packages/api'  # optional
-    skip-cache: 'false'  # optional
+    working-directory: './packages/api' # optional
+    skip-cache: 'false' # optional
 ```
 
 ## Usage Examples
 
 ### Monorepo with Multiple Package Directories
+
 ```yaml
 steps:
   - name: Checkout
@@ -76,6 +80,7 @@ steps:
 ```
 
 ### Simple Single Package Setup
+
 ```yaml
 steps:
   - name: Checkout
@@ -86,6 +91,7 @@ steps:
 ```
 
 ### Force Fresh Install (No Cache)
+
 ```yaml
 steps:
   - name: Checkout

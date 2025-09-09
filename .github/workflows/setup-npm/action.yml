@@ -24,7 +24,7 @@ outputs:
     value: ${{ steps.install-deps.outputs.node-version }}
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4

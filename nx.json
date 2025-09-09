@@ -122,13 +122,16 @@
       }
     },
     "validate:workspace-deps": {
-      "executor": "nx:run-commands", 
+      "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/validate-workspace-deps.js"
       }
     },
     "validate": {
-      "dependsOn": ["validate:package-json", "validate:workspace-deps"]
+      "dependsOn": [
+        "validate:package-json",
+        "validate:workspace-deps"
+      ]
     }
   },
   "generators": {

@@ -77,7 +77,7 @@ class UniversalLogger implements Logger {
       // Use import() for dynamic imports in Node.js environments
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports  
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
       const fullPath = path.resolve(process.cwd(), logFile);
       const formattedMessage =
@@ -161,7 +161,7 @@ if (isNode && typeof process !== 'undefined') {
     } else {
       reasonString = '[Unknown rejection reason]';
     }
-    
+
     LOGGER.error('Promise rejected', reasonString);
   });
 }

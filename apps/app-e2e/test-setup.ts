@@ -10,7 +10,9 @@ jest.setTimeout(120000);
 // Global test configuration
 beforeAll(() => {
   console.log('📱 App E2E Tests Starting');
-  console.log('✅ For full React Native e2e tests, configure Detox with simulators');
+  console.log(
+    '✅ For full React Native e2e tests, configure Detox with simulators',
+  );
 });
 
 beforeEach(() => {
@@ -29,13 +31,13 @@ process.on('unhandledRejection', (reason, promise) => {
 // Simple test utilities without Detox dependency
 export const TestUtils = {
   delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   },
 
   checkEnvironment() {
     return {
       nodeEnv: process.env.NODE_ENV || 'development',
-      testMode: true
+      testMode: true,
     };
-  }
+  },
 };

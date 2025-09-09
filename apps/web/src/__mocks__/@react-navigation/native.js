@@ -2,7 +2,11 @@
 const React = require('react');
 
 const NavigationContainer = ({ children, ...props }) => {
-  return React.createElement('div', { 'data-testid': 'navigation-container', ...props }, children);
+  return React.createElement(
+    'div',
+    { 'data-testid': 'navigation-container', ...props },
+    children,
+  );
 };
 
 module.exports = {

@@ -3,7 +3,9 @@ describe('App E2E Tests', () => {
     // Basic validation that the e2e test setup is working
     expect(true).toBe(true);
     console.log('✅ app-e2e: Test configuration validated successfully!');
-    console.log('✅ For full React Native e2e tests, ensure Detox and simulators are configured.');
+    console.log(
+      '✅ For full React Native e2e tests, ensure Detox and simulators are configured.',
+    );
   });
 
   it('should check test environment setup', () => {

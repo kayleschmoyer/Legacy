@@ -17,7 +17,7 @@ jobs:
     name: Test setup-npm Action
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
     name: Test install-dependencies Action
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
     name: Test install-npm-deps Action
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -89,7 +89,7 @@ jobs:
     name: Test Force Fresh Install
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

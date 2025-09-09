@@ -19,7 +19,7 @@ describe('App', () => {
     const { baseElement } = render(
       <BrowserRouter>
         <App />
-      </BrowserRouter>
+      </BrowserRouter>,
     );
     expect(baseElement).toBeTruthy();
   });
@@ -28,12 +28,12 @@ describe('App', () => {
     const { container } = render(
       <BrowserRouter>
         <App />
-      </BrowserRouter>
+      </BrowserRouter>,
     );
 
     // Check for the loading spinner (the actual LoadingPanel component)
     const loadingSpinner = container.querySelector(
-      '[style*="animation: spin"]'
+      '[style*="animation: spin"]',
     );
     expect(loadingSpinner).toBeTruthy();
   });
@@ -42,12 +42,12 @@ describe('App', () => {
     const { getByText, container } = render(
       <BrowserRouter>
         <App />
-      </BrowserRouter>
+      </BrowserRouter>,
     );
 
     // Initially shows loading
     const loadingSpinner = container.querySelector(
-      '[style*="animation: spin"]'
+      '[style*="animation: spin"]',
     );
     expect(loadingSpinner).toBeTruthy();
 
@@ -66,7 +66,7 @@ describe('App', () => {
       const { container } = render(
         <BrowserRouter>
           <App />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       // Fast-forward time to complete loading and show the homepage
@@ -82,7 +82,7 @@ describe('App', () => {
       const { container } = render(
         <BrowserRouter>
           <App />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -101,7 +101,7 @@ describe('App', () => {
       const { getByText } = render(
         <BrowserRouter>
           <App />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -120,7 +120,7 @@ describe('App', () => {
       const { container } = render(
         <BrowserRouter>
           <App />
-        </BrowserRouter>
+        </BrowserRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -139,7 +139,7 @@ describe('App', () => {
       const { getByText } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -154,7 +154,7 @@ describe('App', () => {
       const { getByText } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -170,7 +170,7 @@ describe('App', () => {
       const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -186,7 +186,7 @@ describe('App', () => {
       const { container, getByText } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Fast-forward time to complete loading
@@ -207,12 +207,12 @@ describe('App', () => {
       const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Should show loading panel initially
       const loadingSpinner = container.querySelector(
-        '[style*="animation: spin"]'
+        '[style*="animation: spin"]',
       );
       expect(loadingSpinner).toBeTruthy();
     });
@@ -221,7 +221,7 @@ describe('App', () => {
       const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
-        </MemoryRouter>
+        </MemoryRouter>,
       );
 
       // Fast-forward time to complete loading

@@ -30,7 +30,7 @@ describe('PlayersOverview', () => {
 
   it('renders correctly with custom initial view', () => {
     const { getByText } = render(
-      <PlayersOverview initialView={TableView.PITCHING} />
+      <PlayersOverview initialView={TableView.PITCHING} />,
     );
 
     expect(getByText('Batting')).toBeTruthy();

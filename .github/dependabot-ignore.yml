@@ -1,0 +1,38 @@
+# Dependabot Ignore Rules
+# This file helps Dependabot avoid creating PRs for updates that are known to cause peer dependency conflicts
+
+# TypeScript ESLint - major version updates often break peer dependencies
+- dependency-name: '@typescript-eslint/eslint-plugin'
+  update-types: ['version-update:semver-major']
+- dependency-name: '@typescript-eslint/parser'
+  update-types: ['version-update:semver-major']
+- dependency-name: 'eslint'
+  update-types: ['version-update:semver-major']
+
+# React ecosystem - major updates require careful coordination
+- dependency-name: 'react'
+  update-types: ['version-update:semver-major']
+- dependency-name: 'react-dom'
+  update-types: ['version-update:semver-major']
+- dependency-name: 'react-native'
+  update-types: ['version-update:semver-major']
+
+# NX - major updates often require migration scripts
+- dependency-name: 'nx'
+  update-types: ['version-update:semver-major']
+- dependency-name: '@nx/*'
+  update-types: ['version-update:semver-major']
+
+# Jest ecosystem - major updates can break testing setup
+- dependency-name: 'jest'
+  update-types: ['version-update:semver-major']
+- dependency-name: '@jest/*'
+  update-types: ['version-update:semver-major']
+
+# Expo - major updates require careful React Native version coordination
+- dependency-name: 'expo'
+  update-types: ['version-update:semver-major']
+
+# Storybook - major updates often require migration
+- dependency-name: '@storybook/*'
+  update-types: ['version-update:semver-major']

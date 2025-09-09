@@ -5,6 +5,7 @@ This repository uses an enhanced Dependabot configuration designed to prevent pe
 ## 🎯 Key Features
 
 ### 📦 **Ecosystem-Aware Grouping**
+
 Dependencies are grouped by ecosystem to ensure related packages are updated together:
 
 - **TypeScript ESLint**: `@typescript-eslint/*`, `eslint`
@@ -19,6 +20,7 @@ Dependencies are grouped by ecosystem to ensure related packages are updated tog
 - **Dev Tools**: TypeScript, Prettier, build tools
 
 ### 🚫 **Major Version Ignores**
+
 Major version updates are ignored for packages known to cause peer dependency conflicts:
 
 - ESLint ecosystem (requires manual coordination)
@@ -29,6 +31,7 @@ Major version updates are ignored for packages known to cause peer dependency co
 - Storybook (migration required)
 
 ### 🔍 **Automatic Validation**
+
 All Dependabot PRs are automatically validated:
 
 - Peer dependency conflict detection
@@ -37,12 +40,13 @@ All Dependabot PRs are automatically validated:
 - TypeScript ESLint configuration validation
 
 ### ✅ **Safe Auto-Approval**
+
 Minor and patch updates without peer conflicts are automatically approved if validation passes.
 
 ## 📋 **Update Schedule**
 
 - **NPM Dependencies**: Weekly (Mondays at 9 AM)
-- **GitHub Actions**: Weekly (Tuesdays at 9 AM)  
+- **GitHub Actions**: Weekly (Tuesdays at 9 AM)
 - **Docker**: Monthly (First Monday at 9 AM)
 
 ## 🔧 **Manual Override Process**
@@ -60,24 +64,28 @@ For major version updates that are ignored:
 When Dependabot PRs show peer conflicts:
 
 ### 1. **Check the validation workflow output**
+
 - Review peer dependency conflict details
 - Check which packages are conflicting
 
 ### 2. **Common conflict patterns:**
 
 **ESLint ecosystem conflicts:**
+
 ```bash
 # Usually requires updating both parser and plugin together
 npm install @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest --save-dev
 ```
 
 **React ecosystem conflicts:**
+
 ```bash
 # Often requires updating types packages
 npm install @types/react@latest @types/react-dom@latest --save-dev
 ```
 
 **NX ecosystem conflicts:**
+
 ```bash
 # May require NX migration
 npx nx migrate latest
@@ -86,16 +94,19 @@ npx nx migrate latest
 ### 3. **Resolution strategies:**
 
 **Option A: Accept with legacy peer deps**
+
 - Works for most cases
 - Monitor for runtime issues
 - Plan future alignment
 
 **Option B: Manual resolution**
+
 - Update conflicting packages manually
 - Test thoroughly
 - Create single coordinated PR
 
 **Option C: Wait for ecosystem alignment**
+
 - Close Dependabot PR
 - Wait for compatible versions
 - Re-enable updates later
@@ -118,7 +129,7 @@ Track dependency health:
 ## 🔄 **Best Practices**
 
 1. **Review grouped updates carefully** - multiple packages changing together
-2. **Test major functionality** after React/React Native updates  
+2. **Test major functionality** after React/React Native updates
 3. **Update local environment** regularly to catch issues early
 4. **Monitor build times** - dependency conflicts can slow builds
 5. **Keep package-lock.json committed** - ensures reproducible builds

@@ -9,55 +9,66 @@ We've implemented automated PR checks to ensure all `package.json` files across 
 ## 📋 Standards Enforced
 
 ### 1. **Scoped Naming**
+
 ```json
 {
   "name": "@legacy-sports/project-name"
 }
 ```
+
 - All packages must use the `@legacy-sports/` scope
 - Prevents conflicts and provides clear ownership
 
 ### 2. **Consistent Versioning**
+
 ```json
 {
   "version": "0.0.1"
 }
 ```
+
 - All workspace packages use version `0.0.1`
 - Root package.json manages actual versioning
 
 ### 3. **Private Flag**
+
 ```json
 {
   "private": true
 }
 ```
+
 - Prevents accidental publishing to npm
 - Required for all workspace packages
 
 ### 4. **Source Paths (Libraries)**
+
 ```json
 {
   "main": "./src/index.ts",
   "types": "./src/index.ts"
 }
 ```
+
 - Libraries should point to TypeScript source files
 - Allows proper IDE intellisense and NX builds
 
 ### 5. **Clean Metadata**
+
 ```json
 {
   // ❌ Remove these fields:
   // "description": "...",
-  // "author": "...", 
+  // "author": "...",
   // "license": "..."
 }
 ```
+
 - Remove unnecessary boilerplate fields
 - Keep configurations minimal and focused
 
 ### 6. **Wildcard Dependencies**
+
 ```json
 {
   "dependencies": {
@@ -66,10 +77,12 @@ We've implemented automated PR checks to ensure all `package.json` files across 
   }
 }
 ```
+
 - Use `"*"` for dependencies managed in root `package.json`
 - Ensures version consistency across workspace
 
 ### 7. **Important Scripts Preservation**
+
 ```json
 {
   "scripts": {
@@ -78,6 +91,7 @@ We've implemented automated PR checks to ensure all `package.json` files across 
   }
 }
 ```
+
 - Keep build, test, dev, and tool-specific scripts
 - Remove empty `"scripts": {}` objects
 
@@ -100,7 +114,7 @@ We've implemented automated PR checks to ensure all `package.json` files across 
 # Validate package.json standards
 npm run validate:package-json
 
-# Validate workspace dependencies  
+# Validate workspace dependencies
 npm run validate:workspace-deps
 
 # Run both validations
@@ -117,12 +131,14 @@ npx nx validate
 ### When PR Checks Fail
 
 1. **Run Local Validation**
+
    ```bash
    npm run validate
    ```
 
 2. **Read Error Messages**
    The validation script provides specific guidance:
+
    ```
    📁 lib/my-package:
      ❌ Name should start with "@legacy-sports/" but is "my-package"
@@ -142,16 +158,16 @@ npx nx validate
 
 ```json
 {
-  "name": "@legacy-sports/my-package",  // ✅ Add scope
-  "version": "0.0.1",                   // ✅ Standard version
-  "private": true,                      // ✅ Add private flag
-  "main": "./src/index.ts",            // ✅ Point to source
-  "types": "./src/index.ts",           // ✅ Point to source
+  "name": "@legacy-sports/my-package", // ✅ Add scope
+  "version": "0.0.1", // ✅ Standard version
+  "private": true, // ✅ Add private flag
+  "main": "./src/index.ts", // ✅ Point to source
+  "types": "./src/index.ts", // ✅ Point to source
   "scripts": {
-    "build": "vite build"              // ✅ Keep important scripts
+    "build": "vite build" // ✅ Keep important scripts
   },
   "dependencies": {
-    "react": "*"                       // ✅ Use wildcards
+    "react": "*" // ✅ Use wildcards
   }
 }
 ```
@@ -159,16 +175,19 @@ npx nx validate
 ## 📖 Benefits
 
 ### For Developers
+
 - **Consistent Experience**: All packages follow same patterns
 - **Better IDE Support**: Proper paths enable intellisense
 - **Faster Builds**: Optimized dependency resolution
 
 ### For the Project
+
 - **No Version Conflicts**: Centralized dependency management
 - **Easier Maintenance**: Consistent package structures
 - **Automated Quality**: PR checks prevent regressions
 
 ### For CI/CD
+
 - **Faster Pipelines**: Efficient dependency resolution
 - **Reliable Builds**: Consistent configurations
 - **Early Detection**: Issues caught before merge
@@ -201,6 +220,7 @@ When creating new packages:
 ## 📊 Monitoring
 
 The validation runs:
+
 - ✅ On every PR with package.json changes
 - ✅ On main branch pushes
 - ✅ In local development with `npm run validate`

@@ -1,11 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
-import {
-  Button,
-  Separator,
-  Text,
-  YStack,
-} from 'tamagui';
+import { Button, Separator, Text, YStack } from 'tamagui';
 import { ListRenderItem, ScrollView } from 'react-native';
 import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
 import {

@@ -1,6 +1,14 @@
 {
   "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "dist", "jest-setup.js", "node_modules/**", ".cache/**", "storybook-static/**", ".storybook/**"],
+  "ignorePatterns": [
+    "!**/*",
+    "dist",
+    "jest-setup.js",
+    "node_modules/**",
+    ".cache/**",
+    "storybook-static/**",
+    ".storybook/**"
+  ],
   "parserOptions": {
     "project": ["./tsconfig.json", "./tsconfig.lib.json"]
   },

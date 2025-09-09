@@ -21,7 +21,7 @@ outputs:
     value: ${{ steps.install-deps.outputs.cache-hit }}
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Install Dependencies
       id: install-deps
