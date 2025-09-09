@@ -1,5 +1,27 @@
 name: Setup NPM
-description: Setup Node.js and NPM with caching
+description: Setup Node.js and install NPM dependencies with caching
+
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+  working-directory:
+    description: 'Working directory for npm operations'
+    required: false
+    default: '.'
+  skip-cache:
+    description: 'Skip cache and force fresh install'
+    required: false
+    default: 'false'
+
+outputs:
+  cache-hit:
+    description: 'Whether dependencies were restored from cache'
+    value: ${{ steps.install-deps.outputs.cache-hit }}
+  node-version:
+    description: 'The Node.js version being used'
+    value: ${{ steps.install-deps.outputs.node-version }}
 
 runs:
   using: "composite"
@@ -7,25 +29,14 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: ${{ inputs.node-version }}
         cache: 'npm'
-
-    - name: Get Node Version
-      id: full-node-version
-      shell: bash
-      run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
-
-    - name: Cache node_modules
-      uses: actions/cache@v4
-      id: cached-npm-dependencies
-      with:
-        path: node_modules
-        key: node_modules-${{ runner.os }}-${{ steps.full-node-version.outputs.version }}-${{ hashFiles('package-lock.json') }}
-        restore-keys: |
-          node_modules-${{ runner.os }}-${{ steps.full-node-version.outputs.version }}-
-          node_modules-${{ runner.os }}-
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
     - name: Install Dependencies
-      if: steps.cached-npm-dependencies.outputs.cache-hit != 'true'
-      shell: bash
-      run: npm ci --legacy-peer-deps
+      id: install-deps
+      uses: ./.github/workflows/install-dependencies
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        skip-cache: ${{ inputs.skip-cache }}
+        cache-prefix: 'npm-deps'

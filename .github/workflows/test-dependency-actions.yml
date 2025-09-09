@@ -1,0 +1,106 @@
+name: Test Dependency Actions
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/install-dependencies/**'
+      - '.github/workflows/install-npm-deps/**'
+      - '.github/workflows/setup-npm/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-setup-npm:
+    name: Test setup-npm Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Test Setup NPM
+        id: setup-npm
+        uses: ./.github/workflows/setup-npm
+
+      - name: Verify Setup NPM Output
+        run: |
+          echo "Cache hit: ${{ steps.setup-npm.outputs.cache-hit }}"
+          echo "Node version: ${{ steps.setup-npm.outputs.node-version }}"
+          echo "Verifying npx command works..."
+          npx --version
+
+  test-install-dependencies:
+    name: Test install-dependencies Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test Install Dependencies
+        id: install-deps
+        uses: ./.github/workflows/install-dependencies
+        with:
+          cache-prefix: 'test-deps'
+
+      - name: Verify Install Dependencies Output
+        run: |
+          echo "Cache hit: ${{ steps.install-deps.outputs.cache-hit }}"
+          echo "Node version: ${{ steps.install-deps.outputs.node-version }}"
+          echo "Verifying node_modules exists..."
+          ls -la node_modules | head -10
+
+  test-install-npm-deps:
+    name: Test install-npm-deps Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Test Install NPM Deps
+        id: install-npm-deps
+        uses: ./.github/workflows/install-npm-deps
+
+      - name: Verify Install NPM Deps Output
+        run: |
+          echo "Cache hit: ${{ steps.install-npm-deps.outputs.cache-hit }}"
+          echo "Verifying dependencies work..."
+          npm list --depth=0 || true
+
+  test-force-fresh-install:
+    name: Test Force Fresh Install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Test Fresh Install
+        uses: ./.github/workflows/setup-npm
+        with:
+          skip-cache: 'true'
+
+      - name: Verify Fresh Install
+        run: |
+          echo "Fresh install completed"
+          echo "Dependencies should be installed without cache"
+          npm list --depth=0 || true
