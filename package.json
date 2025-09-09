@@ -164,7 +164,7 @@
     "@babel/preset-react": "^7.14.5",
     "@config-plugins/detox": "^11.0.0",
     "@graphql-codegen/cli": "^5.0.7",
-    "@graphql-codegen/typescript": "^4.1.6",
+    "@graphql-codegen/typescript": "^5.0.0",
     "@graphql-codegen/typescript-operations": "^4.6.1",
     "@graphql-codegen/typescript-react-apollo": "^4.3.3",
     "@nx/detox": "21.4.1",
