@@ -52,8 +52,19 @@ runs:
         echo "Node version: $(node --version)"
         echo "NPM version: $(npm --version)"
         
-        # Install with legacy peer deps to handle React Native dependencies
-        npm ci --legacy-peer-deps
+        # First try clean install without legacy peer deps
+        if npm ci 2>/dev/null; then
+          echo "✅ Clean install successful (no peer dependency conflicts)"
+        else
+          echo "⚠️ Peer dependency conflicts detected, using --legacy-peer-deps"
+          echo "This may indicate version mismatches that should be reviewed"
+          
+          # Fall back to legacy peer deps for React Native compatibility
+          npm ci --legacy-peer-deps
+          
+          echo "⚠️ Installation completed with --legacy-peer-deps"
+          echo "Consider reviewing peer dependency conflicts in the future"
+        fi
         
         echo "Dependencies installed successfully!"
 
