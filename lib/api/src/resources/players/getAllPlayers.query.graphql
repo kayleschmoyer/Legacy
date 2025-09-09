@@ -1,14 +1,14 @@
 # Query to fetch all players with pagination and sorting
 query GetAllPlayers(
-  $limit: Int,
-  $offset: Int, 
-  $orderBy: String,
+  $limit: Int
+  $offset: Int
+  $orderBy: String
   $orderDirection: String
 ) {
   players(
-    limit: $limit,
-    offset: $offset,
-    orderBy: $orderBy,
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
     orderDirection: $orderDirection
   ) {
     id

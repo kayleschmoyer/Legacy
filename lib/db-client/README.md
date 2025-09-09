@@ -5,6 +5,7 @@ Database client library and migration tools for PostgreSQL database management.
 ## 🗄️ Overview
 
 This library provides:
+
 - **Database client**: Type-safe database access with Drizzle ORM
 - **Migrations**: Schema version control and deployment
 - **Utilities**: Database connection management and helpers
@@ -48,7 +49,7 @@ const players = await db.select().from(playersTable);
 await db.insert(playersTable).values({
   name: 'John Doe',
   position: 'QB',
-  team: 'Eagles'
+  team: 'Eagles',
 });
 ```
 
@@ -83,6 +84,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/legacy_sports
 ### AWS RDS Configuration
 
 For production, database credentials are stored in AWS Secrets Manager:
+
 - Secret name: `legacy-sports-dev-db-creds`
 - Auto-rotation enabled
 - VPC-only access
@@ -92,21 +94,25 @@ For production, database credentials are stored in AWS Secrets Manager:
 ### Core Tables
 
 **Players**:
+
 - Player information and statistics
 - Position and team associations
 - Performance metrics
 
 **Games**:
+
 - Game schedules and results
 - Team matchups
 - Score tracking
 
 **Statistics**:
+
 - Player performance data
 - Game-by-game stats
 - Season aggregations
 
 **Teams**:
+
 - Team information
 - League associations
 - Historical data
@@ -133,6 +139,7 @@ Teams ──< Players
 ### Type Generation
 
 Types are automatically generated from the schema:
+
 - Table types for inserts/selects
 - Relationship types
 - Query result types
@@ -175,6 +182,7 @@ npm run test:integration
 ### Test Database
 
 Separate test database for isolated testing:
+
 - Automatic setup/teardown
 - Transaction rollback per test
 - Seeded test data
@@ -184,6 +192,7 @@ Separate test database for isolated testing:
 ### Migration System
 
 Uses Drizzle migration system:
+
 - SQL-based migrations
 - Version tracking
 - Rollback support
@@ -243,7 +252,7 @@ const teamStats = await db
   .select({
     team: playersTable.team,
     totalPoints: sum(playersTable.points),
-    avgPoints: avg(playersTable.points)
+    avgPoints: avg(playersTable.points),
   })
   .from(playersTable)
   .groupBy(playersTable.team);
@@ -253,8 +262,8 @@ const topPlayers = await db
   .select()
   .from(playersTable)
   .where(
-    playersTable.points > 
-    db.select({ avg: avg(playersTable.points) }).from(playersTable)
+    playersTable.points >
+      db.select({ avg: avg(playersTable.points) }).from(playersTable),
   );
 ```
 
@@ -301,16 +310,19 @@ console.log(`Idle connections: ${pool.idleCount}`);
 ### Common Issues
 
 **Connection failures**:
+
 - Check database credentials
 - Verify network connectivity
 - Review security group settings
 
 **Migration errors**:
+
 - Check migration SQL syntax
 - Verify schema conflicts
 - Review transaction boundaries
 
 **Performance issues**:
+
 - Analyze query execution plans
 - Check index usage
 - Monitor connection pool

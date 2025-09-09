@@ -6,12 +6,12 @@ AWS Lambda functions providing the serverless backend for Legacy Sports.
 
 The backend consists of multiple Lambda functions handling different aspects of the application:
 
-| Function | Purpose | Language | Framework |
-|----------|---------|----------|-----------|
-| **GraphQL** | Main API for data queries and mutations | TypeScript | Apollo Server |
-| **OAuth Proxy** | Google OAuth authentication flow | TypeScript | Express.js |
-| **Stats Lambda** | Background statistics processing | TypeScript | Custom |
-| **Game Selection** | Game data management | TypeScript | Custom |
+| Function           | Purpose                                 | Language   | Framework     |
+| ------------------ | --------------------------------------- | ---------- | ------------- |
+| **GraphQL**        | Main API for data queries and mutations | TypeScript | Apollo Server |
+| **OAuth Proxy**    | Google OAuth authentication flow        | TypeScript | Express.js    |
+| **Stats Lambda**   | Background statistics processing        | TypeScript | Custom        |
+| **Game Selection** | Game data management                    | TypeScript | Custom        |
 
 ## 🏗️ Shared Architecture
 
@@ -26,6 +26,7 @@ The backend consists of multiple Lambda functions handling different aspects of 
 ### Environment Variables
 
 All functions receive:
+
 - `DB_HOST`: PostgreSQL connection string
 - `DB_CREDS_SECRET_NAME`: AWS Secrets Manager secret name
 - `AWS_REGION`: Deployment region
@@ -40,6 +41,7 @@ The main API serving all data queries and mutations.
 **Endpoints**: `/graphql`
 **Method**: POST
 **Features**:
+
 - Apollo Server with TypeScript
 - Schema-first GraphQL
 - Database connection pooling
@@ -47,6 +49,7 @@ The main API serving all data queries and mutations.
 - Error handling and logging
 
 **Key Queries**:
+
 - `getAllPlayers`: Fetch player data
 - `getGameStats`: Game statistics
 - `getSeasonData`: Season information
@@ -58,12 +61,14 @@ Handles Google OAuth authentication flows.
 **Endpoints**: `/oauth/*`
 **Methods**: GET, POST
 **Features**:
+
 - Google OAuth 2.0 integration
 - JWT token management
 - Session handling
 - Secure cookie management
 
 **Flows**:
+
 - Login initiation
 - OAuth callback handling
 - Token refresh
@@ -75,6 +80,7 @@ Background processing for statistics and data aggregation.
 
 **Trigger**: SQS queue messages
 **Features**:
+
 - Batch processing
 - Statistics calculations
 - Data aggregation
@@ -87,6 +93,7 @@ Manages game data and selection logic.
 **Endpoints**: `/games`
 **Methods**: GET, POST
 **Features**:
+
 - Game data retrieval
 - Selection algorithms
 - Cache management
@@ -114,6 +121,7 @@ npm test
 ### Shared Dependencies
 
 Common packages are included in a Lambda Layer:
+
 - Database client libraries
 - Utility functions
 - Shared types and interfaces
@@ -170,6 +178,7 @@ sam local invoke GraphQLFunction --event events/test-event.json
 ### Automatic Deployment
 
 GitHub Actions handles deployment:
+
 - **Trigger**: Push to main branch
 - **Build**: Package functions
 - **Deploy**: Update via Terraform
@@ -192,6 +201,7 @@ npm run deploy
 ### Build Process
 
 Each function follows the same build pattern:
+
 1. TypeScript compilation
 2. Dependency bundling
 3. ZIP package creation
@@ -203,6 +213,7 @@ Each function follows the same build pattern:
 ### Function Configuration
 
 Standard settings across all functions:
+
 - **Memory**: 256MB (adjustable per function)
 - **Timeout**: 30 seconds (API functions), 5 minutes (processing)
 - **Runtime**: Node.js 18.x
@@ -211,6 +222,7 @@ Standard settings across all functions:
 ### VPC Configuration
 
 All functions run in private subnets:
+
 - No direct internet access
 - Database access via security groups
 - NAT Gateway for external API calls
@@ -218,6 +230,7 @@ All functions run in private subnets:
 ### IAM Permissions
 
 Each function has minimal required permissions:
+
 - VPC network access
 - CloudWatch logging
 - Secrets Manager access
@@ -228,6 +241,7 @@ Each function has minimal required permissions:
 ### CloudWatch Metrics
 
 Standard metrics for all functions:
+
 - Invocation count
 - Duration
 - Error rate
@@ -236,6 +250,7 @@ Standard metrics for all functions:
 ### Custom Metrics
 
 Application-specific metrics:
+
 - Database connection time
 - Query performance
 - Authentication success rate
@@ -243,6 +258,7 @@ Application-specific metrics:
 ### Logging
 
 Structured logging with:
+
 - Request/response logging
 - Error details and stack traces
 - Performance timing
@@ -253,16 +269,19 @@ Structured logging with:
 ### Common Issues
 
 **Cold start performance**:
+
 - Monitor duration metrics
 - Consider provisioned concurrency
 - Optimize package size
 
 **Database connection issues**:
+
 - Check VPC configuration
 - Verify security groups
 - Monitor connection pool
 
 **Memory issues**:
+
 - Monitor memory usage
 - Adjust function memory
 - Profile function execution
@@ -270,6 +289,7 @@ Structured logging with:
 ### Debugging
 
 **View logs**:
+
 ```bash
 # Recent logs
 aws logs tail /aws/lambda/legacy-sports-dev-graphql --follow
@@ -279,6 +299,7 @@ aws logs filter-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphq
 ```
 
 **Test function**:
+
 ```bash
 # Direct invocation
 aws lambda invoke --function-name legacy-sports-dev-graphql response.json
@@ -290,11 +311,13 @@ cat response.json
 ### Performance Optimization
 
 **Package size**:
+
 - Use webpack for bundling
 - Exclude dev dependencies
 - Use Lambda layers for shared code
 
 **Runtime performance**:
+
 - Connection pooling
 - Caching strategies
 - Async/await optimization

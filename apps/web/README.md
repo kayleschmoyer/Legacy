@@ -59,6 +59,7 @@ VITE_GRAPHQL_HOST=https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/gra
 ### GraphQL Configuration
 
 Apollo Client is configured in `src/lib/apollo-client.ts`:
+
 - Connects to AWS Lambda GraphQL API
 - Includes operation name in query parameters
 - Error handling and caching configured
@@ -66,6 +67,7 @@ Apollo Client is configured in `src/lib/apollo-client.ts`:
 ### Routing Configuration
 
 Uses Hash Router for GitHub Pages compatibility:
+
 - URLs like `/#/players` instead of `/players`
 - All routes work with direct links
 - No server-side configuration needed
@@ -116,6 +118,7 @@ npm run deploy
 ### Tamagui Integration
 
 Shared UI components with mobile app:
+
 - Cross-platform design system
 - Dark/light theme support
 - Responsive breakpoints
@@ -132,6 +135,7 @@ Shared UI components with mobile app:
 ### Hot Module Replacement
 
 Vite provides fast HMR:
+
 - Instant updates on file changes
 - Preserves component state
 - CSS hot reloading
@@ -164,6 +168,7 @@ npm run analyze
 ### Common Issues
 
 **Build fails**:
+
 ```bash
 # Clear cache and rebuild
 rm -rf dist node_modules
@@ -172,15 +177,18 @@ npm run build
 ```
 
 **GraphQL connection issues**:
+
 - Check network tab for failed requests
 - Verify GraphQL endpoint URL
 - Check AWS Lambda function status
 
 **Routing doesn't work on GitHub Pages**:
+
 - Ensure Hash Router is being used
 - Check base path configuration in `vite.config.ts`
 
 **Styling issues**:
+
 - Verify Tamagui provider is wrapping the app
 - Check CSS import order
 - Clear browser cache
@@ -188,11 +196,13 @@ npm run build
 ### Performance Optimization
 
 **Bundle size**:
+
 - Use dynamic imports for large components
 - Configure manual chunks in Vite config
 - Analyze bundle with `npm run analyze`
 
 **Runtime performance**:
+
 - Use React.memo for expensive components
 - Implement proper Apollo Client caching
 - Optimize images and assets

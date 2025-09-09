@@ -46,6 +46,7 @@ terraform apply
 ### API Gateway
 
 Central entry point for all API requests:
+
 - **Base URL**: `https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev`
 - **Endpoints**:
   - `/graphql` - GraphQL API
@@ -55,12 +56,12 @@ Central entry point for all API requests:
 
 ### Lambda Functions
 
-| Function | Purpose | Endpoint |
-|----------|---------|----------|
-| **GraphQL** | Main API for data queries | `/graphql` |
-| **OAuth Proxy** | Google OAuth authentication | `/oauth` |
-| **Stats Lambda** | Statistics processing | `/stats` |
-| **Game Selection** | Game data management | `/games` |
+| Function           | Purpose                     | Endpoint   |
+| ------------------ | --------------------------- | ---------- |
+| **GraphQL**        | Main API for data queries   | `/graphql` |
+| **OAuth Proxy**    | Google OAuth authentication | `/oauth`   |
+| **Stats Lambda**   | Statistics processing       | `/stats`   |
+| **Game Selection** | Game data management        | `/games`   |
 
 ### Database
 
@@ -79,6 +80,7 @@ Central entry point for all API requests:
 ### GraphQL API (`lambdas/graphql/`)
 
 Main API serving GraphQL queries:
+
 - Player data queries
 - Statistics aggregation
 - Real-time data updates
@@ -91,6 +93,7 @@ npm run deploy:graphql
 ### OAuth Proxy (`lambdas/oauth-proxy/`)
 
 Handles Google OAuth authentication:
+
 - Login flow management
 - Token refresh
 - Session management
@@ -103,6 +106,7 @@ npm run deploy:oauth
 ### Stats Lambda (`lambdas/stats-lambda/`)
 
 Background processing for statistics:
+
 - Data aggregation
 - Performance calculations
 - Historical data processing
@@ -132,6 +136,7 @@ variable "aws_region" {
 ### Secrets Management
 
 Sensitive data stored in AWS Secrets Manager:
+
 - Database credentials
 - OAuth client secrets
 - JWT signing keys
@@ -139,6 +144,7 @@ Sensitive data stored in AWS Secrets Manager:
 ### Database Configuration
 
 PostgreSQL RDS instance with:
+
 - Automated backups
 - Multi-AZ for production
 - Security group restrictions
@@ -171,6 +177,7 @@ npm run health:check
 ### CloudWatch
 
 All Lambda functions automatically log to CloudWatch:
+
 - Function execution logs
 - Performance metrics
 - Error tracking
@@ -185,6 +192,7 @@ terraform output
 ```
 
 Key outputs:
+
 - `graphql_endpoint`: GraphQL API URL
 - `api_gateway_url`: Base API URL
 - Environment variables summary
@@ -194,16 +202,19 @@ Key outputs:
 ### Common Issues
 
 **Terraform fails to apply**:
+
 - Check AWS credentials and permissions
 - Verify region configuration
 - Review state file for conflicts
 
 **Lambda deployment fails**:
+
 - Check function size limits
 - Verify IAM permissions
 - Review CloudWatch logs
 
 **Database connection issues**:
+
 - Check security group rules
 - Verify subnet configuration
 - Test from Lambda function
@@ -211,6 +222,7 @@ Key outputs:
 ### Debugging
 
 **CloudWatch Logs**:
+
 ```bash
 # View recent logs
 aws logs tail /aws/lambda/legacy-sports-dev-graphql --follow
@@ -220,6 +232,7 @@ aws logs filter-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphq
 ```
 
 **Function Testing**:
+
 ```bash
 # Invoke function directly
 aws lambda invoke --function-name legacy-sports-dev-graphql response.json
@@ -230,6 +243,7 @@ aws lambda invoke --function-name legacy-sports-dev-graphql response.json
 ### CI/CD Pipeline
 
 GitHub Actions automatically deploy:
+
 - **Trigger**: Push to main branch
 - **Build**: Package Lambda functions
 - **Deploy**: Update infrastructure

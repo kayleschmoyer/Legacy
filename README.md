@@ -30,11 +30,11 @@ npm run setup:python
 
 ### Available Applications
 
-| App | Description | Command |
-|-----|-------------|---------|
-| **Mobile App** | React Native CLI app | `npm run app:start` |
-| **Web App** | Next.js web application | `npm run web:start` |
-| **GraphQL Explorer** | API testing interface | `npm run gql:start` |
+| App                  | Description             | Command             |
+| -------------------- | ----------------------- | ------------------- |
+| **Mobile App**       | React Native CLI app    | `npm run app:start` |
+| **Web App**          | Next.js web application | `npm run web:start` |
+| **GraphQL Explorer** | API testing interface   | `npm run gql:start` |
 
 ### Quick Development Commands
 
@@ -129,6 +129,7 @@ cp apps/web/.env.example apps/web/.env.local
 ### GraphQL API
 
 The application connects to a live GraphQL API hosted on AWS. The endpoint is configured in:
+
 - `apps/web/src/lib/apollo-client.ts`
 - Environment variable: `VITE_GRAPHQL_HOST`
 
@@ -154,6 +155,7 @@ npx nx e2e web-e2e
 ### Web Deployment
 
 The web app automatically deploys to GitHub Pages on pushes to `main`:
+
 - **URL**: https://bkrupa.github.io/legacy-sports/
 - **Workflow**: `.github/workflows/deploy-web.yml`
 
@@ -217,6 +219,7 @@ npm run validate:packages
 ### Common Issues
 
 **Metro bundler issues (React Native)**:
+
 ```bash
 # Clear Metro cache
 npx react-native start --reset-cache
@@ -227,10 +230,12 @@ npm run app:start
 ```
 
 **GraphQL connection issues**:
+
 - Verify the endpoint URL in `apps/web/src/lib/apollo-client.ts`
 - Check AWS Lambda function logs in CloudWatch
 
 **Build errors**:
+
 ```bash
 # Clean all build artifacts
 npm run clean

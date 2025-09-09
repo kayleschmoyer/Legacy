@@ -53,6 +53,7 @@ npx react-native run-ios
 ### Metro Configuration
 
 The app uses a custom Metro configuration (`metro.config.js`) with:
+
 - **Tamagui support**: For cross-platform UI components
 - **SVG support**: React Native SVG transformer
 - **NX integration**: Monorepo module resolution
@@ -130,6 +131,7 @@ cd ios && pod install
 ## 🎨 UI Components
 
 Uses Tamagui for cross-platform UI components:
+
 - Shared with web application
 - Consistent design system
 - Platform-specific optimizations
@@ -139,12 +141,14 @@ Uses Tamagui for cross-platform UI components:
 ### Common Issues
 
 **Metro bundler won't start**:
+
 ```bash
 # Clear cache and restart
 npx react-native start --reset-cache
 ```
 
 **Android build fails**:
+
 ```bash
 # Clean and rebuild
 cd android
@@ -154,6 +158,7 @@ npm run android
 ```
 
 **iOS build fails**:
+
 ```bash
 # Clean and reinstall pods
 cd ios
@@ -164,6 +169,7 @@ npm run ios
 ```
 
 **App crashes on startup**:
+
 - Check Metro bundler logs
 - Verify all native dependencies are installed
 - Check for version conflicts in package.json
@@ -171,11 +177,13 @@ npm run ios
 ### Platform-Specific Issues
 
 **Android**:
+
 - Ensure Android SDK is properly configured
 - Check `ANDROID_HOME` environment variable
 - Verify emulator or device is running
 
 **iOS**:
+
 - Check Xcode configuration
 - Verify iOS Simulator is running
 - Check provisioning profiles for device builds

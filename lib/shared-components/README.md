@@ -5,6 +5,7 @@ Cross-platform UI components and utilities shared between web and mobile applica
 ## 📚 Overview
 
 This library provides:
+
 - **Cross-platform components**: Work on both React Native and web
 - **Consistent design system**: Tamagui-based theming
 - **Business logic**: Shared screens and data handling
@@ -30,6 +31,7 @@ lib/shared-components/
 ### Screen Components
 
 Pre-built screens ready to use:
+
 - `HomeScreen`: Dashboard and navigation
 - `PlayersScreen`: Player data display
 - `BaseballScreen`: Baseball-specific views
@@ -39,6 +41,7 @@ Pre-built screens ready to use:
 ### UI Components
 
 Base components for building interfaces:
+
 - `LoadingPanel`: Loading states
 - `ErrorBoundary`: Error handling
 - Tables, icons, forms, and more
@@ -46,6 +49,7 @@ Base components for building interfaces:
 ### Feature Components
 
 Domain-specific functionality:
+
 - Authentication flows
 - Data visualization
 - Sport-specific components
@@ -84,6 +88,7 @@ npx nx storybook shared-components
 ### Theme System
 
 Configured in `tamagui.config.ts`:
+
 - Light and dark themes
 - Consistent color palette
 - Typography scale
@@ -92,6 +97,7 @@ Configured in `tamagui.config.ts`:
 ### Platform Differences
 
 Components automatically adapt:
+
 - **Web**: CSS-based styling
 - **React Native**: Native platform styling
 - **Responsive**: Breakpoint-based layouts
@@ -142,6 +148,7 @@ interface AppProviderProps {
 ### Platform Detection
 
 The library automatically detects platform:
+
 - Uses `Platform.OS === 'web'` for web-specific code
 - Renders appropriate components for each platform
 - Handles navigation and styling differences
@@ -164,6 +171,7 @@ npm run test:watch
 ### Visual Testing
 
 Use Storybook for visual component testing:
+
 - Component isolation
 - Props playground
 - Visual regression testing
@@ -174,6 +182,7 @@ Use Storybook for visual component testing:
 ### Build Output
 
 The library builds to multiple formats:
+
 - **ES Modules**: Modern bundlers
 - **CommonJS**: Node.js compatibility
 - **Type Definitions**: TypeScript support
@@ -214,11 +223,13 @@ export { MyComponent } from './components/MyComponent';
 ### Build Issues
 
 **TypeScript errors**:
+
 - Check component prop types
 - Verify imports and exports
 - Run `npx tsc --noEmit` for type checking
 
 **Platform-specific issues**:
+
 - Use Platform.select() for different implementations
 - Check react-native-web compatibility
 - Test on both platforms
@@ -226,11 +237,13 @@ export { MyComponent } from './components/MyComponent';
 ### Runtime Issues
 
 **Theme not working**:
+
 - Ensure TamaguiProvider wraps components
 - Check theme configuration
 - Verify component usage of theme tokens
 
 **Components not rendering**:
+
 - Check AppProvider setup
 - Verify Apollo Client configuration
 - Check for JavaScript errors in console
