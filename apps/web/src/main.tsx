@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
 import { AppProvider } from '@legacy-sports/shared-components';
 import { apolloClient } from './lib/apollo-client';
@@ -14,10 +14,10 @@ const root = ReactDOM.createRoot(rootElement);
 
 root.render(
   <StrictMode>
-    <BrowserRouter>
+    <HashRouter>
       <AppProvider apolloClient={apolloClient} colorScheme="dark">
         <App />
       </AppProvider>
-    </BrowserRouter>
+    </HashRouter>
   </StrictMode>
 );
