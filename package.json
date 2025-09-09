@@ -86,7 +86,7 @@
     "@graphile-contrib/pg-simplify-inflector": "^6.1.0",
     "@pothos/core": "^4.9.0",
     "@react-native-community/cli": "~18.0.0",
-    "@react-native-community/cli-platform-android": "~18.0.0",
+    "@react-native-community/cli-platform-android": "~20.0.2",
     "@react-native-community/cli-platform-ios": "~18.0.0",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@react-navigation/drawer": "^7.1.1",
