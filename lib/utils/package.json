@@ -1,9 +1,7 @@
 {
   "name": "@legacy-sports/utils",
-  "version": "1.0.0",
-  "description": "This library was generated with [Nx](https://nx.dev).",
-  "main": "index.js",
-  "scripts": {},
-  "author": "",
-  "license": "ISC"
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts"
 }

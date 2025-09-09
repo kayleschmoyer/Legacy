@@ -1,4 +1,42 @@
-# Environment Variables Sync Scripts
+# Scripts Directory
+
+This directory contains scripts for various workspace management tasks.
+
+## Package.json Validation Scripts
+
+### `validate-package-json-standards.js`
+Validates that all package.json files follow NX best practices:
+- Scoped naming (@legacy-sports/)
+- Consistent versioning (0.0.1) 
+- Private flag set to true
+- Proper main/types paths for libraries
+- Clean metadata (no description/author/license)
+- Wildcard dependencies for shared packages
+
+**Usage:**
+```bash
+node scripts/validate-package-json-standards.js
+npm run validate:package-json
+npx nx validate:package-json
+```
+
+### `validate-workspace-deps.js`
+Ensures workspace projects use dependencies from root package.json with wildcard references:
+
+**Usage:**
+```bash
+node scripts/validate-workspace-deps.js
+npm run validate:workspace-deps
+npx nx validate:workspace-deps
+```
+
+### Combined Validation
+```bash
+npm run validate
+npx nx validate
+```
+
+## Environment Variables Sync Scripts
 
 This directory contains scripts to synchronize environment variables from AWS Secrets Manager and Terraform outputs to your local `.env` file.
 

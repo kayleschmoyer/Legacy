@@ -1,9 +1,5 @@
 {
-  "name": "app-e2e",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {},
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "name": "@legacy-sports/app-e2e",
+  "version": "0.0.1",
+  "private": true
 }

@@ -1,15 +1,15 @@
 {
   "name": "@legacy-sports/bref-client",
   "version": "0.0.1",
-  "dependencies": {
-    "tslib": "*"
-  },
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "npm run codegen:db"
   },
-  "type": "commonjs",
-  "main": "./src/index.ts",
-  "typings": "./src/index.d.ts",
-  "private": true
+  "dependencies": {
+    "tslib": "*"
+  }
 }

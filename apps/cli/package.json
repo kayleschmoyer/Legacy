@@ -1,8 +1,5 @@
 {
-  "name": "cli",
-  "version": "1.0.0",
-  "main": "index.js",
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "name": "@legacy-sports/cli",
+  "version": "0.0.1",
+  "private": true
 }

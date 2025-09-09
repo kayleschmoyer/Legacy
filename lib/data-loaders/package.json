@@ -1,12 +1,11 @@
 {
-  "name": "data-loaders",
-  "version": "1.0.0",
-  "description": "This library was generated with [Nx](https://nx.dev).",
-  "main": "index.js",
+  "name": "@legacy-sports/data-loaders",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "npm run codegen:db"
-  },
-  "author": "",
-  "license": "ISC"
+  }
 }

@@ -1,7 +1,7 @@
 {
   "name": "@legacy-sports/db-lambda",
-  "version": "1.0.0",
-  "description": "GraphQL API Lambda using Pothos + Drizzle",
+  "version": "0.0.1",
+  "private": true,
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/dev.ts",

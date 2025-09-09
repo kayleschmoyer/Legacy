@@ -9,18 +9,33 @@
 
 const fs = require('fs');
 const path = require('path');
-const glob = require('glob');
 
 const rootPath = process.cwd();
 
 console.log('🔍 Validating workspace dependency management...\n');
 
-// Find all package.json files in workspace projects (exclude node_modules and root)
-const globPattern = '**/package.json';
-const packageJsonFiles = glob.sync(globPattern, {
-  cwd: rootPath,
-  ignore: ['node_modules/**', 'package.json', '**/dist/**', '**/.nx/**', '**/node_modules/**']
-});
+// Find all package.json files recursively
+function findPackageJsonFiles(dir, files = []) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    
+    if (entry.isDirectory()) {
+      // Skip node_modules, dist, .nx, etc.
+      if (!['node_modules', 'dist', '.nx', '.git'].includes(entry.name)) {
+        findPackageJsonFiles(fullPath, files);
+      }
+    } else if (entry.name === 'package.json' && dir !== rootPath) {
+      // Include package.json files except the root one
+      files.push(path.relative(rootPath, fullPath));
+    }
+  }
+  
+  return files;
+}
+
+const packageJsonFiles = findPackageJsonFiles(rootPath);
 
 console.log(`Found ${packageJsonFiles.length} workspace package.json files to validate`);
 console.log('Files:', packageJsonFiles.slice(0, 10), packageJsonFiles.length > 10 ? '...' : '');

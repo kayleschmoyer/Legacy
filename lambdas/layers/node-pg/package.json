@@ -1,13 +1,7 @@
 {
-  "name": "node-pg-layer",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "name": "@legacy-sports/node-pg-layer",
+  "version": "0.0.1",
+  "private": true,
   "dependencies": {
     "pg": "*",
     "pg-hstore": "*"

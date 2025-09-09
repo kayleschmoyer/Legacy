@@ -114,6 +114,21 @@
       "dependsOn": [
         "build"
       ]
+    },
+    "validate:package-json": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/validate-package-json-standards.js"
+      }
+    },
+    "validate:workspace-deps": {
+      "executor": "nx:run-commands", 
+      "options": {
+        "command": "node scripts/validate-workspace-deps.js"
+      }
+    },
+    "validate": {
+      "dependsOn": ["validate:package-json", "validate:workspace-deps"]
     }
   },
   "generators": {

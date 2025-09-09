@@ -44,6 +44,12 @@ jobs:
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
+      - name: Validate Package.json Standards
+        run: node scripts/validate-package-json-standards.js
+
+      - name: Validate Workspace Dependencies
+        run: node scripts/validate-workspace-deps.js
+
       - name: Setup CI
         run: npx nx affected -t setup-ci
 
