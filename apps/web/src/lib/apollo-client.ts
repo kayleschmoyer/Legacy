@@ -4,7 +4,7 @@ import { ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
 const GRAPHQL_URL =
   process.env.REACT_APP_GRAPHQL_HOST ||
   process.env.VITE_GRAPHQL_HOST ||
-  'https://yt30kcp6ha.execute-api.us-east-1.amazonaws.com/dev/graphql';
+  'https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql';
 
 const httpLink = createHttpLink({
   uri: (operation) => `${GRAPHQL_URL}?ref=${operation.operationName}`,
