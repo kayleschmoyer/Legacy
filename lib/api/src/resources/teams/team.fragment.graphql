@@ -1,0 +1,6 @@
+# Team fragment defining the core fields for team data
+fragment Team on Team {
+  id
+  leagueId
+  name
+}

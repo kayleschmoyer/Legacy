@@ -1,39 +1,69 @@
 import * as React from 'react';
-import { Slot } from 'expo-router';
-import Toast from 'react-native-toast-message';
-import { ApplicationProvider } from '@ui-kitten/components';
-import * as eva from '@eva-design/eva';
-import { ApolloProvider } from '@apollo/client';
 import { useColorScheme } from 'react-native';
-import { LoadingPanel } from '../common/components/LoadingPanel';
+import { TamaguiProvider } from 'tamagui';
+import {
+  AppNavigator,
+  AppProvider,
+  BaseballScreen,
+  DemoScreen,
+  FootballScreen,
+  HomeScreen,
+  NavigationRoute,
+  tamaguiConfig,
+} from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
-import { ConditionalProviders } from '../common/ConditionalProviders';
 import { useCurrentUserInfo } from '../common/auth/AuthHooks';
-import { DARK_THEME, LIGHT_THEME } from '../Theme';
+
+// Define your app routes
+const routes: NavigationRoute[] = [
+  {
+    name: 'Home',
+    component: HomeScreen,
+    title: 'Fantasy Sports Hub',
+  },
+  {
+    name: 'Football',
+    component: FootballScreen,
+    title: 'Football',
+  },
+  {
+    name: 'Baseball',
+    component: BaseballScreen,
+    title: 'Baseball',
+  },
+  {
+    name: 'Demo',
+    component: DemoScreen,
+    title: 'Component Demo',
+  },
+];
 
 function InnerLayout(): JSX.Element {
   const { loading } = useCurrentUserInfo();
+  const client = React.useContext(DbClientContext);
+  const colorScheme = useColorScheme();
 
-  if (loading) {
-    return <LoadingPanel />;
-  }
-
-  return <Slot />;
+  return (
+    <AppProvider
+      apolloClient={client.apolloClient}
+      colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+      isLoading={loading}
+    >
+      <AppNavigator routes={routes} initialRoute="Home" />
+    </AppProvider>
+  );
 }
 
 export default function Layout() {
-  const client = React.useContext(DbClientContext);
-  const color = useColorScheme();
-  const theme = color === 'dark' ? DARK_THEME : LIGHT_THEME;
+  const colorScheme = useColorScheme();
 
   return (
-    <ApplicationProvider {...eva} theme={theme}>
-      <ConditionalProviders>
-        <ApolloProvider client={client.apolloClient}>
-          <Toast />
-          <InnerLayout />
-        </ApolloProvider>
-      </ConditionalProviders>
-    </ApplicationProvider>
+    <TamaguiProvider
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      config={tamaguiConfig}
+      defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
+    >
+      <InnerLayout />
+    </TamaguiProvider>
   );
 }

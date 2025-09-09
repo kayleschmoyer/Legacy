@@ -1,0 +1,288 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
+<style>
+  
+  :root {
+    --color-primary-100: #D6E4FF;
+    --color-primary-200: #ADC8FF;
+    --color-primary-300: #84A9FF;
+    --color-primary-400: #6690FF;
+    --color-primary-500: #3366FF;
+    --color-primary-600: #254EDB;
+    --color-primary-700: #1939B7;
+    --color-primary-800: #102693;
+    --color-primary-900: #091A7A;
+    
+    --color-success-500: #AEE50B;
+    --color-info-500: #40E6EF;
+    --color-warning-500: #FFB13D;
+    --color-danger-500: #FF3838;
+    
+    --color-basic-100: #FFFFFF;
+    --color-basic-200: #F7F9FC;
+    --color-basic-600: #8F9BB3;
+    --color-basic-800: #222B45;
+    --color-basic-900: #192038;
+    
+    --bg-primary: #1E1E1E;
+    --bg-secondary: #2A2A2A;
+    --text-primary: #FFFFFF;
+    --text-secondary: #CCCCCC;
+  }
+
+</style>
+`;
+
+exports[`App FootballScreen should match football screen snapshot 1`] = `
+<main
+  style="padding: 2rem;"
+>
+  <div
+    class="css-view-g5y9jx r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci r-padding-1pcd2l5"
+    style="background-color: rgb(30, 30, 30);"
+  >
+    <div
+      class="css-text-146c3p1 r-fontSize-zz5t5d r-fontWeight-vw2c0b r-marginBottom-1ifxtd0 r-textAlign-q4m81j"
+      dir="auto"
+      style="color: rgb(255, 255, 255);"
+    >
+      Football Fantasy
+    </div>
+    <div
+      class="css-text-146c3p1 r-fontSize-1i10wst r-marginBottom-1peese0 r-textAlign-q4m81j"
+      dir="auto"
+      style="color: rgb(204, 204, 204);"
+    >
+      Coming soon...
+    </div>
+  </div>
+</main>
+`;
+
+exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `
+<main
+  style="padding: 2rem;"
+>
+  <div
+    class="css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx r-scrollbarWidth-2eszeu"
+  >
+    <div
+      class="css-view-g5y9jx r-backgroundColor-n1edft r-flexGrow-16y2uox r-paddingBottom-k8qxaj"
+    >
+      <div
+        class="css-view-g5y9jx r-alignItems-1awozwy r-paddingBottom-1sv84sj r-paddingInline-u9wvl5 r-paddingTop-1ur9v65"
+      >
+        <div
+          class="css-text-146c3p1 r-color-jwli3a r-fontSize-3i2nvb r-fontWeight-vw2c0b r-marginBottom-5oul0u r-textAlign-q4m81j"
+          dir="auto"
+        >
+          Fantasy Sports Hub
+        </div>
+        <div
+          class="css-text-146c3p1 r-color-1yis5wz r-fontSize-1i10wst r-textAlign-q4m81j"
+          dir="auto"
+        >
+          Choose your sport
+        </div>
+      </div>
+      <div
+        class="css-view-g5y9jx r-marginBottom-1yflyrw r-marginInline-bhtmuz"
+      >
+        <div
+          class="css-text-146c3p1 r-color-jwli3a r-fontSize-adyw6z r-fontWeight-vw2c0b r-marginBottom-1ifxtd0"
+          dir="auto"
+        >
+          Sports
+        </div>
+        <div
+          class="css-view-g5y9jx r-flexDirection-18u37iz r-flexWrap-1w6e6rj r-gap-1ssbvtb r-justifyContent-1wtj0ep"
+        >
+          <div
+            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-a1w0r5"
+            style="background-color: rgb(45, 45, 45); transition-duration: 0s;"
+            tabindex="0"
+          >
+            <div
+              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            >
+              <div
+                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
+                dir="auto"
+              >
+                ⚾
+              </div>
+              <div
+                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
+                dir="auto"
+              >
+                Baseball
+              </div>
+              <div
+                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
+                style="background-color: rgb(255, 107, 53);"
+              />
+            </div>
+          </div>
+          <div
+            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-a1w0r5"
+            style="background-color: rgb(234, 88, 12); transition-duration: 0s;"
+            tabindex="0"
+          >
+            <div
+              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            >
+              <div
+                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
+                dir="auto"
+              >
+                🏈
+              </div>
+              <div
+                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
+                dir="auto"
+              >
+                Football
+              </div>
+              <div
+                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
+                style="background-color: rgb(249, 115, 22);"
+              />
+            </div>
+          </div>
+          <div
+            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-a1w0r5"
+            style="background-color: rgb(74, 60, 140); transition-duration: 0s;"
+            tabindex="0"
+          >
+            <div
+              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            >
+              <div
+                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
+                dir="auto"
+              >
+                🏀
+              </div>
+              <div
+                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
+                dir="auto"
+              >
+                Basketball
+              </div>
+              <div
+                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
+                style="background-color: rgb(255, 140, 0);"
+              />
+            </div>
+          </div>
+          <div
+            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-a1w0r5"
+            style="background-color: rgb(42, 47, 58); transition-duration: 0s;"
+            tabindex="0"
+          >
+            <div
+              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            >
+              <div
+                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
+                dir="auto"
+              >
+                🏒
+              </div>
+              <div
+                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
+                dir="auto"
+              >
+                Hockey
+              </div>
+              <div
+                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
+                style="background-color: rgb(30, 144, 255);"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+`;
+
+exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
+<style>
+  
+  :root {
+    --color-primary-100: #D6E4FF;
+    --color-primary-200: #ADC8FF;
+    --color-primary-300: #84A9FF;
+    --color-primary-400: #6690FF;
+    --color-primary-500: #3366FF;
+    --color-primary-600: #254EDB;
+    --color-primary-700: #1939B7;
+    --color-primary-800: #102693;
+    --color-primary-900: #091A7A;
+    
+    --color-success-500: #AEE50B;
+    --color-info-500: #40E6EF;
+    --color-warning-500: #FFB13D;
+    --color-danger-500: #FF3838;
+    
+    --color-basic-100: #FFFFFF;
+    --color-basic-200: #F7F9FC;
+    --color-basic-600: #8F9BB3;
+    --color-basic-800: #222B45;
+    --color-basic-900: #192038;
+    
+    --bg-primary: #1E1E1E;
+    --bg-secondary: #2A2A2A;
+    --text-primary: #FFFFFF;
+    --text-secondary: #CCCCCC;
+  }
+
+</style>
+`;
+
+exports[`App Navigation should match navigation snapshot 1`] = `
+<nav
+  style="background-color: rgb(30, 30, 30); padding: 1rem; border-bottom: 1px solid #333;"
+>
+  <div
+    style="display: flex; align-items: center; gap: 2rem;"
+  >
+    <h1
+      style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
+    >
+      🏈 Fantasy Sports Hub
+    </h1>
+    <div
+      style="display: flex; gap: 1rem;"
+    >
+      <a
+        href="/"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
+      >
+        🏠 Home
+      </a>
+      <a
+        href="/football"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        🏈 Football
+      </a>
+      <a
+        href="/baseball"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        ⚾ Baseball
+      </a>
+      <a
+        href="/demo"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        🎨 Demo
+      </a>
+    </div>
+  </div>
+</nav>
+`;

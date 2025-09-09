@@ -168,7 +168,7 @@ function parseRow<T extends object>(
     const statField = StatMapping[stat.toUpperCase()];
 
     if (!statField) {
-      LOGGER.trace(`Skipping field ${stat}`);
+      LOGGER.debug(`Skipping field ${stat}`);
       continue;
     }
 
@@ -182,7 +182,9 @@ function parseRow<T extends object>(
 
         if (isNaN(value)) {
           throw new Error(
-            `Unable to parse field ${statField}: ${text} is not a number`
+            `Unable to parse field ${String(
+              statField
+            )}: ${text} is not a number`
           );
         }
       }

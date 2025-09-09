@@ -6,11 +6,72 @@
   "tags": [],
   "// targets": "to see all targets run: nx show project db --web",
   "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "lambdas/db/dist"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "terraform apply -auto-approve",
+        "cwd": "terraform"
+      }
+    },
+    "deploy:plan": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "terraform plan",
+        "cwd": "terraform"
+      }
+    },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
-        "command": "npx serverless package",
+        "command": "echo 'Legacy serverless package command. Use nx deploy db instead.'",
+        "cwd": "lambdas/db"
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "aws logs tail \"/aws/lambda/legacy-sports-dev-graphql\" --follow",
+        "cwd": "terraform"
+      }
+    },
+    "test-endpoint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "powershell -Command \"$headers = @{'Content-Type' = 'application/json'}; $body = '{\\\"query\\\": \\\"{ hello }\\\"}'; $response = Invoke-RestMethod -Uri 'https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql' -Method POST -Headers $headers -Body $body; $response | ConvertTo-Json\"",
+        "cwd": "terraform"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/dev.ts",
         "cwd": "lambdas/db"
       }
     }

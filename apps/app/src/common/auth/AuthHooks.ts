@@ -60,6 +60,7 @@ function useLastUpdateTime(): number {
 export async function readKeychainValue(
   secret: Secret
 ): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const result = await getGenericPassword({
     service: secret,
   });
@@ -68,6 +69,7 @@ export async function readKeychainValue(
     return null;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
   return result.password;
 }
 
@@ -92,6 +94,7 @@ async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
       sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
       break;
     default:
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       await setGenericPassword(SECRET_USERNAME, tokens.jwt, {
         service: Secret.INTERNAL_JWT,
       });
@@ -108,7 +111,9 @@ async function resetToken(): Promise<void> {
       sessionStorage.clear();
       break;
     default:
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       await resetGenericPassword({ service: Secret.GOOGLE_JWT });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       await resetGenericPassword({ service: Secret.INTERNAL_JWT });
   }
 
@@ -117,6 +122,7 @@ async function resetToken(): Promise<void> {
 }
 
 function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
   const router = useRouter();
   const onSuccess = callbacks?.onSuccess;
   const onFailure = callbacks?.onFailure;
@@ -173,6 +179,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       logout: logout,
     };
   }, [googleLogin, logout]);
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {

@@ -14,12 +14,10 @@ export function getMessageFromError(err: unknown): string {
 
 export function logError(err: unknown): void {
   if (err instanceof Error) {
-    LOGGER.error(err, err.stack);
-  }
-
-  if (typeof err === 'string') {
+    LOGGER.error(err.message, err.stack);
+  } else if (typeof err === 'string') {
     LOGGER.error(err);
+  } else {
+    LOGGER.error('An unknown error occurred');
   }
-
-  LOGGER.error('An unknown error occurred');
 }

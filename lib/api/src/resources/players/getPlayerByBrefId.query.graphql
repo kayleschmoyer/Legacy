@@ -1,0 +1,8 @@
+# Query to fetch a player by Baseball Reference ID
+query GetPlayerByBrefId($brefId: String!) {
+  playerByBrefId(brefId: $brefId) {
+    id
+    name
+    brefId
+  }
+}

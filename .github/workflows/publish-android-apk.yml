@@ -1,0 +1,151 @@
+name: Build and Publish Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/app/**'
+      - 'lib/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+env:
+  # Use Java 17 to match your local setup
+  JAVA_VERSION: '17'
+  # Android build configuration
+  ANDROID_COMPILE_SDK: '34'
+  ANDROID_BUILD_TOOLS: '34.0.0'
+  ANDROID_SDK_TOOLS: '9477386'
+
+jobs:
+  build-android-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NPM and Dependencies
+        uses: ./.github/workflows/setup-npm
+
+      - name: Setup Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Cache Gradle Wrapper
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make Gradlew Executable
+        run: chmod +x apps/app/android/gradlew
+
+      - name: Build Android APK
+        run: |
+          cd apps/app/android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          # Ensure we have enough memory for the build
+          GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=512m
+
+      - name: Extract Version Info
+        id: version
+        run: |
+          # Extract version from package.json
+          VERSION=$(node -p "require('./apps/app/package.json').version")
+          # Get commit SHA (short)
+          COMMIT_SHA=${GITHUB_SHA:0:7}
+          # Create build number from timestamp
+          BUILD_NUMBER=$(date +%Y%m%d_%H%M%S)
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "artifact_name=legacy-sports-v${VERSION}-${BUILD_NUMBER}-${COMMIT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Rename APK with Version
+        run: |
+          cd apps/app/android/app/build/outputs/apk/release
+          mv app-release.apk ${{ steps.version.outputs.artifact_name }}.apk
+
+          # Create a latest symlink for easy access
+          ln -s ${{ steps.version.outputs.artifact_name }}.apk legacy-sports-latest.apk
+
+      - name: Upload APK as GitHub Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: |
+            apps/app/android/app/build/outputs/apk/release/${{ steps.version.outputs.artifact_name }}.apk
+            apps/app/android/app/build/outputs/apk/release/legacy-sports-latest.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          name: Android APK v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})
+          body: |
+            ## Android APK Release
+
+            **Version:** ${{ steps.version.outputs.version }}  
+            **Build:** ${{ steps.version.outputs.build_number }}  
+            **Commit:** ${{ steps.version.outputs.commit_sha }}  
+            **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            ### Download
+            - 📱 **APK File:** `${{ steps.version.outputs.artifact_name }}.apk`
+
+            ### Installation
+            1. Download the APK file
+            2. Enable "Install from Unknown Sources" in Android Settings
+            3. Open the APK file to install
+
+            > **Note:** This is a development build. For production use, proper signing and distribution through Google Play Store is recommended.
+          files: |
+            apps/app/android/app/build/outputs/apk/release/${{ steps.version.outputs.artifact_name }}.apk
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Summary
+        run: |
+          echo "## 🎉 Android APK Build Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** ${{ steps.version.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.version.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Options:" >> $GITHUB_STEP_SUMMARY
+          echo "1. **GitHub Artifacts:** Available in this workflow run for 90 days" >> $GITHUB_STEP_SUMMARY
+          echo "2. **GitHub Release:** Tagged release with permanent download link" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 APK Details:" >> $GITHUB_STEP_SUMMARY
+
+          APK_PATH="apps/app/android/app/build/outputs/apk/release/${{ steps.version.outputs.artifact_name }}.apk"
+          if [ -f "$APK_PATH" ]; then
+            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+            echo "**File Size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "**File Name:** ${{ steps.version.outputs.artifact_name }}.apk" >> $GITHUB_STEP_SUMMARY
+          fi

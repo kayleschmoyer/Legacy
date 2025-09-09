@@ -1,0 +1,33 @@
+# Season batting statistics fragment
+fragment SeasonBatting on SeasonBatting {
+  ab
+  awardSummary
+  battingAvg
+  bb
+  cs
+  doubles
+  g
+  gidp
+  h
+  hbp
+  hr
+  ibb
+  lgId
+  onbasePerc
+  onbasePlusSlugging
+  onbasePlusSluggingPlus
+  pa
+  playerId
+  posSeason
+  r
+  rbi
+  sb
+  season
+  sf
+  sh
+  sluggingPerc
+  so
+  tb
+  team
+  triples
+}

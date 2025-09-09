@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { InternalUser } from './types/Types';
 import { TakeUniqueOrNull, TakeUniqueOrThrow } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
+import { InternalUser } from '../../types/DatabaseTypes';
 import * as Schema from '../../drizzle/internal/schema';
 
 export const InternalSchema = Schema;

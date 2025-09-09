@@ -1,0 +1,40 @@
+# Season pitching statistics fragment
+fragment SeasonPitching on SeasonPitching {
+  playerId
+  season
+  team
+  w
+  l
+  g
+  gs
+  gf
+  cg
+  sho
+  sv
+  ip
+  h
+  r
+  er
+  hr
+  bb
+  ibb
+  so
+  hbp
+  bk
+  wp
+  bf
+  era
+  fip
+  whip
+  hitsPerNine
+  baseOnBallsPerNine
+  strikeoutsPerNine
+  homeRunsPerNine
+  strikeoutsPerBaseOnBalls
+  eraPlus
+  fipMinus
+  winLossPerc
+  awardSummary
+  lgId
+  outsRecorded
+}

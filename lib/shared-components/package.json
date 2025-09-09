@@ -1,0 +1,22 @@
+{
+  "name": "@legacy-sports/shared-components",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "scripts": {
+    "codegen": "graphql-codegen --config codegen.ts",
+    "storybook": "storybook dev -p 6009 -c .storybook",
+    "build-storybook": "storybook build -c .storybook -o ../../dist/storybook",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test-storybook": "test-storybook",
+    "test-storybook:ci": "concurrently -k -s first -n \"SB,TEST\" -c \"magenta,blue\" \"npm run storybook\" \"wait-on tcp:6009 && npm run test-storybook\"",
+    "test:stories": "jest --config=jest.storybook.config.ts",
+    "test:all": "npm run test && npm run test:stories"
+  },
+  "dependencies": {
+    "@legacy-sports/api": "*"
+  }
+}

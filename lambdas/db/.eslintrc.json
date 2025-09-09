@@ -4,7 +4,14 @@
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
-      "rules": {}
+      "rules": {
+        "@nx/enforce-module-boundaries": [
+          "error",
+          {
+            "allow": ["@apollo/server", "@as-integrations/aws-lambda"]
+          }
+        ]
+      }
     },
     {
       "files": ["*.ts", "*.tsx"],

@@ -1,0 +1,16 @@
+# Query to fetch all season batting stats for a player
+query GetPlayerAllSeasonBatting($playerId: Int!) {
+  player(id: $playerId) {
+    id
+    name
+    brefId
+    seasonBattings {
+      nodes {
+        ...SeasonBatting
+      }
+    }
+  }
+}
+
+# Import the SeasonBatting fragment
+#import "./seasonBatting.fragment.graphql"

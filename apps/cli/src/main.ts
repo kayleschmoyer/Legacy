@@ -24,6 +24,7 @@ import {
   handleCreateMatchup,
 } from './commands/createMatchup';
 import { handleTestDb, testDbCommandBuilder } from './commands/testDb';
+import { main as testDatabase } from './commands/test-database';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -59,6 +60,14 @@ async function run(): Promise<void> {
       testDbCommandBuilder,
       handleTestDb
     )
+    .command(
+      'test-database',
+      'Test new database service layer',
+      {},
+      async () => {
+        await testDatabase();
+      }
+    )
     .demandCommand()
     .help()
     .parse();
@@ -67,8 +76,8 @@ async function run(): Promise<void> {
 LOGGER.info('Starting CLI application...');
 
 run()
-  .then((result) => {
-    LOGGER.info('CLI application ran successfully', result);
+  .then(() => {
+    LOGGER.info('CLI application ran successfully');
   })
   .catch((err: unknown) => {
     logError(err);

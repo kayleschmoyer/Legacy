@@ -61,10 +61,12 @@ export async function getPlayers(letter: Letter): Promise<PlayerInfo[]> {
 
     if (brefCode === null) {
       LOGGER.error(`Could Not Match`);
-      LOGGER.debug({
-        href: anchor.getAttribute('href'),
-        regex: BREF_URL_REGEX,
-      });
+      LOGGER.debug(
+        JSON.stringify({
+          href: anchor.getAttribute('href'),
+          regex: BREF_URL_REGEX.toString(),
+        })
+      );
       throw new Error('Error');
     }
 

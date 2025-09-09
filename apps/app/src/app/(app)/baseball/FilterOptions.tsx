@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 
 const FilterOptions = () => {
@@ -8,7 +8,8 @@ const FilterOptions = () => {
   return (
     <View style={styles.container}>
       <RNPickerSelect
-        onValueChange={(value) => setPosition(value)}
+        onValueChange={(value: string) => setPosition(value)}
+        value={position}
         items={[
           { label: 'All Positions', value: '' },
           { label: 'Pitcher', value: 'P' },

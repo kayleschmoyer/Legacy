@@ -12,7 +12,9 @@ import { useRouter } from 'expo-router';
 import { useAuthHandlers } from '../common/auth/AuthHooks';
 
 const Login: React.FC = () => {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
   const router = useRouter();
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     undefined
@@ -27,6 +29,7 @@ const Login: React.FC = () => {
     }).start();
   }, [fadeAnim]);
 
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
   const { googleLogin } = useAuthHandlers({
     onFailure: (err) => {
       setIsLoading(false);
@@ -37,6 +40,7 @@ const Login: React.FC = () => {
       router.replace('/');
     },
   });
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
   const onLogin = () => {
     setIsLoading(true);

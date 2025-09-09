@@ -6,25 +6,38 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 
 const sports = [
-  { name: 'Football', route: 'football' },
-  { name: 'Baseball', route: 'baseball' },
+  { name: 'Football', route: 'Football' as const },
+  { name: 'Baseball', route: 'Baseball' as const },
 ];
 
+type RootStackParamList = {
+  Home: undefined;
+  Football: undefined;
+  Baseball: undefined;
+};
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
+
 export default function Home() {
+  const navigation = useNavigation<NavigationProp>();
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.heading}>Fantasy Sports Hub</Text>
       <Text style={styles.subHeading}>Choose your sport</Text>
       <View style={styles.sportsContainer}>
         {sports.map((sport, index) => (
-          <Link href={sport.route} asChild key={sport.route}>
-            <TouchableOpacity style={styles.sportCard}>
-              <Text style={styles.sportName}>{sport.name}</Text>
-            </TouchableOpacity>
-          </Link>
+          <TouchableOpacity
+            key={sport.route}
+            style={styles.sportCard}
+            onPress={() => navigation.navigate(sport.route)}
+          >
+            <Text style={styles.sportName}>{sport.name}</Text>
+          </TouchableOpacity>
         ))}
       </View>
     </ScrollView>

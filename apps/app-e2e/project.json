@@ -4,31 +4,88 @@
   "sourceRoot": "apps/app-e2e/src",
   "projectType": "application",
   "tags": [],
-  "implicitDependencies": ["app"],
+  "implicitDependencies": [
+    "app"
+  ],
   "// targets": "to see all targets run: nx show project app-e2e --web",
   "targets": {
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "echo 'E2E build done in another job.'"
+        "command": "echo 'Building React Native app for e2e testing...'"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "apps/app-e2e/jest.config.json",
+        "passWithNoTests": true
+      },
+      "configurations": {
+        "ci": {
+          "runInBand": true,
+          "ci": true,
+          "coverage": false
+        }
       }
     },
     "test-ios": {
       "executor": "@nx/detox:test",
       "options": {
-        "detoxConfiguration": "ios.sim.release"
+        "detoxConfiguration": "ios.sim.release",
+        "buildTarget": "app:build"
+      },
+      "configurations": {
+        "debug": {
+          "detoxConfiguration": "ios.sim.debug"
+        },
+        "local": {
+          "detoxConfiguration": "ios.local"
+        }
       }
     },
     "test-android": {
       "executor": "@nx/detox:test",
       "options": {
-        "detoxConfiguration": "android.emu.release"
+        "detoxConfiguration": "android.emu.release",
+        "buildTarget": "app:build"
+      },
+      "configurations": {
+        "debug": {
+          "detoxConfiguration": "android.emu.debug"
+        },
+        "local": {
+          "detoxConfiguration": "android.local"
+        }
       }
     },
-    "test": {
+    "test-build-verification": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "echo 'E2E tests are run in separate executors.'"
+        "command": "jest apps/app-e2e/src/build-verification.spec.ts --config apps/app-e2e/jest.config.json"
+      }
+    },
+    "test-sports-functionality": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest apps/app-e2e/src/sports.spec.ts --config apps/app-e2e/jest.config.json"
+      }
+    },
+    "test-smoke": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest apps/app-e2e/src/app.spec.ts --testNamePattern=\"should launch app successfully|should display main navigation\" --config apps/app-e2e/jest.config.json"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/app-e2e/**/*.{ts,tsx,js,jsx}"
+        ]
       }
     }
   }

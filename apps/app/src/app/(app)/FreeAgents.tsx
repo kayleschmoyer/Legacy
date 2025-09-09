@@ -1,34 +1,67 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
-  View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Animated,
-  Dimensions,
-  StyleSheet,
-  Modal,
-  ScrollView,
-  StatusBar,
-  Platform,
   Vibration,
+  View,
 } from 'react-native';
+import { Filter } from './DraftBoardPage';
 
 // Configuration
-const SPORT_CONFIGS = {
+interface SportConfig {
+  colors: {
+    accent: string;
+    primary: string;
+    secondary: string;
+  };
+  positions: string[];
+  sortOptions: string[];
+  stats: string[];
+}
+
+const SPORT_CONFIGS: Record<string, SportConfig> = {
   baseball: {
+    colors: { accent: '#ff6b35', primary: '#1a1a1a', secondary: '#2d2d2d' },
     positions: ['C', '1B', '2B', '3B', 'SS', 'OF', 'P'],
-    colors: { primary: '#1a1a1a', secondary: '#2d2d2d', accent: '#ff6b35' },
+    sortOptions: ['Rank', 'AVG', 'HR', 'RBI', 'ERA', 'WHIP', 'Ownership%'],
     stats: ['AVG', 'HR', 'RBI', 'R', 'SB', 'ERA', 'W', 'K', 'SV', 'OBP'],
-    sortOptions: ['Rank', 'AVG', 'HR', 'RBI', 'ERA', 'WHIP', 'Ownership%']
   },
   football: {
+    colors: { accent: '#f97316', primary: '#7c2d12', secondary: '#ea580c' },
     positions: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'],
-    colors: { primary: '#7c2d12', secondary: '#ea580c', accent: '#f97316' },
-    stats: ['PASS YDS', 'RUSH YDS', 'REC', 'TD', 'FG', 'INT', 'FPTS'],
-    sortOptions: ['Rank', 'FPTS', 'Targets', 'Touches', 'Ownership%']
-  }
+    sortOptions: [
+      'Rank',
+      'PassYds',
+      'PassTDs',
+      'RushYds',
+      'RushTDs',
+      'Ownership%',
+    ],
+    stats: [
+      'PassYds',
+      'PassTDs',
+      'RushYds',
+      'RushTDs',
+      'Rec',
+      'RecYds',
+      'RecTDs',
+    ],
+  },
 };
 
 // Types
@@ -69,10 +102,13 @@ const PlayerCard: React.FC<{
   isSelected?: boolean;
 }> = ({ player, sport, onSelect, onWatch, onClaim, isSelected }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const sportConfig = SPORT_CONFIGS[sport as keyof typeof SPORT_CONFIGS];
+  const sportConfig = SPORT_CONFIGS[sport];
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.98, useNativeDriver: true }).start();
+    Animated.spring(scaleAnim, {
+      toValue: 0.98,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handlePressOut = () => {
@@ -81,19 +117,27 @@ const PlayerCard: React.FC<{
 
   const getTrendingIcon = () => {
     switch (player.trending) {
-      case 'up': return '📈';
-      case 'down': return '📉';
-      default: return '➡️';
+      case 'up':
+        return '📈';
+      case 'down':
+        return '📉';
+      default:
+        return '➡️';
     }
   };
 
   const getInjuryColor = () => {
     switch (player.injury) {
-      case 'healthy': return '#22c55e';
-      case 'questionable': return '#f59e0b';
-      case 'doubtful': return '#f97316';
-      case 'out': return '#ef4444';
-      default: return '#6b7280';
+      case 'healthy':
+        return '#22c55e';
+      case 'questionable':
+        return '#f59e0b';
+      case 'doubtful':
+        return '#f97316';
+      case 'out':
+        return '#ef4444';
+      default:
+        return '#6b7280';
     }
   };
 
@@ -102,7 +146,10 @@ const PlayerCard: React.FC<{
       style={[
         styles.playerCard,
         { transform: [{ scale: scaleAnim }] },
-        isSelected && { borderColor: sportConfig.colors.accent, borderWidth: 2 },
+        isSelected && {
+          borderColor: sportConfig.colors.accent,
+          borderWidth: 2,
+        },
       ]}
     >
       <TouchableOpacity
@@ -118,17 +165,31 @@ const PlayerCard: React.FC<{
             <Text style={styles.playerName}>{player.name}</Text>
             <View style={styles.playerMeta}>
               <Text style={styles.teamText}>{player.team}</Text>
-              <View style={[styles.positionBadge, { backgroundColor: getPositionColor(player.position, sport) }]}>
+              <View
+                style={[
+                  styles.positionBadge,
+                  { backgroundColor: getPositionColor(player.position, sport) },
+                ]}
+              >
                 <Text style={styles.positionText}>{player.position}</Text>
               </View>
-              <View style={[styles.injuryBadge, { backgroundColor: getInjuryColor() }]}>
-                <Text style={styles.injuryText}>{player.injury.toUpperCase()}</Text>
+              <View
+                style={[
+                  styles.injuryBadge,
+                  { backgroundColor: getInjuryColor() },
+                ]}
+              >
+                <Text style={styles.injuryText}>
+                  {player.injury.toUpperCase()}
+                </Text>
               </View>
             </View>
           </View>
           <View style={styles.cardActions}>
             <TouchableOpacity onPress={onWatch} style={styles.watchButton}>
-              <Text style={styles.watchIcon}>{player.isWatched ? '⭐' : '☆'}</Text>
+              <Text style={styles.watchIcon}>
+                {player.isWatched ? '⭐' : '☆'}
+              </Text>
             </TouchableOpacity>
             <Text style={styles.trendingIcon}>{getTrendingIcon()}</Text>
           </View>
@@ -146,13 +207,20 @@ const PlayerCard: React.FC<{
           </View>
           <View style={styles.statRow}>
             <Text style={styles.statLabel}>FAAB:</Text>
-            <Text style={[styles.statValue, { color: sportConfig.colors.accent }]}>${player.faabValue}</Text>
+            <Text
+              style={[styles.statValue, { color: sportConfig.colors.accent }]}
+            >
+              ${player.faabValue}
+            </Text>
           </View>
         </View>
 
         {/* Action Button */}
         <TouchableOpacity
-          style={[styles.claimButton, { backgroundColor: sportConfig.colors.accent }]}
+          style={[
+            styles.claimButton,
+            { backgroundColor: sportConfig.colors.accent },
+          ]}
           onPress={onClaim}
         >
           <Text style={styles.claimButtonText}>Add Waiver Claim</Text>
@@ -167,13 +235,13 @@ const PlayerCard: React.FC<{
  */
 const FilterPanel: React.FC<{
   sport: string;
-  filters: any;
-  onFiltersChange: (filters: any) => void;
+  filters: Filter;
+  onFiltersChange: (filters: Filter) => void;
   visible: boolean;
   onClose: () => void;
 }> = ({ sport, filters, onFiltersChange, visible, onClose }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const sportConfig = SPORT_CONFIGS[sport as keyof typeof SPORT_CONFIGS];
+  const sportConfig = SPORT_CONFIGS[sport];
 
   useEffect(() => {
     Animated.spring(slideAnim, {
@@ -187,7 +255,10 @@ const FilterPanel: React.FC<{
       <View style={styles.filterOverlay}>
         <TouchableOpacity style={styles.filterBackdrop} onPress={onClose} />
         <Animated.View
-          style={[styles.filterPanel, { transform: [{ translateY: slideAnim }] }]}
+          style={[
+            styles.filterPanel,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
           <View style={styles.filterHeader}>
             <Text style={styles.filterTitle}>Advanced Filters</Text>
@@ -200,12 +271,14 @@ const FilterPanel: React.FC<{
             {/* Position Filter */}
             <Text style={styles.filterSectionTitle}>Position</Text>
             <View style={styles.filterGrid}>
-              {['ALL', ...sportConfig.positions].map(pos => (
+              {['ALL', ...sportConfig.positions].map((pos) => (
                 <TouchableOpacity
                   key={pos}
                   style={[
                     styles.filterChip,
-                    filters.position === pos && { backgroundColor: sportConfig.colors.accent },
+                    filters.position === pos && {
+                      backgroundColor: sportConfig.colors.accent,
+                    },
                   ]}
                   onPress={() => onFiltersChange({ ...filters, position: pos })}
                 >
@@ -217,14 +290,18 @@ const FilterPanel: React.FC<{
             {/* Availability Filter */}
             <Text style={styles.filterSectionTitle}>Availability</Text>
             <View style={styles.filterGrid}>
-              {['All', 'Available', 'Waivers', 'Free Agents'].map(avail => (
+              {['All', 'Available', 'Waivers', 'Free Agents'].map((avail) => (
                 <TouchableOpacity
                   key={avail}
                   style={[
                     styles.filterChip,
-                    filters.availability === avail && { backgroundColor: sportConfig.colors.accent },
+                    filters.availability === avail && {
+                      backgroundColor: sportConfig.colors.accent,
+                    },
                   ]}
-                  onPress={() => onFiltersChange({ ...filters, availability: avail })}
+                  onPress={() =>
+                    onFiltersChange({ ...filters, availability: avail })
+                  }
                 >
                   <Text style={styles.filterChipText}>{avail}</Text>
                 </TouchableOpacity>
@@ -234,14 +311,18 @@ const FilterPanel: React.FC<{
             {/* Trending Filter */}
             <Text style={styles.filterSectionTitle}>Trending</Text>
             <View style={styles.filterGrid}>
-              {['All', 'Rising', 'Falling', 'Hot Adds'].map(trend => (
+              {['All', 'Rising', 'Falling', 'Hot Adds'].map((trend) => (
                 <TouchableOpacity
                   key={trend}
                   style={[
                     styles.filterChip,
-                    filters.trending === trend && { backgroundColor: sportConfig.colors.accent },
+                    filters.trending === trend && {
+                      backgroundColor: sportConfig.colors.accent,
+                    },
                   ]}
-                  onPress={() => onFiltersChange({ ...filters, trending: trend })}
+                  onPress={() =>
+                    onFiltersChange({ ...filters, trending: trend })
+                  }
                 >
                   <Text style={styles.filterChipText}>{trend}</Text>
                 </TouchableOpacity>
@@ -272,14 +353,14 @@ const WaiverClaimModal: React.FC<{
 }> = ({ player, visible, onClose, onSubmit, sport }) => {
   const [faabBid, setFaabBid] = useState('');
   const [priority, setPriority] = useState(1);
-  const sportConfig = SPORT_CONFIGS[sport as keyof typeof SPORT_CONFIGS];
+  const sportConfig = SPORT_CONFIGS[sport];
 
   const handleSubmit = () => {
     if (player) {
       onSubmit({
+        faabBid: parseInt(faabBid) || 0,
         playerId: player.id,
         priority,
-        faabBid: parseInt(faabBid) || 0,
       });
       onClose();
       setFaabBid('');
@@ -294,10 +375,12 @@ const WaiverClaimModal: React.FC<{
       <View style={styles.modalOverlay}>
         <View style={styles.claimModal}>
           <Text style={styles.modalTitle}>Add Waiver Claim</Text>
-          
+
           <View style={styles.playerSummary}>
             <Text style={styles.modalPlayerName}>{player.name}</Text>
-            <Text style={styles.modalPlayerInfo}>{player.team} - {player.position}</Text>
+            <Text style={styles.modalPlayerInfo}>
+              {player.team} - {player.position}
+            </Text>
           </View>
 
           <View style={styles.claimForm}>
@@ -313,12 +396,14 @@ const WaiverClaimModal: React.FC<{
 
             <Text style={styles.formLabel}>Waiver Priority</Text>
             <View style={styles.priorityContainer}>
-              {[1, 2, 3, 4, 5].map(p => (
+              {[1, 2, 3, 4, 5].map((p) => (
                 <TouchableOpacity
                   key={p}
                   style={[
                     styles.priorityButton,
-                    priority === p && { backgroundColor: sportConfig.colors.accent },
+                    priority === p && {
+                      backgroundColor: sportConfig.colors.accent,
+                    },
                   ]}
                   onPress={() => setPriority(p)}
                 >
@@ -333,7 +418,10 @@ const WaiverClaimModal: React.FC<{
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitButton, { backgroundColor: sportConfig.colors.accent }]}
+              style={[
+                styles.submitButton,
+                { backgroundColor: sportConfig.colors.accent },
+              ]}
               onPress={handleSubmit}
             >
               <Text style={styles.submitButtonText}>Submit Claim</Text>
@@ -354,10 +442,10 @@ const FreeAgents: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState('Rank');
   const [filters, setFilters] = useState({
-    position: 'ALL',
     availability: 'All',
-    trending: 'All',
     ownershipRange: [0, 100],
+    position: 'ALL',
+    trending: 'All',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -366,25 +454,30 @@ const FreeAgents: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Sport config
-  const sportConfig = SPORT_CONFIGS[sport];
+  const sportConfig = SPORT_CONFIGS[sport as keyof typeof SPORT_CONFIGS];
 
   // Empty players array - will be populated from database
-  const players: Player[] = [];
+  const players: Player[] = useMemo((): Player[] => [], []);
 
   // Filtered and sorted players
   const filteredPlayers = useMemo(() => {
     return players
       .filter((player) => {
-        const matchesSearch = player.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                            player.team.toLowerCase().includes(searchText.toLowerCase());
-        const matchesPosition = filters.position === 'ALL' || player.position === filters.position;
+        const matchesSearch =
+          player.name.toLowerCase().includes(searchText.toLowerCase()) ||
+          player.team.toLowerCase().includes(searchText.toLowerCase());
+        const matchesPosition =
+          filters.position === 'ALL' || player.position === filters.position;
         return matchesSearch && matchesPosition;
       })
       .sort((a, b) => {
         switch (sortBy) {
-          case 'Rank': return a.rank - b.rank;
-          case 'Ownership%': return b.ownership - a.ownership;
-          default: return a.rank - b.rank;
+          case 'Rank':
+            return a.rank - b.rank;
+          case 'Ownership%':
+            return b.ownership - a.ownership;
+          default:
+            return a.rank - b.rank;
         }
       });
   }, [players, searchText, filters, sortBy]);
@@ -396,7 +489,7 @@ const FreeAgents: React.FC = () => {
   }, []);
 
   const handleWatchToggle = useCallback((playerId: string) => {
-    setWatchlist(prev => {
+    setWatchlist((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(playerId)) {
         newSet.delete(playerId);
@@ -421,7 +514,7 @@ const FreeAgents: React.FC = () => {
   const renderPlayerGrid = () => (
     <FlatList
       data={filteredPlayers}
-      keyExtractor={item => item.id}
+      keyExtractor={(item) => item.id}
       numColumns={IS_TABLET ? 3 : 1}
       renderItem={({ item }) => (
         <PlayerCard
@@ -438,21 +531,36 @@ const FreeAgents: React.FC = () => {
       ListEmptyComponent={
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No free agents available</Text>
-          <Text style={styles.emptyStateSubtext}>Players will appear when database is populated</Text>
+          <Text style={styles.emptyStateSubtext}>
+            Players will appear when database is populated
+          </Text>
         </View>
       }
     />
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: sportConfig.colors.primary }]}>
-      <StatusBar barStyle="light-content" backgroundColor={sportConfig.colors.primary} />
-      
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: sportConfig.colors.primary },
+      ]}
+    >
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={sportConfig.colors.primary}
+      />
+
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: sportConfig.colors.secondary }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: sportConfig.colors.secondary },
+        ]}
+      >
         <Text style={styles.headerTitle}>Free Agents</Text>
         <Text style={styles.sportBadge}>{sport.toUpperCase()}</Text>
-        
+
         {/* Quick Stats */}
         <View style={styles.quickStats}>
           <View style={styles.statItem}>
@@ -469,14 +577,20 @@ const FreeAgents: React.FC = () => {
       {/* Search and Controls */}
       <View style={styles.searchContainer}>
         <TextInput
-          style={[styles.searchInput, { borderColor: sportConfig.colors.accent }]}
+          style={[
+            styles.searchInput,
+            { borderColor: sportConfig.colors.accent },
+          ]}
           placeholder={`Search ${sport} free agents...`}
           placeholderTextColor="#64748b"
           value={searchText}
           onChangeText={setSearchText}
         />
         <TouchableOpacity
-          style={[styles.filterButton, { backgroundColor: sportConfig.colors.accent }]}
+          style={[
+            styles.filterButton,
+            { backgroundColor: sportConfig.colors.accent },
+          ]}
           onPress={() => setShowFilters(true)}
         >
           <Text style={styles.filterButtonText}>Filters</Text>
@@ -485,13 +599,19 @@ const FreeAgents: React.FC = () => {
 
       {/* Sort and View Controls */}
       <View style={styles.controlsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortContainer}>
-          {sportConfig.sortOptions.map(option => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sortContainer}
+        >
+          {sportConfig.sortOptions.map((option) => (
             <TouchableOpacity
               key={option}
               style={[
                 styles.sortButton,
-                sortBy === option && { backgroundColor: sportConfig.colors.accent },
+                sortBy === option && {
+                  backgroundColor: sportConfig.colors.accent,
+                },
               ]}
               onPress={() => setSortBy(option)}
             >
@@ -499,12 +619,14 @@ const FreeAgents: React.FC = () => {
             </TouchableOpacity>
           ))}
         </ScrollView>
-        
+
         <TouchableOpacity
           style={styles.viewToggle}
           onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
         >
-          <Text style={styles.viewToggleText}>{viewMode === 'grid' ? '☰' : '⊞'}</Text>
+          <Text style={styles.viewToggleText}>
+            {viewMode === 'grid' ? '☰' : '⊞'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -535,12 +657,21 @@ const FreeAgents: React.FC = () => {
 // Helper functions
 const getPositionColor = (position: string, sport: string): string => {
   const baseballColors: Record<string, string> = {
-    C: '#ff6b35', '1B': '#ff8c42', '2B': '#ffa726', '3B': '#ffb74d',
-    SS: '#ffcc80', OF: '#ffe0b2', P: '#e65100'
+    '1B': '#ff8c42',
+    '2B': '#ffa726',
+    '3B': '#ffb74d',
+    C: '#ff6b35',
+    OF: '#ffe0b2',
+    P: '#e65100',
+    SS: '#ffcc80',
   };
   const footballColors: Record<string, string> = {
-    QB: '#ea580c', RB: '#f97316', WR: '#fb923c', TE: '#fdba74',
-    K: '#fed7aa', DEF: '#ffedd5'
+    DEF: '#ffedd5',
+    K: '#fed7aa',
+    QB: '#ea580c',
+    RB: '#f97316',
+    TE: '#fdba74',
+    WR: '#fb923c',
   };
   const colors = sport === 'baseball' ? baseballColors : footballColors;
   return colors[position] || '#6b7280';
@@ -552,193 +683,189 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 50,
-    paddingHorizontal: 20,
     paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 50,
   },
   headerTitle: {
+    color: '#ffffff',
     fontSize: 28,
     fontWeight: '800',
-    color: '#ffffff',
     marginBottom: 4,
-  },
-  sportBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 16,
   },
   quickStats: {
     flexDirection: 'row',
     gap: 24,
   },
+  sportBadge: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
   statItem: {
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
+  filterButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   statLabel: {
-    fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
   },
   searchContainer: {
     flexDirection: 'row',
-    padding: 16,
     gap: 12,
+    padding: 16,
   },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    color: '#ffffff',
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  filterButton: {
-    height: 44,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    justifyContent: 'center',
+  controlsContainer: {
     alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  statNumber: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
   },
   filterButtonText: {
     color: '#ffffff',
-    fontWeight: '600',
     fontSize: 14,
+    fontWeight: '600',
   },
-  controlsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  sortContainer: {
+  searchInput: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#ffffff',
     flex: 1,
+    fontSize: 16,
+    height: 44,
+    paddingHorizontal: 16,
   },
   sortButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 20,
     marginRight: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  playerGrid: {
+    padding: 8,
   },
   sortButtonText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
   },
+  sortContainer: {
+    flex: 1,
+  },
   viewToggle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  cardContent: {
+    padding: 16,
   },
   viewToggleText: {
     color: '#ffffff',
     fontSize: 18,
-  },
-  playerGrid: {
-    padding: 8,
-  },
-  playerCard: {
-    flex: 1,
-    margin: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  cardContent: {
-    padding: 16,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  playerCard: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 8,
+    flex: 1,
+    margin: 8,
+    shadowColor: '#000',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
   playerInfo: {
     flex: 1,
   },
-  playerName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
   playerMeta: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
   },
-  teamText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+  playerName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   positionBadge: {
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 6,
-  },
-  positionText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
   },
   injuryBadge: {
+    borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
   },
-  injuryText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#ffffff',
+  teamText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
   },
   cardActions: {
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
   },
-  watchButton: {
-    padding: 4,
+  injuryText: {
+    color: '#ffffff',
+    fontSize: 8,
+    fontWeight: '700',
   },
-  watchIcon: {
-    fontSize: 20,
-  },
-  trendingIcon: {
-    fontSize: 16,
+  positionText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  statRow: {
-    alignItems: 'center',
+  trendingIcon: {
+    fontSize: 16,
+  },
+  watchButton: {
+    padding: 4,
   },
   statLabel: {
-    fontSize: 12,
     color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
   },
-  statValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
+  watchIcon: {
+    fontSize: 20,
   },
   claimButton: {
-    paddingVertical: 10,
+    alignItems: 'center',
     borderRadius: 8,
+    paddingVertical: 10,
+  },
+  statRow: {
     alignItems: 'center',
   },
   claimButtonText: {
@@ -746,29 +873,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  statValue: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   emptyState: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     paddingVertical: 60,
   },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 8,
-  },
   emptyStateSubtext: {
-    fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
     textAlign: 'center',
   },
-  filterOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  emptyStateText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   filterBackdrop: {
     flex: 1,
+  },
+  filterOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+  },
+  filterHeader: {
+    alignItems: 'center',
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  closeButton: {
+    color: '#ffffff',
+    fontSize: 24,
   },
   filterPanel: {
     backgroundColor: 'rgba(30,41,59,0.95)',
@@ -776,45 +920,33 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
-  filterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-  },
-  filterTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#ffffff',
-  },
   filterContent: {
     padding: 20,
   },
-  filterSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  filterTitle: {
     color: '#ffffff',
-    marginBottom: 12,
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
   },
   filterGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
+  filterSectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 16,
+  },
   filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   filterChipText: {
     color: '#ffffff',
@@ -822,90 +954,90 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   rangeContainer: {
-    padding: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
+    padding: 16,
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    flex: 1,
+    justifyContent: 'center',
   },
   rangeLabel: {
     color: '#ffffff',
     fontSize: 14,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   claimModal: {
     backgroundColor: '#2d2d2d',
     borderRadius: 16,
+    maxWidth: 400,
     padding: 24,
     width: '90%',
-    maxWidth: 400,
   },
   modalTitle: {
+    color: '#ffffff',
     fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
     marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalPlayerName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
   },
   playerSummary: {
     alignItems: 'center',
     marginBottom: 24,
   },
-  modalPlayerName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  modalPlayerInfo: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-  },
   claimForm: {
     marginBottom: 24,
   },
-  formLabel: {
+  modalPlayerInfo: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
   },
   formInput: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
-    padding: 12,
     color: '#ffffff',
     fontSize: 16,
     marginBottom: 16,
+    padding: 12,
+  },
+  formLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  priorityButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    flex: 1,
+    paddingVertical: 12,
   },
   priorityContainer: {
     flexDirection: 'row',
     gap: 8,
   },
-  priorityButton: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    alignItems: 'center',
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
   priorityText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   cancelButton: {
-    flex: 1,
-    paddingVertical: 12,
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
-    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 12,
   },
   cancelButtonText: {
     color: '#ffffff',
@@ -913,10 +1045,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitButton: {
+    alignItems: 'center',
+    borderRadius: 8,
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   submitButtonText: {
     color: '#ffffff',

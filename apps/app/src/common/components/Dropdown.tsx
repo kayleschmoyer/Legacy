@@ -1,4 +1,5 @@
-import { IndexPath, Select, SelectItem } from '@ui-kitten/components';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-redundant-type-constituents */
+import { Select } from 'tamagui';
 import { useEffect, useState } from 'react';
 
 export interface DropdownItem {
@@ -15,35 +16,24 @@ export interface DropdownProperties {
 export function Dropdown(props: DropdownProperties): JSX.Element {
   const { value, onChange, items } = props;
 
-  const [selectedIndex, setSelectedIndex] = useState<
-    IndexPath | IndexPath[] | undefined
-  >();
-
-  useEffect(() => {
-    const idx = items.findIndex((i) => value === i.value);
-
-    if (idx !== -1) {
-      setSelectedIndex(new IndexPath(idx));
-    }
-  }, [value, items]);
-
-  const internalOnChange = (idx: IndexPath | IndexPath[]) => {
-    if (Array.isArray(idx)) {
-      throw new Error('Multi select not supported currently');
-    }
-
-    const item = items[idx.row];
-
-    if (item) {
-      onChange(item.value);
-    }
-  };
-
   return (
-    <Select selectedIndex={selectedIndex} onSelect={internalOnChange}>
-      {items.map((i) => (
-        <SelectItem title={i.text} />
-      ))}
+    <Select value={value} onValueChange={onChange}>
+      <Select.Trigger>
+        <Select.Value placeholder="Select an option..." />
+      </Select.Trigger>
+
+      <Select.Content>
+        <Select.ScrollUpButton />
+        <Select.Viewport>
+          {items.map((item) => (
+            <Select.Item key={item.value} index={item.value} value={item.value}>
+              <Select.ItemText>{item.text}</Select.ItemText>
+            </Select.Item>
+          ))}
+        </Select.Viewport>
+        <Select.ScrollDownButton />
+      </Select.Content>
     </Select>
   );
 }
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-redundant-type-constituents */

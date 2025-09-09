@@ -18,7 +18,7 @@ import {
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
-} from './types/Types';
+} from '../../types/DatabaseTypes';
 import * as Schema from '../../drizzle/public/schema';
 
 export const PublicSchema = Schema;

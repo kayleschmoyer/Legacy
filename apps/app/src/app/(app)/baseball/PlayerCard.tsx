@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface Player {
   id: number;
@@ -17,7 +17,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
   return (
     <View style={styles.card}>
       <Text style={styles.name}>{player.name}</Text>
-      <Text>{player.position} - {player.team}</Text>
+      <Text>
+        {player.position} - {player.team}
+      </Text>
       <Text>Batting Average: {player.battingAvg}</Text>
     </View>
   );
@@ -25,10 +27,10 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 15,
-    marginVertical: 10,
     backgroundColor: '#f9f9f9',
     borderRadius: 5,
+    marginVertical: 10,
+    padding: 15,
   },
   name: {
     fontSize: 18,

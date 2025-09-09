@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
 import { Modal, StyleSheet, View } from 'react-native';
-import { Button, CheckBox, Input, Spinner } from '@ui-kitten/components';
+import { Button, Checkbox, Input, Spinner, Text } from 'tamagui';
+import { Check } from '@tamagui/lucide-icons';
 import { DraftType } from '../../api/db/graphql.generated';
 import { addDays } from '../../common/utilities/DateUtilities';
 import { useCreateLeagueMutation } from '../../api/db/leagues/Leagues.generated';
@@ -30,6 +30,7 @@ export default function CreateLeagueModal(
   const [draftType, setDraftType] = useState(DraftType.Normal);
   const [numberOfTeams, setNumberOfTeams] = useState(10);
   const currentUserInfo = useAuthorizedUserInfo();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
 
   const [createLeague, { data, loading, error }] = useCreateLeagueMutation({
@@ -46,10 +47,7 @@ export default function CreateLeagueModal(
 
   useEffect(() => {
     if (error) {
-      Toast.show({
-        text1: error.message,
-        type: 'error',
-      });
+      handleError(error.message);
     }
   }, [error]);
 
@@ -70,6 +68,7 @@ export default function CreateLeagueModal(
   useEffect(() => {
     if (data?.createLeagueAndTeams?.league) {
       onOpenChange(false);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       router.navigate({
         params: {
           leagueId: data.createLeagueAndTeams.league.id,
@@ -94,14 +93,17 @@ export default function CreateLeagueModal(
               onChange={onNumberOfTeamsChanged}
               items={DROPDOWN_TEAM_COUNT_ITEMS}
             />
-            <CheckBox
+            <Checkbox
               checked={draftType === DraftType.Blind}
-              onChange={(v) =>
+              onCheckedChange={(v) =>
                 setDraftType(v ? DraftType.Blind : DraftType.Normal)
               }
             >
-              Use Blind Draft?"
-            </CheckBox>
+              <Checkbox.Indicator>
+                <Check />
+              </Checkbox.Indicator>
+            </Checkbox>
+            <Text>Use Blind Draft?</Text>
 
             <View>
               <Button onPress={() => onOpenChange(false)}>Close</Button>

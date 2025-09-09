@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface PlayerDetailProps {
   route: {
@@ -11,8 +11,20 @@ interface PlayerDetailProps {
 
 const getPlayerDetails = (playerId: number) => {
   const playersData = [
-    { id: 1, name: 'Babe Ruth', position: 'OF', team: 'New York Yankees', battingAvg: 0.342 },
-    { id: 2, name: 'Ty Cobb', position: 'CF', team: 'Detroit Tigers', battingAvg: 0.366 },
+    {
+      battingAvg: 0.342,
+      id: 1,
+      name: 'Babe Ruth',
+      position: 'OF',
+      team: 'New York Yankees',
+    },
+    {
+      battingAvg: 0.366,
+      id: 2,
+      name: 'Ty Cobb',
+      position: 'CF',
+      team: 'Detroit Tigers',
+    },
   ];
   return playersData.find((player) => player.id === playerId);
 };
@@ -41,8 +53,8 @@ const PlayerDetail: React.FC<PlayerDetailProps> = ({ route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
     backgroundColor: '#fff',
+    padding: 20,
   },
   name: {
     fontSize: 24,

@@ -1,0 +1,23 @@
+import React from 'react';
+import { Route, Routes } from 'react-router-dom';
+import { TamaguiProvider } from '@tamagui/core';
+import {
+  BaseballScreen,
+  DemoScreen,
+  FootballScreen,
+  HomeScreen,
+} from '@legacy-sports/shared-components';
+import config from '@tamagui/config/v3';
+
+export function App() {
+  return (
+    <TamaguiProvider config={config}>
+      <Routes>
+        <Route path="/" element={<HomeScreen />} />
+        <Route path="/football" element={<FootballScreen />} />
+        <Route path="/baseball" element={<BaseballScreen />} />
+        <Route path="/demo" element={<DemoScreen />} />
+      </Routes>
+    </TamaguiProvider>
+  );
+}

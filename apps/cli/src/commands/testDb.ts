@@ -52,10 +52,9 @@ export async function handleTestDb(
       client.release();
     }
   } catch (error) {
-    LOGGER.error(
-      'Database connection failed:',
-      error instanceof Error ? error.message : String(error)
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    LOGGER.error('Database connection failed:');
+    LOGGER.error(errorMessage);
     throw error;
   } finally {
     await pool.end();

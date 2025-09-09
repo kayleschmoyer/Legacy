@@ -2,7 +2,7 @@ import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
 import { StyleSheet, View } from 'react-native';
-import { Spinner, Text } from '@ui-kitten/components';
+import { Spinner, Text } from 'tamagui';
 import {
   LeagueFragment,
   TeamFragment,
@@ -41,9 +41,17 @@ function TeamName(props: TeamNameProps): JSX.Element {
 }
 
 export default function LeagueId(): JSX.Element {
-  const { leagueId } = useLocalSearchParams<{ leagueId: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+  const params = useLocalSearchParams();
+  const leagueId = params.leagueId;
 
-  const numLeagueId = parseInt(leagueId, 10);
+  const leagueIdStr =
+    typeof leagueId === 'string'
+      ? leagueId
+      : Array.isArray(leagueId)
+      ? leagueId[0]
+      : '';
+  const numLeagueId = parseInt(leagueIdStr, 10);
 
   const { data, loading } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),
@@ -76,9 +84,17 @@ export default function LeagueId(): JSX.Element {
 }
 
 export function LeagueIdHeader(props: HeaderTitleProps): JSX.Element {
-  const { leagueId } = useGlobalSearchParams<{ leagueId: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+  const params = useGlobalSearchParams();
+  const leagueId = params.leagueId;
 
-  const numLeagueId = parseInt(leagueId, 10);
+  const leagueIdStr =
+    typeof leagueId === 'string'
+      ? leagueId
+      : Array.isArray(leagueId)
+      ? leagueId[0]
+      : '';
+  const numLeagueId = parseInt(leagueIdStr, 10);
 
   const { data } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),

@@ -35,7 +35,7 @@ async function loadPlayer(
 }
 
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  LOGGER.debug(event);
+  LOGGER.debug(JSON.stringify(event));
 
   const dbClient = await getDb();
 

@@ -1,13 +1,30 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { createApplication } from './app';
+import { ApolloServer } from '@apollo/server';
+import { startStandaloneServer } from '@apollo/server/standalone';
+import { schema } from './schema';
 
 const PORT = 5000;
 
-async function run(): Promise<void> {
-  const app = await createApplication();
+async function startServer() {
+  // Create Apollo Server instance
+  const server = new ApolloServer({
+    schema,
+    introspection: true,
+  });
 
-  app.listen(PORT);
-  LOGGER.info(`Server running on port ${PORT}`);
+  // Start the standalone server
+  const { url } = await startStandaloneServer(server, {
+    listen: { port: PORT },
+    context: async () => {
+      return {};
+    },
+  });
+
+  LOGGER.info(`🚀 GraphQL server ready at ${url}`);
+  LOGGER.info(`🎮 GraphQL Playground available at ${url}`);
 }
 
-run().catch((err) => LOGGER.error(err));
+startServer().catch((error: Error) => {
+  LOGGER.error(`Failed to start server: ${error.message}`);
+  process.exit(1);
+});

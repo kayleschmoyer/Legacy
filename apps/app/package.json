@@ -2,23 +2,26 @@
   "name": "app",
   "version": "0.0.1",
   "private": true,
-  "main": "src/index.ts",
-  "dependencies": {
-    "@testing-library/jest-native": "*",
-    "@testing-library/react-native": "*",
-    "metro-config": "*",
-    "react-native": "*",
-    "expo": "*",
-    "react-native-svg": "*",
-    "react-native-web": "*",
-    "react": "18.2.0"
-  },
+  "main": "index.js",
   "scripts": {
-    "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . app",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-    "codegen": "npm run codegen:db"
+    "start": "react-native start"
   },
-  "devDependencies": {}
+  "dependencies": {
+    "@expo/metro-config": "^0.20.17",
+    "expo": "^53.0.22",
+    "expo-router": "~5.1.5",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-reanimated": "~3.17.4",
+    "expo-image": "~2.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@babel/preset-env": "^7.25.0",
+    "@babel/runtime": "^7.25.0",
+    "@expo/cli": "^0.24.20",
+    "@types/react": "~19.0.10"
+  }
 }

@@ -19,7 +19,7 @@ export const matchups = pgTable(
   (table) => {
     return {
       matchupsLeagueFk: foreignKey({
-        columns: [table.id],
+        columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'matchups_league_fk',
       }),

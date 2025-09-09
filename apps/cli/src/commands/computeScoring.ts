@@ -65,13 +65,15 @@ export async function handleComputeScoring(
     const pitchingScorePerGame =
       pitchingStats === null ? 0 : pitchingScore / (pitchingStats.g || 1);
 
-    LOGGER.info({
-      battingScore,
-      battingScorePerGame,
-      fieldingScore,
-      fieldingScorePerGame,
-      pitchingScore,
-      pitchingScorePerGame,
-    });
+    LOGGER.info(
+      JSON.stringify({
+        battingScore,
+        battingScorePerGame,
+        fieldingScore,
+        fieldingScorePerGame,
+        pitchingScore,
+        pitchingScorePerGame,
+      })
+    );
   });
 }

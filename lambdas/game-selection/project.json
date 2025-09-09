@@ -4,5 +4,91 @@
   "sourceRoot": "lambdas/game-selection/src",
   "projectType": "application",
   "tags": [],
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "lambdas/game-selection/dist"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "commands": [
+          "powershell -Command \"Compress-Archive -Path 'lambdas/game-selection/dist/dev.js' -DestinationPath 'lambdas/game-selection/dist/dev.js.zip' -Force\""
+        ],
+        "parallel": false
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform",
+          "terraform apply -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway -auto-approve",
+          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "deploy:plan": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform && terraform plan -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "test-endpoint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "curl -X GET \"https://$(cd terraform && terraform output -raw api_gateway_url)/games/health\" -H \"Content-Type: application/json\""
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "aws logs tail /aws/lambda/legacy-sports-dev-game-selection --follow --region us-east-1"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/dev.ts",
+        "cwd": "lambdas/game-selection"
+      }
+    }
+  }
 }

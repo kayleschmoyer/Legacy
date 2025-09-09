@@ -103,7 +103,7 @@ async function selectGamesForMatchup(
 }
 
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
-  LOGGER.debug(event);
+  LOGGER.debug('Processing SQS event', { event });
 
   const db = await getDb();
 
@@ -116,7 +116,9 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         await selectGamesForMatchup(db.db, matchup.matchupId, matchup.game);
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
-        LOGGER.error(err);
+        LOGGER.error('Error processing record', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   } finally {

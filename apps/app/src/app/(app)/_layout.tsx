@@ -1,17 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
 import { Redirect, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import {
-  Divider,
-  DrawerElement,
-  DrawerItem,
-  Drawer as KittenDrawer,
-  useTheme,
-} from '@ui-kitten/components';
-import { Fragment } from 'react';
+import { Separator, Text, YStack } from 'tamagui';
 import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import ViewGameLogs from './view_game_logs';
@@ -28,11 +22,23 @@ import {
 } from '../../common/auth/AuthHooks';
 import Home from '.';
 
-const { Navigator, Screen } = createDrawerNavigator();
+export type AppDrawerParamList = {
+  '/': undefined;
+  view_game_logs: undefined;
+  view_career_stats: undefined;
+  baseball: undefined;
+  football: undefined;
+  DraftBoardPage: undefined;
+  FreeAgents: undefined;
+  'baseball/league/[leagueId]': { leagueId: string };
+  'baseball/team/[teamId]': { teamId: string };
+};
+
+const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
 
 interface Route {
   title: string;
-  route: string;
+  route: keyof AppDrawerParamList;
 }
 
 const ROUTES = Object.freeze<Route[]>([
@@ -61,46 +67,55 @@ const ROUTES = Object.freeze<Route[]>([
     title: 'Draft Board',
   },
   {
-    route: 'FreeAgents', 
+    route: 'FreeAgents',
     title: 'Free Agents',
   },
 ]);
 
-function CustomDrawerContent(
-  props: DrawerContentComponentProps
-): DrawerElement {
+function CustomDrawerContent(props: DrawerContentComponentProps): JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
 
   const doLogout = () => {
     logout();
+    router.navigate('/login');
+    props.navigation.closeDrawer();
   };
 
-  const onItemSelect = (route: string): void => {
+  const onItemSelect = (route: keyof AppDrawerParamList): void => {
     router.navigate(route);
     props.navigation.closeDrawer();
   };
 
   return (
-    <KittenDrawer>
-      <Fragment>
-        {ROUTES.map((r) => (
-          <DrawerItem
-            key={r.route}
-            title={r.title}
-            onPress={() => onItemSelect(r.route)}
-          />
-        ))}
-      </Fragment>
-      <Divider />
-      <DrawerItem title="Logout" onPress={doLogout} />
-    </KittenDrawer>
+    <YStack flex={1} backgroundColor="$background" padding="$4">
+      {ROUTES.map((r) => (
+        <Text
+          key={r.route}
+          padding="$3"
+          fontSize="$5"
+          onPress={() => onItemSelect(r.route)}
+          pressStyle={{ backgroundColor: '$gray3' }}
+        >
+          {r.title}
+        </Text>
+      ))}
+      <Separator marginVertical="$3" />
+      <Text
+        padding="$3"
+        fontSize="$5"
+        color="$red10"
+        onPress={doLogout}
+        pressStyle={{ backgroundColor: '$gray3' }}
+      >
+        Logout
+      </Text>
+    </YStack>
   );
 }
 
 export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
-  const theme = useTheme();
 
   if (loading) {
     return <LoadingPanel />;
@@ -114,13 +129,15 @@ export default function Layout() {
     <AuthorizedUserContextProvider>
       <GestureHandlerRootView data-testid="gesture-handler" style={{ flex: 1 }}>
         <Navigator
-          drawerContent={(props) => <CustomDrawerContent {...props} />}
+          drawerContent={(props: DrawerContentComponentProps) => (
+            <CustomDrawerContent {...props} />
+          )}
           screenOptions={{
             headerStyle: {
-              backgroundColor: theme['background-basic-color-4'],
+              backgroundColor: '#f5f5f5',
             },
             sceneContainerStyle: {
-              backgroundColor: theme['background-basic-color-1'],
+              backgroundColor: '#ffffff',
             },
           }}
         >

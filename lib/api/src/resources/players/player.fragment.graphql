@@ -1,0 +1,6 @@
+# Player fragment defining the core fields for player data
+fragment Player on Player {
+  id
+  name
+  brefId
+}

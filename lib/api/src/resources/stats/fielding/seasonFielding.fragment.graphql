@@ -1,0 +1,31 @@
+# Season fielding statistics fragment
+fragment SeasonFielding on SeasonFielding {
+  playerId
+  season
+  team
+  pos
+  g
+  gs
+  innDef
+  po
+  a
+  eDef
+  dpDef
+  fieldingPerc
+  rangeFactorPerGame
+  rangeFactorPerNine
+  pickoffs
+  sb
+  cs
+  caughtStealingPerc
+  wp
+  chances
+  cg
+  gOfParts
+  awardSummary
+  lgId
+  fieldingPercLg
+  rangeFactorPerGameLg
+  rangeFactorPerNineLg
+  caughtStealingPercLg
+}

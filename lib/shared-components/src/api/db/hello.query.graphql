@@ -1,0 +1,4 @@
+# Basic test query for the current schema
+query GetHello {
+  hello
+}

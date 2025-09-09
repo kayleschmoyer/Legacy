@@ -1,0 +1,16 @@
+# Query to fetch all season fielding stats for a player
+query GetPlayerAllSeasonFielding($playerId: Int!) {
+  player(id: $playerId) {
+    id
+    name
+    brefId
+    seasonFieldings {
+      nodes {
+        ...SeasonFielding
+      }
+    }
+  }
+}
+
+# Import the SeasonFielding fragment
+#import "./seasonFielding.fragment.graphql"

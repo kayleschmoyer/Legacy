@@ -58,7 +58,10 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
       await connection.close();
       LOGGER.debug('Client disconnected');
     } catch (err) {
-      LOGGER.debug('Could not disconnect client', err);
+      LOGGER.debug('Could not disconnect client');
+      if (err instanceof Error) {
+        LOGGER.debug(err.message);
+      }
     }
   }
 }

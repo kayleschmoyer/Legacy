@@ -1,0 +1,8 @@
+# Query to fetch all players
+query GetAllPlayers {
+  players {
+    id
+    name
+    brefId
+  }
+}

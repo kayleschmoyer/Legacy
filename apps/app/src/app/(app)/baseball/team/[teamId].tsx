@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Divider, Layout, Tab, TabBar, Text } from '@ui-kitten/components';
+import { Separator, Tabs, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
@@ -211,12 +211,22 @@ function TabContent(props: TabContentProps): JSX.Element | null {
 }
 
 export default function Team(): JSX.Element {
-  const { teamId } = useLocalSearchParams<{ teamId: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+  const params = useLocalSearchParams();
+  const teamId = params.teamId;
+
+  const teamIdStr =
+    typeof teamId === 'string'
+      ? teamId
+      : Array.isArray(teamId)
+      ? teamId[0]
+      : '';
+  const numTeamId = parseInt(teamIdStr, 10);
 
   const { loading: loadingTeam, data: team } = useGetTeamByIdQuery({
-    skip: isNaN(parseInt(teamId, 10)),
+    skip: isNaN(numTeamId),
     variables: {
-      teamId: parseInt(teamId, 10),
+      teamId: numTeamId,
       withPositions: true,
     },
   });
@@ -305,23 +315,34 @@ export default function Team(): JSX.Element {
   }
 
   if (!team?.team) {
-    return <Text status="danger">Could not load team</Text>;
+    return <Text color="$red10">Could not load team</Text>;
   }
 
   if (!positions?.leaguePositions) {
-    return <Text status="danger">Could not load positions for league</Text>;
+    return <Text color="$red10">Could not load positions for league</Text>;
   }
 
   return (
     <ScrollView data-testid="scrollview">
-      <Layout data-testid="layout">
-        <TabBar selectedIndex={selectedTabIdx} onSelect={setSelectedTabIdx}>
-          {TABS.map((t) => (
-            <Tab key={t} title={t} />
-          ))}
-        </TabBar>
+      <YStack data-testid="layout">
+        <Tabs
+          value={TABS[selectedTabIdx]}
+          onValueChange={(value) => {
+            const index = TABS.indexOf(value);
+            if (index !== -1) setSelectedTabIdx(index);
+          }}
+          orientation="horizontal"
+        >
+          <Tabs.List>
+            {TABS.map((tab) => (
+              <Tabs.Tab key={tab} value={tab}>
+                <Text>{tab}</Text>
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs>
 
-        <Divider />
+        <Separator />
         <TabContent
           matchup={league?.league?.matchupByCurrentMatchup}
           team={team.team.teamMembers.nodes}
@@ -331,17 +352,28 @@ export default function Team(): JSX.Element {
           selectedTab={TABS[selectedTabIdx]}
           rosterSlots={positions.leaguePositions.nodes}
         />
-      </Layout>
+      </YStack>
     </ScrollView>
   );
 }
 
 export function TeamIdHeader(): JSX.Element {
-  const { teamId } = useLocalSearchParams<{ teamId: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+  const params = useLocalSearchParams();
+  const teamId = params.teamId;
+
+  const teamIdStr =
+    typeof teamId === 'string'
+      ? teamId
+      : Array.isArray(teamId)
+      ? teamId[0]
+      : '';
+  const numTeamId = parseInt(teamIdStr, 10);
+
   const { data: team } = useGetTeamByIdQuery({
-    skip: isNaN(parseInt(teamId, 10)),
+    skip: isNaN(numTeamId),
     variables: {
-      teamId: parseInt(teamId, 10),
+      teamId: numTeamId,
     },
   });
 

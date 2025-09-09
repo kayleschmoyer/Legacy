@@ -1,4 +1,4 @@
-import { Spinner, Text } from '@ui-kitten/components';
+import { Spinner, Text } from 'tamagui';
 import { useMemo } from 'react';
 import { BattingStatsTable } from './BattingStatsTable';
 import { PitchingStatsTable } from './PitchingStatsTable';

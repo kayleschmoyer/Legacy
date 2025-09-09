@@ -1,0 +1,74 @@
+{
+  "name": "web-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/web-e2e/src",
+  "projectType": "application",
+  "tags": [
+    "scope:web",
+    "type:e2e"
+  ],
+  "implicitDependencies": [
+    "web"
+  ],
+  "// targets": "to see all targets run: nx show project web-e2e --web",
+  "targets": {
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test",
+        "cwd": "{projectRoot}"
+      },
+      "configurations": {
+        "ci": {
+          "command": "playwright test --reporter=junit"
+        }
+      }
+    },
+    "e2e:ui": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --ui",
+        "cwd": "."
+      }
+    },
+    "e2e:headed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --headed",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e:debug": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --debug",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e:update-snapshots": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --update-snapshots",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "e2e:snapshots": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --grep='snapshot|visual|html'",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/web-e2e/**/*.{ts,tsx,js,jsx}"
+        ]
+      }
+    }
+  }
+}

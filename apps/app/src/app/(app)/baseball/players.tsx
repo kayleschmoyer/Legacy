@@ -1,6 +1,6 @@
 import { SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useState } from 'react';
-import { Text } from '@ui-kitten/components';
+import { Text } from 'tamagui';
 import {
   BattingStatsTableWithData,
   FieldingStatsTableWithData,

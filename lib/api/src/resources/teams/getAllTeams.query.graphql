@@ -1,0 +1,11 @@
+# Query to fetch all teams
+query GetAllTeams {
+  teams {
+    nodes {
+      ...Team
+    }
+  }
+}
+
+# Import the Team fragment
+#import "./team.fragment.graphql"

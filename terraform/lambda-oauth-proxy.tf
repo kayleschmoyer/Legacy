@@ -1,0 +1,252 @@
+# OAuth Proxy Lambda Configuration
+resource "aws_iam_role" "oauth_proxy_lambda" {
+  name = "${local.name_prefix}-oauth-proxy-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_basic" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_vpc" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
+# Custom policy for OAuth Proxy Lambda
+resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
+  name        = "${local.name_prefix}-oauth-proxy-lambda-secrets"
+  description = "IAM policy for OAuth Proxy Lambda to access secrets"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.database_credentials.arn,
+          aws_secretsmanager_secret.jwt_secret.arn,
+          aws_secretsmanager_secret.google_oauth_client_secret.arn,
+          aws_secretsmanager_secret.oauth_proxy_cookie_secret.arn
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_secrets" {
+  policy_arn = aws_iam_policy.oauth_proxy_lambda_secrets.arn
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
+# IAM policy for RDS access
+resource "aws_iam_policy" "oauth_proxy_lambda_rds" {
+  name        = "${local.name_prefix}-oauth-proxy-lambda-rds"
+  description = "IAM policy for OAuth Proxy Lambda to access RDS"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-db:connect"
+        ]
+        Resource = [
+          "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
+  policy_arn = aws_iam_policy.oauth_proxy_lambda_rds.arn
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
+# CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "oauth_proxy_lambda" {
+  name              = "/aws/lambda/${local.name_prefix}-oauth-proxy"
+  retention_in_days = 14
+
+  tags = local.common_tags
+}
+
+# Build OAuth Proxy Lambda
+resource "null_resource" "build_oauth_proxy_lambda" {
+  triggers = {
+    source_hash = sha256(join("", [
+      for f in fileset("${path.module}/../lambdas/oauth-proxy/src", "**/*.{ts,js,json}")
+      : filesha256("${path.module}/../lambdas/oauth-proxy/src/${f}")
+    ]))
+    package_json = filesha256("${path.module}/../lambdas/oauth-proxy/project.json")
+  }
+
+  provisioner "local-exec" {
+    command     = "npx nx run oauth-proxy:build"
+    working_dir = "${path.module}/.."
+  }
+}
+
+# Archive OAuth Proxy Lambda
+data "archive_file" "oauth_proxy_lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/../lambdas/oauth-proxy/dist"
+  output_path = "${path.module}/../lambdas/oauth-proxy/oauth-proxy-lambda.zip"
+  
+  depends_on = [null_resource.build_oauth_proxy_lambda]
+}
+
+# Lambda Function
+resource "aws_lambda_function" "oauth_proxy" {
+  filename         = data.archive_file.oauth_proxy_lambda.output_path
+  function_name    = "${local.name_prefix}-oauth-proxy"
+  role            = aws_iam_role.oauth_proxy_lambda.arn
+  handler         = "index.handler"
+  runtime         = "nodejs20.x"
+  timeout         = 30
+  memory_size     = 512
+
+  source_code_hash = data.archive_file.oauth_proxy_lambda.output_base64sha256
+
+  vpc_config {
+    subnet_ids         = aws_subnet.private_lambda[*].id
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  environment {
+    variables = {
+      DB_CREDS_PATH                       = aws_secretsmanager_secret.database_credentials.name
+      DB_HOST                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      DB_TYPE                            = "PG_REMOTE"
+      JWT_SECRET_NAME                    = aws_secretsmanager_secret.jwt_secret.name
+      GOOGLE_OAUTH_CLIENT_SECRET_NAME    = aws_secretsmanager_secret.google_oauth_client_secret.name
+      OAUTH_PROXY_COOKIE_SECRET_NAME     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
+      NODE_ENV                           = var.environment
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_basic,
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_vpc,
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_secrets,
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_rds,
+    aws_cloudwatch_log_group.oauth_proxy_lambda
+  ]
+
+  tags = local.common_tags
+}
+
+# API Gateway Integration for OAuth Proxy
+resource "aws_api_gateway_resource" "oauth_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "oauth"
+}
+
+# Catch-all resource for OAuth proxy paths
+resource "aws_api_gateway_resource" "oauth_proxy_paths" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.oauth_proxy.id
+  path_part   = "{proxy+}"
+}
+
+# OPTIONS method for CORS
+resource "aws_api_gateway_method" "oauth_proxy_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "oauth_proxy_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method = aws_api_gateway_method.oauth_proxy_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_method_response" "oauth_proxy_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method = aws_api_gateway_method.oauth_proxy_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "oauth_proxy_options" {
+  depends_on = [aws_api_gateway_integration.oauth_proxy_options]
+  
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method = aws_api_gateway_method.oauth_proxy_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ANY method for OAuth proxy
+resource "aws_api_gateway_method" "oauth_proxy_any" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "oauth_proxy_any" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.oauth_proxy_paths.id
+  http_method             = aws_api_gateway_method.oauth_proxy_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.oauth_proxy.invoke_arn
+}
+
+# Lambda permission for API Gateway
+resource "aws_lambda_permission" "oauth_proxy_api_gateway" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.oauth_proxy.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}

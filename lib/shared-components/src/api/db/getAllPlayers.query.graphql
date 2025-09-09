@@ -1,0 +1,14 @@
+# Query to fetch all players with pagination and sorting support
+#import "./player.fragment.graphql"
+
+query GetAllPlayers($first: Int, $after: Cursor, $orderBy: [PlayersOrderBy!]) {
+  players(first: $first, after: $after, orderBy: $orderBy) {
+    nodes {
+      ...Player
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

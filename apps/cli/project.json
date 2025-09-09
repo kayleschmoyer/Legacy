@@ -7,16 +7,22 @@
   "targets": {
     "build": {
       "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "defaultConfiguration": "production",
       "options": {
         "platform": "node",
         "outputPath": "dist/apps/cli",
-        "format": ["cjs"],
+        "format": [
+          "cjs"
+        ],
         "bundle": false,
         "main": "apps/cli/src/main.ts",
         "tsConfig": "apps/cli/tsconfig.app.json",
-        "assets": ["apps/cli/src/assets"],
+        "assets": [
+          "apps/cli/src/assets"
+        ],
         "generatePackageJson": true,
         "esbuildOptions": {
           "sourcemap": true,
@@ -40,7 +46,9 @@
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "buildTarget": "cli:build",
         "runBuildTargetDependencies": false
@@ -52,6 +60,55 @@
         "production": {
           "buildTarget": "cli:build:production"
         }
+      }
+    },
+    "codegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/cli"
+      }
+    },
+    "codegen:db": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/cli"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register src/main.ts",
+        "cwd": "apps/cli"
+      }
+    },
+    "compute-scoring": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register src/main.ts compute-scoring",
+        "cwd": "apps/cli"
+      }
+    },
+    "run-migrations": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations",
+        "cwd": "apps/cli"
+      }
+    },
+    "load-players": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register src/main.ts load-players",
+        "cwd": "apps/cli"
+      }
+    },
+    "load-career-stats": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register src/main.ts load-career-stats",
+        "cwd": "apps/cli"
       }
     }
   }

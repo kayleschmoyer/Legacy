@@ -9,7 +9,97 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "echo 'Builds will be run in other workers.'"
+        "command": "echo 'Use build-android or build-ios for platform-specific builds'"
+      }
+    },
+    "build-android": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd android && ./gradlew assembleRelease",
+        "cwd": "apps/app"
+      }
+    },
+    "build-ios": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -arch x86_64 build",
+        "cwd": "apps/app"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native start",
+        "cwd": "apps/app"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native start",
+        "cwd": "apps/app"
+      }
+    },
+    "run-ios": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native run-ios",
+        "cwd": "apps/app"
+      }
+    },
+    "run-android": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native run-android",
+        "cwd": "apps/app"
+      }
+    },
+    "codegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/app"
+      }
+    },
+    "codegen:db": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/app"
+      }
+    },
+    "android": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native run-android",
+        "cwd": "apps/app"
+      }
+    },
+    "ios": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx react-native run-ios",
+        "cwd": "apps/app"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "jestConfig": "apps/app/jest.config.ts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/app/**/*.{ts,tsx,js,jsx}"
+        ]
       }
     }
   }

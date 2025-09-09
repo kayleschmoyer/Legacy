@@ -3,7 +3,6 @@ import {
   leagues,
   teams,
   drafts,
-  usersInAppInternal,
   leagueMessages,
   leagueMembers,
   draftTeams,
@@ -11,6 +10,11 @@ import {
   seasonFielding,
   seasonBatting,
   seasonPitching,
+  matchups,
+  matchupPlayers,
+  matchupPlayerGames,
+  teamMembers,
+  leaguePosition,
 } from './schema';
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -24,10 +28,6 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
 export const leaguesRelations = relations(leagues, ({ one, many }) => ({
   teams: many(teams),
   drafts: many(drafts),
-  usersInAppInternal: one(usersInAppInternal, {
-    fields: [leagues.owner],
-    references: [usersInAppInternal.id],
-  }),
   leagueMessages: many(leagueMessages),
   leagueMembers: many(leagueMembers),
 }));
@@ -40,22 +40,10 @@ export const draftsRelations = relations(drafts, ({ one, many }) => ({
   draftTeams: many(draftTeams),
 }));
 
-export const usersInAppInternalRelations = relations(
-  usersInAppInternal,
-  ({ many }) => ({
-    leagues: many(leagues),
-    leagueMessages: many(leagueMessages),
-  })
-);
-
 export const leagueMessagesRelations = relations(leagueMessages, ({ one }) => ({
   league: one(leagues, {
     fields: [leagueMessages.leagueId],
     references: [leagues.id],
-  }),
-  usersInAppInternal: one(usersInAppInternal, {
-    fields: [leagueMessages.userId],
-    references: [usersInAppInternal.id],
   }),
 }));
 

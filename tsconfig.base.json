@@ -16,6 +16,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@legacy-sports/api": ["lib/api/src/index.ts"],
       "@legacy-sports/bref-client": ["lib/bref-client/src/index.ts"],
       "@legacy-sports/codegen-base": ["lib/codegen/codegen.base.ts"],
       "@legacy-sports/data-loaders": ["lib/data-loaders/src/index.ts"],
@@ -23,6 +24,10 @@
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/scoring": ["lib/scoring/src/index.ts"],
+      "@legacy-sports/shared-components": [
+        "lib/shared-components/src/index.ts"
+      ],
+      "@legacy-sports/tamagui-config": ["tamagui.config.ts"],
       "@legacy-sports/utils": ["lib/utils/src/index.ts"]
     }
   },

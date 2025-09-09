@@ -1,0 +1,24 @@
+import React, { PropsWithChildren } from 'react';
+
+export interface WebProvidersProps extends PropsWithChildren {
+  /**
+   * Additional providers to wrap around children
+   */
+  additionalProviders?: React.ComponentType<PropsWithChildren>[];
+}
+
+export function WebProviders({
+  children,
+  additionalProviders = [],
+}: WebProvidersProps): JSX.Element {
+  // Wrap with additional providers if any
+  let wrappedChildren = children;
+
+  for (const Provider of additionalProviders.reverse()) {
+    wrappedChildren = <Provider>{wrappedChildren}</Provider>;
+  }
+
+  return wrappedChildren;
+}
+
+export default WebProviders;

@@ -1,13 +1,24 @@
 {
-  "name": "@legacy-sports/db",
-  "version": "0.0.0",
-  "license": "MIT",
-  "main": "src/index.ts",
+  "name": "@legacy-sports/db-lambda",
+  "version": "1.0.0",
+  "description": "GraphQL API Lambda using Pothos + Drizzle",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "webpack",
-    "make-cache": "ts-node -r tsconfig-paths/register src/makeCache",
-    "dev": "node --watch -r ts-node/register -r tsconfig-paths/register src/dev.ts"
+    "dev": "tsx src/dev.ts",
+    "build": "vite build",
+    "test": "jest"
   },
-  "private": true,
-  "dependencies": {}
+  "dependencies": {
+    "@pothos/core": "*",
+    "@apollo/server": "*",
+    "@as-integrations/aws-lambda": "*",
+    "graphql": "*",
+    "@legacy-sports/db-client": "*",
+    "@legacy-sports/env-utilities": "*",
+    "@legacy-sports/logging": "*",
+    "@legacy-sports/utils": "*"
+  },
+  "devDependencies": {
+    "tsx": "*"
+  }
 }

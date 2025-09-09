@@ -63,7 +63,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         await createMatchup(db.db, matchup);
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
-        LOGGER.error(err);
+        LOGGER.error(err instanceof Error ? err.message : String(err));
       }
     }
   } finally {

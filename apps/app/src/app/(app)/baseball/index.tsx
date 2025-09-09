@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  ImageBackground,
   Modal,
   ScrollView,
   StyleSheet,
@@ -10,10 +11,9 @@ import {
   View,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
-import { ImageBackground } from 'expo-image';
 
 import { Link } from 'expo-router';
-import { Spinner } from '@ui-kitten/components';
+import { Spinner } from 'tamagui';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useGetLeaguesForUserQuery } from '../../../api/db/users/Users.generated';

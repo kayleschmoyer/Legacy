@@ -1,26 +1,22 @@
-import { getEnvVarRequired } from '@legacy-sports/env-utilities';
+import { config } from 'dotenv';
 import { defineConfig } from 'drizzle-kit';
-import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { EnvironmentVariable } from './src/EnvironmentVariable';
+import { getDatabaseConfig } from './src/config/database';
+
+// Load environment variables from the workspace root
+config({ path: resolve(__dirname, '../../.env') });
+
+const dbConfig = getDatabaseConfig();
 
 export default defineConfig({
-  dbCredentials: {
-    database: 'postgres',
-    host: getEnvVarRequired(EnvironmentVariable.DB_HOST),
-    password: getEnvVarRequired(EnvironmentVariable.DB_PASSWORD),
-    ssl: {
-      ca: readFileSync(
-        resolve(__dirname, getEnvVarRequired(EnvironmentVariable.DB_CERT_PATH))
-      ),
-    },
-    user: getEnvVarRequired(EnvironmentVariable.DB_USER),
-  },
+  dbCredentials: dbConfig,
   dialect: 'postgresql',
   migrations: {
     prefix: 'supabase',
   },
-  out: './src/drizzle/migrations',
+  out: './src/drizzle/migrations/public',
   schema: 'src/drizzle/public/schema.ts',
   schemaFilter: ['public'],
+  verbose: true,
+  strict: true,
 });

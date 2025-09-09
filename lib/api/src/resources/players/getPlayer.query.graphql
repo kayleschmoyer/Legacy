@@ -1,0 +1,8 @@
+# Query to fetch a single player by ID
+query GetPlayer($id: Int!) {
+  player(id: $id) {
+    id
+    name
+    brefId
+  }
+}

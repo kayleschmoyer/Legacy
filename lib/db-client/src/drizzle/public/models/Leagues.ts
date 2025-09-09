@@ -19,6 +19,21 @@ import {
 } from './Enums';
 import { players } from './Players';
 
+// Define leagues first since other tables reference it
+export const leagues = pgTable(
+  'leagues',
+  {
+    id: serial('id').primaryKey().notNull(),
+    name: varchar('name').notNull(),
+    owner: integer('owner').notNull(),
+    maxRosterSize: integer('max_roster_size').notNull().default(25),
+    currentMatchup: integer('current_matchup'),
+  },
+  (table) => {
+    return {};
+  }
+);
+
 export const teams = pgTable(
   'teams',
   {
@@ -58,20 +73,6 @@ export const drafts = pgTable(
         name: 'drafts_leagues_id_fk',
       }),
     };
-  }
-);
-
-export const leagues = pgTable(
-  'leagues',
-  {
-    id: serial('id').primaryKey().notNull(),
-    name: varchar('name').notNull(),
-    owner: integer('owner').notNull(),
-    maxRosterSize: integer('max_roster_size').notNull().default(25),
-    currentMatchup: integer('current_matchup'),
-  },
-  (table) => {
-    return {};
   }
 );
 

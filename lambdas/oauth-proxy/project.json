@@ -1,17 +1,117 @@
 {
   "name": "oauth-proxy",
-  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/oauth-proxy",
   "projectType": "application",
-  "tags": [],
   "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "lambdas/oauth-proxy/dist",
+        "configFile": "lambdas/oauth-proxy/vite.config.mts"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
-        "command": "npx serverless package",
-        "cwd": "lambdas/oauth-proxy"
+        "commands": [
+          "powershell -Command \"Compress-Archive -Path 'lambdas/oauth-proxy/dist/index.js' -DestinationPath 'lambdas/oauth-proxy/dist/index.js.zip' -Force\""
+        ],
+        "parallel": false
       }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform",
+          "terraform apply -target=aws_lambda_function.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy_paths -target=aws_api_gateway_method.oauth_proxy_options -target=aws_api_gateway_method.oauth_proxy_any -target=aws_api_gateway_integration.oauth_proxy_options -target=aws_api_gateway_integration.oauth_proxy_any -target=aws_lambda_permission.oauth_proxy_api_gateway -auto-approve",
+          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "deploy:plan": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform && terraform plan -target=aws_lambda_function.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy_paths -target=aws_api_gateway_method.oauth_proxy_options -target=aws_api_gateway_method.oauth_proxy_any -target=aws_api_gateway_integration.oauth_proxy_options -target=aws_api_gateway_integration.oauth_proxy_any -target=aws_lambda_permission.oauth_proxy_api_gateway"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "test-endpoint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "curl -X GET \"https://$(cd terraform && terraform output -raw api_gateway_url)/oauth/health\" -H \"Content-Type: application/json\""
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "aws logs tail /aws/lambda/legacy-sports-dev-oauth-proxy --follow --region us-east-1"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "serve": {
+      "executor": "@nx/vite:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "oauth-proxy:build"
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "oauth-proxy:build:development",
+          "hmr": true
+        },
+        "production": {
+          "buildTarget": "oauth-proxy:build:production",
+          "hmr": false
+        }
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "jestConfig": "lambdas/oauth-proxy/jest.config.ts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
     }
-  }
+  },
+  "tags": []
 }

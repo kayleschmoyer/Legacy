@@ -17,7 +17,7 @@ export type PopulateGameStatsEvent = EventBridgeEvent<
 export async function handler(
   event: PopulateGameStatsEvent
 ): Promise<Record<string, never>> {
-  LOGGER.debug(event);
+  LOGGER.debug('Processing populate game stats event', { event });
 
   const db = await getDb();
 

@@ -5,7 +5,10 @@
       "config": "./jest.config.json"
     },
     "jest": {
-      "setupTimeout": 120000
+      "setupTimeout": 120000,
+      "setupFilesAfterEnv": [
+        "<rootDir>/test-setup.ts"
+      ]
     }
   },
   "apps": {
@@ -19,28 +22,25 @@
       "build": "cd ../../apps/app/ios && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15 Plus' -derivedDataPath ./build -quiet",
       "binaryPath": "../../apps/app/ios/build/Build/Products/Release-iphonesimulator/App.app"
     },
-
     "ios.local": {
       "type": "ios.app",
-      "build": "npx nx run app:build --platform ios --profile preview --wait --local --no-interactive --output=../../apps/app/dist/App.tar.gz",
-      "binaryPath": "../../apps/app/dist/App.app"
+      "build": "cd ../../ && npx nx build-ios app",
+      "binaryPath": "../../apps/app/ios/build/Build/Products/Release-iphonesimulator/App.app"
     },
-
     "android.debug": {
       "type": "android.apk",
-      "build": "cd ../../apps/app/android && ./gradlew assembleDebug assembleAndroidTest -DtestBuildType=debug",
+      "build": "cd ../../apps/app/android && gradlew.bat assembleDebug",
       "binaryPath": "../../apps/app/android/app/build/outputs/apk/debug/app-debug.apk"
     },
     "android.release": {
       "type": "android.apk",
-      "build": "cd ../../apps/app/android && ./gradlew assembleRelease assembleAndroidTest -DtestBuildType=release",
+      "build": "cd ../../apps/app/android && gradlew.bat assembleRelease",
       "binaryPath": "../../apps/app/android/app/build/outputs/apk/release/app-release.apk"
     },
-
     "android.local": {
       "type": "android.apk",
-      "build": "npx nx run app:build --platform android --profile preview --wait --local --no-interactive --output=../../apps/app/dist/App.apk",
-      "binaryPath": "../../apps/app/dist/App.apk"
+      "build": "cd ../../ && npx nx build-android app",
+      "binaryPath": "../../apps/app/android/app/build/outputs/apk/release/app-release.apk"
     }
   },
   "devices": {
@@ -66,12 +66,10 @@
       "device": "simulator",
       "app": "ios.debug"
     },
-
     "ios.sim.local": {
       "device": "simulator",
       "app": "ios.local"
     },
-
     "android.emu.release": {
       "device": "emulator",
       "app": "android.release"
@@ -80,7 +78,6 @@
       "device": "emulator",
       "app": "android.debug"
     },
-
     "android.emu.local": {
       "device": "emulator",
       "app": "android.local"

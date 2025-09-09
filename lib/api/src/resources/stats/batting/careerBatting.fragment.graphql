@@ -1,0 +1,27 @@
+# Career batting statistics fragment
+fragment CareerBatting on CareerBatting {
+  playerId
+  g
+  ab
+  r
+  h
+  doubles
+  triples
+  hr
+  rbi
+  sb
+  cs
+  bb
+  so
+  ibb
+  hbp
+  sh
+  sf
+  gidp
+  battingAvg
+  onbasePerc
+  sluggingPerc
+  onbasePlusSlugging
+  tb
+  pa
+}

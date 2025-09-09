@@ -44,8 +44,9 @@ export async function getDbCredentials(
 
   if (getEnvVarOptional(USE_LOCAL_CREDS) === 'true') {
     LOGGER.debug('Using local credentials.');
+    const dbHost = getEnvVarRequired(DB_HOST);
     return {
-      dbHost: getEnvVarRequired(DB_HOST),
+      dbHost: dbHost.replace(':5432', ''), // Remove port from hostname if present
       dbPassword: getEnvVarRequired(DB_PASSWORD),
       dbUser: getEnvVarRequired(DB_USERNAME),
     };
@@ -61,7 +62,7 @@ export async function getDbCredentials(
   const { username, password } = JSON.parse(dbCreds) as AwsDbCreds;
 
   return {
-    dbHost: dbHost,
+    dbHost: dbHost.replace(':5432', ''), // Remove port from hostname if present
     dbPassword: password,
     dbUser: username,
   };

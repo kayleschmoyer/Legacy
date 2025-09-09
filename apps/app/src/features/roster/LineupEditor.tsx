@@ -2,13 +2,11 @@ import { useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
 import {
   Button,
-  Divider,
-  Layout,
-  List,
-  ListItem,
+  Separator,
+  YStack,
+  ScrollView as TamaguiScrollView,
   Text,
-  useTheme,
-} from '@ui-kitten/components';
+} from 'tamagui';
 import { ListRenderItem, ScrollView } from 'react-native';
 import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
 import {
@@ -65,7 +63,7 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
     BenchPlayerData | StarterData | undefined
   >(undefined);
 
-  const theme = useTheme();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 
   const selectedPositionMapping = useMemo(() => {
     switch (selectedPlayerData?.type) {
@@ -262,57 +260,58 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
       const actualValue = teamMember ? actual[teamMember.playerId] : undefined;
 
       return (
-        <ListItem
-          title={teamMember?.player?.name || 'Empty'}
-          style={{
-            backgroundColor:
-              item === selectedPlayerData
-                ? theme['color-primary-800']
-                : undefined,
-          }}
-          accessoryRight={() => (
-            <Text
-              status={
-                actualValue === undefined
-                  ? 'basic'
-                  : actualValue === projValue
-                  ? 'info'
-                  : actualValue > (projValue || 0)
-                  ? 'success'
-                  : 'danger'
-              }
-            >
-              {actualValue
-                ? `${actualValue.toFixed(2)} (${projValue?.toFixed(2)})`
-                : projValue
-                ? projValue.toFixed(2)
-                : ''}
-            </Text>
-          )}
-          accessoryLeft={() => (
-            <Button
-              style={{ width: 10 }}
-              size="small"
-              onPress={() => onClick(item)}
-              disabled={
-                !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
-                !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
-                // This prevents bench players from being assigned to one another
-                (selectedPositionMapping === undefined &&
-                  positionSlot === undefined &&
-                  selectedPlayer !== undefined &&
-                  selectedPlayer !== teamMember)
-              }
-              status="success"
-            >
-              {positionSlot?.positionType
-                ? humanizeString(positionSlot.positionType)
-                    .toUpperCase()
-                    .replace(' ', '')
-                : 'BE'}
-            </Button>
-          )}
-        />
+        <YStack
+          backgroundColor={
+            item === selectedPlayerData ? '$primary' : '$background'
+          }
+          padding="$3"
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Button
+            size="$2"
+            onPress={() => onClick(item)}
+            disabled={
+              !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
+              !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
+              // This prevents bench players from being assigned to one another
+              (selectedPositionMapping === undefined &&
+                positionSlot === undefined &&
+                selectedPlayer !== undefined &&
+                selectedPlayer !== teamMember)
+            }
+            theme="active"
+          >
+            {positionSlot?.positionType
+              ? humanizeString(positionSlot.positionType)
+                  .toUpperCase()
+                  .replace(' ', '')
+              : 'BE'}
+          </Button>
+
+          <Text flex={1} textAlign="center">
+            {teamMember?.player?.name || 'Empty'}
+          </Text>
+
+          <Text
+            color={
+              actualValue === undefined
+                ? '$color'
+                : actualValue === projValue
+                ? '$blue10'
+                : actualValue > (projValue || 0)
+                ? '$green10'
+                : '$red10'
+            }
+          >
+            {actualValue
+              ? `${actualValue.toFixed(2)} (${projValue?.toFixed(2)})`
+              : projValue
+              ? projValue.toFixed(2)
+              : ''}
+          </Text>
+        </YStack>
       );
     },
     [
@@ -324,22 +323,23 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
       selectedPlayerData,
       selectedPositionMapping,
       team,
-      theme,
     ]
   );
 
   return (
     <ScrollView>
-      <Layout
-        style={{ alignItems: 'center', justifyContent: 'center' }}
+      <YStack
+        alignItems="center"
+        justifyContent="center"
         data-testId="lineup-editor"
       >
-        <List
-          data={rosterSlots}
-          ItemSeparatorComponent={Divider}
-          renderItem={onRenderItem}
-        />
-      </Layout>
+        {rosterSlots.map((item, index) => (
+          <YStack key={index}>
+            {onRenderItem({ item, index })}
+            {index < rosterSlots.length - 1 && <Separator />}
+          </YStack>
+        ))}
+      </YStack>
     </ScrollView>
   );
 }

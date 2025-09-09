@@ -1,0 +1,9 @@
+# Query to fetch a single team by ID
+query GetTeam($id: Int!) {
+  team(id: $id) {
+    ...Team
+  }
+}
+
+# Import the Team fragment
+#import "./team.fragment.graphql"

@@ -22,8 +22,8 @@ export function proxyLambdaToExpress(
     headers: req.headers,
   } as APIGatewayEvent;
 
-  LOGGER.debug(req);
-  LOGGER.debug(event);
+  LOGGER.debug(JSON.stringify(req.body || {}));
+  LOGGER.debug(JSON.stringify(event));
 
   handler(event)
     .then((response) => {
@@ -54,8 +54,8 @@ export function proxySqsToExpress(
     Records: [{ body: JSON.stringify(req.body) } as SQSRecord],
   };
 
-  LOGGER.debug(req);
-  LOGGER.debug(event);
+  LOGGER.debug(JSON.stringify(req.body || {}));
+  LOGGER.debug(JSON.stringify(event));
 
   handler(event)
     .then(() => {

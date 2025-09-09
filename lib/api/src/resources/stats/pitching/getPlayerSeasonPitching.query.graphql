@@ -1,0 +1,18 @@
+# Query to fetch a player's season pitching statistics
+query GetPlayerSeasonPitching(
+  $playerId: Int!
+  $season: String!
+  $team: String!
+) {
+  seasonPitching(playerId: $playerId, season: $season, team: $team) {
+    ...SeasonPitching
+    player {
+      id
+      name
+      brefId
+    }
+  }
+}
+
+# Import the SeasonPitching fragment
+#import "./seasonPitching.fragment.graphql"

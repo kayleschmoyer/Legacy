@@ -3,6 +3,7 @@
     "name": "App",
     "slug": "app",
     "version": "1.0.0",
+    "sdkVersion": "52.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "legacysports",
@@ -14,7 +15,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.legacySports"
@@ -31,7 +34,9 @@
       "bundler": "metro",
       "build": {
         "babel": {
-          "include": ["@ui-kitten/components"]
+          "include": [
+            "tamagui"
+          ]
         }
       }
     },
@@ -39,7 +44,9 @@
       [
         "expo-asset",
         {
-          "assets": ["./assets"]
+          "assets": [
+            "./assets"
+          ]
         }
       ],
       "expo-router",

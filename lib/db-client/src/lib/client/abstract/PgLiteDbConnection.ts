@@ -41,7 +41,10 @@ export class PgLiteDbConnection<
     try {
       await this.client.close();
     } catch (err) {
-      LOGGER.warn('Could not close the DB connection', err);
+      LOGGER.warn('Could not close the DB connection');
+      if (err instanceof Error) {
+        LOGGER.warn(err.message);
+      }
     }
   }
 }

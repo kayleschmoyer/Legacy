@@ -6,11 +6,98 @@
   "tags": [],
   "// targets": "to see all targets run: nx show project stats-lambda --web",
   "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "lambdas/stats-lambda/dist"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": [
+        "{options.reportsDirectory}"
+      ],
+      "options": {
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/lambdas/stats-lambda"
+      }
+    },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
-        "command": "npx serverless package",
+        "commands": [
+          "powershell -Command \"Compress-Archive -Path 'lambdas/stats-lambda/dist/load-career.js' -DestinationPath 'lambdas/stats-lambda/dist/load-career.js.zip' -Force\""
+        ],
+        "parallel": false
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform",
+          "terraform apply -target=aws_lambda_function.stats -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
+          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "deploy:plan": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "commands": [
+          "cd terraform && terraform plan -target=aws_lambda_function.stats -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "test-endpoint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "curl -X POST \"https://$(cd terraform && terraform output -raw api_gateway_url)/stats/load-career\" -H \"Content-Type: application/json\" -d '{\"test\": true}'"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "aws logs tail /aws/lambda/legacy-sports-dev-stats --follow --region us-east-1"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/dev.ts",
         "cwd": "lambdas/stats-lambda"
       }
     }

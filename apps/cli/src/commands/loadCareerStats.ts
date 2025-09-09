@@ -41,7 +41,7 @@ export async function handleLoadCareerStats(
   await runWithPublicClient(opts, async (db) => {
     const players = await getPlayersOnTeams(db);
 
-    const errors = [];
+    const errors: unknown[] = [];
 
     for (const player of players) {
       LOGGER.info(`Loading Player ${player.brefId}`);
@@ -52,12 +52,12 @@ export async function handleLoadCareerStats(
           await loadCareerStats(db, player.brefId);
         }
       } catch (err) {
-        LOGGER.error(err);
+        LOGGER.error(String(err));
         errors.push(err);
       }
     }
 
     LOGGER.info(`Created ${players.length} players`);
-    LOGGER.error(errors);
+    LOGGER.error(`Errors encountered: ${JSON.stringify(errors)}`);
   });
 }

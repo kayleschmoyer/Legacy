@@ -19,7 +19,8 @@ function getGitRepoRoot(): string {
       encoding: 'utf-8',
     }).trim();
   } catch (error) {
-    LOGGER.error('Failed to get git repository root:', error);
+    LOGGER.error('Failed to get git repository root:');
+    LOGGER.error(String(error));
     throw error;
   }
 }
@@ -32,7 +33,8 @@ export function loadEnvFile(args: CommandArgs): void {
   if (args.useDotenvFile) {
     const rootDir = getGitRepoRoot();
     const envPath = path.join(rootDir, '.env');
-    LOGGER.info('Loading environment from .env file at:', envPath);
+    LOGGER.info('Loading environment from .env file at:');
+    LOGGER.info(envPath);
     config({ path: envPath });
   }
 }

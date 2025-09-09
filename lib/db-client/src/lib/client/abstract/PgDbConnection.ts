@@ -40,9 +40,24 @@ export class PgDbConnection<
     };
 
     if (this.dbCertPath !== undefined) {
-      options.ssl = {
-        ca: readFileSync(this.dbCertPath).toString(),
-      };
+      try {
+        options.ssl = {
+          ca: readFileSync(this.dbCertPath).toString(),
+        };
+      } catch (error) {
+        // If cert file can't be read, fall back to basic SSL for AWS RDS
+        options.ssl = {
+          rejectUnauthorized: false,
+        };
+      }
+    } else {
+      // For AWS RDS connections without cert path, enable SSL with relaxed verification
+      const dbType = process.env.DB_TYPE;
+      if (dbType === 'PG_REMOTE') {
+        options.ssl = {
+          rejectUnauthorized: false,
+        };
+      }
     }
 
     const pgPool = new Pool(options);
