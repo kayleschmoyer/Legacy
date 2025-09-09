@@ -54,7 +54,7 @@ jobs:
         run: npx nx affected -t setup-ci
 
       - name: Run CI Tasks
-        run: npx nx affected -t lint build test format bundle prebuild
+        run: npx nx affected -t lint build test format bundle
 
   build-ios:
     name: Build iOS

@@ -1,5 +1,5 @@
-const { withNxMetro } = require('@nx/expo');
-const { getDefaultConfig } = require('@expo/metro-config');
+const { withNxMetro } = require('@nx/react-native');
+const { getDefaultConfig } = require('@react-native/metro-config');
 const { mergeConfig } = require('metro-config');
 const exclusionList = require('metro-config/src/defaults/exclusionList');
 const path = require('path');

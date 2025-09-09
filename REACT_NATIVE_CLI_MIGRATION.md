@@ -7,9 +7,18 @@ Successfully completed migration from Expo with EAS dependency to pure React Nat
 ## Migration Completed
 
 ### ✅ EAS Removal Complete
+
 - **Removed**: `eas-cli` dependency from package.json
 - **Removed**: `eas-build-post-install.mjs` script file
 - **Removed**: All EAS build configurations
+
+### ✅ NX Expo Plugin Removal Complete
+
+- **Removed**: `@nx/expo/plugin` from nx.json configuration
+- **Removed**: `@nx/expo` dependency from package.json
+- **Removed**: `prebuild` target from CI workflow and scripts
+- **Updated**: Metro config to use `@nx/react-native` instead of `@nx/expo`
+- **Updated**: TypeScript config to remove Expo SVG type declarations
 - **Completed**: Full transition to React Native CLI
 
 ## Changes Made
@@ -168,3 +177,19 @@ apps/app/
 ```
 
 The app is now a standard React Native CLI project that can be built and deployed independently without any Expo cloud services or EAS dependencies!
+
+## Issues Resolved
+
+### CI Prebuild Task Failure
+
+**Problem**: The CI workflow was failing on `app:prebuild` task after Expo removal.
+
+**Root Cause**: The `@nx/expo/plugin` was still configured in `nx.json`, which automatically creates a `prebuild` target for Expo projects. This target was being called by the CI workflow but no longer worked after migrating to React Native CLI.
+
+**Solution**: Completely removed all remaining Expo/NX integration:
+
+- Removed `@nx/expo/plugin` from `nx.json`
+- Removed `@nx/expo` dependency from `package.json`
+- Removed `prebuild` from CI workflow and root scripts
+- Updated Metro config to use `@nx/react-native` instead of `@nx/expo`
+- Removed Expo TypeScript declarations

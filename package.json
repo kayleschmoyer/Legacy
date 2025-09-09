@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "all": "nx affected -t build lint:fix lint format test make-cache bundle prebuild",
+    "all": "nx affected -t build lint:fix lint format test make-cache bundle",
     "clean:node": "npkill -d",
     "clean:python": "rimraf --glob **/.venv",
     "clean": "npm run clean:python && npm run clean:node",
@@ -46,8 +46,7 @@
           "^lint",
           "^format",
           "^test",
-          "^bundle",
-          "^prebuild"
+          "^bundle"
         ]
       },
       "dev": {
@@ -186,7 +185,6 @@
     "@nx/esbuild": "21.4.1",
     "@nx/eslint": "21.4.1",
     "@nx/eslint-plugin": "21.4.1",
-    "@nx/expo": "21.4.1",
     "@nx/jest": "21.4.1",
     "@nx/js": "21.4.1",
     "@nx/node": "21.4.1",
