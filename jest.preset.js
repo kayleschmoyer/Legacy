@@ -1,6 +1,6 @@
 const nxPreset = require('@nx/jest/preset').default;
 
-module.exports = { 
+module.exports = {
   ...nxPreset,
   // Enable watch mode optimizations
   watchman: true,
@@ -13,6 +13,6 @@ module.exports = {
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/**/index.{js,jsx,ts,tsx}'
-  ]
+    '!src/**/index.{js,jsx,ts,tsx}',
+  ],
 };

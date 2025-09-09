@@ -242,7 +242,6 @@
     "concurrently": "^9.2.1",
     "detox": "^20.41.1",
     "drizzle-kit": "^0.24.2",
-    "eas-cli": "^11.0.2",
     "esbuild": "^0.19.2",
     "eslint": "~8.57.0",
     "eslint-config-prettier": "10.1.8",

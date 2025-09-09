@@ -13,7 +13,7 @@ The Jest configuration has been updated to run only tests related to changed fil
 ```javascript
 const nxPreset = require('@nx/jest/preset').default;
 
-module.exports = { 
+module.exports = {
   ...nxPreset,
   // Enable watch mode optimizations
   watchman: true,
@@ -26,12 +26,13 @@ module.exports = {
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/**/index.{js,jsx,ts,tsx}'
-  ]
+    '!src/**/index.{js,jsx,ts,tsx}',
+  ],
 };
 ```
 
 **Benefits:**
+
 - **Watchman Integration**: Faster file change detection
 - **Caching**: Improved test performance through result caching
 - **Clean Mocks**: Prevents test interference
@@ -51,6 +52,7 @@ module.exports = {
 ```
 
 **Available Commands:**
+
 - `npm run test:changed` - Run tests only for affected projects (default behavior)
 - `npm run test:all` - Run tests for all projects
 - `npm run test:watch` - Run tests in watch mode
@@ -63,7 +65,7 @@ Example from `lib/shared-components/package.json`:
 {
   "scripts": {
     "test": "jest --onlyChanged",
-    "test:watch": "jest --watch --onlyChanged", 
+    "test:watch": "jest --watch --onlyChanged",
     "test:all-files": "jest",
     "test:coverage": "jest --coverage"
   }
@@ -71,6 +73,7 @@ Example from `lib/shared-components/package.json`:
 ```
 
 **Benefits:**
+
 - `test` - Only runs tests for changed files
 - `test:all-files` - Runs all tests when needed
 - `test:watch` - Watch mode with change detection
@@ -142,12 +145,12 @@ NX's affected detection considers:
 
 ### **Example Scenarios**
 
-| Change | Tests Run |
-|--------|-----------|
-| Modify `lib/utils/src/index.ts` | Tests in `lib/utils` + any project that imports utils |
-| Update `package.json` dependency | All affected projects that use that dependency |
-| Change only documentation | No tests (unless docs affect build) |
-| Modify shared component | Component tests + any app/lib that imports it |
+| Change                           | Tests Run                                             |
+| -------------------------------- | ----------------------------------------------------- |
+| Modify `lib/utils/src/index.ts`  | Tests in `lib/utils` + any project that imports utils |
+| Update `package.json` dependency | All affected projects that use that dependency        |
+| Change only documentation        | No tests (unless docs affect build)                   |
+| Modify shared component          | Component tests + any app/lib that imports it         |
 
 ## 🔧 Customization Options
 
@@ -179,16 +182,19 @@ jest src/components/Button.test.tsx
 ## 📊 Performance Benefits
 
 ### **Local Development**
+
 - **Faster Feedback**: Only relevant tests run
 - **Reduced Resource Usage**: Less CPU and memory consumption
 - **Improved Focus**: Test output only shows relevant failures
 
 ### **CI/CD Performance**
+
 - **Faster Builds**: Significantly reduced test execution time
 - **Efficient Resource Usage**: Less compute time on build servers
 - **Parallel Optimization**: NX can better parallelize smaller test suites
 
 ### **Example Metrics**
+
 - Full test suite: ~7-10 minutes
 - Changed files only: ~30 seconds - 2 minutes (typical)
 - Watch mode: ~5-15 seconds per change
@@ -225,17 +231,20 @@ If tests are slow even with `--onlyChanged`:
 ## 📚 Best Practices
 
 ### **Commit Workflow**
+
 1. Make incremental changes
 2. Run `npm run test:changed` before committing
 3. Ensure all affected tests pass
 4. Use `npm run test:all` periodically to catch integration issues
 
 ### **Code Review**
+
 1. Review test output in PR checks
 2. Verify that appropriate tests are being run
 3. Request full test suite for major changes
 
 ### **Debugging**
+
 1. Use `test:all-files` when debugging mysterious failures
 2. Check git status if expected tests aren't running
 3. Use Jest's `--verbose` flag for detailed output
