@@ -94,7 +94,12 @@ export type User = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
-export type GetAllPlayersQueryVariables = Exact<{ [key: string]: never; }>;
+export type GetAllPlayersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+}>;
 
 
 export type GetAllPlayersQuery = { __typename?: 'Query', players?: Array<{ __typename?: 'Player', id?: number | null, name?: string | null, brefId?: string | null }> | null };
@@ -128,8 +133,13 @@ export const PlayerFragmentDoc = gql`
 }
     `;
 export const GetAllPlayers = gql`
-    query GetAllPlayers {
-  players {
+    query GetAllPlayers($limit: Int, $offset: Int, $orderBy: String, $orderDirection: String) {
+  players(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+  ) {
     id
     name
     brefId
@@ -149,6 +159,10 @@ export const GetAllPlayers = gql`
  * @example
  * const { data, loading, error } = useGetAllPlayersQuery({
  *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
  *   },
  * });
  */

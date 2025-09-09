@@ -42,8 +42,9 @@ export function PlayersGrid({
 
   const { data, loading, error, refetch } = useGetAllPlayersQuery({
     variables: {
-      first: pageSize,
-      orderBy: [sortBy],
+      limit: pageSize,
+      orderBy: sortBy.split('_')[0].toLowerCase(),
+      orderDirection: sortBy.split('_')[1].toLowerCase(),
     },
     errorPolicy: 'all',
   });
@@ -53,9 +54,9 @@ export function PlayersGrid({
   }, [refetch]);
 
   const filteredPlayers = useMemo(() => {
-    if (!data?.players?.nodes) return [];
+    if (!data?.players) return [];
 
-    const players = data.players.nodes.filter(
+    const players = data.players.filter(
       (player): player is PlayerFragment => player !== null
     );
 
@@ -63,10 +64,10 @@ export function PlayersGrid({
 
     return players.filter(
       (player) =>
-        player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        player.brefId.toLowerCase().includes(searchTerm.toLowerCase())
+        player.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        player.brefId?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [data?.players?.nodes, searchTerm]);
+  }, [data?.players, searchTerm]);
 
   if (loading && !data) {
     return (
