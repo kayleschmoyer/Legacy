@@ -15,6 +15,7 @@ async function startServer() {
   // Start the standalone server
   const { url } = await startStandaloneServer(server, {
     listen: { port: PORT },
+    // eslint-disable-next-line @typescript-eslint/require-await
     context: async () => {
       return {};
     },

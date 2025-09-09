@@ -44,9 +44,9 @@ builder.queryField('users', (t) =>
 
       return users.map((user) => ({
         id: Number(user.id),
-        email: user.email as string | null,
-        username: user.username as string | null,
-        accessLevel: user.accessLevel as string | null,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
       }));
     },
   })
@@ -68,9 +68,9 @@ builder.queryField('user', (t) =>
 
       return {
         id: Number(user.id),
-        email: user.email as string | null,
-        username: user.username as string | null,
-        accessLevel: user.accessLevel as string | null,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
       };
     },
   })
@@ -92,9 +92,9 @@ builder.queryField('userByEmail', (t) =>
 
       return {
         id: Number(user.id),
-        email: user.email as string | null,
-        username: user.username as string | null,
-        accessLevel: user.accessLevel as string | null,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
       };
     },
   })
@@ -117,9 +117,9 @@ builder.queryField('searchUsers', (t) =>
 
       return users.map((user) => ({
         id: Number(user.id),
-        email: user.email as string | null,
-        username: user.username as string | null,
-        accessLevel: user.accessLevel as string | null,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
       }));
     },
   })

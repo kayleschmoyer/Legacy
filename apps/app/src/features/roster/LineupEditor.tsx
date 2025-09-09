@@ -3,9 +3,8 @@ import humanizeString from 'humanize-string';
 import {
   Button,
   Separator,
-  YStack,
-  ScrollView as TamaguiScrollView,
   Text,
+  YStack,
 } from 'tamagui';
 import { ListRenderItem, ScrollView } from 'react-native';
 import { canPlayerPlayPosition } from '../../common/temporary_models/Models';

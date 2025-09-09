@@ -1,6 +1,6 @@
 {
   "root": true,
-  "ignorePatterns": ["**/*", "dist", "node_modules"],
+  "ignorePatterns": ["**/*", "dist", "node_modules", "**/node_modules/**"],
   "plugins": ["@nx"],
   "overrides": [
     {
@@ -39,6 +39,10 @@
         "plugin:@nx/typescript",
         "plugin:@typescript-eslint/recommended-type-checked"
       ],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": ["./tsconfig.base.json"]
+      },
       "plugins": ["eslint-plugin-import"],
       "rules": {
         "@typescript-eslint/no-unsafe-assignment": "warn",

@@ -163,7 +163,7 @@ describe('App', () => {
       });
 
       expect(getByText('Football Fantasy')).toBeInTheDocument();
-      expect(getByText('Coming soon...')).toBeInTheDocument();
+      expect(getByText('Manage your leagues and drafts')).toBeInTheDocument();
     });
 
     it('should match football screen snapshot', () => {

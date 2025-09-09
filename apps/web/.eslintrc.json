@@ -3,7 +3,8 @@
   "ignorePatterns": [
     "!**/*",
     "**/vite.config.*.timestamp*",
-    "**/vitest.config.*.timestamp*"
+    "**/vitest.config.*.timestamp*",
+    "mocks/**"
   ],
   "parserOptions": {
     "project": ["./tsconfig.json", "./tsconfig.app.json"]
@@ -15,7 +16,17 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
-      "rules": {}
+      "rules": {
+        "@typescript-eslint/no-unsafe-assignment": "warn",
+        "jsx-a11y/accessible-emoji": "warn"
+      }
+    },
+    {
+      "files": ["e2e/**/*.ts", "e2e/**/*.tsx"],
+      "rules": {
+        "react-hooks/rules-of-hooks": "off",
+        "@typescript-eslint/require-await": "off"
+      }
     },
     {
       "files": ["*.js", "*.jsx"],

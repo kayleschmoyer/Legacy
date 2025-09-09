@@ -1,10 +1,9 @@
 import SchemaBuilder from '@pothos/core';
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 
 // Initialize database service
-const dbService = createDatabaseService(getDbOptions());
+createDatabaseService(getDbOptions());
 
 // Define the schema builder with comprehensive types
 export const builder = new SchemaBuilder<{

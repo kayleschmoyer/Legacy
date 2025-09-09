@@ -25,13 +25,13 @@
       }
     },
     "test": {
-      "executor": "@nx/vite:test",
+      "executor": "@nx/jest:jest",
       "outputs": [
-        "{options.reportsDirectory}"
+        "{options.outputPath}"
       ],
       "options": {
-        "passWithNoTests": true,
-        "reportsDirectory": "../../coverage/lambdas/stats-lambda"
+        "jestConfig": "lambdas/stats-lambda/jest.config.ts",
+        "passWithNoTests": true
       }
     },
     "package": {

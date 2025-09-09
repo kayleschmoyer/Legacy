@@ -4,8 +4,8 @@
  */
 
 import { DbOptions } from '@legacy-sports/utils';
-import { UserService, createUserService } from './UserService';
-import { PlayerService, createPlayerService } from './PlayerService';
+import { createPlayerService, PlayerService } from './PlayerService';
+import { createUserService, UserService } from './UserService';
 
 export class DatabaseService {
   public readonly users: UserService;

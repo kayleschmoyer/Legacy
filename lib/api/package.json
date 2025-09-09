@@ -10,10 +10,8 @@
   },
   "dependencies": {
     "@apollo/client": "^3.11.4",
-    "@graphql-codegen/introspection": "^5.0.0",
-    "graphql": "^16.9.0"
-  },
-  "peerDependencies": {
-    "react": ">=18.0.0"
+    "@graphql-codegen/cli": "^5.0.7",
+    "graphql": "^16.9.0",
+    "react": "^19.0.0"
   }
 }

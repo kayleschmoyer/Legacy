@@ -1,6 +1,6 @@
 {
   "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", ".expo", "web-build", "cache", "dist"],
+  "ignorePatterns": ["!**/*", ".expo", "web-build", "cache", "dist", "src/.startup.ts"],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
