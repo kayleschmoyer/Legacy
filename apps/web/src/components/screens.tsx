@@ -1,4 +1,5 @@
 import React from 'react';
+import { PlayersTable } from '@legacy-sports/shared-components';
 
 export function HomeScreen(): JSX.Element {
   return (
@@ -30,8 +31,11 @@ export function FootballScreen(): JSX.Element {
 export function PlayersScreen(): JSX.Element {
   return (
     <div style={{ padding: '20px' }}>
-      <h1>Players Screen</h1>
-      <p>Player statistics and information</p>
+      <h1>Players</h1>
+      <p>Browse and manage player information</p>
+      <div style={{ marginTop: '20px' }}>
+        <PlayersTable />
+      </div>
     </div>
   );
 }

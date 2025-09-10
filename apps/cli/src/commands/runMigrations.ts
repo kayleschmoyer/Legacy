@@ -2,7 +2,7 @@ import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-import { migrate } from 'drizzle-orm/pglite/migrator';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { resolve } from 'path';
 
 export const runMigrationsCommandBuilder = (argv: Argv) =>
@@ -17,7 +17,7 @@ export async function runMigrations(): Promise<void> {
     await migrate(db, {
       migrationsFolder: resolve(
         __dirname,
-        '../../../../lib/db-client/src/drizzle/migrations'
+        '../../../../lib/db-client/src/drizzle/migrations',
       ),
     });
   });

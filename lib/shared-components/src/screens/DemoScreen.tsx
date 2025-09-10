@@ -6,7 +6,7 @@ import {
   View,
   TouchableOpacity,
   Alert,
-} from 'react-native';
+} from '../platform-components';
 
 const styles = StyleSheet.create({
   container: {

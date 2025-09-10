@@ -1,7 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
-import { PgLiteDbConnection } from './abstract/PgLiteDbConnection';
 import { PgDbConnection } from './abstract/PgDbConnection';
 import { BaseDbConnection, GenericDatabase } from './abstract/BaseDbClient';
 import { PublicDb } from './PublicDbClient';
@@ -10,22 +9,20 @@ import * as PublicSchema from '../../drizzle/public/schema';
 import * as InternalSchema from '../../drizzle/internal/schema';
 
 export function getPublicDbConnection(
-  options: DbOptions
+  options: DbOptions,
 ): BaseDbConnection<typeof PublicSchema> {
   return getDbConnection(options, PublicSchema);
 }
 
 export function getDbConnection<TSchema extends Record<string, unknown>>(
   options: DbOptions,
-  schema: TSchema
+  schema: TSchema,
 ): BaseDbConnection<TSchema> {
   switch (options.type) {
     case 'pg-local':
       return new PgDbConnection(options.dbCertPath, schema);
     case 'pg-remote':
       return new PgDbConnection(undefined, schema);
-    case 'pglite':
-      return new PgLiteDbConnection<TSchema>(options.dataPath, schema);
     default:
       throw new Error('Invalid connection type');
   }
@@ -34,11 +31,11 @@ export function getDbConnection<TSchema extends Record<string, unknown>>(
 export async function runWithClient<T, TSchema extends Record<string, unknown>>(
   options: DbOptions,
   schema: TSchema,
-  callback: (client: GenericDatabase<TSchema>) => Promise<T>
+  callback: (client: GenericDatabase<TSchema>) => Promise<T>,
 ): Promise<T> {
   const connection: BaseDbConnection<TSchema> = getDbConnection(
     options,
-    schema
+    schema,
   );
 
   try {
@@ -68,14 +65,14 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
 
 export function runWithPublicClient<T>(
   options: DbOptions,
-  callback: (client: PublicDb) => Promise<T>
+  callback: (client: PublicDb) => Promise<T>,
 ): Promise<T> {
   return runWithClient(options, PublicSchema, callback);
 }
 
 export function runWithInternalClient<T>(
   options: DbOptions,
-  callback: (client: InternalDb) => Promise<T>
+  callback: (client: InternalDb) => Promise<T>,
 ): Promise<T> {
   return runWithClient(options, InternalSchema, callback);
 }

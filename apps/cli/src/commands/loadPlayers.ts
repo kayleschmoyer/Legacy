@@ -13,27 +13,36 @@ export const loadPlayersCommandBuilder = (argv: Argv) =>
 export async function handleLoadPlayers(): Promise<void> {
   LOGGER.info('Starting player loading process...');
 
-  const opts = getDbOptions();
-  LOGGER.info(`Database options: ${JSON.stringify(opts)}`);
+  try {
+    const opts = getDbOptions();
+    LOGGER.info(`Database options: ${JSON.stringify(opts)}`);
 
-  let totalPlayersCreated = 0;
-  const startTime = Date.now();
+    let totalPlayersCreated = 0;
+    const startTime = Date.now();
 
-  LOGGER.info('Connecting to database...');
-  await runWithPublicClient(opts, async (db) => {
-    LOGGER.info('Database connection established, starting player loading...');
-    for (let i = 0; i < 26; i++) {
-      const letter = String.fromCharCode(97 + i) as Letter;
+    LOGGER.info('Connecting to database...');
+    await runWithPublicClient(opts, async (db) => {
+      LOGGER.info(
+        'Database connection established, starting player loading...'
+      );
+
+      // Start with just letter 'A' for testing
+      const letter = 'a' as Letter;
 
       try {
-        LOGGER.debug(`Loading players for letter: ${letter.toUpperCase()}`);
+        LOGGER.info(`Loading players for letter: ${letter.toUpperCase()}`);
         const letterPlayers = await getPlayers(letter);
 
         if (letterPlayers.length === 0) {
-          LOGGER.debug(`No players found for letter ${letter.toUpperCase()}`);
-          continue;
+          LOGGER.info(`No players found for letter ${letter.toUpperCase()}`);
+          return;
         }
 
+        LOGGER.info(
+          `Found ${
+            letterPlayers.length
+          } players for letter ${letter.toUpperCase()}`
+        );
         const createdPlayers = await bulkCreatePlayers(db, letterPlayers);
         totalPlayersCreated += createdPlayers.length;
 
@@ -50,13 +59,23 @@ export async function handleLoadPlayers(): Promise<void> {
         );
         throw error; // Re-throw to stop the process on error
       }
+    });
+
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
+
+    LOGGER.info(`✅ Player loading completed successfully!`);
+    LOGGER.info(`📊 Total players processed: ${totalPlayersCreated}`);
+    LOGGER.info(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
+  } catch (error) {
+    LOGGER.error(
+      `Fatal error in handleLoadPlayers: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    if (error instanceof Error && error.stack) {
+      LOGGER.error(`Stack trace: ${error.stack}`);
     }
-  });
-
-  const endTime = Date.now();
-  const duration = (endTime - startTime) / 1000;
-
-  LOGGER.info(`✅ Player loading completed successfully!`);
-  LOGGER.info(`📊 Total players processed: ${totalPlayersCreated}`);
-  LOGGER.info(`⏱️  Duration: ${duration.toFixed(2)} seconds`);
+    throw error;
+  }
 }

@@ -8,7 +8,8 @@ const BREF_URL_REGEX = new RegExp(
 );
 
 export interface PlayerInfo {
-  name: string;
+  firstName: string;
+  lastName: string;
   brefId: string;
 }
 
@@ -70,9 +71,16 @@ export async function getPlayers(letter: Letter): Promise<PlayerInfo[]> {
       throw new Error('Error');
     }
 
+    // Split name into first and last name
+    const fullName = anchor.text.trim();
+    const nameParts = fullName.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     result.push({
       brefId: brefCode,
-      name: anchor.text,
+      firstName,
+      lastName,
     });
   }
 

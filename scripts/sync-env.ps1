@@ -5,6 +5,10 @@
 # - DB_HOST: RDS Proxy endpoint (use for runtime/production)
 # - DB_HOST_DIRECT: Direct RDS endpoint (use for migrations and admin tasks)
 # - The script updates both values for flexibility
+#
+# Special Character Handling:
+# - Automatically escapes dollar signs ($) in DB_PASSWORD for proper dotenv parsing
+# - Adds SSL configuration for secure database connections
 
 param(
     [string]$Environment = "dev",
@@ -81,34 +85,43 @@ $newEnvVars["CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.
 $newEnvVars["GOOGLE_OAUTH_CLIENT_SECRET"] = $googleSecret
 $newEnvVars["DB_USER"] = $dbCreds.username
 $newEnvVars["DB_PASSWORD"] = $dbCreds.password
+$newEnvVars["DB_PORT"] = "5432"
+$newEnvVars["DB_SSL_MODE"] = "require"
+$newEnvVars["DB_CERT_PATH"] = "C:/code/legacy-sports/certs/us-east-1-bundle.pem"
 $newEnvVars["JWT_SECRET"] = $jwtSecret
 $newEnvVars["COOKIE_SECRET"] = $cookieSecret
 
 # Add new AWS-specific environment variables
-$newEnvVars["DB_TYPE"] = "PG_REMOTE"
 $newEnvVars["AWS_REGION"] = $terraformOutput.environment_variables_summary.value.aws_region
 $newEnvVars["DB_CREDENTIALS_SECRET_NAME"] = $terraformOutput.environment_variables_summary.value.db_creds_secret_name
 $newEnvVars["RDS_PROXY_ENDPOINT"] = $terraformOutput.rds_proxy_endpoint.value
-$newEnvVars["USE_LOCAL_CREDS"] = "false"
+$newEnvVars["USE_LOCAL_CREDS"] = "true"
 
 # Get direct database endpoint for migrations (if available)
 try {
     Push-Location $TerraformDir
     $directDbEndpoint = terraform output -raw rds_instance_endpoint
     Pop-Location
-    $newEnvVars["DB_HOST_DIRECT"] = $directDbEndpoint
+    
+    # Strip port if present (format: host:port)
+    $directDbHost = $directDbEndpoint -replace ':.*$', ''
+    $newEnvVars["DB_HOST_DIRECT"] = $directDbHost
     
     # Set main DB_HOST based on user preference
     if ($DatabaseEndpoint -eq "direct") {
-        $newEnvVars["DB_HOST"] = $directDbEndpoint
+        $newEnvVars["DB_HOST"] = $directDbHost
         Write-Host "Using direct database endpoint for DB_HOST" -ForegroundColor Yellow
     } else {
-        $newEnvVars["DB_HOST"] = $terraformOutput.environment_variables_summary.value.db_host
+        $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
+        $proxyHost = $proxyEndpoint -replace ':.*$', ''
+        $newEnvVars["DB_HOST"] = $proxyHost
         Write-Host "Using RDS proxy endpoint for DB_HOST" -ForegroundColor Yellow
     }
 } catch {
     Write-Warning "Could not retrieve direct database endpoint. Using proxy endpoint."
-    $newEnvVars["DB_HOST"] = $terraformOutput.environment_variables_summary.value.db_host
+    $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
+    $proxyHost = $proxyEndpoint -replace ':.*$', ''
+    $newEnvVars["DB_HOST"] = $proxyHost
     Pop-Location
 }
 
@@ -154,8 +167,13 @@ foreach ($line in $envLines) {
         if ($newEnvVars.ContainsKey($key)) {
             $newValue = $newEnvVars[$key]
             
+            # Special handling for password - escape dollar signs for dotenv parsing
+            if ($key -eq "DB_PASSWORD") {
+                $newValue = $newValue -replace '\$', '\$'
+                $newValue = "`"$newValue`""
+            }
             # Quote values that contain special characters
-            if ($newValue -match '[#$()%+{}><&|;`"'' ]') {
+            elseif ($newValue -match '[#$()%+{}><&|;`"'' ]') {
                 $newValue = "`"$newValue`""
             }
             
@@ -184,8 +202,13 @@ foreach ($key in $newEnvVars.Keys) {
     if ($updatedKeys -notcontains $key) {
         $newValue = $newEnvVars[$key]
         
+        # Special handling for password - escape dollar signs for dotenv parsing
+        if ($key -eq "DB_PASSWORD") {
+            $newValue = $newValue -replace '\$', '\$'
+            $newValue = "`"$newValue`""
+        }
         # Quote values that contain special characters
-        if ($newValue -match '[#$()%+{}><&|;`"'' ]') {
+        elseif ($newValue -match '[#$()%+{}><&|;`"'' ]') {
             $newValue = "`"$newValue`""
         }
         

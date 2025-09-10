@@ -30,6 +30,18 @@ export default defineConfig(({ mode }) => {
         // React Native Web compatibility
         'react-native$':
           platform === 'web' ? 'react-native-web' : 'react-native',
+        'react-native-svg$':
+          platform === 'web' ? 'react-native-svg-web' : 'react-native-svg',
+
+        // React Native Picker compatibility
+        '@react-native-picker/picker$':
+          platform === 'web'
+            ? resolve(
+                __dirname,
+                '../../apps/web/src/mocks/react-native-picker.ts'
+              )
+            : '@react-native-picker/picker',
+
         'react-native/Libraries/Components/View/ViewStylePropTypes$':
           'react-native-web/dist/exports/View/ViewStylePropTypes',
         'react-native/Libraries/EventEmitter/RCTDeviceEventEmitter$':
@@ -60,12 +72,27 @@ export default defineConfig(({ mode }) => {
               'react-native',
               'react-native-table-component',
               '@expo/vector-icons',
+              '@tamagui/animations-react-native',
+              '@react-native-community/cli',
+              'react-native-picker-select',
+              'react-native-gesture-handler',
+              'react-native-reanimated',
+              'react-native-screens',
+              'react-native-svg',
+              'react-native-safe-area-context',
             ],
       esbuildOptions: {
         loader: {
           '.js': 'jsx',
         },
         jsx: 'automatic',
+        define:
+          platform === 'web'
+            ? {
+                'process.env.REACT_NATIVE_VERSION': 'undefined',
+                global: 'globalThis',
+              }
+            : {},
       },
     },
 
@@ -90,15 +117,23 @@ export default defineConfig(({ mode }) => {
           'react-dom',
           'react/jsx-runtime',
           ...(platform === 'web'
-            ? ['react-native-web']
+            ? ['react-native-web', 'react-native-svg-web']
             : [
                 'react-native',
+                'react-native-svg',
                 '@expo/vector-icons',
                 'react-native-table-component',
+                'react-native-screens',
+                'react-native-safe-area-context',
+                'react-native-gesture-handler',
+                'react-native-reanimated',
               ]),
           '@tamagui/core',
           '@tamagui/config',
-          '@tamagui/animations-react-native',
+          // Only externalize tamagui animations for mobile
+          ...(platform === 'mobile'
+            ? ['@tamagui/animations-react-native']
+            : []),
           '@react-navigation/native',
           '@react-navigation/stack',
           '@react-navigation/drawer',

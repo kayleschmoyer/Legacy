@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Alert,
-} from 'react-native';
+  KeyboardAvoidingView,
+} from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
 import { User, AuthState } from '../../types';
 

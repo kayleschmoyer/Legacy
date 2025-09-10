@@ -21,8 +21,9 @@ export type Scalars = {
 export type Player = {
   __typename?: 'Player';
   brefId?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  name?: Maybe<Scalars['String']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
 };
 
 export type Query = {
@@ -94,12 +95,79 @@ export type User = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
+export type GetAllPlayersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetAllPlayersQuery = { __typename?: 'Query', players?: Array<{ __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null }> | null };
+
 export type GetHelloQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetHelloQuery = { __typename?: 'Query', hello?: string | null };
 
+export type PlayerFragment = { __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null };
 
+export const PlayerFragmentDoc = gql`
+    fragment Player on Player {
+  id
+  firstName
+  lastName
+  brefId
+}
+    `;
+export const GetAllPlayers = gql`
+    query GetAllPlayers($limit: Int, $offset: Int, $orderBy: String, $orderDirection: String) {
+  players(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+  ) {
+    ...Player
+  }
+}
+    ${PlayerFragmentDoc}`;
+
+/**
+ * __useGetAllPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetAllPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAllPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAllPlayersQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
+ *   },
+ * });
+ */
+export function useGetAllPlayersQuery(baseOptions?: Apollo.QueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+      }
+export function useGetAllPlayersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+        }
+export function useGetAllPlayersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+        }
+export type GetAllPlayersQueryHookResult = ReturnType<typeof useGetAllPlayersQuery>;
+export type GetAllPlayersLazyQueryHookResult = ReturnType<typeof useGetAllPlayersLazyQuery>;
+export type GetAllPlayersSuspenseQueryHookResult = ReturnType<typeof useGetAllPlayersSuspenseQuery>;
+export type GetAllPlayersQueryResult = Apollo.QueryResult<GetAllPlayersQuery, GetAllPlayersQueryVariables>;
 export const GetHello = gql`
     query GetHello {
   hello

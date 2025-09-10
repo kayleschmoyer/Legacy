@@ -8,7 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../../platform-components';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
@@ -90,7 +90,7 @@ export function DraftBoardGrid({
 }: DraftBoardGridProps): JSX.Element {
   const rounds = Math.min(
     Math.ceil(draftBoard.totalPicks / draftBoard.teams.length),
-    maxRounds
+    maxRounds,
   );
 
   const renderTeamHeader = () => (
@@ -143,7 +143,7 @@ export function DraftBoardGrid({
           const pickNumber =
             (roundNumber - 1) * draftBoard.teams.length + actualTeamIndex + 1;
           const pick = draftBoard.picks.find(
-            (p) => p.pickNumber === pickNumber
+            (p) => p.pickNumber === pickNumber,
           );
           const isCurrentPick = pickNumber === draftBoard.currentPick;
 

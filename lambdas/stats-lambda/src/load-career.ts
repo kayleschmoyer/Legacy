@@ -55,7 +55,10 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       try {
         brefId = JSON.parse(record.body) as string;
       } catch (parseError) {
-        LOGGER.error(`Failed to parse message body for record ${record.messageId}:`, parseError as Error);
+        LOGGER.error(
+          `Failed to parse message body for record ${record.messageId}:`,
+          parseError as Error
+        );
         batchItemFailures.push({ itemIdentifier: record.messageId });
         continue;
       }
@@ -68,17 +71,23 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 
       // Process the player
       await loadPlayer(dbClient, brefId);
-      LOGGER.debug(`Successfully processed record ${record.messageId} for player ${brefId}`);
-      
+      LOGGER.debug(
+        `Successfully processed record ${record.messageId} for player ${brefId}`
+      );
     } catch (error) {
-      LOGGER.error(`Failed to process record ${record.messageId}:`, error as Error);
+      LOGGER.error(
+        `Failed to process record ${record.messageId}:`,
+        error as Error
+      );
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }
   }
 
   await dbClient.close();
 
-  LOGGER.debug(`Processed ${event.Records.length} records, ${batchItemFailures.length} failures`);
+  LOGGER.debug(
+    `Processed ${event.Records.length} records, ${batchItemFailures.length} failures`
+  );
 
   return {
     batchItemFailures,

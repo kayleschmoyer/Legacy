@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const fs = require('fs');
 
 async function testConnection() {
   console.log('Testing database connectivity...');
@@ -12,10 +13,16 @@ async function testConnection() {
     password: process.env.DB_PASSWORD,
   };
 
-  // Add SSL configuration for AWS
-  if (process.env.DB_TYPE === 'PG_REMOTE') {
+  // Add SSL configuration if DB_CERT_PATH is not present (remote connection)
+  if (!process.env.DB_CERT_PATH) {
     config.ssl = {
       rejectUnauthorized: false,
+    };
+  } else {
+    // Local connection with certificate
+    console.log(`Using certificate: ${process.env.DB_CERT_PATH}`);
+    config.ssl = {
+      ca: fs.readFileSync(process.env.DB_CERT_PATH),
     };
   }
 

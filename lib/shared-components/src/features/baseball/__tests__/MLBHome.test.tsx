@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { View, Text } from 'react-native';
+import { View, Text } from '../../../platform-components';
 import { MLBHome } from '../MLBHome';
 
 describe('MLBHome', () => {
@@ -11,7 +11,7 @@ describe('MLBHome', () => {
 
   it('renders correctly with custom title and subtitle', () => {
     const { getByText } = render(
-      <MLBHome title="Custom MLB Title" subtitle="Custom subtitle for MLB" />
+      <MLBHome title="Custom MLB Title" subtitle="Custom subtitle for MLB" />,
     );
 
     expect(getByText('Custom MLB Title')).toBeTruthy();
@@ -24,7 +24,7 @@ describe('MLBHome', () => {
         <View>
           <Text>Custom child content</Text>
         </View>
-      </MLBHome>
+      </MLBHome>,
     );
 
     expect(getByText('Custom child content')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('MLBHome', () => {
 
   it('displays custom title and subtitle', () => {
     const { getByText } = render(
-      <MLBHome title="Custom Title" subtitle="Custom Subtitle" />
+      <MLBHome title="Custom Title" subtitle="Custom Subtitle" />,
     );
 
     expect(getByText('Custom Title')).toBeTruthy();

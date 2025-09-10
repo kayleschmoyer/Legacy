@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
-} from 'react-native';
+} from '../../platform-components';
 import { Player, DraftState, DraftTeam, Filter } from '../../types';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 
@@ -56,7 +56,7 @@ const useTimer = (initialTime: number) => {
       setTime(newTime);
       setIsActive(false);
     },
-    [initialTime]
+    [initialTime],
   );
 
   return { time, isActive, start, pause, reset };
@@ -282,7 +282,7 @@ export function DraftBoard({
   const currentTeam = draft.teams.find(
     (team) =>
       team.picks.length ===
-      Math.floor((draft.currentPick - 1) / draft.teams.length)
+      Math.floor((draft.currentPick - 1) / draft.teams.length),
   );
 
   // Filter players

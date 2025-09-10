@@ -5,14 +5,16 @@ import { builder } from './builder';
 // Player type
 const PlayerRef = builder.objectRef<{
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   brefId: string;
 }>('Player');
 
 PlayerRef.implement({
   fields: (t) => ({
     id: t.exposeInt('id'),
-    name: t.exposeString('name'),
+    firstName: t.exposeString('firstName'),
+    lastName: t.exposeString('lastName'),
     brefId: t.exposeString('brefId'),
   }),
 });
@@ -30,7 +32,12 @@ builder.queryField('players', (t) =>
     resolve: async (root, args) => {
       const dbService = createDatabaseService(getDbOptions());
 
-      const orderBy = args.orderBy as 'id' | 'name' | 'brefId' | undefined;
+      const orderBy = args.orderBy as
+        | 'id'
+        | 'firstName'
+        | 'lastName'
+        | 'brefId'
+        | undefined;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
 
       return dbService.players.getPlayers({

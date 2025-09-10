@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from '../../platform-components';
 import { BattingStatsTable } from './BattingStatsTable';
 import { PitchingStatsTable } from './PitchingStatsTable';
 import { FieldingStatsTable } from './FieldingStatsTable';
@@ -95,9 +95,9 @@ export function BattingStatsTableWithData({
   const filteredStats = useMemo(
     () =>
       stats?.filter(
-        (s): s is BattingStatsWithPlayer => s !== undefined && s !== null
+        (s): s is BattingStatsWithPlayer => s !== undefined && s !== null,
       ) || [],
-    [stats]
+    [stats],
   );
 
   if (loading) {
@@ -142,9 +142,9 @@ export function PitchingStatsTableWithData({
   const filteredStats = useMemo(
     () =>
       stats?.filter(
-        (s): s is PitchingStatsWithPlayer => s !== undefined && s !== null
+        (s): s is PitchingStatsWithPlayer => s !== undefined && s !== null,
       ) || [],
-    [stats]
+    [stats],
   );
 
   if (loading) {
@@ -189,9 +189,9 @@ export function FieldingStatsTableWithData({
   const filteredStats = useMemo(
     () =>
       stats?.filter(
-        (s): s is FieldingStatsWithPlayer => s !== undefined && s !== null
+        (s): s is FieldingStatsWithPlayer => s !== undefined && s !== null,
       ) || [],
-    [stats]
+    [stats],
   );
 
   if (loading) {

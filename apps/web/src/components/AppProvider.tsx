@@ -13,7 +13,7 @@ export function AppProvider({
   apolloClient,
   colorScheme,
   isLoading,
-}: AppProviderProps): JSX.Element {
+}: AppProviderProps): React.JSX.Element {
   if (isLoading) {
     return (
       <div

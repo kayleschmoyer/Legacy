@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
-} from 'react-native';
+} from '../../platform-components';
 import { StatsTableColumn, StatsTableRow } from '../../types';
 import { DEFAULT_COLORS } from '../../config/sports';
 

@@ -1,13 +1,13 @@
-// Generated GraphQL types, documents, and hooks
+// Local GraphQL types, documents, and hooks from shared-components
 export {
-  type PlayerFragment,
+  type Player as PlayerFragment,
   type GetAllPlayersQuery,
   type GetAllPlayersQueryVariables,
+  type GetAllPlayersQueryHookResult,
+  type GetAllPlayersLazyQueryHookResult,
+  type GetAllPlayersQueryResult,
   PlayerFragmentDoc as PLAYER_FRAGMENT,
   GetAllPlayers as GET_ALL_PLAYERS,
   useGetAllPlayersQuery,
   useGetAllPlayersLazyQuery,
-  type GetAllPlayersQueryHookResult,
-  type GetAllPlayersLazyQueryHookResult,
-  type GetAllPlayersQueryResult,
-} from '@legacy-sports/api';
+} from '../../api/db/graphql.generated';

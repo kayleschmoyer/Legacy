@@ -142,7 +142,6 @@ resource "aws_lambda_function" "oauth_proxy" {
     variables = {
       DB_CREDS_PATH                       = aws_secretsmanager_secret.database_credentials.name
       DB_HOST                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      DB_TYPE                            = "PG_REMOTE"
       JWT_SECRET_NAME                    = aws_secretsmanager_secret.jwt_secret.name
       GOOGLE_OAUTH_CLIENT_SECRET_NAME    = aws_secretsmanager_secret.google_oauth_client_secret.name
       OAUTH_PROXY_COOKIE_SECRET_NAME     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name

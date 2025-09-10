@@ -12,6 +12,22 @@ import {
   loadCareerStatsCommandBuilder,
 } from './commands/loadCareerStats';
 import {
+  handleLoadSinglePlayerStats,
+  loadSinglePlayerStatsCommandBuilder,
+} from './commands/loadSinglePlayerStats';
+import {
+  handleListPlayers,
+  listPlayersCommandBuilder,
+} from './commands/listPlayers';
+import {
+  handleTestAddPlayer,
+  testAddPlayerCommandBuilder,
+} from './commands/testAddPlayer';
+import {
+  handleTestConnection,
+  testConnectionCommandBuilder,
+} from './commands/testConnection';
+import {
   computeScoringCommandBuilder,
   handleComputeScoring,
 } from './commands/computeScoring';
@@ -24,6 +40,10 @@ import {
   handleCreateMatchup,
 } from './commands/createMatchup';
 import { handleTestDb, testDbCommandBuilder } from './commands/testDb';
+import {
+  handleTestRawConnection,
+  testRawConnectionCommandBuilder,
+} from './commands/testRawConnection';
 import { main as testDatabase } from './commands/test-database';
 
 async function run(): Promise<void> {
@@ -40,6 +60,30 @@ async function run(): Promise<void> {
       '',
       loadCareerStatsCommandBuilder,
       handleLoadCareerStats
+    )
+    .command(
+      'load-single-player-stats',
+      'Load career stats for a specific player',
+      loadSinglePlayerStatsCommandBuilder,
+      handleLoadSinglePlayerStats
+    )
+    .command(
+      'list-players',
+      'List players from the database',
+      listPlayersCommandBuilder,
+      handleListPlayers
+    )
+    .command(
+      'test-add-player',
+      'Test adding a player to the database',
+      testAddPlayerCommandBuilder,
+      handleTestAddPlayer
+    )
+    .command(
+      'test-connection',
+      'Test database connection and environment variables',
+      testConnectionCommandBuilder,
+      handleTestConnection
     )
     .command(
       'compute-scoring',
@@ -59,6 +103,12 @@ async function run(): Promise<void> {
       'Tests database connectivity',
       testDbCommandBuilder,
       handleTestDb
+    )
+    .command(
+      'test-raw-connection',
+      'Test raw PostgreSQL connection using pg package',
+      testRawConnectionCommandBuilder,
+      handleTestRawConnection
     )
     .command(
       'test-database',

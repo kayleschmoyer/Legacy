@@ -1,4 +1,15 @@
-import { and, asc, count, desc, eq, ilike, inArray, SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  or,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
@@ -6,8 +17,10 @@ import { Player } from '../../types/DatabaseTypes';
 
 export interface PlayerFilters {
   ids?: number[];
-  name?: string;
-  nameLike?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  fullNameLike?: string;
   brefId?: string;
 }
 
@@ -15,7 +28,7 @@ export interface PlayerQueryOptions {
   filters?: PlayerFilters;
   limit?: number;
   offset?: number;
-  orderBy?: 'id' | 'name' | 'brefId';
+  orderBy?: 'id' | 'firstName' | 'lastName' | 'brefId';
   orderDirection?: 'asc' | 'desc';
 }
 
@@ -135,14 +148,19 @@ export class PlayerService {
   }
 
   /**
-   * Search players by name
+   * Search players by name (searches both first and last names)
    */
   async searchPlayers(searchTerm: string, limit = 10): Promise<Player[]> {
     return runWithPublicClient(this.options, async (db) => {
       return db
         .select()
         .from(PublicSchema.players)
-        .where(ilike(PublicSchema.players.name, `%${searchTerm}%`))
+        .where(
+          or(
+            ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
+            ilike(PublicSchema.players.lastName, `%${searchTerm}%`)
+          )
+        )
         .limit(limit);
     });
   }
@@ -157,14 +175,34 @@ export class PlayerService {
       conditions.push(inArray(PublicSchema.players.id, filters.ids));
     }
 
-    if (filters.name) {
-      conditions.push(eq(PublicSchema.players.name, filters.name));
+    if (filters.firstName) {
+      conditions.push(eq(PublicSchema.players.firstName, filters.firstName));
     }
 
-    if (filters.nameLike) {
+    if (filters.lastName) {
+      conditions.push(eq(PublicSchema.players.lastName, filters.lastName));
+    }
+
+    if (filters.fullName) {
+      // Use a raw SQL comparison for the concatenated full name
       conditions.push(
-        ilike(PublicSchema.players.name, `%${filters.nameLike}%`)
+        sql`${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName} = ${filters.fullName}`
       );
+    }
+
+    if (filters.fullNameLike) {
+      const firstNameCondition = ilike(
+        PublicSchema.players.firstName,
+        `%${filters.fullNameLike}%`
+      );
+      const lastNameCondition = ilike(
+        PublicSchema.players.lastName,
+        `%${filters.fullNameLike}%`
+      );
+      const nameCondition = or(firstNameCondition, lastNameCondition);
+      if (nameCondition) {
+        conditions.push(nameCondition);
+      }
     }
 
     if (filters.brefId) {

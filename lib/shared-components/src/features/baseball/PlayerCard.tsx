@@ -1,5 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+} from '../../platform-components';
 
 // Generic player interface for baseball cards
 export interface BaseballPlayer {

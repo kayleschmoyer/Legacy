@@ -11,7 +11,7 @@ export {
   Table,
   LoadingPanel,
   SecureStorage,
-} from './platform-components';
+} from '__PLATFORM_COMPONENTS__';
 
 // New shared components
 export * from './Dropdown';
@@ -20,7 +20,7 @@ export * from './AppProvider';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
 // Cross-platform components from new structure
-export * from './platform-components';
+export * from '__PLATFORM_COMPONENTS__';
 
 // Export all shared components and types
 export * from './config/sports';
@@ -37,7 +37,7 @@ export * from './features/leagues/CreateLeagueModal';
 export * from './features/draft/DraftBoard';
 
 // Player components
-export * from './features/players/FreeAgents';
+export * from './features/players';
 
 // Auth components
 export * from './features/auth';
@@ -91,4 +91,4 @@ export * from './features/auth/WebProviders';
 export * from './navigation/TamaguiAppNavigator';
 
 // Tamagui config
-export { default as tamaguiConfig } from './tamagui.config';
+export { default as tamaguiConfig } from './tamagui.config.web';
