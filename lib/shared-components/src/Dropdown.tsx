@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 
 export interface DropdownItem {
   text: string;
@@ -69,7 +69,7 @@ const WebDropdown = (props: DropdownProperties) => {
 };
 
 export function Dropdown(props: DropdownProperties): JSX.Element {
-  if (Platform.OS === 'web') {
+  if (PlatformUtils.isWeb) {
     return <WebDropdown {...props} />;
   }
   return <RNDropdown {...props} />;

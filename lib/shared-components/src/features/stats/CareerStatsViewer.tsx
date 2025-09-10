@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LazyTable } from '../../components/LazyTable';
+import { LazyTable } from '../../platform-components/wrappers/LazyTable';
 import { handleError } from '../../utils/ErrorHandler';
 
 // Cross-platform table implementation for career stats

@@ -7,11 +7,7 @@ import {
   UseGoogleLoginOptionsAuthCodeFlow,
 } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import {
-  getGenericPassword,
-  resetGenericPassword,
-  setGenericPassword,
-} from 'react-native-keychain';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -51,8 +47,6 @@ export enum Secret {
 
 let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 
-const SECRET_USERNAME = '';
-
 function useLastUpdateTime(): number {
   return KEYCHAIN_LAST_UPDATE;
 }
@@ -60,17 +54,20 @@ function useLastUpdateTime(): number {
 export async function readKeychainValue(
   secret: Secret
 ): Promise<string | null> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-  const result = await getGenericPassword({
-    service: secret,
-  });
-
-  if (result === false) {
+  try {
+    if (Platform.OS === 'web') {
+      // On web, use sessionStorage
+      return typeof sessionStorage !== 'undefined'
+        ? sessionStorage.getItem(secret)
+        : null;
+    } else {
+      // On mobile, use Expo SecureStore
+      return await SecureStore.getItemAsync(secret);
+    }
+  } catch (error) {
+    console.error('Error reading secure storage:', error);
     return null;
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-  return result.password;
 }
 
 export async function getJwt(): Promise<LegacySportsJwt | null> {
@@ -89,36 +86,49 @@ export async function getJwt(): Promise<LegacySportsJwt | null> {
 }
 
 async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
-  switch (Platform.OS) {
-    case 'web':
-      sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
-      break;
-    default:
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await setGenericPassword(SECRET_USERNAME, tokens.jwt, {
-        service: Secret.INTERNAL_JWT,
-      });
-      break;
-  }
+  try {
+    if (Platform.OS === 'web') {
+      // On web, use sessionStorage
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
+      }
+    } else {
+      // On mobile, use Expo SecureStore
+      await SecureStore.setItemAsync(Secret.INTERNAL_JWT, tokens.jwt);
+    }
 
-  // Trigger the react update
-  KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+    // Trigger the react update
+    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+  } catch (error) {
+    console.error('Error storing token:', error);
+  }
 }
 
 async function resetToken(): Promise<void> {
-  switch (Platform.OS) {
-    case 'web':
-      sessionStorage.clear();
-      break;
-    default:
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await resetGenericPassword({ service: Secret.GOOGLE_JWT });
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await resetGenericPassword({ service: Secret.INTERNAL_JWT });
-  }
+  try {
+    if (Platform.OS === 'web') {
+      // On web, use sessionStorage
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.clear();
+      }
+    } else {
+      // On mobile, use Expo SecureStore - delete individual keys
+      const keysToDelete = [Secret.GOOGLE_JWT, Secret.INTERNAL_JWT];
+      for (const key of keysToDelete) {
+        try {
+          await SecureStore.deleteItemAsync(key);
+        } catch (error) {
+          // Ignore errors for keys that don't exist
+          console.debug(`Key ${key} not found in SecureStore`);
+        }
+      }
+    }
 
-  // Trigger the react update
-  KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+    // Trigger the react update
+    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+  } catch (error) {
+    console.error('Error resetting tokens:', error);
+  }
 }
 
 function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {

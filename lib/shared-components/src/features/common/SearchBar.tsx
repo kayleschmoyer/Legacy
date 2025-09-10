@@ -1,15 +1,9 @@
 import React, { useCallback, useState } from 'react';
+import { LazyIcon } from '../../platform-components/wrappers/LazyIcon';
 import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Platform,
-} from 'react-native';
-import { LazyIcon } from '../../components/LazyIcon';
+  PlatformUtils,
+  CrossPlatformComponent,
+} from '../../platform-components/wrappers/PlatformUtils';
 
 // Generic filter option interface
 export interface FilterOption {

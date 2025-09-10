@@ -1,18 +1,26 @@
+/// <reference path="./platform-aliases.d.ts" />
+
 export * from './Button';
 export * from './Layout';
 export * from './screens/SportsScreens';
 export * from './screens/DemoScreen';
 
+// Direct imports from platform components (no wrapper needed)
+export {
+  Icon,
+  Table,
+  LoadingPanel,
+  SecureStorage,
+} from './platform-components';
+
 // New shared components
-export * from './LoadingPanel';
 export * from './Dropdown';
 export * from './ConditionalProviders';
 export * from './AppProvider';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
-// Cross-platform components
-export * from './components/LazyTable';
-export * from './components/LazyIcon';
+// Cross-platform components from new structure
+export * from './platform-components';
 
 // Export all shared components and types
 export * from './config/sports';
@@ -34,7 +42,7 @@ export * from './features/players/FreeAgents';
 // Auth components
 export * from './features/auth';
 
-// Utils
+// Utils (keep backward compatibility)
 export * from './utils/HookHelpers';
 export * from './utils/DateUtilities';
 export * from './utils/ErrorHandler';

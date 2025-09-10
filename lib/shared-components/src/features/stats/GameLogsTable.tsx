@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  StyleSheet,
-} from 'react-native';
-import { LazyTable } from '../../components/LazyTable';
+import { LazyTable } from '../../platform-components/wrappers/LazyTable';
 import { handleError } from '../../utils/ErrorHandler';
+
+// Platform-agnostic React components (no React Native imports)
+// Using CSS-in-JS for styling instead of StyleSheet
 
 // Cross-platform table implementation
 interface TableProps {
