@@ -276,3 +276,21 @@ resource "aws_lambda_permission" "stats_api_gateway" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
+
+# SQS Event Source Mapping for Stats Lambda
+resource "aws_lambda_event_source_mapping" "stats_sqs" {
+  event_source_arn = aws_sqs_queue.load_season_stats.arn
+  function_name    = aws_lambda_function.stats.arn
+  
+  # Batch processing configuration
+  batch_size = 10
+  # Note: maximum_batching_window_in_seconds is not supported for FIFO queues
+  
+  # Error handling
+  function_response_types = ["ReportBatchItemFailures"]
+  
+  depends_on = [
+    aws_lambda_function.stats,
+    aws_sqs_queue.load_season_stats
+  ]
+}
