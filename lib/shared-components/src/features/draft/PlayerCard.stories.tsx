@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
-import { PlayerCard, Player, PlayerCardProps } from './PlayerCard';
+import { Player, PlayerCard } from './PlayerCard';
 
 const meta: Meta<typeof PlayerCard> = {
   title: 'Features/Draft/PlayerCard',
@@ -297,7 +297,8 @@ export const WithInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Test card click/selection
-    const card = canvas.getByText(args.player.name).closest('div');
+    const playerName = (args.player as Player)?.name || '';
+    const card = canvas.getByText(playerName).closest('div');
     if (card) {
       await userEvent.click(card);
       await expect(args.onSelect).toHaveBeenCalled();

@@ -31,10 +31,21 @@ export default defineConfig(() => ({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+    rollupOptions: {
+      external: [
+        // Externalize React Native packages that cause issues
+        'react-native-safe-area-context',
+        'react-native-screens',
+      ],
+    },
   },
   resolve: {
     alias: {
       'react-native': 'react-native-web',
+      // Mock problematic paths that don't exist in react-native-web
+      'react-native/Libraries/Utilities/codegenNativeComponent': './src/mocks/codegenNativeComponent.js',
+      'react-native/Libraries/Utilities/codegenNativeCommands': './src/mocks/codegenNativeCommands.js',
+      'react-native/Libraries/ReactNative/AppContainer': './src/mocks/AppContainer.js',
     },
     extensions: [
       '.web.tsx',

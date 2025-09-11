@@ -3,11 +3,11 @@ import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 export interface NavigationRoute {
   name: string;
-  component: React.ComponentType<any>;
+  component: React.ComponentType;
   title: string;
   path?: string; // For web routing
 }

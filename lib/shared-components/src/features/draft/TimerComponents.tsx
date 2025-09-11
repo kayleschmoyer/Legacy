@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Animated,
+  Platform,
   StyleSheet,
   Text,
-  View,
-  Platform,
   Vibration,
+  View,
 } from 'react-native';
 
 export interface TimerProps {

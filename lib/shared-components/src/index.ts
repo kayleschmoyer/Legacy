@@ -2,6 +2,7 @@ export * from './Button';
 export * from './Layout';
 export * from './screens/SportsScreens';
 export * from './screens/DemoScreen';
+export * from './screens/DraftBoardScreen';
 
 // New shared components
 export * from './LoadingPanel';

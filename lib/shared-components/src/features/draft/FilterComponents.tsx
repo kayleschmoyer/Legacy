@@ -3,7 +3,6 @@ import {
   Animated,
   Dimensions,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,

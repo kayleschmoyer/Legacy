@@ -1,9 +1,7 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import {
-  Animated,
   Dimensions,
   FlatList,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -219,25 +217,17 @@ export function DraftPickHistory({
     item: Pick;
     index: number;
   }) => {
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-
     const handlePressIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.98,
-        useNativeDriver: true,
-      }).start();
+      // Simple press feedback without animation for now
     };
 
     const handlePressOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
+      // Simple press feedback without animation for now
     };
 
     if (variant === 'timeline') {
       return (
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <View>
           <TouchableOpacity
             style={styles.timelinePickItem}
             onPress={() => onPickPress?.(pick)}
@@ -260,13 +250,13 @@ export function DraftPickHistory({
               </Text>
             </View>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       );
     }
 
     if (variant === 'compact') {
       return (
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <View>
           <TouchableOpacity
             style={styles.compactPickItem}
             onPress={() => onPickPress?.(pick)}
@@ -281,13 +271,13 @@ export function DraftPickHistory({
               {pick.player.position}
             </Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       );
     }
 
     // Default list variant
     return (
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <View>
         <TouchableOpacity
           style={styles.listPickItem}
           onPress={() => onPickPress?.(pick)}
@@ -307,7 +297,7 @@ export function DraftPickHistory({
             {new Date(pick.timestamp).toLocaleTimeString()}
           </Text>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     );
   };
 

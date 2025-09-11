@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   ActivityIndicator,
+  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Alert,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { User, AuthState } from '../../types';
+import { AuthState } from '../../types';
 
 export interface LoginCredentials {
   email: string;
@@ -154,7 +154,7 @@ export function AuthForm({
           }
           break;
       }
-    } catch (err) {
+    } catch {
       // Error handling is done via the error prop
     }
   };
@@ -291,7 +291,7 @@ export function AuthForm({
         {/* Submit Button */}
         <TouchableOpacity
           style={[styles.submitButton, loading && styles.disabledButton]}
-          onPress={handleSubmit}
+          onPress={() => { void handleSubmit(); }}
           disabled={loading}
         >
           {loading ? (
@@ -399,7 +399,7 @@ export function AuthProvider({
     );
   }
 
-  return <>{children}</>;
+  return children;
 }
 
 const styles = StyleSheet.create({

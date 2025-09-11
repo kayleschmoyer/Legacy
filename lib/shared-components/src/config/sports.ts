@@ -98,3 +98,6 @@ export const DRAFT_TYPES = Object.freeze([
 
 export const SORT_DIRECTIONS = ['ASC', 'DESC'] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
+
+// Alias for backward compatibility
+export const sportsConfig = SPORT_CONFIGS;

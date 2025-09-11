@@ -1,11 +1,10 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from 'react-native';
 
 // Types
@@ -35,11 +34,16 @@ export interface PlayerCardProps {
   showStats?: boolean;
   showOwnership?: boolean;
   actionLabel?: string;
+  onMultiSelect?: (id: string) => void;
+  multiSelected?: boolean;
+  comparisonMode?: boolean;
+  onShowStats?: () => void;
+  hapticFeedback?: boolean;
 }
 
 // Utility function to get position colors
 const getPositionColor = (position: string, sport: string): string => {
-  const colorMaps = {
+const colorMaps: Record<string, Record<string, string>> = {
     baseball: {
       C: '#ef4444',
       '1B': '#f97316',
@@ -107,6 +111,11 @@ export function PlayerCard({
   showStats = false,
   showOwnership = false,
   actionLabel = 'Select',
+  onMultiSelect,
+  multiSelected = false,
+  comparisonMode = false,
+  onShowStats,
+  hapticFeedback = false,
 }: PlayerCardProps): JSX.Element {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 

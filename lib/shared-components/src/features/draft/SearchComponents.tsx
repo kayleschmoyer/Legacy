@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Search } from '@tamagui/lucide-icons';
 import {
   Animated,
   FlatList,
@@ -116,7 +117,7 @@ export function SearchBar({
 
   return (
     <Animated.View style={[containerStyle, { borderColor }]}>
-      {showSearchIcon && <Text style={styles.searchIcon}>🔍</Text>}
+      {showSearchIcon && <Search size={20} color="#6b7280" />}
 
       <TextInput
         ref={inputRef}

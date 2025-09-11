@@ -1,23 +1,22 @@
 import React from 'react';
 import {
-  XStack as TamaguiXStack,
-  YStack as TamaguiYStack,
   Card as TamaguiCard,
-  H1 as TamaguiH1,
-  H2 as TamaguiH2,
-  H3 as TamaguiH3,
-  Paragraph as TamaguiParagraph,
-  Separator as TamaguiSeparator,
-  ScrollView,
   CardProps as TamaguiCardProps,
-  XStackProps,
-  YStackProps,
+  H1 as TamaguiH1,
   H1Props,
+  H2 as TamaguiH2,
   H2Props,
+  H3 as TamaguiH3,
   H3Props,
+  Paragraph as TamaguiParagraph,
   ParagraphProps,
+  ScrollView,
+  Separator as TamaguiSeparator,
   SeparatorProps,
-  View,
+  XStack as TamaguiXStack,
+  XStackProps,
+  YStack as TamaguiYStack,
+  YStackProps,
 } from 'tamagui';
 
 export interface CardProps extends TamaguiCardProps {
@@ -49,7 +48,7 @@ export const Card: React.FC<CardProps> = ({
 
 export interface ScreenContainerProps {
   children: React.ReactNode;
-  style?: any;
+  style?: object;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({

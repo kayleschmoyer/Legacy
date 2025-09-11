@@ -1,695 +1,361 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  Modal,
-  Animated,
-  StyleSheet,
-  Platform,
-  Dimensions,
-} from 'react-native';
-import { Player, DraftState, DraftTeam, Filter } from '../../types';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, Badge, Button, Checkbox, Dialog, Input, RadioGroup, ScrollView, Select, Separator, Spinner, Switch, Tabs, Text, useTheme, XStack, YStack } from 'tamagui';
+import { AccessibilitySettings } from './AccessibilitySettings';
+import { AISuggestions } from './AISuggestions';
+import { ChatPanel } from './ChatPanel';
+import { DraftOrder } from './DraftOrder';
+import { DraftTimer } from './DraftTimer';
+import { LiveStream } from './LiveStream';
+import { NotificationBell } from './NotificationBell';
+import { Player, PlayerCard } from './PlayerCard';
+import { StatsOverlay } from './StatsOverlay';
+import { TradeProposal } from './TradeProposal';
+import { VRMode } from './VRMode';
+import { sportsConfig } from '../../config/sports';
+import { useAISuggestions, useDraftData, useDragAndDrop, useRealTimeUpdates, useVoiceCommands } from '../../hooks';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_TABLET = SCREEN_WIDTH > 768;
+interface DraftBoardProps {
+  sport: string;
+  leagueId: string;
+  teamId: string;
+  userId: string;
+}
 
-// Utility function for position colors
-const getPositionColor = (position: string, sport: string): string => {
-  const colors = [
-    '#3B82F6',
-    '#10B981',
-    '#F59E0B',
-    '#EF4444',
-    '#8B5CF6',
-    '#F97316',
-  ];
-  const sportConfig = SPORT_CONFIGS[sport];
-  const index = sportConfig?.positions.indexOf(position) ?? 0;
-  return colors[index % colors.length];
-};
+export const DraftBoard: React.FC<DraftBoardProps> = ({ sport, leagueId, teamId, userId }) => {
+  const theme = useTheme();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPosition, setFilterPosition] = useState('All');
+  const [sortBy, setSortBy] = useState('rank');
+  const [autoPickEnabled, setAutoPickEnabled] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showTrade, setShowTrade] = useState(false);
+  const [vrMode, setVrMode] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [accessibilityMode, setAccessibilityMode] = useState(false);
+  const [themeMode, setThemeMode] = useState('light');
+  const [notificationSettings, setNotificationSettings] = useState({ sound: true, vibration: true });
+  const [draftSpeed, setDraftSpeed] = useState(30);
+  const [multiSelect, setMultiSelect] = useState<string[]>([]);
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [liveStreamEnabled, setLiveStreamEnabled] = useState(false);
+  const [integrationSettings, setIntegrationSettings] = useState({ espn: false, yahoo: false });
 
-/**
- * Custom hook for draft timer
- */
-const useTimer = (initialTime: number) => {
-  const [time, setTime] = useState(initialTime);
-  const [isActive, setIsActive] = useState(false);
+  const { players, draftOrder, currentPick, isLoading, error } = useDraftData(sport, leagueId, teamId);
+  const { updates } = useRealTimeUpdates(leagueId);
+  const { suggestions } = useAISuggestions(players, sport);
+  const { voiceCommand, isListening } = useVoiceCommands(voiceEnabled);
+  useDragAndDrop();
+
+interface SportConfig {
+  name: string;
+  positions: string[];
+}
+
+const defaultSportConfig: SportConfig = { name: 'Unknown', positions: [] };
+
+  const sportConfig = (sportsConfig as Record<string, SportConfig>)[sport] || defaultSportConfig;
+  const scrollRef = useRef(null);
+
+  const filteredPlayers = useMemo(() => {
+    return players
+      .filter(player => 
+        player.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        (filterPosition === 'All' || player.position === filterPosition)
+      )
+      .sort((a, b) => {
+        if (sortBy === 'rank') return a.rank - b.rank;
+        if (sortBy === 'name') return a.name.localeCompare(b.name);
+        if (sortBy === 'value') return b.value - a.value;
+        return 0;
+      });
+  }, [players, searchQuery, filterPosition, sortBy]);
+
+  const handlePick = useCallback((playerId: string) => {
+    fetch('/api/draft/pick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, leagueId, teamId, userId, multiSelect }),
+    })
+      .then(response => {
+        if (response.ok) {
+          setSelectedPlayer(null);
+          setMultiSelect([]);
+          console.log('Pick successful!');
+        } else {
+          console.error('Pick failed');
+        }
+      })
+      .catch(err => console.error('Pick failed:', err));
+  }, [leagueId, teamId, userId, multiSelect]);
+
+  const handleAutoPick = useCallback(() => {
+    if (autoPickEnabled && filteredPlayers.length > 0) {
+      void handlePick(filteredPlayers[0].id);
+    }
+  }, [autoPickEnabled, filteredPlayers, handlePick]);
+
+  const handleVoiceCommand = useCallback((command: string) => {
+    if (command.includes('pick')) {
+      const playerName = command.replace('pick', '').trim();
+      const player = filteredPlayers.find(p => p.name.toLowerCase().includes(playerName.toLowerCase()));
+      if (player) void handlePick(player.id);
+    }
+  }, [filteredPlayers, handlePick]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isActive && time > 0) {
-      interval = setInterval(() => {
-        setTime((t) => Math.max(0, t - 1));
-      }, 1000);
+    if (voiceCommand) handleVoiceCommand(voiceCommand);
+  }, [voiceCommand, handleVoiceCommand]);
+
+  useEffect(() => {
+    if (updates.length > 0) {
+      console.log('Draft updated!');
     }
-    return () => clearInterval(interval);
-  }, [isActive, time]);
+  }, [updates]);
 
-  const start = useCallback(() => setIsActive(true), []);
-  const pause = useCallback(() => setIsActive(false), []);
-  const reset = useCallback(
-    (newTime: number = initialTime) => {
-      setTime(newTime);
-      setIsActive(false);
-    },
-    [initialTime]
-  );
+  if (isLoading) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Spinner size="large" />
+        <Text>Loading {sportConfig.name} Draft...</Text>
+      </YStack>
+    );
+  }
 
-  return { time, isActive, start, pause, reset };
-};
-
-/**
- * Player card component
- */
-interface PlayerCardProps {
-  player: Player;
-  onSelect: () => void;
-  isSelected?: boolean;
-  sport?: string;
-  isDrafted?: boolean;
-}
-
-const PlayerCard: React.FC<PlayerCardProps> = ({
-  player,
-  onSelect,
-  isSelected,
-  sport = 'baseball',
-  isDrafted = false,
-}) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
+  if (error) {
+    return (
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Text color="red">Error: {error.message}</Text>
+        <Button onPress={() => window.location.reload()}>Retry</Button>
+      </YStack>
+    );
+  }
 
   return (
-    <Animated.View
-      style={[
-        styles.playerCard,
-        { transform: [{ scale: scaleAnim }] },
-        isSelected && styles.selectedCard,
-        isDrafted && styles.draftedCard,
-      ]}
-    >
-      <TouchableOpacity
-        onPress={onSelect}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardContent}
-        activeOpacity={1}
-        disabled={isDrafted}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={[styles.playerName, isDrafted && styles.draftedText]}>
-            {player.name}
-          </Text>
-          <View
-            style={[
-              styles.positionBadge,
-              { backgroundColor: getPositionColor(player.position, sport) },
-              isDrafted && styles.draftedBadge,
-            ]}
-          >
-            <Text style={styles.positionText}>{player.position}</Text>
-          </View>
-        </View>
-        <Text style={[styles.teamText, isDrafted && styles.draftedText]}>
-          {player.team}
+    <YStack flex={1} backgroundColor={theme.background} padding="$4" space="$4">
+      <XStack justifyContent="space-between" alignItems="center">
+        <Text fontSize="$8" fontWeight="bold" color={theme.color}>
+          {sportConfig.name} Draft Board
         </Text>
-        <View style={styles.cardFooter}>
-          <Text style={[styles.adpText, isDrafted && styles.draftedText]}>
-            ADP: {player.adp}
-          </Text>
-          <Text style={[styles.rankText, isDrafted && styles.draftedText]}>
-            #{player.rank}
-          </Text>
-        </View>
-        {isDrafted && (
-          <View style={styles.draftedOverlay}>
-            <Text style={styles.draftedLabel}>DRAFTED</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
+        <XStack space="$2">
+          <NotificationBell updates={updates} settings={notificationSettings} />
+          <Button onPress={() => setShowChat(true)}>Chat</Button>
+          <Button onPress={() => setVrMode(true)}>VR Mode</Button>
+          <AccessibilitySettings mode={accessibilityMode} onChange={setAccessibilityMode} />
+        </XStack>
+      </XStack>
+
+      <DraftTimer sport={sport} currentPick={currentPick} speed={draftSpeed} onSpeedChange={setDraftSpeed} />
+
+      <Tabs defaultValue="players" orientation="horizontal">
+        <Tabs.List>
+          <Tabs.Tab value="players">Players</Tabs.Tab>
+          <Tabs.Tab value="order">Order</Tabs.Tab>
+          <Tabs.Tab value="ai">AI</Tabs.Tab>
+          <Tabs.Tab value="settings">Settings</Tabs.Tab>
+          <Tabs.Tab value="demo">Home Football Baseball Players Demo</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Content value="players">
+          <XStack space="$2" alignItems="center">
+            <Input
+              placeholder="Search players..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              flex={1}
+            />
+            <Select value={filterPosition} onValueChange={setFilterPosition}>
+              <Select.Trigger>
+                <Text>{filterPosition}</Text>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="All">All Positions</Select.Item>
+                {sportConfig.positions.map(pos => (
+                  <Select.Item key={pos} value={pos}>{pos}</Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <Select.Trigger>
+                <Text>Sort by {sortBy}</Text>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="rank">Rank</Select.Item>
+                <Select.Item value="name">Name</Select.Item>
+                <Select.Item value="value">Value</Select.Item>
+              </Select.Content>
+            </Select>
+          </XStack>
+
+          <XStack space="$2" alignItems="center">
+            <Text>Auto-Pick</Text>
+            <Switch checked={autoPickEnabled} onCheckedChange={setAutoPickEnabled} />
+            <Button onPress={handleAutoPick} disabled={!autoPickEnabled}>
+              Auto Pick
+            </Button>
+            <Text>Voice</Text>
+            <Switch checked={voiceEnabled} onCheckedChange={setVoiceEnabled} />
+            {isListening && <Badge>Listening...</Badge>}
+          </XStack>
+
+          <XStack space="$2" alignItems="center">
+            <Checkbox checked={multiSelect.length > 0} onCheckedChange={() => setMultiSelect([])} />
+            <Text>Multi-Select</Text>
+            <Checkbox checked={comparisonMode} onCheckedChange={setComparisonMode} />
+            <Text>Compare</Text>
+            <Checkbox checked={liveStreamEnabled} onCheckedChange={setLiveStreamEnabled} />
+            <Text>Live Stream</Text>
+          </XStack>
+
+          <ScrollView ref={scrollRef}>
+            <AnimatePresence>
+              {filteredPlayers.map(player => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  onSelect={setSelectedPlayer}
+                  isSelected={selectedPlayer?.id === player.id}
+                  onMultiSelect={(id) => setMultiSelect(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
+                  multiSelected={multiSelect.includes(player.id)}
+                  comparisonMode={comparisonMode}
+                  onShowStats={() => setShowStats(true)}
+                />
+              ))}
+            </AnimatePresence>
+          </ScrollView>
+        </Tabs.Content>
+
+        <Tabs.Content value="order">
+          <DraftOrder order={draftOrder} currentPick={currentPick} />
+        </Tabs.Content>
+
+        <Tabs.Content value="ai">
+          <AISuggestions suggestions={suggestions} onPick={handlePick} />
+        </Tabs.Content>
+
+        <Tabs.Content value="settings">
+          <YStack space="$4">
+            <Text fontSize="$6">Preferences</Text>
+            <RadioGroup value={themeMode} onValueChange={setThemeMode}>
+              <RadioGroup.Item value="light" label="Light" />
+              <RadioGroup.Item value="dark" label="Dark" />
+              <RadioGroup.Item value="auto" label="Auto" />
+            </RadioGroup>
+            <Separator />
+            <XStack space="$2">
+              <Text>Sound</Text>
+              <Switch checked={notificationSettings.sound} onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, sound: checked }))} />
+            </XStack>
+            <XStack space="$2">
+              <Text>Vibration</Text>
+              <Switch checked={notificationSettings.vibration} onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, vibration: checked }))} />
+            </XStack>
+            <Separator />
+            <Text>Integrations</Text>
+            <Checkbox checked={integrationSettings.espn} onCheckedChange={(checked) => setIntegrationSettings(prev => ({ ...prev, espn: checked }))} label="ESPN" />
+            <Checkbox checked={integrationSettings.yahoo} onCheckedChange={(checked) => setIntegrationSettings(prev => ({ ...prev, yahoo: checked }))} label="Yahoo" />
+          </YStack>
+        </Tabs.Content>
+
+        <Tabs.Content value="demo">
+          <YStack space="$4">
+            <Text fontSize="$6">Home Football Baseball Players Demo</Text>
+            <Text>This tab demonstrates players from different sports.</Text>
+            
+            <YStack space="$2">
+              <Text fontSize="$5" fontWeight="bold">Football Players</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <XStack space="$2">
+                  {[
+                    { id: 'fb1', name: 'Patrick Mahomes', position: 'QB', team: 'KC', rank: 1, value: 95 },
+                    { id: 'fb2', name: 'Christian McCaffrey', position: 'RB', team: 'SF', rank: 2, value: 92 },
+                    { id: 'fb3', name: 'Cooper Kupp', position: 'WR', team: 'LAR', rank: 3, value: 88 },
+                  ].map(player => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player as Player}
+                      onSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      isSelected={false}
+                      onMultiSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      multiSelected={false}
+                      comparisonMode={false}
+                      onShowStats={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                    />
+                  ))}
+                </XStack>
+              </ScrollView>
+            </YStack>
+
+            <YStack space="$2">
+              <Text fontSize="$5" fontWeight="bold">Baseball Players</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <XStack space="$2">
+                  {[
+                    { id: 'bb1', name: 'Shohei Ohtani', position: 'P/DH', team: 'LAD', rank: 1, value: 98 },
+                    { id: 'bb2', name: 'Juan Soto', position: 'OF', team: 'NYY', rank: 2, value: 94 },
+                    { id: 'bb3', name: 'Mookie Betts', position: 'OF', team: 'LAD', rank: 3, value: 91 },
+                  ].map(player => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player as Player}
+                      onSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      isSelected={false}
+                      onMultiSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      multiSelected={false}
+                      comparisonMode={false}
+                      onShowStats={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                    />
+                  ))}
+                </XStack>
+              </ScrollView>
+            </YStack>
+
+            <YStack space="$2">
+              <Text fontSize="$5" fontWeight="bold">Basketball Players</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <XStack space="$2">
+                  {[
+                    { id: 'bk1', name: 'Nikola Jokic', position: 'C', team: 'DEN', rank: 1, value: 97 },
+                    { id: 'bk2', name: 'Luka Doncic', position: 'PG', team: 'DAL', rank: 2, value: 95 },
+                    { id: 'bk3', name: 'Giannis Antetokounmpo', position: 'PF', team: 'MIL', rank: 3, value: 93 },
+                  ].map(player => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player as Player}
+                      onSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      isSelected={false}
+                      onMultiSelect={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                      multiSelected={false}
+                      comparisonMode={false}
+                      onShowStats={() => {}} // eslint-disable-line @typescript-eslint/no-empty-function
+                    />
+                  ))}
+                </XStack>
+              </ScrollView>
+            </YStack>
+          </YStack>
+        </Tabs.Content>
+      </Tabs>
+
+      {selectedPlayer && (
+        <Dialog open={!!selectedPlayer} onOpenChange={() => setSelectedPlayer(null)}>
+          <Dialog.Content>
+            <Dialog.Title>Confirm Pick</Dialog.Title>
+            <Text>{selectedPlayer.name}</Text>
+            <XStack space="$2" marginTop="$2">
+              <Button onPress={() => handlePick(selectedPlayer.id)}>Pick</Button>
+              <Button variant="outline" onPress={() => setSelectedPlayer(null)}>Cancel</Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog>
+      )}
+
+      {showStats && <StatsOverlay onClose={() => setShowStats(false)} player={selectedPlayer} />}
+      {showChat && <ChatPanel onClose={() => setShowChat(false)} leagueId={leagueId} />}
+      {showTrade && <TradeProposal onClose={() => setShowTrade(false)} leagueId={leagueId} teamId={teamId} />}
+      {liveStreamEnabled && <LiveStream leagueId={leagueId} />}
+      {vrMode && <VRMode onClose={() => setVrMode(false)} sport={sport} />}
+    </YStack>
   );
 };
-
-/**
- * Timer component
- */
-interface TimerProps {
-  time: number;
-  isActive: boolean;
-}
-
-const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
-
-  const getTimerColor = () => {
-    if (time > 30) return DEFAULT_COLORS.success;
-    if (time > 10) return DEFAULT_COLORS.warning;
-    return DEFAULT_COLORS.error;
-  };
-
-  return (
-    <View style={[styles.timerContainer, { backgroundColor: getTimerColor() }]}>
-      <Text style={styles.timerText}>
-        {minutes}:{seconds.toString().padStart(2, '0')}
-      </Text>
-      <Text style={styles.timerLabel}>
-        {isActive ? 'Time Remaining' : 'Paused'}
-      </Text>
-    </View>
-  );
-};
-
-/**
- * Filter controls
- */
-interface FilterControlsProps {
-  filters: Filter;
-  onFiltersChange: (filters: Filter) => void;
-  positions: string[];
-  searchText: string;
-  onSearchChange: (text: string) => void;
-}
-
-const FilterControls: React.FC<FilterControlsProps> = ({
-  filters,
-  onFiltersChange,
-  positions,
-  searchText,
-  onSearchChange,
-}) => {
-  const allPositions = ['ALL', ...positions];
-
-  return (
-    <View style={styles.filterControls}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search players..."
-        placeholderTextColor="#888"
-        value={searchText}
-        onChangeText={onSearchChange}
-      />
-
-      <View style={styles.positionFilters}>
-        {allPositions.map((position) => (
-          <TouchableOpacity
-            key={position}
-            style={[
-              styles.filterChip,
-              filters.position === position && styles.filterChipActive,
-            ]}
-            onPress={() => onFiltersChange({ ...filters, position })}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                filters.position === position && styles.filterChipTextActive,
-              ]}
-            >
-              {position}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-};
-
-/**
- * Draft status bar
- */
-interface DraftStatusProps {
-  draft: DraftState;
-  currentTeam?: DraftTeam;
-}
-
-const DraftStatus: React.FC<DraftStatusProps> = ({ draft, currentTeam }) => {
-  return (
-    <View style={styles.draftStatus}>
-      <Text style={styles.draftTitle}>{draft.name}</Text>
-      <Text style={styles.currentPick}>
-        Pick #{draft.currentPick}
-        {currentTeam && ` - ${currentTeam.name}`}
-      </Text>
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusText}>{draft.status.toUpperCase()}</Text>
-      </View>
-    </View>
-  );
-};
-
-/**
- * Main DraftBoard component
- */
-export interface DraftBoardProps {
-  draft: DraftState;
-  availablePlayers: Player[];
-  onPlayerDraft: (player: Player) => void;
-  onTimerControl?: (action: 'start' | 'pause' | 'reset') => void;
-  draftedPlayerIds?: Set<string>;
-}
-
-export function DraftBoard({
-  draft,
-  availablePlayers,
-  onPlayerDraft,
-  onTimerControl,
-  draftedPlayerIds = new Set(),
-}: DraftBoardProps): JSX.Element {
-  const [searchText, setSearchText] = useState('');
-  const [filters, setFilters] = useState<Filter>({ position: 'ALL' });
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-
-  const { time, isActive, start, pause, reset } = useTimer(draft.timeRemaining);
-
-  const sportConfig = SPORT_CONFIGS[draft.sport] || SPORT_CONFIGS.baseball;
-  const currentTeam = draft.teams.find(
-    (team) =>
-      team.picks.length ===
-      Math.floor((draft.currentPick - 1) / draft.teams.length)
-  );
-
-  // Filter players
-  const filteredPlayers = availablePlayers.filter((player) => {
-    const matchesSearch =
-      searchText === '' ||
-      player.name.toLowerCase().includes(searchText.toLowerCase());
-    const matchesPosition =
-      filters.position === 'ALL' || player.position === filters.position;
-    const isAvailable = !draftedPlayerIds.has(player.id);
-
-    return matchesSearch && matchesPosition && isAvailable;
-  });
-
-  const handlePlayerSelect = (player: Player) => {
-    setSelectedPlayer(player);
-    setShowConfirmModal(true);
-  };
-
-  const handleConfirmDraft = () => {
-    if (selectedPlayer) {
-      onPlayerDraft(selectedPlayer);
-      setSelectedPlayer(null);
-      setShowConfirmModal(false);
-    }
-  };
-
-  const handleTimerControl = (action: 'start' | 'pause' | 'reset') => {
-    switch (action) {
-      case 'start':
-        start();
-        break;
-      case 'pause':
-        pause();
-        break;
-      case 'reset':
-        reset();
-        break;
-    }
-    onTimerControl?.(action);
-  };
-
-  const renderPlayer = ({ item }: { item: Player }) => (
-    <PlayerCard
-      player={item}
-      onSelect={() => handlePlayerSelect(item)}
-      isSelected={selectedPlayer?.id === item.id}
-      sport={draft.sport}
-      isDrafted={draftedPlayerIds.has(item.id)}
-    />
-  );
-
-  return (
-    <View style={styles.container}>
-      {/* Draft Status */}
-      <DraftStatus draft={draft} currentTeam={currentTeam} />
-
-      {/* Timer */}
-      <Timer time={time} isActive={isActive} />
-
-      {/* Timer Controls */}
-      <View style={styles.timerControls}>
-        <TouchableOpacity
-          style={styles.timerButton}
-          onPress={() => handleTimerControl(isActive ? 'pause' : 'start')}
-        >
-          <Text style={styles.timerButtonText}>
-            {isActive ? 'Pause' : 'Start'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.timerButton}
-          onPress={() => handleTimerControl('reset')}
-        >
-          <Text style={styles.timerButtonText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Filters */}
-      <FilterControls
-        filters={filters}
-        onFiltersChange={setFilters}
-        positions={sportConfig.positions}
-        searchText={searchText}
-        onSearchChange={setSearchText}
-      />
-
-      {/* Player List */}
-      <FlatList
-        data={filteredPlayers}
-        renderItem={renderPlayer}
-        keyExtractor={(item) => item.id}
-        numColumns={IS_TABLET ? 3 : 2}
-        columnWrapperStyle={IS_TABLET ? styles.row : undefined}
-        style={styles.playerList}
-        showsVerticalScrollIndicator={false}
-      />
-
-      {/* Confirmation Modal */}
-      <Modal
-        visible={showConfirmModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowConfirmModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Draft Pick</Text>
-            {selectedPlayer && (
-              <>
-                <Text style={styles.modalPlayerName}>
-                  {selectedPlayer.name}
-                </Text>
-                <Text style={styles.modalPlayerDetails}>
-                  {selectedPlayer.position} - {selectedPlayer.team}
-                </Text>
-                <Text style={styles.modalPlayerRank}>
-                  Rank: #{selectedPlayer.rank}
-                </Text>
-              </>
-            )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowConfirmModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirmButton}
-                onPress={handleConfirmDraft}
-              >
-                <Text style={styles.modalConfirmText}>Draft Player</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  draftStatus: {
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  draftTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    flex: 1,
-  },
-  currentPick: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  statusBadge: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  timerContainer: {
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  timerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  timerLabel: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.text,
-    marginTop: 4,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  timerButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  timerButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  filterControls: {
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.secondary,
-  },
-  searchInput: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-  },
-  positionFilters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  filterChip: {
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  filterChipActive: {
-    backgroundColor: DEFAULT_COLORS.accent,
-  },
-  filterChipText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: DEFAULT_COLORS.text,
-  },
-  playerList: {
-    flex: 1,
-    padding: 8,
-  },
-  row: {
-    justifyContent: 'space-around',
-  },
-  playerCard: {
-    flex: IS_TABLET ? 1 : 0.48,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    margin: 4,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  selectedCard: {
-    borderWidth: 2,
-    borderColor: DEFAULT_COLORS.accent,
-  },
-  draftedCard: {
-    opacity: 0.6,
-  },
-  cardContent: {
-    padding: 12,
-    position: 'relative',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  playerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  positionBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  draftedBadge: {
-    backgroundColor: DEFAULT_COLORS.border,
-  },
-  positionText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  teamText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  adpText: {
-    fontSize: 11,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  rankText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.accent,
-  },
-  draftedText: {
-    color: DEFAULT_COLORS.border,
-  },
-  draftedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  draftedLabel: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 16,
-    padding: 24,
-    width: Platform.OS === 'web' ? 320 : '80%',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-  },
-  modalPlayerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.accent,
-    marginBottom: 8,
-  },
-  modalPlayerDetails: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  modalPlayerRank: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalCancelButton: {
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  modalConfirmButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-});

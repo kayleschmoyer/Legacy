@@ -9,6 +9,7 @@ import {
 import {
   BaseballScreen,
   DemoScreen,
+  DraftBoardScreen,
   FootballScreen,
   HomeScreen,
   LoadingPanel,
@@ -52,14 +53,14 @@ function Navigation() {
             fontWeight: 'bold',
           }}
         >
-          🏈 Fantasy Sports Hub
+          <span role="img" aria-label="Football">🏈</span> Fantasy Sports Hub
         </h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <Link
             to="/"
             style={location.pathname === '/' ? activeLinkStyle : linkStyle}
           >
-            🏠 Home
+            <span role="img" aria-label="Home">🏠</span> Home
           </Link>
           <Link
             to="/football"
@@ -67,7 +68,7 @@ function Navigation() {
               location.pathname === '/football' ? activeLinkStyle : linkStyle
             }
           >
-            🏈 Football
+            <span role="img" aria-label="Football">🏈</span> Football
           </Link>
           <Link
             to="/baseball"
@@ -75,7 +76,7 @@ function Navigation() {
               location.pathname === '/baseball' ? activeLinkStyle : linkStyle
             }
           >
-            ⚾ Baseball
+            <span role="img" aria-label="Baseball">⚾</span> Baseball
           </Link>
           <Link
             to="/players"
@@ -83,13 +84,25 @@ function Navigation() {
               location.pathname === '/players' ? activeLinkStyle : linkStyle
             }
           >
-            👥 Players
+            <span role="img" aria-label="Players">👥</span> Players
           </Link>
           <Link
             to="/demo"
             style={location.pathname === '/demo' ? activeLinkStyle : linkStyle}
           >
-            🎨 Demo
+            <span role="img" aria-label="Demo">🎨</span> Demo
+          </Link>
+          <Link
+            to="/draftboard"
+            style={location.pathname === '/draftboard' ? activeLinkStyle : linkStyle}
+          >
+            <span role="img" aria-label="Draftboard">📋</span> Draftboard
+          </Link>
+          <Link
+            to="/draftboard"
+            style={location.pathname === '/draftboard' ? activeLinkStyle : linkStyle}
+          >
+            <span role="img" aria-label="Draftboard">📋</span> Draftboard
           </Link>
         </div>
       </div>
@@ -160,6 +173,7 @@ export function App() {
         <Route path="/baseball" element={<BaseballScreen />} />
         <Route path="/players" element={<PlayersScreen />} />
         <Route path="/demo" element={<DemoScreen />} />
+        <Route path="/draftboard" element={<DraftBoardScreen />} />
       </Routes>
     </AppLayout>
   );

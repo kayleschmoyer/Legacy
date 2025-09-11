@@ -1,15 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import {
-  FilterChip,
-  QuickFilters,
-  FilterDrawer,
-  FilterChipProps,
-  QuickFiltersProps,
-  FilterDrawerProps,
   Filter,
+  FilterChip,
+  FilterDrawer,
   FilterSection,
-  FilterOption,
+  QuickFilters,
 } from './FilterComponents';
 
 const meta: Meta<typeof FilterChip> = {
@@ -170,7 +166,7 @@ export const WithInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Test chip click
-    const chip = canvas.getByText(args.label);
+    const chip = canvas.getByText(String(args.label));
     await userEvent.click(chip);
     await expect(args.onPress).toHaveBeenCalled();
   },
@@ -361,6 +357,8 @@ export const QuickFiltersMany: QuickFiltersStory = {
   },
 };
 
+export default QuickFiltersMeta;
+
 // Filter Drawer Stories
 const FilterDrawerMeta: Meta<typeof FilterDrawer> = {
   title: 'Features/Draft/FilterDrawer',
@@ -466,6 +464,8 @@ export const FilterDrawerHidden: FilterDrawerStory = {
   },
   render: (args) => <FilterDrawer {...args} />,
 };
+
+export default FilterDrawerMeta;
 
 // Chip Variants Showcase
 export const ChipVariants: Story = {
@@ -587,29 +587,31 @@ export const ChipVariants: Story = {
   },
 };
 
-// Interactive Filter Demo
+// Interactive Filter Demo Component
+const FilterDemoComponent = () => {
+  const [filters, setFilters] = React.useState<Filter>({
+    position: '',
+    availability: 'available',
+  });
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <h3>Interactive Filter Demo</h3>
+      <p>Current filters: {JSON.stringify(filters)}</p>
+
+      <QuickFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        sections={footballFilterSections.slice(0, 2)}
+        maxVisible={2}
+        variant="horizontal"
+      />
+    </div>
+  );
+};
+
 export const FilterDemo: Story = {
-  render: () => {
-    const [filters, setFilters] = React.useState<Filter>({
-      position: '',
-      availability: 'available',
-    });
-
-    return (
-      <div style={{ padding: '20px' }}>
-        <h3>Interactive Filter Demo</h3>
-        <p>Current filters: {JSON.stringify(filters)}</p>
-
-        <QuickFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          sections={footballFilterSections.slice(0, 2)}
-          maxVisible={2}
-          variant="horizontal"
-        />
-      </div>
-    );
-  },
+  render: () => <FilterDemoComponent />,
   parameters: {
     layout: 'padded',
   },
