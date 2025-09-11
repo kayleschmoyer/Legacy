@@ -169,7 +169,6 @@ resource "aws_lambda_function" "stats" {
     variables = {
       DB_CREDS_PATH                       = aws_secretsmanager_secret.database_credentials.name
       DB_HOST                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      DB_TYPE                            = "PG_REMOTE"
       SQS_QUEUE_URL                      = aws_sqs_queue.load_season_stats.url
       NODE_ENV                           = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
@@ -275,4 +274,22 @@ resource "aws_lambda_permission" "stats_api_gateway" {
   function_name = aws_lambda_function.stats.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# SQS Event Source Mapping for Stats Lambda
+resource "aws_lambda_event_source_mapping" "stats_sqs" {
+  event_source_arn = aws_sqs_queue.load_season_stats.arn
+  function_name    = aws_lambda_function.stats.arn
+  
+  # Batch processing configuration
+  batch_size = 10
+  # Note: maximum_batching_window_in_seconds is not supported for FIFO queues
+  
+  # Error handling
+  function_response_types = ["ReportBatchItemFailures"]
+  
+  depends_on = [
+    aws_lambda_function.stats,
+    aws_sqs_queue.load_season_stats
+  ]
 }

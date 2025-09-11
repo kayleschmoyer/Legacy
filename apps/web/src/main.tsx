@@ -1,7 +1,11 @@
 import { StrictMode } from 'react';
 import { HashRouter } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
-import { AppProvider } from '@legacy-sports/shared-components';
+
+// Initialize React Native Web
+import 'react-native-web/dist/cjs/exports/AppRegistry';
+
+import { AppProvider } from './components/AppProvider';
 import { apolloClient } from './lib/apollo-client';
 import App from './app/app';
 

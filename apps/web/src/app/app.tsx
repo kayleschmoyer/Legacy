@@ -6,15 +6,18 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
+import { Icon, Table } from '@legacy-sports/shared-components';
+
 import {
   BaseballScreen,
   DemoScreen,
   DraftBoardScreen,
   FootballScreen,
   HomeScreen,
-  LoadingPanel,
   PlayersScreen,
-} from '@legacy-sports/shared-components';
+} from '../components/screens';
+
+import { LoadingPanel } from '../components/LoadingPanel';
 
 // Simple Navigation Component
 function Navigation() {

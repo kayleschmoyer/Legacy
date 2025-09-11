@@ -38,12 +38,9 @@ export function getDatabaseConfig(): DatabaseConfig {
     };
   } catch {
     // For AWS RDS, require SSL but allow self-signed certificates
-    const dbType = process.env.DB_TYPE;
-    if (dbType === 'PG_REMOTE') {
-      config.ssl = {
-        rejectUnauthorized: false, // Allow self-signed certificates for AWS RDS
-      };
-    }
+    config.ssl = {
+      rejectUnauthorized: false, // Allow self-signed certificates for AWS RDS
+    };
   }
 
   return config;

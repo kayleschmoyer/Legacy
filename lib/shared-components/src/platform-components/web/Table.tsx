@@ -1,6 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import type { TableProps } from './LazyTable';
+
+export interface TableProps {
+  headers: string[];
+  data: Array<Array<string | number>>;
+  title?: string;
+  style?: React.CSSProperties;
+}
 
 // Web-specific table implementation using HTML
 const WebTable: React.FC<TableProps> = ({ headers, data, title, style }) => {

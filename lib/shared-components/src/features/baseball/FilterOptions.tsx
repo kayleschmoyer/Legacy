@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Platform } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Platform,
+  Picker,
+} from '../../platform-components';
 
 // Position options for baseball
 export const BASEBALL_POSITIONS = [

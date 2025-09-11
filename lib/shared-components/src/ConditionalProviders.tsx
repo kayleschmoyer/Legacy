@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform } from './platform-components';
 
 // Platform-specific providers
 interface ProvidersProps {

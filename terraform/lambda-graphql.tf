@@ -142,7 +142,6 @@ resource "aws_lambda_function" "graphql" {
     variables = {
       DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
       DB_HOST       = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      DB_TYPE       = "PG_REMOTE"
       NODE_ENV      = var.environment
     }
   }

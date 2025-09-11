@@ -1,10 +1,10 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform } from './platform-components';
 import { ApolloClient, ApolloProvider } from '@apollo/client';
 import { TamaguiProvider } from 'tamagui';
-import { LoadingPanel } from './LoadingPanel';
+import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
-import config from '../tamagui.config';
+import config from './tamagui.config.web';
 
 interface AppProviderProps {
   children: React.ReactNode;

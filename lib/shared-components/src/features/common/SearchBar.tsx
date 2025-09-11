@@ -1,15 +1,14 @@
 import React, { useCallback, useState } from 'react';
 import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  Icon,
   View,
-  Platform,
-} from 'react-native';
-import { LazyIcon } from '../../components/LazyIcon';
+  Text,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  FlatList,
+  StyleSheet,
+} from '../../platform-components';
 
 // Generic filter option interface
 export interface FilterOption {
@@ -69,12 +68,8 @@ const DEFAULT_FILTER_OPTIONS: FilterOption[] = [
 
 // Cross-platform icon component
 const FilterIcon = () => {
-  if (Platform.OS === 'web') {
-    return <Text style={styles.filterIconText}>⚙️</Text>;
-  }
-
-  // For React Native, use LazyIcon with fallback
-  return <LazyIcon name="filter-list" size={24} color="white" />;
+  // For React Native, use Icon with fallback
+  return <Icon name="filter-list" size={24} color="white" />;
 };
 
 export function SearchBar({
@@ -84,7 +79,7 @@ export function SearchBar({
   currentFilters,
   filterOptions = DEFAULT_FILTER_OPTIONS,
   placeholder = 'Search players...',
-}: SearchBarProps): JSX.Element {
+}: SearchBarProps): React.JSX.Element {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState<{ [key: string]: string | null }>(
     currentFilters
@@ -129,7 +124,11 @@ export function SearchBar({
       <FlatList
         data={item.options}
         horizontal
-        renderItem={({ item: option }) => (
+        renderItem={({
+          item: option,
+        }: {
+          item: { label: string; value: string | null };
+        }) => (
           <TouchableOpacity
             style={[
               styles.filterOption,
@@ -144,7 +143,9 @@ export function SearchBar({
             <Text style={styles.filterOptionText}>{option.label}</Text>
           </TouchableOpacity>
         )}
-        keyExtractor={(item) => item.value || 'null'}
+        keyExtractor={(item: { label: string; value: string | null }) =>
+          item.value || 'null'
+        }
         showsHorizontalScrollIndicator={false}
       />
     </View>
@@ -187,7 +188,7 @@ export function SearchBar({
             <FlatList
               data={updatedFilterOptions}
               renderItem={renderFilterOption}
-              keyExtractor={(item) => item.label}
+              keyExtractor={(item: FilterOption) => item.label}
               showsVerticalScrollIndicator={false}
             />
 

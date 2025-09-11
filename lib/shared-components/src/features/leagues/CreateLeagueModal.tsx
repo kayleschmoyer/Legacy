@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Platform,
   Alert,
-} from 'react-native';
+} from '../../platform-components';
 import {
   SPORT_CONFIGS,
   DROPDOWN_TEAM_COUNT_ITEMS,

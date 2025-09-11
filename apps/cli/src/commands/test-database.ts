@@ -49,13 +49,13 @@ async function main() {
     // Get all players with limit
     const players = await dbService.players.getPlayers({
       limit: 5,
-      orderBy: 'name',
+      orderBy: 'firstName',
       orderDirection: 'asc',
     });
     console.log(`Found ${players.length} players:`);
     players.forEach((player) => {
       console.log(
-        `  - ID: ${player.id}, Name: ${player.name}, BRef ID: ${player.brefId}`
+        `  - ID: ${player.id}, Name: ${player.firstName} ${player.lastName}, BRef ID: ${player.brefId}`
       );
     });
 
@@ -68,7 +68,9 @@ async function main() {
       const searchResults = await dbService.players.searchPlayers('a', 3);
       console.log(`\nPlayers with 'a' in name (first 3):`);
       searchResults.forEach((player) => {
-        console.log(`  - ${player.name} (${player.brefId})`);
+        console.log(
+          `  - ${player.firstName} ${player.lastName} (${player.brefId})`
+        );
       });
     }
 

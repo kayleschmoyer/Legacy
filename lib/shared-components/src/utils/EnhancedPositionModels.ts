@@ -50,10 +50,10 @@ export const ALLOWED_POSITIONS = Object.freeze<
 });
 
 export const PITCHING_POSITIONS = Object.freeze(
-  new Set<Position>(['SP', 'RP'])
+  new Set<Position>(['SP', 'RP']),
 );
 export const BATTING_POSITIONS = Object.freeze(
-  new Set<Position>(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'])
+  new Set<Position>(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']),
 );
 
 export interface PlayerPosition {
@@ -63,7 +63,8 @@ export interface PlayerPosition {
 
 export interface Player {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   eligiblePositions: PlayerPosition[];
 }
 
@@ -102,19 +103,19 @@ export function isBattingSlot(positionSlot: PositionSlot): boolean {
 
 export function isPitcher(player: Player): boolean {
   return player.eligiblePositions.some((pos) =>
-    PITCHING_POSITIONS.has(pos.position)
+    PITCHING_POSITIONS.has(pos.position),
   );
 }
 
 export function isBatter(player: Player): boolean {
   return player.eligiblePositions.some((pos) =>
-    BATTING_POSITIONS.has(pos.position)
+    BATTING_POSITIONS.has(pos.position),
   );
 }
 
 export function canPlayerPlayPosition(
   player: Player | undefined,
-  positionSlot: PositionSlot | undefined
+  positionSlot: PositionSlot | undefined,
 ): boolean {
   if (!player || !positionSlot) {
     return false;
@@ -126,7 +127,7 @@ export function canPlayerPlayPosition(
   }
 
   return player.eligiblePositions.some((playerPos) =>
-    allowedPositions.includes(playerPos.position)
+    allowedPositions.includes(playerPos.position),
   );
 }
 
@@ -158,7 +159,7 @@ export function getPositionDisplayName(positionSlot: PositionSlot): string {
 
 export function validateLineup(
   lineup: Array<{ player: Player; position: PositionSlot }>,
-  requiredPositions: PositionSlot[]
+  requiredPositions: PositionSlot[],
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   const usedPlayers = new Set<string>();
@@ -167,16 +168,18 @@ export function validateLineup(
   // Check for duplicate players
   for (const entry of lineup) {
     if (usedPlayers.has(entry.player.id)) {
-      errors.push(`Player ${entry.player.name} is used multiple times`);
+      errors.push(
+        `Player ${entry.player.firstName} ${entry.player.lastName} is used multiple times`,
+      );
     }
     usedPlayers.add(entry.player.id);
 
     // Check if player can play the position
     if (!canPlayerPlayPosition(entry.player, entry.position)) {
       errors.push(
-        `${entry.player.name} cannot play ${getPositionDisplayName(
-          entry.position
-        )}`
+        `${entry.player.firstName} ${entry.player.lastName} cannot play ${getPositionDisplayName(
+          entry.position,
+        )}`,
       );
     }
 
@@ -187,7 +190,7 @@ export function validateLineup(
   for (const requiredPos of requiredPositions) {
     if (!filledPositions.has(requiredPos)) {
       errors.push(
-        `Missing required position: ${getPositionDisplayName(requiredPos)}`
+        `Missing required position: ${getPositionDisplayName(requiredPos)}`,
       );
     }
   }

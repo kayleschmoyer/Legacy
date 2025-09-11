@@ -10,7 +10,7 @@ import {
   Alert,
   Modal,
   TextInput,
-} from 'react-native';
+} from '../../platform-components';
 import { League, User } from '../../types';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 import {

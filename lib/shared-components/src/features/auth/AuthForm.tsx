@@ -3,14 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+  Alert,
+  KeyboardAvoidingView,
+} from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
 import { AuthState } from '../../types';
 

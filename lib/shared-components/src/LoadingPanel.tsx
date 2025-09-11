@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 import { Spinner } from 'tamagui';
 
 // For React Native
@@ -56,7 +56,7 @@ const WebLoadingPanel = () => {
 };
 
 export function LoadingPanel(): JSX.Element {
-  if (Platform.OS === 'web') {
+  if (PlatformUtils.isWeb) {
     return <WebLoadingPanel />;
   }
   return <RNLoadingPanel />;

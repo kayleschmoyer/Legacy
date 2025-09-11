@@ -5,8 +5,7 @@ import {
   StyleSheet,
   Text,
   Vibration,
-  View,
-} from 'react-native';
+} from '../../platform-components';
 
 export interface TimerProps {
   initialTime: number;
@@ -114,7 +113,7 @@ export function useTimer({
       setIsActive(false);
       colorAnim.setValue(1);
     },
-    [initialTime, colorAnim]
+    [initialTime, colorAnim],
   );
 
   const toggle = useCallback(() => {

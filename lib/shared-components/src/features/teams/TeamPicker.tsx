@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from '../../platform-components';
 import { Picker } from '@react-native-picker/picker';
 
 // Generic team interface

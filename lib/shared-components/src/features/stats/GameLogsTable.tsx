@@ -1,23 +1,27 @@
 import React, { useState } from 'react';
 import {
+  Table,
   Platform,
+  StyleSheet,
   ScrollView,
+  View,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  StyleSheet,
-} from 'react-native';
-import { LazyTable } from '../../components/LazyTable';
+} from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
+
+// Platform-agnostic React components (no React Native imports)
+// Using CSS-in-JS for styling instead of StyleSheet
 
 // Cross-platform table implementation
 interface TableProps {
   headers: string[];
   data: Array<Array<string | number>>;
+  title?: string;
 }
 
-const CrossPlatformTable: React.FC<TableProps> = ({ headers, data }) => {
+const CrossPlatformTable: React.FC<TableProps> = ({ headers, data, title }) => {
   if (Platform.OS === 'web') {
     return (
       <table
@@ -62,7 +66,7 @@ const CrossPlatformTable: React.FC<TableProps> = ({ headers, data }) => {
   }
 
   // React Native implementation
-  return <LazyTable headers={headers} data={data} title={title} />;
+  return <Table headers={headers} data={data} title={title} />;
 };
 
 export interface GameLogsTableProps {

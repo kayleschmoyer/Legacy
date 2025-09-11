@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+  KeyboardAvoidingView,
+} from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
 import { useAuthHandlers } from './AuthHooks';
 

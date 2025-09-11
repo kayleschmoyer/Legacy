@@ -7,8 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { LazyTable } from '../../components/LazyTable';
+} from '../../platform-components';
+import { Table } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
 
 // Cross-platform table implementation for career stats
@@ -73,7 +73,7 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
   // React Native implementation
   return (
     <View style={styles.tableSection}>
-      <LazyTable headers={headers} data={data} title={title} />
+      <Table headers={headers} data={data} title={title} />
     </View>
   );
 };

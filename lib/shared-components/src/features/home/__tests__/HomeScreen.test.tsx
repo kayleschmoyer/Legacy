@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { Dimensions } from '../../../platform-components';
 import { HomeScreen, HomeScreenProps } from '../HomeScreen';
 
 // Mock Dimensions for testing different screen sizes

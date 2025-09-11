@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
-} from 'react-native';
+} from '../../platform-components';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -48,7 +48,7 @@ export function HomeScreen({
       key,
       name: SPORT_CONFIGS[key].name,
       enabled: true,
-    })
+    }),
   );
 
   const allSports = sports || defaultSports;
@@ -107,7 +107,7 @@ export function HomeScreen({
 
   const renderCustomAction = (
     action: (typeof customActions)[0],
-    index: number
+    index: number,
   ) => (
     <TouchableOpacity
       key={`action-${index}`}

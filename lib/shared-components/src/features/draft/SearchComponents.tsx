@@ -9,7 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../../platform-components';
 
 export interface SearchBarProps {
   value: string;

@@ -8,7 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../../platform-components';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

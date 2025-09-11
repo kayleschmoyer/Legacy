@@ -11,7 +11,7 @@ import {
   Platform,
   Dimensions,
   ScrollView,
-} from 'react-native';
+} from '../../platform-components';
 import { Player, Filter } from '../../types';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 
@@ -495,7 +495,7 @@ export function FreeAgents({
   });
   const [sortBy, setSortBy] = useState('Rank');
   const [selectedPlayer, setSelectedPlayer] = useState<FreeAgentPlayer | null>(
-    null
+    null,
   );
   const [showClaimModal, setShowClaimModal] = useState(false);
 

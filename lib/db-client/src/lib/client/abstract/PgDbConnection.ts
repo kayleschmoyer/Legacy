@@ -52,12 +52,9 @@ export class PgDbConnection<
       }
     } else {
       // For AWS RDS connections without cert path, enable SSL with relaxed verification
-      const dbType = process.env.DB_TYPE;
-      if (dbType === 'PG_REMOTE') {
-        options.ssl = {
-          rejectUnauthorized: false,
-        };
-      }
+      options.ssl = {
+        rejectUnauthorized: false,
+      };
     }
 
     const pgPool = new Pool(options);

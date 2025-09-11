@@ -194,3 +194,12 @@ yarn-error.log
 ## Nested node_modules
 
 node_modules/
+
+# Lambda deployment artifacts
+*.zip
+**/*.zip
+.serverless/
+
+# Terraform build artifacts
+terraform/build/
+terraform/*.zip

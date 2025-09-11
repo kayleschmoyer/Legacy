@@ -6,7 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
-} from 'react-native';
+} from '../platform-components';
 import { Route, NavigationConfig } from '../types';
 import { DEFAULT_COLORS } from '../config/sports';
 
@@ -207,7 +207,7 @@ export function Router({
   // Redirect to initial route if no route found
   if (!route) {
     const initialRoute = config.routes.find(
-      (r) => r.path === config.initialRoute
+      (r) => r.path === config.initialRoute,
     );
     if (initialRoute) {
       return <initialRoute.component />;
@@ -256,7 +256,7 @@ export function NavigationProvider({
       setCurrentRoute(route);
       onRouteChange?.(route);
     },
-    [onRouteChange]
+    [onRouteChange],
   );
 
   const goBack = React.useCallback(() => {

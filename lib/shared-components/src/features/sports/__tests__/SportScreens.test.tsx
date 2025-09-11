@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { Text, View } from 'react-native';
+import { Text, View } from '../../../platform-components';
 import {
   SportScreen,
   BaseballScreen,
@@ -25,7 +25,7 @@ describe('SportScreens', () => {
           backgroundColor="#FF0000"
           titleColor="#FFFFFF"
           subtitleColor="#CCCCCC"
-        />
+        />,
       );
       expect(getByText('Custom Soccer Title')).toBeTruthy();
       expect(getByText('Custom subtitle')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('SportScreens', () => {
           <View>
             <Text>Custom content</Text>
           </View>
-        </SportScreen>
+        </SportScreen>,
       );
       expect(getByText('Custom content')).toBeTruthy();
     });
@@ -49,7 +49,7 @@ describe('SportScreens', () => {
 
     it('displays custom title when provided', () => {
       const { getByText } = render(
-        <SportScreen sportName="Soccer" title="Custom Title" />
+        <SportScreen sportName="Soccer" title="Custom Title" />,
       );
       expect(getByText('Custom Title')).toBeTruthy();
     });
@@ -71,7 +71,7 @@ describe('SportScreens', () => {
         <BaseballScreen
           title="MLB Season"
           subtitle="2024 Season Starting Soon"
-        />
+        />,
       );
       expect(getByText('MLB Season')).toBeTruthy();
       expect(getByText('2024 Season Starting Soon')).toBeTruthy();

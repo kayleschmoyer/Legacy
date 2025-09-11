@@ -1,13 +1,13 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { TamaguiProvider } from '@tamagui/core';
+import config from '../../../../lib/shared-components/src/tamagui.config.web';
 import {
   BaseballScreen,
   DemoScreen,
   FootballScreen,
   HomeScreen,
 } from '@legacy-sports/shared-components';
-import config from '@tamagui/config/v3';
 
 export function App() {
   return (

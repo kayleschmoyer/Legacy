@@ -6,7 +6,7 @@ import {
   View,
   Text,
   Platform,
-} from 'react-native';
+} from '../../platform-components';
 import {
   BattingStatsTableWithData,
   FieldingStatsTableWithData,

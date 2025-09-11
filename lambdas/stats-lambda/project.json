@@ -54,7 +54,7 @@
       "options": {
         "commands": [
           "cd terraform",
-          "terraform apply -target=aws_lambda_function.stats -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
+          "terraform apply -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
           "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
         ],
         "parallel": false,
@@ -68,7 +68,7 @@
       ],
       "options": {
         "commands": [
-          "cd terraform && terraform plan -target=aws_lambda_function.stats -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway"
+          "cd terraform && terraform plan -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway"
         ],
         "parallel": false,
         "cwd": "."

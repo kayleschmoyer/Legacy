@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
-import { Platform } from 'react-native';
 import { AsyncHookResult, useAsyncHook } from '../../utils/HookHelpers';
+import { SecureStorage } from '../../platform-components';
 
 // Import dependencies with fallbacks for testing environment
 let getEnvVarRequired: any = () => '';
@@ -22,17 +22,6 @@ try {
   LOGGER = logging.LOGGER;
 } catch {
   // Fallback for test environment
-}
-
-// Import keychain only for native platforms
-let keychainModule: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    keychainModule = require('react-native-keychain');
-  } catch {
-    // Keychain not available, will use fallback
-  }
 }
 
 export interface AuthHandlers {
@@ -63,118 +52,47 @@ export enum Secret {
 
 let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 
-const SECRET_USERNAME = '';
-
 function useLastUpdateTime(): number {
   return KEYCHAIN_LAST_UPDATE;
 }
 
-export async function readKeychainValue(
-  secret: Secret
-): Promise<string | null> {
-  if (Platform.OS === 'web' || !keychainModule) {
-    return null;
-  }
-
+export async function readSecureValue(secret: Secret): Promise<string | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const result = await keychainModule.getGenericPassword({
-      service: secret,
-    });
-
-    if (result === false) {
-      return null;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-    return result.password;
+    return await SecureStorage.getItem(secret);
   } catch (error) {
-    LOGGER.error('Error reading keychain', error);
+    LOGGER.error('Error reading secure storage', error);
     return null;
   }
 }
 
 export async function getJwt(): Promise<LegacySportsJwt | null> {
-  let internalJwt: string | null;
-
-  switch (Platform.OS) {
-    case 'web':
-      try {
-        internalJwt =
-          typeof sessionStorage !== 'undefined'
-            ? sessionStorage.getItem(Secret.INTERNAL_JWT)
-            : null;
-      } catch (error) {
-        internalJwt = null;
-      }
-      break;
-    default:
-      internalJwt = await readKeychainValue(Secret.INTERNAL_JWT);
-      break;
+  try {
+    const internalJwt = await SecureStorage.getItem(Secret.INTERNAL_JWT);
+    return internalJwt === null ? null : jwtDecode(internalJwt);
+  } catch (error) {
+    LOGGER.error('Error getting JWT from secure storage', error);
+    return null;
   }
-
-  return internalJwt === null ? null : jwtDecode(internalJwt);
 }
 
 async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
-  switch (Platform.OS) {
-    case 'web':
-      try {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
-        }
-      } catch (error) {
-        LOGGER.warn('Could not store token in sessionStorage', error);
-      }
-      break;
-    default:
-      if (keychainModule) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          await keychainModule.setGenericPassword(SECRET_USERNAME, tokens.jwt, {
-            service: Secret.INTERNAL_JWT,
-          });
-        } catch (error) {
-          LOGGER.error('Error storing token to keychain', error);
-        }
-      }
-      break;
+  try {
+    await SecureStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
+    // Trigger the react update
+    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+  } catch (error) {
+    LOGGER.error('Error storing token to secure storage', error);
   }
-
-  // Trigger the react update
-  KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 }
 
 async function resetToken(): Promise<void> {
-  switch (Platform.OS) {
-    case 'web':
-      try {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.clear();
-        }
-      } catch (error) {
-        LOGGER.warn('Could not clear sessionStorage', error);
-      }
-      break;
-    default:
-      if (keychainModule) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          await keychainModule.resetGenericPassword({
-            service: Secret.GOOGLE_JWT,
-          });
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          await keychainModule.resetGenericPassword({
-            service: Secret.INTERNAL_JWT,
-          });
-        } catch (error) {
-          LOGGER.error('Error resetting keychain', error);
-        }
-      }
+  try {
+    await SecureStorage.clear();
+    // Trigger the react update
+    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
+  } catch (error) {
+    LOGGER.error('Error clearing secure storage', error);
   }
-
-  // Trigger the react update
-  KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 }
 
 function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {

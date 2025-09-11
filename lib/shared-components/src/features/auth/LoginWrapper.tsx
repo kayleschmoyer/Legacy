@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+  KeyboardAvoidingView,
+} from '../../platform-components';
 
 export interface LoginWrapperProps {
   /**

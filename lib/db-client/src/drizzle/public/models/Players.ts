@@ -16,14 +16,15 @@ export const players = pgTable(
   'players',
   {
     id: serial('id').primaryKey().notNull(),
-    name: text('name').notNull(),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull(),
     brefId: varchar('bref_id', { length: 10 }).notNull(),
   },
   (table) => {
     return {
       playersUkBrefId: unique('players_uk_bref_id').on(table.brefId),
     };
-  }
+  },
 );
 
 export const playerEligiblePositions = pgView('player_eligible_positions', {

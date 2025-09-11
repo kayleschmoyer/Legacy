@@ -5,7 +5,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+  Platform,
+} from '../../platform-components';
 
 // Types
 export interface Player {

@@ -1,19 +1,27 @@
+/// <reference path="./platform-aliases.d.ts" />
+
 export * from './Button';
 export * from './Layout';
 export * from './screens/SportsScreens';
 export * from './screens/DemoScreen';
 export * from './screens/DraftBoardScreen';
 
+// Direct imports from platform components (no wrapper needed)
+export {
+  Icon,
+  Table,
+  LoadingPanel,
+  SecureStorage,
+} from '__PLATFORM_COMPONENTS__';
+
 // New shared components
-export * from './LoadingPanel';
 export * from './Dropdown';
 export * from './ConditionalProviders';
 export * from './AppProvider';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
-// Cross-platform components
-export * from './components/LazyTable';
-export * from './components/LazyIcon';
+// Cross-platform components from new structure
+export * from '__PLATFORM_COMPONENTS__';
 
 // Export all shared components and types
 export * from './config/sports';
@@ -30,12 +38,12 @@ export * from './features/leagues/CreateLeagueModal';
 export * from './features/draft/DraftBoard';
 
 // Player components
-export * from './features/players/FreeAgents';
+export * from './features/players';
 
 // Auth components
 export * from './features/auth';
 
-// Utils
+// Utils (keep backward compatibility)
 export * from './utils/HookHelpers';
 export * from './utils/DateUtilities';
 export * from './utils/ErrorHandler';
@@ -84,4 +92,4 @@ export * from './features/auth/WebProviders';
 export * from './navigation/TamaguiAppNavigator';
 
 // Tamagui config
-export { default as tamaguiConfig } from './tamagui.config';
+export { default as tamaguiConfig } from './tamagui.config.web';

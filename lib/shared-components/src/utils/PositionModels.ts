@@ -63,7 +63,8 @@ export interface LeaguePosition {
 
 export interface Player {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   eligiblePositions?: Position[];
 }
 
@@ -88,7 +89,7 @@ export interface TeamMemberWithPositions extends TeamMember {
 export type PositionType = keyof typeof ALLOWED_POSITIONS;
 
 export function isPitchingSlot(
-  value: LeaguePosition | null
+  value: LeaguePosition | null,
 ): value is LeaguePosition {
   return (
     value !== null && PITCHING_POSITIONS.has(value.positionType as Position)
@@ -96,7 +97,7 @@ export function isPitchingSlot(
 }
 
 export function isBattingSlot(
-  value: LeaguePosition | null
+  value: LeaguePosition | null,
 ): value is LeaguePosition {
   return (
     value !== null && !PITCHING_POSITIONS.has(value.positionType as Position)
@@ -104,32 +105,32 @@ export function isBattingSlot(
 }
 
 export function isPitcher(
-  teamMember: TeamMemberWithPositions | null
+  teamMember: TeamMemberWithPositions | null,
 ): teamMember is TeamMemberWithPositions {
   return (
     teamMember !== null &&
     teamMember.player?.playerEligiblePositions !== undefined &&
     teamMember.player.playerEligiblePositions.nodes.some(
-      (p) => p?.position && PITCHING_POSITIONS.has(p.position)
+      (p) => p?.position && PITCHING_POSITIONS.has(p.position),
     )
   );
 }
 
 export function isBatter(
-  teamMember: TeamMemberWithPositions | null
+  teamMember: TeamMemberWithPositions | null,
 ): teamMember is TeamMemberWithPositions {
   return (
     teamMember !== null &&
     teamMember.player?.playerEligiblePositions !== undefined &&
     teamMember.player.playerEligiblePositions.nodes.some(
-      (p) => p?.position && !PITCHING_POSITIONS.has(p.position)
+      (p) => p?.position && !PITCHING_POSITIONS.has(p.position),
     )
   );
 }
 
 export function canPlayerPlayPosition(
   player: TeamMemberWithPositions | undefined,
-  positionMapping: LeaguePosition | undefined
+  positionMapping: LeaguePosition | undefined,
 ): boolean {
   if (player === undefined || positionMapping === undefined) {
     return true;
@@ -149,7 +150,7 @@ export function canPlayerPlayPosition(
   for (const pos of allowedPositions) {
     if (
       player.player.playerEligiblePositions.nodes.some(
-        (e) => e !== null && e.position === pos
+        (e) => e !== null && e.position === pos,
       )
     ) {
       return true;
@@ -184,7 +185,7 @@ export function getPositionDisplayName(positionType: string): string {
 // Helper to check if two positions are compatible
 export function arePositionsCompatible(
   playerPosition: Position,
-  slotPosition: string
+  slotPosition: string,
 ): boolean {
   const allowedPositions = ALLOWED_POSITIONS[slotPosition];
   return allowedPositions ? allowedPositions.includes(playerPosition) : false;
