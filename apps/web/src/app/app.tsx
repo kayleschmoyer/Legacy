@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { Icon, Table } from '@legacy-sports/shared-components';
+// Note: shared-components import removed as it's not available in this context
 
 import {
   BaseballScreen,
@@ -99,13 +99,7 @@ function Navigation() {
             to="/draftboard"
             style={location.pathname === '/draftboard' ? activeLinkStyle : linkStyle}
           >
-            <span role="img" aria-label="Draftboard">📋</span> Draftboard
-          </Link>
-          <Link
-            to="/draftboard"
-            style={location.pathname === '/draftboard' ? activeLinkStyle : linkStyle}
-          >
-            <span role="img" aria-label="Draftboard">📋</span> Draftboard
+            <span role="img" aria-label="Draftboard">📋</span> Draft Board
           </Link>
         </div>
       </div>
@@ -132,7 +126,11 @@ function NavigableHomeScreen() {
     }
   };
 
-  return <HomeScreen onSportPress={handleSportPress} />;
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
+  return <HomeScreen onSportPress={handleSportPress} onNavigate={handleNavigate} />;
 }
 
 // Main App Layout

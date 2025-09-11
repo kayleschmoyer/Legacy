@@ -200,6 +200,59 @@ if (typeof globalThis !== 'undefined') {
   (globalThis as any).StyleSheet = StyleSheet;
 }
 
+// Basic Animated implementation for web
+class AnimatedValue {
+  private _value: number;
+  private _listeners: ((value: number) => void)[] = [];
+
+  constructor(initialValue: number) {
+    this._value = initialValue;
+  }
+
+  get value(): number {
+    return this._value;
+  }
+
+  set value(newValue: number) {
+    this._value = newValue;
+    this._listeners.forEach(listener => listener(newValue));
+  }
+
+  addListener(callback: (value: number) => void) {
+    this._listeners.push(callback);
+    return {
+      remove: () => {
+        const index = this._listeners.indexOf(callback);
+        if (index > -1) {
+          this._listeners.splice(index, 1);
+        }
+      },
+    };
+  }
+}
+
+export const Animated = {
+  Value: AnimatedValue,
+  timing: (value: AnimatedValue, config: { toValue: number; duration?: number; useNativeDriver?: boolean }) => {
+    return {
+      start: (callback?: () => void) => {
+        // Simple immediate animation for web
+        value.value = config.toValue;
+        if (callback) callback();
+      },
+    };
+  },
+  parallel: (animations: any[]) => {
+    return {
+      start: (callback?: () => void) => {
+        // Execute all animations immediately
+        animations.forEach(anim => anim.start());
+        if (callback) callback();
+      },
+    };
+  },
+};
+
 export const Platform = {
   OS: 'web' as const,
   select: (specifics: { web?: any; default?: any; [key: string]: any }) =>
@@ -421,33 +474,6 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
-};
-
-// Basic Animated API for web
-export const Animated = {
-  View: ({ style, ...props }: any) => <div style={style} {...props} />,
-  Text: ({ style, ...props }: any) => <span style={style} {...props} />,
-  Value: class {
-    constructor(private value: number) {}
-    setValue(value: number) {
-      this.value = value;
-    }
-    addListener(listener: (state: { value: number }) => void) {
-      // In a real implementation, you'd want to track listeners
-    }
-    removeAllListeners() {}
-  },
-  timing: (value: any, config: any) => ({
-    start: (callback?: () => void) => {
-      // Simple implementation - in reality you'd want proper animations
-      if (callback) setTimeout(callback, config.duration || 0);
-    },
-  }),
-  spring: (value: any, config: any) => ({
-    start: (callback?: () => void) => {
-      if (callback) setTimeout(callback, 300);
-    },
-  }),
 };
 
 // Alert API for web

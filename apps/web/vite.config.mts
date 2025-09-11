@@ -31,10 +31,6 @@ export default defineConfig(async () => {
         disableExtraction: process.env.NODE_ENV === 'development',
         // Enable tree shaking
         useReactNativeWebLite: false,
-        shouldExtract: (path: string) => {
-          if (path.includes('node_modules')) return false;
-          return true;
-        },
       }),
       react(),
       nxViteTsPaths(),

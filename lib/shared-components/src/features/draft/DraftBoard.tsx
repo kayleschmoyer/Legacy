@@ -1,20 +1,13 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  Modal,
-  Animated,
-  StyleSheet,
-  Platform,
-  Dimensions,
-} from '../../platform-components';
-import { Player, DraftState, DraftTeam, Filter } from '../../types';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import React, { useCallback, useEffect, useState } from 'react';
+import { DraftState, DraftTeam, Filter, Player } from '../../types';
+import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Simple StyleSheet replacement for web
+const StyleSheet = {
+  create: (styles: Record<string, React.CSSProperties>) => styles,
+};
+
+const SCREEN_WIDTH = typeof window !== 'undefined' ? window.innerWidth : 375;
 const IS_TABLET = SCREEN_WIDTH > 768;
 
 // Utility function for position colors
@@ -80,68 +73,79 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   sport = 'baseball',
   isDrafted = false,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [isPressed, setIsPressed] = useState(false);
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-    }).start();
-  };
+  const handlePressIn = () => setIsPressed(true);
+  const handlePressOut = () => setIsPressed(false);
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
+  const playerName = player.player || `${player.firstName} ${player.lastName}`;
 
   return (
-    <Animated.View
-      style={[
-        styles.playerCard,
-        { transform: [{ scale: scaleAnim }] },
-        isSelected && styles.selectedCard,
-        isDrafted && styles.draftedCard,
-      ]}
+    <div
+      style={{
+        ...styles.playerCard,
+        transform: isPressed ? 'scale(0.98)' : 'scale(1)',
+        ...(isSelected ? styles.selectedCard : {}),
+        ...(isDrafted ? styles.draftedCard : {}),
+        transition: 'transform 0.1s ease',
+      }}
     >
-      <TouchableOpacity
-        onPress={onSelect}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardContent}
-        activeOpacity={1}
+      <button
+        onClick={onSelect}
+        onMouseDown={handlePressIn}
+        onMouseUp={handlePressOut}
+        onMouseLeave={handlePressOut}
+        style={{
+          ...styles.cardContent,
+          cursor: isDrafted ? 'default' : 'pointer',
+          opacity: isDrafted ? 0.6 : 1,
+        }}
         disabled={isDrafted}
       >
-        <View style={styles.cardHeader}>
-          <Text style={[styles.playerName, isDrafted && styles.draftedText]}>
-            {player.name}
-          </Text>
-          <View
-            style={[
-              styles.positionBadge,
-              { backgroundColor: getPositionColor(player.position, sport) },
-              isDrafted && styles.draftedBadge,
-            ]}
+        <div style={styles.cardHeader}>
+          <span style={{
+            ...styles.playerName,
+            ...(isDrafted ? styles.draftedText : {}),
+          }}>
+            {playerName}
+          </span>
+          <div
+            style={{
+              ...styles.positionBadge,
+              backgroundColor: getPositionColor(player.position, sport),
+              ...(isDrafted ? styles.draftedBadge : {}),
+            }}
           >
-            <Text style={styles.positionText}>{player.position}</Text>
-          </View>
-        </View>
-        <Text style={[styles.teamText, isDrafted && styles.draftedText]}>
+            <span style={styles.positionText}>{player.position}</span>
+          </div>
+        </div>
+        <span style={{
+          ...styles.teamText,
+          ...(isDrafted ? styles.draftedText : {}),
+        }}>
           {player.team}
-        </Text>
-        <View style={styles.cardFooter}>
-          <Text style={[styles.adpText, isDrafted && styles.draftedText]}>
+        </span>
+        <div style={styles.cardFooter}>
+          <span style={{
+            ...styles.adpText,
+            ...(isDrafted ? styles.draftedText : {}),
+          }}>
             ADP: {player.adp}
-          </Text>
-          <Text style={[styles.rankText, isDrafted && styles.draftedText]}>
+          </span>
+          <span style={{
+            ...styles.rankText,
+            ...(isDrafted ? styles.draftedText : {}),
+          }}>
             #{player.rank}
-          </Text>
-        </View>
+          </span>
+        </div>
         {isDrafted && (
-          <View style={styles.draftedOverlay}>
-            <Text style={styles.draftedLabel}>DRAFTED</Text>
-          </View>
+          <div style={styles.draftedOverlay}>
+            <span style={styles.draftedLabel}>DRAFTED</span>
+          </div>
         )}
-      </TouchableOpacity>
-    </Animated.View>
+      </button>
+    </div>
   );
 };
 
@@ -164,14 +168,17 @@ const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
   };
 
   return (
-    <View style={[styles.timerContainer, { backgroundColor: getTimerColor() }]}>
-      <Text style={styles.timerText}>
+    <div style={{
+      ...styles.timerContainer,
+      backgroundColor: getTimerColor(),
+    }}>
+      <span style={styles.timerText}>
         {minutes}:{seconds.toString().padStart(2, '0')}
-      </Text>
-      <Text style={styles.timerLabel}>
+      </span>
+      <span style={styles.timerLabel}>
         {isActive ? 'Time Remaining' : 'Paused'}
-      </Text>
-    </View>
+      </span>
+    </div>
   );
 };
 
@@ -196,37 +203,34 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   const allPositions = ['ALL', ...positions];
 
   return (
-    <View style={styles.filterControls}>
-      <TextInput
+    <div style={styles.filterControls}>
+      <input
         style={styles.searchInput}
         placeholder="Search players..."
-        placeholderTextColor="#888"
         value={searchText}
-        onChangeText={onSearchChange}
+        onChange={(e) => onSearchChange(e.target.value)}
       />
 
-      <View style={styles.positionFilters}>
+      <div style={styles.positionFilters}>
         {allPositions.map((position) => (
-          <TouchableOpacity
+          <button
             key={position}
-            style={[
-              styles.filterChip,
-              filters.position === position && styles.filterChipActive,
-            ]}
-            onPress={() => onFiltersChange({ ...filters, position })}
+            style={{
+              ...styles.filterChip,
+              ...(filters.position === position ? styles.filterChipActive : {}),
+            }}
+            onClick={() => onFiltersChange({ ...filters, position })}
           >
-            <Text
-              style={[
-                styles.filterChipText,
-                filters.position === position && styles.filterChipTextActive,
-              ]}
-            >
+            <span style={{
+              ...styles.filterChipText,
+              ...(filters.position === position ? styles.filterChipTextActive : {}),
+            }}>
               {position}
-            </Text>
-          </TouchableOpacity>
+            </span>
+          </button>
         ))}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 };
 
@@ -240,16 +244,16 @@ interface DraftStatusProps {
 
 const DraftStatus: React.FC<DraftStatusProps> = ({ draft, currentTeam }) => {
   return (
-    <View style={styles.draftStatus}>
-      <Text style={styles.draftTitle}>{draft.name}</Text>
-      <Text style={styles.currentPick}>
+    <div style={styles.draftStatus}>
+      <span style={styles.draftTitle}>{draft.name}</span>
+      <span style={styles.currentPick}>
         Pick #{draft.currentPick}
         {currentTeam && ` - ${currentTeam.name}`}
-      </Text>
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusText}>{draft.status.toUpperCase()}</Text>
-      </View>
-    </View>
+      </span>
+      <div style={styles.statusBadge}>
+        <span style={styles.statusText}>{draft.status.toUpperCase()}</span>
+      </div>
+    </div>
   );
 };
 
@@ -270,7 +274,7 @@ export function DraftBoard({
   onPlayerDraft,
   onTimerControl,
   draftedPlayerIds = new Set(),
-}: DraftBoardProps): JSX.Element {
+}: DraftBoardProps): React.JSX.Element {
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<Filter>({ position: 'ALL' });
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -287,9 +291,10 @@ export function DraftBoard({
 
   // Filter players
   const filteredPlayers = availablePlayers.filter((player) => {
+    const playerName = player.player || `${player.firstName} ${player.lastName}`;
     const matchesSearch =
       searchText === '' ||
-      player.name.toLowerCase().includes(searchText.toLowerCase());
+      playerName.toLowerCase().includes(searchText.toLowerCase());
     const matchesPosition =
       filters.position === 'ALL' || player.position === filters.position;
     const isAvailable = !draftedPlayerIds.has(player.id);
@@ -325,18 +330,8 @@ export function DraftBoard({
     onTimerControl?.(action);
   };
 
-  const renderPlayer = ({ item }: { item: Player }) => (
-    <PlayerCard
-      player={item}
-      onSelect={() => handlePlayerSelect(item)}
-      isSelected={selectedPlayer?.id === item.id}
-      sport={draft.sport}
-      isDrafted={draftedPlayerIds.has(item.id)}
-    />
-  );
-
   return (
-    <View style={styles.container}>
+    <div style={styles.container}>
       {/* Draft Status */}
       <DraftStatus draft={draft} currentTeam={currentTeam} />
 
@@ -344,22 +339,22 @@ export function DraftBoard({
       <Timer time={time} isActive={isActive} />
 
       {/* Timer Controls */}
-      <View style={styles.timerControls}>
-        <TouchableOpacity
+      <div style={styles.timerControls}>
+        <button
           style={styles.timerButton}
-          onPress={() => handleTimerControl(isActive ? 'pause' : 'start')}
+          onClick={() => handleTimerControl(isActive ? 'pause' : 'start')}
         >
-          <Text style={styles.timerButtonText}>
+          <span style={styles.timerButtonText}>
             {isActive ? 'Pause' : 'Start'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+          </span>
+        </button>
+        <button
           style={styles.timerButton}
-          onPress={() => handleTimerControl('reset')}
+          onClick={() => handleTimerControl('reset')}
         >
-          <Text style={styles.timerButtonText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
+          <span style={styles.timerButtonText}>Reset</span>
+        </button>
+      </div>
 
       {/* Filters */}
       <FilterControls
@@ -371,57 +366,62 @@ export function DraftBoard({
       />
 
       {/* Player List */}
-      <FlatList
-        data={filteredPlayers}
-        renderItem={renderPlayer}
-        keyExtractor={(item) => item.id}
-        numColumns={IS_TABLET ? 3 : 2}
-        columnWrapperStyle={IS_TABLET ? styles.row : undefined}
-        style={styles.playerList}
-        showsVerticalScrollIndicator={false}
-      />
+      <div style={{
+        ...styles.playerList,
+        display: 'grid',
+        gridTemplateColumns: IS_TABLET ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+        gap: '16px',
+        padding: '16px',
+        overflowY: 'auto',
+      }}>
+        {filteredPlayers.map((player) => (
+          <PlayerCard
+            key={player.id}
+            player={player}
+            onSelect={() => handlePlayerSelect(player)}
+            isSelected={selectedPlayer?.id === player.id}
+            sport={draft.sport}
+            isDrafted={draftedPlayerIds.has(player.id)}
+          />
+        ))}
+      </div>
 
       {/* Confirmation Modal */}
-      <Modal
-        visible={showConfirmModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowConfirmModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Draft Pick</Text>
+      {showConfirmModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={styles.modalTitle}>Confirm Draft Pick</h3>
             {selectedPlayer && (
               <>
-                <Text style={styles.modalPlayerName}>
-                  {selectedPlayer.name}
-                </Text>
-                <Text style={styles.modalPlayerDetails}>
+                <p style={styles.modalPlayerName}>
+                  {selectedPlayer.player || `${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
+                </p>
+                <p style={styles.modalPlayerDetails}>
                   {selectedPlayer.position} - {selectedPlayer.team}
-                </Text>
-                <Text style={styles.modalPlayerRank}>
+                </p>
+                <p style={styles.modalPlayerRank}>
                   Rank: #{selectedPlayer.rank}
-                </Text>
+                </p>
               </>
             )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
+            <div style={styles.modalButtons}>
+              <button
                 style={styles.modalCancelButton}
-                onPress={() => setShowConfirmModal(false)}
+                onClick={() => setShowConfirmModal(false)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+                <span style={styles.modalCancelText}>Cancel</span>
+              </button>
+              <button
                 style={styles.modalConfirmButton}
-                onPress={handleConfirmDraft}
+                onClick={handleConfirmDraft}
               >
-                <Text style={styles.modalConfirmText}>Draft Player</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+                <span style={styles.modalConfirmText}>Draft Player</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -452,8 +452,10 @@ const styles = StyleSheet.create({
   statusBadge: {
     backgroundColor: DEFAULT_COLORS.accent,
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingLeft: 8,
+    paddingRight: 8,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   statusText: {
     fontSize: 12,
@@ -484,8 +486,10 @@ const styles = StyleSheet.create({
   },
   timerButton: {
     backgroundColor: DEFAULT_COLORS.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
     borderRadius: 8,
   },
   timerButtonText: {
@@ -513,8 +517,10 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 12,
+    paddingTop: 6,
+    paddingBottom: 6,
     borderRadius: 16,
   },
   filterChipActive: {
@@ -541,20 +547,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     margin: 4,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
   },
   selectedCard: {
     borderWidth: 2,
@@ -582,8 +575,10 @@ const styles = StyleSheet.create({
   },
   positionBadge: {
     borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingLeft: 6,
+    paddingRight: 6,
+    paddingTop: 2,
+    paddingBottom: 2,
   },
   draftedBadge: {
     backgroundColor: DEFAULT_COLORS.border,
@@ -639,7 +634,7 @@ const styles = StyleSheet.create({
     backgroundColor: DEFAULT_COLORS.secondary,
     borderRadius: 16,
     padding: 24,
-    width: Platform.OS === 'web' ? 320 : '80%',
+    width: 320,
     alignItems: 'center',
   },
   modalTitle: {
@@ -670,8 +665,10 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderRadius: 8,
     flex: 1,
     alignItems: 'center',
@@ -682,8 +679,10 @@ const styles = StyleSheet.create({
   },
   modalConfirmButton: {
     backgroundColor: DEFAULT_COLORS.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderRadius: 8,
     flex: 1,
     alignItems: 'center',

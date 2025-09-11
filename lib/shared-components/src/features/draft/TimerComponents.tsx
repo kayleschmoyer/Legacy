@@ -1,11 +1,55 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import {
-  Animated,
-  Platform,
-  StyleSheet,
-  Text,
-  Vibration,
-} from '../../platform-components';
+
+// Web-compatible implementations
+const StyleSheet = {
+  create: (styles: Record<string, React.CSSProperties>) => styles,
+};
+
+// Simple animation value for web
+class WebAnimatedValue {
+  constructor(private _value: number) {}
+  
+  setValue(value: number) {
+    this._value = value;
+  }
+  
+  interpolate({ inputRange, outputRange }: { inputRange: number[]; outputRange: string[] }) {
+    // Simple interpolation for web
+    const index = inputRange.findIndex(val => this._value <= val);
+    return outputRange[index >= 0 ? index : outputRange.length - 1];
+  }
+}
+
+interface AnimationConfig {
+  duration?: number;
+  toValue: number;
+  useNativeDriver?: boolean;
+}
+
+const Animated = {
+  Value: WebAnimatedValue,
+  timing: (value: WebAnimatedValue, config: AnimationConfig) => ({
+    start: () => {
+      // Simple immediate animation for web
+      value.setValue(config.toValue);
+    }
+  }),
+  View: ({ style, children, ...props }: { style?: React.CSSProperties; children?: React.ReactNode; [key: string]: unknown }) => 
+    <div style={style} {...props}>{children}</div>,
+};
+
+const Platform = {
+  OS: 'web' as const,
+};
+
+const Vibration = {
+  vibrate: (duration: number) => {
+    // Web vibration API if available
+    if ('vibrate' in navigator) {
+      navigator.vibrate(duration);
+    }
+  },
+};
 
 export interface TimerProps {
   initialTime: number;
@@ -19,7 +63,7 @@ export interface TimerProps {
 export interface TimerBarProps {
   time: number;
   maxTime: number;
-  colorAnim?: Animated.Value;
+  colorAnim?: WebAnimatedValue;
   label?: string;
   variant?: 'default' | 'compact' | 'large';
 }
@@ -141,7 +185,7 @@ export function TimerBar({
   colorAnim,
   label = 'Time Remaining',
   variant = 'default',
-}: TimerBarProps): JSX.Element {
+}: TimerBarProps): React.JSX.Element {
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
 
@@ -174,32 +218,42 @@ export function TimerBar({
     outputRange: ['#ef4444', '#f59e0b', '#10b981'], // Red, Yellow, Green
   });
 
-  const timerStyle = [styles.timerBar, styles[`${variant}Timer`]];
+  const timerStyle = {
+    ...styles.timerBar,
+    ...styles[`${variant}Timer`],
+  };
 
   return (
-    <Animated.View style={[timerStyle, { backgroundColor }]}>
-      <View style={styles.timerContent}>
-        <Text style={[styles.timerText, styles[`${variant}Text`]]}>
+    <Animated.View style={{
+      ...timerStyle,
+      backgroundColor: typeof backgroundColor === 'string' ? backgroundColor : '#10b981'
+    }}>
+      <div style={styles.timerContent}>
+        <span style={{
+          ...styles.timerText,
+          ...styles[`${variant}Text`],
+        }}>
           {minutes}:{seconds.toString().padStart(2, '0')}
-        </Text>
+        </span>
         {label && (
-          <Text style={[styles.timerLabel, styles[`${variant}Label`]]}>
+          <span style={{
+            ...styles.timerLabel,
+            ...styles[`${variant}Label`],
+          }}>
             {label}
-          </Text>
+          </span>
         )}
-      </View>
+      </div>
 
       {/* Progress indicator */}
-      <View style={styles.progressContainer}>
-        <View
-          style={[
-            styles.progressBar,
-            {
-              width: `${Math.max(0, (time / maxTime) * 100)}%`,
-            },
-          ]}
+      <div style={styles.progressContainer}>
+        <div
+          style={{
+            ...styles.progressBar,
+            width: `${Math.max(0, (time / maxTime) * 100)}%`,
+          }}
         />
-      </View>
+      </div>
     </Animated.View>
   );
 }
@@ -223,7 +277,7 @@ export function CountdownTimer({
   label = 'Time Remaining',
   variant = 'default',
   showProgress = true,
-}: CountdownTimerProps): JSX.Element {
+}: CountdownTimerProps): React.JSX.Element {
   const timer = useTimer({
     initialTime,
     onTimeUpdate,
@@ -246,17 +300,18 @@ export function CountdownTimer({
 
 const styles = StyleSheet.create({
   timerBar: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderRadius: 12,
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    marginTop: 8,
+    marginBottom: 8,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
+    position: 'relative',
   },
 
   defaultTimer: {
@@ -265,57 +320,63 @@ const styles = StyleSheet.create({
 
   compactTimer: {
     minHeight: 40,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
 
   largeTimer: {
     minHeight: 80,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
 
   timerContent: {
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    flexDirection: 'column',
   },
 
   timerText: {
-    fontSize: 24,
+    fontSize: '24px',
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
+    margin: 0,
   },
 
   defaultText: {
-    fontSize: 24,
+    fontSize: '24px',
   },
 
   compactText: {
-    fontSize: 18,
+    fontSize: '18px',
   },
 
   largeText: {
-    fontSize: 32,
+    fontSize: '32px',
   },
 
   timerLabel: {
-    fontSize: 12,
+    fontSize: '12px',
     color: '#ffffff',
     opacity: 0.8,
     marginTop: 4,
     textAlign: 'center',
+    margin: 0,
   },
 
   defaultLabel: {
-    fontSize: 12,
+    fontSize: '12px',
   },
 
   compactLabel: {
-    fontSize: 10,
+    fontSize: '10px',
   },
 
   largeLabel: {
-    fontSize: 14,
+    fontSize: '14px',
   },
 
   progressContainer: {
