@@ -1,15 +1,15 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
-  Platform,
-  Dimensions,
+  Text,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;

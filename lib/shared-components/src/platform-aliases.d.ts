@@ -155,8 +155,8 @@ declare module '__PLATFORM_COMPONENTS__' {
 
   export interface DimensionsAPI {
     get: (dimension: 'window' | 'screen') => { width: number; height: number };
-    addEventListener: (event: string, handler: Function) => void;
-    removeEventListener: (event: string, handler: Function) => void;
+    addEventListener: (event: string, handler: (...args: unknown[]) => void) => void;
+    removeEventListener: (event: string, handler: (...args: unknown[]) => void) => void;
   }
 
   export interface StyleSheetAPI {
@@ -263,7 +263,7 @@ declare global {
     };
   }
 
-  var StyleSheet: {
+  const StyleSheet: {
     create: <T extends Record<string, React.CSSProperties>>(styles: T) => T;
   };
 }

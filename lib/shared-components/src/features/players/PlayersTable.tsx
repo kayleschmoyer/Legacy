@@ -1,17 +1,17 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   H2,
   Input,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
   ScrollView,
   Select,
   Separator,
-  View,
   Sheet,
+  Spinner,
+  Text,
+  View,
+  XStack,
+  YStack,
 } from 'tamagui';
 import {
   ArrowUpDown,
@@ -21,7 +21,7 @@ import {
   Tag,
   User,
 } from '@tamagui/lucide-icons';
-import { useGetAllPlayersQuery, PlayerFragment } from './PlayersApi';
+import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 
 export interface PlayersTableProps {
   onPlayerSelect?: (player: PlayerFragment) => void;
@@ -186,7 +186,7 @@ export function PlayersTable({
               <Select.Value placeholder="Sort by..." />
             </Select.Trigger>
 
-            <Select.Adapt when="sm" platform="touch">
+            <Select.Adapt platform="touch">
               <Sheet modal dismissOnSnapToBottom>
                 <Sheet.Frame>
                   <Sheet.ScrollView>

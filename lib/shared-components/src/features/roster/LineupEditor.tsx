@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  FlatList,
   ScrollView,
   StyleSheet,
-  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 import {

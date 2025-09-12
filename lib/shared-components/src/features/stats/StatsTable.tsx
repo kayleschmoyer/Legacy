@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { StatsTableColumn, StatsTableRow } from '../../types';
 import { DEFAULT_COLORS } from '../../config/sports';

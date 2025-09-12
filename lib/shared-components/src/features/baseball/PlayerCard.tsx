@@ -2,8 +2,8 @@ import React from 'react';
 import {
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 

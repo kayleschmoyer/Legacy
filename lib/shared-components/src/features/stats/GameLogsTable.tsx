@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
-  Table,
   Platform,
-  StyleSheet,
   ScrollView,
-  View,
+  StyleSheet,
+  Table,
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
 import { safeStyle } from '../../utils/styles';

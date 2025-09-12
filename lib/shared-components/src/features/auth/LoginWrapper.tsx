@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 

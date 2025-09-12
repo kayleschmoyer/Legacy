@@ -15,16 +15,12 @@ export default defineConfig(({ mode }) => {
     plugins: [
       ...(platform === 'web' ? [reactNativeWeb()] : []),
       ...(platform === 'web' ? [tamaguiPlugin({
-        config: './src/tamagui.config.web.ts',
+        config: resolve(__dirname, 'src/tamagui.config.web.ts'),
         platform: 'web',
         // Disable extraction in development to avoid issues
         disableExtraction: process.env.NODE_ENV === 'development',
         // Enable tree shaking
         useReactNativeWebLite: false,
-        shouldExtract: (path: string) => {
-          if (path.includes('node_modules')) return false;
-          return true;
-        },
       })] : []),
       react(), 
       nxViteTsPaths()

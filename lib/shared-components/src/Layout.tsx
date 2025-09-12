@@ -1,44 +1,24 @@
 import React from 'react';
 import {
+  ScrollView,
   Card as TamaguiCard,
   CardProps as TamaguiCardProps,
   H1 as TamaguiH1,
-  H1Props,
   H2 as TamaguiH2,
-  H2Props,
   H3 as TamaguiH3,
-  H3Props,
   Paragraph as TamaguiParagraph,
-  ParagraphProps,
-  ScrollView,
-  CardProps as TamaguiCardProps,
+  Separator as TamaguiSeparator,
   View,
+  XStack as TamaguiXStack,
+  YStack as TamaguiYStack,
 } from 'tamagui';
 
-// Define our own prop types since not all are exported
-export interface H1Props {
-  children?: React.ReactNode;
-  [key: string]: any;
-}
-
-export interface H2Props {
-  children?: React.ReactNode;
-  [key: string]: any;
-}
-
-export interface H3Props {
-  children?: React.ReactNode;
-  [key: string]: any;
-}
-
-export interface ParagraphProps {
-  children?: React.ReactNode;
-  [key: string]: any;
-}
-
-export interface SeparatorProps {
-  [key: string]: any;
-}
+// Define our own prop types using React.ComponentProps
+export type H1Props = React.ComponentProps<typeof TamaguiH1>;
+export type H2Props = React.ComponentProps<typeof TamaguiH2>;
+export type H3Props = React.ComponentProps<typeof TamaguiH3>;
+export type ParagraphProps = React.ComponentProps<typeof TamaguiParagraph>;
+export type SeparatorProps = React.ComponentProps<typeof TamaguiSeparator>;
 
 export interface CardProps extends TamaguiCardProps {
   title?: string;

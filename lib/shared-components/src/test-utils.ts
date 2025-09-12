@@ -2,8 +2,8 @@
  * Modern testing utilities that avoid deprecated react-test-renderer
  */
 import {
-  render as rtlRender,
   RenderOptions,
+  render as rtlRender,
 } from '@testing-library/react';
 import React, { ReactElement } from 'react';
 

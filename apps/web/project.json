@@ -4,5 +4,25 @@
   "sourceRoot": "apps/web/src",
   "projectType": "application",
   "tags": [],
-  "// targets": "to see all targets run: nx show project web --web"
+  "// targets": "to see all targets run: nx show project web --web",
+  "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/web"
+      },
+      "configurations": {
+        "development": {
+          "mode": "development",
+          "sourcemap": true
+        },
+        "production": {
+          "mode": "production",
+          "sourcemap": false
+        }
+      }
+    }
+  }
 }

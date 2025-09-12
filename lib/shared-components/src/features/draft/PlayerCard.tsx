@@ -1,11 +1,11 @@
 import React, { useCallback, useRef } from 'react';
 import {
   Animated,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 

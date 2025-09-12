@@ -1,20 +1,20 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   H2,
   Input,
+  ScrollView,
+  Select,
+  Separator,
   Spinner,
   Text,
   View,
   XStack,
   YStack,
-  ScrollView,
-  Select,
-  Separator,
 } from 'tamagui';
-import { ChevronDown, Search, RefreshCw } from '@tamagui/lucide-icons';
+import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
 import { PlayerCard } from './PlayerCard';
-import { useGetAllPlayersQuery, PlayerFragment } from './PlayersApi';
+import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 
 export interface PlayersGridProps {
   onPlayerSelect?: (player: PlayerFragment) => void;

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Platform } from './platform-components';
 import { ApolloClient, ApolloProvider } from '@apollo/client';
 import { TamaguiProvider } from 'tamagui';
+import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
 import config from './tamagui.config.web';
@@ -27,7 +27,7 @@ const NativeLayout = ({
   try {
     return (
       <TamaguiProvider
-        config={config}
+        config={config as any}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
         <ConditionalProviders>
@@ -55,7 +55,7 @@ const WebLayout = ({
   try {
     return (
       <TamaguiProvider
-        config={config}
+        config={config as any}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
         <div

@@ -1,7 +1,18 @@
 import React from 'react';
 import { PlayersTable } from '@legacy-sports/shared-components';
+import { EliteDraftBoardScreen } from './EliteDraftBoard';
 
 export function HomeScreen(): React.JSX.Element {
+  const handleSportClick = (sport: string) => {
+    console.log(`Selected sport: ${sport}`);
+    // Add navigation logic here
+  };
+
+  const handleNavigate = (path: string) => {
+    console.log(`Navigating to: ${path}`);
+    // Add navigation logic here
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <h1>Home Screen</h1>

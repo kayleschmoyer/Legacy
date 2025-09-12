@@ -4,10 +4,20 @@ import { DraftBoard } from '../features/draft/DraftBoard';
 export const DraftBoardScreen: React.FC = () => {
   // Demo values for the draftboard
   const demoProps = {
-    sport: 'football',
-    leagueId: 'demo-league',
-    teamId: 'demo-team',
-    userId: 'demo-user',
+    draft: {
+      id: 'demo-draft',
+      name: 'Demo Draft',
+      sport: 'baseball' as const,
+      status: 'active' as const,
+      currentPick: 1,
+      timeRemaining: 120,
+      teams: [],
+      picks: [],
+    },
+    availablePlayers: [],
+    onPlayerDraft: () => {
+      // Demo handler
+    },
   };
 
   return (

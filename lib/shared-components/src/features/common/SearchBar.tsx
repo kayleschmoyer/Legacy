@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Icon,
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  Modal,
   FlatList,
+  Icon,
+  Modal,
   StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 

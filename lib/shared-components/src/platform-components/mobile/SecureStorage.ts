@@ -1,5 +1,3 @@
-import { LOGGER } from '@legacy-sports/logging';
-
 // Dynamic import for Expo SecureStore
 let secureStore: any = null;
 
@@ -10,7 +8,7 @@ const initializeStorage = async () => {
       secureStore = await import('expo-secure-store');
     }
   } catch (error) {
-    LOGGER.warn(
+    console.warn(
       'Expo SecureStore not available, falling back to sessionStorage',
       error instanceof Error ? error.message : String(error),
     );
@@ -52,11 +50,11 @@ export class SecureStorage {
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.setItem(key, value);
         } else {
-          LOGGER.warn('No secure storage available on mobile platform');
+          console.warn('No secure storage available on mobile platform');
         }
       }
     } catch (error) {
-      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
+      console.error(`Error storing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -84,7 +82,7 @@ export class SecureStorage {
         return null;
       }
     } catch (error) {
-      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
+      console.error(`Error retrieving secure item ${key}:`, error as Error);
       return null;
     }
   }
@@ -106,7 +104,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
+      console.error(`Error removing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -126,7 +124,7 @@ export class SecureStorage {
             await secureStore.deleteItemAsync(key);
           } catch (error) {
             // Ignore errors for keys that don't exist
-            LOGGER.debug(`Key ${key} not found in SecureStore`);
+            console.debug(`Key ${key} not found in SecureStore`);
           }
         }
       } else {
@@ -136,7 +134,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      LOGGER.error('Error clearing secure storage:', error as Error);
+      console.error('Error clearing secure storage:', error as Error);
       throw error;
     }
   }

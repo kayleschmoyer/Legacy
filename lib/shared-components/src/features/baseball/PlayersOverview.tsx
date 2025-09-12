@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
+  Platform,
   SafeAreaView,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
-  Text,
-  Platform,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 import {

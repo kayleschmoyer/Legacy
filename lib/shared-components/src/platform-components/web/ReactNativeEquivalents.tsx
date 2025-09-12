@@ -75,8 +75,8 @@ function ScrollView({
       className={className}
       style={{
         overflow: 'auto',
-        ...(style as React.CSSProperties),
-        ...(contentContainerStyle as React.CSSProperties),
+        ...(style),
+        ...(contentContainerStyle),
       }}
     >
       {children}
@@ -309,12 +309,12 @@ export const Dimensions = {
     width: typeof window !== 'undefined' ? window.innerWidth : 375,
     height: typeof window !== 'undefined' ? window.innerHeight : 667,
   }),
-  addEventListener: (event: string, handler: Function) => {
+  addEventListener: (event: string, handler: (...args: unknown[]) => void) => {
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', handler as EventListener);
     }
   },
-  removeEventListener: (event: string, handler: Function) => {
+  removeEventListener: (event: string, handler: (...args: unknown[]) => void) => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', handler as EventListener);
     }
@@ -433,7 +433,7 @@ function FlatList<ItemT>({
   };
 
   const contentStyle: React.CSSProperties = {
-    ...(contentContainerStyle as React.CSSProperties),
+    ...(contentContainerStyle),
   };
 
   return (
@@ -511,7 +511,7 @@ function Modal({
     maxWidth: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
-    ...(style as React.CSSProperties),
+    ...(style),
   };
 
   return (
@@ -645,7 +645,7 @@ function SafeAreaView({
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
-        ...(style as React.CSSProperties),
+        ...(style),
       }}
       {...props}
     >

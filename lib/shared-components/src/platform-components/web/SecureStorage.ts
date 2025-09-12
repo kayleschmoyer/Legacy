@@ -1,5 +1,3 @@
-import { LOGGER } from '@legacy-sports/logging';
-
 export interface SecureStorageOptions {
   requireAuthentication?: boolean;
 }
@@ -17,10 +15,11 @@ export class SecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(key, value);
       } else {
-        LOGGER.warn('sessionStorage not available on web platform');
+        console.warn('sessionStorage not available on web platform');
       }
+      return Promise.resolve();
     } catch (error) {
-      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
+      console.error(`Error storing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -34,14 +33,14 @@ export class SecureStorage {
   ): Promise<string | null> {
     try {
       if (typeof sessionStorage !== 'undefined') {
-        return sessionStorage.getItem(key);
+        return Promise.resolve(sessionStorage.getItem(key));
       } else {
-        LOGGER.warn('sessionStorage not available on web platform');
-        return null;
+        console.warn('sessionStorage not available on web platform');
+        return Promise.resolve(null);
       }
     } catch (error) {
-      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
-      return null;
+      console.error(`Error retrieving secure item ${key}:`, error as Error);
+      return Promise.resolve(null);
     }
   }
 
@@ -53,8 +52,9 @@ export class SecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem(key);
       }
+      return Promise.resolve();
     } catch (error) {
-      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
+      console.error(`Error removing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -67,8 +67,9 @@ export class SecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.clear();
       }
+      return Promise.resolve();
     } catch (error) {
-      LOGGER.error('Error clearing secure storage:', error as Error);
+      console.error('Error clearing secure storage:', error as Error);
       throw error;
     }
   }

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
-import { PlayerCard } from './PlayerCard';
 import { MockedProvider } from '@apollo/client/testing';
+import { PlayerCard } from './PlayerCard';
 
 const mockPlayer = {
   __typename: 'Player' as const,

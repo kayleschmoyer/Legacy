@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  Modal,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
-  StyleSheet,
-  Platform,
-  Alert,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 import {
-  SPORT_CONFIGS,
-  DROPDOWN_TEAM_COUNT_ITEMS,
   DRAFT_TYPES,
+  DROPDOWN_TEAM_COUNT_ITEMS,
+  SPORT_CONFIGS,
 } from '../../config/sports';
 import { DraftType, League } from '../../types';
 
@@ -51,9 +51,7 @@ function CreateLeagueModal({
   const [showTeamCountDropdown, setShowTeamCountDropdown] = useState(false);
   const [showDraftTypeDropdown, setShowDraftTypeDropdown] = useState(false);
 
-  const sportOptions = Object.keys(SPORT_CONFIGS) as Array<
-    keyof typeof SPORT_CONFIGS
-  >;
+  const sportOptions = Object.keys(SPORT_CONFIGS);
 
   useEffect(() => {
     if (error) {

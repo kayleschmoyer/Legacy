@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { YStack, H1, H2, H3, Paragraph, Separator } from './Layout';
+import { H1, H2, H3, Paragraph, Separator, YStack } from './Layout';
 import { Button } from './Button';
 
 // YStack Stories

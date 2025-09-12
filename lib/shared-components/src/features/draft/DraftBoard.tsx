@@ -92,7 +92,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     <Animated.View
       style={safeStyle([
         styles.playerCard,
-        { transform: [{ scale: scaleAnim }] },
         isSelected && styles.selectedCard,
         isDrafted && styles.draftedCard,
       ])}
@@ -146,15 +145,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
             ])}
           >
             #{player.rank}
-          </span>
-        </div>
+          </Text>
+        </View>
         {isDrafted && (
           <div style={styles.draftedOverlay}>
             <span style={styles.draftedLabel}>DRAFTED</span>
           </div>
         )}
       </button>
-    </div>
+    </Animated.View>
   );
 };
 
@@ -185,11 +184,11 @@ const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
     >
       <Text style={styles.timerText}>
         {minutes}:{seconds.toString().padStart(2, '0')}
-      </span>
-      <span style={styles.timerLabel}>
+      </Text>
+      <Text style={styles.timerLabel}>
         {isActive ? 'Time Remaining' : 'Paused'}
-      </span>
-    </div>
+      </Text>
+    </View>
   );
 };
 
@@ -230,7 +229,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
               styles.filterChip,
               filters.position === position && styles.filterChipActive,
             ])}
-            onPress={() => onFiltersChange({ ...filters, position })}
+            onClick={() => onFiltersChange({ ...filters, position })}
           >
             <Text
               style={safeStyle([
@@ -239,7 +238,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
               ])}
             >
               {position}
-            </span>
+            </Text>
           </button>
         ))}
       </div>
@@ -304,7 +303,8 @@ function DraftBoard({
 
   // Filter players
   const filteredPlayers = availablePlayers.filter((player) => {
-    const playerName = player.player || `${player.firstName} ${player.lastName}`;
+    const playerName =
+      player.player || `${player.firstName} ${player.lastName}`;
     const matchesSearch =
       searchText === '' ||
       `${player.firstName} ${player.lastName}`
@@ -381,14 +381,16 @@ function DraftBoard({
       />
 
       {/* Player List */}
-      <div style={{
-        ...styles.playerList,
-        display: 'grid',
-        gridTemplateColumns: IS_TABLET ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
-        gap: '16px',
-        padding: '16px',
-        overflowY: 'auto',
-      }}>
+      <div
+        style={{
+          ...styles.playerList,
+          display: 'grid',
+          gridTemplateColumns: IS_TABLET ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+          gap: '16px',
+          padding: '16px',
+          overflowY: 'auto',
+        }}
+      >
         {filteredPlayers.map((player) => (
           <PlayerCard
             key={player.id}
@@ -413,10 +415,10 @@ function DraftBoard({
                 </Text>
                 <Text style={styles.modalPlayerDetails}>
                   {selectedPlayer.position} - {selectedPlayer.team}
-                </p>
-                <p style={styles.modalPlayerRank}>
+                </Text>
+                <Text style={styles.modalPlayerRank}>
                   Rank: #{selectedPlayer.rank}
-                </p>
+                </Text>
               </>
             )}
             <div style={styles.modalButtons}>

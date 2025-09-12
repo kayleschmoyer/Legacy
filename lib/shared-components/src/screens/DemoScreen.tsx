@@ -1,11 +1,11 @@
 import React from 'react';
 import {
+  Alert,
   Platform,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  Alert,
+  View,
 } from '../platform-components';
 import { safeStyle } from '../utils/styles';
 

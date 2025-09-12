@@ -1,20 +1,20 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  Modal,
   Animated,
-  StyleSheet,
-  Platform,
   Dimensions,
+  FlatList,
+  Modal,
+  Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
-import { safeStyle, safeConditionalStyle } from '../../utils/styles';
-import { Player, Filter } from '../../types';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { safeConditionalStyle, safeStyle } from '../../utils/styles';
+import { Filter, Player } from '../../types';
+import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
@@ -509,7 +509,7 @@ function FreeAgents({
 
   // Filter and sort players
   const filteredAndSortedPlayers = useMemo(() => {
-    let filtered = players.filter((player) => {
+    const filtered = players.filter((player) => {
       const matchesSearch =
         searchText === '' ||
         `${player.firstName} ${player.lastName}`

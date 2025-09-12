@@ -1,14 +1,15 @@
 import React from 'react';
 import { TamaguiProvider } from 'tamagui';
 import { ApolloProvider } from '@apollo/client';
-import { PlayersTable, PlayersTableDemo } from './PlayersTable';
+import { PlayersTable } from './PlayersTable';
+import { PlayersTableDemo } from './PlayersTableDemo';
 import { apolloClient } from './apollo-client'; // Your Apollo client
 import config from '../../tamagui.config.web'; // Your Tamagui config
 
 // Basic usage
 export function SimplePlayersTable() {
   return (
-    <TamaguiProvider config={config}>
+    <TamaguiProvider config={config as any}>
       <ApolloProvider client={apolloClient}>
         <PlayersTable />
       </ApolloProvider>
@@ -24,7 +25,7 @@ export function PlayerSelectionTable() {
   };
 
   return (
-    <TamaguiProvider config={config}>
+    <TamaguiProvider config={config as any}>
       <ApolloProvider client={apolloClient}>
         <PlayersTable
           title="Choose a Player"
@@ -41,7 +42,7 @@ export function PlayerSelectionTable() {
 // Demo component with multiple examples
 export function PlayersTableShowcase() {
   return (
-    <TamaguiProvider config={config}>
+    <TamaguiProvider config={config as any}>
       <ApolloProvider client={apolloClient}>
         <PlayersTableDemo title="Players Table Examples" />
       </ApolloProvider>

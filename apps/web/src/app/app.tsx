@@ -54,14 +54,20 @@ function Navigation() {
             fontWeight: 'bold',
           }}
         >
-          <span role="img" aria-label="football">🏈</span> Fantasy Sports Hub
+          <span role="img" aria-label="football">
+            🏈
+          </span>{' '}
+          Fantasy Sports Hub
         </h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <Link
             to="/"
             style={location.pathname === '/' ? activeLinkStyle : linkStyle}
           >
-            <span role="img" aria-label="home">🏠</span> Home
+            <span role="img" aria-label="home">
+              🏠
+            </span>{' '}
+            Home
           </Link>
           <Link
             to="/football"
@@ -69,7 +75,10 @@ function Navigation() {
               location.pathname === '/football' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="football">🏈</span> Football
+            <span role="img" aria-label="football">
+              🏈
+            </span>{' '}
+            Football
           </Link>
           <Link
             to="/baseball"
@@ -77,7 +86,10 @@ function Navigation() {
               location.pathname === '/baseball' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="baseball">⚾</span> Baseball
+            <span role="img" aria-label="baseball">
+              ⚾
+            </span>{' '}
+            Baseball
           </Link>
           <Link
             to="/players"
@@ -85,13 +97,19 @@ function Navigation() {
               location.pathname === '/players' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="players">👥</span> Players
+            <span role="img" aria-label="players">
+              👥
+            </span>{' '}
+            Players
           </Link>
           <Link
             to="/demo"
             style={location.pathname === '/demo' ? activeLinkStyle : linkStyle}
           >
-            <span role="img" aria-label="demo">🎨</span> Demo
+            <span role="img" aria-label="demo">
+              🎨
+            </span>{' '}
+            Demo
           </Link>
         </div>
       </div>

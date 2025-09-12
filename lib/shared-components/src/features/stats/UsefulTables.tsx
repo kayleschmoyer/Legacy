@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { View, Text, ActivityIndicator } from '../../platform-components';
 import { BattingStatsData, BattingStatsTable } from './BattingStatsTable';
 import { PitchingStatsData, PitchingStatsTable } from './PitchingStatsTable';
 import { FieldingStatsTable } from './FieldingStatsTable';
+import { ActivityIndicator, Text, View } from '../../platform-components';
 
 // Generic interfaces to avoid GraphQL dependencies
 interface Player {

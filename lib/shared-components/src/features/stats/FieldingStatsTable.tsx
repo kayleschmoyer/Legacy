@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet } from '../../platform-components';
+import { ScrollView, StyleSheet, Text, View } from '../../platform-components';
 
 const TABLE_HEADER = [
   'Player',

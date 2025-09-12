@@ -1,9 +1,9 @@
 import React from 'react';
-import { Platform } from './platform-components';
 import { NavigationContainer } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Platform } from './platform-components';
 
 export interface NavigationRoute {
   name: string;

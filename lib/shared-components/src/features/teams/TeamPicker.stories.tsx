@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import {
-  TeamPicker,
   AdvancedTeamPicker,
-  TeamData,
-  TeamPickerProps,
   AdvancedTeamPickerProps,
+  TeamData,
+  TeamPicker,
+  TeamPickerProps,
 } from './TeamPicker';
 
 const meta: Meta<typeof TeamPicker> = {

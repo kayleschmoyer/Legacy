@@ -5,6 +5,7 @@
     "**/vite.config.*.timestamp*",
     "**/vitest.config.*.timestamp*",
     "mocks/**",
+    "src/mocks/**/*.js",
     "src/__mocks__/**/*.js",
     "**/test-setup.ts"
   ],

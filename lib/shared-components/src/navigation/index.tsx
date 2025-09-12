@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  Platform,
   ScrollView,
   StyleSheet,
-  Platform,
+  Text,
+  TouchableOpacity,
+  View,
 } from '../platform-components';
-import { Route, NavigationConfig } from '../types';
+import { NavigationConfig, Route } from '../types';
 import { safeStyle } from '../utils/styles';
 import { DEFAULT_COLORS } from '../config/sports';
 
@@ -166,7 +166,7 @@ function BreadcrumbNavigation({
           {index > 0 && <Text style={styles.breadcrumbSeparator}>/</Text>}
 
           {item.route ? (
-            <TouchableOpacity onPress={() => onNavigate(item.route!)}>
+            <TouchableOpacity onPress={() => item.route && onNavigate(item.route)}>
               <Text style={styles.breadcrumbLink}>{item.title}</Text>
             </TouchableOpacity>
           ) : (

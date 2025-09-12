@@ -52,7 +52,7 @@ const meta: Meta<typeof FilterChip> = {
   },
 };
 
-export default meta;
+// Export meta instead of default to avoid conflicts
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
@@ -353,8 +353,6 @@ export const QuickFiltersMany: QuickFiltersStory = {
   },
 };
 
-export default QuickFiltersMeta;
-
 // Filter Drawer Stories
 const FilterDrawerMeta: Meta<typeof FilterDrawer> = {
   title: 'Features/Draft/FilterDrawer',
@@ -459,6 +457,9 @@ export const FilterDrawerHidden: FilterDrawerStory = {
 };
 
 export default FilterDrawerMeta;
+
+// Also export the chip meta for reference
+export { meta as FilterChipMeta, QuickFiltersMeta };
 
 // Chip Variants Showcase
 export const ChipVariants: Story = {

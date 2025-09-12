@@ -1,9 +1,9 @@
-import React, { createContext, useContext, PropsWithChildren } from 'react';
+import React, { createContext, PropsWithChildren, useContext } from 'react';
 import {
-  useCurrentUserInfo,
-  LegacySportsJwt,
   AuthHandlers,
+  LegacySportsJwt,
   useAuthHandlers,
+  useCurrentUserInfo,
 } from './AuthHooks';
 
 export interface AuthContextValue {

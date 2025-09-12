@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  FlatList,
-  StyleSheet,
-  Platform,
   Alert,
+  FlatList,
   Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
 import { League, User } from '../../types';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
 import { safeStyle } from '../../utils/styles';
 import {
-  CreateLeagueModal,
   CreateLeagueFormData,
+  CreateLeagueModal,
 } from '../leagues/CreateLeagueModal';
 
 export interface QuickAction {

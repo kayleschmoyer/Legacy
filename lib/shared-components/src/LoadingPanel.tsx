@@ -1,16 +1,17 @@
 import React from 'react';
-import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 import { Spinner } from 'tamagui';
+import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 
 export interface Props {
-  // Add any props needed for LoadingPanel
+  loading?: boolean;
+  message?: string;
 }
 
 // For React Native
 const RNLoadingPanel = () => {
   try {
     return <Spinner />;
-  } catch (error) {
+  } catch {
     // Fallback if Tamagui is not available
     return (
       <div

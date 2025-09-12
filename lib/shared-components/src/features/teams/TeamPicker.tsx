@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
 import { Picker } from '@react-native-picker/picker';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Generic team interface
 export interface TeamData {
@@ -68,7 +69,7 @@ function TeamPicker({
         <View style={safeStyle([styles.container, style])}>
           <Picker
             selectedValue={selectedTeam}
-            onValueChange={(itemValue) => onSelect(itemValue)}
+            onValueChange={(itemValue: number) => onSelect(itemValue)}
             style={styles.picker}
             dropdownIconColor="#FFD700"
           >
@@ -207,11 +208,11 @@ function AdvancedTeamPicker({
         <View style={safeStyle([styles.container, style])}>
           <Picker
             selectedValue={selectedTeam}
-            onValueChange={(itemValue) => !disabled && onSelect(itemValue)}
-            style={safeStyle([
+            onValueChange={(itemValue: number) => !disabled && onSelect(itemValue)}
+            style={[
               styles.picker,
               disabled && styles.pickerDisabled,
-            ]) as any}
+            ] as StyleProp<ViewStyle>}
             dropdownIconColor="#FFD700"
             enabled={!disabled}
           >

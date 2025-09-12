@@ -1,5 +1,5 @@
-/// <reference path="./platform-aliases.d.ts" />
-/// <reference path="./types/tamagui.d.ts" />
+import './platform-aliases.d.ts';
+import './types/tamagui.d.ts';
 
 export * from './Button';
 export * from './Layout';
@@ -161,9 +161,6 @@ export * from './navigation';
 export * from './features/auth/LoginWrapper';
 export * from './features/auth/WebProviders';
 export * from './navigation/TamaguiAppNavigator';
-
-// Tamagui config
-export { default as tamaguiConfig } from './tamagui.config.web';
 
 // Type definitions (we can infer these from the platform components)
 export type { IconProps } from './platform-components/wrappers/LazyIcon';

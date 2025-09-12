@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from '../../platform-components';
+import { Platform, StyleSheet, Text, View } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 
 export interface MLBHomeProps {

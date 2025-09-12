@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView } from '../../platform-components';
+import { ScrollView, StyleSheet, Text, View } from '../../platform-components';
 
 // Generic player detail interface
 export interface PlayerDetailData {

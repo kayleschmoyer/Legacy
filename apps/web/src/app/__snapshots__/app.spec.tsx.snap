@@ -36,7 +36,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         >
           🏈
         </span>
-         Fantasy Sports Hub
+         
+        Fantasy Sports Hub
       </h1>
       <div
         style="display: flex; gap: 1rem;"
@@ -51,7 +52,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             🏠
           </span>
-           Home
+           
+          Home
         </a>
         <a
           href="/football"
@@ -63,7 +65,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             🏈
           </span>
-           Football
+           
+          Football
         </a>
         <a
           href="/baseball"
@@ -75,7 +78,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             ⚾
           </span>
-           Baseball
+           
+          Baseball
         </a>
         <a
           href="/players"
@@ -87,7 +91,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             👥
           </span>
-           Players
+           
+          Players
         </a>
         <a
           href="/demo"
@@ -99,7 +104,8 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             🎨
           </span>
-           Demo
+           
+          Demo
         </a>
       </div>
     </div>
@@ -174,7 +180,8 @@ exports[`App FootballScreen should render football screen with navigation and la
         >
           🏈
         </span>
-         Fantasy Sports Hub
+         
+        Fantasy Sports Hub
       </h1>
       <div
         style="display: flex; gap: 1rem;"
@@ -189,7 +196,8 @@ exports[`App FootballScreen should render football screen with navigation and la
           >
             🏠
           </span>
-           Home
+           
+          Home
         </a>
         <a
           href="/football"
@@ -201,7 +209,8 @@ exports[`App FootballScreen should render football screen with navigation and la
           >
             🏈
           </span>
-           Football
+           
+          Football
         </a>
         <a
           href="/baseball"
@@ -213,7 +222,8 @@ exports[`App FootballScreen should render football screen with navigation and la
           >
             ⚾
           </span>
-           Baseball
+           
+          Baseball
         </a>
         <a
           href="/players"
@@ -225,7 +235,8 @@ exports[`App FootballScreen should render football screen with navigation and la
           >
             👥
           </span>
-           Players
+           
+          Players
         </a>
         <a
           href="/demo"
@@ -237,7 +248,8 @@ exports[`App FootballScreen should render football screen with navigation and la
           >
             🎨
           </span>
-           Demo
+           
+          Demo
         </a>
       </div>
     </div>
@@ -404,7 +416,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         >
           🏈
         </span>
-         Fantasy Sports Hub
+         
+        Fantasy Sports Hub
       </h1>
       <div
         style="display: flex; gap: 1rem;"
@@ -419,7 +432,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             🏠
           </span>
-           Home
+           
+          Home
         </a>
         <a
           href="/football"
@@ -431,7 +445,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             🏈
           </span>
-           Football
+           
+          Football
         </a>
         <a
           href="/baseball"
@@ -443,7 +458,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             ⚾
           </span>
-           Baseball
+           
+          Baseball
         </a>
         <a
           href="/players"
@@ -455,7 +471,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             👥
           </span>
-           Players
+           
+          Players
         </a>
         <a
           href="/demo"
@@ -467,7 +484,8 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             🎨
           </span>
-           Demo
+           
+          Demo
         </a>
       </div>
     </div>
@@ -614,7 +632,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
       >
         🏈
       </span>
-       Fantasy Sports Hub
+       
+      Fantasy Sports Hub
     </h1>
     <div
       style="display: flex; gap: 1rem;"
@@ -629,7 +648,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         >
           🏠
         </span>
-         Home
+         
+        Home
       </a>
       <a
         href="/football"
@@ -641,7 +661,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         >
           🏈
         </span>
-         Football
+         
+        Football
       </a>
       <a
         href="/baseball"
@@ -653,7 +674,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         >
           ⚾
         </span>
-         Baseball
+         
+        Baseball
       </a>
       <a
         href="/players"
@@ -665,7 +687,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         >
           👥
         </span>
-         Players
+         
+        Players
       </a>
       <a
         href="/demo"
@@ -677,7 +700,8 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         >
           🎨
         </span>
-         Demo
+         
+        Demo
       </a>
     </div>
   </div>
@@ -700,7 +724,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
       >
         🏈
       </span>
-       Fantasy Sports Hub
+       
+      Fantasy Sports Hub
     </h1>
     <div
       style="display: flex; gap: 1rem;"
@@ -715,7 +740,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         >
           🏠
         </span>
-         Home
+         
+        Home
       </a>
       <a
         href="/football"
@@ -727,7 +753,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         >
           🏈
         </span>
-         Football
+         
+        Football
       </a>
       <a
         href="/baseball"
@@ -739,7 +766,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         >
           ⚾
         </span>
-         Baseball
+         
+        Baseball
       </a>
       <a
         href="/players"
@@ -751,7 +779,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         >
           👥
         </span>
-         Players
+         
+        Players
       </a>
       <a
         href="/demo"
@@ -763,7 +792,8 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         >
           🎨
         </span>
-         Demo
+         
+        Demo
       </a>
     </div>
   </div>

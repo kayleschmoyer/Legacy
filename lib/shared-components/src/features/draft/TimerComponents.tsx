@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Animated,
+  Platform,
   StyleSheet,
   Text,
-  View,
-  Platform,
   Vibration,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 
@@ -183,15 +183,15 @@ function TimerBar({
       <View style={styles.timerContent}>
         <Text style={safeStyle([styles.timerText, styles[`${variant}Text`]])}>
           {minutes}:{seconds.toString().padStart(2, '0')}
-        </span>
+        </Text>
         {label && (
           <Text
             style={safeStyle([styles.timerLabel, styles[`${variant}Label`]])}
           >
             {label}
-          </span>
+          </Text>
         )}
-      </div>
+      </View>
 
       {/* Progress indicator */}
       <View style={styles.progressContainer}>
@@ -203,7 +203,7 @@ function TimerBar({
             },
           ])}
         />
-      </div>
+      </View>
     </Animated.View>
   );
 }

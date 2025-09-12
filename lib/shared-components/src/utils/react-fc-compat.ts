@@ -2,7 +2,9 @@ import React from 'react';
 
 // React 19 compatibility utility for React.FC
 // This type works around the Element vs ReactNode incompatibility
-export type ReactFC<P = Record<string, never>> = (props: P) => React.ReactElement | null;
+export type ReactFC<P = Record<string, never>> = (
+  props: P,
+) => React.ReactElement | null;
 
 // Legacy React.FC for compatibility
 export type LegacyReactFC<P = Record<string, never>> = React.FC<P>;

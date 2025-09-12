@@ -33,6 +33,7 @@ __export(tamagui_config_web_exports, {
   default: () => tamagui_config_web_default
 });
 module.exports = __toCommonJS(tamagui_config_web_exports);
+var import_core2 = require("@tamagui/core");
 
 // ../../node_modules/@tamagui/shorthands/dist/esm/v4.mjs
 var shorthands = {
@@ -1498,7 +1499,7 @@ function createAnimations(animations) {
         getValue() {
           return val;
         },
-        setValue(next, config, onFinish2) {
+        setValue(next, config2, onFinish2) {
           setVal(next), setOnFinish(onFinish2);
         },
         stop() {
@@ -1723,4 +1724,8 @@ var defaultConfig = {
 };
 
 // ../../lib/shared-components/src/tamagui.config.web.ts
-var tamagui_config_web_default = defaultConfig;
+var config = (0, import_core2.createTamagui)({
+  ...defaultConfig,
+  fontLanguages: ["en"]
+});
+var tamagui_config_web_default = config;

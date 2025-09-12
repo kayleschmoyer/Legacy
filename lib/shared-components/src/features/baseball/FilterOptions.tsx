@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  Platform,
   Picker,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 

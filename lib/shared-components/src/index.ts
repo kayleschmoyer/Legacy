@@ -1,5 +1,5 @@
-/// <reference path="./platform-aliases.d.ts" />
-/// <reference path="./types/tamagui.d.ts" />
+import './platform-aliases.d.ts';
+import './types/tamagui.d.ts';
 
 export * from './Button';
 export * from './Layout';

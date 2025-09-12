@@ -1,7 +1,8 @@
 import React from 'react';
 
 export interface Props {
-  // Add any props needed for LoadingPanel
+  loading?: boolean;
+  message?: string;
 }
 
 export const LoadingPanel: React.FC<Props> = () => {

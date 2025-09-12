@@ -1,5 +1,5 @@
 import React from 'react';
-import { YStack, H1, H2, Separator } from 'tamagui';
+import { H1, H2, Separator, YStack } from 'tamagui';
 import { PlayersTable } from './PlayersTable';
 import { PlayerFragment } from './PlayersApi';
 

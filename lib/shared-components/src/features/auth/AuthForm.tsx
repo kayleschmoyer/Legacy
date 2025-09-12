@@ -293,50 +293,59 @@ function AuthForm({
           ])}
           onPress={handleSubmit}
           disabled={loading}
-        />
+        >
+          <Text style={styles.submitButtonText}>{getButtonText()}</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-        {mode !== 'forgot' && (
-          <input
-            style={{
-              width: '100%',
-              padding: '12px',
-              marginBottom: '15px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '16px',
-              boxSizing: 'border-box',
-            }}
-            placeholder="Password"
-            type="password"
-            value={formData.password}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, password: e.target.value }))
-            }
-            disabled={loading}
-          />
-        )}
+      {Platform.OS === 'web' && (
+        <div style={{ padding: '20px', maxWidth: '400px', margin: '0 auto' }}>
+          {mode !== 'forgot' && (
+            <input
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginBottom: '15px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '16px',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Password"
+              type="password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, password: e.target.value }))
+              }
+              disabled={loading}
+            />
+          )}
 
-        {mode === 'register' && (
-          <input
-            style={{
-              width: '100%',
-              padding: '12px',
-              marginBottom: '15px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '16px',
-              boxSizing: 'border-box',
-            }}
-            placeholder="Confirm Password"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, confirmPassword: e.target.value }))
-            }
-            disabled={loading}
-          />
-        )}
-      </div>
+          {mode === 'register' && (
+            <input
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginBottom: '15px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '16px',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Confirm Password"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  confirmPassword: e.target.value,
+                }))
+              }
+              disabled={loading}
+            />
+          )}
+        </div>
+      )}
 
       {/* Submit Button */}
       <button
@@ -351,7 +360,9 @@ function AuthForm({
           cursor: loading ? 'not-allowed' : 'pointer',
           marginBottom: '20px',
         }}
-        onClick={() => { void handleSubmit(); }}
+        onClick={() => {
+          void handleSubmit();
+        }}
         disabled={loading}
       >
         {loading ? 'Loading...' : getButtonText()}
@@ -459,23 +470,29 @@ function AuthProvider({
 }: AuthProviderProps): React.ReactElement {
   if (authState.isLoading) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px',
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          border: `4px solid ${DEFAULT_COLORS.accent}`,
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '20px',
-        }} />
-        <p style={{ color: DEFAULT_COLORS.text, fontSize: '16px' }}>Loading...</p>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px',
+        }}
+      >
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            border: `4px solid ${DEFAULT_COLORS.accent}`,
+            borderTopColor: 'transparent',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '20px',
+          }}
+        />
+        <p style={{ color: DEFAULT_COLORS.text, fontSize: '16px' }}>
+          Loading...
+        </p>
       </div>
     );
   }

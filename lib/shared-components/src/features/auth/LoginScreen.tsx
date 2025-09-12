@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useAuthHandlers } from './AuthHooks';
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
 } from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { useAuthHandlers } from './AuthHooks';
 import { safeStyle } from '../../utils/styles';
 
 export interface LoginScreenProps {
