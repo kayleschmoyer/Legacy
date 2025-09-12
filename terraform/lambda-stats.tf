@@ -123,34 +123,15 @@ resource "aws_cloudwatch_log_group" "stats_lambda" {
   tags = local.common_tags
 }
 
-# Build Stats Lambda
-resource "null_resource" "build_stats_lambda" {
-  triggers = {
-    source_hash = sha256(join("", [
-      for f in fileset("${path.module}/../lambdas/stats-lambda/src", "**/*.{ts,js,json}")
-      : filesha256("${path.module}/../lambdas/stats-lambda/src/${f}")
-    ]))
-    package_json = filesha256("${path.module}/../lambdas/stats-lambda/project.json")
-  }
-
-  provisioner "local-exec" {
-    command     = "npx nx run stats-lambda:build"
-    working_dir = "${path.module}/.."
-  }
-}
-
-# Archive Stats Lambda
-data "archive_file" "stats_lambda" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambdas/stats-lambda/dist"
-  output_path = "${path.module}/../lambdas/stats-lambda/stats-lambda.zip"
-  
-  depends_on = [null_resource.build_stats_lambda]
+# Data source to get the current Stats Lambda version from SSM
+data "aws_ssm_parameter" "stats_lambda_version" {
+  name = "/legacy-sports/${var.environment}/lambda/stats/version"
 }
 
 # Lambda Function
 resource "aws_lambda_function" "stats" {
-  filename         = data.archive_file.stats_lambda.output_path
+  s3_bucket         = aws_s3_bucket.lambda_deployments.bucket
+  s3_key           = "stats/stats-${data.aws_ssm_parameter.stats_lambda_version.value}.zip"
   function_name    = "${local.name_prefix}-stats"
   role            = aws_iam_role.stats_lambda.arn
   handler         = "index.handler"
@@ -158,7 +139,7 @@ resource "aws_lambda_function" "stats" {
   timeout         = 300  # 5 minutes for stats processing
   memory_size     = 512  # Higher memory for data processing
 
-  source_code_hash = data.archive_file.stats_lambda.output_base64sha256
+  source_code_hash = data.aws_ssm_parameter.stats_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id

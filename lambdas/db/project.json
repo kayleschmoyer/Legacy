@@ -30,8 +30,8 @@
         "build"
       ],
       "options": {
-        "command": "terraform apply -auto-approve",
-        "cwd": "terraform"
+        "command": "../../scripts/deploy-lambda.sh graphql",
+        "cwd": "lambdas/db"
       }
     },
     "deploy:plan": {
@@ -40,8 +40,15 @@
         "build"
       ],
       "options": {
-        "command": "terraform plan",
-        "cwd": "terraform"
+        "command": "cd ../../terraform && terraform plan -target=aws_lambda_function.graphql",
+        "cwd": "lambdas/db"
+      }
+    },
+    "deploy:apply": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd ../../terraform && terraform apply -target=aws_lambda_function.graphql -auto-approve",
+        "cwd": "lambdas/db"
       }
     },
     "package": {

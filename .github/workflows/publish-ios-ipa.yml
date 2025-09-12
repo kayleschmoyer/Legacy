@@ -1,0 +1,297 @@
+name: Build and Publish iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/app/**'
+      - 'lib/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+      create_release:
+        description: 'Create GitHub Release'
+        required: false
+        default: true
+        type: boolean
+
+# Cancel in-progress builds for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.build_type || 'Release' }}
+  cancel-in-progress: true
+
+env:
+  # iOS build configuration
+  IOS_VERSION: '17.0'
+  XCODE_VERSION: '15.4'
+
+jobs:
+  build-ios-ipa:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Install Dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Setup Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Install CocoaPods
+        run: |
+          cd apps/app/ios
+          pod install --repo-update
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/app/ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('apps/app/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Generate React Native Bundle
+        run: |
+          cd apps/app
+          npx react-native bundle \
+            --platform ios \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output ios/main.jsbundle \
+            --assets-dest ios/
+
+      - name: Extract Version Info
+        id: version
+        run: |
+          # Extract version from package.json
+          VERSION=$(node -p "require('./apps/app/package.json').version")
+          # Get commit SHA (short)
+          COMMIT_SHA=${GITHUB_SHA:0:7}
+          # Create build number from timestamp
+          BUILD_NUMBER=$(date +%Y%m%d_%H%M%S)
+          # Determine build configuration
+          BUILD_CONFIG="${{ github.event.inputs.build_type || 'Release' }}"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "build_config=$BUILD_CONFIG" >> $GITHUB_OUTPUT
+          echo "artifact_name=legacy-sports-ios-v${VERSION}-${BUILD_NUMBER}-${COMMIT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Update Build Number in Info.plist
+        run: |
+          # Update CFBundleVersion with our build number
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.version.outputs.build_number }}" apps/app/ios/App/Info.plist
+          # Update CFBundleShortVersionString with version
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" apps/app/ios/App/Info.plist
+
+      - name: Build iOS App for Simulator
+        if: steps.version.outputs.build_config == 'Debug'
+        run: |
+          cd apps/app/ios
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration ${{ steps.version.outputs.build_config }} \
+            -sdk iphonesimulator \
+            -arch x86_64 \
+            -derivedDataPath ./build \
+            build
+
+      - name: Build iOS App for Device (Archive)
+        if: steps.version.outputs.build_config == 'Release'
+        run: |
+          cd apps/app/ios
+          
+          # Create archive
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration ${{ steps.version.outputs.build_config }} \
+            -sdk iphoneos \
+            -archivePath ./build/App.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export IPA (Release only)
+        if: steps.version.outputs.build_config == 'Release'
+        run: |
+          cd apps/app/ios
+          
+          # Create export options plist
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+          
+          # Export IPA
+          xcodebuild \
+            -exportArchive \
+            -archivePath ./build/App.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath ./build/export \
+            -allowProvisioningUpdates
+
+      - name: Rename and Prepare Artifacts
+        run: |
+          cd apps/app/ios
+          
+          if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
+            # For Release builds, we have an IPA
+            mv build/export/App.ipa build/export/${{ steps.version.outputs.artifact_name }}.ipa
+            
+            # Create a latest symlink
+            ln -s ${{ steps.version.outputs.artifact_name }}.ipa build/export/legacy-sports-ios-latest.ipa
+            
+            echo "IPA_PATH=apps/app/ios/build/export/${{ steps.version.outputs.artifact_name }}.ipa" >> $GITHUB_ENV
+            echo "LATEST_PATH=apps/app/ios/build/export/legacy-sports-ios-latest.ipa" >> $GITHUB_ENV
+          else
+            # For Debug builds, create a zip of the .app bundle
+            cd build/Build/Products/Debug-iphonesimulator
+            zip -r "${{ steps.version.outputs.artifact_name }}.app.zip" App.app
+            mv "${{ steps.version.outputs.artifact_name }}.app.zip" ../../../../
+            
+            echo "APP_ZIP_PATH=apps/app/ios/${{ steps.version.outputs.artifact_name }}.app.zip" >> $GITHUB_ENV
+          fi
+
+      - name: Upload IPA as GitHub Artifact (Release)
+        if: steps.version.outputs.build_config == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: |
+            ${{ env.IPA_PATH }}
+            ${{ env.LATEST_PATH }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload App Bundle as GitHub Artifact (Debug)
+        if: steps.version.outputs.build_config == 'Debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: ${{ env.APP_ZIP_PATH }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Create Release (Release builds only)
+        if: |
+          steps.version.outputs.build_config == 'Release' && 
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          name: iOS IPA v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})
+          body: |
+            ## iOS IPA Release
+
+            **Version:** ${{ steps.version.outputs.version }}  
+            **Build:** ${{ steps.version.outputs.build_number }}  
+            **Commit:** ${{ steps.version.outputs.commit_sha }}  
+            **Configuration:** ${{ steps.version.outputs.build_config }}  
+            **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            ### Download
+            - 📱 **IPA File:** `${{ steps.version.outputs.artifact_name }}.ipa`
+
+            ### Installation Options
+            
+            #### Option 1: Sideload with Tools
+            - Use tools like **AltStore**, **Sideloadly**, or **3uTools**
+            - Requires Apple ID (free developer account works)
+            
+            #### Option 2: Xcode Installation
+            1. Download and extract the IPA
+            2. Open Xcode → Window → Devices and Simulators
+            3. Connect your iOS device
+            4. Drag the .app bundle to your device
+            
+            #### Option 3: TestFlight (if configured)
+            - Upload to App Store Connect for TestFlight distribution
+            
+            > **Note:** This is a development build without proper code signing. For production use, proper provisioning profiles and distribution certificates are required.
+          files: ${{ env.IPA_PATH }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Summary
+        run: |
+          echo "## 🎉 iOS Build Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** ${{ steps.version.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration:** ${{ steps.version.outputs.build_config }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.version.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
+            echo "### 📥 IPA Download Options:" >> $GITHUB_STEP_SUMMARY
+            echo "1. **GitHub Artifacts:** Available in this workflow run for 90 days" >> $GITHUB_STEP_SUMMARY
+            echo "2. **GitHub Release:** Tagged release with permanent download link" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📱 Installation Methods:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Sideloading:** Use AltStore, Sideloadly, or similar tools" >> $GITHUB_STEP_SUMMARY
+            echo "- **Xcode:** Install via Xcode Devices and Simulators" >> $GITHUB_STEP_SUMMARY
+            echo "- **TestFlight:** Upload to App Store Connect (requires developer account)" >> $GITHUB_STEP_SUMMARY
+            
+            if [ -f "${{ env.IPA_PATH }}" ]; then
+              IPA_SIZE=$(du -h "${{ env.IPA_PATH }}" | cut -f1)
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 📱 IPA Details:" >> $GITHUB_STEP_SUMMARY
+              echo "**File Size:** $IPA_SIZE" >> $GITHUB_STEP_SUMMARY
+              echo "**File Name:** ${{ steps.version.outputs.artifact_name }}.ipa" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### 📥 Debug App Bundle:" >> $GITHUB_STEP_SUMMARY
+            echo "- **GitHub Artifacts:** Available in this workflow run for 30 days" >> $GITHUB_STEP_SUMMARY
+            echo "- **Installation:** Use iOS Simulator or Xcode for device installation" >> $GITHUB_STEP_SUMMARY
+          fi

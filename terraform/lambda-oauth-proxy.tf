@@ -1,6 +1,17 @@
 # OAuth Proxy Lambda Configuration
 resource "aws_iam_role" "oauth_proxy_lambda" {
-  name = "${local.name_prefix}-oauth-proxy-lambda-role"
+  name = "${local.n# Lambda Function
+resource "aws_lambda_function" "oauth_proxy" {
+  s3_bucket         = aws_s3_bucket.lambda_deployments.bucket
+  s3_key           = "oauth-proxy/oauth-proxy-${data.aws_ssm_parameter.oauth_proxy_lambda_version.value}.zip"
+  function_name    = "${local.name_prefix}-oauth-proxy"
+  role            = aws_iam_role.oauth_proxy_lambda.arn
+  handler         = "index.handler"
+  runtime         = "nodejs20.x"
+  timeout         = 30
+  memory_size     = 256
+
+  source_code_hash = data.aws_ssm_parameter.oauth_proxy_lambda_version.value-oauth-proxy-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -96,29 +107,9 @@ resource "aws_cloudwatch_log_group" "oauth_proxy_lambda" {
   tags = local.common_tags
 }
 
-# Build OAuth Proxy Lambda
-resource "null_resource" "build_oauth_proxy_lambda" {
-  triggers = {
-    source_hash = sha256(join("", [
-      for f in fileset("${path.module}/../lambdas/oauth-proxy/src", "**/*.{ts,js,json}")
-      : filesha256("${path.module}/../lambdas/oauth-proxy/src/${f}")
-    ]))
-    package_json = filesha256("${path.module}/../lambdas/oauth-proxy/project.json")
-  }
-
-  provisioner "local-exec" {
-    command     = "npx nx run oauth-proxy:build"
-    working_dir = "${path.module}/.."
-  }
-}
-
-# Archive OAuth Proxy Lambda
-data "archive_file" "oauth_proxy_lambda" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambdas/oauth-proxy/dist"
-  output_path = "${path.module}/../lambdas/oauth-proxy/oauth-proxy-lambda.zip"
-  
-  depends_on = [null_resource.build_oauth_proxy_lambda]
+# Data source to get the current OAuth Proxy Lambda version from SSM
+data "aws_ssm_parameter" "oauth_proxy_lambda_version" {
+  name = "/legacy-sports/${var.environment}/lambda/oauth-proxy/version"
 }
 
 # Lambda Function

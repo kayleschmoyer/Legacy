@@ -3,11 +3,16 @@ name: Publish Load Stats Lambda
 # Controls when the workflow will run
 on:
   workflow_dispatch:
-  #push:
-  #  branches: [main]
-  #  paths:
-  #    - 'lambdas/stats-lambda/**'
-  #    - .github/workflows/publish-stats-lambda.yml
+  push:
+    branches: [main]
+    paths:
+      - 'lambdas/stats-lambda/**'
+      - '.github/workflows/publish-stats-lambda.yml'
+
+# Cancel in-progress deployments for the same workflow
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
@@ -25,10 +30,9 @@ permissions:
 jobs:
   build:
     name: Deploy Load Stats Lambda
-    concurrency:
-      group: ${{ github.workflow }}
-      cancel-in-progress: true
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -37,6 +41,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Main Branch
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "❌ Deployment can only run from main branch"
+            echo "Current branch: ${{ github.ref }}"
+            exit 1
+          fi
+          echo "✅ Deploying from main branch"
+
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
@@ -44,11 +57,40 @@ jobs:
         uses: ./.github/workflows/setup-aws
         id: setup-aws
 
-      - name: Make Cache Directory
+      - name: Build and Deploy Stats Lambda
         working-directory: lambdas/stats-lambda
-        run: mkdir -p dist
+        run: |
+          # Build the Lambda using Nx
+          npx nx run stats-lambda:build
+          
+          # Create version string
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+          
+          # Create deployment package
+          zip -r "stats-${VERSION}.zip" dist/
+          
+          # Get S3 bucket name from Terraform output or use default
+          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
+          
+          # Upload to S3
+          aws s3 cp "stats-${VERSION}.zip" "s3://${S3_BUCKET}/stats/" --region ${{ env.AWS_REGION }}
+          
+          # Update SSM parameter
+          aws ssm put-parameter \
+            --name "/legacy-sports/${AWS_STAGE}/lambda/stats/version" \
+            --value "$VERSION" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Lambda package uploaded: stats-${VERSION}.zip"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: Deploy Lambda
-        uses: ./.github/workflows/deploy-serverless-lambda
-        with:
-          lambda-directory: lambdas/stats-lambda
+      - name: Deploy Infrastructure
+        working-directory: terraform
+        run: |
+          # Apply Terraform to deploy the new Lambda version
+          terraform init
+          terraform plan -target=aws_lambda_function.stats
+          terraform apply -target=aws_lambda_function.stats -auto-approve

@@ -49,29 +49,33 @@
     "deploy": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "package"
+        "build"
       ],
       "options": {
-        "commands": [
-          "cd terraform",
-          "terraform apply -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
-          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
-        ],
-        "parallel": false,
-        "cwd": "."
+        "command": "../../scripts/deploy-lambda.sh stats",
+        "cwd": "lambdas/stats-lambda"
       }
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "package"
+        "build"
       ],
       "options": {
+        "command": "cd ../../terraform && terraform plan -target=aws_lambda_function.stats",
+        "cwd": "lambdas/stats-lambda"
+      }
+    },
+    "deploy:apply": {
+      "executor": "nx:run-commands",
+      "options": {
         "commands": [
-          "cd terraform && terraform plan -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway"
+          "cd ../../terraform",
+          "terraform apply -target=aws_lambda_function.stats -target=aws_lambda_event_source_mapping.stats_sqs -target=aws_api_gateway_resource.stats -target=aws_api_gateway_resource.stats_paths -target=aws_api_gateway_method.stats_options -target=aws_api_gateway_method.stats_post -target=aws_api_gateway_integration.stats_options -target=aws_api_gateway_integration.stats_post -target=aws_lambda_permission.stats_api_gateway -auto-approve",
+          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
         ],
         "parallel": false,
-        "cwd": "."
+        "cwd": "lambdas/stats-lambda"
       }
     },
     "test-endpoint": {

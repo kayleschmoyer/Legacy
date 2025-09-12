@@ -40,6 +40,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Main Branch
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "❌ Deployment can only run from main branch"
+            echo "Current branch: ${{ github.ref }}"
+            exit 1
+          fi
+          echo "✅ Deploying from main branch"
+
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
@@ -54,24 +63,48 @@ jobs:
             POSTGRES, rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
           parse-json-secrets: true
 
-      - name: Make Cache Directory
-        working-directory: lambdas/db
-        run: mkdir -p dist
-
-      - name: Echo NX Version
-        working-directory: lambdas/db
-        run: echo $(npx nx --version)
-
-      - name: Make the Cache
+      - name: Build and Deploy GraphQL Lambda
         env:
           DB_HOST: ${{env.DB_HOST}}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_USER: ${{ env.POSTGRES_USERNAME }}
           DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
         working-directory: lambdas/db
-        run: npm run make-cache
+        run: |
+          # Create cache
+          npm run make-cache
+          
+          # Build the Lambda
+          npm run build
+          
+          # Create version string
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+          
+          # Create deployment package
+          zip -r "graphql-${VERSION}.zip" dist/
+          
+          # Get S3 bucket name from Terraform output or SSM
+          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
+          
+          # Upload to S3
+          aws s3 cp "graphql-${VERSION}.zip" "s3://${S3_BUCKET}/graphql/" --region ${{ env.AWS_REGION }}
+          
+          # Update SSM parameter
+          aws ssm put-parameter \
+            --name "/legacy-sports/${AWS_STAGE}/lambda/graphql/version" \
+            --value "$VERSION" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Lambda package uploaded: graphql-${VERSION}.zip"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: Deploy Lambda
-        uses: ./.github/workflows/deploy-serverless-lambda
-        with:
-          lambda-directory: lambdas/db
+      - name: Deploy Infrastructure
+        working-directory: terraform
+        run: |
+          # Apply Terraform to deploy the new Lambda version
+          terraform init
+          terraform plan -target=aws_lambda_function.graphql
+          terraform apply -target=aws_lambda_function.graphql -auto-approve

@@ -1,0 +1,370 @@
+name: Build Android App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/app/**'
+      - 'lib/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: false
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+      create_releases:
+        description: 'Create GitHub Releases'
+        required: false
+        default: true
+        type: boolean
+
+# Cancel in-progress builds for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-android-${{ github.event.inputs.build_type || 'release' }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  setup:
+    name: Setup and Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
+      build_type: ${{ steps.platform.outputs.build_type }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Extract Version Info
+        id: version
+        run: |
+          VERSION=$(node -p "require('./apps/app/package.json').version")
+          COMMIT_SHA=${GITHUB_SHA:0:7}
+          BUILD_NUMBER=$(date +%Y%m%d_%H%M%S)
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Set Build Type
+        id: platform
+        run: |
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+          else
+            echo "build_android=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ "$PLATFORMS" == "both" ] || [ "$PLATFORMS" == "ios" ]; then
+            echo "build_ios=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_ios=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+
+  build-android:
+    name: Build Android APK
+    needs: setup
+    if: needs.setup.outputs.build_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NPM and Dependencies
+        uses: ./.github/workflows/setup-npm
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Make Gradlew Executable
+        run: chmod +x apps/app/android/gradlew
+
+      - name: Build Android APK
+        run: |
+          cd apps/app/android
+          if [ "${{ needs.setup.outputs.build_type }}" == "debug" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          fi
+        env:
+          GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=512m
+
+      - name: Prepare Android Artifacts
+        run: |
+          cd apps/app/android/app/build/outputs/apk
+          BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
+          ARTIFACT_NAME="legacy-sports-android-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}-${{ needs.setup.outputs.commit_sha }}"
+          
+          if [ "$BUILD_TYPE" == "debug" ]; then
+            cd debug
+            mv app-debug.apk "$ARTIFACT_NAME-debug.apk"
+            ln -s "$ARTIFACT_NAME-debug.apk" legacy-sports-android-latest-debug.apk
+          else
+            cd release  
+            mv app-release.apk "$ARTIFACT_NAME.apk"
+            ln -s "$ARTIFACT_NAME.apk" legacy-sports-android-latest.apk
+          fi
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ needs.setup.outputs.build_type }}-v${{ needs.setup.outputs.version }}
+          path: |
+            apps/app/android/app/build/outputs/apk/**/*.apk
+          retention-days: 90
+
+  build-ios:
+    name: Build iOS IPA
+    needs: setup
+    if: needs.setup.outputs.build_ios == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Install Dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install CocoaPods
+        run: |
+          cd apps/app/ios
+          pod install --repo-update
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/app/ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('apps/app/ios/Podfile.lock') }}
+
+      - name: Update iOS Build Info
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.setup.outputs.build_number }}" apps/app/ios/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ needs.setup.outputs.version }}" apps/app/ios/App/Info.plist
+
+      - name: Build iOS App
+        run: |
+          cd apps/app/ios
+          BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
+          
+          if [ "$BUILD_TYPE" == "debug" ]; then
+            # Build for simulator
+            xcodebuild \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Debug \
+              -sdk iphonesimulator \
+              -arch x86_64 \
+              -derivedDataPath ./build \
+              build
+          else
+            # Build archive for device
+            xcodebuild \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Release \
+              -sdk iphoneos \
+              -archivePath ./build/App.xcarchive \
+              archive \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
+          fi
+
+      - name: Export iOS Artifacts
+        run: |
+          cd apps/app/ios
+          BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
+          ARTIFACT_NAME="legacy-sports-ios-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}-${{ needs.setup.outputs.commit_sha }}"
+          
+          if [ "$BUILD_TYPE" == "debug" ]; then
+            # Create zip of .app bundle for simulator
+            cd build/Build/Products/Debug-iphonesimulator
+            zip -r "$ARTIFACT_NAME-debug.app.zip" App.app
+            mv "$ARTIFACT_NAME-debug.app.zip" ../../../../
+          else
+            # Export IPA
+            cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+            
+            xcodebuild \
+              -exportArchive \
+              -archivePath ./build/App.xcarchive \
+              -exportOptionsPlist ExportOptions.plist \
+              -exportPath ./build/export \
+              -allowProvisioningUpdates
+            
+            mv build/export/App.ipa build/export/"$ARTIFACT_NAME.ipa"
+            ln -s "$ARTIFACT_NAME.ipa" build/export/legacy-sports-ios-latest.ipa
+          fi
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ needs.setup.outputs.build_type }}-v${{ needs.setup.outputs.version }}
+          path: |
+            apps/app/ios/build/export/*.ipa
+            apps/app/ios/*.app.zip
+          retention-days: 90
+          if-no-files-found: ignore
+
+  create-releases:
+    name: Create GitHub Releases
+    needs: [setup, build-android, build-ios]
+    if: |
+      always() && 
+      needs.setup.result == 'success' &&
+      (needs.build-android.result == 'success' || needs.build-ios.result == 'success') &&
+      needs.setup.outputs.build_type == 'release' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.create_releases == 'true'))
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Combined Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          name: Mobile Apps v${{ needs.setup.outputs.version }} (${{ needs.setup.outputs.commit_sha }})
+          body: |
+            ## 📱 Mobile Apps Release
+
+            **Version:** ${{ needs.setup.outputs.version }}  
+            **Build:** ${{ needs.setup.outputs.build_number }}  
+            **Commit:** ${{ needs.setup.outputs.commit_sha }}  
+            **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            ### 📦 Available Downloads
+
+            ${{ needs.setup.outputs.build_android == 'true' && '#### 🤖 Android APK
+            - **Installation:** Enable "Install from Unknown Sources" and install the APK
+            - **Testing:** Works on any Android device or emulator' || '' }}
+
+            ${{ needs.setup.outputs.build_ios == 'true' && '#### 🍎 iOS IPA  
+            - **Sideloading:** Use AltStore, Sideloadly, or similar tools
+            - **Xcode:** Install via Xcode Devices and Simulators
+            - **TestFlight:** Upload to App Store Connect for distribution' || '' }}
+
+            ### 🔧 Technical Details
+            - **Build Type:** Release
+            - **Android Built:** ${{ needs.setup.outputs.build_android }}
+            - **iOS Built:** ${{ needs.setup.outputs.build_ios }}
+
+            > **Note:** These are development builds. Production distribution requires proper code signing and store submission.
+          files: |
+            **/*.apk
+            **/*.ipa
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  summary:
+    name: Build Summary
+    needs: [setup, build-android, build-ios]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 📱 Mobile Apps Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number:** ${{ needs.setup.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type:** ${{ needs.setup.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ needs.setup.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🎯 Build Results" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.setup.outputs.build_android }}" == "true" ]; then
+            if [ "${{ needs.build-android.result }}" == "success" ]; then
+              echo "- ✅ **Android APK:** Build successful" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ **Android APK:** Build failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⏭️ **Android APK:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.setup.outputs.build_ios }}" == "true" ]; then
+            if [ "${{ needs.build-ios.result }}" == "success" ]; then
+              echo "- ✅ **iOS IPA:** Build successful" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ **iOS IPA:** Build failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ⏭️ **iOS IPA:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Check the **Artifacts** section of this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "- For release builds, check **GitHub Releases** for permanent download links" >> $GITHUB_STEP_SUMMARY

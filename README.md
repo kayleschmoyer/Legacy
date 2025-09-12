@@ -2,7 +2,22 @@
 
 A modern sports data management platform built with React Native CLI, Next.js web, and AWS serverless backend.
 
-## 🚀 Quick Start
+## � Download Mobile App
+
+### Android APK
+
+[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/latest)
+
+**Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases)
+
+**Installation Instructions:**
+1. Download the APK file from the link above
+2. Enable "Install from Unknown Sources" in your Android settings
+3. Install the APK on your Android device
+
+> **Note:** iOS builds coming soon! Currently focusing on Android development to avoid the $99/year Apple Developer Program cost during early development.
+
+## �🚀 Quick Start
 
 ### Prerequisites
 
@@ -152,6 +167,16 @@ npx nx e2e web-e2e
 
 ## 📦 Building & Deployment
 
+### Automated Mobile Builds
+
+Android APKs are automatically built and released on every push to `main`:
+
+- **📱 Download**: [Latest Android APK](https://github.com/bkrupa/legacy-sports/releases/latest)
+- **🔄 Auto-builds**: Triggered on app code changes
+- **📋 Workflow**: `.github/workflows/build-android-app.yml`
+
+Manual builds can also be triggered from [GitHub Actions](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml).
+
 ### Web Deployment
 
 The web app automatically deploys to GitHub Pages on pushes to `main`:
@@ -159,7 +184,7 @@ The web app automatically deploys to GitHub Pages on pushes to `main`:
 - **URL**: https://bkrupa.github.io/legacy-sports/
 - **Workflow**: `.github/workflows/deploy-web.yml`
 
-### Mobile App Builds
+### Local Mobile Builds
 
 ```bash
 # Android APK
@@ -171,13 +196,17 @@ npm run app:build-ios
 
 ### Lambda Deployment
 
-AWS Lambda functions are deployed via Terraform:
+AWS Lambda functions are deployed via S3-based Terraform automation:
 
 ```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
+# Deploy individual lambda
+./scripts/deploy-lambda.sh graphql
+
+# Deploy all lambdas
+./scripts/deploy-lambda-all.sh
+
+# Via Terraform
+cd terraform && terraform apply
 ```
 
 ## 🛠️ Development Tools

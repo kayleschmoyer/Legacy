@@ -1,24 +1,6 @@
-# Data source for the Lambda deployment package
-data "archive_file" "graphql_lambda" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambdas/db/dist"
-  output_path = "${path.module}/../lambdas/db/graphql-lambda.zip"
-  
-  depends_on = [null_resource.build_graphql_lambda]
-}
-
-# Build the Lambda function using Vite
-resource "null_resource" "build_graphql_lambda" {
-  triggers = {
-    # Rebuild when source files change
-    source_hash = filesha256("${path.module}/../lambdas/db/src/index.ts")
-    config_hash = filesha256("${path.module}/../lambdas/db/vite.config.mts")
-  }
-
-  provisioner "local-exec" {
-    working_dir = "${path.module}/../lambdas/db"
-    command     = "npm run build"
-  }
+# Data source to get the current GraphQL Lambda version from SSM
+data "aws_ssm_parameter" "graphql_lambda_version" {
+  name = "/legacy-sports/${var.environment}/lambda/graphql/version"
 }
 
 # IAM role for the GraphQL Lambda
@@ -123,7 +105,8 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_rds" {
 
 # Lambda function
 resource "aws_lambda_function" "graphql" {
-  filename         = data.archive_file.graphql_lambda.output_path
+  s3_bucket         = aws_s3_bucket.lambda_deployments.bucket
+  s3_key           = "graphql/graphql-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
   function_name    = "${local.name_prefix}-graphql"
   role            = aws_iam_role.graphql_lambda.arn
   handler         = "index.handler"
@@ -131,7 +114,7 @@ resource "aws_lambda_function" "graphql" {
   timeout         = 30
   memory_size     = 1024
 
-  source_code_hash = data.archive_file.graphql_lambda.output_base64sha256
+  source_code_hash = data.aws_ssm_parameter.graphql_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id
