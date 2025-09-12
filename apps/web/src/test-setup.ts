@@ -1,4 +1,18 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disab  return {
+    ...RN,
+    Platform: {
+      OS: 'web',
+      select: (options: any) => options.web || options.default,
+    },
+    StyleSheet: {
+      ...RN.StyleSheet,
+      hairlineWidth: 1,
+    },
+    Dimensions: {
+      get: (size?: any) => ({ width: 1024, height: 768 }),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    },eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -17,7 +31,8 @@ jest.mock('react-native', () => {
     ...RN,
     Platform: {
       OS: 'web',
-      select: (options) => options.web || options.default,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      select: (options: any) => options.web || options.default,
     },
     StyleSheet: {
       ...RN.StyleSheet,
@@ -30,7 +45,7 @@ jest.mock('react-native', () => {
     },
     PixelRatio: {
       get: () => 1,
-      getPixelSizeForLayoutSize: (size) => size,
+      getPixelSizeForLayoutSize: (size: any) => size,
     },
   };
 });
@@ -40,52 +55,57 @@ jest.mock('react-native-svg', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react');
   return {
-    Svg: ({ children, ...props }) =>
+    Svg: ({ children, ...props }: any) =>
       React.createElement('svg', props, children),
-    Circle: (props) => React.createElement('circle', props),
-    Rect: (props) => React.createElement('rect', props),
-    Path: (props) => React.createElement('path', props),
-    G: ({ children, ...props }) => React.createElement('g', props, children),
-    Text: ({ children, ...props }) =>
+    Circle: (props: any) => React.createElement('circle', props),
+    Rect: (props: any) => React.createElement('rect', props),
+    Path: (props: any) => React.createElement('path', props),
+    G: ({ children, ...props }: any) =>
+      React.createElement('g', props, children),
+    Text: ({ children, ...props }: any) =>
       React.createElement('text', props, children),
-    Line: (props) => React.createElement('line', props),
-    Polygon: (props) => React.createElement('polygon', props),
-    Polyline: (props) => React.createElement('polyline', props),
-    Ellipse: (props) => React.createElement('ellipse', props),
-    Image: (props) => React.createElement('image', props),
-    ClipPath: ({ children, ...props }) =>
+    Line: (props: any) => React.createElement('line', props),
+    Polygon: (props: any) => React.createElement('polygon', props),
+    Polyline: (props: any) => React.createElement('polyline', props),
+    Ellipse: (props: any) => React.createElement('ellipse', props),
+    Image: (props: any) => React.createElement('image', props),
+    ClipPath: ({ children, ...props }: any) =>
       React.createElement('clipPath', props, children),
-    Defs: ({ children, ...props }) =>
+    Defs: ({ children, ...props }: any) =>
       React.createElement('defs', props, children),
-    LinearGradient: ({ children, ...props }) =>
+    LinearGradient: ({ children, ...props }: any) =>
       React.createElement('linearGradient', props, children),
-    RadialGradient: ({ children, ...props }) =>
+    RadialGradient: ({ children, ...props }: any) =>
       React.createElement('radialGradient', props, children),
-    Stop: (props) => React.createElement('stop', props),
-    Use: (props) => React.createElement('use', props),
-    Symbol: ({ children, ...props }) =>
+    Stop: (props: any) => React.createElement('stop', props),
+    Use: (props: any) => React.createElement('use', props),
+    Symbol: ({ children, ...props }: any) =>
       React.createElement('symbol', props, children),
-    Marker: ({ children, ...props }) =>
+    Marker: ({ children, ...props }: any) =>
       React.createElement('marker', props, children),
-    Pattern: ({ children, ...props }) =>
+    Pattern: ({ children, ...props }: any) =>
       React.createElement('pattern', props, children),
-    Mask: ({ children, ...props }) =>
+    Mask: ({ children, ...props }: any) =>
       React.createElement('mask', props, children),
-    ForeignObject: ({ children, ...props }) =>
+    ForeignObject: ({ children, ...props }: any) =>
       React.createElement('foreignObject', props, children),
-    TSpan: ({ children, ...props }) =>
+    TSpan: ({ children, ...props }: any) =>
       React.createElement('tspan', props, children),
-    TextPath: ({ children, ...props }) =>
+    TextPath: ({ children, ...props }: any) =>
       React.createElement('textPath', props, children),
   };
 });
 
 // Mock IntersectionObserver for components that might use it
-global.IntersectionObserver = jest.fn(() => ({
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),
   disconnect: jest.fn(),
   unobserve: jest.fn(),
-}));
+  root: null,
+  rootMargin: '',
+  thresholds: [],
+  takeRecords: jest.fn(),
+})) as any;
 
 // Mock window.matchMedia for responsive components
 Object.defineProperty(window, 'matchMedia', {

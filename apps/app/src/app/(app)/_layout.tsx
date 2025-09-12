@@ -72,7 +72,7 @@ const ROUTES = Object.freeze<Route[]>([
   },
 ]);
 
-function CustomDrawerContent(props: DrawerContentComponentProps): JSX.Element {
+function CustomDrawerContent(props: DrawerContentComponentProps): React.JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
 

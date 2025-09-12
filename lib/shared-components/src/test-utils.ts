@@ -4,27 +4,24 @@
 import {
   render as rtlRender,
   RenderOptions,
-} from '@testing-library/react-native';
+} from '@testing-library/react';
 import React, { ReactElement } from 'react';
 
 // Re-export everything from testing library except render
-export * from '@testing-library/react-native';
+export * from '@testing-library/react';
 
 // Custom render function that doesn't expose deprecated toJSON
 export const render = (ui: ReactElement, options?: RenderOptions) => {
   const result = rtlRender(ui, options);
 
-  // Remove toJSON from the result to prevent usage of deprecated API
-  const { toJSON, ...cleanResult } = result;
-
   return {
-    ...cleanResult,
+    ...result,
     // Provide a modern alternative for snapshot-like testing
-    getRenderedComponent: () => result.container || result.baseElement,
+    getRenderedComponent: () => result.container,
     // Helper for basic structural verification
     verifyRender: () => {
       // Just verify the component rendered without throwing
-      return cleanResult.container !== null;
+      return result.container !== null;
     },
   };
 };

@@ -1,6 +1,10 @@
 import React from 'react';
 
-export function LoadingPanel(): JSX.Element {
+export interface Props {
+  // Add any props needed for LoadingPanel
+}
+
+export const LoadingPanel: React.FC<Props> = () => {
   return (
     <div
       style={{
@@ -29,4 +33,4 @@ export function LoadingPanel(): JSX.Element {
       `}</style>
     </div>
   );
-}
+};

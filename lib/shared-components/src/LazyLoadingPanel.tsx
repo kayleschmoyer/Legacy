@@ -1,10 +1,14 @@
 import React from 'react';
 
-// Build-time import using alias resolution
-// This will be resolved to the appropriate platform-specific component at build time
-import { LoadingPanel as PlatformLoadingPanel } from '__PLATFORM_COMPONENTS__';
+// Use direct import instead of magic string alias
+import { LoadingPanel as PlatformLoadingPanel } from './platform-components';
+
+export interface LoadingPanelProps {
+  // Currently no props needed, but using a named interface for future extensibility
+  className?: string;
+}
 
 // Re-export with the same interface
-export function LoadingPanel(): JSX.Element {
+export const LoadingPanel: React.FC<LoadingPanelProps> = () => {
   return <PlatformLoadingPanel />;
-}
+};

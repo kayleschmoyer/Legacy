@@ -19,12 +19,12 @@ export interface AuthorizedUserContextProviderProps extends PropsWithChildren {
   onAuthCheckComplete?: (isAuthenticated: boolean) => void;
 }
 
-export function AuthorizedUserContextProvider({
+function AuthorizedUserContextProvider({ 
   children,
   loadingComponent: LoadingComponent = LoadingPanel,
   unauthenticatedComponent: UnauthenticatedComponent,
   onAuthCheckComplete,
-}: AuthorizedUserContextProviderProps): JSX.Element {
+ }: AuthorizedUserContextProviderProps) {
   const { loading, data: currentInfo } = useCurrentUserInfo();
 
   React.useEffect(() => {
@@ -72,3 +72,5 @@ export function useIsAuthenticated(): boolean {
   const value = useContext(AUTHORIZED_CONTEXT);
   return value !== null;
 }
+
+export { AuthorizedUserContextProvider };

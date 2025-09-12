@@ -29,7 +29,7 @@ export class PgDbConnection<
   }
 
   protected async _initialize(): Promise<PostgresDbInitProps<TSchema>> {
-    const { dbHost, dbUser, dbPassword } = await getDbCredentials();
+    const { dbHost, dbUser, dbPassword } = getDbCredentials();
 
     const options: PoolConfig = {
       database: 'postgres',

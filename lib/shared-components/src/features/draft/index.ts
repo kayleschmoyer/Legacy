@@ -9,14 +9,23 @@ export * from './DraftBoardComponents';
 export type {
   Player,
   PlayerCardProps,
+} from './PlayerCard';
+
+export type {
   Filter,
   FilterSection,
+} from './FilterComponents';
+
+export type {
   SearchSuggestion,
   SortOption,
+} from './SearchComponents';
+
+export type {
   DraftTeam,
   Pick,
   DraftBoard,
-} from './PlayerCard';
+} from './DraftBoardComponents';
 
 export type {
   TimerProps,

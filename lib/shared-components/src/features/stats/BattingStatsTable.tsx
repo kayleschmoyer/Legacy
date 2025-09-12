@@ -54,12 +54,12 @@ export interface BattingStatsTableProps {
   onPlayerPress?: (playerData: BattingStatsData) => void;
 }
 
-export function BattingStatsTable({
+function BattingStatsTable({ 
   stats,
   title = 'Batting Statistics',
   maxHeight,
   onPlayerPress,
-}: BattingStatsTableProps): JSX.Element {
+ }: BattingStatsTableProps) {
   // Transform the data to match the table format
   const tableData: StatsTableRow[] = stats.map((record) => ({
     player: record.player?.name || 'Unknown',
@@ -99,3 +99,5 @@ export function BattingStatsTable({
     />
   );
 }
+
+export { BattingStatsTable };

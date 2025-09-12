@@ -14,13 +14,12 @@ import {
   Sheet,
 } from 'tamagui';
 import {
-  ChevronDown,
-  Search,
-  RefreshCw,
-  ChevronUp,
-  User,
-  Tag,
   ArrowUpDown,
+  ChevronDown,
+  RefreshCw,
+  Search,
+  Tag,
+  User,
 } from '@tamagui/lucide-icons';
 import { useGetAllPlayersQuery, PlayerFragment } from './PlayersApi';
 
@@ -61,7 +60,7 @@ export function PlayersTable({
   title = 'Players',
   selectable = false,
   compact = false,
-}: PlayersTableProps): JSX.Element {
+}: PlayersTableProps): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentSort, setCurrentSort] = useState<SortOption>(SORT_OPTIONS[0]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -135,7 +134,7 @@ export function PlayersTable({
 
   if (error) {
     return (
-      <YStack padding="$4" space="$3" alignItems="center">
+      <YStack p="$4" gap="$3" ai="center">
         <Text color="$red10">Error loading players: {error.message}</Text>
         <Button onPress={handleRefresh} icon={RefreshCw}>
           Try Again
@@ -145,12 +144,12 @@ export function PlayersTable({
   }
 
   return (
-    <YStack flex={1} padding={compact ? '$2' : '$4'} space="$3">
+    <YStack flex={1} p={compact ? '$2' : '$4'} gap="$3">
       {/* Header */}
-      <XStack justifyContent="space-between" alignItems="center">
-        <H2 size={compact ? '$5' : '$6'}>{title}</H2>
+      <XStack jc="space-between" ai="center">
+        <H2 size={compact ? 5 : 6}>{title}</H2>
         <Button
-          size={compact ? '$2' : '$3'}
+          size={compact ? 2 : 3}
           variant="outlined"
           onPress={handleRefresh}
           icon={RefreshCw}
@@ -161,11 +160,11 @@ export function PlayersTable({
       </XStack>
 
       {/* Controls */}
-      <XStack space="$3" flexWrap="wrap">
+      <XStack gap="$3" flexWrap="wrap">
         {/* Search */}
         {showSearch && (
-          <XStack flex={1} minWidth={200} alignItems="center" space="$2">
-            <Search size={16} color="$gray10" />
+          <XStack flex={1} minW={200} ai="center" gap="$2">
+            <Search size={16} color="gray" />
             <Input
               flex={1}
               placeholder="Search players..."
@@ -199,7 +198,7 @@ export function PlayersTable({
                           value={`${option.orderBy}_${option.orderDirection}`}
                         >
                           <Select.ItemText>{option.label}</Select.ItemText>
-                          <Select.ItemIndicator marginLeft="auto">
+                          <Select.ItemIndicator marginLeft={0}>
                             <ArrowUpDown size={16} />
                           </Select.ItemIndicator>
                         </Select.Item>
@@ -211,17 +210,9 @@ export function PlayersTable({
             </Select.Adapt>
 
             <Select.Content zIndex={200000}>
-              <Select.ScrollUpButton
-                alignItems="center"
-                justifyContent="center"
-                position="relative"
-                width="100%"
-                height="$3"
-              >
-                <ChevronUp size={20} />
-              </Select.ScrollUpButton>
+              <Select.ScrollUpButton />
 
-              <Select.Viewport minWidth={200}>
+              <Select.Viewport minW={200}>
                 {SORT_OPTIONS.map((option, index) => (
                   <Select.Item
                     key={index}
@@ -229,22 +220,14 @@ export function PlayersTable({
                     value={`${option.orderBy}_${option.orderDirection}`}
                   >
                     <Select.ItemText>{option.label}</Select.ItemText>
-                    <Select.ItemIndicator marginLeft="auto">
+                    <Select.ItemIndicator marginLeft={0}>
                       <ArrowUpDown size={16} />
                     </Select.ItemIndicator>
                   </Select.Item>
                 ))}
               </Select.Viewport>
 
-              <Select.ScrollDownButton
-                alignItems="center"
-                justifyContent="center"
-                position="relative"
-                width="100%"
-                height="$3"
-              >
-                <ChevronDown size={20} />
-              </Select.ScrollDownButton>
+              <Select.ScrollDownButton />
             </Select.Content>
           </Select>
         )}
@@ -254,7 +237,7 @@ export function PlayersTable({
 
       {/* Loading State */}
       {loading && (
-        <XStack justifyContent="center" padding="$4">
+        <XStack jc="center" p="$4">
           <Spinner size="large" />
         </XStack>
       )}
@@ -262,26 +245,38 @@ export function PlayersTable({
       {/* Table Content */}
       {!loading && (
         <ScrollView flex={1} showsVerticalScrollIndicator={true}>
-          <YStack space="$1">
+          <YStack gap="$1">
             {/* Table Header */}
             <XStack
-              backgroundColor="$gray2"
-              padding={compact ? '$2' : '$3'}
-              borderRadius="$2"
+              bg="$gray2"
+              p={compact ? '$2' : '$3'}
+              r="$2"
               borderWidth={1}
-              borderColor="$gray6"
+              borderColor="gray"
             >
-              <Text flex={0.8} fontWeight="bold" size={compact ? '$2' : '$3'}>
+              <Text
+                flex={0.8}
+                fontWeight="bold"
+                fontSize={compact ? 2 : 3}
+              >
                 ID
               </Text>
-              <Text flex={2} fontWeight="bold" size={compact ? '$2' : '$3'}>
+              <Text flex={2} fontWeight="bold" fontSize={compact ? 2 : 3}>
                 Name
               </Text>
-              <Text flex={1.5} fontWeight="bold" size={compact ? '$2' : '$3'}>
+              <Text
+                flex={1.5}
+                fontWeight="bold"
+                fontSize={compact ? 2 : 3}
+              >
                 Bref ID
               </Text>
               {selectable && (
-                <Text flex={1} fontWeight="bold" size={compact ? '$2' : '$3'}>
+                <Text
+                  flex={1}
+                  fontWeight="bold"
+                  fontSize={compact ? 2 : 3}
+                >
                   Action
                 </Text>
               )}
@@ -289,7 +284,7 @@ export function PlayersTable({
 
             {/* Table Rows */}
             {filteredPlayers.length === 0 ? (
-              <XStack justifyContent="center" padding="$4">
+              <XStack jc="center" p="$4">
                 <Text color="$gray10">
                   {searchTerm
                     ? 'No players found matching your search.'
@@ -300,47 +295,47 @@ export function PlayersTable({
               filteredPlayers.map((player, index) => (
                 <XStack
                   key={player.id}
-                  padding={compact ? '$2' : '$3'}
-                  backgroundColor={index % 2 === 0 ? '$gray1' : 'transparent'}
-                  borderRadius="$2"
+                  p={compact ? '$2' : '$3'}
+                  bg={index % 2 === 0 ? '$gray1' : 'transparent'}
+                  r="$2"
                   borderWidth={selectedPlayer?.id === player.id ? 2 : 1}
                   borderColor={
-                    selectedPlayer?.id === player.id ? '$blue8' : '$gray4'
+                    selectedPlayer?.id === player.id ? '$blue8' : 'gray'
                   }
                   pressStyle={{
-                    backgroundColor: '$gray3',
+                    bg: '$gray3',
                   }}
                   onPress={() => handlePlayerClick(player)}
                   cursor={onPlayerSelect ? 'pointer' : 'default'}
                 >
-                  <Text flex={0.8} size={compact ? '$2' : '$3'} color="$gray11">
+                  <Text
+                    flex={0.8}
+                    fontSize={compact ? 2 : 3}
+                    color="gray"
+                  >
                     {player.id}
                   </Text>
-                  <XStack flex={2} alignItems="center" space="$2">
-                    <User size={compact ? 12 : 16} color="$gray10" />
-                    <Text size={compact ? '$2' : '$3'} fontWeight="500">
+                  <XStack flex={2} ai="center" gap="$2">
+                    <User size={compact ? 12 : 16} color="gray" />
+                    <Text fontSize={compact ? 2 : 3} fontWeight="500">
                       {getFullName(player)}
                     </Text>
                   </XStack>
-                  <XStack flex={1.5} alignItems="center" space="$2">
-                    <Tag size={compact ? 10 : 14} color="$gray10" />
+                  <XStack flex={1.5} ai="center" gap="$2">
+                    <Tag size={compact ? 10 : 14} color="gray" />
                     <Text
-                      size={compact ? '$2' : '$3'}
-                      color="$gray11"
+                      fontSize={compact ? 2 : 3}
+                      color="gray"
                       fontFamily="$mono"
                     >
                       {player.brefId}
                     </Text>
                   </XStack>
                   {selectable && (
-                    <XStack flex={1} justifyContent="center">
+                    <XStack flex={1} jc="center">
                       <Button
                         size={compact ? '$1' : '$2'}
-                        variant={
-                          selectedPlayer?.id === player.id
-                            ? 'solid'
-                            : 'outlined'
-                        }
+                        variant="outlined"
                         onPress={() => handlePlayerClick(player)}
                       >
                         {selectedPlayer?.id === player.id
@@ -364,9 +359,9 @@ export function PlayersTable({
           <>
             <Separator />
             <XStack
-              justifyContent="space-between"
-              alignItems="center"
-              padding="$2"
+              jc="space-between"
+              ai="center"
+              p="$2"
             >
               <Button
                 size={compact ? '$2' : '$3'}
@@ -376,11 +371,11 @@ export function PlayersTable({
               >
                 Previous
               </Button>
-              <Text size={compact ? '$2' : '$3'} color="$gray11">
+              <Text fontSize={compact ? 2 : 3} color="gray">
                 Page {currentPage + 1}
               </Text>
               <Button
-                size={compact ? '$2' : '$3'}
+                size={compact ? 2 : 3}
                 variant="outlined"
                 disabled={data.players.length < pageSize}
                 onPress={handleNextPage}
@@ -393,8 +388,8 @@ export function PlayersTable({
 
       {/* Results Summary */}
       {!loading && (
-        <XStack justifyContent="center" padding="$2">
-          <Text size={compact ? '$1' : '$2'} color="$gray10">
+        <XStack jc="center" p="$2">
+          <Text fontSize={compact ? 1 : 2} color="gray">
             {searchTerm
               ? `${filteredPlayers.length} of ${data?.players?.length || 0} players shown`
               : `${data?.players?.length || 0} players total`}

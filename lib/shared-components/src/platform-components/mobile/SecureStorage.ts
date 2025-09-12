@@ -12,7 +12,7 @@ const initializeStorage = async () => {
   } catch (error) {
     LOGGER.warn(
       'Expo SecureStore not available, falling back to sessionStorage',
-      error,
+      error instanceof Error ? error.message : String(error),
     );
   }
 };
@@ -56,7 +56,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      LOGGER.error(`Error storing secure item ${key}:`, error);
+      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -84,7 +84,7 @@ export class SecureStorage {
         return null;
       }
     } catch (error) {
-      LOGGER.error(`Error retrieving secure item ${key}:`, error);
+      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
       return null;
     }
   }
@@ -106,7 +106,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      LOGGER.error(`Error removing secure item ${key}:`, error);
+      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -136,7 +136,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      LOGGER.error('Error clearing secure storage:', error);
+      LOGGER.error('Error clearing secure storage:', error as Error);
       throw error;
     }
   }

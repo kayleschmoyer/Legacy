@@ -5,6 +5,7 @@ import {
   Input,
   Spinner,
   Text,
+  View,
   XStack,
   YStack,
   ScrollView,
@@ -30,13 +31,13 @@ const SORT_OPTIONS = [
   { label: 'ID (High to Low)', value: 'ID_DESC' },
 ] as const;
 
-export function PlayersGrid({
+function PlayersGrid({
   onPlayerSelect,
   pageSize = 50,
   showSearch = true,
   showSorting = true,
   title = 'Players',
-}: PlayersGridProps): JSX.Element {
+}: PlayersGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<string>('NAME_ASC');
 
@@ -57,34 +58,42 @@ export function PlayersGrid({
     if (!data?.players) return [];
 
     const players = data.players.filter(
-      (player): player is PlayerFragment => player !== null
+      (player): player is PlayerFragment => player !== null,
     );
 
     if (!searchTerm) return players;
 
     return players.filter(
       (player) =>
-        player.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        player.brefId?.toLowerCase().includes(searchTerm.toLowerCase())
+        `${player.firstName || ''} ${player.lastName || ''}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        player.brefId?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [data?.players, searchTerm]);
 
   if (loading && !data) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
+      <YStack
+        flex={1}
+        style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}
+      >
         <Spinner size="large" color="$blue10" />
-        <Text marginTop="$2">Loading players...</Text>
+        <Text style={{ marginTop: 8 }}>Loading players...</Text>
       </YStack>
     );
   }
 
   if (error) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
-        <Text color="$red10" textAlign="center" marginBottom="$3">
+      <YStack
+        flex={1}
+        style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}
+      >
+        <Text color="$red10" style={{ textAlign: 'center', marginBottom: 12 }}>
           Error loading players: {error.message}
         </Text>
-        <Button onPress={handleRefresh} theme="active">
+        <Button onPress={handleRefresh}>
           <RefreshCw size={16} />
           Retry
         </Button>
@@ -93,17 +102,17 @@ export function PlayersGrid({
   }
 
   return (
-    <YStack flex={1} padding="$4" backgroundColor="$background">
+    <YStack 
+      flex={1} 
+      p="$4"
+      bg="$background"
+    >
       {/* Header */}
-      <YStack marginBottom="$4">
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          marginBottom="$3"
-        >
+      <YStack mb="$4">
+        <XStack jc="space-between" ai="center" mb="$3">
           <H2 color="$color">{title}</H2>
-          <XStack gap="$2" alignItems="center">
-            <Text theme="alt2">
+          <XStack gap="$2" ai="center">
+            <Text color="$gray10">
               {filteredPlayers.length} player
               {filteredPlayers.length !== 1 ? 's' : ''}
             </Text>
@@ -115,9 +124,9 @@ export function PlayersGrid({
 
         {/* Controls */}
         {(showSearch || showSorting) && (
-          <XStack gap="$3" alignItems="center" flexWrap="wrap">
+          <XStack gap="$3" ai="center" flexWrap="wrap">
             {showSearch && (
-              <XStack flex={1} minWidth={200} alignItems="center">
+              <XStack flex={1} minW={200} ai="center">
                 <Input
                   placeholder="Search players..."
                   value={searchTerm}
@@ -125,16 +134,23 @@ export function PlayersGrid({
                   flex={1}
                   size="$3"
                 />
-                <Button
-                  position="absolute"
-                  right="$2"
-                  zIndex={1}
-                  size="$2"
-                  circular
-                  chromeless
+                {/* Search overlay button */}
+                <View
+                  pos="absolute"
+                  r="$2"
+                  t="$2"
+                  zi={1}
+                  pointerEvents="none"
                 >
-                  <Search size={16} />
-                </Button>
+                  <Button
+                    size={2}
+                    circular
+                    chromeless
+                    pointerEvents="auto"
+                  >
+                    <Search size={16} />
+                  </Button>
+                </View>
               </XStack>
             )}
 
@@ -152,10 +168,10 @@ export function PlayersGrid({
                   <Select.Viewport>
                     <Select.Group>
                       <Select.Label>Sort Options</Select.Label>
-                      {SORT_OPTIONS.map((option) => (
+                      {SORT_OPTIONS.map((option, idx) => (
                         <Select.Item
                           key={option.value}
-                          index={option.value}
+                          index={idx}
                           value={option.value}
                         >
                           <Select.ItemText>{option.label}</Select.ItemText>
@@ -171,32 +187,27 @@ export function PlayersGrid({
         )}
       </YStack>
 
-      <Separator marginBottom="$4" />
+      <Separator mb="$4" />
 
       {/* Players Grid */}
       {filteredPlayers.length === 0 ? (
-        <YStack flex={1} justifyContent="center" alignItems="center">
-          <Text theme="alt2" textAlign="center">
+        <YStack flex={1} jc="center" ai="center">
+          <Text color="$gray10" ta="center">
             {searchTerm
               ? 'No players found matching your search.'
               : 'No players available.'}
           </Text>
         </YStack>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView>
           <YStack
             flexDirection="row"
             flexWrap="wrap"
             gap="$3"
-            justifyContent="flex-start"
+            jc="flex-start"
           >
             {filteredPlayers.map((player) => (
-              <YStack
-                key={player.id}
-                width="calc(50% - 6px)"
-                minWidth={280}
-                maxWidth={400}
-              >
+              <YStack key={player.id} width={200} minW={280} maxW={400}>
                 <PlayerCard player={player} onPlayerClick={onPlayerSelect} />
               </YStack>
             ))}
@@ -206,3 +217,5 @@ export function PlayersGrid({
     </YStack>
   );
 }
+
+export { PlayersGrid };

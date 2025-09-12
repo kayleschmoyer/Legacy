@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from '../platform-components';
+import { safeStyle } from '../utils/styles';
 
 const styles = StyleSheet.create({
   container: {
@@ -119,23 +120,23 @@ const Button = ({
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger' | 'success';
 }) => {
-  const buttonStyle = [
+  const buttonStyle = safeStyle([
     styles.button,
     variant === 'secondary' && styles.buttonSecondary,
     variant === 'danger' && styles.buttonDanger,
     variant === 'success' && styles.buttonSuccess,
-  ];
+  ]);
 
-  const textStyle = [
+  const textStyle = safeStyle([
     styles.buttonText,
     variant === 'secondary' && styles.buttonTextSecondary,
-  ];
+  ]);
 
   if (Platform.OS === 'web') {
     return (
       <div
         style={{
-          ...Object.assign({}, ...buttonStyle),
+          ...buttonStyle,
           cursor: 'pointer',
           userSelect: 'none',
         }}
@@ -147,7 +148,7 @@ const Button = ({
           e.currentTarget.style.opacity = '1';
         }}
       >
-        <span style={Object.assign({}, ...textStyle)}>{title}</span>
+        <span style={textStyle}>{title}</span>
       </div>
     );
   }
@@ -159,7 +160,7 @@ const Button = ({
   );
 };
 
-export function DemoScreen() {
+function DemoScreen() {
   const showAlert = (message: string) => {
     if (Platform.OS === 'web') {
       alert(message);
@@ -234,4 +235,6 @@ export function DemoScreen() {
       </View>
     </View>
   );
-}
+};
+
+export { DemoScreen };

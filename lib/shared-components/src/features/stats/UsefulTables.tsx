@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, ActivityIndicator } from '../../platform-components';
-import { BattingStatsTable } from './BattingStatsTable';
-import { PitchingStatsTable } from './PitchingStatsTable';
+import { BattingStatsData, BattingStatsTable } from './BattingStatsTable';
+import { PitchingStatsData, PitchingStatsTable } from './PitchingStatsTable';
 import { FieldingStatsTable } from './FieldingStatsTable';
 
 // Generic interfaces to avoid GraphQL dependencies
@@ -85,18 +85,29 @@ export interface FieldingStatsTableWithDataProps {
   error?: Error | null;
 }
 
-export function BattingStatsTableWithData({
+function BattingStatsTableWithData({ 
   data,
   loading,
   error,
-}: BattingStatsTableWithDataProps): JSX.Element {
+ }: BattingStatsTableWithDataProps) {
   const stats = data?.nodes;
 
   const filteredStats = useMemo(
     () =>
       stats?.filter(
         (s): s is BattingStatsWithPlayer => s !== undefined && s !== null,
-      ) || [],
+      ).map((stat): BattingStatsData => ({
+        player: stat.player ? { name: stat.player.name || undefined } : undefined,
+        ab: stat.ab || undefined,
+        h: stat.h || undefined,
+        hr: stat.hr || undefined,
+        rbi: stat.rbi || undefined,
+        r: stat.r || undefined,
+        sb: stat.sb || undefined,
+        bb: stat.bb || undefined,
+        so: stat.so || undefined,
+        // Add other fields as needed
+      })) || [],
     [stats],
   );
 
@@ -132,18 +143,33 @@ export function BattingStatsTableWithData({
   return <BattingStatsTable stats={filteredStats} />;
 }
 
-export function PitchingStatsTableWithData({
+function PitchingStatsTableWithData({ 
   data,
   loading,
   error,
-}: PitchingStatsTableWithDataProps): JSX.Element {
+ }: PitchingStatsTableWithDataProps) {
   const stats = data?.nodes;
 
   const filteredStats = useMemo(
     () =>
       stats?.filter(
         (s): s is PitchingStatsWithPlayer => s !== undefined && s !== null,
-      ) || [],
+      ).map((stat): PitchingStatsData => ({
+        player: stat.player ? { name: stat.player.name || undefined } : undefined,
+        w: stat.w || undefined,
+        l: stat.l || undefined,
+        era: stat.era || undefined,
+        g: stat.g || undefined,
+        gs: stat.gs || undefined,
+        sv: stat.sv || undefined,
+        ip: stat.ip || undefined,
+        h: stat.h || undefined,
+        er: stat.er || undefined,
+        hr: stat.hr || undefined,
+        bb: stat.bb || undefined,
+        so: stat.so || undefined,
+        // Add other fields as needed
+      })) || [],
     [stats],
   );
 
@@ -179,11 +205,11 @@ export function PitchingStatsTableWithData({
   return <PitchingStatsTable stats={filteredStats} />;
 }
 
-export function FieldingStatsTableWithData({
+function FieldingStatsTableWithData({ 
   data,
   loading,
   error,
-}: FieldingStatsTableWithDataProps): JSX.Element {
+ }: FieldingStatsTableWithDataProps) {
   const stats = data?.nodes;
 
   const filteredStats = useMemo(
@@ -225,3 +251,7 @@ export function FieldingStatsTableWithData({
 
   return <FieldingStatsTable stats={filteredStats} />;
 }
+
+export { BattingStatsTableWithData };
+export { PitchingStatsTableWithData };
+export { FieldingStatsTableWithData };

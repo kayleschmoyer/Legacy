@@ -26,14 +26,14 @@ export interface AuthGuardProps extends PropsWithChildren {
   redirectToLogin?: boolean;
 }
 
-export function AuthGuard({
+function AuthGuard({ 
   children,
   fallback: FallbackComponent = LoginScreen,
   loadingComponent: LoadingComponent = LoadingPanel,
   onLoginSuccess,
   onLoginFailure,
   redirectToLogin = true,
-}: AuthGuardProps): JSX.Element {
+ }: AuthGuardProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -55,3 +55,5 @@ export function AuthGuard({
 
   return <>{children}</>;
 }
+
+export { AuthGuard };

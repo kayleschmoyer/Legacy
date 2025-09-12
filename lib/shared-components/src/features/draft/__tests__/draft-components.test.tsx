@@ -1,15 +1,15 @@
 import React from 'react';
-import { render, fireEvent } from '../../../test-utils';
+import { fireEvent, render } from '../../../test-utils';
 
 import {
-  PlayerCard,
-  TimerBar,
-  FilterChip,
-  QuickFilters,
-  FilterDrawer,
-  SearchBar,
-  SearchAndSortBar,
   DraftStatusBar,
+  FilterChip,
+  FilterDrawer,
+  PlayerCard,
+  QuickFilters,
+  SearchAndSortBar,
+  SearchBar,
+  TimerBar,
 } from '../index';
 
 // Mock data
@@ -95,7 +95,7 @@ describe('Draft Components', () => {
         />
       );
 
-      fireEvent.press(getByText('Mike Trout'));
+      fireEvent.click(getByText('Mike Trout'));
       expect(onSelectMock).toHaveBeenCalledTimes(1);
     });
 
@@ -187,7 +187,7 @@ describe('Draft Components', () => {
         />
       );
 
-      fireEvent.press(getByText('Outfield'));
+      fireEvent.click(getByText('Outfield'));
       expect(onPressMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -218,7 +218,7 @@ describe('Draft Components', () => {
         />
       );
 
-      fireEvent.press(getByText('OF'));
+      fireEvent.click(getByText('OF'));
       expect(onFiltersChangeMock).toHaveBeenCalledWith({
         position: 'OF',
       });
@@ -254,7 +254,7 @@ describe('Draft Components', () => {
         />
       );
 
-      fireEvent.press(getByText('✕'));
+      fireEvent.click(getByText('✕'));
       expect(onCloseMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -282,7 +282,7 @@ describe('Draft Components', () => {
         />
       );
 
-      fireEvent.changeText(getByPlaceholderText('Search...'), 'Mike Trout');
+      fireEvent.input(getByPlaceholderText('Search...'), { target: { value: 'Mike Trout' } });
       expect(onChangeTextMock).toHaveBeenCalledWith('Mike Trout');
     });
 
@@ -338,7 +338,7 @@ describe('Draft Components', () => {
       );
 
       expect(getByText('Filter')).toBeTruthy();
-      fireEvent.press(getByText('Filter'));
+      fireEvent.click(getByText('Filter'));
       expect(onFilterPressMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -372,7 +372,7 @@ describe('Draft Components', () => {
       );
 
       expect(getByText('Start Draft')).toBeTruthy();
-      fireEvent.press(getByText('Start Draft'));
+      fireEvent.click(getByText('Start Draft'));
       expect(onStartDraftMock).toHaveBeenCalledTimes(1);
     });
 
@@ -386,7 +386,7 @@ describe('Draft Components', () => {
       );
 
       expect(getByText('Pause')).toBeTruthy();
-      fireEvent.press(getByText('Pause'));
+      fireEvent.click(getByText('Pause'));
       expect(onPauseDraftMock).toHaveBeenCalledTimes(1);
     });
 

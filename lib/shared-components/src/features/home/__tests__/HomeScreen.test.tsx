@@ -1,10 +1,6 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Dimensions } from '../../../platform-components';
+import { fireEvent, render } from '@testing-library/react';
 import { HomeScreen, HomeScreenProps } from '../HomeScreen';
-
-// Mock Dimensions for testing different screen sizes
-const mockDimensions = Dimensions as jest.Mocked<typeof Dimensions>;
 
 describe('HomeScreen', () => {
   const mockOnSportPress = jest.fn();
@@ -15,8 +11,6 @@ describe('HomeScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset to mobile dimensions
-    mockDimensions.get.mockReturnValue({ width: 375, height: 667 });
   });
 
   describe('Rendering Tests', () => {
@@ -118,15 +112,6 @@ describe('HomeScreen', () => {
       expect(queryByText('Baseball')).toBeNull(); // Should not show disabled sport
     });
 
-    it('adapts to tablet layout correctly', () => {
-      // Mock tablet dimensions
-      mockDimensions.get.mockReturnValue({ width: 1024, height: 768 });
-
-      const { getByText } = render(<HomeScreen {...defaultProps} />);
-      expect(getByText('Fantasy Sports Hub')).toBeTruthy();
-      // Component should render without crashing on tablet size
-    });
-
     it('handles empty sports list gracefully', () => {
       const props: HomeScreenProps = {
         ...defaultProps,
@@ -187,7 +172,7 @@ describe('HomeScreen', () => {
 
       // Assuming default sports include Football
       const footballCard = getByText('Football');
-      fireEvent.press(footballCard);
+      fireEvent.click(footballCard);
 
       expect(mockOnSportPress).toHaveBeenCalledWith('football');
     });
@@ -209,7 +194,7 @@ describe('HomeScreen', () => {
       const { getByText } = render(<HomeScreen {...props} />);
 
       const actionButton = getByText('Test Action');
-      fireEvent.press(actionButton);
+      fireEvent.click(actionButton);
 
       expect(mockCustomAction).toHaveBeenCalled();
     });

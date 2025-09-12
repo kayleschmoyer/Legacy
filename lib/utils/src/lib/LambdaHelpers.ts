@@ -37,7 +37,7 @@ export function proxyLambdaToExpress(
       res.send(response.body);
     })
     .catch((err) => {
-      LOGGER.error(err);
+      LOGGER.error(String(err));
       res.status(500);
       res.send();
     });
@@ -63,7 +63,7 @@ export function proxySqsToExpress(
       res.send();
     })
     .catch((err) => {
-      LOGGER.error(err);
+      LOGGER.error(String(err));
       res.status(500);
       res.send();
     });

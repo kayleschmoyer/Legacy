@@ -1,25 +1,7 @@
 import React from 'react';
-import { EliteDraftBoardScreen } from './EliteDraftBoard';
-// import { DraftBoard } from '@legacy-sports/shared-components';
+import { PlayersTable } from '@legacy-sports/shared-components';
 
-interface HomeScreenProps {
-  onSportPress?: (sportKey: string) => void;
-  onNavigate?: (path: string) => void;
-}
-
-export function HomeScreen({ onSportPress, onNavigate }: HomeScreenProps): React.JSX.Element {
-  const handleSportClick = (sportKey: string) => {
-    if (onSportPress) {
-      onSportPress(sportKey);
-    }
-  };
-
-  const handleNavigate = (path: string) => {
-    if (onNavigate) {
-      onNavigate(path);
-    }
-  };
-
+export function HomeScreen(): React.JSX.Element {
   return (
     <div style={{ padding: '20px' }}>
       <h1>Home Screen</h1>
@@ -94,9 +76,7 @@ export function PlayersScreen(): React.JSX.Element {
       <h1>Players</h1>
       <p>Browse and manage player information</p>
       <div style={{ marginTop: '20px' }}>
-        <p style={{ color: '#888', fontStyle: 'italic' }}>
-          Players table component not available - would display player roster here
-        </p>
+        <PlayersTable />
       </div>
     </div>
   );

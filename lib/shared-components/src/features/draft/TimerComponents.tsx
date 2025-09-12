@@ -1,55 +1,13 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-
-// Web-compatible implementations
-const StyleSheet = {
-  create: (styles: Record<string, React.CSSProperties>) => styles,
-};
-
-// Simple animation value for web
-class WebAnimatedValue {
-  constructor(private _value: number) {}
-  
-  setValue(value: number) {
-    this._value = value;
-  }
-  
-  interpolate({ inputRange, outputRange }: { inputRange: number[]; outputRange: string[] }) {
-    // Simple interpolation for web
-    const index = inputRange.findIndex(val => this._value <= val);
-    return outputRange[index >= 0 ? index : outputRange.length - 1];
-  }
-}
-
-interface AnimationConfig {
-  duration?: number;
-  toValue: number;
-  useNativeDriver?: boolean;
-}
-
-const Animated = {
-  Value: WebAnimatedValue,
-  timing: (value: WebAnimatedValue, config: AnimationConfig) => ({
-    start: () => {
-      // Simple immediate animation for web
-      value.setValue(config.toValue);
-    }
-  }),
-  View: ({ style, children, ...props }: { style?: React.CSSProperties; children?: React.ReactNode; [key: string]: unknown }) => 
-    <div style={style} {...props}>{children}</div>,
-};
-
-const Platform = {
-  OS: 'web' as const,
-};
-
-const Vibration = {
-  vibrate: (duration: number) => {
-    // Web vibration API if available
-    if ('vibrate' in navigator) {
-      navigator.vibrate(duration);
-    }
-  },
-};
+import React, { useEffect, useRef, useCallback } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  View,
+  Platform,
+  Vibration,
+} from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 export interface TimerProps {
   initialTime: number;
@@ -63,7 +21,7 @@ export interface TimerProps {
 export interface TimerBarProps {
   time: number;
   maxTime: number;
-  colorAnim?: WebAnimatedValue;
+  colorAnim?: any; // TODO: Type this properly when Animated types are available
   label?: string;
   variant?: 'default' | 'compact' | 'large';
 }
@@ -179,13 +137,13 @@ export function useTimer({
 /**
  * Timer Bar Component with smooth color transitions
  */
-export function TimerBar({
+function TimerBar({
   time,
   maxTime,
   colorAnim,
   label = 'Time Remaining',
   variant = 'default',
-}: TimerBarProps): React.JSX.Element {
+}: TimerBarProps) {
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
 
@@ -218,40 +176,32 @@ export function TimerBar({
     outputRange: ['#ef4444', '#f59e0b', '#10b981'], // Red, Yellow, Green
   });
 
-  const timerStyle = {
-    ...styles.timerBar,
-    ...styles[`${variant}Timer`],
-  };
+  const timerStyle = safeStyle([styles.timerBar, styles[`${variant}Timer`]]);
 
   return (
-    <Animated.View style={{
-      ...timerStyle,
-      backgroundColor: typeof backgroundColor === 'string' ? backgroundColor : '#10b981'
-    }}>
-      <div style={styles.timerContent}>
-        <span style={{
-          ...styles.timerText,
-          ...styles[`${variant}Text`],
-        }}>
+    <Animated.View style={[timerStyle, { backgroundColor }]}>
+      <View style={styles.timerContent}>
+        <Text style={safeStyle([styles.timerText, styles[`${variant}Text`]])}>
           {minutes}:{seconds.toString().padStart(2, '0')}
         </span>
         {label && (
-          <span style={{
-            ...styles.timerLabel,
-            ...styles[`${variant}Label`],
-          }}>
+          <Text
+            style={safeStyle([styles.timerLabel, styles[`${variant}Label`]])}
+          >
             {label}
           </span>
         )}
       </div>
 
       {/* Progress indicator */}
-      <div style={styles.progressContainer}>
-        <div
-          style={{
-            ...styles.progressBar,
-            width: `${Math.max(0, (time / maxTime) * 100)}%`,
-          }}
+      <View style={styles.progressContainer}>
+        <View
+          style={safeStyle([
+            styles.progressBar,
+            {
+              width: `${Math.max(0, (time / maxTime) * 100)}%`,
+            },
+          ])}
         />
       </div>
     </Animated.View>
@@ -267,7 +217,7 @@ export interface CountdownTimerProps extends TimerProps {
   showProgress?: boolean;
 }
 
-export function CountdownTimer({
+function CountdownTimer({
   initialTime,
   onTimeUpdate,
   onTimeExpired,
@@ -277,7 +227,7 @@ export function CountdownTimer({
   label = 'Time Remaining',
   variant = 'default',
   showProgress = true,
-}: CountdownTimerProps): React.JSX.Element {
+}: CountdownTimerProps) {
   const timer = useTimer({
     initialTime,
     onTimeUpdate,
@@ -397,3 +347,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
   },
 });
+
+export { TimerBar };
+export { CountdownTimer };

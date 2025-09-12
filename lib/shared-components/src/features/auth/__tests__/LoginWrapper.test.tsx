@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { LoginWrapper } from '../LoginWrapper';
 
 describe('LoginWrapper', () => {
@@ -56,9 +56,9 @@ describe('LoginWrapper', () => {
     const passwordInput = getByPlaceholderText('Password');
     const loginButton = getByText('Login');
 
-    fireEvent.changeText(emailInput, 'test@example.com');
-    fireEvent.changeText(passwordInput, 'password123');
-    fireEvent.press(loginButton);
+    fireEvent.input(emailInput, { target: { value: 'test@example.com' } });
+    fireEvent.input(passwordInput, { target: { value: 'password123' } });
+    fireEvent.click(loginButton);
 
     await waitFor(() => {
       expect(mockOnLogin).toHaveBeenCalledWith(
@@ -74,7 +74,7 @@ describe('LoginWrapper', () => {
     );
 
     const loginButton = getByText('Login');
-    fireEvent.press(loginButton);
+    fireEvent.click(loginButton);
 
     await waitFor(() => {
       expect(queryByText('Please enter both email and password.')).toBeTruthy();
@@ -87,7 +87,7 @@ describe('LoginWrapper', () => {
     const { getByText } = render(<LoginWrapper onRegister={mockOnRegister} />);
 
     const registerLink = getByText('Register here');
-    fireEvent.press(registerLink);
+    fireEvent.click(registerLink);
 
     expect(mockOnRegister).toHaveBeenCalled();
   });

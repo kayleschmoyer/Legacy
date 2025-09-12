@@ -22,12 +22,12 @@ const YStackMeta: Meta<typeof YStack> = {
       options: ['$1', '$2', '$3', '$4', '$5'],
       description: 'Space between children',
     },
-    alignItems: {
+    ai: {
       control: 'select',
       options: ['flex-start', 'center', 'flex-end', 'stretch'],
-      description: 'Cross-axis alignment',
+      description: 'Cross-axis alignment (alignItems shorthand)',
     },
-    justifyContent: {
+    jc: {
       control: 'select',
       options: [
         'flex-start',

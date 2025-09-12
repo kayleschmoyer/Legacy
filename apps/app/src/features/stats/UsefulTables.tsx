@@ -15,7 +15,7 @@ import {
   CareerPitchingsOrderBy,
 } from '../../api/db/graphql.generated';
 
-export function BattingStatsTableWithData(): JSX.Element {
+export function BattingStatsTableWithData(): React.JSX.Element {
   const { data, loading } = useGetCareerBattingStatsQuery({
     variables: {
       first: 25,
@@ -43,7 +43,7 @@ export function BattingStatsTableWithData(): JSX.Element {
   return <BattingStatsTable stats={filteredStats} />;
 }
 
-export function PitchingStatsTableWithData(): JSX.Element {
+export function PitchingStatsTableWithData(): React.JSX.Element {
   const { data, loading } = useGetCareerPitchingStatsQuery({
     variables: {
       first: 25,
@@ -69,7 +69,7 @@ export function PitchingStatsTableWithData(): JSX.Element {
   return <PitchingStatsTable stats={filteredStats} />;
 }
 
-export function FieldingStatsTableWithData(): JSX.Element {
+export function FieldingStatsTableWithData(): React.JSX.Element {
   const { data, loading } = useGetCareerFieldingStatsQuery({
     variables: {
       first: 25,

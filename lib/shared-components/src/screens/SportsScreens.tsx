@@ -126,7 +126,7 @@ const baseballStyles = StyleSheet.create({
   },
 });
 
-export function FootballScreen() {
+function FootballScreen() {
   return (
     <View style={footballStyles.container}>
       <Text style={footballStyles.heading}>Football Fantasy</Text>
@@ -137,9 +137,9 @@ export function FootballScreen() {
       <Text style={footballStyles.sectionTitle}>Upcoming Drafts</Text>
     </View>
   );
-}
+};
 
-export function BaseballScreen() {
+function BaseballScreen() {
   return (
     <View style={baseballStyles.container}>
       <Text style={baseballStyles.heading}>Baseball Fantasy</Text>
@@ -148,4 +148,7 @@ export function BaseballScreen() {
       <Text style={baseballStyles.sectionTitle}>Manage Your Leagues</Text>
     </View>
   );
-}
+};
+
+export { FootballScreen };
+export { BaseballScreen };

@@ -1,13 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { DraftState, DraftTeam, Filter, Player } from '../../types';
-import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+  Modal,
+  Animated,
+  StyleSheet,
+  Platform,
+  Dimensions,
+} from '../../platform-components';
+import { Player, DraftState, DraftTeam, Filter } from '../../types';
+import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { safeStyle } from '../../utils/styles';
 
-// Simple StyleSheet replacement for web
-const StyleSheet = {
-  create: (styles: Record<string, React.CSSProperties>) => styles,
-};
-
-const SCREEN_WIDTH = typeof window !== 'undefined' ? window.innerWidth : 375;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
 
 // Utility function for position colors
@@ -33,7 +41,7 @@ const useTimer = (initialTime: number) => {
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isActive && time > 0) {
       interval = setInterval(() => {
         setTime((t) => Math.max(0, t - 1));
@@ -81,14 +89,13 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const playerName = player.player || `${player.firstName} ${player.lastName}`;
 
   return (
-    <div
-      style={{
-        ...styles.playerCard,
-        transform: isPressed ? 'scale(0.98)' : 'scale(1)',
-        ...(isSelected ? styles.selectedCard : {}),
-        ...(isDrafted ? styles.draftedCard : {}),
-        transition: 'transform 0.1s ease',
-      }}
+    <Animated.View
+      style={safeStyle([
+        styles.playerCard,
+        { transform: [{ scale: scaleAnim }] },
+        isSelected && styles.selectedCard,
+        isDrafted && styles.draftedCard,
+      ])}
     >
       <button
         onClick={onSelect}
@@ -102,40 +109,42 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         }}
         disabled={isDrafted}
       >
-        <div style={styles.cardHeader}>
-          <span style={{
-            ...styles.playerName,
-            ...(isDrafted ? styles.draftedText : {}),
-          }}>
-            {playerName}
-          </span>
-          <div
-            style={{
-              ...styles.positionBadge,
-              backgroundColor: getPositionColor(player.position, sport),
-              ...(isDrafted ? styles.draftedBadge : {}),
-            }}
+        <View style={styles.cardHeader}>
+          <Text
+            style={safeStyle([
+              styles.playerName,
+              isDrafted && styles.draftedText,
+            ])}
           >
-            <span style={styles.positionText}>{player.position}</span>
-          </div>
-        </div>
-        <span style={{
-          ...styles.teamText,
-          ...(isDrafted ? styles.draftedText : {}),
-        }}>
+            {`${player.firstName} ${player.lastName}`}
+          </Text>
+          <View
+            style={safeStyle([
+              styles.positionBadge,
+              { backgroundColor: getPositionColor(player.position, sport) },
+              ...(isDrafted ? [styles.draftedBadge] : []),
+            ])}
+          >
+            <Text style={styles.positionText}>{player.position}</Text>
+          </View>
+        </View>
+        <Text
+          style={safeStyle([styles.teamText, isDrafted && styles.draftedText])}
+        >
           {player.team}
-        </span>
-        <div style={styles.cardFooter}>
-          <span style={{
-            ...styles.adpText,
-            ...(isDrafted ? styles.draftedText : {}),
-          }}>
+        </Text>
+        <View style={styles.cardFooter}>
+          <Text
+            style={safeStyle([styles.adpText, isDrafted && styles.draftedText])}
+          >
             ADP: {player.adp}
-          </span>
-          <span style={{
-            ...styles.rankText,
-            ...(isDrafted ? styles.draftedText : {}),
-          }}>
+          </Text>
+          <Text
+            style={safeStyle([
+              styles.rankText,
+              isDrafted && styles.draftedText,
+            ])}
+          >
             #{player.rank}
           </span>
         </div>
@@ -168,11 +177,13 @@ const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
   };
 
   return (
-    <div style={{
-      ...styles.timerContainer,
-      backgroundColor: getTimerColor(),
-    }}>
-      <span style={styles.timerText}>
+    <View
+      style={safeStyle([
+        styles.timerContainer,
+        { backgroundColor: getTimerColor() },
+      ])}
+    >
+      <Text style={styles.timerText}>
         {minutes}:{seconds.toString().padStart(2, '0')}
       </span>
       <span style={styles.timerLabel}>
@@ -215,16 +226,18 @@ const FilterControls: React.FC<FilterControlsProps> = ({
         {allPositions.map((position) => (
           <button
             key={position}
-            style={{
-              ...styles.filterChip,
-              ...(filters.position === position ? styles.filterChipActive : {}),
-            }}
-            onClick={() => onFiltersChange({ ...filters, position })}
+            style={safeStyle([
+              styles.filterChip,
+              filters.position === position && styles.filterChipActive,
+            ])}
+            onPress={() => onFiltersChange({ ...filters, position })}
           >
-            <span style={{
-              ...styles.filterChipText,
-              ...(filters.position === position ? styles.filterChipTextActive : {}),
-            }}>
+            <Text
+              style={safeStyle([
+                styles.filterChipText,
+                filters.position === position && styles.filterChipTextActive,
+              ])}
+            >
               {position}
             </span>
           </button>
@@ -268,13 +281,13 @@ export interface DraftBoardProps {
   draftedPlayerIds?: Set<string>;
 }
 
-export function DraftBoard({
+function DraftBoard({
   draft,
   availablePlayers,
   onPlayerDraft,
   onTimerControl,
   draftedPlayerIds = new Set(),
-}: DraftBoardProps): React.JSX.Element {
+}: DraftBoardProps) {
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<Filter>({ position: 'ALL' });
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -294,7 +307,9 @@ export function DraftBoard({
     const playerName = player.player || `${player.firstName} ${player.lastName}`;
     const matchesSearch =
       searchText === '' ||
-      playerName.toLowerCase().includes(searchText.toLowerCase());
+      `${player.firstName} ${player.lastName}`
+        .toLowerCase()
+        .includes(searchText.toLowerCase());
     const matchesPosition =
       filters.position === 'ALL' || player.position === filters.position;
     const isAvailable = !draftedPlayerIds.has(player.id);
@@ -393,10 +408,10 @@ export function DraftBoard({
             <h3 style={styles.modalTitle}>Confirm Draft Pick</h3>
             {selectedPlayer && (
               <>
-                <p style={styles.modalPlayerName}>
-                  {selectedPlayer.player || `${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
-                </p>
-                <p style={styles.modalPlayerDetails}>
+                <Text style={styles.modalPlayerName}>
+                  {`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
+                </Text>
+                <Text style={styles.modalPlayerDetails}>
                   {selectedPlayer.position} - {selectedPlayer.team}
                 </p>
                 <p style={styles.modalPlayerRank}>
@@ -692,3 +707,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export { DraftBoard };

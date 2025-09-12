@@ -7,6 +7,7 @@ import {
   StyleSheet,
   FlatList,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 import {
   canPlayerPlayPosition,
   getPositionDisplayName,
@@ -50,7 +51,7 @@ interface StarterData {
 
 type PlayerData = StarterData | BenchPlayerData | EmptySlotData;
 
-export function LineupEditor(props: LineupEditorProps): JSX.Element {
+function LineupEditor(props: LineupEditorProps) {
   const {
     availableRosterSlots,
     onPlayerAdded,
@@ -278,21 +279,21 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
 
       return (
         <TouchableOpacity
-          style={[
+          style={safeStyle([
             styles.listItem,
             isSelected && styles.selectedItem,
             isDisabled && styles.disabledItem,
-          ]}
+          ])}
           onPress={() => onClick(item)}
           disabled={isDisabled}
         >
           {/* Position Button */}
           <View style={styles.positionContainer}>
             <TouchableOpacity
-              style={[
+              style={safeStyle([
                 styles.positionButton,
                 isDisabled && styles.positionButtonDisabled,
-              ]}
+              ])}
               onPress={() => onClick(item)}
               disabled={isDisabled}
             >
@@ -307,7 +308,9 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
           {/* Player Info */}
           <View style={styles.playerInfo}>
             <Text style={styles.playerName}>
-              {teamMember?.player?.name || 'Empty'}
+              {teamMember?.player
+                ? `${teamMember.player.firstName} ${teamMember.player.lastName}`
+                : 'Empty'}
             </Text>
             {teamMember?.player?.eligiblePositions && (
               <Text style={styles.eligiblePositions}>
@@ -318,7 +321,9 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
 
           {/* Stats */}
           <View style={styles.statsContainer}>
-            <Text style={[styles.statsText, { color: getStatusColor() }]}>
+            <Text
+              style={safeStyle([styles.statsText, { color: getStatusColor() }])}
+            >
               {actualValue
                 ? `${actualValue.toFixed(2)} (${
                     projValue?.toFixed(2) || '0.00'
@@ -367,7 +372,10 @@ export function LineupEditor(props: LineupEditorProps): JSX.Element {
         {selectedPlayer && (
           <View style={styles.selectedPlayerInfo}>
             <Text style={styles.selectedPlayerText}>
-              Selected: {selectedPlayer.player?.name}
+              Selected:{' '}
+              {selectedPlayer.player
+                ? `${selectedPlayer.player.firstName} ${selectedPlayer.player.lastName}`
+                : 'Unknown'}
               {selectedPositionMapping && (
                 <Text style={styles.selectedPositionText}>
                   {' '}
@@ -480,3 +488,6 @@ const styles = StyleSheet.create({
     color: '#FFD700',
   },
 });
+
+export { humanizeString };
+export { LineupEditor };

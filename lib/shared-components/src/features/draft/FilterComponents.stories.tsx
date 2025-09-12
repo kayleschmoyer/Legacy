@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import {
@@ -307,7 +308,6 @@ export const QuickFiltersDefault: QuickFiltersStory = {
     maxVisible: 2,
     variant: 'horizontal',
   },
-  render: (args) => <QuickFilters {...args} />,
 };
 
 export const QuickFiltersGrid: QuickFiltersStory = {
@@ -318,7 +318,6 @@ export const QuickFiltersGrid: QuickFiltersStory = {
     maxVisible: 4,
     variant: 'grid',
   },
-  render: (args) => <QuickFilters {...args} />,
 };
 
 export const QuickFiltersBaseball: QuickFiltersStory = {
@@ -329,7 +328,6 @@ export const QuickFiltersBaseball: QuickFiltersStory = {
     maxVisible: 2,
     variant: 'horizontal',
   },
-  render: (args) => <QuickFilters {...args} />,
 };
 
 export const QuickFiltersSingle: QuickFiltersStory = {
@@ -340,7 +338,6 @@ export const QuickFiltersSingle: QuickFiltersStory = {
     maxVisible: 1,
     variant: 'horizontal',
   },
-  render: (args) => <QuickFilters {...args} />,
 };
 
 export const QuickFiltersMany: QuickFiltersStory = {
@@ -351,7 +348,6 @@ export const QuickFiltersMany: QuickFiltersStory = {
     maxVisible: 4,
     variant: 'horizontal',
   },
-  render: (args) => <QuickFilters {...args} />,
   parameters: {
     layout: 'padded',
   },
@@ -433,7 +429,6 @@ export const FilterDrawerDefault: FilterDrawerStory = {
     onReset: fn(),
     variant: 'slide',
   },
-  render: (args) => <FilterDrawer {...args} />,
 };
 
 export const FilterDrawerBaseball: FilterDrawerStory = {
@@ -449,7 +444,6 @@ export const FilterDrawerBaseball: FilterDrawerStory = {
     onReset: fn(),
     variant: 'fade',
   },
-  render: (args) => <FilterDrawer {...args} />,
 };
 
 export const FilterDrawerHidden: FilterDrawerStory = {
@@ -462,7 +456,6 @@ export const FilterDrawerHidden: FilterDrawerStory = {
     title: 'Filter Players',
     variant: 'scale',
   },
-  render: (args) => <FilterDrawer {...args} />,
 };
 
 export default FilterDrawerMeta;
@@ -587,7 +580,7 @@ export const ChipVariants: Story = {
   },
 };
 
-// Interactive Filter Demo Component
+// Interactive Filter Demo
 const FilterDemoComponent = () => {
   const [filters, setFilters] = React.useState<Filter>({
     position: '',

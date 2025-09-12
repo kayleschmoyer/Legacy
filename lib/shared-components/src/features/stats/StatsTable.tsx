@@ -9,6 +9,7 @@ import {
 } from '../../platform-components';
 import { StatsTableColumn, StatsTableRow } from '../../types';
 import { DEFAULT_COLORS } from '../../config/sports';
+import { safeStyle } from '../../utils/styles';
 
 export interface StatsTableProps {
   columns: StatsTableColumn[];
@@ -19,14 +20,14 @@ export interface StatsTableProps {
   onRowPress?: (row: StatsTableRow, index: number) => void;
 }
 
-export function StatsTable({
+function StatsTable({
   columns,
   data,
   title,
   sortable = true,
   maxHeight = 400,
   onRowPress,
-}: StatsTableProps): JSX.Element {
+}: StatsTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -74,7 +75,7 @@ export function StatsTable({
       {columns.map((column) => (
         <TouchableOpacity
           key={column.key}
-          style={[styles.headerCell, { flex: 1 }]}
+          style={safeStyle([styles.headerCell, { flex: 1 }])}
           onPress={() => handleSort(column.key)}
           disabled={!sortable || !column.sortable}
         >
@@ -90,12 +91,18 @@ export function StatsTable({
   const renderRow = (row: StatsTableRow, index: number) => (
     <TouchableOpacity
       key={index}
-      style={[styles.dataRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}
+      style={safeStyle([
+        styles.dataRow,
+        index % 2 === 0 ? styles.evenRow : styles.oddRow,
+      ])}
       onPress={() => onRowPress?.(row, index)}
       disabled={!onRowPress}
     >
       {columns.map((column) => (
-        <View key={column.key} style={[styles.dataCell, { flex: 1 }]}>
+        <View
+          key={column.key}
+          style={safeStyle([styles.dataCell, { flex: 1 }])}
+        >
           <Text style={styles.dataText} numberOfLines={1}>
             {String(row[column.key] ?? '')}
           </Text>
@@ -116,7 +123,7 @@ export function StatsTable({
         {renderHeader()}
 
         <ScrollView
-          style={[styles.scrollContainer, { maxHeight }]}
+          style={safeStyle([styles.scrollContainer, { maxHeight }])}
           showsVerticalScrollIndicator={true}
         >
           {sortedData.map((row, index) => renderRow(row, index))}
@@ -200,3 +207,5 @@ const styles = StyleSheet.create({
     }),
   },
 });
+
+export { StatsTable };

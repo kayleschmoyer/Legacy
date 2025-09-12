@@ -68,9 +68,11 @@ const WebDropdown = (props: DropdownProperties) => {
   );
 };
 
-export function Dropdown(props: DropdownProperties): JSX.Element {
+function Dropdown(props: DropdownProperties) {
   if (PlatformUtils.isWeb) {
     return <WebDropdown {...props} />;
   }
   return <RNDropdown {...props} />;
 }
+
+export { Dropdown };

@@ -24,7 +24,7 @@ export interface CreateLeagueModalProps {
 
 export default function CreateLeagueModal(
   props: CreateLeagueModalProps
-): JSX.Element {
+): React.JSX.Element {
   const { onOpenChange, open } = props;
   const [leagueName, setLeagueName] = useState('');
   const [draftType, setDraftType] = useState(DraftType.Normal);

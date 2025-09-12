@@ -411,7 +411,6 @@ export const AdvancedDefault: AdvancedStory = {
     groupByDivision: false,
     disabled: false,
   },
-  render: (args) => <AdvancedTeamPicker {...args} />,
 };
 
 export const WithDivisionGrouping: AdvancedStory = {
@@ -425,7 +424,6 @@ export const WithDivisionGrouping: AdvancedStory = {
     groupByDivision: true,
     disabled: false,
   },
-  render: (args) => <AdvancedTeamPicker {...args} />,
 };
 
 export const DisabledPicker: AdvancedStory = {
@@ -439,7 +437,6 @@ export const DisabledPicker: AdvancedStory = {
     groupByDivision: false,
     disabled: true,
   },
-  render: (args) => <AdvancedTeamPicker {...args} />,
 };
 
 export const LeagueOnly: AdvancedStory = {
@@ -453,7 +450,6 @@ export const LeagueOnly: AdvancedStory = {
     groupByDivision: false,
     disabled: false,
   },
-  render: (args) => <AdvancedTeamPicker {...args} />,
 };
 
 // Interactive tests

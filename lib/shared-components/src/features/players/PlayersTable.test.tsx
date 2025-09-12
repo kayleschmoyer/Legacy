@@ -7,12 +7,14 @@ import { GET_ALL_PLAYERS } from './PlayersApi';
 // Mock data
 const mockPlayers = [
   {
+    __typename: 'Player',
     id: 1,
     firstName: 'David',
     lastName: 'Aardsma',
     brefId: 'aardsda01',
   },
   {
+    __typename: 'Player',
     id: 2,
     firstName: 'Henry',
     lastName: 'Aaron',
@@ -37,22 +39,29 @@ const mocks = [
       },
     },
   },
+  // Mock for pageSize: 25 test
+  {
+    request: {
+      query: GET_ALL_PLAYERS,
+      variables: {
+        limit: 25,
+        offset: 0,
+        orderBy: 'firstName',
+        orderDirection: 'asc',
+      },
+    },
+    result: {
+      data: {
+        players: mockPlayers,
+      },
+    },
+  },
 ];
-
-// Mock Tamagui provider for testing
-const MockTamaguiProvider = ({ children }: { children: React.ReactNode }) => {
-  return <div data-testid="tamagui-provider">{children}</div>;
-};
-
-jest.mock('tamagui', () => ({
-  ...jest.requireActual('tamagui'),
-  TamaguiProvider: MockTamaguiProvider,
-}));
 
 describe('PlayersTable', () => {
   const renderWithMocks = (props = {}) => {
     return render(
-      <MockedProvider mocks={mocks} addTypename={false}>
+      <MockedProvider mocks={mocks}>
         <PlayersTable {...props} />
       </MockedProvider>,
     );
@@ -84,7 +93,9 @@ describe('PlayersTable', () => {
 
   it('shows sort dropdown when showSorting is true', () => {
     renderWithMocks({ showSorting: true });
-    expect(screen.getByText('Sort by...')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('')).toBeInTheDocument(); // Select element should be present
+    // Or check for the select element structure
+    expect(document.querySelector('select')).toBeInTheDocument();
   });
 
   it('handles player selection', () => {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
-import { View, Text } from '../../../platform-components';
+import { render } from '@testing-library/react';
+import { Text, View } from '../../../platform-components';
 import { MLBHome } from '../MLBHome';
 
 describe('MLBHome', () => {

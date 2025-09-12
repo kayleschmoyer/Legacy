@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { AsyncHookResult, useAsyncHook } from '../../utils/HookHelpers';
-import { SecureStorage } from '../../platform-components';
+import { Platform, SecureStorage } from '../../platform-components';
 
 // Import dependencies with fallbacks for testing environment
 let getEnvVarRequired: any = () => '';
@@ -126,6 +126,6 @@ export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
 
   return useAsyncHook(
     useMemo(() => getJwt, [lastUpdate]),
-    [lastUpdate]
+    [lastUpdate],
   );
 }

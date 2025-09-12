@@ -1,10 +1,7 @@
 import React from 'react';
 import { TamaguiProvider } from 'tamagui';
 import { ApolloProvider } from '@apollo/client';
-import {
-  PlayersTable,
-  PlayersTableDemo,
-} from '@legacy-sports/shared-components';
+import { PlayersTable, PlayersTableDemo } from './PlayersTable';
 import { apolloClient } from './apollo-client'; // Your Apollo client
 import config from '../../tamagui.config.web'; // Your Tamagui config
 
@@ -21,7 +18,7 @@ export function SimplePlayersTable() {
 
 // Advanced usage with selection
 export function PlayerSelectionTable() {
-  const handlePlayerSelect = (player) => {
+  const handlePlayerSelect = (player: any) => {
     console.log('Selected player:', player);
     alert(`Selected: ${player.firstName} ${player.lastName}`);
   };

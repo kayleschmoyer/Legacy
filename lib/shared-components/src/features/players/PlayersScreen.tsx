@@ -8,11 +8,11 @@ export interface PlayersScreenProps {
   title?: string;
 }
 
-export function PlayersScreen({
+function PlayersScreen({
   onPlayerSelect,
   pageSize = 50,
   title = 'All Players',
-}: PlayersScreenProps): JSX.Element {
+}: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
       console.log('Selected player:', player);
@@ -30,4 +30,6 @@ export function PlayersScreen({
       title={title}
     />
   );
-}
+};
+
+export { PlayersScreen };

@@ -2,17 +2,6 @@
 // Note: GraphQL operations are generated in the shared/graphql.generated.ts file
 // This file provides convenient re-exports for team-related operations
 
-export {
-  GetAllTeamsDocument,
-  GetAllTeamsQuery,
-  GetAllTeamsQueryVariables,
-  useGetAllTeamsQuery,
-  useGetAllTeamsLazyQuery,
-  GetTeamDocument,
-  GetTeamQuery,
-  GetTeamQueryVariables,
-  useGetTeamQuery,
-  useGetTeamLazyQuery,
-  TeamFragment,
-  TeamFragmentDoc,
-} from '../../shared/graphql.generated';
+// Currently no team-specific operations are generated
+// Only basic Player and User operations are available in the generated schema
+export {};

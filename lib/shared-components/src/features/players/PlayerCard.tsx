@@ -7,10 +7,7 @@ export interface PlayerCardProps {
   onPlayerClick?: (player: PlayerFragment) => void;
 }
 
-export function PlayerCard({
-  player,
-  onPlayerClick,
-}: PlayerCardProps): JSX.Element {
+function PlayerCard({ player, onPlayerClick }: PlayerCardProps) {
   return (
     <Card
       elevate
@@ -22,22 +19,22 @@ export function PlayerCard({
       pressStyle={{ scale: 0.875 }}
       onPress={() => onPlayerClick?.(player)}
       cursor={onPlayerClick ? 'pointer' : 'default'}
-      backgroundColor="$background"
+      bg="$background"
       borderColor="$borderColor"
-      marginBottom="$2"
+      mb="$2"
     >
       <Card.Header>
         <H4 color="$color" numberOfLines={1}>
-          {player.name}
+          {`${player.firstName} ${player.lastName}`}
         </H4>
       </Card.Header>
 
       <Card.Footer>
-        <XStack flex={1} justifyContent="space-between" alignItems="center">
-          <Paragraph theme="alt2" size="$2">
+        <XStack flex={1} jc="space-between" ai="center">
+          <Paragraph theme="alt2" size={2}>
             ID: {player.id}
           </Paragraph>
-          <Paragraph theme="alt2" size="$2" fontFamily="$mono">
+          <Paragraph theme="alt2" size={2} fontFamily="$mono">
             {player.brefId}
           </Paragraph>
         </XStack>
@@ -45,3 +42,5 @@ export function PlayerCard({
     </Card>
   );
 }
+
+export { PlayerCard };

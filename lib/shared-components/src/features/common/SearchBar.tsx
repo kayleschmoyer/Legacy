@@ -9,6 +9,7 @@ import {
   FlatList,
   StyleSheet,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Generic filter option interface
 export interface FilterOption {
@@ -72,31 +73,31 @@ const FilterIcon = () => {
   return <Icon name="filter-list" size={24} color="white" />;
 };
 
-export function SearchBar({
+function SearchBar({
   value,
   onSearch,
   onFilter,
   currentFilters,
   filterOptions = DEFAULT_FILTER_OPTIONS,
   placeholder = 'Search players...',
-}: SearchBarProps): React.JSX.Element {
+}: SearchBarProps) {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState<{ [key: string]: string | null }>(
-    currentFilters
+    currentFilters,
   );
 
   const handleSearch = useCallback(
     (text: string) => {
       onSearch(text);
     },
-    [onSearch]
+    [onSearch],
   );
 
   const handleFilterChange = useCallback(
     (key: string, value: string | null) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
     },
-    []
+    [],
   );
 
   const applyFilters = useCallback(() => {
@@ -130,12 +131,11 @@ export function SearchBar({
           item: { label: string; value: string | null };
         }) => (
           <TouchableOpacity
-            style={[
+            style={safeStyle([
               styles.filterOption,
-              filters[item.label.toLowerCase()] === option.value
-                ? styles.filterOptionSelected
-                : null,
-            ]}
+              filters[item.label.toLowerCase()] === option.value &&
+                styles.filterOptionSelected,
+            ])}
             onPress={() =>
               handleFilterChange(item.label.toLowerCase(), option.value)
             }
@@ -194,19 +194,19 @@ export function SearchBar({
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.resetButton]}
+                style={safeStyle([styles.modalButton, styles.resetButton])}
                 onPress={resetFilters}
               >
                 <Text style={styles.modalButtonText}>Reset All</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={safeStyle([styles.modalButton, styles.cancelButton])}
                 onPress={() => setShowFilterModal(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.applyButton]}
+                style={safeStyle([styles.modalButton, styles.applyButton])}
                 onPress={applyFilters}
               >
                 <Text style={styles.modalButtonText}>Apply</Text>
@@ -322,3 +322,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
   },
 });
+
+export { SearchBar };

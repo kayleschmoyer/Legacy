@@ -8,11 +8,6 @@
       "@nx/react/typings/image.d.ts",
       "vite/client"
     ],
-    "paths": {
-      "@legacy-sports/shared-components": [
-        "../../lib/shared-components/src/index.web.ts"
-      ]
-    }
   },
   "exclude": [
     "src/**/*.spec.ts",

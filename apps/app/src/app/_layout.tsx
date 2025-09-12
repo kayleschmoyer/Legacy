@@ -38,7 +38,7 @@ const routes: NavigationRoute[] = [
   },
 ];
 
-function InnerLayout(): JSX.Element {
+function InnerLayout(): React.JSX.Element {
   const { loading } = useCurrentUserInfo();
   const client = React.useContext(DbClientContext);
   const colorScheme = useColorScheme();

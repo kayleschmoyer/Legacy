@@ -4,6 +4,7 @@
   "license": "MIT",
   "scripts": {
     "all": "nx affected -t build lint:fix lint format test make-cache bundle",
+    "typecheck": "nx affected -t typecheck",
     "clean:node": "npkill -d",
     "clean:python": "rimraf --glob **/.venv",
     "clean": "npm run clean:python && npm run clean:node",

@@ -12,6 +12,7 @@ import {
   Dimensions,
   ScrollView,
 } from '../../platform-components';
+import { safeStyle, safeConditionalStyle } from '../../utils/styles';
 import { Player, Filter } from '../../types';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 
@@ -112,14 +113,14 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
   return (
     <Animated.View
-      style={[
+      style={safeStyle([
         styles.playerCard,
         { transform: [{ scale: scaleAnim }] },
         isSelected && {
           borderColor: sportConfig.colors.accent,
           borderWidth: 2,
         },
-      ]}
+      ])}
     >
       <TouchableOpacity
         onPress={onSelect}
@@ -131,22 +132,24 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
         {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.playerInfo}>
-            <Text style={styles.playerName}>{player.name}</Text>
+            <Text
+              style={styles.playerName}
+            >{`${player.firstName} ${player.lastName}`}</Text>
             <View style={styles.playerMeta}>
               <Text style={styles.teamText}>{player.team}</Text>
               <View
-                style={[
+                style={safeStyle([
                   styles.positionBadge,
                   { backgroundColor: getPositionColor(player.position, sport) },
-                ]}
+                ])}
               >
                 <Text style={styles.positionText}>{player.position}</Text>
               </View>
               <View
-                style={[
+                style={safeStyle([
                   styles.injuryBadge,
                   { backgroundColor: getInjuryColor(player.injury) },
-                ]}
+                ])}
               >
                 <Text style={styles.injuryText}>
                   {player.injury.toUpperCase()}
@@ -177,10 +180,10 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
         {/* Action Button */}
         <TouchableOpacity
-          style={[
+          style={safeStyle([
             styles.claimButton,
             { backgroundColor: sportConfig.colors.accent },
-          ]}
+          ])}
           onPress={onClaim}
         >
           <Text style={styles.claimButtonText}>Claim Player</Text>
@@ -242,17 +245,17 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
           {allPositions.map((position) => (
             <TouchableOpacity
               key={position}
-              style={[
+              style={safeStyle([
                 styles.filterChip,
                 filters.position === position && styles.filterChipActive,
-              ]}
+              ])}
               onPress={() => onFiltersChange({ ...filters, position })}
             >
               <Text
-                style={[
+                style={safeStyle([
                   styles.filterChipText,
                   filters.position === position && styles.filterChipTextActive,
-                ]}
+                ])}
               >
                 {position}
               </Text>
@@ -265,17 +268,17 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
           {trendingOptions.map((trending) => (
             <TouchableOpacity
               key={trending}
-              style={[
+              style={safeStyle([
                 styles.filterChip,
                 filters.trending === trending && styles.filterChipActive,
-              ]}
+              ])}
               onPress={() => onFiltersChange({ ...filters, trending })}
             >
               <Text
-                style={[
+                style={safeStyle([
                   styles.filterChipText,
                   filters.trending === trending && styles.filterChipTextActive,
-                ]}
+                ])}
               >
                 {trending === 'ALL' ? 'All Trends' : `${trending} 📈`}
               </Text>
@@ -306,20 +309,20 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
             {sortOptions.map((option) => (
               <TouchableOpacity
                 key={option}
-                style={[
+                style={safeStyle([
                   styles.sortOption,
                   sortBy === option && styles.sortOptionActive,
-                ]}
+                ])}
                 onPress={() => {
                   onSortChange(option);
                   setShowSortModal(false);
                 }}
               >
                 <Text
-                  style={[
+                  style={safeStyle([
                     styles.sortOptionText,
                     sortBy === option && styles.sortOptionTextActive,
-                  ]}
+                  ])}
                 >
                   {option}
                 </Text>
@@ -384,7 +387,9 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
           <Text style={styles.claimModalTitle}>Submit Waiver Claim</Text>
 
           <View style={styles.playerSummary}>
-            <Text style={styles.claimPlayerName}>{player.name}</Text>
+            <Text
+              style={styles.claimPlayerName}
+            >{`${player.firstName} ${player.lastName}`}</Text>
             <Text style={styles.claimPlayerDetails}>
               {player.position} - {player.team}
             </Text>
@@ -421,10 +426,10 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
             <Text style={styles.inputLabel}>Drop Player (Optional)</Text>
             <ScrollView style={styles.dropPlayerList}>
               <TouchableOpacity
-                style={[
+                style={safeStyle([
                   styles.dropPlayerOption,
                   !dropPlayerId && styles.dropPlayerOptionSelected,
-                ]}
+                ])}
                 onPress={() => setDropPlayerId(undefined)}
               >
                 <Text style={styles.dropPlayerText}>
@@ -434,15 +439,16 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
               {rosterPlayers.map((rosterPlayer) => (
                 <TouchableOpacity
                   key={rosterPlayer.id}
-                  style={[
+                  style={safeStyle([
                     styles.dropPlayerOption,
                     dropPlayerId === rosterPlayer.id &&
                       styles.dropPlayerOptionSelected,
-                  ]}
+                  ])}
                   onPress={() => setDropPlayerId(rosterPlayer.id)}
                 >
                   <Text style={styles.dropPlayerText}>
-                    {rosterPlayer.name} ({rosterPlayer.position})
+                    {`${rosterPlayer.firstName} ${rosterPlayer.lastName}`} (
+                    {rosterPlayer.position})
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -479,14 +485,14 @@ export interface FreeAgentsProps {
   rosterPlayers: Player[];
 }
 
-export function FreeAgents({
+function FreeAgents({
   sport,
   players,
   onPlayerClaim,
   onPlayerWatch,
   maxFaab,
   rosterPlayers,
-}: FreeAgentsProps): JSX.Element {
+}: FreeAgentsProps) {
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<Filter>({
     position: 'ALL',
@@ -506,7 +512,9 @@ export function FreeAgents({
     let filtered = players.filter((player) => {
       const matchesSearch =
         searchText === '' ||
-        player.name.toLowerCase().includes(searchText.toLowerCase());
+        `${player.firstName} ${player.lastName}`
+          .toLowerCase()
+          .includes(searchText.toLowerCase());
       const matchesPosition =
         filters.position === 'ALL' || player.position === filters.position;
       const matchesTrending =
@@ -916,3 +924,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export { FreeAgents };

@@ -10,6 +10,7 @@ import {
   View,
   KeyboardAvoidingView,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 export interface LoginWrapperProps {
   /**
@@ -56,15 +57,15 @@ export interface LoginWrapperProps {
   /**
    * Custom styles for the container
    */
-  containerStyle?: any;
+  containerStyle?: React.CSSProperties;
   /**
    * Custom styles for the title
    */
-  titleStyle?: any;
+  titleStyle?: React.CSSProperties;
   /**
    * Custom styles for the login button
    */
-  buttonStyle?: any;
+  buttonStyle?: React.CSSProperties;
   /**
    * Animation duration in milliseconds
    * @default 500
@@ -72,7 +73,7 @@ export interface LoginWrapperProps {
   animationDuration?: number;
 }
 
-export function LoginWrapper({
+function LoginWrapper({
   title = 'Welcome to Legacy Sports!',
   emailPlaceholder = 'Email',
   passwordPlaceholder = 'Password',
@@ -86,7 +87,7 @@ export function LoginWrapper({
   titleStyle,
   buttonStyle,
   animationDuration = 500,
-}: LoginWrapperProps): JSX.Element {
+}: LoginWrapperProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [internalLoading, setInternalLoading] = useState(false);
@@ -146,10 +147,10 @@ export function LoginWrapper({
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, containerStyle]}
+      style={safeStyle([styles.container, containerStyle])}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Text style={[styles.title, titleStyle]}>{title}</Text>
+      <Text style={safeStyle([styles.title, titleStyle])}>{title}</Text>
 
       <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
         <TextInput
@@ -183,8 +184,8 @@ export function LoginWrapper({
         <TouchableOpacity
           style={[
             styles.loginButton,
-            buttonStyle,
-            isLoading && styles.loginButtonDisabled,
+            ...(buttonStyle ? [buttonStyle] : []),
+            ...(isLoading ? [styles.loginButtonDisabled] : []),
           ]}
           onPress={handleLogin}
           disabled={isLoading}
@@ -202,11 +203,17 @@ export function LoginWrapper({
           disabled={isLoading}
         >
           <Text
-            style={[styles.registerLinkText, isLoading && styles.disabledText]}
+            style={safeStyle([
+              styles.registerLinkText,
+              isLoading && styles.disabledText,
+            ])}
           >
             {registerLinkText.split('Register here')[0]}
             <Text
-              style={[styles.registerLink, isLoading && styles.disabledText]}
+              style={safeStyle([
+                styles.registerLink,
+                isLoading && styles.disabledText,
+              ])}
             >
               Register here
             </Text>
@@ -288,4 +295,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { LoginWrapper };
 export default LoginWrapper;

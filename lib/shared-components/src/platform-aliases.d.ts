@@ -3,6 +3,16 @@ declare module '__PLATFORM_COMPONENTS__' {
   import { IconProps } from './platform-components/wrappers/LazyIcon';
   import { TableProps } from './platform-components/wrappers/LazyTable';
 
+  // Extend CSS properties to include React Native layout properties
+  declare module 'csstype' {
+    interface Properties {
+      marginVertical?: number | string;
+      marginHorizontal?: number | string;
+      paddingVertical?: number | string;
+      paddingHorizontal?: number | string;
+    }
+  }
+
   // SecureStorage interface
   export interface SecureStorageOptions {
     requireAuthentication?: boolean;
@@ -32,6 +42,7 @@ declare module '__PLATFORM_COMPONENTS__' {
   export interface TextProps extends React.HTMLProps<HTMLSpanElement> {
     style?: React.CSSProperties;
     children?: React.ReactNode;
+    numberOfLines?: number;
   }
 
   export interface ScrollViewProps {
@@ -60,6 +71,15 @@ declare module '__PLATFORM_COMPONENTS__' {
     defaultValue?: string;
     disabled?: boolean;
     className?: string;
+    onFocus?: () => void;
+    onBlur?: () => void;
+    autoFocus?: boolean;
+    autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+    keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+    secureTextEntry?: boolean;
+    editable?: boolean;
+    autoComplete?: string;
+    autoCorrect?: boolean;
   }
 
   export interface ActivityIndicatorProps {
@@ -144,8 +164,8 @@ declare module '__PLATFORM_COMPONENTS__' {
   }
 
   export interface AnimatedAPI {
-    View: React.FC<any>;
-    Text: React.FC<any>;
+    View: (props: any) => React.ReactNode;
+    Text: (props: any) => React.ReactNode;
     Value: new (value: number) => any;
     timing: (
       value: any,
@@ -155,6 +175,7 @@ declare module '__PLATFORM_COMPONENTS__' {
       value: any,
       config: any,
     ) => { start: (callback?: () => void) => void };
+    parallel: (animations: any[]) => { start: (callback?: () => void) => void };
   }
 
   export interface AlertAPI {
@@ -167,18 +188,26 @@ declare module '__PLATFORM_COMPONENTS__' {
   }
 
   // React Native equivalent components
-  export const View: React.FC<ViewProps>;
-  export const Text: React.FC<TextProps>;
-  export const ScrollView: React.FC<ScrollViewProps>;
-  export const TouchableOpacity: React.FC<TouchableOpacityProps>;
-  export const TextInput: React.FC<TextInputProps>;
-  export const ActivityIndicator: React.FC<ActivityIndicatorProps>;
-  export function FlatList<ItemT>(props: FlatListProps<ItemT>): JSX.Element;
-  export const Modal: React.FC<ModalProps>;
-  export const SafeAreaView: React.FC<SafeAreaViewProps>;
-  export const KeyboardAvoidingView: React.FC<KeyboardAvoidingViewProps>;
-  export const Picker: React.FC<PickerProps> & {
-    Item: React.FC<PickerItemProps>;
+  export const View: (props: ViewProps) => React.ReactNode;
+  export const Text: (props: TextProps) => React.ReactNode;
+  export const ScrollView: (props: ScrollViewProps) => React.ReactNode;
+  export const TouchableOpacity: (
+    props: TouchableOpacityProps,
+  ) => React.ReactNode;
+  export const TextInput: (props: TextInputProps) => React.ReactNode;
+  export const ActivityIndicator: (
+    props: ActivityIndicatorProps,
+  ) => React.ReactNode;
+  export const FlatList: <ItemT>(
+    props: FlatListProps<ItemT>,
+  ) => React.ReactNode;
+  export const Modal: (props: ModalProps) => React.ReactNode;
+  export const SafeAreaView: (props: SafeAreaViewProps) => React.ReactNode;
+  export const KeyboardAvoidingView: (
+    props: KeyboardAvoidingViewProps,
+  ) => React.ReactNode;
+  export const Picker: ((props: PickerProps) => React.ReactNode) & {
+    Item: (props: PickerItemProps) => React.ReactNode;
   };
 
   // Platform APIs
@@ -190,35 +219,37 @@ declare module '__PLATFORM_COMPONENTS__' {
   export const Vibration: VibrationAPI;
 
   // Direct exports with common names (resolved at build time)
-  export const Icon: React.FC<IconProps>;
-  export const Table: React.FC<TableProps>;
-  export function LoadingPanel(): JSX.Element;
+  export const Icon: (props: IconProps) => React.ReactNode;
+  export const Table: (props: TableProps) => React.ReactNode;
+  export const LoadingPanel: () => React.ReactNode;
 
   // Platform-specific named exports (for advanced usage)
-  export const WebIcons: React.FC<IconProps>;
-  export const WebTable: React.FC<TableProps>;
-  export const MobileIcons: React.FC<IconProps>;
-  export const MobileTable: React.FC<TableProps>;
+  export const WebIcons: (props: IconProps) => React.ReactNode;
+  export const WebTable: (props: TableProps) => React.ReactNode;
+  export const MobileIcons: (props: IconProps) => React.ReactNode;
+  export const MobileTable: (props: TableProps) => React.ReactNode;
 
   // ReactNativeEquivalents default export
   export interface ReactNativeEquivalentsModule {
-    ActivityIndicator: React.FC<ActivityIndicatorProps>;
+    ActivityIndicator: (props: ActivityIndicatorProps) => React.ReactNode;
     Alert: AlertAPI;
     Animated: AnimatedAPI;
     Dimensions: DimensionsAPI;
-    FlatList: <ItemT>(props: FlatListProps<ItemT>) => JSX.Element;
-    KeyboardAvoidingView: React.FC<KeyboardAvoidingViewProps>;
-    Modal: React.FC<ModalProps>;
-    Picker: React.FC<PickerProps> & { Item: React.FC<PickerItemProps> };
+    FlatList: <ItemT>(props: FlatListProps<ItemT>) => React.ReactNode;
+    KeyboardAvoidingView: (props: KeyboardAvoidingViewProps) => React.ReactNode;
+    Modal: (props: ModalProps) => React.ReactNode;
+    Picker: ((props: PickerProps) => React.ReactNode) & {
+      Item: (props: PickerItemProps) => React.ReactNode;
+    };
     Platform: PlatformAPI;
-    SafeAreaView: React.FC<SafeAreaViewProps>;
-    ScrollView: React.FC<ScrollViewProps>;
+    SafeAreaView: (props: SafeAreaViewProps) => React.ReactNode;
+    ScrollView: (props: ScrollViewProps) => React.ReactNode;
     StyleSheet: StyleSheetAPI;
-    Text: React.FC<TextProps>;
-    TextInput: React.FC<TextInputProps>;
-    TouchableOpacity: React.FC<TouchableOpacityProps>;
+    Text: (props: TextProps) => React.ReactNode;
+    TextInput: (props: TextInputProps) => React.ReactNode;
+    TouchableOpacity: (props: TouchableOpacityProps) => React.ReactNode;
     Vibration: VibrationAPI;
-    View: React.FC<ViewProps>;
+    View: (props: ViewProps) => React.ReactNode;
   }
 
   export const ReactNativeEquivalents: ReactNativeEquivalentsModule;

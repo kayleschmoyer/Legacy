@@ -13,6 +13,7 @@ import {
 } from '../../platform-components';
 import { League, User } from '../../types';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { safeStyle } from '../../utils/styles';
 import {
   CreateLeagueModal,
   CreateLeagueFormData,
@@ -38,7 +39,7 @@ export interface SportHomeProps {
   error?: string | null;
 }
 
-export function SportHome({
+function SportHome({
   sport,
   user,
   leagues,
@@ -49,7 +50,7 @@ export function SportHome({
   quickActions = [],
   loading = false,
   error,
-}: SportHomeProps): JSX.Element {
+}: SportHomeProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -107,10 +108,10 @@ export function SportHome({
 
   const renderLeague = ({ item }: { item: League }) => (
     <TouchableOpacity
-      style={[
+      style={safeStyle([
         styles.leagueCard,
         { borderLeftColor: sportConfig.colors.accent },
-      ]}
+      ])}
       onPress={() => onLeaguePress(item)}
     >
       <View style={styles.leagueHeader}>
@@ -123,7 +124,12 @@ export function SportHome({
         <Text style={styles.leagueInfo}>
           Draft: {new Date(item.draftDate).toLocaleDateString()}
         </Text>
-        <Text style={[styles.draftType, { color: sportConfig.colors.accent }]}>
+        <Text
+          style={safeStyle([
+            styles.draftType,
+            { color: sportConfig.colors.accent },
+          ])}
+        >
           {item.draftType} Draft
         </Text>
       </View>
@@ -132,10 +138,10 @@ export function SportHome({
 
   const renderQuickAction = ({ item }: { item: QuickAction }) => (
     <TouchableOpacity
-      style={[
+      style={safeStyle([
         styles.actionButton,
         { backgroundColor: item.color || DEFAULT_COLORS.accent },
-      ]}
+      ])}
       onPress={item.onPress}
       disabled={loading}
     >
@@ -148,7 +154,10 @@ export function SportHome({
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View
-        style={[styles.header, { backgroundColor: sportConfig.colors.primary }]}
+        style={safeStyle([
+          styles.header,
+          { backgroundColor: sportConfig.colors.primary },
+        ])}
       >
         <Text style={styles.title}>{sportConfig.name} Fantasy</Text>
         <Text style={styles.subtitle}>Welcome back, {user.name}!</Text>
@@ -237,10 +246,10 @@ export function SportHome({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
+                  style={safeStyle([
                     styles.submitButton,
                     { backgroundColor: sportConfig.colors.accent },
-                  ]}
+                  ])}
                   onPress={handleJoinLeague}
                   disabled={loading}
                 >
@@ -471,3 +480,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export { SportHome };

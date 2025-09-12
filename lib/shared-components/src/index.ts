@@ -1,4 +1,5 @@
 /// <reference path="./platform-aliases.d.ts" />
+/// <reference path="./types/tamagui.d.ts" />
 
 export * from './Button';
 export * from './Layout';
@@ -93,3 +94,6 @@ export * from './navigation/TamaguiAppNavigator';
 
 // Tamagui config
 export { default as tamaguiConfig } from './tamagui.config.web';
+
+// Style utilities
+export * from './utils/styles';

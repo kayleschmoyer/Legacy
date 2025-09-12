@@ -57,11 +57,7 @@ const getPlayerDetails = (playerId: number): PlayerDetailData | undefined => {
   return playersData.find((player) => player.id === playerId);
 };
 
-export function PlayerDetail({
-  player,
-  loading,
-  error,
-}: PlayerDetailProps): JSX.Element {
+function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
   if (loading) {
     return (
       <View style={styles.container}>
@@ -190,9 +186,7 @@ export interface PlayerDetailByIdProps {
   playerId: number;
 }
 
-export function PlayerDetailById({
-  playerId,
-}: PlayerDetailByIdProps): JSX.Element {
+function PlayerDetailById({ playerId }: PlayerDetailByIdProps) {
   const player = getPlayerDetails(playerId);
 
   return <PlayerDetail player={player} />;
@@ -263,3 +257,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export { PlayerDetail };
+export { PlayerDetailById };

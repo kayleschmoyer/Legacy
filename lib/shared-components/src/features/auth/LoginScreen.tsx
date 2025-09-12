@@ -11,6 +11,7 @@ import {
 } from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
 import { useAuthHandlers } from './AuthHooks';
+import { safeStyle } from '../../utils/styles';
 
 export interface LoginScreenProps {
   /**
@@ -43,7 +44,7 @@ export interface LoginScreenProps {
   buttonText?: string;
 }
 
-export function LoginScreen({
+function LoginScreen({
   onLoginSuccess,
   onLoginFailure,
   title = 'Welcome to Legacy Sports!',
@@ -51,10 +52,10 @@ export function LoginScreen({
   containerStyle,
   buttonStyle,
   buttonText = 'Login with Google',
-}: LoginScreenProps): JSX.Element {
+}: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [fadeAnim] = useState(new Animated.Value(0));
 
@@ -93,7 +94,7 @@ export function LoginScreen({
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, containerStyle]}
+      style={safeStyle([styles.container, containerStyle])}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
@@ -106,7 +107,7 @@ export function LoginScreen({
           ) : null}
 
           <TouchableOpacity
-            style={[styles.loginButton, buttonStyle]}
+            style={safeStyle([styles.loginButton, buttonStyle])}
             onPress={handleLogin}
             disabled={isLoading}
           >
@@ -194,3 +195,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
+
+export { LoginScreen };

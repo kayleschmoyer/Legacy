@@ -7,10 +7,10 @@ export interface WebProvidersProps extends PropsWithChildren {
   additionalProviders?: React.ComponentType<PropsWithChildren>[];
 }
 
-export function WebProviders({
+function WebProviders({ 
   children,
   additionalProviders = [],
-}: WebProvidersProps): JSX.Element {
+ }: WebProvidersProps) {
   // Wrap with additional providers if any
   let wrappedChildren = children;
 
@@ -21,4 +21,6 @@ export function WebProviders({
   return wrappedChildren;
 }
 
+
+export { WebProviders };
 export default WebProviders;

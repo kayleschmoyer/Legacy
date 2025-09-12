@@ -1,5 +1,22 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
+exports[`App FootballScreen should display correct football content 1`] = `
+<main
+  style="padding: 2rem;"
+>
+  <div
+    style="padding: 20px;"
+  >
+    <h1>
+      Football Screen
+    </h1>
+    <p>
+      Football statistics and information
+    </p>
+  </div>
+</main>
+`;
+
 exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
 <div
   style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
@@ -13,7 +30,13 @@ exports[`App FootballScreen should match complete football page layout snapshot 
       <h1
         style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
       >
-        🏈 Fantasy Sports Hub
+        <span
+          aria-label="football"
+          role="img"
+        >
+          🏈
+        </span>
+         Fantasy Sports Hub
       </h1>
       <div
         style="display: flex; gap: 1rem;"
@@ -22,31 +45,61 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           href="/"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          🏠 Home
+          <span
+            aria-label="home"
+            role="img"
+          >
+            🏠
+          </span>
+           Home
         </a>
         <a
           href="/football"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
         >
-          🏈 Football
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           Football
         </a>
         <a
           href="/baseball"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          ⚾ Baseball
+          <span
+            aria-label="baseball"
+            role="img"
+          >
+            ⚾
+          </span>
+           Baseball
         </a>
         <a
           href="/players"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          👥 Players
+          <span
+            aria-label="players"
+            role="img"
+          >
+            👥
+          </span>
+           Players
         </a>
         <a
           href="/demo"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          🎨 Demo
+          <span
+            aria-label="demo"
+            role="img"
+          >
+            🎨
+          </span>
+           Demo
         </a>
       </div>
     </div>
@@ -55,26 +108,14 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     style="padding: 2rem;"
   >
     <div
-      class="css-view-g5y9jx r-alignItems-1awozwy r-backgroundColor-n1h2e2 r-display-6koalj r-flexGrow-16y2uox r-minHeight-16monfm r-padding-1pcd2l5"
+      style="padding: 20px;"
     >
-      <div
-        class="css-text-146c3p1 r-color-a4n0a9 r-fontFamily-78nqea r-fontSize-zz5t5d r-fontWeight-vw2c0b r-marginBottom-15d164r"
-        dir="auto"
-      >
-        Football Fantasy
-      </div>
-      <div
-        class="css-text-146c3p1 r-color-jwli3a r-fontFamily-78nqea r-fontSize-1i10wst r-marginBottom-117bsoe"
-        dir="auto"
-      >
-        Manage your leagues and drafts
-      </div>
-      <div
-        class="css-text-146c3p1 r-color-jwli3a r-fontFamily-78nqea r-fontSize-1x35g6 r-fontWeight-1kfrs79 r-marginBottom-15d164r"
-        dir="auto"
-      >
-        Upcoming Drafts
-      </div>
+      <h1>
+        Football Screen
+      </h1>
+      <p>
+        Football statistics and information
+      </p>
     </div>
   </main>
 </div>
@@ -85,28 +126,137 @@ exports[`App FootballScreen should match football screen snapshot 1`] = `
   style="padding: 2rem;"
 >
   <div
-    class="css-view-g5y9jx r-alignItems-1awozwy r-backgroundColor-n1h2e2 r-display-6koalj r-flexGrow-16y2uox r-minHeight-16monfm r-padding-1pcd2l5"
+    style="padding: 20px;"
   >
-    <div
-      class="css-text-146c3p1 r-color-a4n0a9 r-fontFamily-78nqea r-fontSize-zz5t5d r-fontWeight-vw2c0b r-marginBottom-15d164r"
-      dir="auto"
-    >
-      Football Fantasy
-    </div>
-    <div
-      class="css-text-146c3p1 r-color-jwli3a r-fontFamily-78nqea r-fontSize-1i10wst r-marginBottom-117bsoe"
-      dir="auto"
-    >
-      Manage your leagues and drafts
-    </div>
-    <div
-      class="css-text-146c3p1 r-color-jwli3a r-fontFamily-78nqea r-fontSize-1x35g6 r-fontWeight-1kfrs79 r-marginBottom-15d164r"
-      dir="auto"
-    >
-      Upcoming Drafts
-    </div>
+    <h1>
+      Football Screen
+    </h1>
+    <p>
+      Football statistics and information
+    </p>
   </div>
 </main>
+`;
+
+exports[`App FootballScreen should render football screen when navigating to /football 1`] = `
+<main
+  style="padding: 2rem;"
+>
+  <div
+    style="padding: 20px;"
+  >
+    <h1>
+      Football Screen
+    </h1>
+    <p>
+      Football statistics and information
+    </p>
+  </div>
+</main>
+`;
+
+exports[`App FootballScreen should render football screen with navigation and layout 1`] = `
+<div
+  style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
+>
+  <nav
+    style="background-color: rgb(30, 30, 30); padding: 1rem; border-bottom: 1px solid #333;"
+  >
+    <div
+      style="display: flex; align-items: center; gap: 2rem;"
+    >
+      <h1
+        style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
+      >
+        <span
+          aria-label="football"
+          role="img"
+        >
+          🏈
+        </span>
+         Fantasy Sports Hub
+      </h1>
+      <div
+        style="display: flex; gap: 1rem;"
+      >
+        <a
+          href="/"
+          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+        >
+          <span
+            aria-label="home"
+            role="img"
+          >
+            🏠
+          </span>
+           Home
+        </a>
+        <a
+          href="/football"
+          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
+        >
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           Football
+        </a>
+        <a
+          href="/baseball"
+          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+        >
+          <span
+            aria-label="baseball"
+            role="img"
+          >
+            ⚾
+          </span>
+           Baseball
+        </a>
+        <a
+          href="/players"
+          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+        >
+          <span
+            aria-label="players"
+            role="img"
+          >
+            👥
+          </span>
+           Players
+        </a>
+        <a
+          href="/demo"
+          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+        >
+          <span
+            aria-label="demo"
+            role="img"
+          >
+            🎨
+          </span>
+           Demo
+        </a>
+      </div>
+    </div>
+  </nav>
+  <main
+    style="padding: 2rem;"
+  >
+    <div
+      style="padding: 20px;"
+    >
+      <h1>
+        Football Screen
+      </h1>
+      <p>
+        Football statistics and information
+      </p>
+    </div>
+  </main>
+</div>
 `;
 
 exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `
@@ -114,144 +264,121 @@ exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `
   style="padding: 2rem;"
 >
   <div
-    class="css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx r-scrollbarWidth-2eszeu"
+    style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
   >
     <div
-      class="css-view-g5y9jx r-backgroundColor-n1edft r-flexGrow-16y2uox r-paddingBottom-k8qxaj"
+      style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
     >
-      <div
-        class="css-view-g5y9jx r-alignItems-1awozwy r-paddingBottom-1sv84sj r-paddingInline-u9wvl5 r-paddingTop-1ur9v65"
+      <span
+        style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
       >
-        <div
-          class="css-text-146c3p1 r-color-jwli3a r-fontSize-3i2nvb r-fontWeight-vw2c0b r-marginBottom-5oul0u r-textAlign-q4m81j"
-          dir="auto"
-        >
-          Fantasy Sports Hub
-        </div>
-        <div
-          class="css-text-146c3p1 r-color-1yis5wz r-fontSize-1i10wst r-textAlign-q4m81j"
-          dir="auto"
-        >
-          Choose your sport
-        </div>
-      </div>
-      <div
-        class="css-view-g5y9jx r-marginBottom-1yflyrw r-marginInline-bhtmuz"
+        Fantasy Sports Hub
+      </span>
+      <span
+        style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
       >
-        <div
-          class="css-text-146c3p1 r-color-jwli3a r-fontSize-adyw6z r-fontWeight-vw2c0b r-marginBottom-1ifxtd0"
-          dir="auto"
+        Choose your sport
+      </span>
+    </div>
+    <div
+      style="margin-bottom: 30px;"
+    >
+      <span
+        style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
+      >
+        Sports
+      </span>
+      <div
+        style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+      >
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
+          type="button"
         >
-          Sports
-        </div>
-        <div
-          class="css-view-g5y9jx r-flexDirection-18u37iz r-flexWrap-1w6e6rj r-gap-1ssbvtb r-justifyContent-1wtj0ep"
+          <div
+            style="padding: 20px; align-items: center; position: relative;"
+          >
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
+            >
+              ⚾
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Baseball
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
+            />
+          </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
+          type="button"
         >
           <div
-            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-            style="background-color: rgb(45, 45, 45); transition-duration: 0s;"
-            tabindex="0"
+            style="padding: 20px; align-items: center; position: relative;"
           >
-            <div
-              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
             >
-              <div
-                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                dir="auto"
-              >
-                ⚾
-              </div>
-              <div
-                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                dir="auto"
-              >
-                Baseball
-              </div>
-              <div
-                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                style="background-color: rgb(255, 107, 53);"
-              />
-            </div>
+              🏈
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Football
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
+            />
           </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
+          type="button"
+        >
           <div
-            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-            style="background-color: rgb(234, 88, 12); transition-duration: 0s;"
-            tabindex="0"
+            style="padding: 20px; align-items: center; position: relative;"
           >
-            <div
-              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
             >
-              <div
-                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                dir="auto"
-              >
-                🏈
-              </div>
-              <div
-                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                dir="auto"
-              >
-                Football
-              </div>
-              <div
-                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                style="background-color: rgb(249, 115, 22);"
-              />
-            </div>
+              🏀
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Basketball
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
+            />
           </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
+          type="button"
+        >
           <div
-            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-            style="background-color: rgb(74, 60, 140); transition-duration: 0s;"
-            tabindex="0"
+            style="padding: 20px; align-items: center; position: relative;"
           >
-            <div
-              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
             >
-              <div
-                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                dir="auto"
-              >
-                🏀
-              </div>
-              <div
-                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                dir="auto"
-              >
-                Basketball
-              </div>
-              <div
-                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                style="background-color: rgb(255, 140, 0);"
-              />
-            </div>
-          </div>
-          <div
-            class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-            style="background-color: rgb(42, 47, 58); transition-duration: 0s;"
-            tabindex="0"
-          >
-            <div
-              class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+              🏒
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
             >
-              <div
-                class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                dir="auto"
-              >
-                🏒
-              </div>
-              <div
-                class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                dir="auto"
-              >
-                Hockey
-              </div>
-              <div
-                class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                style="background-color: rgb(30, 144, 255);"
-              />
-            </div>
+              Hockey
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
+            />
           </div>
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -271,7 +398,13 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
       <h1
         style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
       >
-        🏈 Fantasy Sports Hub
+        <span
+          aria-label="football"
+          role="img"
+        >
+          🏈
+        </span>
+         Fantasy Sports Hub
       </h1>
       <div
         style="display: flex; gap: 1rem;"
@@ -280,31 +413,61 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           href="/"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
         >
-          🏠 Home
+          <span
+            aria-label="home"
+            role="img"
+          >
+            🏠
+          </span>
+           Home
         </a>
         <a
           href="/football"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          🏈 Football
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           Football
         </a>
         <a
           href="/baseball"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          ⚾ Baseball
+          <span
+            aria-label="baseball"
+            role="img"
+          >
+            ⚾
+          </span>
+           Baseball
         </a>
         <a
           href="/players"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          👥 Players
+          <span
+            aria-label="players"
+            role="img"
+          >
+            👥
+          </span>
+           Players
         </a>
         <a
           href="/demo"
           style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
         >
-          🎨 Demo
+          <span
+            aria-label="demo"
+            role="img"
+          >
+            🎨
+          </span>
+           Demo
         </a>
       </div>
     </div>
@@ -313,144 +476,121 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     style="padding: 2rem;"
   >
     <div
-      class="css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx r-scrollbarWidth-2eszeu"
+      style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
     >
       <div
-        class="css-view-g5y9jx r-backgroundColor-n1edft r-flexGrow-16y2uox r-paddingBottom-k8qxaj"
+        style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
       >
-        <div
-          class="css-view-g5y9jx r-alignItems-1awozwy r-paddingBottom-1sv84sj r-paddingInline-u9wvl5 r-paddingTop-1ur9v65"
+        <span
+          style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
         >
-          <div
-            class="css-text-146c3p1 r-color-jwli3a r-fontSize-3i2nvb r-fontWeight-vw2c0b r-marginBottom-5oul0u r-textAlign-q4m81j"
-            dir="auto"
-          >
-            Fantasy Sports Hub
-          </div>
-          <div
-            class="css-text-146c3p1 r-color-1yis5wz r-fontSize-1i10wst r-textAlign-q4m81j"
-            dir="auto"
-          >
-            Choose your sport
-          </div>
-        </div>
-        <div
-          class="css-view-g5y9jx r-marginBottom-1yflyrw r-marginInline-bhtmuz"
+          Fantasy Sports Hub
+        </span>
+        <span
+          style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
         >
-          <div
-            class="css-text-146c3p1 r-color-jwli3a r-fontSize-adyw6z r-fontWeight-vw2c0b r-marginBottom-1ifxtd0"
-            dir="auto"
+          Choose your sport
+        </span>
+      </div>
+      <div
+        style="margin-bottom: 30px;"
+      >
+        <span
+          style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
+        >
+          Sports
+        </span>
+        <div
+          style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+        >
+          <button
+            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
+            type="button"
           >
-            Sports
-          </div>
-          <div
-            class="css-view-g5y9jx r-flexDirection-18u37iz r-flexWrap-1w6e6rj r-gap-1ssbvtb r-justifyContent-1wtj0ep"
+            <div
+              style="padding: 20px; align-items: center; position: relative;"
+            >
+              <span
+                style="font-size: 48px; margin-bottom: 12px;"
+              >
+                ⚾
+              </span>
+              <span
+                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+              >
+                Baseball
+              </span>
+              <div
+                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
+              />
+            </div>
+          </button>
+          <button
+            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
+            type="button"
           >
             <div
-              class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-              style="background-color: rgb(45, 45, 45); transition-duration: 0s;"
-              tabindex="0"
+              style="padding: 20px; align-items: center; position: relative;"
             >
-              <div
-                class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+              <span
+                style="font-size: 48px; margin-bottom: 12px;"
               >
-                <div
-                  class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                  dir="auto"
-                >
-                  ⚾
-                </div>
-                <div
-                  class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                  dir="auto"
-                >
-                  Baseball
-                </div>
-                <div
-                  class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                  style="background-color: rgb(255, 107, 53);"
-                />
-              </div>
+                🏈
+              </span>
+              <span
+                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+              >
+                Football
+              </span>
+              <div
+                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
+              />
             </div>
+          </button>
+          <button
+            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
+            type="button"
+          >
             <div
-              class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-              style="background-color: rgb(234, 88, 12); transition-duration: 0s;"
-              tabindex="0"
+              style="padding: 20px; align-items: center; position: relative;"
             >
-              <div
-                class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+              <span
+                style="font-size: 48px; margin-bottom: 12px;"
               >
-                <div
-                  class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                  dir="auto"
-                >
-                  🏈
-                </div>
-                <div
-                  class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                  dir="auto"
-                >
-                  Football
-                </div>
-                <div
-                  class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                  style="background-color: rgb(249, 115, 22);"
-                />
-              </div>
+                🏀
+              </span>
+              <span
+                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+              >
+                Basketball
+              </span>
+              <div
+                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
+              />
             </div>
+          </button>
+          <button
+            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
+            type="button"
+          >
             <div
-              class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-              style="background-color: rgb(74, 60, 140); transition-duration: 0s;"
-              tabindex="0"
+              style="padding: 20px; align-items: center; position: relative;"
             >
-              <div
-                class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+              <span
+                style="font-size: 48px; margin-bottom: 12px;"
               >
-                <div
-                  class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                  dir="auto"
-                >
-                  🏀
-                </div>
-                <div
-                  class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                  dir="auto"
-                >
-                  Basketball
-                </div>
-                <div
-                  class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                  style="background-color: rgb(255, 140, 0);"
-                />
-              </div>
-            </div>
-            <div
-              class="css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-1867qdf r-boxShadow-xo6mi1 r-minWidth-qtfnoi r-overflow-1udh08x r-width-1lullxq"
-              style="background-color: rgb(42, 47, 58); transition-duration: 0s;"
-              tabindex="0"
-            >
-              <div
-                class="css-view-g5y9jx r-alignItems-1awozwy r-padding-1pcd2l5 r-position-bnwqim"
+                🏒
+              </span>
+              <span
+                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
               >
-                <div
-                  class="css-text-146c3p1 r-fontSize-s67bdx r-marginBottom-6gpygo"
-                  dir="auto"
-                >
-                  🏒
-                </div>
-                <div
-                  class="css-text-146c3p1 r-color-jwli3a r-fontSize-1i10wst r-fontWeight-1kfrs79 r-textAlign-q4m81j"
-                  dir="auto"
-                >
-                  Hockey
-                </div>
-                <div
-                  class="css-view-g5y9jx r-bottom-1p0dtai r-height-hdaws3 r-left-1d2f490 r-position-u8s1d r-right-zchlnj"
-                  style="background-color: rgb(30, 144, 255);"
-                />
-              </div>
+                Hockey
+              </span>
+              <div
+                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
+              />
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </div>
@@ -468,7 +608,13 @@ exports[`App Navigation should match navigation snapshot 1`] = `
     <h1
       style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
     >
-      🏈 Fantasy Sports Hub
+      <span
+        aria-label="football"
+        role="img"
+      >
+        🏈
+      </span>
+       Fantasy Sports Hub
     </h1>
     <div
       style="display: flex; gap: 1rem;"
@@ -477,33 +623,275 @@ exports[`App Navigation should match navigation snapshot 1`] = `
         href="/"
         style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
       >
-        🏠 Home
+        <span
+          aria-label="home"
+          role="img"
+        >
+          🏠
+        </span>
+         Home
       </a>
       <a
         href="/football"
         style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
       >
-        🏈 Football
+        <span
+          aria-label="football"
+          role="img"
+        >
+          🏈
+        </span>
+         Football
       </a>
       <a
         href="/baseball"
         style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
       >
-        ⚾ Baseball
+        <span
+          aria-label="baseball"
+          role="img"
+        >
+          ⚾
+        </span>
+         Baseball
       </a>
       <a
         href="/players"
         style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
       >
-        👥 Players
+        <span
+          aria-label="players"
+          role="img"
+        >
+          👥
+        </span>
+         Players
       </a>
       <a
         href="/demo"
         style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
       >
-        🎨 Demo
+        <span
+          aria-label="demo"
+          role="img"
+        >
+          🎨
+        </span>
+         Demo
       </a>
     </div>
   </div>
 </nav>
+`;
+
+exports[`App Navigation should render navigation with correct links 1`] = `
+<nav
+  style="background-color: rgb(30, 30, 30); padding: 1rem; border-bottom: 1px solid #333;"
+>
+  <div
+    style="display: flex; align-items: center; gap: 2rem;"
+  >
+    <h1
+      style="color: rgb(255, 255, 255); margin: 0px; font-size: 1.5rem; font-weight: bold;"
+    >
+      <span
+        aria-label="football"
+        role="img"
+      >
+        🏈
+      </span>
+       Fantasy Sports Hub
+    </h1>
+    <div
+      style="display: flex; gap: 1rem;"
+    >
+      <a
+        href="/"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: rgb(51, 102, 255); transition: all 0.2s;"
+      >
+        <span
+          aria-label="home"
+          role="img"
+        >
+          🏠
+        </span>
+         Home
+      </a>
+      <a
+        href="/football"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        <span
+          aria-label="football"
+          role="img"
+        >
+          🏈
+        </span>
+         Football
+      </a>
+      <a
+        href="/baseball"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        <span
+          aria-label="baseball"
+          role="img"
+        >
+          ⚾
+        </span>
+         Baseball
+      </a>
+      <a
+        href="/players"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        <span
+          aria-label="players"
+          role="img"
+        >
+          👥
+        </span>
+         Players
+      </a>
+      <a
+        href="/demo"
+        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
+      >
+        <span
+          aria-label="demo"
+          role="img"
+        >
+          🎨
+        </span>
+         Demo
+      </a>
+    </div>
+  </div>
+</nav>
+`;
+
+exports[`App should render homepage after loading completes 1`] = `
+<main
+  style="padding: 2rem;"
+>
+  <div
+    style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
+  >
+    <div
+      style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
+    >
+      <span
+        style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
+      >
+        Fantasy Sports Hub
+      </span>
+      <span
+        style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
+      >
+        Choose your sport
+      </span>
+    </div>
+    <div
+      style="margin-bottom: 30px;"
+    >
+      <span
+        style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
+      >
+        Sports
+      </span>
+      <div
+        style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+      >
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
+          type="button"
+        >
+          <div
+            style="padding: 20px; align-items: center; position: relative;"
+          >
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
+            >
+              ⚾
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Baseball
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
+            />
+          </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
+          type="button"
+        >
+          <div
+            style="padding: 20px; align-items: center; position: relative;"
+          >
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
+            >
+              🏈
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Football
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
+            />
+          </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
+          type="button"
+        >
+          <div
+            style="padding: 20px; align-items: center; position: relative;"
+          >
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
+            >
+              🏀
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Basketball
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
+            />
+          </div>
+        </button>
+        <button
+          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
+          type="button"
+        >
+          <div
+            style="padding: 20px; align-items: center; position: relative;"
+          >
+            <span
+              style="font-size: 48px; margin-bottom: 12px;"
+            >
+              🏒
+            </span>
+            <span
+              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
+            >
+              Hockey
+            </span>
+            <div
+              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
+            />
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
 `;

@@ -1,5 +1,7 @@
 import React from 'react';
-import { NavigationProvider, createParam } from 'solito';
+// TODO: Fix Solito imports - NavigationProvider not available in current version
+// import { NavigationProvider, createParam } from 'solito';
+import { createParam } from 'solito';
 import { NavigationContainer } from '@react-navigation/native';
 
 export const { useParam } = createParam<{
@@ -13,10 +15,13 @@ interface SolitoProviderProps {
   children: React.ReactNode;
 }
 
-export function SolitoProvider({ children }: SolitoProviderProps) {
+function SolitoProvider({ children }: SolitoProviderProps) {
   return (
     <NavigationContainer>
-      <NavigationProvider>{children}</NavigationProvider>
+      {/* TODO: Restore NavigationProvider when solito import is fixed */}
+      {children}
     </NavigationContainer>
   );
-}
+};
+
+export { SolitoProvider };

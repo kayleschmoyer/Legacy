@@ -1,4 +1,5 @@
-export default {
+/* eslint-disable */
+module.exports = {
   coverageDirectory: '../../coverage/apps/app',
   displayName: 'app',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],

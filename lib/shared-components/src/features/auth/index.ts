@@ -1,10 +1,10 @@
 // Auth hooks and utilities
 export * from './AuthHooks';
-export * from './AuthProvider';
+export { AuthProvider as AuthContextProvider } from './AuthProvider';
 export * from './AuthorizedUserContext';
 
 // Auth components
-export * from './AuthForm';
+export { AuthProvider as AuthFormProvider } from './AuthForm';
 export * from './LoginScreen';
 export * from './AuthGuard';
 

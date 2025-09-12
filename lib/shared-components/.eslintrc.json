@@ -7,7 +7,8 @@
     "node_modules/**",
     ".cache/**",
     "storybook-static/**",
-    ".storybook/**"
+    ".storybook/**",
+    "**/*.example.tsx"
   ],
   "parserOptions": {
     "project": ["./tsconfig.json", "./tsconfig.lib.json"]

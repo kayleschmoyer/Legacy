@@ -31,12 +31,12 @@ export interface TamaguiAppNavigatorProps {
 /**
  * Cross-platform navigation setup using either React Navigation (mobile) or React Router (web)
  */
-export function TamaguiAppNavigator({
+function TamaguiAppNavigator({ 
   routes,
   initialRoute,
   isAuthenticated = false,
   fallbackComponent: FallbackComponent,
-}: TamaguiAppNavigatorProps): JSX.Element {
+ }: TamaguiAppNavigatorProps) {
   // Filter routes based on authentication status
   const availableRoutes = routes.filter(
     (route) => !route.isProtected || isAuthenticated
@@ -220,4 +220,8 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
   }
 }
 
+
+export { TamaguiAppNavigator };
+export { NativeNavigator };
+export { WebNavigator };
 export default TamaguiAppNavigator;

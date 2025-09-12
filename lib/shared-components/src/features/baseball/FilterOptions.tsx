@@ -6,6 +6,7 @@ import {
   Platform,
   Picker,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Position options for baseball
 export const BASEBALL_POSITIONS = [
@@ -34,7 +35,7 @@ export interface FilterOptionsProps {
   positions?: { label: string; value: string }[];
 }
 
-export function FilterOptions({
+function FilterOptions({
   position = '',
   onPositionChange,
   team = '',
@@ -43,24 +44,27 @@ export function FilterOptions({
   onLeagueChange,
   disabled = false,
   positions = BASEBALL_POSITIONS,
-}: FilterOptionsProps): JSX.Element {
+}: FilterOptionsProps) {
   const [localPosition, setLocalPosition] = useState(position);
   const [localTeam, setLocalTeam] = useState(team);
   const [localLeague, setLocalLeague] = useState(league);
 
-  const handlePositionChange = (value: string) => {
-    setLocalPosition(value);
-    onPositionChange?.(value);
+  const handlePositionChange = (value: string | number, index?: number) => {
+    const stringValue = String(value);
+    setLocalPosition(stringValue);
+    onPositionChange?.(stringValue);
   };
 
-  const handleTeamChange = (value: string) => {
-    setLocalTeam(value);
-    onTeamChange?.(value);
+  const handleTeamChange = (value: string | number, index?: number) => {
+    const stringValue = String(value);
+    setLocalTeam(stringValue);
+    onTeamChange?.(stringValue);
   };
 
-  const handleLeagueChange = (value: string) => {
-    setLocalLeague(value);
-    onLeagueChange?.(value);
+  const handleLeagueChange = (value: string | number, index?: number) => {
+    const stringValue = String(value);
+    setLocalLeague(stringValue);
+    onLeagueChange?.(stringValue);
   };
 
   // Web implementation
@@ -141,7 +145,7 @@ export function FilterOptions({
   // Native implementation
   try {
     // Only try to load picker in React Native environment
-    if (Platform.OS !== 'web') {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
       return (
         <View style={styles.container}>
           {/* Position Filter */}
@@ -152,7 +156,10 @@ export function FilterOptions({
                 <Picker
                   selectedValue={localPosition}
                   onValueChange={handlePositionChange}
-                  style={[styles.picker, disabled && styles.pickerDisabled]}
+                  style={safeStyle([
+                    styles.picker,
+                    disabled && styles.pickerDisabled,
+                  ])}
                   enabled={!disabled}
                   dropdownIconColor="#FFD700"
                 >
@@ -177,7 +184,10 @@ export function FilterOptions({
                 <Picker
                   selectedValue={localTeam}
                   onValueChange={handleTeamChange}
-                  style={[styles.picker, disabled && styles.pickerDisabled]}
+                  style={safeStyle([
+                    styles.picker,
+                    disabled && styles.pickerDisabled,
+                  ])}
                   enabled={!disabled}
                   dropdownIconColor="#FFD700"
                 >
@@ -219,7 +229,10 @@ export function FilterOptions({
                 <Picker
                   selectedValue={localLeague}
                   onValueChange={handleLeagueChange}
-                  style={[styles.picker, disabled && styles.pickerDisabled]}
+                  style={safeStyle([
+                    styles.picker,
+                    disabled && styles.pickerDisabled,
+                  ])}
                   enabled={!disabled}
                   dropdownIconColor="#FFD700"
                 >
@@ -326,3 +339,5 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
 });
+
+export { FilterOptions };

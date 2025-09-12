@@ -4,23 +4,29 @@ import {
   ButtonProps as TamaguiButtonProps,
 } from 'tamagui';
 
-export interface ButtonProps extends Omit<TamaguiButtonProps, 'children'> {
+export interface ButtonProps extends Omit<TamaguiButtonProps, 'variant'> {
   title?: string;
   children?: React.ReactNode;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'outlined';
 }
 
-export const Button: React.FC<ButtonProps> = ({
+function Button({
   title,
   children,
   variant = 'primary',
   ...props
-}) => {
-  const themeVariant = variant === 'primary' ? 'blue' : 'outlined';
+}: ButtonProps) {
+  // Use chromeless for secondary and outlined variants, default theme for primary
+  const buttonProps =
+    variant === 'secondary' || variant === 'outlined'
+      ? { chromeless: true, ...props }
+      : props;
 
   return (
-    <TamaguiButton theme={themeVariant} size="$4" {...props}>
+    <TamaguiButton size="$4" {...buttonProps}>
       {children || title}
     </TamaguiButton>
   );
-};
+}
+
+export { Button };

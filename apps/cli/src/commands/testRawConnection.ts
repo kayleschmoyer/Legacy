@@ -1,7 +1,42 @@
 import { Client } from 'pg';
+
+import { LOGGER } from '@legacy-sports/logging';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { LOGGER } from '@legacy-sports/logging';
+
+// Define types for database query results
+interface ServerInfoRow {
+  version: string;
+  current_user: string;
+  current_database: string;
+  now: string;
+}
+
+interface SchemaRow {
+  schema_name: string;
+}
+
+interface TableRow {
+  table_name: string;
+}
+
+interface ColumnRow {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+}
+
+interface PlayerRow {
+  id: number;
+  first_name: string;
+  last_name: string;
+  bref_id: string | null;
+}
+
+type SSLConfig = false | {
+  rejectUnauthorized: boolean;
+  ca: string;
+};
 
 export const testRawConnectionCommandBuilder = () => ({});
 
@@ -32,7 +67,7 @@ export async function handleTestRawConnection(): Promise<void> {
   }
 
   // Read SSL certificate if provided
-  let sslConfig: any = false;
+  let sslConfig: SSLConfig = false;
   if (dbCertPath && dbSslMode) {
     try {
       // Handle relative paths from workspace root
@@ -91,7 +126,7 @@ export async function handleTestRawConnection(): Promise<void> {
 
     // Test a simple query
     LOGGER.info('Testing simple query...');
-    const result = await client.query(
+    const result = await client.query<ServerInfoRow>(
       'SELECT version(), current_user, current_database(), now()',
     );
     LOGGER.info('Query result:');
@@ -102,7 +137,7 @@ export async function handleTestRawConnection(): Promise<void> {
 
     // Test listing schemas
     LOGGER.info('Testing schema listing...');
-    const schemaResult = await client.query(
+    const schemaResult = await client.query<SchemaRow>(
       'SELECT schema_name FROM information_schema.schemata ORDER BY schema_name',
     );
     LOGGER.info(
@@ -111,7 +146,7 @@ export async function handleTestRawConnection(): Promise<void> {
 
     // Test listing tables in public schema
     LOGGER.info('Testing table listing...');
-    const tableResult = await client.query(`
+    const tableResult = await client.query<TableRow>(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
@@ -123,7 +158,7 @@ export async function handleTestRawConnection(): Promise<void> {
 
     // Check players table structure
     LOGGER.info('Checking players table structure...');
-    const columnsResult = await client.query(`
+    const columnsResult = await client.query<ColumnRow>(`
       SELECT column_name, data_type, is_nullable 
       FROM information_schema.columns 
       WHERE table_schema = 'public' AND table_name = 'players' 
@@ -138,7 +173,7 @@ export async function handleTestRawConnection(): Promise<void> {
 
     // Show sample player data
     LOGGER.info('Sample player data:');
-    const playersResult = await client.query(`
+    const playersResult = await client.query<PlayerRow>(`
       SELECT id, first_name, last_name, bref_id 
       FROM players 
       LIMIT 5
@@ -148,15 +183,15 @@ export async function handleTestRawConnection(): Promise<void> {
         `  - ID: ${row.id}, Name: "${row.first_name} ${row.last_name}", Bref ID: ${row.bref_id || 'null'}`,
       );
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     LOGGER.error('❌ Failed to connect to PostgreSQL database');
-    LOGGER.error(`Error: ${error?.message || 'Unknown error'}`);
+    LOGGER.error(`Error: ${(error as Error)?.message || 'Unknown error'}`);
     LOGGER.error('Full error:', JSON.stringify(error, null, 2));
   } finally {
     try {
       await client.end();
       LOGGER.info('Database connection closed');
-    } catch (error: any) {
+    } catch (error: unknown) {
       LOGGER.warn('Error closing connection:', JSON.stringify(error, null, 2));
     }
   }

@@ -13,7 +13,7 @@ enum TableView {
   FIELDING,
 }
 
-export default function Players(): JSX.Element {
+export default function Players(): React.JSX.Element {
   const [selectedView, setSelectedView] = useState(TableView.BATTING);
 
   return (

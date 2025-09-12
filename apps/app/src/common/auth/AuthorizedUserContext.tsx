@@ -7,7 +7,7 @@ export const AUTHORIZED_CONTEXT = createContext<null | LegacySportsJwt>(null);
 
 export function AuthorizedUserContextProvider({
   children,
-}: PropsWithChildren): JSX.Element {
+}: PropsWithChildren): React.JSX.Element {
   const { loading, data: currentInfo } = useCurrentUserInfo();
 
   if (loading) {

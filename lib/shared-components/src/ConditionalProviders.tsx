@@ -17,11 +17,13 @@ const NativeProviders = ({ children }: ProvidersProps) => {
   return <div data-providers="native">{children}</div>;
 };
 
-export function ConditionalProviders({
+function ConditionalProviders({ 
   children,
-}: ProvidersProps): JSX.Element {
+ }: ProvidersProps) {
   if (Platform.OS === 'web') {
     return <WebProviders>{children}</WebProviders>;
   }
   return <NativeProviders>{children}</NativeProviders>;
 }
+
+export { ConditionalProviders };

@@ -2,6 +2,10 @@ import React from 'react';
 import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 import { Spinner } from 'tamagui';
 
+export interface Props {
+  // Add any props needed for LoadingPanel
+}
+
 // For React Native
 const RNLoadingPanel = () => {
   try {
@@ -55,9 +59,9 @@ const WebLoadingPanel = () => {
   );
 };
 
-export function LoadingPanel(): JSX.Element {
+export const LoadingPanel: React.FC<Props> = () => {
   if (PlatformUtils.isWeb) {
     return <WebLoadingPanel />;
   }
   return <RNLoadingPanel />;
-}
+};

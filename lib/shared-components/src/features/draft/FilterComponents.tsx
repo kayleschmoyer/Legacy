@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -68,14 +69,14 @@ export interface QuickFiltersProps {
 /**
  * Filter Chip Component
  */
-export function FilterChip({
+function FilterChip({
   label,
   value,
   isSelected,
   onPress,
   variant = 'default',
   size = 'medium',
-}: FilterChipProps): JSX.Element {
+}: FilterChipProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -108,13 +109,13 @@ export function FilterChip({
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={chipStyle}
+        style={safeStyle(chipStyle)}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.8}
       >
-        <Text style={textStyle}>{label}</Text>
+        <Text style={safeStyle(textStyle)}>{label}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -123,13 +124,13 @@ export function FilterChip({
 /**
  * Quick Filters Bar Component
  */
-export function QuickFilters({
+function QuickFilters({
   filters,
   onFiltersChange,
   sections,
   maxVisible = 1,
   variant = 'horizontal',
-}: QuickFiltersProps): JSX.Element {
+}: QuickFiltersProps) {
   const visibleSections = sections.slice(0, maxVisible);
 
   const containerStyle = [
@@ -138,7 +139,7 @@ export function QuickFilters({
   ];
 
   return (
-    <View style={containerStyle}>
+    <View style={safeStyle(containerStyle)}>
       {visibleSections.map((section) => (
         <View key={section.key} style={styles.quickFilterSection}>
           <Text style={styles.quickFilterTitle}>{section.title}</Text>
@@ -146,10 +147,10 @@ export function QuickFilters({
             horizontal={variant === 'horizontal'}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[
+            contentContainerStyle={safeStyle([
               styles.quickFilterOptions,
               variant === 'grid' && styles.quickFilterOptionsGrid,
-            ]}
+            ])}
           >
             {section.options.map((option) => (
               <FilterChip
@@ -179,7 +180,7 @@ export function QuickFilters({
 /**
  * Filter Drawer Component with smooth animations
  */
-export function FilterDrawer({
+function FilterDrawer({
   visible,
   onClose,
   filters,
@@ -190,7 +191,7 @@ export function FilterDrawer({
   applyLabel = 'Apply',
   onReset,
   variant = 'slide',
-}: FilterDrawerProps): JSX.Element {
+}: FilterDrawerProps) {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -308,13 +309,13 @@ export function FilterDrawer({
           {/* Footer */}
           <View style={styles.drawerFooter}>
             <TouchableOpacity
-              style={[styles.drawerButton, styles.resetButton]}
+              style={safeStyle([styles.drawerButton, styles.resetButton])}
               onPress={handleReset}
             >
               <Text style={styles.resetButtonText}>{resetLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.drawerButton, styles.applyButton]}
+              style={safeStyle([styles.drawerButton, styles.applyButton])}
               onPress={onClose}
             >
               <Text style={styles.applyButtonText}>{applyLabel}</Text>
@@ -564,3 +565,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 });
+
+export { FilterChip };
+export { QuickFilters };
+export { FilterDrawer };

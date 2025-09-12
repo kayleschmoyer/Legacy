@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { resolve } from 'path';
+import { tamaguiPlugin } from '@tamagui/vite-plugin';
+import reactNativeWeb from 'vite-plugin-react-native-web';
 
 export default defineConfig(({ mode }) => {
   const platform = process.env.BUILD_PLATFORM || 'web';
@@ -10,12 +12,32 @@ export default defineConfig(({ mode }) => {
     cacheDir: '../../node_modules/.vite/lib/shared-components',
     root: __dirname,
 
-    plugins: [react(), nxViteTsPaths()],
+    plugins: [
+      ...(platform === 'web' ? [reactNativeWeb()] : []),
+      ...(platform === 'web' ? [tamaguiPlugin({
+        config: './src/tamagui.config.web.ts',
+        platform: 'web',
+        // Disable extraction in development to avoid issues
+        disableExtraction: process.env.NODE_ENV === 'development',
+        // Enable tree shaking
+        useReactNativeWebLite: false,
+        shouldExtract: (path: string) => {
+          if (path.includes('node_modules')) return false;
+          return true;
+        },
+      })] : []),
+      react(), 
+      nxViteTsPaths()
+    ],
 
     // Modern cross-platform configuration
     define: {
       __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
       'process.env.PLATFORM': JSON.stringify(platform),
+      'process.env.TAMAGUI_TARGET': JSON.stringify(platform),
+      'process.env.NODE_ENV': JSON.stringify(
+        process.env.NODE_ENV || 'development'
+      ),
     },
 
     resolve: {
@@ -65,6 +87,7 @@ export default defineConfig(({ mode }) => {
 
     // Handle JSX in dependencies based on platform
     optimizeDeps: {
+      include: platform === 'web' ? ['react', 'react-dom', '@apollo/client'] : [],
       exclude:
         platform === 'mobile'
           ? ['react-native-table-component', '@expo/vector-icons']

@@ -1,6 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Animated,
+  Platform,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+} from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { AuthState } from '../../types';
+import { User, AuthState } from '../../types';
+import { safeStyle } from '../../utils/styles';
 
 export interface LoginCredentials {
   email: string;
@@ -21,16 +34,16 @@ export interface AuthFormProps {
   initialMode?: 'login' | 'register';
 }
 
-export function AuthForm({
+function AuthForm({
   onLogin,
   onRegister,
   onForgotPassword,
   loading = false,
   error = null,
   initialMode = 'login',
-}: AuthFormProps): React.JSX.Element {
+}: AuthFormProps): React.ReactElement {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(
-    initialMode
+    initialMode,
   );
   const [formData, setFormData] = useState({
     name: '',
@@ -195,50 +208,90 @@ export function AuthForm({
         transition: 'opacity 0.6s ease, transform 0.6s ease',
       }}
     >
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h2 style={{ margin: '0 0 10px 0', color: '#333' }}>{getTitle()}</h2>
-        <p style={{ margin: '0', color: '#666' }}>Legacy Sports</p>
-      </div>
+      <Animated.View
+        style={[
+          styles.formContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <Text style={styles.subtitle}>Legacy Sports</Text>
+        </View>
 
-      {/* Form Fields */}
-      <div style={{ marginBottom: '20px' }}>
-        {mode === 'register' && (
-          <input
-            style={{
-              width: '100%',
-              padding: '12px',
-              marginBottom: '15px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '16px',
-              boxSizing: 'border-box',
-            }}
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, name: e.target.value }))
+        {/* Form Fields */}
+        <View style={styles.inputContainer}>
+          {mode === 'register' && (
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor="#888"
+              value={formData.name}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, name: text }))
+              }
+              autoCapitalize="words"
+              {...(Platform.OS !== 'web' && { editable: !loading })}
+            />
+          )}
+
+          <TextInput
+            style={styles.input}
+            placeholder="Email Address"
+            placeholderTextColor="#888"
+            value={formData.email}
+            onChangeText={(text) =>
+              setFormData((prev) => ({ ...prev, email: text }))
             }
-            disabled={loading}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={Platform.OS !== 'web' ? !loading : true}
           />
-        )}
 
-        <input
-          style={{
-            width: '100%',
-            padding: '12px',
-            marginBottom: '15px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '16px',
-            boxSizing: 'border-box',
-          }}
-          placeholder="Email Address"
-          type="email"
-          value={formData.email}
-          onChange={(e) =>
-            setFormData((prev) => ({ ...prev, email: e.target.value }))
-          }
+          {mode !== 'forgot' && (
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#888"
+              value={formData.password}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, password: text }))
+              }
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password"
+              editable={Platform.OS !== 'web' ? !loading : true}
+            />
+          )}
+
+          {mode === 'register' && (
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#888"
+              value={formData.confirmPassword}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, confirmPassword: text }))
+              }
+              secureTextEntry
+              autoCapitalize="none"
+              editable={Platform.OS !== 'web' ? !loading : true}
+            />
+          )}
+        </View>
+
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={safeStyle([
+            styles.submitButton,
+            loading && styles.disabledButton,
+          ])}
+          onPress={handleSubmit}
           disabled={loading}
         />
 
@@ -382,6 +435,8 @@ export function AuthForm({
   );
 }
 
+export { AuthForm };
+
 /**
  * Auth context provider wrapper (optional helper component)
  */
@@ -394,14 +449,14 @@ export interface AuthProviderProps {
   onForgotPassword?: (email: string) => Promise<void>;
 }
 
-export function AuthProvider({
+function AuthProvider({
   children,
   authState,
   onLogin,
   onRegister,
   onLogout,
   onForgotPassword,
-}: AuthProviderProps): React.JSX.Element {
+}: AuthProviderProps): React.ReactElement {
   if (authState.isLoading) {
     return (
       <div style={{
@@ -440,14 +495,109 @@ export function AuthProvider({
   return children as React.JSX.Element;
 }
 
-// Add CSS animation for spinner
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  `;
-  document.head.appendChild(style);
-}
+export { AuthProvider };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: DEFAULT_COLORS.primary,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 400 : undefined,
+    alignSelf: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: DEFAULT_COLORS.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: DEFAULT_COLORS.accent,
+    fontWeight: '600',
+  },
+  inputContainer: {
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: DEFAULT_COLORS.secondary,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: DEFAULT_COLORS.text,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: DEFAULT_COLORS.border,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
+  },
+  submitButton: {
+    backgroundColor: DEFAULT_COLORS.accent,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  disabledButton: {
+    backgroundColor: DEFAULT_COLORS.border,
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: DEFAULT_COLORS.text,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  linksContainer: {
+    alignItems: 'center',
+  },
+  linkText: {
+    color: DEFAULT_COLORS.accent,
+    fontSize: 16,
+    fontWeight: '600',
+    textDecorationLine: Platform.OS === 'web' ? 'underline' : undefined,
+  },
+  switchModeContainer: {
+    marginTop: 16,
+  },
+  switchModeText: {
+    fontSize: 16,
+    color: DEFAULT_COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: DEFAULT_COLORS.primary,
+  },
+  loadingText: {
+    color: DEFAULT_COLORS.text,
+    fontSize: 16,
+    marginTop: 16,
+  },
+});

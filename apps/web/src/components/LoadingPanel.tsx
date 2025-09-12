@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function LoadingPanel(): JSX.Element {
+export function LoadingPanel(): React.JSX.Element {
   return (
     <div
       style={{

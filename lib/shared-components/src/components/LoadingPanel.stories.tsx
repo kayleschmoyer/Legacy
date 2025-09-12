@@ -22,7 +22,7 @@ export const Default: Story = {};
 
 export const InContainer: Story = {
   decorators: [
-    (Story) => (
+    (Story: React.ComponentType) => (
       <div
         style={{ width: '300px', height: '200px', border: '1px solid #ccc' }}
       >

@@ -9,7 +9,7 @@ export interface PlayersTableDemoProps {
 
 export function PlayersTableDemo({
   title = 'Players Table Demo',
-}: PlayersTableDemoProps): JSX.Element {
+}: PlayersTableDemoProps) {
   const handlePlayerSelect = (player: PlayerFragment) => {
     console.log('Selected player:', player);
     alert(
@@ -18,7 +18,7 @@ export function PlayersTableDemo({
   };
 
   return (
-    <YStack flex={1} padding="$4" space="$4">
+    <YStack flex={1} p="$4" space="$4">
       <H1>{title}</H1>
 
       <YStack space="$4">

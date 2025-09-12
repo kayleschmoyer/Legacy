@@ -1,12 +1,12 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render } from '@testing-library/react';
 import { Text, View } from '../../../platform-components';
 import {
-  SportScreen,
   BaseballScreen,
-  FootballScreen,
   BasketballScreen,
+  FootballScreen,
   HockeyScreen,
+  SportScreen,
 } from '../SportScreens';
 
 describe('SportScreens', () => {

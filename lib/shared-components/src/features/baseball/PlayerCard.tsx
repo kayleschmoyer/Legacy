@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Generic player interface for baseball cards
 export interface BaseballPlayer {
@@ -31,13 +32,13 @@ export interface PlayerCardProps {
   style?: object;
 }
 
-export function PlayerCard({
+function PlayerCard({
   player,
   onPress,
   showStats = 'both',
   compact = false,
   style,
-}: PlayerCardProps): JSX.Element {
+}: PlayerCardProps) {
   const isPitcher =
     player.position === 'P' ||
     player.position === 'SP' ||
@@ -66,7 +67,7 @@ export function PlayerCard({
 
   return (
     <CardComponent
-      style={[styles.card, compact && styles.compactCard, style]}
+      style={safeStyle([styles.card, compact && styles.compactCard, style])}
       onPress={onPress ? handlePress : undefined}
     >
       {/* Header */}
@@ -193,11 +194,11 @@ export interface PlayerCardListProps {
   showStats?: 'batting' | 'pitching' | 'both';
 }
 
-export function PlayerCardList({
+function PlayerCardList({
   players,
   onPlayerPress,
   showStats = 'both',
-}: PlayerCardListProps): JSX.Element {
+}: PlayerCardListProps) {
   return (
     <View style={styles.listContainer}>
       {players.map((player) => (
@@ -346,3 +347,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
 });
+
+export { PlayerCard };
+export { PlayerCardList };

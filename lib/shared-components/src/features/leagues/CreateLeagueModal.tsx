@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 import {
   SPORT_CONFIGS,
   DROPDOWN_TEAM_COUNT_ITEMS,
@@ -32,18 +33,18 @@ export interface CreateLeagueModalProps {
   error?: string | null;
 }
 
-export function CreateLeagueModal({
+function CreateLeagueModal({
   visible,
   onClose,
   onSubmit,
   loading = false,
   error,
-}: CreateLeagueModalProps): JSX.Element {
+}: CreateLeagueModalProps) {
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     sport: 'baseball',
     numberOfTeams: 10,
-    draftType: DraftType.Normal,
+    draftType: DraftType.NORMAL,
   });
 
   const [showSportDropdown, setShowSportDropdown] = useState(false);
@@ -82,7 +83,7 @@ export function CreateLeagueModal({
         leagueName: '',
         sport: 'baseball',
         numberOfTeams: 10,
-        draftType: DraftType.Normal,
+        draftType: DraftType.NORMAL,
       });
     } catch (err) {
       // Error handling is done via the error prop
@@ -94,7 +95,7 @@ export function CreateLeagueModal({
     options: Array<{ label: string; value: string }>,
     onSelect: (value: string) => void,
     isVisible: boolean,
-    onToggle: () => void
+    onToggle: () => void,
   ) => (
     <View style={styles.dropdownContainer}>
       <TouchableOpacity
@@ -163,7 +164,7 @@ export function CreateLeagueModal({
               (value) =>
                 setFormData((prev) => ({ ...prev, sport: value as any })),
               showSportDropdown,
-              () => setShowSportDropdown(!showSportDropdown)
+              () => setShowSportDropdown(!showSportDropdown),
             )}
           </View>
 
@@ -182,7 +183,7 @@ export function CreateLeagueModal({
                   numberOfTeams: parseInt(value, 10),
                 })),
               showTeamCountDropdown,
-              () => setShowTeamCountDropdown(!showTeamCountDropdown)
+              () => setShowTeamCountDropdown(!showTeamCountDropdown),
             )}
           </View>
 
@@ -192,21 +193,21 @@ export function CreateLeagueModal({
             {renderDropdown(
               DRAFT_TYPES.find((type) => type.value === formData.draftType)
                 ?.label || 'Normal',
-              DRAFT_TYPES,
+              [...DRAFT_TYPES],
               (value) =>
                 setFormData((prev) => ({
                   ...prev,
                   draftType: value as DraftType,
                 })),
               showDraftTypeDropdown,
-              () => setShowDraftTypeDropdown(!showDraftTypeDropdown)
+              () => setShowDraftTypeDropdown(!showDraftTypeDropdown),
             )}
           </View>
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
+              style={safeStyle([styles.button, styles.cancelButton])}
               onPress={onClose}
               disabled={loading}
             >
@@ -214,11 +215,11 @@ export function CreateLeagueModal({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
+              style={safeStyle([
                 styles.button,
                 styles.submitButton,
                 loading && styles.disabledButton,
-              ]}
+              ])}
               onPress={handleSubmit}
               disabled={loading}
             >
@@ -375,3 +376,5 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+export { CreateLeagueModal };

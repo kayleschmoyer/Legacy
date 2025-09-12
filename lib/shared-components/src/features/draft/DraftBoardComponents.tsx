@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
@@ -79,13 +80,13 @@ export interface DraftStatusBarProps {
 /**
  * Draft Board Grid Component - Shows the complete draft board
  */
-export function DraftBoardGrid({
+function DraftBoardGrid({
   draftBoard,
   onTeamPress,
   onPickPress,
   variant = 'full',
   maxRounds = 15,
-}: DraftBoardGridProps): JSX.Element {
+}: DraftBoardGridProps) {
   const rounds = Math.min(
     Math.ceil(draftBoard.totalPicks / draftBoard.teams.length),
     maxRounds,
@@ -101,14 +102,14 @@ export function DraftBoardGrid({
           key={team.id}
           style={[
             styles.teamHeaderCell,
-            team.isCurrentPick && styles.currentTeamHeader,
+            ...(team.isCurrentPick ? [styles.currentTeamHeader] : []),
           ]}
           onPress={() => onTeamPress?.(team)}
         >
           <Text
             style={[
               styles.teamHeaderText,
-              team.isCurrentPick && styles.currentTeamHeaderText,
+              ...(team.isCurrentPick ? [styles.currentTeamHeaderText] : []),
             ]}
             numberOfLines={1}
           >
@@ -150,8 +151,8 @@ export function DraftBoardGrid({
               key={team.id}
               style={[
                 styles.pickCell,
-                isCurrentPick && styles.currentPickCell,
-                pick && styles.completedPickCell,
+                ...(isCurrentPick ? [styles.currentPickCell] : []),
+                ...(pick ? [styles.completedPickCell] : []),
               ]}
               onPress={() => pick && onPickPress?.(pick)}
               disabled={!pick}
@@ -186,7 +187,7 @@ export function DraftBoardGrid({
   ];
 
   return (
-    <View style={containerStyle}>
+    <View style={safeStyle(containerStyle)}>
       <FlatList
         data={Array.from({ length: rounds }, (_, i) => i + 1)}
         keyExtractor={(item) => item.toString()}
@@ -202,12 +203,12 @@ export function DraftBoardGrid({
 /**
  * Draft Pick History Component
  */
-export function DraftPickHistory({
+function DraftPickHistory({
   picks,
   onPickPress,
   maxVisible = 10,
   variant = 'list',
-}: DraftPickHistoryProps): JSX.Element {
+}: DraftPickHistoryProps) {
   const recentPicks = picks.slice(-maxVisible).reverse();
 
   const renderPickItem = ({
@@ -307,7 +308,7 @@ export function DraftPickHistory({
   ];
 
   return (
-    <View style={containerStyle}>
+    <View style={safeStyle(containerStyle)}>
       <Text style={styles.historyTitle}>Recent Picks</Text>
       <FlatList
         data={recentPicks}
@@ -323,13 +324,13 @@ export function DraftPickHistory({
 /**
  * Team Roster Component
  */
-export function TeamRoster({
+function TeamRoster({
   team,
   sport,
   onPlayerPress,
   variant = 'list',
   showPositions = true,
-}: TeamRosterProps): JSX.Element {
+}: TeamRosterProps) {
   const renderRosterItem = ({ item: pick }: { item: Pick }) => (
     <TouchableOpacity
       style={styles.rosterItem}
@@ -374,14 +375,14 @@ export function TeamRoster({
 /**
  * Draft Status Bar Component
  */
-export function DraftStatusBar({
+function DraftStatusBar({
   draftBoard,
   currentTeam,
   timeRemaining,
   onStartDraft,
   onPauseDraft,
   variant = 'full',
-}: DraftStatusBarProps): JSX.Element {
+}: DraftStatusBarProps) {
   const getStatusColor = () => {
     switch (draftBoard.status) {
       case 'active':
@@ -411,12 +412,15 @@ export function DraftStatusBar({
   const progress = (draftBoard.currentPick - 1) / draftBoard.totalPicks;
 
   return (
-    <View style={[styles.statusBar, styles[`${variant}StatusBar`]]}>
+    <View style={safeStyle([styles.statusBar, styles[`${variant}StatusBar`]])}>
       <View style={styles.statusContent}>
         <View style={styles.statusLeft}>
           <View style={styles.statusIndicator}>
             <View
-              style={[styles.statusDot, { backgroundColor: getStatusColor() }]}
+              style={safeStyle([
+                styles.statusDot,
+                { backgroundColor: getStatusColor() },
+              ])}
             />
             <Text style={styles.statusText}>{getStatusText()}</Text>
           </View>
@@ -453,7 +457,7 @@ export function DraftStatusBar({
 
           {draftBoard.status === 'active' && onPauseDraft && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.pauseButton]}
+              style={safeStyle([styles.actionButton, styles.pauseButton])}
               onPress={onPauseDraft}
             >
               <Text style={styles.actionButtonText}>Pause</Text>
@@ -466,7 +470,10 @@ export function DraftStatusBar({
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
             <View
-              style={[styles.progressFill, { width: `${progress * 100}%` }]}
+              style={safeStyle([
+                styles.progressFill,
+                { width: `${progress * 100}%` },
+              ])}
             />
           </View>
         </View>
@@ -984,3 +991,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
+
+export { DraftBoardGrid };
+export { DraftPickHistory };
+export { TeamRoster };
+export { DraftStatusBar };

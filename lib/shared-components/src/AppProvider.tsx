@@ -78,9 +78,11 @@ const WebLayout = ({
   }
 };
 
-export function AppProvider(props: AppProviderProps): JSX.Element {
+function AppProvider(props: AppProviderProps) {
   if (Platform.OS === 'web') {
     return <WebLayout {...props} />;
   }
   return <NativeLayout {...props} />;
 }
+
+export { AppProvider };

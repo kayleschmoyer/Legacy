@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 export interface MLBHomeProps {
   /**
@@ -29,19 +30,21 @@ export interface MLBHomeProps {
   children?: React.ReactNode;
 }
 
-export function MLBHome({
+function MLBHome({
   title = 'MLB Players',
   subtitle,
   containerStyle,
   titleStyle,
   subtitleStyle,
   children,
-}: MLBHomeProps): JSX.Element {
+}: MLBHomeProps) {
   return (
-    <View style={[styles.container, containerStyle]}>
-      <Text style={[styles.title, titleStyle]}>{title}</Text>
+    <View style={safeStyle([styles.container, containerStyle])}>
+      <Text style={safeStyle([styles.title, titleStyle])}>{title}</Text>
       {subtitle && (
-        <Text style={[styles.subtitle, subtitleStyle]}>{subtitle}</Text>
+        <Text style={safeStyle([styles.subtitle, subtitleStyle])}>
+          {subtitle}
+        </Text>
       )}
       {children}
     </View>
@@ -71,4 +74,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { MLBHome };
 export default MLBHome;

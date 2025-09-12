@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 export interface SearchBarProps {
   value: string;
@@ -67,7 +68,7 @@ export interface SearchAndSortBarProps {
 /**
  * Enhanced Search Bar Component
  */
-export function SearchBar({
+function SearchBar({
   value,
   onChangeText,
   placeholder = 'Search...',
@@ -78,8 +79,8 @@ export function SearchBar({
   showSearchIcon = true,
   showClearButton = true,
   autoFocus = false,
-}: SearchBarProps): JSX.Element {
-  const inputRef = useRef<TextInput>(null);
+}: SearchBarProps) {
+  const inputRef = useRef<any>(null);
   const focusAnim = useRef(new Animated.Value(0)).current;
 
   const handleFocus = () => {
@@ -121,7 +122,7 @@ export function SearchBar({
 
       <TextInput
         ref={inputRef}
-        style={[styles.searchInput, styles[`${variant}Input`]]}
+        style={safeStyle([styles.searchInput, styles[`${variant}Input`]])}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -145,13 +146,13 @@ export function SearchBar({
 /**
  * Search with Suggestions Component
  */
-export function SearchWithSuggestions({
+function SearchWithSuggestions({
   suggestions,
   onSuggestionPress,
   maxSuggestions = 5,
   showSuggestions = true,
   ...searchProps
-}: SearchWithSuggestionsProps): JSX.Element {
+}: SearchWithSuggestionsProps) {
   const visibleSuggestions = suggestions.slice(0, maxSuggestions);
   const showSuggestionsList =
     showSuggestions &&
@@ -195,13 +196,13 @@ export function SearchWithSuggestions({
 /**
  * Sort Selector Component
  */
-export function SortSelector({
+function SortSelector({
   options,
   selectedSort,
   onSortChange,
   variant = 'dropdown',
   label = 'Sort by',
-}: SortSelectorProps): JSX.Element {
+}: SortSelectorProps) {
   const selectedOption = options.find((opt) => opt.key === selectedSort);
 
   if (variant === 'tabs') {
@@ -214,14 +215,16 @@ export function SortSelector({
               key={option.key}
               style={[
                 styles.sortTab,
-                selectedSort === option.key && styles.sortTabActive,
+                ...(selectedSort === option.key ? [styles.sortTabActive] : []),
               ]}
               onPress={() => onSortChange(option.key)}
             >
               <Text
                 style={[
                   styles.sortTabText,
-                  selectedSort === option.key && styles.sortTabTextActive,
+                  ...(selectedSort === option.key
+                    ? [styles.sortTabTextActive]
+                    : []),
                 ]}
               >
                 {option.label}
@@ -243,14 +246,16 @@ export function SortSelector({
               key={option.key}
               style={[
                 styles.sortChip,
-                selectedSort === option.key && styles.sortChipActive,
+                ...(selectedSort === option.key ? [styles.sortChipActive] : []),
               ]}
               onPress={() => onSortChange(option.key)}
             >
               <Text
                 style={[
                   styles.sortChipText,
-                  selectedSort === option.key && styles.sortChipTextActive,
+                  ...(selectedSort === option.key
+                    ? [styles.sortChipTextActive]
+                    : []),
                 ]}
               >
                 {option.label}
@@ -279,7 +284,7 @@ export function SortSelector({
 /**
  * Combined Search and Sort Bar
  */
-export function SearchAndSortBar({
+function SearchAndSortBar({
   searchValue,
   onSearchChange,
   sortOptions,
@@ -289,11 +294,11 @@ export function SearchAndSortBar({
   placeholder = 'Search players...',
   showFilterButton = true,
   variant = 'default',
-}: SearchAndSortBarProps): JSX.Element {
-  const containerStyle = [
+}: SearchAndSortBarProps) {
+  const containerStyle = safeStyle([
     styles.searchAndSortContainer,
     styles[`${variant}SearchAndSort`],
-  ];
+  ]);
 
   return (
     <View style={containerStyle}>
@@ -595,3 +600,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+export { SearchBar };
+export { SearchWithSuggestions };
+export { SortSelector };
+export { SearchAndSortBar };

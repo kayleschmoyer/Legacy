@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 import { Picker } from '@react-native-picker/picker';
 
 // Generic team interface
@@ -18,21 +19,21 @@ export interface TeamPickerProps {
   teams: TeamData[];
   onSelect: (teamId: number) => void;
   placeholder?: string;
-  style?: object;
+  style?: React.CSSProperties;
 }
 
 // Cross-platform team picker component
-export function TeamPicker({
+function TeamPicker({
   selectedTeam,
   teams,
   onSelect,
   placeholder = 'Select a team',
   style,
-}: TeamPickerProps): JSX.Element {
-  if (Platform.OS === 'web') {
+}: TeamPickerProps) {
+  if ((Platform.OS as string) === 'web') {
     // Web implementation using HTML select
     return (
-      <View style={[styles.container, style]}>
+      <View style={safeStyle([styles.container, style])}>
         <select
           value={selectedTeam}
           onChange={(e) => onSelect(Number(e.target.value))}
@@ -62,9 +63,9 @@ export function TeamPicker({
   // Native implementation using Picker (if available) or fallback
   try {
     // Only try to load picker in React Native environment
-    if (Platform.OS !== 'web' && typeof require !== 'undefined') {
+    if ((Platform.OS as string) !== 'web' && typeof require !== 'undefined') {
       return (
-        <View style={[styles.container, style]}>
+        <View style={safeStyle([styles.container, style])}>
           <Picker
             selectedValue={selectedTeam}
             onValueChange={(itemValue) => onSelect(itemValue)}
@@ -92,7 +93,9 @@ export function TeamPicker({
   const selectedTeamData = teams.find((team) => team.id === selectedTeam);
 
   return (
-    <View style={[styles.container, styles.fallbackContainer, style]}>
+    <View
+      style={safeStyle([styles.container, styles.fallbackContainer, style])}
+    >
       <Text style={styles.fallbackText}>
         {selectedTeamData ? selectedTeamData.name : placeholder}
       </Text>
@@ -109,7 +112,7 @@ export interface AdvancedTeamPickerProps extends TeamPickerProps {
   disabled?: boolean;
 }
 
-export function AdvancedTeamPicker({
+function AdvancedTeamPicker({
   selectedTeam,
   teams,
   onSelect,
@@ -119,17 +122,20 @@ export function AdvancedTeamPicker({
   groupByDivision = false,
   disabled = false,
   style,
-}: AdvancedTeamPickerProps): JSX.Element {
+}: AdvancedTeamPickerProps) {
   // Group teams by division if requested
   const organizedTeams = groupByDivision
-    ? teams.reduce((acc, team) => {
-        const division = team.division || 'Unknown Division';
-        if (!acc[division]) {
-          acc[division] = [];
-        }
-        acc[division].push(team);
-        return acc;
-      }, {} as Record<string, TeamData[]>)
+    ? teams.reduce(
+        (acc, team) => {
+          const division = team.division || 'Unknown Division';
+          if (!acc[division]) {
+            acc[division] = [];
+          }
+          acc[division].push(team);
+          return acc;
+        },
+        {} as Record<string, TeamData[]>,
+      )
     : { 'All Teams': teams };
 
   const formatTeamLabel = (team: TeamData): string => {
@@ -146,9 +152,9 @@ export function AdvancedTeamPicker({
     return label;
   };
 
-  if (Platform.OS === 'web') {
+  if ((Platform.OS as string) === 'web') {
     return (
-      <View style={[styles.container, style]}>
+      <View style={safeStyle([styles.container, style])}>
         <select
           value={selectedTeam}
           onChange={(e) => onSelect(Number(e.target.value))}
@@ -186,7 +192,7 @@ export function AdvancedTeamPicker({
                   </option>
                 ));
               }
-            }
+            },
           )}
         </select>
       </View>
@@ -196,13 +202,16 @@ export function AdvancedTeamPicker({
   // Native implementation
   try {
     // Only try to load picker in React Native environment
-    if (Platform.OS !== 'web' && typeof require !== 'undefined') {
+    if ((Platform.OS as string) !== 'web' && typeof require !== 'undefined') {
       return (
-        <View style={[styles.container, style]}>
+        <View style={safeStyle([styles.container, style])}>
           <Picker
             selectedValue={selectedTeam}
             onValueChange={(itemValue) => !disabled && onSelect(itemValue)}
-            style={[styles.picker, disabled && styles.pickerDisabled]}
+            style={safeStyle([
+              styles.picker,
+              disabled && styles.pickerDisabled,
+            ]) as any}
             dropdownIconColor="#FFD700"
             enabled={!disabled}
           >
@@ -227,9 +236,14 @@ export function AdvancedTeamPicker({
   const selectedTeamData = teams.find((team) => team.id === selectedTeam);
 
   return (
-    <View style={[styles.container, styles.fallbackContainer, style]}>
+    <View
+      style={safeStyle([styles.container, styles.fallbackContainer, style])}
+    >
       <Text
-        style={[styles.fallbackText, disabled && styles.fallbackTextDisabled]}
+        style={safeStyle([
+          styles.fallbackText,
+          disabled && styles.fallbackTextDisabled,
+        ])}
       >
         {selectedTeamData ? formatTeamLabel(selectedTeamData) : placeholder}
       </Text>
@@ -277,3 +291,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 });
+
+export { TeamPicker };
+export { AdvancedTeamPicker };

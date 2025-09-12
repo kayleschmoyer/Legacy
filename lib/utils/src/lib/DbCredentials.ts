@@ -20,9 +20,9 @@ const DEFAULT_DB_CREDENTIALS_ENVIRONMENT_VARIABLES =
     DB_USERNAME: 'DB_USER',
   });
 
-export async function getDbCredentials(
+export function getDbCredentials(
   envVars: Partial<DbCredentialsEnvironmentVariables> = {}
-): Promise<DbCredentials> {
+): DbCredentials {
   const { DB_HOST, DB_PASSWORD, DB_USERNAME } = {
     ...DEFAULT_DB_CREDENTIALS_ENVIRONMENT_VARIABLES,
     ...envVars,

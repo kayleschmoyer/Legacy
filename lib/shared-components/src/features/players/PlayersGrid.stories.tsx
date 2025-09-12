@@ -66,7 +66,7 @@ const errorMock = {
       orderBy: ['NAME_ASC'],
     },
   },
-  error: new Error('Failed to load players'),
+  error: new globalThis.Error('Failed to load players'),
 };
 
 const emptyMock = {

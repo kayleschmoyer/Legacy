@@ -2,14 +2,13 @@ import type { Meta, StoryObj } from '@storybook/react';
 import {
   Card,
   ScreenContainer,
-  XStack,
-  YStack,
   H1,
   H2,
   H3,
   Paragraph,
   Separator,
 } from './Layout';
+import { XStack, YStack } from 'tamagui';
 import { Button } from './Button';
 
 // Card Stories

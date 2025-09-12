@@ -12,7 +12,7 @@ export interface DropdownProperties {
   items: readonly Readonly<DropdownItem>[];
 }
 
-export function Dropdown(props: DropdownProperties): JSX.Element {
+export function Dropdown(props: DropdownProperties): React.JSX.Element {
   const { value, onChange, items } = props;
 
   return (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, Platform } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 export interface SportScreenProps {
   /**
@@ -49,7 +50,7 @@ export interface SportScreenProps {
   children?: React.ReactNode;
 }
 
-export function SportScreen({
+function SportScreen({
   sportName,
   title,
   subtitle = 'Coming soon...',
@@ -60,16 +61,26 @@ export function SportScreen({
   titleStyle,
   subtitleStyle,
   children,
-}: SportScreenProps): JSX.Element {
+}: SportScreenProps) {
   const displayTitle = title || `${sportName} Fantasy`;
 
   return (
-    <View style={[styles.container, { backgroundColor }, containerStyle]}>
-      <Text style={[styles.title, { color: titleColor }, titleStyle]}>
+    <View
+      style={safeStyle([styles.container, { backgroundColor }, containerStyle])}
+    >
+      <Text
+        style={safeStyle([styles.title, { color: titleColor }, titleStyle])}
+      >
         {displayTitle}
       </Text>
 
-      <Text style={[styles.subtitle, { color: subtitleColor }, subtitleStyle]}>
+      <Text
+        style={safeStyle([
+          styles.subtitle,
+          { color: subtitleColor },
+          subtitleStyle,
+        ])}
+      >
         {subtitle}
       </Text>
 
@@ -81,25 +92,25 @@ export function SportScreen({
 // Specific sport screen implementations
 export type BaseballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
-export function BaseballScreen(props: BaseballScreenProps): JSX.Element {
+function BaseballScreen(props: BaseballScreenProps) {
   return <SportScreen sportName="Baseball" {...props} />;
 }
 
 export type FootballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
-export function FootballScreen(props: FootballScreenProps): JSX.Element {
+function FootballScreen(props: FootballScreenProps) {
   return <SportScreen sportName="Football" {...props} />;
 }
 
 export type BasketballScreenProps = Omit<SportScreenProps, 'sportName'>;
 
-export function BasketballScreen(props: BasketballScreenProps): JSX.Element {
+function BasketballScreen(props: BasketballScreenProps) {
   return <SportScreen sportName="Basketball" {...props} />;
 }
 
 export type HockeyScreenProps = Omit<SportScreenProps, 'sportName'>;
 
-export function HockeyScreen(props: HockeyScreenProps): JSX.Element {
+function HockeyScreen(props: HockeyScreenProps) {
   return <SportScreen sportName="Hockey" {...props} />;
 }
 
@@ -123,4 +134,9 @@ const styles = StyleSheet.create({
   },
 });
 
+export { SportScreen };
+export { BaseballScreen };
+export { FootballScreen };
+export { BasketballScreen };
+export { HockeyScreen };
 export default SportScreen;

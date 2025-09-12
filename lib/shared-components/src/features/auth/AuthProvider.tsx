@@ -41,10 +41,10 @@ export interface AuthProviderProps extends PropsWithChildren {
   ) => void;
 }
 
-export function AuthProvider({
+function AuthProvider({ 
   children,
   onAuthStateChange,
-}: AuthProviderProps): JSX.Element {
+ }: AuthProviderProps) {
   const { data: user, loading: isLoading, error } = useCurrentUserInfo();
   const authHandlers = useAuthHandlers();
 
@@ -92,3 +92,5 @@ export function useAuthenticatedUser(): LegacySportsJwt {
 
   return user;
 }
+
+export { AuthProvider };

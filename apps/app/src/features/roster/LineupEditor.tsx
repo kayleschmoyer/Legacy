@@ -42,7 +42,7 @@ interface StarterData {
 
 type PlayerData = StarterData | BenchPlayerData | EmptySlotData;
 
-export function LineupEditor(props: LineupEditorProps): JSX.Element {
+export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   const {
     availableRosterSlots,
     onPlayerAdded,

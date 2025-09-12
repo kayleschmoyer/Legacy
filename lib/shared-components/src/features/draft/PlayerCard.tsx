@@ -7,6 +7,7 @@ import {
   View,
   Platform,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Types
 export interface Player {
@@ -62,9 +63,9 @@ const colorMaps: Record<string, Record<string, string>> = {
       K: '#06b6d4',
       DEF: '#8b5cf6',
     },
-  };
+  } as const;
 
-  return colorMaps[sport]?.[position] || '#6b7280';
+  return (colorMaps as any)[sport]?.[position] || '#6b7280';
 };
 
 // Injury status colors
@@ -101,7 +102,7 @@ const TrendingIndicator: React.FC<{ trending?: string }> = ({ trending }) => {
  * Reusable Player Card Component
  * Supports multiple variants for different contexts (draft, free agents, roster)
  */
-export function PlayerCard({
+function PlayerCard({
   player,
   onSelect,
   onWatch,
@@ -112,12 +113,7 @@ export function PlayerCard({
   showStats = false,
   showOwnership = false,
   actionLabel = 'Select',
-  onMultiSelect,
-  multiSelected = false,
-  comparisonMode = false,
-  onShowStats,
-  hapticFeedback = false,
-}: PlayerCardProps): JSX.Element {
+}: PlayerCardProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
@@ -160,20 +156,20 @@ export function PlayerCard({
 
           <View style={styles.badgeContainer}>
             <View
-              style={[
+              style={safeStyle([
                 styles.positionBadge,
                 { backgroundColor: getPositionColor(player.position, sport) },
-              ]}
+              ])}
             >
               <Text style={styles.positionText}>{player.position}</Text>
             </View>
 
             {player.injury && player.injury !== 'healthy' && (
               <View
-                style={[
+                style={safeStyle([
                   styles.injuryBadge,
                   { backgroundColor: getInjuryColor(player.injury) },
-                ]}
+                ])}
               >
                 <Text style={styles.injuryText}>
                   {player.injury.charAt(0).toUpperCase()}
@@ -191,7 +187,13 @@ export function PlayerCard({
               .map(([key, value]) => (
                 <View key={key} style={styles.statItem}>
                   <Text style={styles.statLabel}>{key}</Text>
-                  <Text style={styles.statValue}>{value}</Text>
+                  <Text style={styles.statValue}>
+                    {typeof value === 'string' || typeof value === 'number'
+                      ? value
+                      : value != null
+                        ? JSON.stringify(value)
+                        : '-'}
+                  </Text>
                 </View>
               ))}
           </View>
@@ -225,11 +227,11 @@ export function PlayerCard({
           <View style={styles.actionRow}>
             {onWatch && (
               <TouchableOpacity
-                style={[
+                style={safeStyle([
                   styles.actionButton,
                   styles.watchButton,
                   player.isWatched && styles.watchedButton,
-                ]}
+                ])}
                 onPress={onWatch}
               >
                 <Text style={styles.actionButtonText}>
@@ -240,7 +242,7 @@ export function PlayerCard({
 
             {onAction && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.primaryAction]}
+                style={safeStyle([styles.actionButton, styles.primaryAction])}
                 onPress={onAction}
               >
                 <Text style={styles.actionButtonText}>{actionLabel}</Text>
@@ -462,3 +464,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 });
+
+export { PlayerCard };

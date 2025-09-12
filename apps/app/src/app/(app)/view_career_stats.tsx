@@ -4,7 +4,7 @@ import { Button, ScrollView, Text, TextInput } from 'react-native';
 import { Row, Table } from 'react-native-table-component';
 import { handleError } from '../../common/utilities/ErrorHandler';
 
-export default function ViewCareerStats(): JSX.Element {
+export default function ViewCareerStats(): React.JSX.Element {
   const [player, setPlayer] = React.useState('');
   const [data, setData] = React.useState<
     Record<string, Record<string, string | number>> | undefined

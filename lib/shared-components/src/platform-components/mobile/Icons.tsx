@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from 'react-native';
 import type { IconProps } from './LazyIcon';
+import { safeStyle } from '../../utils/styles';
 
 // Native icon implementation with fallback
 const NativeIcons: React.FC<IconProps> = ({
@@ -41,7 +42,9 @@ const NativeIcons: React.FC<IconProps> = ({
 
   // Show loading state briefly
   if (isLoading) {
-    return <Text style={[{ fontSize: size, color }, style]}>⚙️</Text>;
+    return (
+      <Text style={safeStyle([{ fontSize: size, color }, style]) as any}>⚙️</Text>
+    );
   }
 
   // Use MaterialIcons if available
@@ -75,7 +78,9 @@ const NativeIcons: React.FC<IconProps> = ({
   const iconSymbol = iconMap[name] || '❓';
 
   return (
-    <Text style={[{ fontSize: size, color, lineHeight: size }, style]}>
+    <Text
+      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style]) as any}
+    >
       {iconSymbol}
     </Text>
   );

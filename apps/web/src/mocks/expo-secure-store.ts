@@ -1,19 +1,19 @@
 // Mock for expo-secure-store on web platform
 // This provides web-safe fallbacks for SecureStore operations
 
-export const getItemAsync = async (key: string): Promise<string | null> => {
+export const getItemAsync = (key: string): Promise<string | null> => {
   try {
     if (typeof sessionStorage !== 'undefined') {
-      return sessionStorage.getItem(key);
+      return Promise.resolve(sessionStorage.getItem(key));
     }
-    return null;
+    return Promise.resolve(null);
   } catch (error) {
     console.warn('Error reading from sessionStorage:', error);
-    return null;
+    return Promise.resolve(null);
   }
 };
 
-export const setItemAsync = async (
+export const setItemAsync = (
   key: string,
   value: string,
 ): Promise<void> => {
@@ -21,18 +21,22 @@ export const setItemAsync = async (
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(key, value);
     }
+    return Promise.resolve();
   } catch (error) {
     console.warn('Error writing to sessionStorage:', error);
+    return Promise.resolve();
   }
 };
 
-export const deleteItemAsync = async (key: string): Promise<void> => {
+export const deleteItemAsync = (key: string): Promise<void> => {
   try {
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(key);
     }
+    return Promise.resolve();
   } catch (error) {
     console.warn('Error removing from sessionStorage:', error);
+    return Promise.resolve();
   }
 };
 

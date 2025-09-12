@@ -5,7 +5,7 @@ import {
   EnvironmentVariable,
 } from '../../EnvironmentVariables';
 
-export function WebProviders({ children }: PropsWithChildren): JSX.Element {
+export function WebProviders({ children }: PropsWithChildren): React.JSX.Element {
   return (
     <GoogleOAuthProvider
       clientId={getEnvVarRequired(EnvironmentVariable.GOOGLE_OAUTH_CLIENT_ID)}

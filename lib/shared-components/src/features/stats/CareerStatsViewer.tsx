@@ -10,6 +10,7 @@ import {
 } from '../../platform-components';
 import { Table } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
+import { safeStyle } from '../../utils/styles';
 
 // Cross-platform table implementation for career stats
 interface CareerStatsTableProps {
@@ -86,9 +87,9 @@ export interface CareerStatsViewerProps {
   apiEndpoint?: string;
 }
 
-export function CareerStatsViewer({
+function CareerStatsViewer({
   apiEndpoint = 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
-}: CareerStatsViewerProps): JSX.Element {
+}: CareerStatsViewerProps) {
   const [player, setPlayer] = useState('');
   const [loading, setLoading] = useState(false);
   const [battingStats, setBattingStats] = useState<
@@ -132,7 +133,9 @@ export function CareerStatsViewer({
       // Process batting stats
       if (data.batting) {
         const battingHeadersArray = Object.keys(data.batting);
-        const battingDataArray = [Object.values(data.batting)];
+        const battingDataArray = [
+          Object.values(data.batting) as (string | number)[],
+        ];
         setBattingHeaders(battingHeadersArray);
         setBattingStats(battingDataArray);
       }
@@ -140,7 +143,9 @@ export function CareerStatsViewer({
       // Process pitching stats
       if (data.pitching) {
         const pitchingHeadersArray = Object.keys(data.pitching);
-        const pitchingDataArray = [Object.values(data.pitching)];
+        const pitchingDataArray = [
+          Object.values(data.pitching) as (string | number)[],
+        ];
         setPitchingHeaders(pitchingHeadersArray);
         setPitchingStats(pitchingDataArray);
       }
@@ -148,7 +153,9 @@ export function CareerStatsViewer({
       // Process fielding stats
       if (data.fielding) {
         const fieldingHeadersArray = Object.keys(data.fielding);
-        const fieldingDataArray = [Object.values(data.fielding)];
+        const fieldingDataArray = [
+          Object.values(data.fielding) as (string | number)[],
+        ];
         setFieldingHeaders(fieldingHeadersArray);
         setFieldingStats(fieldingDataArray);
       }
@@ -182,7 +189,7 @@ export function CareerStatsViewer({
       </View>
 
       <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+        style={safeStyle([styles.button, loading && styles.buttonDisabled])}
         onPress={getCareerStats}
         disabled={loading}
       >
@@ -339,4 +346,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { CareerStatsViewer };
 export default CareerStatsViewer;

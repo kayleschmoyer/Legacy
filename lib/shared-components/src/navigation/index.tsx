@@ -8,6 +8,7 @@ import {
   Platform,
 } from '../platform-components';
 import { Route, NavigationConfig } from '../types';
+import { safeStyle } from '../utils/styles';
 import { DEFAULT_COLORS } from '../config/sports';
 
 export interface NavigationItem {
@@ -31,14 +32,14 @@ export interface NavigationDrawerProps {
   onLogout?: () => void;
 }
 
-export function NavigationDrawer({
+function NavigationDrawer({
   items,
   currentRoute,
   onNavigate,
   onClose,
   userInfo,
   onLogout,
-}: NavigationDrawerProps): JSX.Element {
+}: NavigationDrawerProps) {
   const handleItemPress = (route: string) => {
     onNavigate(route);
     onClose?.();
@@ -64,18 +65,17 @@ export function NavigationDrawer({
             {item.divider && <View style={styles.divider} />}
 
             <TouchableOpacity
-              style={[
+              style={safeStyle([
                 styles.navItem,
                 currentRoute === item.route && styles.navItemActive,
-              ]}
+              ])}
               onPress={() => handleItemPress(item.route)}
             >
               {item.icon && <Text style={styles.navIcon}>{item.icon}</Text>}
               <Text
-                style={[
-                  styles.navText,
+                style={safeStyle([
                   currentRoute === item.route && styles.navTextActive,
-                ]}
+                ])}
               >
                 {item.title}
               </Text>
@@ -111,28 +111,28 @@ export interface TabNavigationProps {
   onNavigate: (route: string) => void;
 }
 
-export function TabNavigation({
+function TabNavigation({
   items,
   currentRoute,
   onNavigate,
-}: TabNavigationProps): JSX.Element {
+}: TabNavigationProps) {
   return (
     <View style={styles.tabContainer}>
       {items.map((item) => (
         <TouchableOpacity
           key={item.route}
-          style={[
+          style={safeStyle([
             styles.tabItem,
             currentRoute === item.route && styles.tabItemActive,
-          ]}
+          ])}
           onPress={() => onNavigate(item.route)}
         >
           {item.icon && <Text style={styles.tabIcon}>{item.icon}</Text>}
           <Text
-            style={[
+            style={safeStyle([
               styles.tabText,
               currentRoute === item.route && styles.tabTextActive,
-            ]}
+            ])}
           >
             {item.title}
           </Text>
@@ -155,10 +155,10 @@ export interface BreadcrumbNavigationProps {
   onNavigate: (route: string) => void;
 }
 
-export function BreadcrumbNavigation({
+function BreadcrumbNavigation({
   items,
   onNavigate,
-}: BreadcrumbNavigationProps): JSX.Element {
+}: BreadcrumbNavigationProps) {
   return (
     <View style={styles.breadcrumbContainer}>
       {items.map((item, index) => (
@@ -188,12 +188,12 @@ export interface RouterProps {
   children?: React.ReactNode;
 }
 
-export function Router({
+function Router({
   config,
   currentRoute,
   isAuthenticated,
   children,
-}: RouterProps): JSX.Element {
+}: RouterProps) {
   const route = config.routes.find((r) => r.path === currentRoute);
 
   // Redirect to auth if not authenticated and route requires auth
@@ -242,11 +242,11 @@ export interface NavigationProviderProps {
   onRouteChange?: (route: string) => void;
 }
 
-export function NavigationProvider({
+function NavigationProvider({
   children,
   initialRoute,
   onRouteChange,
-}: NavigationProviderProps): JSX.Element {
+}: NavigationProviderProps) {
   const [currentRoute, setCurrentRoute] = React.useState(initialRoute);
   const [history, setHistory] = React.useState<string[]>([initialRoute]);
 
@@ -435,3 +435,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export { NavigationDrawer };
+export { TabNavigation };
+export { BreadcrumbNavigation };
+export { Router };
+export { NavigationProvider };

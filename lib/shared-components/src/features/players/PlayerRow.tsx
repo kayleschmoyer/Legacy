@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 
 // Generic player interface to avoid dependencies
 export interface PlayerRowData {
@@ -25,20 +26,20 @@ export interface PlayerRowProps {
   onDraft: (player: PlayerRowData) => void;
 }
 
-export function PlayerRow({ player, onDraft }: PlayerRowProps): JSX.Element {
+function PlayerRow({ player, onDraft }: PlayerRowProps) {
   return (
     <TouchableOpacity onPress={() => onDraft(player)} style={styles.tableRow}>
-      <Text style={[styles.tableCell, styles.tableCellTextLeft]}>
+      <Text style={safeStyle([styles.tableCell, styles.tableCellTextLeft])}>
         {player.player}
       </Text>
       <Text style={styles.tableCell}>{player.pos}</Text>
-      <Text style={[styles.tableCell, styles.tableCellTextLeft]}>
+      <Text style={safeStyle([styles.tableCell, styles.tableCellTextLeft])}>
         {player.team}
       </Text>
       <Text style={styles.tableCell}>{player.hr}</Text>
       <Text style={styles.tableCell}>{player.avg}</Text>
       <Text style={styles.tableCell}>{player.rbi}</Text>
-      <Text style={[styles.tableCell, styles.tableCellTextLeft]}>
+      <Text style={safeStyle([styles.tableCell, styles.tableCellTextLeft])}>
         {player.legacy}
       </Text>
       <Text style={styles.tableCell}>{player.fantasyPoints}</Text>
@@ -71,3 +72,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 });
+
+export { PlayerRow };

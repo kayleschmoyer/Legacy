@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
+import { safeStyle } from '../../utils/styles';
 
 // Platform-agnostic React components (no React Native imports)
 // Using CSS-in-JS for styling instead of StyleSheet
@@ -77,9 +78,9 @@ export interface GameLogsTableProps {
   apiEndpoint?: string;
 }
 
-export function GameLogsTable({
+function GameLogsTable({
   apiEndpoint = 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
-}: GameLogsTableProps): JSX.Element {
+}: GameLogsTableProps) {
   const [player, setPlayer] = useState('');
   const [date, setDate] = useState('');
   const [data, setData] = useState<
@@ -174,7 +175,7 @@ export function GameLogsTable({
       </View>
 
       <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+        style={safeStyle([styles.button, loading && styles.buttonDisabled])}
         onPress={getGameLog}
         disabled={loading}
       >
@@ -282,4 +283,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { GameLogsTable };
 export default GameLogsTable;

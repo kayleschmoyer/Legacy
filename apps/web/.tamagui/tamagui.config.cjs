@@ -1498,7 +1498,7 @@ function createAnimations(animations) {
         getValue() {
           return val;
         },
-        setValue(next, config2, onFinish2) {
+        setValue(next, config, onFinish2) {
           setVal(next), setOnFinish(onFinish2);
         },
         stop() {
@@ -1723,27 +1723,4 @@ var defaultConfig = {
 };
 
 // ../../lib/shared-components/src/tamagui.config.web.ts
-var import_core2 = require("@tamagui/core");
-var config = (0, import_core2.createTamagui)({
-  ...defaultConfig,
-  // Web-specific settings
-  settings: {
-    ...defaultConfig.settings,
-    allowedStyleValues: "strict",
-    autocompleteSpecificTokens: "except-special",
-    fastSchemeChange: true
-  },
-  // Override themes if needed
-  themes: {
-    ...defaultConfig.themes
-  },
-  // Override tokens if needed
-  tokens: {
-    ...defaultConfig.tokens
-  },
-  // Keep animations for web compatibility
-  animations: {
-    ...defaultConfig.animations
-  }
-});
-var tamagui_config_web_default = config;
+var tamagui_config_web_default = defaultConfig;

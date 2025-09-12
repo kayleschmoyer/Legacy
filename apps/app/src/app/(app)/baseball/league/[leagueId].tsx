@@ -15,7 +15,7 @@ interface TeamNameProps {
   standing: number;
 }
 
-function TeamName(props: TeamNameProps): JSX.Element {
+function TeamName(props: TeamNameProps): React.JSX.Element {
   const { team, leagueData, standing } = props;
 
   const owner = useMemo(() => {
@@ -40,7 +40,7 @@ function TeamName(props: TeamNameProps): JSX.Element {
   );
 }
 
-export default function LeagueId(): JSX.Element {
+export default function LeagueId(): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
@@ -83,7 +83,7 @@ export default function LeagueId(): JSX.Element {
   );
 }
 
-export function LeagueIdHeader(props: HeaderTitleProps): JSX.Element {
+export function LeagueIdHeader(props: HeaderTitleProps): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useGlobalSearchParams();
   const leagueId = params.leagueId;

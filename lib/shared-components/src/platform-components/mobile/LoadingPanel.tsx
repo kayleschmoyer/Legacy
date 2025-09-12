@@ -1,7 +1,11 @@
 import React from 'react';
 import { Spinner } from 'tamagui';
 
-export function LoadingPanel(): JSX.Element {
+export interface Props {
+  // Add any props needed for LoadingPanel
+}
+
+export const LoadingPanel: React.FC<Props> = () => {
   try {
     return <Spinner />;
   } catch (error) {
@@ -19,4 +23,4 @@ export function LoadingPanel(): JSX.Element {
       </div>
     );
   }
-}
+};

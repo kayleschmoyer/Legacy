@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -34,14 +35,14 @@ export interface HomeScreenProps {
   showAllSports?: boolean;
 }
 
-export function HomeScreen({
+function HomeScreen({
   title = 'Fantasy Sports Hub',
   subtitle = 'Choose your sport',
   sports,
   onSportPress,
   customActions = [],
   showAllSports = true,
-}: HomeScreenProps): JSX.Element {
+}: HomeScreenProps) {
   // Default to all configured sports if none provided
   const defaultSports: SportOption[] = Object.keys(SPORT_CONFIGS).map(
     (key) => ({
@@ -73,7 +74,7 @@ export function HomeScreen({
     return (
       <TouchableOpacity
         key={sport.key}
-        style={[
+        style={safeStyle([
           styles.sportCard,
           {
             backgroundColor: isEnabled
@@ -81,7 +82,7 @@ export function HomeScreen({
               : DEFAULT_COLORS.border,
           },
           !isEnabled && styles.disabledCard,
-        ]}
+        ])}
         onPress={() => isEnabled && onSportPress(sport.key)}
         disabled={!isEnabled}
       >
@@ -89,15 +90,20 @@ export function HomeScreen({
           <Text style={styles.sportIcon}>
             {sport.icon || getSportIcon(sport.key)}
           </Text>
-          <Text style={[styles.sportName, !isEnabled && styles.disabledText]}>
+          <Text
+            style={safeStyle([
+              styles.sportName,
+              !isEnabled && styles.disabledText,
+            ])}
+          >
             {sport.name}
           </Text>
           {sportConfig && (
             <View
-              style={[
+              style={safeStyle([
                 styles.sportAccent,
                 { backgroundColor: sportConfig.colors.accent },
-              ]}
+              ])}
             />
           )}
         </View>
@@ -111,10 +117,10 @@ export function HomeScreen({
   ) => (
     <TouchableOpacity
       key={`action-${index}`}
-      style={[
+      style={safeStyle([
         styles.actionCard,
         { backgroundColor: action.color || DEFAULT_COLORS.accent },
-      ]}
+      ])}
       onPress={action.onPress}
     >
       <View style={styles.actionCardContent}>
@@ -323,3 +329,5 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
+
+export { HomeScreen };

@@ -53,7 +53,7 @@ interface TabContentProps {
   team: readonly (TeamMemberWithPositionsFragment | null)[];
 }
 
-function TabContent(props: TabContentProps): JSX.Element | null {
+function TabContent(props: TabContentProps): React.JSX.Element | null {
   const {
     team,
     onPlayerAdded,
@@ -210,7 +210,7 @@ function TabContent(props: TabContentProps): JSX.Element | null {
   }
 }
 
-export default function Team(): JSX.Element {
+export default function Team(): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useLocalSearchParams();
   const teamId = params.teamId;
@@ -357,7 +357,7 @@ export default function Team(): JSX.Element {
   );
 }
 
-export function TeamIdHeader(): JSX.Element {
+export function TeamIdHeader(): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useLocalSearchParams();
   const teamId = params.teamId;

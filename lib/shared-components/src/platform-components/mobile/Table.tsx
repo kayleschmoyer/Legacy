@@ -1,17 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { TableProps } from './LazyTable';
+import { safeStyle } from '../../utils/styles';
 
 // Native table implementation using basic React Native components
 const NativeTable: React.FC<TableProps> = ({ headers, data, title, style }) => {
   return (
-    <View style={[styles.container, style]}>
+    <View style={safeStyle([styles.container, style]) as any}>
       {title && <Text style={styles.title}>{title}</Text>}
 
       {/* Header Row */}
       <View style={styles.headerRow}>
         {headers.map((header, index) => (
-          <View key={index} style={[styles.headerCell, { flex: 1 }]}>
+          <View key={index} style={safeStyle([styles.headerCell, { flex: 1 }]) as any}>
             <Text style={styles.headerText}>{header}</Text>
           </View>
         ))}
@@ -21,7 +22,10 @@ const NativeTable: React.FC<TableProps> = ({ headers, data, title, style }) => {
       {data.map((row, rowIndex) => (
         <View key={rowIndex} style={styles.dataRow}>
           {row.map((cell, cellIndex) => (
-            <View key={cellIndex} style={[styles.dataCell, { flex: 1 }]}>
+            <View
+              key={cellIndex}
+              style={safeStyle([styles.dataCell, { flex: 1 }]) as any}
+            >
               <Text style={styles.cellText}>{cell}</Text>
             </View>
           ))}

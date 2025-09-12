@@ -32,7 +32,7 @@ export interface PitchingStatsTableProps {
 
 export function PitchingStatsTable(
   props: PitchingStatsTableProps
-): JSX.Element {
+): React.JSX.Element {
   const { stats } = props;
 
   const data = useMemo(() => {

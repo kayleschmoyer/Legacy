@@ -6,14 +6,12 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-// Note: shared-components import removed as it's not available in this context
+import { HomeScreen } from '@legacy-sports/shared-components';
 
 import {
   BaseballScreen,
   DemoScreen,
-  DraftBoardScreen,
   FootballScreen,
-  HomeScreen,
   PlayersScreen,
 } from '../components/screens';
 
@@ -56,14 +54,14 @@ function Navigation() {
             fontWeight: 'bold',
           }}
         >
-          <span role="img" aria-label="Football">🏈</span> Fantasy Sports Hub
+          <span role="img" aria-label="football">🏈</span> Fantasy Sports Hub
         </h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <Link
             to="/"
             style={location.pathname === '/' ? activeLinkStyle : linkStyle}
           >
-            <span role="img" aria-label="Home">🏠</span> Home
+            <span role="img" aria-label="home">🏠</span> Home
           </Link>
           <Link
             to="/football"
@@ -71,7 +69,7 @@ function Navigation() {
               location.pathname === '/football' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="Football">🏈</span> Football
+            <span role="img" aria-label="football">🏈</span> Football
           </Link>
           <Link
             to="/baseball"
@@ -79,7 +77,7 @@ function Navigation() {
               location.pathname === '/baseball' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="Baseball">⚾</span> Baseball
+            <span role="img" aria-label="baseball">⚾</span> Baseball
           </Link>
           <Link
             to="/players"
@@ -87,19 +85,13 @@ function Navigation() {
               location.pathname === '/players' ? activeLinkStyle : linkStyle
             }
           >
-            <span role="img" aria-label="Players">👥</span> Players
+            <span role="img" aria-label="players">👥</span> Players
           </Link>
           <Link
             to="/demo"
             style={location.pathname === '/demo' ? activeLinkStyle : linkStyle}
           >
-            <span role="img" aria-label="Demo">🎨</span> Demo
-          </Link>
-          <Link
-            to="/draftboard"
-            style={location.pathname === '/draftboard' ? activeLinkStyle : linkStyle}
-          >
-            <span role="img" aria-label="Draftboard">📋</span> Draft Board
+            <span role="img" aria-label="demo">🎨</span> Demo
           </Link>
         </div>
       </div>
@@ -126,11 +118,7 @@ function NavigableHomeScreen() {
     }
   };
 
-  const handleNavigate = (path: string) => {
-    navigate(path);
-  };
-
-  return <HomeScreen onSportPress={handleSportPress} onNavigate={handleNavigate} />;
+  return <HomeScreen onSportPress={handleSportPress} />;
 }
 
 // Main App Layout
@@ -174,7 +162,6 @@ export function App() {
         <Route path="/baseball" element={<BaseballScreen />} />
         <Route path="/players" element={<PlayersScreen />} />
         <Route path="/demo" element={<DemoScreen />} />
-        <Route path="/draftboard" element={<DraftBoardScreen />} />
       </Routes>
     </AppLayout>
   );

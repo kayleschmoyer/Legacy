@@ -6,6 +6,7 @@ import {
   BreadcrumbNavigation,
   NavigationDrawerProps,
   TabNavigationProps,
+  BreadcrumbNavigationProps,
   NavigationItem,
   TabItem,
 } from './index';
@@ -233,7 +234,6 @@ export const TabDefault: TabStory = {
     currentRoute: '/roster',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
 };
 
 export const TabWithoutIcons: TabStory = {
@@ -242,7 +242,6 @@ export const TabWithoutIcons: TabStory = {
     currentRoute: '/overview',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
 };
 
 export const TabDifferentActive: TabStory = {
@@ -251,7 +250,6 @@ export const TabDifferentActive: TabStory = {
     currentRoute: '/draft',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
 };
 
 export const TabMinimal: TabStory = {
@@ -263,7 +261,6 @@ export const TabMinimal: TabStory = {
     currentRoute: '/tab1',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
 };
 
 export const TabManyItems: TabStory = {
@@ -281,7 +278,7 @@ export const TabManyItems: TabStory = {
     currentRoute: '/teams',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
+  render: (args: any) => <TabNavigation {...args} />,
 };
 
 // Interactive tab test
@@ -291,7 +288,7 @@ export const TabWithInteraction: TabStory = {
     currentRoute: '/roster',
     onNavigate: fn(),
   },
-  render: (args) => <TabNavigation {...args} />,
+  render: (args: any) => <TabNavigation {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -330,7 +327,7 @@ export const BreadcrumbDefault: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args) => <BreadcrumbNavigation {...args} />,
+  render: (args: any) => <BreadcrumbNavigation {...args} />,
 };
 
 export const BreadcrumbShort: BreadcrumbStory = {
@@ -341,7 +338,7 @@ export const BreadcrumbShort: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args) => <BreadcrumbNavigation {...args} />,
+  render: (args: any) => <BreadcrumbNavigation {...args} />,
 };
 
 export const BreadcrumbSingle: BreadcrumbStory = {
@@ -349,7 +346,7 @@ export const BreadcrumbSingle: BreadcrumbStory = {
     items: [{ title: 'Home', route: '/' }],
     onNavigate: fn(),
   },
-  render: (args) => <BreadcrumbNavigation {...args} />,
+  render: (args: any) => <BreadcrumbNavigation {...args} />,
 };
 
 export const BreadcrumbLong: BreadcrumbStory = {
@@ -368,7 +365,7 @@ export const BreadcrumbLong: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args) => <BreadcrumbNavigation {...args} />,
+  render: (args: any) => <BreadcrumbNavigation {...args} />,
 };
 
 // Combined navigation showcase

@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import { Dropdown, DropdownItem } from './Dropdown';
@@ -176,7 +177,12 @@ export const Controlled: Story = {
 
     return (
       <div style={{ padding: '20px' }}>
-        <Dropdown {...args} value={value} onChange={setValue} />
+        <Dropdown
+          {...args}
+          value={value}
+          onChange={setValue}
+          items={args.items || []}
+        />
         <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
           Selected value: <strong>{value || 'None'}</strong>
         </p>

@@ -3,7 +3,7 @@ import { ApolloClient, ApolloProvider } from '@apollo/client';
 
 interface AppProviderProps {
   children: React.ReactNode;
-  apolloClient: ApolloClient<any>;
+  apolloClient: ApolloClient<unknown>;
   colorScheme?: 'light' | 'dark';
   isLoading?: boolean;
 }

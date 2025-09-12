@@ -7,6 +7,7 @@ import {
   Text,
   Platform,
 } from '../../platform-components';
+import { safeStyle } from '../../utils/styles';
 import {
   BattingStatsTableWithData,
   FieldingStatsTableWithData,
@@ -35,20 +36,27 @@ export interface PlayersOverviewProps {
   tabStyle?: any;
 }
 
-export function PlayersOverview({
+function PlayersOverview({
   initialView = TableView.BATTING,
   containerStyle,
   tabStyle,
-}: PlayersOverviewProps): JSX.Element {
+}: PlayersOverviewProps) {
   const [selectedView, setSelectedView] = useState(initialView);
 
   const renderTabButton = (view: TableView, label: string) => (
     <TouchableOpacity
-      style={[styles.tab, tabStyle, selectedView === view && styles.activeTab]}
+      style={[
+        styles.tab,
+        tabStyle,
+        ...(selectedView === view ? [styles.activeTab] : []),
+      ]}
       onPress={() => setSelectedView(view)}
     >
       <Text
-        style={[styles.tabText, selectedView === view && styles.activeTabText]}
+        style={[
+          styles.tabText,
+          ...(selectedView === view ? [styles.activeTabText] : []),
+        ]}
       >
         {label}
       </Text>
@@ -58,7 +66,7 @@ export function PlayersOverview({
   const Container = Platform.OS === 'web' ? View : SafeAreaView;
 
   return (
-    <Container style={[styles.container, containerStyle]}>
+    <Container style={safeStyle([styles.container, containerStyle])}>
       <View style={styles.tabBar}>
         {renderTabButton(TableView.BATTING, 'Batting')}
         {renderTabButton(TableView.PITCHING, 'Pitching')}
@@ -119,4 +127,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { PlayersOverview };
 export default PlayersOverview;

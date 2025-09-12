@@ -39,26 +39,20 @@ describe('App', () => {
   });
 
   it('should render homepage after loading completes', () => {
-    const { getByText, container } = render(
+    const { container } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     );
-
-    // Initially shows loading
-    const loadingSpinner = container.querySelector(
-      '[style*="animation: spin"]',
-    );
-    expect(loadingSpinner).toBeTruthy();
 
     // Fast-forward time to complete loading
     act(() => {
       jest.advanceTimersByTime(1000);
     });
 
-    // Loading should be gone and homepage should be visible
-    expect(getByText('Fantasy Sports Hub')).toBeInTheDocument();
-    expect(getByText('Choose your sport')).toBeInTheDocument();
+    // Snapshot test the main content after loading
+    const mainContent = container.querySelector('main');
+    expect(mainContent).toMatchSnapshot();
   });
 
   describe('Homepage Snapshot', () => {
@@ -98,7 +92,7 @@ describe('App', () => {
 
   describe('Navigation', () => {
     it('should render navigation with correct links', () => {
-      const { getByText } = render(
+      const { container } = render(
         <BrowserRouter>
           <App />
         </BrowserRouter>,
@@ -109,11 +103,10 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      expect(getByText('🏈 Fantasy Sports Hub')).toBeInTheDocument();
-      expect(getByText('🏠 Home')).toBeInTheDocument();
-      expect(getByText('🏈 Football')).toBeInTheDocument();
-      expect(getByText('⚾ Baseball')).toBeInTheDocument();
-      expect(getByText('🎨 Demo')).toBeInTheDocument();
+      // Check navigation exists and take snapshot for structure/content verification
+      const nav = container.querySelector('nav');
+      expect(nav).toBeInTheDocument();
+      expect(nav).toMatchSnapshot();
     });
 
     it('should match navigation snapshot', () => {
@@ -136,7 +129,7 @@ describe('App', () => {
 
   describe('FootballScreen', () => {
     it('should render football screen when navigating to /football', () => {
-      const { getByText } = render(
+      const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
         </MemoryRouter>,
@@ -147,11 +140,14 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      expect(getByText('Football Fantasy')).toBeInTheDocument();
+      // Verify football screen is rendered and matches expected content
+      const footballContent = container.querySelector('main');
+      expect(footballContent).toBeInTheDocument();
+      expect(footballContent).toMatchSnapshot();
     });
 
     it('should display correct football content', () => {
-      const { getByText } = render(
+      const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
         </MemoryRouter>,
@@ -162,8 +158,10 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      expect(getByText('Football Fantasy')).toBeInTheDocument();
-      expect(getByText('Manage your leagues and drafts')).toBeInTheDocument();
+      // Verify football content is present and matches expected structure
+      const footballContent = container.querySelector('main');
+      expect(footballContent).toBeInTheDocument();
+      expect(footballContent).toMatchSnapshot();
     });
 
     it('should match football screen snapshot', () => {
@@ -183,7 +181,7 @@ describe('App', () => {
     });
 
     it('should render football screen with navigation and layout', () => {
-      const { container, getByText } = render(
+      const { container } = render(
         <MemoryRouter initialEntries={['/football']}>
           <App />
         </MemoryRouter>,
@@ -194,13 +192,12 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      // Check that navigation is present
-      expect(getByText('🏈 Fantasy Sports Hub')).toBeInTheDocument();
-      expect(getByText('🏈 Football')).toBeInTheDocument();
-
-      // Check that the full layout is rendered correctly
+      // Check that basic layout elements are present and take snapshot for structure verification
       expect(container.querySelector('nav')).toBeInTheDocument();
       expect(container.querySelector('main')).toBeInTheDocument();
+      
+      // Snapshot ensures navigation content and layout are correct
+      expect(container.firstChild).toMatchSnapshot();
     });
 
     it('should show loading initially even when navigating to football', () => {

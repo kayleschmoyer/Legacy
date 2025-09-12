@@ -2,17 +2,6 @@
 // Note: GraphQL operations are generated in the shared/graphql.generated.ts file
 // This file provides convenient re-exports for pitching statistics operations
 
-export {
-  GetPlayerSeasonPitchingDocument,
-  GetPlayerSeasonPitchingQuery,
-  GetPlayerSeasonPitchingQueryVariables,
-  useGetPlayerSeasonPitchingQuery,
-  useGetPlayerSeasonPitchingLazyQuery,
-  GetPlayerAllSeasonPitchingDocument,
-  GetPlayerAllSeasonPitchingQuery,
-  GetPlayerAllSeasonPitchingQueryVariables,
-  useGetPlayerAllSeasonPitchingQuery,
-  useGetPlayerAllSeasonPitchingLazyQuery,
-  SeasonPitchingFragment,
-  SeasonPitchingFragmentDoc,
-} from '../../../shared/graphql.generated';
+// Currently no pitching statistics operations are generated
+// Only basic Player and User operations are available in the generated schema
+export {};

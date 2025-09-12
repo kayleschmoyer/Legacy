@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { H1, H2, H3, Paragraph, YStack, Separator } from './Layout';
+import { YStack } from 'tamagui';
+import { H1, H2, H3, Paragraph, Separator } from './Layout';
 
 // Typography Stories - Combined
 const TypographyMeta: Meta = {
@@ -64,7 +65,7 @@ export const ParagraphText: StoryObj = {
 export const TypographyHierarchy: StoryObj = {
   name: 'Typography Hierarchy',
   render: () => (
-    <YStack space="$3" maxWidth={600}>
+    <YStack space="$3" maxW="$20">
       <H1>Legacy Sports App</H1>
       <Paragraph>
         Welcome to the Legacy Sports application. This demonstrates our
@@ -102,7 +103,7 @@ export const TypographyHierarchy: StoryObj = {
 export const LongFormContent: StoryObj = {
   name: 'Long Form Content',
   render: () => (
-    <YStack space="$3" maxWidth={600}>
+    <YStack space="$3" maxW="$20">
       <H1>About Legacy Sports</H1>
 
       <Paragraph>

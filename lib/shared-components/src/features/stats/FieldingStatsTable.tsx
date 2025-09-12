@@ -44,9 +44,9 @@ export interface FieldingStatsTableProps {
   stats: readonly FieldingStatsRecord[];
 }
 
-export function FieldingStatsTable({
+function FieldingStatsTable({ 
   stats,
-}: FieldingStatsTableProps): JSX.Element {
+ }: FieldingStatsTableProps) {
   const data = useMemo(() => {
     return stats.map((record) => [
       record.player?.name || 'Unknown',
@@ -135,3 +135,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export { FieldingStatsTable };

@@ -26,7 +26,7 @@ export interface FieldingStatsTableProps {
 
 export function FieldingStatsTable(
   props: FieldingStatsTableProps
-): JSX.Element {
+): React.JSX.Element {
   const { stats } = props;
 
   const data = useMemo(() => {

@@ -166,9 +166,11 @@ const WebNavigator = ({ routes, initialRoute }: AppNavigatorProps) => {
   );
 };
 
-export function AppNavigator(props: AppNavigatorProps): JSX.Element {
+function AppNavigator(props: AppNavigatorProps) {
   if (Platform.OS === 'web') {
     return <WebNavigator {...props} />;
   }
   return <NativeNavigator {...props} />;
 }
+
+export { AppNavigator };
