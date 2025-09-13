@@ -29,6 +29,11 @@ on:
         default: true
         type: boolean
 
+# Required permissions for nx-set-shas action
+permissions:
+  actions: read
+  contents: read
+
 # Cancel in-progress builds for the same workflow
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.build_type || 'Release' }}
@@ -67,6 +72,9 @@ jobs:
 
       - name: Setup Nx SHAs
         uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: 'main'
+          error-on-no-successful-workflow: false
 
       - name: Install CocoaPods
         run: |

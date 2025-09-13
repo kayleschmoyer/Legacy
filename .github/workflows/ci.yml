@@ -58,6 +58,9 @@ jobs:
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: 'main'
+          error-on-no-successful-workflow: false
 
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: npx nx-cloud record -- echo Hello World
@@ -155,6 +158,9 @@ jobs:
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: 'main'
+          error-on-no-successful-workflow: false
 
       # Only build iOS if the app project is affected
       - name: Check if iOS build is needed
@@ -205,6 +211,9 @@ jobs:
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: 'main'
+          error-on-no-successful-workflow: false
 
       # Only build Android if the app project is affected
       - name: Check if Android build is needed
