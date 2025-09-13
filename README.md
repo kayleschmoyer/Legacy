@@ -11,6 +11,7 @@ A modern sports data management platform built with React Native CLI, Next.js we
 **Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases)
 
 **Installation Instructions:**
+
 1. Download the APK file from the link above
 2. Enable "Install from Unknown Sources" in your Android settings
 3. Install the APK on your Android device

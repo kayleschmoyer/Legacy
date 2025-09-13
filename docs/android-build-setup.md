@@ -16,10 +16,12 @@ Unlike iOS, Android builds don't require any paid certificates or complex signin
 ### 3. How to Use
 
 #### Automatic Builds
+
 - Push changes to `main` branch that affect the app
 - The workflow will automatically build a release APK
 
 #### Manual Builds
+
 1. Go to GitHub Actions in your repository
 2. Select "Build Android App" workflow
 3. Click "Run workflow"
@@ -29,6 +31,7 @@ Unlike iOS, Android builds don't require any paid certificates or complex signin
 ### 4. What You Get
 
 The workflow will:
+
 - Build Android APK (debug or release)
 - Upload as GitHub artifact
 - Create GitHub release with downloadable APK
@@ -37,6 +40,7 @@ The workflow will:
 ### 5. APK Installation
 
 To install the APK on Android devices:
+
 1. Download the APK from GitHub releases
 2. Enable "Install from Unknown Sources" in Android settings
 3. Install the APK
@@ -44,6 +48,7 @@ To install the APK on Android devices:
 ### 6. No Additional Configuration Needed
 
 Since you're using:
+
 - ✅ Expo SDK 52 (already configured)
 - ✅ Standard React Native Android setup
 - ✅ Gradle build system (already working)

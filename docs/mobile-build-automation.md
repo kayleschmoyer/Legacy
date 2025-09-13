@@ -9,10 +9,11 @@ Your repository now has comprehensive GitHub Actions workflows for building both
 ### 1. **Android APK Builds**
 
 #### `publish-android-apk.yml` - Production Android Builds
-- **Triggers:** 
+
+- **Triggers:**
   - Push to `main` branch (when app code changes)
   - Manual trigger via GitHub UI
-- **Outputs:** 
+- **Outputs:**
   - Signed APK files
   - GitHub Releases with download links
   - Artifacts with 90-day retention
@@ -22,6 +23,7 @@ Your repository now has comprehensive GitHub Actions workflows for building both
   - Release notes generation
 
 #### `build-android-manual.yml` - Manual Android Builds
+
 - **Triggers:** Manual only
 - **Options:**
   - Choose Release or Debug build
@@ -31,8 +33,9 @@ Your repository now has comprehensive GitHub Actions workflows for building both
 ### 2. **iOS IPA Builds**
 
 #### `publish-ios-ipa.yml` - iOS Builds (NEW)
+
 - **Triggers:**
-  - Push to `main` branch (when app code changes)  
+  - Push to `main` branch (when app code changes)
   - Manual trigger via GitHub UI
 - **Outputs:**
   - IPA files (for Release builds)
@@ -46,6 +49,7 @@ Your repository now has comprehensive GitHub Actions workflows for building both
 ### 3. **Cross-Platform Builds**
 
 #### `build-mobile-apps.yml` - Unified Mobile Builds (NEW)
+
 - **Triggers:**
   - Push to `main` branch
   - Manual trigger with platform selection
@@ -63,24 +67,28 @@ Your repository now has comprehensive GitHub Actions workflows for building both
 ### ✅ **What's Automated**
 
 **Version Management:**
+
 - Automatic version extraction from `package.json`
 - Build number generation with timestamps
 - Git commit SHA integration
 - Consistent versioning across platforms
 
 **Android Builds:**
+
 - Gradle-based compilation
 - APK generation (Release/Debug)
 - Automatic signing (development)
 - Size optimization
 
 **iOS Builds:**
+
 - Xcode workspace compilation
 - Archive creation for distribution
 - IPA export for device installation
 - Simulator builds for testing
 
 **Artifact Management:**
+
 - GitHub Artifacts with retention policies
 - GitHub Releases for permanent downloads
 - Versioned filenames with metadata
@@ -89,41 +97,46 @@ Your repository now has comprehensive GitHub Actions workflows for building both
 ### 🎯 **Trigger Strategies**
 
 **Automatic (Recommended):**
+
 ```yaml
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/app/**'      # App code changes
-      - 'lib/**'           # Shared library changes
-      - 'package.json'     # Dependency changes
+      - 'apps/app/**' # App code changes
+      - 'lib/**' # Shared library changes
+      - 'package.json' # Dependency changes
 ```
 
 **Manual (Flexible):**
+
 ```yaml
 on:
   workflow_dispatch:
     inputs:
-      platforms:          # Choose Android, iOS, or both
-      build_type:         # Release or Debug
-      create_releases:    # Generate GitHub releases
+      platforms: # Choose Android, iOS, or both
+      build_type: # Release or Debug
+      create_releases: # Generate GitHub releases
 ```
 
 ## 📦 Output Artifacts
 
 ### **Android APK Files**
+
 ```
 legacy-sports-android-v1.0.0-20240912_143022-abc123.apk
 legacy-sports-android-latest.apk (symlink)
 ```
 
 ### **iOS IPA Files**
+
 ```
 legacy-sports-ios-v1.0.0-20240912_143022-abc123.ipa
 legacy-sports-ios-latest.ipa (symlink)
 ```
 
 ### **Debug Builds**
+
 ```
 legacy-sports-android-v1.0.0-20240912_143022-abc123-debug.apk
 legacy-sports-ios-v1.0.0-20240912_143022-abc123-debug.app.zip
@@ -139,6 +152,7 @@ legacy-sports-ios-v1.0.0-20240912_143022-abc123-debug.app.zip
    - Follow installation prompts
 
 2. **ADB Installation:**
+
    ```bash
    adb install legacy-sports-latest.apk
    ```
@@ -168,11 +182,13 @@ legacy-sports-ios-v1.0.0-20240912_143022-abc123-debug.app.zip
 ### **Current Setup (Development)**
 
 **Android:**
+
 - ✅ Development keystore included
 - ✅ Basic APK signing functional
 - ⚠️ Uses debug certificates (not for production)
 
 **iOS:**
+
 - ⚠️ Code signing disabled for CI builds
 - ✅ Archive creation functional
 - ⚠️ Requires manual signing for device installation
@@ -182,11 +198,13 @@ legacy-sports-ios-v1.0.0-20240912_143022-abc123-debug.app.zip
 For production releases, you'll need:
 
 **Android:**
+
 - Upload keystore to GitHub Secrets
 - Configure release signing in Gradle
 - Enable Play Store upload automation
 
 **iOS:**
+
 - Add provisioning profiles to secrets
 - Configure code signing certificates
 - Enable App Store Connect automation
@@ -194,6 +212,7 @@ For production releases, you'll need:
 ## 🎮 Usage Examples
 
 ### **Build Both Platforms (Manual)**
+
 1. Go to GitHub Actions tab
 2. Select "Build Mobile Apps (Cross-Platform)"
 3. Click "Run workflow"
@@ -204,12 +223,14 @@ For production releases, you'll need:
 5. Download from Artifacts or Releases
 
 ### **Android Only (Automatic)**
+
 1. Make changes to `apps/app/` code
 2. Create PR and merge to `main`
 3. "Build and Publish Android APK" runs automatically
 4. APK available in Artifacts and Releases
 
 ### **iOS Testing Build**
+
 1. Go to "Build iOS IPA" workflow
 2. Run with Debug configuration
 3. Download .app.zip for simulator testing
@@ -217,11 +238,13 @@ For production releases, you'll need:
 ## 📊 Build Performance
 
 **Typical Build Times:**
+
 - **Android APK:** ~10-15 minutes
 - **iOS IPA:** ~15-25 minutes
 - **Cross-Platform:** ~20-30 minutes (parallel)
 
 **Resource Usage:**
+
 - **Android:** Ubuntu runners (cost-effective)
 - **iOS:** macOS runners (higher cost, required for iOS)
 - **Concurrent:** Up to 2 jobs can run simultaneously
@@ -231,11 +254,13 @@ For production releases, you'll need:
 ### **Common Android Issues**
 
 **Gradle Build Fails:**
+
 - Check Java version compatibility
 - Verify Android SDK versions
 - Review dependency conflicts
 
 **APK Size Too Large:**
+
 - Enable ProGuard/R8 optimization
 - Remove unused resources
 - Check asset sizes
@@ -243,11 +268,13 @@ For production releases, you'll need:
 ### **Common iOS Issues**
 
 **Xcode Build Fails:**
+
 - Verify Xcode version compatibility
 - Check CocoaPods integration
 - Review iOS deployment target
 
 **IPA Export Fails:**
+
 - Code signing configuration
 - Provisioning profile issues
 - Export options plist problems
@@ -262,17 +289,20 @@ For production releases, you'll need:
 ## 🚀 Next Steps
 
 ### **Immediate (Ready to Use)**
+
 - ✅ Manual builds via GitHub UI
 - ✅ Automatic builds on main branch merges
 - ✅ Development distribution via GitHub
 
 ### **Enhanced Setup (Optional)**
+
 - 🔐 Production code signing setup
 - 📱 App Store/Play Store upload automation
 - 🧪 Integration with testing frameworks
 - 📊 Build metrics and notifications
 
 ### **Advanced Features (Future)**
+
 - 🌟 Feature branch builds with PR comments
 - 🎯 A/B testing build variants
 - 📈 Crash reporting integration

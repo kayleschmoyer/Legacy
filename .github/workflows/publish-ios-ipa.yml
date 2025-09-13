@@ -1,15 +1,20 @@
-name: Build and Publish iOS IPA
+name: Build and Publish iOS IPA (DISABLED)
+
+# DISABLED: iOS builds require Apple Developer Program ($99/year)
+# This workflow is disabled until iOS certificates are configured
+# To enable: replace workflow_dispatch trigger with push/paths triggers
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/app/**'
-      - 'lib/**'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
     inputs:
+      force_enable:
+        description: 'WARNING: Force enable iOS build (will fail without certificates)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
       build_type:
         description: 'Build Configuration'
         required: false
@@ -131,7 +136,7 @@ jobs:
         if: steps.version.outputs.build_config == 'Release'
         run: |
           cd apps/app/ios
-          
+
           # Create archive
           xcodebuild \
             -workspace App.xcworkspace \
@@ -148,7 +153,7 @@ jobs:
         if: steps.version.outputs.build_config == 'Release'
         run: |
           cd apps/app/ios
-          
+
           # Create export options plist
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -168,7 +173,7 @@ jobs:
           </dict>
           </plist>
           EOF
-          
+
           # Export IPA
           xcodebuild \
             -exportArchive \
@@ -180,7 +185,7 @@ jobs:
       - name: Rename and Prepare Artifacts
         run: |
           cd apps/app/ios
-          
+
           if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
             # For Release builds, we have an IPA
             mv build/export/App.ipa build/export/${{ steps.version.outputs.artifact_name }}.ipa
@@ -241,20 +246,20 @@ jobs:
             - 📱 **IPA File:** `${{ steps.version.outputs.artifact_name }}.ipa`
 
             ### Installation Options
-            
+
             #### Option 1: Sideload with Tools
             - Use tools like **AltStore**, **Sideloadly**, or **3uTools**
             - Requires Apple ID (free developer account works)
-            
+
             #### Option 2: Xcode Installation
             1. Download and extract the IPA
             2. Open Xcode → Window → Devices and Simulators
             3. Connect your iOS device
             4. Drag the .app bundle to your device
-            
+
             #### Option 3: TestFlight (if configured)
             - Upload to App Store Connect for TestFlight distribution
-            
+
             > **Note:** This is a development build without proper code signing. For production use, proper provisioning profiles and distribution certificates are required.
           files: ${{ env.IPA_PATH }}
           draft: false
@@ -272,7 +277,7 @@ jobs:
           echo "**Configuration:** ${{ steps.version.outputs.build_config }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ steps.version.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
             echo "### 📥 IPA Download Options:" >> $GITHUB_STEP_SUMMARY
             echo "1. **GitHub Artifacts:** Available in this workflow run for 90 days" >> $GITHUB_STEP_SUMMARY

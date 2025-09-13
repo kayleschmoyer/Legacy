@@ -1,8 +1,16 @@
-name: Setup AWS
-description: Configure AWS credentials and install certificates
+﻿name: 'Setup AWS'
+description: 'Configure AWS credentials and install certificates'
 
 inputs:
-  aws-    - name: Configure AWS Credentials
+  aws-region:
+    description: 'AWS region to use'
+    required: false
+    default: 'us-east-1'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration
@@ -14,76 +22,4 @@ inputs:
       shell: bash
       run: |
         echo "Verifying AWS credentials..."
-        aws sts get-caller-identity   required: true
-    type: string
-    default: us-east-1
-  certificate-url:
-    required: true
-    type: string
-    default: https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem
-  certificate-file:
-    required: true
-    type: string
-    default: aws-certs.pem
-  installed-cert-location:
-    required: true
-    type: string
-    default: /usr/local/share/ca-certificates/aws-certs.crt 
-
-outputs:
-  ecr-registry: 
-    description: "The ECR registry that was signed in to."
-    value: ${{ steps.login-ecr.outputs.registry }}
-  cert-file: 
-    description: "The file path for the AWS Cert .pem file."
-    value: ${{ steps.get-certificate-file-name.outputs.value }}
-  installed-cert-location:
-    description: "The location that the cert file was installed."
-    value: ${{ inputs.installed-cert-location }}
-
-runs:
-  using: "composite"
-  steps:
-    - name: configure aws credentials
-      uses: aws-actions/configure-aws-credentials@v1.7.0
-      with:
-        role-to-assume: arn:aws:iam::176661590736:role/GithubActionsECRIntegration #change to reflect your IAM role’s ARN
-        role-session-name: GitHub_to_AWS_via_FederatedOIDC
-        aws-region: ${{ inputs.aws-region }}
-
-    - name: Sts GetCallerIdentity
-      shell: bash
-      run: aws sts get-caller-identity
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    - name: Set Certificate File Path
-      id: get-certificate-file-name
-      shell: bash
-      run: echo "value=$(pwd)/${{ inputs.certificate-file }}" >> "$GITHUB_OUTPUT" 
-
-    - name: Download AWS Certificates
-      shell: bash
-      run: |
-        echo "Downloading AWS RDS certificate bundle..."
-        wget -O ${{ inputs.certificate-file }} ${{ inputs.certificate-url }}
-        
-    - name: Install AWS Certificates
-      shell: bash
-      run: |
-        echo "Installing certificates to system trust store..."
-        sudo cp ${{ inputs.certificate-file }} ${{ inputs.installed-cert-location }}
-
-    - name: Verify Certificate Installation
-      shell: bash
-      run: |
-        echo "Verifying certificate installation..."
-        openssl x509 -in ${{ inputs.installed-cert-location }} -text -noout | head -10
-
-    - name: Update Certificate Store
-      shell: bash
-      run: |
-        echo "Updating system certificate store..."
-        sudo update-ca-certificates
+        aws sts get-caller-identity
