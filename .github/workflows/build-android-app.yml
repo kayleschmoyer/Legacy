@@ -135,6 +135,9 @@ jobs:
         run: |
           cd apps/app/android
 
+          # Set execute permissions for gradlew
+          chmod +x gradlew
+
           # Determine build type
           BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
 
