@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  Modal,
   Animated,
-  StyleSheet,
-  Platform,
   Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from '../../platform-components';
-import { Player, DraftState, DraftTeam, Filter } from '../../types';
-import { SPORT_CONFIGS, DEFAULT_COLORS } from '../../config/sports';
+import { DraftState, DraftTeam, Filter, Player } from '../../types';
+import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
 import { safeStyle } from '../../utils/styles';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

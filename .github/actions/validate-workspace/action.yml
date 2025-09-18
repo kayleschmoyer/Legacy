@@ -1,0 +1,13 @@
+name: 'Validate Workspace'
+description: 'Run workspace validation checks'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate Package.json Standards
+      shell: bash
+      run: node scripts/validate-package-json-standards.js
+
+    - name: Validate Workspace Dependencies
+      shell: bash
+      run: node scripts/validate-workspace-deps.js

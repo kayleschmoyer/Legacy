@@ -1,0 +1,36 @@
+name: 'Setup Workspace'
+description: 'Common setup steps for Node.js, dependencies, and Nx'
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+  install-dependencies:
+    description: 'Whether to install dependencies'
+    required: false
+    default: 'true'
+  set-nx-shas:
+    description: 'Whether to set NX SHAs for affected detection'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+
+    - name: Install Dependencies
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: npm ci --legacy-peer-deps
+
+    - name: Set NX SHAs
+      if: inputs.set-nx-shas == 'true'
+      uses: nrwl/nx-set-shas@v4
+      with:
+        main-branch-name: 'main'
+        error-on-no-successful-workflow: false

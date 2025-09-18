@@ -27,7 +27,7 @@
       "@legacy-sports/shared-components": [
         "lib/shared-components/src/index.ts"
       ],
-      "@legacy-sports/tamagui-config": ["tamagui.config.ts"],
+      "@legacy-sports/tamagui-config": ["lib/tamagui-config/src/index.ts"],
       "@legacy-sports/utils": ["lib/utils/src/index.ts"]
     }
   },

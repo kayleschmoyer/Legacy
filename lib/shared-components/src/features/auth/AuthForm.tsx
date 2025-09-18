@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  Platform,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
+  View,
 } from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { User, AuthState } from '../../types';
+import { AuthState, User } from '../../types';
 import { safeStyle } from '../../utils/styles';
 
 export interface LoginCredentials {

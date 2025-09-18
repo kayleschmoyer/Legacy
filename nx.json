@@ -2,10 +2,7 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
   "namedInputs": {
-    "default": [
-      "{projectRoot}/**/*",
-      "sharedGlobals"
-    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -16,9 +13,7 @@
       "!{projectRoot}/src/test-setup.[jt]s",
       "!{projectRoot}/test-setup.[jt]s"
     ],
-    "sharedGlobals": [
-      "{workspaceRoot}/.github/workflows/ci.yml"
-    ]
+    "sharedGlobals": ["{workspaceRoot}/.github/workflows/integration-build.yml"]
   },
   "parallel": 5,
   "plugins": [
@@ -81,25 +76,16 @@
   "targetDefaults": {
     "@nx/esbuild:esbuild": {
       "cache": true,
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "default",
-        "^default"
-      ]
+      "dependsOn": ["^build"],
+      "inputs": ["default", "^default"]
     },
     "deploy": {
       "cache": false,
-      "dependsOn": [
-        "build"
-      ]
+      "dependsOn": ["build"]
     },
     "deploy:plan": {
       "cache": false,
-      "dependsOn": [
-        "build"
-      ]
+      "dependsOn": ["build"]
     },
     "validate:package-json": {
       "executor": "nx:run-commands",
@@ -114,10 +100,35 @@
       }
     },
     "validate": {
-      "dependsOn": [
-        "validate:package-json",
-        "validate:workspace-deps"
-      ]
+      "dependsOn": ["validate:package-json", "validate:workspace-deps"]
+    },
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"]
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/.eslintrc.base.json",
+        "{projectRoot}/.eslintrc.json",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        {
+          "externalDependencies": ["eslint"]
+        }
+      ],
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "command": "eslint ."
+      },
+      "configurations": {
+        "dry-run": {
+          "command": "eslint . --fix-dry-run"
+        }
+      }
     }
   },
   "generators": {

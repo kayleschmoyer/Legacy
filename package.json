@@ -4,7 +4,6 @@
   "license": "MIT",
   "scripts": {
     "all": "nx affected -t build lint:fix lint format test make-cache bundle",
-    "typecheck": "nx affected -t typecheck",
     "clean:node": "npkill -d",
     "clean:python": "rimraf --glob **/.venv",
     "clean": "npm run clean:python && npm run clean:node",
@@ -127,6 +126,7 @@
     "expo-font": "~13.3.2",
     "expo-image": "~2.4.0",
     "expo-keep-awake": "~14.1.4",
+    "expo-linking": "^8.0.8",
     "expo-router": "~5.1.5",
     "expo-secure-store": "^14.2.3",
     "express": "4.21.2",

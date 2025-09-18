@@ -1,0 +1,107 @@
+name: 'Run Nx Tasks'
+description: 'Run Nx tasks with comprehensive error handling'
+inputs:
+  tasks:
+    description: 'Space-separated list of tasks to run (e.g., "lint test build")'
+    required: true
+  scope:
+    description: 'Scope of execution: "affected" or "all"'
+    required: false
+    default: 'affected'
+  parallel:
+    description: 'Number of parallel processes'
+    required: false
+    default: '3'
+  verbose:
+    description: 'Enable verbose output'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup CI for projects
+      shell: bash
+      run: |
+        if [[ "${{ inputs.scope }}" == "affected" ]]; then
+          npx nx affected -t setup-ci || echo "setup-ci target not available"
+        else
+          npx nx run-many -t setup-ci || echo "setup-ci target not available"
+        fi
+
+    - name: Run Nx Tasks
+      shell: bash
+      run: |
+        tasks="${{ inputs.tasks }}"
+        scope="${{ inputs.scope }}"
+        parallel="${{ inputs.parallel }}"
+        verbose_flag=""
+
+        if [[ "${{ inputs.verbose }}" == "true" ]]; then
+          verbose_flag="--verbose"
+        fi
+
+        echo "Running tasks: $tasks"
+        echo "Scope: $scope"
+        echo "Parallel: $parallel"
+
+        # Build the nx command
+        if [[ "$scope" == "affected" ]]; then
+          nx_cmd="npx nx affected --parallel=$parallel -t $tasks $verbose_flag"
+        else
+          nx_cmd="npx nx run-many --parallel=$parallel -t $tasks $verbose_flag"
+        fi
+
+        echo "Executing: $nx_cmd"
+
+        # Run the command with error handling
+        if eval "$nx_cmd"; then
+          echo "✅ All tasks completed successfully"
+        else
+          echo "❌ Some tasks failed. Running individual task analysis..."
+          
+          # Get list of projects
+          if [[ "$scope" == "affected" ]]; then
+            projects=$(npx nx show projects --affected)
+          else
+            projects=$(npx nx show projects)
+          fi
+          
+          # Run each task individually for better error visibility
+          for task in $tasks; do
+            echo "=== Running task: $task ==="
+            for project in $projects; do
+              # Check if project has this target
+              if npx nx show project $project --json | jq -e ".targets.$task" > /dev/null 2>&1; then
+                echo "Running $task for $project..."
+                if npx nx run $project:$task $verbose_flag; then
+                  echo "✅ $project:$task succeeded"
+                else
+                  echo "❌ $project:$task failed"
+                fi
+              fi
+            done
+          done
+          
+          # Exit with error since some tasks failed
+          exit 1
+        fi
+
+    - name: Run optional tasks
+      shell: bash
+      run: |
+        scope="${{ inputs.scope }}"
+
+        # Run format check if available
+        if [[ "$scope" == "affected" ]]; then
+          npx nx affected -t format || echo "Format target not available for affected projects"
+        else
+          npx nx run-many -t format || echo "Format target not available"
+        fi
+
+        # Run bundle if available
+        if [[ "$scope" == "affected" ]]; then
+          npx nx affected -t bundle || echo "Bundle target not available for affected projects"
+        else
+          npx nx run-many -t bundle || echo "Bundle target not available"
+        fi

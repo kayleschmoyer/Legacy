@@ -12,6 +12,13 @@ import { Table } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
 import { safeStyle } from '../../utils/styles';
 
+// API response interface
+interface CareerStatsResponse {
+  batting?: Record<string, string | number>;
+  pitching?: Record<string, string | number>;
+  fielding?: Record<string, string | number>;
+}
+
 // Cross-platform table implementation for career stats
 interface CareerStatsTableProps {
   headers: string[];
@@ -128,14 +135,12 @@ function CareerStatsViewer({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as CareerStatsResponse;
 
       // Process batting stats
       if (data.batting) {
         const battingHeadersArray = Object.keys(data.batting);
-        const battingDataArray = [
-          Object.values(data.batting) as (string | number)[],
-        ];
+        const battingDataArray = [Object.values(data.batting)];
         setBattingHeaders(battingHeadersArray);
         setBattingStats(battingDataArray);
       }
@@ -143,9 +148,7 @@ function CareerStatsViewer({
       // Process pitching stats
       if (data.pitching) {
         const pitchingHeadersArray = Object.keys(data.pitching);
-        const pitchingDataArray = [
-          Object.values(data.pitching) as (string | number)[],
-        ];
+        const pitchingDataArray = [Object.values(data.pitching)];
         setPitchingHeaders(pitchingHeadersArray);
         setPitchingStats(pitchingDataArray);
       }
@@ -153,9 +156,7 @@ function CareerStatsViewer({
       // Process fielding stats
       if (data.fielding) {
         const fieldingHeadersArray = Object.keys(data.fielding);
-        const fieldingDataArray = [
-          Object.values(data.fielding) as (string | number)[],
-        ];
+        const fieldingDataArray = [Object.values(data.fielding)];
         setFieldingHeaders(fieldingHeadersArray);
         setFieldingStats(fieldingDataArray);
       }

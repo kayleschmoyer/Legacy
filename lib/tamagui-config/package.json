@@ -1,0 +1,12 @@
+{
+  "name": "@legacy-sports/tamagui-config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "tslib": "*",
+    "@tamagui/config": "*"
+  }
+}

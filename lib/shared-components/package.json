@@ -25,6 +25,7 @@
     "test:all": "npm run test && npm run test:stories"
   },
   "dependencies": {
-    "@legacy-sports/api": "*"
+    "@legacy-sports/api": "*",
+    "@legacy-sports/tamagui-config": "*"
   }
 }

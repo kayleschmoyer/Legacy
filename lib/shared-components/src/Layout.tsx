@@ -8,9 +8,9 @@ import {
   H3 as TamaguiH3,
   Paragraph as TamaguiParagraph,
   Separator as TamaguiSeparator,
-  View,
   XStack as TamaguiXStack,
   YStack as TamaguiYStack,
+  View,
 } from 'tamagui';
 
 // Define our own prop types using React.ComponentProps

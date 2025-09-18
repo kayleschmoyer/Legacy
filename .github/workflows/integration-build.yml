@@ -1,0 +1,71 @@
+name: Integration Build
+
+# This workflow runs integration builds on main branch to ensure the full repository is always passing
+# It runs ALL projects (not just affected) to catch integration issues after merges
+# For pull request validation, see pr-validation.yml
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/**
+      - lambdas/**
+      - lib/**
+      - package-lock.json
+      - poetry.lock
+
+# Cancel in-progress runs for the same workflow on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+env:
+  NX_CLOUD_DISTRIBUTED_EXECUTION: false
+
+jobs:
+  integration-build:
+    name: Integration Build (Full Repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 20
+          install-dependencies: true
+          set-nx-shas: true
+
+      - name: Validate Workspace
+        uses: ./.github/actions/validate-workspace
+
+      - name: Show Full Repository Build Plan
+        run: |
+          echo "This is an integration build that will validate the ENTIRE repository"
+          echo ""
+          echo "All projects in workspace:"
+          npx nx show projects
+          echo ""
+          echo "Build dependency graph for all projects:"
+          npx nx run-many -t build --dry-run
+          echo ""
+
+      - name: Run Full Repository Validation
+        uses: ./.github/actions/nx-tasks
+        with:
+          tasks: 'lint test build'
+          scope: 'all'
+          parallel: '3'
+          verbose: 'true'

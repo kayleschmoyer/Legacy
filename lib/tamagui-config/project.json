@@ -1,0 +1,19 @@
+{
+  "name": "tamagui-config",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/tamagui-config/src",
+  "projectType": "library",
+  "tags": ["type:config", "scope:ui"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/lib/tamagui-config",
+        "main": "lib/tamagui-config/src/index.ts",
+        "tsConfig": "lib/tamagui-config/tsconfig.lib.json",
+        "assets": []
+      }
+    }
+  }
+}

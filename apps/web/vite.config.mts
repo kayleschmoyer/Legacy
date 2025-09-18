@@ -25,7 +25,10 @@ export default defineConfig(async () => {
     plugins: [
       reactNativeWeb(),
       tamaguiPlugin({
-        config: resolve(__dirname, '../../lib/shared-components/src/tamagui.config.web.ts'),
+        config: resolve(
+          __dirname,
+          '../../lib/shared-components/src/tamagui.config.web.ts',
+        ),
         platform: 'web',
         // Disable extraction in development to avoid issues
         disableExtraction: process.env.NODE_ENV === 'development',
