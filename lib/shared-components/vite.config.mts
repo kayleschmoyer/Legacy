@@ -14,16 +14,23 @@ export default defineConfig(({ mode }) => {
 
     plugins: [
       ...(platform === 'web' ? [reactNativeWeb()] : []),
-      ...(platform === 'web' ? [tamaguiPlugin({
-        config: resolve(__dirname, 'src/tamagui.config.web.ts'),
-        platform: 'web',
-        // Disable extraction in development to avoid issues
-        disableExtraction: process.env.NODE_ENV === 'development',
-        // Enable tree shaking
-        useReactNativeWebLite: false,
-      })] : []),
-      react(), 
-      nxViteTsPaths()
+      ...(platform === 'web'
+        ? [
+            tamaguiPlugin({
+              config: resolve(
+                __dirname,
+                '../tamagui-config/src/lib/tamagui-config.ts',
+              ),
+              platform: 'web',
+              // Disable extraction in development to avoid issues
+              disableExtraction: process.env.NODE_ENV === 'development',
+              // Enable tree shaking
+              useReactNativeWebLite: false,
+            }),
+          ]
+        : []),
+      react(),
+      nxViteTsPaths(),
     ],
 
     // Modern cross-platform configuration
@@ -32,7 +39,7 @@ export default defineConfig(({ mode }) => {
       'process.env.PLATFORM': JSON.stringify(platform),
       'process.env.TAMAGUI_TARGET': JSON.stringify(platform),
       'process.env.NODE_ENV': JSON.stringify(
-        process.env.NODE_ENV || 'development'
+        process.env.NODE_ENV || 'development',
       ),
     },
 
@@ -42,7 +49,7 @@ export default defineConfig(({ mode }) => {
         // Single alias pointing to platform directory index
         __PLATFORM_COMPONENTS__: resolve(
           __dirname,
-          `src/platform-components/${platform}/index.ts`
+          `src/platform-components/${platform}/index.ts`,
         ),
 
         // React Native Web compatibility
@@ -56,7 +63,7 @@ export default defineConfig(({ mode }) => {
           platform === 'web'
             ? resolve(
                 __dirname,
-                '../../apps/web/src/mocks/react-native-picker.ts'
+                '../../apps/web/src/mocks/react-native-picker.ts',
               )
             : '@react-native-picker/picker',
 
@@ -83,7 +90,8 @@ export default defineConfig(({ mode }) => {
 
     // Handle JSX in dependencies based on platform
     optimizeDeps: {
-      include: platform === 'web' ? ['react', 'react-dom', '@apollo/client'] : [],
+      include:
+        platform === 'web' ? ['react', 'react-dom', '@apollo/client'] : [],
       exclude:
         platform === 'mobile'
           ? ['react-native-table-component', '@expo/vector-icons']

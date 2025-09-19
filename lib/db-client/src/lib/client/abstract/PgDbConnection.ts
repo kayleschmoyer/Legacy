@@ -1,8 +1,8 @@
-import { getDbCredentials } from '@legacy-sports/utils';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import { Pool, PoolClient, PoolConfig } from 'pg';
 import { readFileSync } from 'fs';
 import { BaseDbConnection, InitProperties } from './BaseDbClient';
+import { getDatabaseConfig } from '../../../config/database';
 
 interface PostgresDbInitProps<TSchema extends Record<string, unknown>>
   extends InitProperties<TSchema> {
@@ -11,7 +11,7 @@ interface PostgresDbInitProps<TSchema extends Record<string, unknown>>
 }
 
 export class PgDbConnection<
-  TSchema extends Record<string, unknown>
+  TSchema extends Record<string, unknown>,
 > extends BaseDbConnection<TSchema, PostgresDbInitProps<TSchema>> {
   public get client(): PoolClient {
     return this.initProperties.client;
@@ -23,23 +23,26 @@ export class PgDbConnection<
 
   constructor(
     private readonly dbCertPath: string | undefined,
-    private readonly schema: TSchema
+    private readonly schema: TSchema,
   ) {
     super();
   }
 
   protected async _initialize(): Promise<PostgresDbInitProps<TSchema>> {
-    const { dbHost, dbUser, dbPassword } = getDbCredentials();
+    const dbConfig = await getDatabaseConfig();
 
     const options: PoolConfig = {
-      database: 'postgres',
-      host: dbHost,
-      password: dbPassword,
+      database: dbConfig.database,
+      host: dbConfig.host,
+      password: dbConfig.password,
       port: 5432,
-      user: dbUser,
+      user: dbConfig.user,
     };
 
-    if (this.dbCertPath !== undefined) {
+    // Use SSL configuration from database config
+    if (dbConfig.ssl) {
+      options.ssl = dbConfig.ssl;
+    } else if (this.dbCertPath !== undefined) {
       try {
         options.ssl = {
           ca: readFileSync(this.dbCertPath).toString(),

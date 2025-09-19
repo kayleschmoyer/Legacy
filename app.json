@@ -3,5 +3,8 @@
     "expo-asset",
     "expo-font",
     "expo-router"
-  ]
+  ],
+  "android": {
+    "package": "com.anonymous.legacysportssource"
+  }
 }

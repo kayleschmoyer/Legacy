@@ -1,12 +1,12 @@
 import { config } from 'dotenv';
 import { defineConfig } from 'drizzle-kit';
 import { resolve } from 'path';
-import { getDatabaseConfig } from './src/config/database';
+import { getDatabaseConfigSync } from './src/config/database';
 
 // Load environment variables from the workspace root
 config({ path: resolve(__dirname, '../../.env') });
 
-const dbConfig = getDatabaseConfig();
+const dbConfig = getDatabaseConfigSync();
 
 export default defineConfig({
   dbCredentials: dbConfig,

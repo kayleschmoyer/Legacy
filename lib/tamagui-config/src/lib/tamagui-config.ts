@@ -1,9 +1,12 @@
-import { config } from '@tamagui/config/v3';
+import { config } from '@tamagui/config';
+import { createTamagui } from 'tamagui';
+import type { TamaguiInternalConfig } from 'tamagui';
 
 // Shared Tamagui configuration for all applications in the workspace
 // This ensures consistency in design tokens, themes, and components across
 // web, mobile, and any other platforms using Tamagui
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const tamaguiConfig: any = config;
+
+// Create and export the Tamagui configuration
+export const tamaguiConfig: TamaguiInternalConfig = createTamagui(config);
 
 export default tamaguiConfig;

@@ -1,5 +1,20 @@
 {
   "name": "@legacy-sports/app-e2e",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "scripts": {
+    "e2e": "wdio run",
+    "e2e:android": "wdio run --spec ./src/app.e2e.js",
+    "e2e:debug": "wdio run --spec ./src/app.e2e.js --logLevel debug"
+  },
+  "devDependencies": {
+    "@wdio/cli": "*",
+    "webdriverio": "*",
+    "@wdio/appium-service": "*",
+    "@wdio/local-runner": "*",
+    "@wdio/mocha-framework": "*",
+    "@wdio/spec-reporter": "*",
+    "appium": "*",
+    "appium-uiautomator2-driver": "*"
+  }
 }

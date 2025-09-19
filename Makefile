@@ -1,7 +1,7 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format dev deploy infrastructure android ios
+.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios
 .DEFAULT_GOAL := help
 
 # Colors for output
@@ -120,6 +120,8 @@ lint-fix: ## Run linting with auto-fix on all projects
 format: ## Format code across all projects
 	@$(ECHO_CMD) "$(BLUE)Formatting code...$(RESET)"
 	npx nx format:write
+
+fmt: format ## Alias for format command
 
 typecheck: ## Run TypeScript type checking
 	@$(ECHO_CMD) "$(BLUE)Running type checking...$(RESET)"

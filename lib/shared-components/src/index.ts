@@ -93,7 +93,7 @@ export * from './features/auth/WebProviders';
 export * from './navigation/TamaguiAppNavigator';
 
 // Tamagui config
-export { default as tamaguiConfig } from './tamagui.config.web';
+export { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
 // Style utilities
 export * from './utils/styles';

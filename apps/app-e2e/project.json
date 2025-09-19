@@ -29,34 +29,18 @@
         }
       }
     },
-    "test-ios": {
-      "executor": "@nx/detox:test",
+    "e2e-android": {
+      "executor": "nx:run-commands",
       "options": {
-        "detoxConfiguration": "ios.sim.release",
-        "buildTarget": "app:build"
-      },
-      "configurations": {
-        "debug": {
-          "detoxConfiguration": "ios.sim.debug"
-        },
-        "local": {
-          "detoxConfiguration": "ios.local"
-        }
+        "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js",
+        "cwd": "apps/app-e2e"
       }
     },
-    "test-android": {
-      "executor": "@nx/detox:test",
+    "e2e-android-debug": {
+      "executor": "nx:run-commands",
       "options": {
-        "detoxConfiguration": "android.emu.release",
-        "buildTarget": "app:build"
-      },
-      "configurations": {
-        "debug": {
-          "detoxConfiguration": "android.emu.debug"
-        },
-        "local": {
-          "detoxConfiguration": "android.local"
-        }
+        "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js --logLevel debug",
+        "cwd": "apps/app-e2e"
       }
     },
     "test-build-verification": {

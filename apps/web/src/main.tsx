@@ -5,7 +5,7 @@ import * as ReactDOM from 'react-dom/client';
 // Initialize React Native Web
 import 'react-native-web/dist/cjs/exports/AppRegistry';
 
-import { AppProvider } from './components/AppProvider';
+import { AppProvider } from '@legacy-sports/shared-components';
 import { apolloClient } from './lib/apollo-client';
 import App from './app/app';
 
@@ -23,5 +23,5 @@ root.render(
         <App />
       </AppProvider>
     </HashRouter>
-  </StrictMode>
+  </StrictMode>,
 );

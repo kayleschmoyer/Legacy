@@ -27,7 +27,7 @@ export default defineConfig(async () => {
       tamaguiPlugin({
         config: resolve(
           __dirname,
-          '../../lib/shared-components/src/tamagui.config.web.ts',
+          '../../lib/tamagui-config/src/lib/tamagui-config.ts',
         ),
         platform: 'web',
         // Disable extraction in development to avoid issues

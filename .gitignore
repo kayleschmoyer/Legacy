@@ -205,4 +205,4 @@ terraform/build/
 terraform/*.zip
 
 # Tamagui generated files
-.tamagui/
+**/.tamagui/

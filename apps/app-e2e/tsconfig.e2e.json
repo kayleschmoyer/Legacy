@@ -4,7 +4,8 @@
     "sourceMap": false,
     "outDir": "../../dist/out-tsc",
     "allowJs": true,
-    "types": ["node", "jest", "detox"]
+    "resolveJsonModule": true,
+    "types": ["node", "jest", "webdriverio", "mocha"]
   },
   "include": ["src/**/*.ts", "src/**/*.js"]
 }
