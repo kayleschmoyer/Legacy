@@ -130,10 +130,6 @@ function HomeScreen({
     </TouchableOpacity>
   );
 
-  // Calculate grid layout
-  const numColumns = IS_TABLET ? 4 : 2;
-  const cardWidth = (100 - (numColumns + 1) * 2) / numColumns; // Account for margins
-
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -168,7 +164,15 @@ function HomeScreen({
       {/* Empty State */}
       {availableSports.length === 0 && customActions.length === 0 && (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>🏆</Text>
+          <Text style={styles.emptyStateIcon}>
+            {Platform.OS === 'web' ? (
+              <span role="img" aria-label="Trophy">
+                🏆
+              </span>
+            ) : (
+              '🏆'
+            )}
+          </Text>
           <Text style={styles.emptyStateTitle}>No Sports Available</Text>
           <Text style={styles.emptyStateText}>
             Check back later for available fantasy sports.
@@ -224,7 +228,7 @@ const styles = StyleSheet.create({
     minWidth: 140,
     borderRadius: 16,
     overflow: 'hidden',
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -237,6 +241,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   disabledCard: {
@@ -278,7 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -291,6 +302,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   actionCardContent: {

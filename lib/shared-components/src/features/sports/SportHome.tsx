@@ -193,7 +193,15 @@ function SportHome({
           />
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>🏆</Text>
+            <Text style={styles.emptyStateIcon}>
+              {Platform.OS === 'web' ? (
+                <span role="img" aria-label="Trophy">
+                  🏆
+                </span>
+              ) : (
+                '🏆'
+              )}
+            </Text>
             <Text style={styles.emptyStateTitle}>No Leagues Yet</Text>
             <Text style={styles.emptyStateText}>
               Create your first league or join an existing one to get started!
@@ -306,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     minWidth: 120,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -319,6 +327,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   actionIcon: {
@@ -347,7 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -360,6 +375,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   leagueHeader: {

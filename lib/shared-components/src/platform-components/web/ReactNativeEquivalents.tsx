@@ -1,4 +1,10 @@
 import React from 'react';
+import type {
+  AnimatedAPI,
+  AnimatedValue,
+  AnimationConfig,
+  SpringConfig,
+} from '../types';
 
 // Helper function to flatten style arrays
 const flattenStyles = (
@@ -17,22 +23,22 @@ function View({
   children,
   ...props
 }: React.HTMLProps<HTMLDivElement> & {
-  style?: React.CSSProperties | React.CSSProperties[];
+  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
 }) {
   return (
-    <div style={flattenStyles(style)} {...props}>
+    <div style={flattenStyles(style as React.CSSProperties | React.CSSProperties[])} {...props}>
       {children}
     </div>
   );
 }
 
 interface TextProps extends Omit<React.HTMLProps<HTMLSpanElement>, 'style'> {
-  style?: React.CSSProperties | React.CSSProperties[];
+  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
   numberOfLines?: number;
 }
 
 function Text({ style, numberOfLines, children, ...props }: TextProps) {
-  const flatStyle = flattenStyles(style);
+  const flatStyle = flattenStyles(style as React.CSSProperties | React.CSSProperties[]);
   const textStyle: React.CSSProperties = {
     ...flatStyle,
     ...(numberOfLines && {
@@ -75,8 +81,8 @@ function ScrollView({
       className={className}
       style={{
         overflow: 'auto',
-        ...(style),
-        ...(contentContainerStyle),
+        ...style,
+        ...contentContainerStyle,
       }}
     >
       {children}
@@ -85,7 +91,7 @@ function ScrollView({
 }
 
 interface TouchableOpacityProps {
-  style?: React.CSSProperties | React.CSSProperties[];
+  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
   children?: React.ReactNode;
   onPress?: () => void;
   onPressIn?: () => void;
@@ -114,7 +120,7 @@ function TouchableOpacity({
         background: 'none',
         border: 'none',
         cursor: disabled ? 'default' : 'pointer',
-        ...flattenStyles(style),
+        ...flattenStyles(style as React.CSSProperties | React.CSSProperties[]),
       }}
       onClick={disabled ? undefined : onPress}
       onMouseDown={
@@ -174,7 +180,7 @@ function ActivityIndicator({
 }
 
 interface TextInputProps {
-  ref?: React.RefObject<any>;
+  ref?: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
   style?: React.CSSProperties | React.CSSProperties[];
   onChangeText?: (text: string) => void;
   multiline?: boolean;
@@ -248,7 +254,7 @@ function TextInput({
 
   return multiline ? (
     <textarea
-      ref={ref}
+      ref={ref as React.RefObject<HTMLTextAreaElement>}
       {...commonProps}
       autoComplete={autoComplete}
       spellCheck={autoCorrect}
@@ -260,7 +266,7 @@ function TextInput({
     />
   ) : (
     <input
-      ref={ref}
+      ref={ref as React.RefObject<HTMLInputElement>}
       {...commonProps}
       type={secureTextEntry ? 'password' : 'text'}
       inputMode={
@@ -274,7 +280,10 @@ function TextInput({
       autoComplete={autoComplete}
       spellCheck={autoCorrect}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && (returnKeyType === 'search' || returnKeyType === 'done')) {
+        if (
+          e.key === 'Enter' &&
+          (returnKeyType === 'search' || returnKeyType === 'done')
+        ) {
           onSubmitEditing?.();
         }
       }}
@@ -289,19 +298,26 @@ export const StyleSheet = {
 
 // Declare StyleSheet as a global for web platform
 if (typeof window !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
   (window as any).StyleSheet = StyleSheet;
 }
 
 // Also make it available on globalThis for better compatibility
 if (typeof globalThis !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
   (globalThis as any).StyleSheet = StyleSheet;
 }
 
 export const Platform = {
   OS: 'web' as 'web' | 'ios' | 'android',
   Version: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-  select: (specifics: { web?: any; default?: any; [key: string]: any }) =>
-    specifics.web ?? specifics.default,
+  select: function <T>(specifics: {
+    web?: T;
+    default?: T;
+    [key: string]: T | undefined;
+  }): T | undefined {
+    return specifics.web ?? specifics.default;
+  },
 };
 
 export const Dimensions = {
@@ -314,7 +330,10 @@ export const Dimensions = {
       window.addEventListener('resize', handler as EventListener);
     }
   },
-  removeEventListener: (event: string, handler: (...args: unknown[]) => void) => {
+  removeEventListener: (
+    event: string,
+    handler: (...args: unknown[]) => void,
+  ) => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', handler as EventListener);
     }
@@ -350,16 +369,25 @@ interface FlatListProps<ItemT> {
   contentContainerStyle?: React.CSSProperties;
   onEndReached?: () => void;
   onEndReachedThreshold?: number;
-  ListHeaderComponent?: React.ComponentType<any> | React.ReactElement | null;
-  ListFooterComponent?: React.ComponentType<any> | React.ReactElement | null;
-  ListEmptyComponent?: React.ComponentType<any> | React.ReactElement | null;
+  ListHeaderComponent?:
+    | React.ComponentType<unknown>
+    | React.ReactElement
+    | null;
+  ListFooterComponent?:
+    | React.ComponentType<unknown>
+    | React.ReactElement
+    | null;
+  ListEmptyComponent?: React.ComponentType<unknown> | React.ReactElement | null;
   showsHorizontalScrollIndicator?: boolean;
   showsVerticalScrollIndicator?: boolean;
   columnWrapperStyle?: React.CSSProperties;
   stickyHeaderIndices?: number[];
   scrollEnabled?: boolean;
   keyboardShouldPersistTaps?: string;
-  ItemSeparatorComponent?: React.ComponentType<any> | React.ReactElement | null;
+  ItemSeparatorComponent?:
+    | React.ComponentType<unknown>
+    | React.ReactElement
+    | null;
 }
 
 function FlatList<ItemT>({
@@ -408,7 +436,11 @@ function FlatList<ItemT>({
   }, [onEndReached, onEndReachedThreshold]);
 
   const renderComponent = (
-    Component: React.ComponentType<any> | React.ReactElement | null | undefined,
+    Component:
+      | React.ComponentType<unknown>
+      | React.ReactElement
+      | null
+      | undefined,
   ): React.ReactElement | null => {
     if (!Component) return null;
     if (React.isValidElement(Component)) return Component;
@@ -433,7 +465,7 @@ function FlatList<ItemT>({
   };
 
   const contentStyle: React.CSSProperties = {
-    ...(contentContainerStyle),
+    ...contentContainerStyle,
   };
 
   return (
@@ -511,7 +543,7 @@ function Modal({
     maxWidth: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
-    ...(style),
+    ...style,
   };
 
   return (
@@ -524,23 +556,58 @@ function Modal({
 }
 
 // Basic Animated API for web
-export const Animated = {
-  View: ({ style, ...props }: any) => <div style={style} {...props} />,
-  Text: ({ style, ...props }: any) => <span style={style} {...props} />,
-  Value: class {
-    constructor(private value: number) {}
-    setValue(value: number) {
+export const Animated: AnimatedAPI = {
+  View: ({
+    style,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
+  }) => {
+    // Handle animated values and complex style arrays
+    const processedStyle = Array.isArray(style)
+      ? flattenStyles(style)
+      : style;
+    return <div style={processedStyle} {...props} />;
+  },
+  Text: ({
+    style,
+    ...props
+  }: React.HTMLAttributes<HTMLSpanElement> & {
+    style?: React.CSSProperties;
+  }) => <span style={style} {...props} />,
+  Value: class implements AnimatedValue {
+    private value: number;
+    private listeners: Map<string, (value: { value: number }) => void> =
+      new Map();
+    private listenerCounter = 0;
+
+    constructor(value: number) {
       this.value = value;
     }
+
+    setValue(value: number) {
+      this.value = value;
+      this.listeners.forEach((listener) => listener({ value }));
+    }
+
     getValue() {
       return this.value;
     }
-    addListener(listener: (state: { value: number }) => void) {
-      // In a real implementation, you'd want to track listeners
+
+    addListener(callback: (value: { value: number }) => void): string {
+      const id = (this.listenerCounter++).toString();
+      this.listeners.set(id, callback);
+      return id;
     }
+
+    removeListener(id: string) {
+      this.listeners.delete(id);
+    }
+
     removeAllListeners() {
-      // Empty implementation for web
+      this.listeners.clear();
     }
+
     interpolate(config: {
       inputRange: number[];
       outputRange: (number | string)[];
@@ -581,18 +648,30 @@ export const Animated = {
       };
     }
   },
-  timing: (value: any, config: any) => ({
+  timing: (value: AnimatedValue, config: AnimationConfig) => ({
     start: (callback?: () => void) => {
       // Simple implementation - in reality you'd want proper animations
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      if (value && value.setValue) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        value.setValue(config.toValue);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
       if (callback) setTimeout(callback, config.duration || 0);
     },
   }),
-  spring: (value: any, config: any) => ({
+  spring: (value: AnimatedValue, config: SpringConfig) => ({
     start: (callback?: () => void) => {
+      // Simple implementation - in reality you'd want proper animations
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      if (value && value.setValue) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        value.setValue(config.toValue);
+      }
       if (callback) setTimeout(callback, 300);
     },
   }),
-  parallel: (animations: any[]) => ({
+  parallel: (animations: { start: (callback?: () => void) => void }[]) => ({
     start: (callback?: () => void) => {
       // Start all animations in parallel and call callback when all are done
       let completedCount = 0;
@@ -617,7 +696,15 @@ export const Animated = {
 
 // Alert API for web
 export const Alert = {
-  alert: (title: string, message?: string, buttons?: any[]) => {
+  alert: (
+    title: string,
+    message?: string,
+    buttons?: Array<{
+      text?: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>,
+  ) => {
     if (buttons && buttons.length > 0) {
       if (window.confirm(`${title}\n${message || ''}`)) {
         const okButton = buttons.find((b) => b.style !== 'cancel');
@@ -645,7 +732,7 @@ function SafeAreaView({
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
-        ...(style),
+        ...style,
       }}
       {...props}
     >
@@ -672,7 +759,7 @@ export const Vibration = {
 
 // KeyboardAvoidingView component for web (simplified)
 interface KeyboardAvoidingViewProps {
-  style?: React.CSSProperties;
+  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
   children?: React.ReactNode;
   behavior?: 'height' | 'position' | 'padding';
   keyboardVerticalOffset?: number;
@@ -689,7 +776,7 @@ function KeyboardAvoidingView({
 }: KeyboardAvoidingViewProps) {
   // For web, we can just render a div since keyboard handling is different
   return (
-    <div style={style} {...props}>
+    <div style={flattenStyles(style as React.CSSProperties | React.CSSProperties[])} {...props}>
       {children}
     </div>
   );
@@ -780,6 +867,7 @@ export {
 const ReactNativeEquivalents = {
   ActivityIndicator,
   Alert,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   Animated,
   Dimensions,
   FlatList,

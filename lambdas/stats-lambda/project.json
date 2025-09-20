@@ -41,7 +41,7 @@
       ],
       "options": {
         "commands": [
-          "powershell -Command \"Compress-Archive -Path 'lambdas/stats-lambda/dist/load-career.js' -DestinationPath 'lambdas/stats-lambda/dist/load-career.js.zip' -Force\""
+          "powershell -Command \"Compress-Archive -Path 'lambdas/stats-lambda/dist/index.js' -DestinationPath 'lambdas/stats-lambda/dist/index.js.zip' -Force\""
         ],
         "parallel": false
       }

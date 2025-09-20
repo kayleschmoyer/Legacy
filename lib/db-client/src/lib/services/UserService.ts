@@ -53,7 +53,9 @@ export class UserService {
         : [];
 
       if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
+        query = query.where(and(...conditions)) as typeof query;
       }
 
       // Build final query parts
@@ -67,15 +69,15 @@ export class UserService {
           orderDirection === 'desc'
             ? query.orderBy(desc(orderColumn))
             : query.orderBy(asc(orderColumn))
-        ) as any;
+        ) as typeof query;
       }
 
       if (queryOptions.limit) {
-        query = query.limit(queryOptions.limit) as any;
+        query = query.limit(queryOptions.limit) as typeof query;
       }
 
       if (queryOptions.offset) {
-        query = query.offset(queryOptions.offset) as any;
+        query = query.offset(queryOptions.offset) as typeof query;
       }
 
       return query.execute();
@@ -139,7 +141,9 @@ export class UserService {
 
       let finalQuery = queryBuilder;
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as any;
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
+        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
       }
 
       const result = await finalQuery.execute();
@@ -158,8 +162,8 @@ export class UserService {
         .where(
           or(
             ilike(PublicSchema.users.email, `%${searchTerm}%`),
-            ilike(PublicSchema.users.username, `%${searchTerm}%`)
-          )
+            ilike(PublicSchema.users.username, `%${searchTerm}%`),
+          ),
         )
         .limit(limit);
     });
@@ -181,7 +185,7 @@ export class UserService {
 
     if (filters.emailLike) {
       conditions.push(
-        ilike(PublicSchema.users.email, `%${filters.emailLike}%`)
+        ilike(PublicSchema.users.email, `%${filters.emailLike}%`),
       );
     }
 
@@ -191,7 +195,7 @@ export class UserService {
 
     if (filters.usernameLike) {
       conditions.push(
-        ilike(PublicSchema.users.username, `%${filters.usernameLike}%`)
+        ilike(PublicSchema.users.username, `%${filters.usernameLike}%`),
       );
     }
 

@@ -9,7 +9,7 @@ export interface Props {
 export const LoadingPanel: React.FC<Props> = () => {
   try {
     return <Spinner />;
-  } catch (error) {
+  } catch {
     // Fallback if Tamagui is not available
     return (
       <div

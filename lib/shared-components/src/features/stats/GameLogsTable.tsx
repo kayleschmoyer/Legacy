@@ -113,6 +113,7 @@ function GameLogsTable({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const serverData: Record<
         string,
         Record<string, string | number>
@@ -176,7 +177,7 @@ function GameLogsTable({
 
       <TouchableOpacity
         style={safeStyle([styles.button, loading && styles.buttonDisabled])}
-        onPress={getGameLog}
+        onPress={() => void getGameLog()}
         disabled={loading}
       >
         <Text style={styles.buttonText}>

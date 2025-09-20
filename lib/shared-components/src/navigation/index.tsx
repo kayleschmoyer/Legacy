@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from '../platform-components';
-import { NavigationConfig, Route } from '../types';
+import { NavigationConfig } from '../types';
 import { safeStyle } from '../utils/styles';
 import { DEFAULT_COLORS } from '../config/sports';
 
@@ -166,7 +166,9 @@ function BreadcrumbNavigation({
           {index > 0 && <Text style={styles.breadcrumbSeparator}>/</Text>}
 
           {item.route ? (
-            <TouchableOpacity onPress={() => item.route && onNavigate(item.route)}>
+            <TouchableOpacity
+              onPress={() => item.route && onNavigate(item.route)}
+            >
               <Text style={styles.breadcrumbLink}>{item.title}</Text>
             </TouchableOpacity>
           ) : (
@@ -220,7 +222,7 @@ function Router({
   }
 
   // Fallback to children
-  return <>{children}</>;
+  return children;
 }
 
 /**

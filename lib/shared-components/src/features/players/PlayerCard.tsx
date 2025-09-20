@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, H4, Paragraph, XStack, YStack } from 'tamagui';
+import { Card, H4, Paragraph, XStack } from 'tamagui';
 import { PlayerFragment } from './PlayersApi';
 
 export interface PlayerCardProps {

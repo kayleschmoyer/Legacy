@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { fn } from '@storybook/test';
 import { H1, H2, H3, Paragraph, Separator, YStack } from './Layout';
 import { Button } from './Button';
 
 // YStack Stories
 const YStackMeta: Meta<typeof YStack> = {
   title: 'Layout/YStack',
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   component: YStack,
   parameters: {
     layout: 'centered',
@@ -51,7 +53,7 @@ export const DefaultYStack: YStackStory = {
       <Paragraph key="2">
         Some descriptive text that explains the content below.
       </Paragraph>,
-      <Button key="3" onPress={() => {}}>
+      <Button key="3" onPress={fn()}>
         Action Button
       </Button>,
     ],
@@ -64,7 +66,7 @@ export const CenteredYStack: YStackStory = {
     children: [
       <H1 key="1">Centered Content</H1>,
       <Paragraph key="2">This content is centered horizontally</Paragraph>,
-      <Button key="3" onPress={() => {}}>
+      <Button key="3" onPress={fn()}>
         Centered Button
       </Button>,
     ],
@@ -79,7 +81,7 @@ export const SpacedYStack: YStackStory = {
       <Paragraph key="2">There's more space between these elements.</Paragraph>,
       <Separator key="3" />,
       <Paragraph key="4">Notice the larger gaps?</Paragraph>,
-      <Button key="5" onPress={() => {}}>
+      <Button key="5" onPress={fn()}>
         Spaced Button
       </Button>,
     ],
@@ -94,16 +96,16 @@ export const FormLayoutYStack: YStackStory = {
       <H3 key="1">User Information</H3>,
       <Paragraph key="2">Please fill out the form below:</Paragraph>,
       <Separator key="3" />,
-      <Button key="4" onPress={() => {}} variant="outlined">
+      <Button key="4" onPress={fn()} variant="outlined">
         Name Field
       </Button>,
-      <Button key="5" onPress={() => {}} variant="outlined">
+      <Button key="5" onPress={fn()} variant="outlined">
         Email Field
       </Button>,
-      <Button key="6" onPress={() => {}} variant="outlined">
+      <Button key="6" onPress={fn()} variant="outlined">
         Phone Field
       </Button>,
-      <Button key="7" onPress={() => {}}>
+      <Button key="7" onPress={fn()}>
         Submit
       </Button>,
     ],

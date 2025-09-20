@@ -15,7 +15,7 @@ import {
   DROPDOWN_TEAM_COUNT_ITEMS,
   SPORT_CONFIGS,
 } from '../../config/sports';
-import { DraftType, League } from '../../types';
+import { DraftType } from '../../types';
 
 export interface CreateLeagueFormData {
   leagueName: string;
@@ -83,7 +83,7 @@ function CreateLeagueModal({
         numberOfTeams: 10,
         draftType: DraftType.NORMAL,
       });
-    } catch (err) {
+    } catch {
       // Error handling is done via the error prop
     }
   };
@@ -160,7 +160,14 @@ function CreateLeagueModal({
                 value: sport,
               })),
               (value) =>
-                setFormData((prev) => ({ ...prev, sport: value as any })),
+                setFormData((prev) => ({
+                  ...prev,
+                  sport: value as
+                    | 'baseball'
+                    | 'football'
+                    | 'basketball'
+                    | 'hockey',
+                })),
               showSportDropdown,
               () => setShowSportDropdown(!showSportDropdown),
             )}
@@ -189,8 +196,9 @@ function CreateLeagueModal({
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Draft Type</Text>
             {renderDropdown(
-              DRAFT_TYPES.find((type) => type.value === formData.draftType)
-                ?.label || 'Normal',
+              DRAFT_TYPES.find(
+                (type) => type.value === (formData.draftType as string),
+              )?.label || 'Normal',
               [...DRAFT_TYPES],
               (value) =>
                 setFormData((prev) => ({
@@ -218,7 +226,7 @@ function CreateLeagueModal({
                 styles.submitButton,
                 loading && styles.disabledButton,
               ])}
-              onPress={handleSubmit}
+              onPress={() => void handleSubmit()}
               disabled={loading}
             >
               <Text style={styles.submitButtonText}>
@@ -244,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1E1E',
     borderRadius: 15,
     padding: 24,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -257,6 +265,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   modalTitle: {
@@ -316,7 +331,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#555',
     zIndex: 1001,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -329,6 +344,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   dropdownMenuItem: {

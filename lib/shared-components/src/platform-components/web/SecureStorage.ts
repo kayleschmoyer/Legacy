@@ -1,3 +1,29 @@
+// Logger setup with fallback
+let LOGGER: {
+  error: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+} = {
+  // Default fallback implementations
+  error: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.error(...args);
+  },
+  warn: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.warn(...args);
+  },
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: typeof LOGGER;
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+}
+
 export interface SecureStorageOptions {
   requireAuthentication?: boolean;
 }
@@ -15,11 +41,11 @@ export class SecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(key, value);
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
       }
       return Promise.resolve();
     } catch (error) {
-      console.error(`Error storing secure item ${key}:`, error as Error);
+      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -33,13 +59,16 @@ export class SecureStorage {
   ): Promise<string | null> {
     try {
       if (typeof sessionStorage !== 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return Promise.resolve(sessionStorage.getItem(key));
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return Promise.resolve(null);
       }
     } catch (error) {
-      console.error(`Error retrieving secure item ${key}:`, error as Error);
+      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return Promise.resolve(null);
     }
   }
@@ -54,7 +83,7 @@ export class SecureStorage {
       }
       return Promise.resolve();
     } catch (error) {
-      console.error(`Error removing secure item ${key}:`, error as Error);
+      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -69,7 +98,7 @@ export class SecureStorage {
       }
       return Promise.resolve();
     } catch (error) {
-      console.error('Error clearing secure storage:', error as Error);
+      LOGGER.error('Error clearing secure storage:', error as Error);
       throw error;
     }
   }

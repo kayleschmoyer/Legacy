@@ -53,6 +53,7 @@ GOOGLE_CLIENT_ID=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summ
 DB_HOST=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.db_host')
 AWS_REGION=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.aws_region')
 RDS_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.rds_proxy_endpoint.value')
+SQS_QUEUE_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_queue_url')
 
 # Get direct database endpoint for migrations (if available)
 cd "$TERRAFORM_DIR"
@@ -107,6 +108,7 @@ COOKIE_SECRET=$COOKIE_SECRET
 AWS_REGION=$AWS_REGION
 DB_CREDENTIALS_SECRET_NAME=$DB_CREDS_SECRET_NAME
 RDS_PROXY_ENDPOINT=$RDS_PROXY_ENDPOINT
+SQS_QUEUE_URL=$SQS_QUEUE_URL
 USE_LOCAL_CREDS=true
 EOF
 
@@ -196,6 +198,7 @@ echo "  Database Host (Proxy): $RDS_PROXY_ENDPOINT"
 echo "  Database Host (Direct): $DB_HOST_DIRECT"
 echo "  Database User: $DB_USER"
 echo "  AWS Region: $AWS_REGION"
+echo "  SQS Queue URL: $SQS_QUEUE_URL"
 echo "  Google Client ID: $GOOGLE_CLIENT_ID"
 echo "  Secrets updated: JWT, Google OAuth, Cookie, Database Password"
 echo ""

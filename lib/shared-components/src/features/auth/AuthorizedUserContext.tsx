@@ -19,12 +19,12 @@ export interface AuthorizedUserContextProviderProps extends PropsWithChildren {
   onAuthCheckComplete?: (isAuthenticated: boolean) => void;
 }
 
-function AuthorizedUserContextProvider({ 
+function AuthorizedUserContextProvider({
   children,
   loadingComponent: LoadingComponent = LoadingPanel,
   unauthenticatedComponent: UnauthenticatedComponent,
   onAuthCheckComplete,
- }: AuthorizedUserContextProviderProps) {
+}: AuthorizedUserContextProviderProps) {
   const { loading, data: currentInfo } = useCurrentUserInfo();
 
   React.useEffect(() => {
@@ -43,7 +43,7 @@ function AuthorizedUserContextProvider({
     }
     // If no unauthenticated component provided, just return null
     // The parent should handle the redirect logic
-    return <></>;
+    return null;
   }
 
   return (
@@ -58,7 +58,7 @@ export function useAuthorizedUserInfo(): LegacySportsJwt {
 
   if (value === null) {
     throw new Error(
-      'This component must be rendered inside an AuthorizedUserContextProvider'
+      'This component must be rendered inside an AuthorizedUserContextProvider',
     );
   }
 

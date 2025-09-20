@@ -1,6 +1,6 @@
 import { Argv } from 'yargs';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
-import axios from 'axios';
+import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import {
@@ -28,13 +28,18 @@ export const loadSinglePlayerStatsCommandBuilder = (argv: Argv) =>
 type ArgsType<T> = T extends Argv<infer P> ? P : never;
 
 async function insertIntoSqs(playerId: string): Promise<void> {
-  const sqsHost = getEnvVarRequired(EnvironmentVariable.LOAD_STATS_SQS_HOST);
+  const queueUrl = getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
 
-  await axios.post(sqsHost, JSON.stringify(playerId), {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+  const sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+  const command = new SendMessageCommand({
+    QueueUrl: queueUrl,
+    MessageBody: JSON.stringify(playerId),
+    MessageGroupId: 'stats-loading', // Required for FIFO queues
+    MessageDeduplicationId: `${playerId}-${Date.now()}`, // Ensure uniqueness
   });
+
+  await sqsClient.send(command);
 }
 
 type HandleLoadSinglePlayerStatsArgs = ArgsType<
@@ -53,8 +58,9 @@ export async function handleLoadSinglePlayerStats(
     const player = await getPlayerByBrefId(db, args.player);
 
     if (!player) {
-      LOGGER.error(`Player with brefId "${args.player}" not found in database`);
-      return;
+      const errorMsg = `Player with brefId "${args.player}" not found in database`;
+      LOGGER.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
     LOGGER.info(

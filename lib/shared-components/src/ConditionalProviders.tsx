@@ -17,9 +17,7 @@ const NativeProviders = ({ children }: ProvidersProps) => {
   return <div data-providers="native">{children}</div>;
 };
 
-function ConditionalProviders({ 
-  children,
- }: ProvidersProps) {
+function ConditionalProviders({ children }: ProvidersProps) {
   if (Platform.OS === 'web') {
     return <WebProviders>{children}</WebProviders>;
   }

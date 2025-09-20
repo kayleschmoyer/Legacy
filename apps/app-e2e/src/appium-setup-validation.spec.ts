@@ -13,14 +13,18 @@ describe('Appium E2E Setup Validation', () => {
 
   it('should validate Appium dependencies are installed', () => {
     const packageJsonPath = path.join(__dirname, '..', 'package.json');
-    const packageJsonData = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as {
+    const packageJsonData = JSON.parse(
+      fs.readFileSync(packageJsonPath, 'utf8'),
+    ) as {
       devDependencies: Record<string, string>;
     };
-    
+
     expect(packageJsonData.devDependencies['@wdio/cli']).toBeDefined();
     expect(packageJsonData.devDependencies['webdriverio']).toBeDefined();
-    expect(packageJsonData.devDependencies['@wdio/appium-service']).toBeDefined();
-    
+    expect(
+      packageJsonData.devDependencies['@wdio/appium-service'],
+    ).toBeDefined();
+
     console.log('✅ Appium + WebDriverIO dependencies installed');
     console.log('📱 Ready for React Native E2E testing');
   });
@@ -34,7 +38,7 @@ describe('Appium E2E Setup Validation', () => {
     console.log('1. Start Android emulator');
     console.log('2. Build React Native app');
     console.log('3. Run: nx run app-e2e:e2e-android');
-    
+
     expect(true).toBe(true);
   });
 
@@ -45,12 +49,12 @@ describe('Appium E2E Setup Validation', () => {
       'appium:deviceName': 'emulator',
       'appium:automationName': 'UiAutomator2',
       'appium:appPackage': 'com.legacysports',
-      'appium:appActivity': '.MainActivity'
+      'appium:appActivity': '.MainActivity',
     };
-    
+
     expect(testCapabilities.platformName).toBe('Android');
     expect(testCapabilities['appium:automationName']).toBe('UiAutomator2');
-    
+
     console.log('✅ Android E2E test capabilities validated');
     console.log('📦 App package: com.legacysports');
   });

@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
     padding: 20,
     ...(Platform.OS === 'web' && {
       minHeight: 400,
-      display: 'flex' as any,
+      display: 'flex' as const,
     }),
   },
   title: {
@@ -235,6 +235,6 @@ function DemoScreen() {
       </View>
     </View>
   );
-};
+}
 
 export { DemoScreen };

@@ -97,6 +97,9 @@ $newEnvVars["DB_CREDENTIALS_SECRET_NAME"] = $terraformOutput.environment_variabl
 $newEnvVars["RDS_PROXY_ENDPOINT"] = $terraformOutput.rds_proxy_endpoint.value
 $newEnvVars["USE_LOCAL_CREDS"] = "true"
 
+# Add SQS environment variables
+$newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_queue_url
+
 # Get direct database endpoint for migrations (if available)
 try {
     Push-Location $TerraformDir
@@ -230,6 +233,7 @@ Write-Host "  Database Host (Proxy): $($terraformOutput.rds_proxy_endpoint.value
 Write-Host "  Database Host (Direct): $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
 Write-Host "  Database User: $($dbCreds.username)" -ForegroundColor Gray
 Write-Host "  AWS Region: $($terraformOutput.environment_variables_summary.value.aws_region)" -ForegroundColor Gray
+Write-Host "  SQS Queue URL: $($terraformOutput.environment_variables_summary.value.sqs_queue_url)" -ForegroundColor Gray
 Write-Host "  Google Client ID: $($terraformOutput.environment_variables_summary.value.google_oauth_client_id)" -ForegroundColor Gray
 Write-Host "  Secrets updated: JWT, Google OAuth, Cookie, Database Password" -ForegroundColor Gray
 Write-Host ""

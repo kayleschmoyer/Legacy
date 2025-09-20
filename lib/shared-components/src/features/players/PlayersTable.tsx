@@ -9,7 +9,6 @@ import {
   Sheet,
   Spinner,
   Text,
-  View,
   XStack,
   YStack,
 } from 'tamagui';
@@ -107,7 +106,7 @@ export function PlayersTable({
   );
 
   const handleRefresh = useCallback(() => {
-    refetch();
+    void refetch();
   }, [refetch]);
 
   const handleSortChange = useCallback((value: string) => {
@@ -254,29 +253,17 @@ export function PlayersTable({
               borderWidth={1}
               borderColor="gray"
             >
-              <Text
-                flex={0.8}
-                fontWeight="bold"
-                fontSize={compact ? 2 : 3}
-              >
+              <Text flex={0.8} fontWeight="bold" fontSize={compact ? 2 : 3}>
                 ID
               </Text>
               <Text flex={2} fontWeight="bold" fontSize={compact ? 2 : 3}>
                 Name
               </Text>
-              <Text
-                flex={1.5}
-                fontWeight="bold"
-                fontSize={compact ? 2 : 3}
-              >
+              <Text flex={1.5} fontWeight="bold" fontSize={compact ? 2 : 3}>
                 Bref ID
               </Text>
               {selectable && (
-                <Text
-                  flex={1}
-                  fontWeight="bold"
-                  fontSize={compact ? 2 : 3}
-                >
+                <Text flex={1} fontWeight="bold" fontSize={compact ? 2 : 3}>
                   Action
                 </Text>
               )}
@@ -308,11 +295,7 @@ export function PlayersTable({
                   onPress={() => handlePlayerClick(player)}
                   cursor={onPlayerSelect ? 'pointer' : 'default'}
                 >
-                  <Text
-                    flex={0.8}
-                    fontSize={compact ? 2 : 3}
-                    color="gray"
-                  >
+                  <Text flex={0.8} fontSize={compact ? 2 : 3} color="gray">
                     {player.id}
                   </Text>
                   <XStack flex={2} ai="center" gap="$2">
@@ -358,11 +341,7 @@ export function PlayersTable({
         data.players.length >= pageSize && (
           <>
             <Separator />
-            <XStack
-              jc="space-between"
-              ai="center"
-              p="$2"
-            >
+            <XStack jc="space-between" ai="center" p="$2">
               <Button
                 size={compact ? '$2' : '$3'}
                 variant="outlined"

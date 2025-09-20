@@ -6,6 +6,29 @@ import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
 
+// Logger setup with fallback
+let LOGGER: {
+  warn: (...args: unknown[]) => void;
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: {
+      warn: (...args: unknown[]) => void;
+    };
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+  LOGGER = {
+    warn: (...args: unknown[]) => {
+      // eslint-disable-next-line no-console
+      console.warn(...args);
+    },
+  };
+}
+
 interface AppProviderProps {
   children: React.ReactNode;
   apolloClient: ApolloClient; // Apollo client instance
@@ -27,7 +50,8 @@ const NativeLayout = ({
   try {
     return (
       <TamaguiProvider
-        config={tamaguiConfig as any}
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        config={tamaguiConfig}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
         <ConditionalProviders>
@@ -35,8 +59,9 @@ const NativeLayout = ({
         </ConditionalProviders>
       </TamaguiProvider>
     );
-  } catch (error) {
-    console.warn('Failed to load native dependencies:', error);
+  } catch (error: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    LOGGER.warn('Failed to load native dependencies:', error);
     return <LoadingPanel />;
   }
 };
@@ -55,7 +80,8 @@ const WebLayout = ({
   try {
     return (
       <TamaguiProvider
-        config={tamaguiConfig as any}
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
+        config={tamaguiConfig}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
         <div
@@ -72,8 +98,9 @@ const WebLayout = ({
         </div>
       </TamaguiProvider>
     );
-  } catch (error) {
-    console.warn('Failed to load Apollo client:', error);
+  } catch (error: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    LOGGER.warn('Failed to load Apollo client:', error);
     return <LoadingPanel />;
   }
 };

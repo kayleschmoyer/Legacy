@@ -35,15 +35,15 @@ export interface SportScreenProps {
   /**
    * Custom styles for the container
    */
-  containerStyle?: any;
+  containerStyle?: React.CSSProperties;
   /**
    * Custom styles for the title
    */
-  titleStyle?: any;
+  titleStyle?: React.CSSProperties;
   /**
    * Custom styles for the subtitle
    */
-  subtitleStyle?: any;
+  subtitleStyle?: React.CSSProperties;
   /**
    * Additional content to render below the subtitle
    */

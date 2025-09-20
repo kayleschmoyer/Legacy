@@ -11,8 +11,8 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     lib: {
-      entry: 'src/load-career.ts',
-      fileName: 'load-career',
+      entry: 'src/index.ts',
+      fileName: 'index',
       formats: ['cjs'],
     },
     outDir: 'dist',

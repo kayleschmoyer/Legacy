@@ -7,20 +7,18 @@ exports.config = {
   // Runner Configuration
   // ====================
   runner: 'local',
-  
+
   //
   // ==================
   // Specify Test Files
   // ==================
-  specs: [
-    './src/**/*.e2e.js'
-  ],
-  
+  specs: ['./src/**/*.e2e.js'],
+
   // Patterns to exclude.
   exclude: [
     // 'path/to/excluded/files'
   ],
-  
+
   //
   // ============
   // Capabilities
@@ -33,13 +31,16 @@ exports.config = {
       'appium:deviceName': 'Android Emulator',
       'appium:platformVersion': '13',
       'appium:automationName': 'UiAutomator2',
-      'appium:app': path.join(process.cwd(), 'android/app/build/outputs/apk/debug/app-debug.apk'),
+      'appium:app': path.join(
+        process.cwd(),
+        'android/app/build/outputs/apk/debug/app-debug.apk',
+      ),
       'appium:appWaitActivity': '.MainActivity',
       'appium:newCommandTimeout': 240,
       'appium:autoGrantPermissions': true,
-    }
+    },
   ],
-  
+
   //
   // ===================
   // Test Configurations
@@ -50,28 +51,31 @@ exports.config = {
   waitforTimeout: 10000,
   connectionRetryTimeout: 120000,
   connectionRetryCount: 3,
-  
+
   //
   // =====
   // Hooks
   // =====
   services: [
-    ['appium', {
-      args: {
-        address: 'localhost',
-        port: 4723,
-        relaxedSecurity: true
+    [
+      'appium',
+      {
+        args: {
+          address: 'localhost',
+          port: 4723,
+          relaxedSecurity: true,
+        },
+        logPath: './logs',
       },
-      logPath: './logs'
-    }]
+    ],
   ],
-  
+
   framework: 'mocha',
   reporters: ['spec'],
-  
+
   mochaOpts: {
     ui: 'bdd',
-    timeout: 60000
+    timeout: 60000,
   },
 
   //
@@ -104,7 +108,7 @@ exports.config = {
    */
   before: function (capabilities, specs) {
     // Set implicit wait
-    driver.setTimeout({ 'implicit': 10000 });
+    driver.setTimeout({ implicit: 10000 });
   },
 
   /**
@@ -117,7 +121,7 @@ exports.config = {
   /**
    * Gets executed after all workers got shut down and the process is about to exit.
    */
-  onComplete: function(exitCode, config, capabilities, results) {
+  onComplete: function (exitCode, config, capabilities, results) {
     console.log('🏁 All E2E tests finished');
-  }
+  },
 };

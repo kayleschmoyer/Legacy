@@ -8,6 +8,7 @@ export function combineStyles(
   ...styles: (CSSProperties | CSSProperties[] | false | undefined | null)[]
 ): CSSProperties {
   const flatStyles = styles.flat(Infinity).filter(Boolean) as CSSProperties[];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return Object.assign({}, ...flatStyles);
 }
 
@@ -35,6 +36,7 @@ export function createStyleArray(
 export function safeStyle(
   styles:
     | (CSSProperties | false | undefined | null)[]
+    | CSSProperties[]
     | CSSProperties
     | false
     | undefined
@@ -47,7 +49,10 @@ export function safeStyle(
         style !== false && style !== null && style !== undefined,
     );
     if (filtered.length === 0) return {};
-    if (filtered.length === 1) return filtered[0];
+    if (filtered.length === 1) {
+      const firstStyle = filtered[0];
+      return firstStyle || {};
+    }
     return Object.assign({}, ...filtered) as CSSProperties;
   }
   // At this point, styles must be CSSProperties since we've ruled out array, false, null, undefined
@@ -60,6 +65,6 @@ export function safeStyle(
  */
 export function safeConditionalStyle(
   style: false | CSSProperties | null | undefined,
-): CSSProperties | undefined {
-  return style || undefined;
+): CSSProperties {
+  return style || {};
 }

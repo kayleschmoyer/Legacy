@@ -6,13 +6,15 @@ import { safeStyle } from '../../utils/styles';
 // Native table implementation using basic React Native components
 const NativeTable: React.FC<TableProps> = ({ headers, data, title, style }) => {
   return (
-    <View style={safeStyle([styles.container, style]) as any}>
+    // @ts-expect-error - Cross-platform style compatibility
+    <View style={safeStyle([styles.container, style])}>
       {title && <Text style={styles.title}>{title}</Text>}
 
       {/* Header Row */}
       <View style={styles.headerRow}>
         {headers.map((header, index) => (
-          <View key={index} style={safeStyle([styles.headerCell, { flex: 1 }]) as any}>
+          // @ts-expect-error - Cross-platform style compatibility
+          <View key={index} style={safeStyle([styles.headerCell, { flex: 1 }])}>
             <Text style={styles.headerText}>{header}</Text>
           </View>
         ))}
@@ -24,7 +26,8 @@ const NativeTable: React.FC<TableProps> = ({ headers, data, title, style }) => {
           {row.map((cell, cellIndex) => (
             <View
               key={cellIndex}
-              style={safeStyle([styles.dataCell, { flex: 1 }]) as any}
+              // @ts-expect-error - Cross-platform style compatibility
+              style={safeStyle([styles.dataCell, { flex: 1 }])}
             >
               <Text style={styles.cellText}>{cell}</Text>
             </View>

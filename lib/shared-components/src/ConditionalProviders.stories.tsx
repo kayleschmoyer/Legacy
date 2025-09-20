@@ -238,7 +238,10 @@ export const PlatformInfo: Story = {
             border: '1px solid #c3e6cb',
           }}
         >
-          ✅ ConditionalProviders is working correctly
+          <span role="img" aria-label="Check mark">
+            ✅
+          </span>{' '}
+          ConditionalProviders is working correctly
         </div>
       </div>
     ),

@@ -85,6 +85,7 @@
     "@apollo/server": "^4.12.2",
     "@as-integrations/aws-lambda": "^3.1.0",
     "@aws-sdk/client-secrets-manager": "^3.637.0",
+    "@aws-sdk/client-sqs": "^3.637.0",
     "@dataplan/json": "0.0.1-beta.33",
     "@dataplan/pg": "0.0.1-beta.37",
     "@envelop/core": "^5.3.1",

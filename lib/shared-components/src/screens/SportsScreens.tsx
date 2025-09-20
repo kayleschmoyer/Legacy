@@ -1,51 +1,6 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, View } from '../platform-components';
 
-// Platform-agnostic styles
-const commonStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    ...(Platform.OS === 'web' && {
-      minHeight: '60vh',
-      display: 'flex' as any,
-    }),
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#3366FF',
-    marginBottom: 16,
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#CCCCCC',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 24,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  comingSoon: {
-    fontSize: 16,
-    color: '#8F9BB3',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: 20,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-});
-
 // Football-specific styles matching mobile app
 const footballStyles = StyleSheet.create({
   container: {
@@ -55,7 +10,7 @@ const footballStyles = StyleSheet.create({
     padding: 20,
     ...(Platform.OS === 'web' && {
       minHeight: '60vh',
-      display: 'flex' as any,
+      display: 'flex' as const,
     }),
   },
   heading: {
@@ -95,7 +50,7 @@ const baseballStyles = StyleSheet.create({
     padding: 20,
     ...(Platform.OS === 'web' && {
       minHeight: '60vh',
-      display: 'flex' as any,
+      display: 'flex' as const,
     }),
   },
   heading: {
@@ -137,7 +92,7 @@ function FootballScreen() {
       <Text style={footballStyles.sectionTitle}>Upcoming Drafts</Text>
     </View>
   );
-};
+}
 
 function BaseballScreen() {
   return (
@@ -148,7 +103,7 @@ function BaseballScreen() {
       <Text style={baseballStyles.sectionTitle}>Manage Your Leagues</Text>
     </View>
   );
-};
+}
 
 export { FootballScreen };
 export { BaseballScreen };

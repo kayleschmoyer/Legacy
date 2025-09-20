@@ -10,12 +10,13 @@ import {
 } from '@legacy-sports/shared-components';
 
 export function App() {
-  const handleSportPress = (sportKey: string) => {
+  const handleSportPress = (sportKey: string): void => {
     console.log('Sport pressed:', sportKey);
     // Navigation logic would go here
   };
 
   return (
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     <TamaguiProvider config={tamaguiConfig}>
       <Routes>
         <Route

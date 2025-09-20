@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: jest.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -24,11 +24,14 @@ jest.mock('react-native', () => ({
   SafeAreaView: 'SafeAreaView', // Add SafeAreaView mock
   TextInput: 'TextInput',
   StyleSheet: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
     create: (styles: any) => styles,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
     flatten: (style: any) => style,
   },
   Platform: {
     OS: 'ios',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     select: jest.fn((platforms) => platforms.ios || platforms.default),
   },
   Dimensions: {

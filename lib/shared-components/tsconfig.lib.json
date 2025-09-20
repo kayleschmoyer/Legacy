@@ -20,9 +20,9 @@
     "src/**/*.test.jsx"
   ],
   "include": [
-    "src/**/*.js", 
-    "src/**/*.jsx", 
-    "src/**/*.ts", 
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.ts",
     "src/**/*.tsx",
     "src/types/tamagui.d.ts"
   ]

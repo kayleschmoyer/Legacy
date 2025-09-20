@@ -1,5 +1,36 @@
+// Logger setup with fallback
+let LOGGER: {
+  error: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  debug: (...args: unknown[]) => void;
+} = {
+  // Default fallback implementations
+  error: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.error(...args);
+  },
+  warn: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.warn(...args);
+  },
+  debug: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.debug(...args);
+  },
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: typeof LOGGER;
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+}
+
 // Dynamic import for Expo SecureStore
-let secureStore: any = null;
+let secureStore: typeof import('expo-secure-store') | null = null;
 
 // Initialize Expo SecureStore
 const initializeStorage = async () => {
@@ -8,7 +39,7 @@ const initializeStorage = async () => {
       secureStore = await import('expo-secure-store');
     }
   } catch (error) {
-    console.warn(
+    LOGGER.warn(
       'Expo SecureStore not available, falling back to sessionStorage',
       error instanceof Error ? error.message : String(error),
     );
@@ -42,6 +73,7 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await secureStore.setItemAsync(key, value, {
           requireAuthentication: options?.requireAuthentication || false,
         });
@@ -50,11 +82,11 @@ export class SecureStorage {
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.setItem(key, value);
         } else {
-          console.warn('No secure storage available on mobile platform');
+          LOGGER.warn('No secure storage available on mobile platform');
         }
       }
     } catch (error) {
-      console.error(`Error storing secure item ${key}:`, error as Error);
+      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -71,6 +103,7 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return
         return await secureStore.getItemAsync(key, {
           requireAuthentication: options?.requireAuthentication || false,
         });
@@ -82,7 +115,7 @@ export class SecureStorage {
         return null;
       }
     } catch (error) {
-      console.error(`Error retrieving secure item ${key}:`, error as Error);
+      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
       return null;
     }
   }
@@ -96,6 +129,7 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await secureStore.deleteItemAsync(key);
       } else {
         // Fallback to sessionStorage if SecureStore unavailable
@@ -104,7 +138,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      console.error(`Error removing secure item ${key}:`, error as Error);
+      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
       throw error;
     }
   }
@@ -121,10 +155,11 @@ export class SecureStorage {
         const knownKeys = ['GOOGLE_JWT', 'INTERNAL_JWT'];
         for (const key of knownKeys) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
             await secureStore.deleteItemAsync(key);
-          } catch (error) {
+          } catch {
             // Ignore errors for keys that don't exist
-            console.debug(`Key ${key} not found in SecureStore`);
+            LOGGER.debug(`Key ${key} not found in SecureStore`);
           }
         }
       } else {
@@ -134,7 +169,7 @@ export class SecureStorage {
         }
       }
     } catch (error) {
-      console.error('Error clearing secure storage:', error as Error);
+      LOGGER.error('Error clearing secure storage:', error as Error);
       throw error;
     }
   }

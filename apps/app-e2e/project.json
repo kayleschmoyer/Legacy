@@ -4,9 +4,7 @@
   "sourceRoot": "apps/app-e2e/src",
   "projectType": "application",
   "tags": [],
-  "implicitDependencies": [
-    "app"
-  ],
+  "implicitDependencies": ["app"],
   "// targets": "to see all targets run: nx show project app-e2e --web",
   "targets": {
     "build": {
@@ -63,13 +61,9 @@
     },
     "lint": {
       "executor": "@nx/eslint:lint",
-      "outputs": [
-        "{options.outputFile}"
-      ],
+      "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": [
-          "apps/app-e2e/**/*.{ts,tsx,js,jsx}"
-        ]
+        "lintFilePatterns": ["apps/app-e2e/**/*.{ts,tsx,js,jsx}"]
       }
     }
   }

@@ -128,7 +128,7 @@ export interface StatsTableRow {
 export interface Route {
   name: string;
   path: string;
-  component: React.ComponentType<any>;
+  component: React.ComponentType;
   icon?: string;
   requiresAuth?: boolean;
 }

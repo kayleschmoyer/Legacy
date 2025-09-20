@@ -3,6 +3,27 @@ import { Text } from 'react-native';
 import type { IconProps } from './LazyIcon';
 import { safeStyle } from '../../utils/styles';
 
+// Logger setup with fallback
+let LOGGER: {
+  info: (...args: unknown[]) => void;
+} = {
+  // Default fallback implementations
+  info: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.info(...args);
+  },
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: typeof LOGGER;
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+}
+
 // Native icon implementation with fallback
 const NativeIcons: React.FC<IconProps> = ({
   name,
@@ -11,7 +32,12 @@ const NativeIcons: React.FC<IconProps> = ({
   style,
 }) => {
   // Try to dynamically import MaterialIcons if available
-  const [IconComponent, setIconComponent] = React.useState<any>(null);
+  const [IconComponent, setIconComponent] = React.useState<React.ComponentType<{
+    name: string;
+    size: number;
+    color: string;
+    style?: unknown;
+  }> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -22,10 +48,11 @@ const NativeIcons: React.FC<IconProps> = ({
         // Dynamic import with error handling
         const { MaterialIcons } = await import('@expo/vector-icons');
         if (mounted) {
-          setIconComponent(() => MaterialIcons);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+          setIconComponent(MaterialIcons as any);
         }
-      } catch (error) {
-        console.log('MaterialIcons not available, using fallback');
+      } catch {
+        LOGGER.info('MaterialIcons not available, using fallback');
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -33,7 +60,7 @@ const NativeIcons: React.FC<IconProps> = ({
       }
     };
 
-    loadIcons();
+    void loadIcons();
 
     return () => {
       mounted = false;
@@ -43,7 +70,16 @@ const NativeIcons: React.FC<IconProps> = ({
   // Show loading state briefly
   if (isLoading) {
     return (
-      <Text style={safeStyle([{ fontSize: size, color }, style]) as any}>⚙️</Text>
+      <>
+        {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+        <Text
+          // @ts-expect-error - Cross-platform style compatibility
+          style={safeStyle([{ fontSize: size, color }, style])}
+          accessibilityLabel="Loading gear"
+        >
+          ⚙️
+        </Text>
+      </>
     );
   }
 
@@ -79,7 +115,8 @@ const NativeIcons: React.FC<IconProps> = ({
 
   return (
     <Text
-      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style]) as any}
+      // @ts-expect-error - Cross-platform style compatibility
+      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style])}
     >
       {iconSymbol}
     </Text>

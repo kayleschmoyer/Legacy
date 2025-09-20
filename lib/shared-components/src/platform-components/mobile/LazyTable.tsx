@@ -2,9 +2,9 @@ import React from 'react';
 
 export interface TableProps {
   headers: string[];
-  data: any[][];
+  data: (string | number | boolean | null)[][];
   title?: string;
-  style?: any;
+  style?: React.CSSProperties;
 }
 
 // Lazy-loaded table component for mobile

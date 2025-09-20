@@ -13,7 +13,10 @@
       ],
       "options": {
         "outputPath": "dist/lib/shared-components",
-        "configFile": "lib/shared-components/vite.config.mts"
+        "configFile": "lib/shared-components/vite.config.mts",
+        "main": "src/index.ts",
+        "tsConfig": "lib/shared-components/tsconfig.lib.json",
+        "skipTypeCheck": false
       }
     },
     "test": {

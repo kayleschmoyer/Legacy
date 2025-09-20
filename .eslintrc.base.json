@@ -1,42 +1,37 @@
 {
   "root": false,
-  "ignorePatterns": [
-    "dist",
-    "node_modules",
-    ".expo",
-    "web-build",
-    "cache"
-  ],
+  "ignorePatterns": ["dist", "node_modules", ".expo", "web-build", "cache"],
   "overrides": [
     {
-      "files": [
-        "*.ts",
-        "*.tsx",
-        "*.js",
-        "*.jsx"
-      ],
-      "rules": {}
+      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+      "rules": {
+        "no-console": "error"
+      }
     },
     {
-      "files": [
-        "*.ts",
-        "*.tsx"
-      ],
+      "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": [
-          "tsconfig.*?.json"
-        ]
+        "project": ["tsconfig.*?.json"]
       },
       "rules": {
         "@typescript-eslint/no-explicit-any": "warn"
       }
     },
     {
-      "files": [
-        "*.js",
-        "*.jsx"
-      ],
+      "files": ["*.js", "*.jsx"],
       "rules": {}
+    },
+    {
+      "files": [
+        "tools/**/*.js",
+        "scripts/**/*.js",
+        "*.config.js",
+        "test-*.js",
+        "**/logging/src/**/*.ts"
+      ],
+      "rules": {
+        "no-console": "off"
+      }
     }
   ]
 }

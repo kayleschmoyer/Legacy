@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
-import { PlayerRow, PlayerRowData, PlayerRowProps } from './PlayerRow';
+import { PlayerRow, PlayerRowData } from './PlayerRow';
 
 const meta: Meta<typeof PlayerRow> = {
   title: 'Features/Players/PlayerRow',
@@ -293,6 +293,7 @@ export const WithInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Test row click
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     const playerName = canvas.getByText(args.player.player);
     const row = playerName.closest('div');
     if (row) {

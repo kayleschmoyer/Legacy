@@ -191,7 +191,7 @@ function CareerStatsViewer({
 
       <TouchableOpacity
         style={safeStyle([styles.button, loading && styles.buttonDisabled])}
-        onPress={getCareerStats}
+        onPress={() => void getCareerStats()}
         disabled={loading}
       >
         <Text style={styles.buttonText}>

@@ -4,7 +4,7 @@ export interface IconProps {
   name: string;
   size?: number;
   color?: string;
-  style?: any;
+  style?: React.CSSProperties;
   onPress?: () => void;
 }
 

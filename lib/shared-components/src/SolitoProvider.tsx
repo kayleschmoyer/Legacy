@@ -22,6 +22,6 @@ function SolitoProvider({ children }: SolitoProviderProps) {
       {children}
     </NavigationContainer>
   );
-};
+}
 
 export { SolitoProvider };

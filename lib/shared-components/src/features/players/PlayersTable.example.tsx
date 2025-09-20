@@ -6,6 +6,29 @@ import { PlayersTableDemo } from './PlayersTableDemo';
 import { apolloClient } from './apollo-client'; // Your Apollo client
 import { tamaguiConfig } from '@legacy-sports/tamagui-config'; // Your Tamagui config
 
+// Logger setup with fallback
+let LOGGER: {
+  info: (...args: unknown[]) => void;
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: {
+      info: (...args: unknown[]) => void;
+    };
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+  LOGGER = {
+    info: (...args: unknown[]) => {
+      // eslint-disable-next-line no-console
+      console.info(...args);
+    },
+  };
+}
+
 // Basic usage
 export function SimplePlayersTable() {
   return (
@@ -20,7 +43,7 @@ export function SimplePlayersTable() {
 // Advanced usage with selection
 export function PlayerSelectionTable() {
   const handlePlayerSelect = (player: any) => {
-    console.log('Selected player:', player);
+    LOGGER.info('Selected player:', player);
     alert(`Selected: ${player.firstName} ${player.lastName}`);
   };
 

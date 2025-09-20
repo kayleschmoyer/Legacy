@@ -7,4 +7,5 @@ export enum EnvironmentVariable {
   DB_USER = 'DB_USER',
   GRAPHQL_HOST = 'GRAPHQL_HOST',
   LOAD_STATS_SQS_HOST = 'LOAD_STATS_SQS_HOST',
+  SQS_QUEUE_URL = 'SQS_QUEUE_URL',
 }

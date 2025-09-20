@@ -1,31 +1,41 @@
 import { useCallback, useMemo } from 'react';
-import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { AsyncHookResult, useAsyncHook } from '../../utils/HookHelpers';
 import { Platform, SecureStorage } from '../../platform-components';
 
 // Import dependencies with fallbacks for testing environment
-let getEnvVarRequired: any = () => '';
-let LOGGER: any = { error: () => {}, warn: () => {}, info: () => {} };
+let LOGGER: {
+  error: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+} = {
+  // Default fallback implementations (should not be reached in production)
+  error: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.error(...args);
+  },
+  warn: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.warn(...args);
+  },
+  info: (...args: unknown[]) => {
+    // eslint-disable-next-line no-console
+    console.info(...args);
+  },
+};
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const envUtilities = require('@legacy-sports/env-utilities');
-  getEnvVarRequired = envUtilities.getEnvVarRequired;
-} catch {
-  // Fallback for test environment
-}
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const logging = require('@legacy-sports/logging');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: typeof LOGGER;
+  };
   LOGGER = logging.LOGGER;
 } catch {
   // Fallback for test environment
 }
 
 export interface AuthHandlers {
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export interface AuthCallbacks {
@@ -75,16 +85,6 @@ export async function getJwt(): Promise<LegacySportsJwt | null> {
   }
 }
 
-async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
-  try {
-    await SecureStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
-    // Trigger the react update
-    KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
-  } catch (error) {
-    LOGGER.error('Error storing token to secure storage', error);
-  }
-}
-
 async function resetToken(): Promise<void> {
   try {
     await SecureStorage.clear();
@@ -116,16 +116,17 @@ function useNativeAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  return Platform.OS === 'web'
-    ? useWebAuthHandlers(callbacks)
-    : useNativeAuthHandlers(callbacks);
+  const webHandlers = useWebAuthHandlers(callbacks);
+  const nativeHandlers = useNativeAuthHandlers(callbacks);
+
+  return Platform.OS === 'web' ? webHandlers : nativeHandlers;
 }
 
 export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
   const lastUpdate = useLastUpdateTime();
 
   return useAsyncHook(
-    useMemo(() => getJwt, [lastUpdate]),
+    useMemo(() => getJwt, []),
     [lastUpdate],
   );
 }

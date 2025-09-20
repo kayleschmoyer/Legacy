@@ -51,7 +51,7 @@ function PlayersGrid({
   });
 
   const handleRefresh = useCallback(() => {
-    refetch();
+    void refetch();
   }, [refetch]);
 
   const filteredPlayers = useMemo(() => {
@@ -102,11 +102,7 @@ function PlayersGrid({
   }
 
   return (
-    <YStack 
-      flex={1} 
-      p="$4"
-      bg="$background"
-    >
+    <YStack flex={1} p="$4" bg="$background">
       {/* Header */}
       <YStack mb="$4">
         <XStack jc="space-between" ai="center" mb="$3">
@@ -135,19 +131,8 @@ function PlayersGrid({
                   size="$3"
                 />
                 {/* Search overlay button */}
-                <View
-                  pos="absolute"
-                  r="$2"
-                  t="$2"
-                  zi={1}
-                  pointerEvents="none"
-                >
-                  <Button
-                    size={2}
-                    circular
-                    chromeless
-                    pointerEvents="auto"
-                  >
+                <View pos="absolute" r="$2" t="$2" zi={1} pointerEvents="none">
+                  <Button size={2} circular chromeless pointerEvents="auto">
                     <Search size={16} />
                   </Button>
                 </View>
@@ -200,12 +185,7 @@ function PlayersGrid({
         </YStack>
       ) : (
         <ScrollView>
-          <YStack
-            flexDirection="row"
-            flexWrap="wrap"
-            gap="$3"
-            jc="flex-start"
-          >
+          <YStack flexDirection="row" flexWrap="wrap" gap="$3" jc="flex-start">
             {filteredPlayers.map((player) => (
               <YStack key={player.id} width={200} minW={280} maxW={400}>
                 <PlayerCard player={player} onPlayerClick={onPlayerSelect} />

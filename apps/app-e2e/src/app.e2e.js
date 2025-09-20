@@ -13,8 +13,8 @@ describe('App E2E Tests', () => {
       async () => await driver.isDisplayed('//android.widget.TextView'),
       {
         timeout: 30000,
-        timeoutMsg: 'App did not launch within 30 seconds'
-      }
+        timeoutMsg: 'App did not launch within 30 seconds',
+      },
     );
 
     console.log('✅ App launched successfully');
@@ -33,17 +33,26 @@ describe('App E2E Tests', () => {
     // Basic navigation test
     try {
       // Look for any touchable elements
-      const touchableElements = await driver.$$('//android.widget.Button | //android.view.ViewGroup[@clickable="true"]');
-      
+      const touchableElements = await driver.$$(
+        '//android.widget.Button | //android.view.ViewGroup[@clickable="true"]',
+      );
+
       if (touchableElements.length > 0) {
-        console.log(`✅ Found ${touchableElements.length} interactive elements`);
+        console.log(
+          `✅ Found ${touchableElements.length} interactive elements`,
+        );
       } else {
-        console.log('ℹ️ No interactive elements found - this is normal for a basic app');
+        console.log(
+          'ℹ️ No interactive elements found - this is normal for a basic app',
+        );
       }
-      
+
       expect(true).toBe(true);
     } catch (error) {
-      console.log('ℹ️ Navigation test skipped - no navigation elements found:', error.message);
+      console.log(
+        'ℹ️ Navigation test skipped - no navigation elements found:',
+        error.message,
+      );
       expect(true).toBe(true);
     }
   });
@@ -55,13 +64,16 @@ describe('App E2E Tests', () => {
       await driver.touchAction({
         action: 'tap',
         x: screenCenter.width / 2,
-        y: screenCenter.height / 2
+        y: screenCenter.height / 2,
       });
 
       console.log('✅ Touch interactions working');
       expect(true).toBe(true);
     } catch (error) {
-      console.log('ℹ️ Touch interaction test completed with basic validation:', error.message);
+      console.log(
+        'ℹ️ Touch interaction test completed with basic validation:',
+        error.message,
+      );
       expect(true).toBe(true);
     }
   });
@@ -77,7 +89,10 @@ const E2EHelpers = {
   async waitForElement(selector, timeout = 10000) {
     return await driver.waitUntil(
       async () => await driver.isDisplayed(selector),
-      { timeout, timeoutMsg: `Element ${selector} not found within ${timeout}ms` }
+      {
+        timeout,
+        timeoutMsg: `Element ${selector} not found within ${timeout}ms`,
+      },
     );
   },
 
@@ -97,7 +112,7 @@ const E2EHelpers = {
     const element = await driver.$(selector);
     const actualText = await element.getText();
     expect(actualText).toContain(expectedText);
-  }
+  },
 };
 
 // Export helpers for use in other test files

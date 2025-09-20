@@ -104,9 +104,18 @@ declare module '__PLATFORM_COMPONENTS__' {
     contentContainerStyle?: React.CSSProperties;
     onEndReached?: () => void;
     onEndReachedThreshold?: number;
-    ListHeaderComponent?: React.ComponentType<any> | React.ReactElement | null;
-    ListFooterComponent?: React.ComponentType<any> | React.ReactElement | null;
-    ListEmptyComponent?: React.ComponentType<any> | React.ReactElement | null;
+    ListHeaderComponent?:
+      | React.ComponentType<unknown>
+      | React.ReactElement
+      | null;
+    ListFooterComponent?:
+      | React.ComponentType<unknown>
+      | React.ReactElement
+      | null;
+    ListEmptyComponent?:
+      | React.ComponentType<unknown>
+      | React.ReactElement
+      | null;
     showsHorizontalScrollIndicator?: boolean;
     showsVerticalScrollIndicator?: boolean;
   }
@@ -155,8 +164,14 @@ declare module '__PLATFORM_COMPONENTS__' {
 
   export interface DimensionsAPI {
     get: (dimension: 'window' | 'screen') => { width: number; height: number };
-    addEventListener: (event: string, handler: (...args: unknown[]) => void) => void;
-    removeEventListener: (event: string, handler: (...args: unknown[]) => void) => void;
+    addEventListener: (
+      event: string,
+      handler: (...args: unknown[]) => void,
+    ) => void;
+    removeEventListener: (
+      event: string,
+      handler: (...args: unknown[]) => void,
+    ) => void;
   }
 
   export interface StyleSheetAPI {
@@ -164,22 +179,55 @@ declare module '__PLATFORM_COMPONENTS__' {
   }
 
   export interface AnimatedAPI {
-    View: (props: any) => React.ReactNode;
-    Text: (props: any) => React.ReactNode;
-    Value: new (value: number) => any;
+    View: (props: ViewProps) => React.ReactNode;
+    Text: (props: TextProps) => React.ReactNode;
+    Value: new (value: number) => AnimatedValue;
     timing: (
-      value: any,
-      config: any,
+      value: AnimatedValue,
+      config: AnimationConfig,
     ) => { start: (callback?: () => void) => void };
     spring: (
-      value: any,
-      config: any,
+      value: AnimatedValue,
+      config: SpringConfig,
     ) => { start: (callback?: () => void) => void };
-    parallel: (animations: any[]) => { start: (callback?: () => void) => void };
+    parallel: (animations: AnimatedTimingConfig[]) => {
+      start: (callback?: () => void) => void;
+    };
+  }
+
+  // Animation helper types
+  export interface AnimatedValue {
+    setValue: (value: number) => void;
+    addListener: (callback: (value: { value: number }) => void) => string;
+    removeListener: (id: string) => void;
+  }
+
+  export interface AnimationConfig {
+    toValue: number;
+    duration?: number;
+    easing?: (value: number) => number;
+    useNativeDriver?: boolean;
+  }
+
+  export interface SpringConfig {
+    toValue: number;
+    friction?: number;
+    tension?: number;
+    useNativeDriver?: boolean;
+  }
+
+  export interface AnimatedTimingConfig {
+    start: (callback?: () => void) => void;
   }
 
   export interface AlertAPI {
-    alert: (title: string, message?: string, buttons?: any[]) => void;
+    alert: (title: string, message?: string, buttons?: AlertButton[]) => void;
+  }
+
+  export interface AlertButton {
+    text?: string;
+    onPress?: () => void;
+    style?: 'default' | 'cancel' | 'destructive';
   }
 
   export interface VibrationAPI {

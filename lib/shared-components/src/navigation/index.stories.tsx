@@ -2,13 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
 import {
   BreadcrumbNavigation,
-  BreadcrumbNavigationProps,
   NavigationDrawer,
-  NavigationDrawerProps,
   NavigationItem,
   TabItem,
   TabNavigation,
-  TabNavigationProps,
 } from './index';
 
 const meta: Meta<typeof NavigationDrawer> = {
@@ -183,6 +180,7 @@ export const WithInteraction: Story = {
 };
 
 // Tab Navigation Stories
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TabMeta: Meta<typeof TabNavigation> = {
   title: 'Navigation/TabNavigation',
   component: TabNavigation,
@@ -278,7 +276,8 @@ export const TabManyItems: TabStory = {
     currentRoute: '/teams',
     onNavigate: fn(),
   },
-  render: (args: any) => <TabNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <TabNavigation {...(args as any)} />,
 };
 
 // Interactive tab test
@@ -288,7 +287,8 @@ export const TabWithInteraction: TabStory = {
     currentRoute: '/roster',
     onNavigate: fn(),
   },
-  render: (args: any) => <TabNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <TabNavigation {...(args as any)} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -300,6 +300,7 @@ export const TabWithInteraction: TabStory = {
 };
 
 // Breadcrumb Navigation Stories
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const BreadcrumbMeta: Meta<typeof BreadcrumbNavigation> = {
   title: 'Navigation/BreadcrumbNavigation',
   component: BreadcrumbNavigation,
@@ -327,7 +328,8 @@ export const BreadcrumbDefault: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args: any) => <BreadcrumbNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
 
 export const BreadcrumbShort: BreadcrumbStory = {
@@ -338,7 +340,8 @@ export const BreadcrumbShort: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args: any) => <BreadcrumbNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
 
 export const BreadcrumbSingle: BreadcrumbStory = {
@@ -346,7 +349,8 @@ export const BreadcrumbSingle: BreadcrumbStory = {
     items: [{ title: 'Home', route: '/' }],
     onNavigate: fn(),
   },
-  render: (args: any) => <BreadcrumbNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
 
 export const BreadcrumbLong: BreadcrumbStory = {
@@ -365,7 +369,8 @@ export const BreadcrumbLong: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
-  render: (args: any) => <BreadcrumbNavigation {...args} />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
 
 // Combined navigation showcase

@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -107,7 +110,7 @@ function FilterChip({
   ];
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+    <Animated.View style={safeStyle({ transform: 'scale(1)' })}>
       <TouchableOpacity
         style={safeStyle(chipStyle)}
         onPress={onPress}
@@ -236,21 +239,22 @@ function FilterDrawer({
     }
   };
 
-  const getAnimatedStyle = () => {
-    switch (variant) {
-      case 'slide':
-        return { transform: [{ translateY: slideAnim }] };
-      case 'fade':
-        return { opacity: fadeAnim };
-      case 'scale':
-        return {
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }],
-        };
-      default:
-        return {};
-    }
-  };
+  // Animation disabled for web compatibility
+  // const getAnimatedStyle = () => {
+  //   switch (variant) {
+  //     case 'slide':
+  //       return { transform: [{ translateY: slideAnim }] };
+  //     case 'fade':
+  //       return { opacity: fadeAnim };
+  //     case 'scale':
+  //       return {
+  //         opacity: fadeAnim,
+  //         transform: [{ scale: scaleAnim }],
+  //       };
+  //     default:
+  //       return {};
+  //   }
+  // };
 
   if (!visible && variant !== 'slide') return null;
 
@@ -263,11 +267,11 @@ function FilterDrawer({
           activeOpacity={1}
         />
         <Animated.View
-          style={[
+          style={safeStyle([
             styles.filterDrawer,
             variant === 'scale' && styles.scaleDrawer,
-            getAnimatedStyle(),
-          ]}
+            // Skip animated style for web compatibility
+          ])}
         >
           {/* Header */}
           <View style={styles.drawerHeader}>

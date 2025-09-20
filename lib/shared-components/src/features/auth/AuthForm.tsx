@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   Animated,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
@@ -12,7 +9,7 @@ import {
   View,
 } from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { AuthState, User } from '../../types';
+import { AuthState } from '../../types';
 import { safeStyle } from '../../utils/styles';
 
 export interface LoginCredentials {
@@ -45,7 +42,7 @@ function AuthForm({
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(
     initialMode,
   );
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterData>({
     name: '',
     email: '',
     password: '',
@@ -209,13 +206,13 @@ function AuthForm({
       }}
     >
       <Animated.View
-        style={[
+        style={safeStyle([
           styles.formContainer,
           {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
+            opacity: 1,
+            transform: `translateY(0px)`,
           },
-        ]}
+        ])}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -231,9 +228,9 @@ function AuthForm({
               placeholder="Full Name"
               placeholderTextColor="#888"
               value={formData.name}
-              onChangeText={(text) =>
-                setFormData((prev) => ({ ...prev, name: text }))
-              }
+              onChangeText={(text) => {
+                setFormData((prev) => ({ ...prev, name: text }));
+              }}
               autoCapitalize="words"
               {...(Platform.OS !== 'web' && { editable: !loading })}
             />
@@ -244,9 +241,9 @@ function AuthForm({
             placeholder="Email Address"
             placeholderTextColor="#888"
             value={formData.email}
-            onChangeText={(text) =>
-              setFormData((prev) => ({ ...prev, email: text }))
-            }
+            onChangeText={(text) => {
+              setFormData((prev) => ({ ...prev, email: text }));
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -291,7 +288,7 @@ function AuthForm({
             styles.submitButton,
             loading && styles.disabledButton,
           ])}
-          onPress={handleSubmit}
+          onPress={() => void handleSubmit()}
           disabled={loading}
         >
           <Text style={styles.submitButtonText}>{getButtonText()}</Text>
@@ -553,11 +550,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: DEFAULT_COLORS.border,
-    ...Platform.select({
+    ...(Platform.select({
       web: {
-        outlineStyle: 'none',
+        outlineStyle: 'none' as const,
       },
-    }),
+    }) as { outlineStyle?: string }),
   },
   submitButton: {
     backgroundColor: DEFAULT_COLORS.accent,
@@ -565,7 +562,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -578,6 +575,13 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
+    }) as {
+      shadowColor?: string;
+      shadowOffset?: { width: number; height: number };
+      shadowOpacity?: number;
+      shadowRadius?: number;
+      elevation?: number;
+      boxShadow?: string;
     }),
   },
   disabledButton: {

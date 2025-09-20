@@ -1,11 +1,8 @@
 /**
  * Modern testing utilities that avoid deprecated react-test-renderer
  */
-import {
-  RenderOptions,
-  render as rtlRender,
-} from '@testing-library/react';
-import React, { ReactElement } from 'react';
+import { RenderOptions, render as rtlRender } from '@testing-library/react';
+import { ReactElement } from 'react';
 
 // Re-export everything from testing library except render
 export * from '@testing-library/react';

@@ -1,12 +1,29 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
-import {
-  AdvancedTeamPicker,
-  AdvancedTeamPickerProps,
-  TeamData,
-  TeamPicker,
-  TeamPickerProps,
-} from './TeamPicker';
+import { AdvancedTeamPicker, TeamData, TeamPicker } from './TeamPicker';
+
+// Logger setup with fallback
+let LOGGER: {
+  info: (...args: unknown[]) => void;
+};
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const logging = require('@legacy-sports/logging') as {
+    LOGGER: {
+      info: (...args: unknown[]) => void;
+    };
+  };
+  LOGGER = logging.LOGGER;
+} catch {
+  // Fallback for test environment
+  LOGGER = {
+    info: (...args: unknown[]) => {
+      // eslint-disable-next-line no-console
+      console.info(...args);
+    },
+  };
+}
 
 const meta: Meta<typeof TeamPicker> = {
   title: 'Features/Teams/TeamPicker',
@@ -349,6 +366,7 @@ export const WithCustomStyle: Story = {
 };
 
 // Advanced Team Picker Stories
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const AdvancedMeta: Meta<typeof AdvancedTeamPicker> = {
   title: 'Features/Teams/AdvancedTeamPicker',
   component: AdvancedTeamPicker,
@@ -465,6 +483,7 @@ export const WithInteraction: Story = {
 
     // For web implementation, test the select element
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const selectElement = canvas.getByDisplayValue(args.placeholder);
       if (selectElement && selectElement.tagName === 'SELECT') {
         await userEvent.selectOptions(selectElement, '1');
@@ -472,7 +491,7 @@ export const WithInteraction: Story = {
       }
     } catch {
       // If no select element found, it might be using the fallback
-      console.log('Using fallback picker implementation');
+      LOGGER.info('Using fallback picker implementation');
     }
   },
 };

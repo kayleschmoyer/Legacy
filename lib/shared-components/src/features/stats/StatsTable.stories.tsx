@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
-import { StatsTable, StatsTableProps } from './StatsTable';
+import { StatsTable } from './StatsTable';
 import { StatsTableColumn, StatsTableRow } from '../../types';
 
 const meta: Meta<typeof StatsTable> = {

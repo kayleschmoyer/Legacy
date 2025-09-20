@@ -7,7 +7,10 @@ export interface AuthGuardProps extends PropsWithChildren {
   /**
    * Component to show when user is not authenticated
    */
-  fallback?: React.ComponentType<any>;
+  fallback?: React.ComponentType<{
+    onLoginSuccess?: () => void;
+    onLoginFailure?: (error: string) => void;
+  }>;
   /**
    * Component to show while checking authentication
    */
@@ -26,14 +29,14 @@ export interface AuthGuardProps extends PropsWithChildren {
   redirectToLogin?: boolean;
 }
 
-function AuthGuard({ 
+function AuthGuard({
   children,
   fallback: FallbackComponent = LoginScreen,
   loadingComponent: LoadingComponent = LoadingPanel,
   onLoginSuccess,
   onLoginFailure,
   redirectToLogin = true,
- }: AuthGuardProps) {
+}: AuthGuardProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -42,7 +45,7 @@ function AuthGuard({
 
   if (!isAuthenticated) {
     if (!redirectToLogin) {
-      return <></>;
+      return null;
     }
 
     return (
@@ -53,7 +56,7 @@ function AuthGuard({
     );
   }
 
-  return <>{children}</>;
+  return children;
 }
 
 export { AuthGuard };

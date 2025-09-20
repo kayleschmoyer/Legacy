@@ -17,13 +17,58 @@ import { getTable, getTableBody, RowParser } from './HtmlParser';
 
 const GAME_IDENTIFIER_GROUP = 'gameIdentifier';
 const GAME_IDENTIFIER_REGEX = new RegExp(
-  `^\\/boxes\\/\\w{3}\\/(?<${GAME_IDENTIFIER_GROUP}>\\w{12}).shtml$`
+  `^\\/boxes\\/\\w{3}\\/(?<${GAME_IDENTIFIER_GROUP}>\\w{12}).shtml$`,
 );
 
 const StatMapping: Record<
   string,
   keyof SeasonBatting | keyof SeasonFielding | keyof SeasonPitching
 > = {
+  // Batting stats - with b_ prefix
+  B_GAMES: 'g',
+  B_PA: 'pa',
+  B_AB: 'ab',
+  B_R: 'r',
+  B_H: 'h',
+  B_DOUBLES: 'doubles',
+  B_TRIPLES: 'triples',
+  B_HR: 'hr',
+  B_RBI: 'rbi',
+  B_SB: 'sb',
+  B_CS: 'cs',
+  B_BB: 'bb',
+  B_SO: 'so',
+  B_BATTING_AVG: 'battingAvg',
+  B_ONBASE_PERC: 'onbasePerc',
+  B_SLUGGING_PERC: 'sluggingPerc',
+  B_ONBASE_PLUS_SLUGGING: 'onbasePlusSlugging',
+  B_ONBASE_PLUS_SLUGGING_PLUS: 'onbasePlusSluggingPlus',
+  B_TB: 'tb',
+  B_GIDP: 'gidp',
+  B_HBP: 'hbp',
+  B_SH: 'sh',
+  B_SF: 'sf',
+  B_IBB: 'ibb',
+
+  // Season/year field
+  YEAR_ID: 'season',
+
+  // Team field
+  TEAM_NAME_ABBR: 'team',
+
+  // Fielding fields (with f_ prefix from Baseball Reference)
+  F_POSITION: 'pos',
+  F_GAMES: 'g',
+  F_GAMES_STARTED: 'gs',
+  F_INNINGS: 'innDef',
+  F_CHANCES: 'chances',
+  F_PO: 'po',
+  F_ASSISTS: 'a',
+  F_ERRORS: 'eDef',
+  F_DP: 'dpDef',
+  F_FIELDING_PERC: 'fieldingPerc',
+
+  // Legacy mappings (keeping for backwards compatibility)
   '2B': 'doubles',
   '3B': 'triples',
   A: 'a',
@@ -91,7 +136,6 @@ const StatMapping: Record<
   WHIP: 'whip',
   WIN_LOSS_PERC: 'winLossPerc',
   WP: 'wp',
-  YEAR_ID: 'season',
 };
 
 const NUMERIC_STATS = Object.freeze(
@@ -133,12 +177,12 @@ const NUMERIC_STATS = Object.freeze(
     'triples',
     'w',
     'wp',
-  ])
+  ]),
 );
 
 function parseRow<T extends object>(
   row: HTMLElement,
-  playerId: number
+  playerId: number,
 ): T | null {
   const headers = row.getElementsByTagName('th');
   const cols = row.getElementsByTagName('td');
@@ -146,7 +190,7 @@ function parseRow<T extends object>(
   const allCells = headers.concat(cols);
 
   const yearCell = allCells.find(
-    (c) => c.getAttribute('data-stat') === 'year_ID'
+    (c) => c.getAttribute('data-stat') === 'year_id',
   );
 
   const rowId = yearCell?.getAttribute('csk');
@@ -183,8 +227,8 @@ function parseRow<T extends object>(
         if (isNaN(value)) {
           throw new Error(
             `Unable to parse field ${String(
-              statField
-            )}: ${text} is not a number`
+              statField,
+            )}: ${text} is not a number`,
           );
         }
       }
@@ -204,7 +248,7 @@ function parseRow<T extends object>(
 
 export function parseTable<T extends object>(
   table: HTMLElement | null,
-  parser: RowParser<T>
+  parser: RowParser<T>,
 ): T[] {
   if (table === null) {
     return [];
@@ -229,7 +273,7 @@ export function parseTable<T extends object>(
 }
 
 function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
-  const battingStats = getTable(root, 'batting_standard');
+  const battingStats = getTable(root, 'players_standard_batting');
   return parseTable<SeasonBatting>(battingStats, (r) => {
     const s = parseRow<SeasonBatting & { pos?: string }>(r, playerId);
 
@@ -244,19 +288,19 @@ function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
 
 function getFieldingStats(
   root: HTMLElement,
-  playerId: number
+  playerId: number,
 ): SeasonFielding[] {
-  const fieldingStats = getTable(root, 'standard_fielding');
+  const fieldingStats = getTable(root, 'players_standard_fielding');
   return parseTable<SeasonFielding>(fieldingStats, (r) =>
-    parseRow(r, playerId)
+    parseRow(r, playerId),
   );
 }
 
 function getPitchingStats(
   root: HTMLElement,
-  playerId: number
+  playerId: number,
 ): SeasonPitching[] {
-  const pitchingStats = getTable(root, 'pitching_standard');
+  const pitchingStats = getTable(root, 'players_standard_pitching');
   return parseTable(pitchingStats, (r) => parseRow(r, playerId));
 }
 
@@ -282,7 +326,7 @@ export async function getCareerStats(player: Player): Promise<CareerStats> {
 export async function getGameBattingStats(
   player: Player,
   season: number,
-  gameNumber: number
+  gameNumber: number,
 ): Promise<GameBatting | null> {
   const data = await getGameStats(player.brefId, 'b', season);
   const root = htmlParser(data);
@@ -333,7 +377,7 @@ export async function getGameBattingStats(
 export async function getGamePitchingStats(
   player: Player,
   season: number,
-  gameNumber: number
+  gameNumber: number,
 ): Promise<GamePitching | null> {
   const data = await getGameStats(player.brefId, 'p', season);
   const root = htmlParser(data);
@@ -365,7 +409,7 @@ export async function getGamePitchingStats(
   const cells = gameRow.getElementsByTagName('td');
 
   const identifierCell = cells.find(
-    (cell) => cell.getAttribute('data-stat') === 'date_game'
+    (cell) => cell.getAttribute('data-stat') === 'date_game',
   );
 
   const link = identifierCell
@@ -383,7 +427,7 @@ export async function getGamePitchingStats(
   // Pitching specific stat parsing
   const decision =
     cells.find(
-      (cell) => cell.getAttribute('data-stat') === 'player_game_result'
+      (cell) => cell.getAttribute('data-stat') === 'player_game_result',
     )?.text || '';
 
   if (decision.includes('BW') || decision.startsWith('W')) {
@@ -424,7 +468,7 @@ export async function getGameFieldingStats(
   player: Player,
   season: number,
   gameNumber: number,
-  pos: string
+  pos: string,
 ): Promise<GameFielding | null> {
   const data = await getGameStats(player.brefId, 'f', season);
 

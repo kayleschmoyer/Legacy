@@ -60,22 +60,26 @@ export class PlayerService {
       let finalQuery = queryBuilder;
 
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as any;
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
+        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
       }
 
       if (orderColumn) {
         finalQuery =
           orderDirection === 'desc'
-            ? (finalQuery.orderBy(desc(orderColumn)) as any)
-            : (finalQuery.orderBy(asc(orderColumn)) as any);
+            ? (finalQuery.orderBy(desc(orderColumn)) as typeof finalQuery)
+            : (finalQuery.orderBy(asc(orderColumn)) as typeof finalQuery);
       }
 
       if (queryOptions.limit) {
-        finalQuery = finalQuery.limit(queryOptions.limit) as any;
+        finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
       }
 
       if (queryOptions.offset) {
-        finalQuery = finalQuery.offset(queryOptions.offset) as any;
+        finalQuery = finalQuery.offset(
+          queryOptions.offset,
+        ) as typeof finalQuery;
       }
 
       return finalQuery.execute();
@@ -131,18 +135,21 @@ export class PlayerService {
    */
   async countPlayers(filters?: PlayerFilters): Promise<number> {
     return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db
+      let queryBuilder = db
         .select({ count: count() })
         .from(PublicSchema.players);
 
       const conditions = filters ? this.buildPlayerFilters(filters) : [];
 
-      let finalQuery = queryBuilder;
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as any;
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
+        queryBuilder = queryBuilder.where(
+          and(...conditions),
+        ) as typeof queryBuilder;
       }
 
-      const result = await finalQuery.execute();
+      const result = await queryBuilder.execute();
       return result[0]?.count || 0;
     });
   }
@@ -158,8 +165,8 @@ export class PlayerService {
         .where(
           or(
             ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
-            ilike(PublicSchema.players.lastName, `%${searchTerm}%`)
-          )
+            ilike(PublicSchema.players.lastName, `%${searchTerm}%`),
+          ),
         )
         .limit(limit);
     });
@@ -186,18 +193,18 @@ export class PlayerService {
     if (filters.fullName) {
       // Use a raw SQL comparison for the concatenated full name
       conditions.push(
-        sql`${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName} = ${filters.fullName}`
+        sql`${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName} = ${filters.fullName}`,
       );
     }
 
     if (filters.fullNameLike) {
       const firstNameCondition = ilike(
         PublicSchema.players.firstName,
-        `%${filters.fullNameLike}%`
+        `%${filters.fullNameLike}%`,
       );
       const lastNameCondition = ilike(
         PublicSchema.players.lastName,
-        `%${filters.fullNameLike}%`
+        `%${filters.fullNameLike}%`,
       );
       const nameCondition = or(firstNameCondition, lastNameCondition);
       if (nameCondition) {

@@ -29,11 +29,11 @@ export interface PlayersOverviewProps {
   /**
    * Custom styles for the container
    */
-  containerStyle?: any;
+  containerStyle?: React.CSSProperties;
   /**
    * Custom styles for tabs
    */
-  tabStyle?: any;
+  tabStyle?: React.CSSProperties;
 }
 
 function PlayersOverview({
@@ -45,18 +45,18 @@ function PlayersOverview({
 
   const renderTabButton = (view: TableView, label: string) => (
     <TouchableOpacity
-      style={[
+      style={safeStyle([
         styles.tab,
         tabStyle,
         ...(selectedView === view ? [styles.activeTab] : []),
-      ]}
+      ])}
       onPress={() => setSelectedView(view)}
     >
       <Text
-        style={[
+        style={safeStyle([
           styles.tabText,
           ...(selectedView === view ? [styles.activeTabText] : []),
-        ]}
+        ])}
       >
         {label}
       </Text>

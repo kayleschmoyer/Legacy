@@ -1,14 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  FlatList,
-  Modal,
-  Platform,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from '../../platform-components';
 import { DraftState, DraftTeam, Filter, Player } from '../../types';
@@ -81,13 +76,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   sport = 'baseball',
   isDrafted = false,
 }) => {
-  const [isPressed, setIsPressed] = useState(false);
-
-  const handlePressIn = () => setIsPressed(true);
-  const handlePressOut = () => setIsPressed(false);
-
-  const playerName = player.player || `${player.firstName} ${player.lastName}`;
-
   return (
     <Animated.View
       style={safeStyle([
@@ -98,9 +86,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     >
       <button
         onClick={onSelect}
-        onMouseDown={handlePressIn}
-        onMouseUp={handlePressOut}
-        onMouseLeave={handlePressOut}
         style={{
           ...styles.cardContent,
           cursor: isDrafted ? 'default' : 'pointer',
@@ -307,9 +292,7 @@ function DraftBoard({
       player.player || `${player.firstName} ${player.lastName}`;
     const matchesSearch =
       searchText === '' ||
-      `${player.firstName} ${player.lastName}`
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
+      playerName.toLowerCase().includes(searchText.toLowerCase());
     const matchesPosition =
       filters.position === 'ALL' || player.position === filters.position;
     const isAvailable = !draftedPlayerIds.has(player.id);

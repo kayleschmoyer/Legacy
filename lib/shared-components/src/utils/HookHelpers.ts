@@ -19,7 +19,7 @@ export interface AsyncHookResult<T> {
 
 export function useAsyncHook<T>(
   promiseCreator: () => Promise<T>,
-  deps?: React.DependencyList
+  deps?: React.DependencyList,
 ): AsyncHookResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,8 @@ export function useAsyncHook<T>(
         setError(new Error(message));
       })
       .finally(() => setLoading(false));
-  }, deps || [promiseCreator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
 
   return {
     data,

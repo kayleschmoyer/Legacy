@@ -13,7 +13,7 @@ export {
   Table,
   LoadingPanel,
   SecureStorage,
-} from '__PLATFORM_COMPONENTS__';
+} from './platform-components';
 
 // New shared components
 export * from './Dropdown';
@@ -22,7 +22,7 @@ export * from './AppProvider';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
 // Cross-platform components from new structure
-export * from '__PLATFORM_COMPONENTS__';
+export * from './platform-components';
 
 // Export all shared components and types
 export * from './config/sports';

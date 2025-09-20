@@ -10,7 +10,6 @@ import {
   Separator as TamaguiSeparator,
   XStack as TamaguiXStack,
   YStack as TamaguiYStack,
-  View,
 } from 'tamagui';
 
 // Define our own prop types using React.ComponentProps
@@ -56,21 +55,29 @@ function ScreenContainer({ children, style }: ScreenContainerProps) {
 }
 
 // Layout Components (using Tamagui directly)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 export const XStack = TamaguiXStack;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 export const YStack = TamaguiYStack;
 
 // Typography Components (using Tamagui directly)
-export const H1: React.FC<H1Props> = (props) => <TamaguiH1 {...props} />;
+export const H1: React.FC<H1Props> = (props: H1Props) => (
+  <TamaguiH1 {...props} />
+);
 
-export const H2: React.FC<H2Props> = (props) => <TamaguiH2 {...props} />;
+export const H2: React.FC<H2Props> = (props: H2Props) => (
+  <TamaguiH2 {...props} />
+);
 
-export const H3: React.FC<H3Props> = (props) => <TamaguiH3 {...props} />;
+export const H3: React.FC<H3Props> = (props: H3Props) => (
+  <TamaguiH3 {...props} />
+);
 
-export const Paragraph: React.FC<ParagraphProps> = (props) => (
+export const Paragraph: React.FC<ParagraphProps> = (props: ParagraphProps) => (
   <TamaguiParagraph {...props} />
 );
 
-export const Separator: React.FC<SeparatorProps> = (props) => (
+export const Separator: React.FC<SeparatorProps> = (props: SeparatorProps) => (
   <TamaguiSeparator {...props} />
 );
 
