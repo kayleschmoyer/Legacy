@@ -1,8 +1,14 @@
-name: 'Validate Workspace'
-description: 'Run workspace validation checks'
+name: "Validate Workspace"
+description: "Run workspace validation checks with optional PR commenting"
+
+inputs:
+  comment-on-failure:
+    description: "Whether to comment on PR when validation fails"
+    required: false
+    default: "false"
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate Package.json Standards
       shell: bash
@@ -11,3 +17,53 @@ runs:
     - name: Validate Workspace Dependencies
       shell: bash
       run: node scripts/validate-workspace-deps.js
+
+    - name: Comment on PR (if validation failed)
+      if: failure() && inputs.comment-on-failure == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+
+          const comment = `## 📦 Package.json Standards Check Failed
+
+          Your PR includes changes to \`package.json\` files that don't follow our NX workspace best practices.
+
+          ### 🔧 Required Standards:
+
+          1. **Scoped Naming**: All packages must use \`@legacy-sports/\` prefix
+          2. **Consistent Versioning**: All packages should use version \`0.0.1\`
+          3. **Private Flag**: Add \`"private": true\` to prevent accidental publishing
+          4. **Clean Paths**: Libraries should point \`main\` and \`types\` to \`./src/index.ts\`
+          5. **No Unnecessary Metadata**: Remove \`description\`, \`author\`, \`license\` fields
+          6. **Wildcard Dependencies**: Use \`"*"\` for dependencies managed in root \`package.json\`
+          7. **Preserve Important Scripts**: Keep build/test/dev scripts but remove empty scripts objects
+
+          ### 🚀 How to Fix:
+
+          1. Run the validation script locally:
+             \`\`\`bash
+             node scripts/validate-package-json-standards.js
+             \`\`\`
+
+          2. Update your \`package.json\` files according to the error messages
+
+          3. For examples, see the standardized packages in \`lib/\` directories
+
+          ### 📖 Documentation:
+
+          These standards ensure:
+          - Consistent dependency management across the workspace
+          - Proper scoping and versioning
+          - Clean, maintainable package configurations
+          - Prevention of version conflicts and dependency drift
+
+          Once you've fixed the issues, the check will pass automatically! 🎉`;
+
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number,
+            body: comment
+          });

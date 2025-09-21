@@ -8,23 +8,23 @@ on:
   workflow_dispatch:
     inputs:
       force_enable:
-        description: 'WARNING: Force enable iOS build (will fail without certificates)'
+        description: "WARNING: Force enable iOS build (will fail without certificates)"
         required: true
-        default: 'false'
+        default: "false"
         type: choice
         options:
-          - 'false'
-          - 'true'
+          - "false"
+          - "true"
       build_type:
-        description: 'Build Configuration'
+        description: "Build Configuration"
         required: false
-        default: 'Release'
+        default: "Release"
         type: choice
         options:
           - Release
           - Debug
       create_release:
-        description: 'Create GitHub Release'
+        description: "Create GitHub Release"
         required: false
         default: true
         type: boolean
@@ -41,8 +41,8 @@ concurrency:
 
 env:
   # iOS build configuration
-  IOS_VERSION: '17.0'
-  XCODE_VERSION: '15.4'
+  IOS_VERSION: "17.0"
+  XCODE_VERSION: "15.4"
 
 jobs:
   build-ios-ipa:
@@ -59,8 +59,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
+          cache: "npm"
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -73,7 +73,7 @@ jobs:
       - name: Setup Nx SHAs
         uses: nrwl/nx-set-shas@v4
         with:
-          main-branch-name: 'main'
+          main-branch-name: "main"
           error-on-no-successful-workflow: false
 
       - name: Install CocoaPods

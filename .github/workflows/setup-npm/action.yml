@@ -3,34 +3,34 @@ description: Setup Node.js and install NPM dependencies with caching
 
 inputs:
   node-version:
-    description: 'Node.js version to use'
+    description: "Node.js version to use"
     required: false
-    default: '20'
+    default: "22"
   working-directory:
-    description: 'Working directory for npm operations'
+    description: "Working directory for npm operations"
     required: false
-    default: '.'
+    default: "."
   skip-cache:
-    description: 'Skip cache and force fresh install'
+    description: "Skip cache and force fresh install"
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   cache-hit:
-    description: 'Whether dependencies were restored from cache'
+    description: "Whether dependencies were restored from cache"
     value: ${{ steps.install-deps.outputs.cache-hit }}
   node-version:
-    description: 'The Node.js version being used'
+    description: "The Node.js version being used"
     value: ${{ steps.install-deps.outputs.node-version }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: 'npm'
+        cache: "npm"
         cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
     - name: Install Dependencies
@@ -39,4 +39,4 @@ runs:
       with:
         working-directory: ${{ inputs.working-directory }}
         skip-cache: ${{ inputs.skip-cache }}
-        cache-prefix: 'npm-deps'
+        cache-prefix: "npm-deps"

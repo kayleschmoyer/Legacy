@@ -86,7 +86,9 @@ function LoginScreen({
         <Text style={styles.title}>{title}</Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
 
-        <Animated.View style={safeStyle([styles.formContainer, { opacity: 1 }])}>
+        <Animated.View
+          style={safeStyle([styles.formContainer, { opacity: 1 }])}
+        >
           {errorMessage ? (
             <Text style={styles.errorMessage}>{errorMessage}</Text>
           ) : null}

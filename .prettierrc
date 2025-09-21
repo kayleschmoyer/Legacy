@@ -1,3 +1,24 @@
 {
-  "singleQuote": true
+  "singleQuote": true,
+  "overrides": [
+    {
+      "files": "*.{yml,yaml}",
+      "options": {
+        "singleQuote": false,
+        "bracketSpacing": true,
+        "tabWidth": 2,
+        "printWidth": 120
+      }
+    },
+    {
+      "files": ".github/**/*.{yml,yaml}",
+      "options": {
+        "singleQuote": false,
+        "bracketSpacing": true,
+        "tabWidth": 2,
+        "printWidth": 150,
+        "proseWrap": "preserve"
+      }
+    }
+  ]
 }

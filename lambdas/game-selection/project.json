@@ -7,9 +7,7 @@
   "targets": {
     "build": {
       "executor": "@nx/vite:build",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "lambdas/game-selection/dist"
@@ -25,21 +23,17 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
-          "powershell -Command \"Compress-Archive -Path 'lambdas/game-selection/dist/dev.js' -DestinationPath 'lambdas/game-selection/dist/dev.js.zip' -Force\""
+          "cd lambdas/game-selection/dist && zip -j dev.js.zip dev.js"
         ],
         "parallel": false
       }
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "package"
-      ],
+      "dependsOn": ["package"],
       "options": {
         "commands": [
           "cd terraform",
@@ -52,9 +46,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "package"
-      ],
+      "dependsOn": ["package"],
       "options": {
         "commands": [
           "cd terraform && terraform plan -target=aws_lambda_function.game_selection -target=aws_api_gateway_resource.game_selection -target=aws_api_gateway_resource.game_selection_paths -target=aws_api_gateway_method.game_selection_options -target=aws_api_gateway_method.game_selection_any -target=aws_api_gateway_integration.game_selection_options -target=aws_api_gateway_integration.game_selection_any -target=aws_lambda_permission.game_selection_api_gateway"

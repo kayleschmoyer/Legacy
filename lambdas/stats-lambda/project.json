@@ -8,9 +8,7 @@
   "targets": {
     "build": {
       "executor": "@nx/vite:build",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "lambdas/stats-lambda/dist"
@@ -26,9 +24,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "jestConfig": "lambdas/stats-lambda/jest.config.ts",
         "passWithNoTests": true
@@ -36,21 +32,17 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
-          "powershell -Command \"Compress-Archive -Path 'lambdas/stats-lambda/dist/index.js' -DestinationPath 'lambdas/stats-lambda/dist/index.js.zip' -Force\""
+          "cd lambdas/stats-lambda/dist && zip -j index.js.zip index.js"
         ],
         "parallel": false
       }
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "../../scripts/deploy-lambda.sh stats",
         "cwd": "lambdas/stats-lambda"
@@ -58,9 +50,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "cd ../../terraform && terraform plan -target=aws_lambda_function.stats",
         "cwd": "lambdas/stats-lambda"

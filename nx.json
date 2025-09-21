@@ -15,10 +15,20 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/integration-build.yml"]
   },
-  "parallel": 5,
+  "parallel": 8,
   "plugins": [
-    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" } },
-    { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
+    {
+      "plugin": "@nx/jest/plugin",
+      "options": {
+        "targetName": "test"
+      }
+    },
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    },
     {
       "plugin": "@nx/vite/plugin",
       "options": {
@@ -69,8 +79,14 @@
       "dependsOn": ["^build"],
       "inputs": ["default", "^default"]
     },
-    "deploy": { "cache": false, "dependsOn": ["build"] },
-    "deploy:plan": { "cache": false, "dependsOn": ["build"] },
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
+    "deploy:plan": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
     "validate:package-json": {
       "executor": "nx:run-commands",
       "options": {
@@ -79,7 +95,9 @@
     },
     "validate:workspace-deps": {
       "executor": "nx:run-commands",
-      "options": { "command": "node scripts/validate-workspace-deps.js" }
+      "options": {
+        "command": "node scripts/validate-workspace-deps.js"
+      }
     },
     "validate": {
       "dependsOn": ["validate:package-json", "validate:workspace-deps"]
@@ -98,11 +116,19 @@
         "{workspaceRoot}/.eslintrc.base.json",
         "{projectRoot}/.eslintrc.json",
         "{workspaceRoot}/tools/eslint-rules/**/*",
-        { "externalDependencies": ["eslint"] }
+        {
+          "externalDependencies": ["eslint"]
+        }
       ],
       "outputs": ["{options.outputFile}"],
-      "options": { "command": "eslint ." },
-      "configurations": { "dry-run": { "command": "eslint . --fix-dry-run" } }
+      "options": {
+        "command": "eslint ."
+      },
+      "configurations": {
+        "dry-run": {
+          "command": "eslint . --fix-dry-run"
+        }
+      }
     }
   },
   "generators": {
@@ -113,7 +139,9 @@
         "linter": "eslint",
         "bundler": "vite"
       },
-      "component": { "style": "css" },
+      "component": {
+        "style": "css"
+      },
       "library": {
         "style": "css",
         "linter": "eslint",

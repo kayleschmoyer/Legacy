@@ -121,7 +121,9 @@ function SearchBar({
   ];
 
   return (
-    <Animated.View style={safeStyle([...containerStyle, { borderColor: '#374151' }])}>
+    <Animated.View
+      style={safeStyle([...containerStyle, { borderColor: '#374151' }])}
+    >
       {showSearchIcon && <Search size={20} color="#6b7280" />}
 
       <TextInput

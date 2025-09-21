@@ -1,36 +1,122 @@
-name: 'Setup Workspace'
-description: 'Common setup steps for Node.js, dependencies, and Nx'
+name: "Setup Workspace"
+description: "Common setup steps for Node.js, dependencies, and Nx"
 inputs:
   node-version:
-    description: 'Node.js version to use'
+    description: "Node.js version to use"
     required: false
-    default: '20'
+    default: "22"
   install-dependencies:
-    description: 'Whether to install dependencies'
+    description: "Whether to install dependencies"
     required: false
-    default: 'true'
+    default: "true"
   set-nx-shas:
-    description: 'Whether to set NX SHAs for affected detection'
+    description: "Whether to set NX SHAs for affected detection"
     required: false
-    default: 'true'
+    default: "true"
+
+outputs:
+  cache-hit:
+    description: "Whether dependencies were restored from cache"
+    value: ${{ steps.cached-dependencies.outputs.cache-hit }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: 'npm'
+        cache: "npm"
+        cache-dependency-path: "package-lock.json"
 
-    - name: Install Dependencies
+    - name: Install System Dependencies
+      shell: bash
+      run: |
+        echo "Installing system dependencies for cross-platform builds..."
+
+        # Install zip utility for lambda packaging (if not already present)
+        if ! command -v zip &> /dev/null; then
+          echo "Installing zip utility..."
+          sudo apt-get update -qq
+          sudo apt-get install -y zip
+          echo "✅ zip utility installed"
+        else
+          echo "✅ zip utility already available"
+        fi
+
+    - name: Cache Node Modules (Aggressive)
+      if: inputs.install-dependencies == 'true'
+      uses: actions/cache@v4
+      id: cached-dependencies
+      with:
+        path: |
+          ~/.npm
+          node_modules
+          */*/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install Dependencies (Fast)
+      if: inputs.install-dependencies == 'true' && steps.cached-dependencies.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Installing NPM dependencies..."
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+
+        # Use npm ci with aggressive optimizations for speed
+        npm ci --prefer-offline --no-audit --no-fund --silent
+
+        echo "✅ Dependencies installed successfully!"
+
+    - name: Verify Dependencies
       if: inputs.install-dependencies == 'true'
       shell: bash
-      run: npm ci --legacy-peer-deps
+      run: |
+        if [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
+          echo "✅ Dependencies restored from cache"
+        else
+          echo "✅ Dependencies installed fresh"
+        fi
+
+        if [ ! -d "node_modules" ]; then
+          echo "❌ node_modules directory not found"
+          exit 1
+        fi
+
+        echo "Dependencies verified successfully!"
 
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
       uses: nrwl/nx-set-shas@v4
       with:
-        main-branch-name: 'main'
+        main-branch-name: "main"
         error-on-no-successful-workflow: false
+
+    - name: Configure Nx Cloud (Aggressive Performance)
+      shell: bash
+      run: |
+        echo "Configuring Nx Cloud for maximum performance..."
+
+        # Use official Nx Cloud environment variables with aggressive settings
+        echo "NX_CLOUD_NO_TIMEOUTS=true" >> $GITHUB_ENV
+        echo "NX_VERBOSE_LOGGING=false" >> $GITHUB_ENV
+        echo "NX_DAEMON=false" >> $GITHUB_ENV
+
+        # Aggressive distributed execution settings for speed
+        echo "NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT=6" >> $GITHUB_ENV
+        echo "NX_PARALLEL=8" >> $GITHUB_ENV
+
+        echo "✅ Nx Cloud configured for maximum performance"
+
+    - name: Start Nx Cloud Distributed CI
+      shell: bash
+      run: |
+        if [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
+          echo "Starting Nx Cloud distributed CI run..."
+          npx nx-cloud start-ci-run --distribute-on="6 linux-medium-js" --stop-agents-after="build,test,lint"
+          echo "✅ Distributed CI run started with 6 agents"
+        else
+          echo "Distributed execution not enabled, skipping agent startup"
+        fi

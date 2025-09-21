@@ -6,8 +6,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'lambdas/stats-lambda/**'
-      - '.github/workflows/publish-stats-lambda.yml'
+      - "lambdas/stats-lambda/**"
+      - ".github/workflows/publish-stats-lambda.yml"
 
 # Cancel in-progress deployments for the same workflow
 concurrency:
@@ -21,6 +21,8 @@ env:
   AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2,sg-07083f37d7e8e24c5,sg-05999e0f1cbd13139
   # The private subnet on us-east-1c
   AWS_VPC_SUBNET_IDS: subnet-031d24899cb105d13
+  # Nx Cloud access token for enhanced CI features (set as GitHub secret)
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 # Permission can be added at job level or workflow level
 permissions:
@@ -62,28 +64,28 @@ jobs:
         run: |
           # Build the Lambda using Nx
           npx nx run stats-lambda:build
-          
+
           # Create version string
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
           VERSION="${TIMESTAMP}-${COMMIT_SHA}"
-          
+
           # Create deployment package
           zip -r "stats-${VERSION}.zip" dist/
-          
+
           # Get S3 bucket name from Terraform output or use default
           S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
-          
+
           # Upload to S3
           aws s3 cp "stats-${VERSION}.zip" "s3://${S3_BUCKET}/stats/" --region ${{ env.AWS_REGION }}
-          
+
           # Update SSM parameter
           aws ssm put-parameter \
             --name "/legacy-sports/${AWS_STAGE}/lambda/stats/version" \
             --value "$VERSION" \
             --overwrite \
             --region ${{ env.AWS_REGION }}
-          
+
           echo "✅ Lambda package uploaded: stats-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
@@ -94,3 +96,8 @@ jobs:
           terraform init
           terraform plan -target=aws_lambda_function.stats
           terraform apply -target=aws_lambda_function.stats -auto-approve
+
+      # Enable Nx Cloud Self-Healing CI for any build issues
+      - name: Fix CI Issues
+        run: npx nx-cloud fix-ci
+        if: always()

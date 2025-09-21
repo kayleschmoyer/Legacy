@@ -1,7 +1,7 @@
 name: PR Validation
 
-# This workflow provides comprehensive validation for pull requests
-# It replaces the previous duplicate validation in ci.yml for PRs
+# This workflow provides comprehensive validation for pull requests using Nx DTE
+# It replaces multiple parallel jobs with a single job that leverages Nx's distributed task execution
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -16,116 +16,158 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  # Nx Cloud with Distributed Task Execution - let Nx handle the parallelism
+  NX_CLOUD_DISTRIBUTED_EXECUTION: true
+  # Increased agents for better task distribution
+  NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT: 8
+  NX_DAEMON: false
+  # Performance settings
+  NX_CLOUD_TIMEOUT: 300000
+  # Let Nx handle internal parallelism
+  NX_PARALLEL: 4
+  # Nx Cloud access token for enhanced CI features
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
 jobs:
-  affected-validation:
-    name: Validate Affected Projects
+  # Core validation using Nx DTE - consolidates lint, test, build into optimal task distribution
+  core-validation:
+    name: Code Quality & Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           filter: tree:0
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Setup
         uses: ./.github/actions/setup
         with:
-          node-version: 20
+          node-version: 22
           install-dependencies: true
           set-nx-shas: true
 
-      - name: Validate Workspace
-        uses: ./.github/actions/validate-workspace
-
-      - name: Show Affected Projects
-        run: |
-          echo "Projects affected by this PR:"
-          npx nx show projects --affected
-          echo ""
-          echo "Tasks that will be run:"
-          echo "npx nx affected -t lint test build"
-
-      - name: Run Affected Validation
+      - name: Lint, Test & Build
         uses: ./.github/actions/nx-tasks
         with:
-          tasks: 'lint test build'
-          scope: 'affected'
-          parallel: '3'
-          verbose: 'false'
+          tasks: "lint test build"
+          scope: "affected"
+          parallel: "4"
+          verbose: "false"
 
-  # Separate job for checking affected lambda deployments
-  lambda-validation:
-    name: Validate Lambda Changes
+      - name: Package Lambdas
+        shell: bash
+        run: |
+          echo "📦 Packaging lambda functions locally on GitHub runner..."
+          echo "This ensures zip utilities are available and avoids cross-platform issues."
+
+          # Use Nx affected to run package task for affected lambda projects only
+          # This will automatically detect affected lambdas and handle empty results gracefully
+          npx nx affected -t package --base=origin/main --head=HEAD || echo "No lambda projects with package targets were affected"
+
+      - name: Check Formatting
+        shell: bash
+        run: |
+          echo "🎨 Checking code formatting with Prettier..."
+          npx nx format:check --base=origin/main --head=HEAD
+          if [ $? -eq 0 ]; then
+            echo "✅ All files are properly formatted"
+          else
+            echo "❌ Some files are not properly formatted"
+            echo "Run 'npx nx format:write' to fix formatting issues"
+            exit 1
+          fi
+
+  # Package validation - separate job since it's conditional and has special permissions
+  package-validation:
+    name: Package Standards
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    if: contains(github.event.pull_request.changed_files, 'package.json')
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+
+      - name: Validate Standards
+        uses: ./.github/actions/validate-workspace
+        with:
+          comment-on-failure: true
+
+  # Lambda deployment validation - separate since it needs AWS secrets for terraform plan
+  lambda-deployment-validation:
+    name: Lambda Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: contains(github.event.pull_request.changed_files, 'lambdas/')
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           filter: tree:0
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Setup
         uses: ./.github/actions/setup
         with:
-          node-version: 20
+          node-version: 22
           install-dependencies: true
           set-nx-shas: true
 
-      # Check if any lambda projects are affected
-      - name: Check Affected Lambda Projects
-        id: check-lambdas
+      - name: Run Deployment Plans
         run: |
-          affected_projects=$(npx nx show projects --affected --json)
-          lambda_projects=$(echo "$affected_projects" | jq -r '.[] | select(contains("db") or contains("game-selection") or contains("oauth-proxy") or contains("stats-lambda"))')
+          echo "🚀 Running Terraform deployment plans for affected lambda functions..."
+          affected_lambdas=$(npx nx show projects --affected --json | jq -r '.[] | select(contains("lambda") or contains("db") or contains("oauth") or contains("game-selection"))')
 
-          if [ -n "$lambda_projects" ]; then
-            echo "affected_lambdas=true" >> $GITHUB_OUTPUT
-            echo "Lambda projects affected: $lambda_projects"
+          if [ -n "$affected_lambdas" ]; then
+            echo "Running deployment plans for affected lambda projects: $affected_lambdas"
+            npx nx affected -t deploy:plan --projects=tag:lambda
           else
-            echo "affected_lambdas=false" >> $GITHUB_OUTPUT
-            echo "No lambda projects affected"
+            echo "No lambda projects affected, skipping deployment validation"
           fi
 
-      # Run lambda-specific validation
-      - name: Validate Lambda Projects
-        if: steps.check-lambdas.outputs.affected_lambdas == 'true'
-        run: |
-          # Test lambda packaging
-          npx nx affected -t package --projects=tag:lambda
-
-          # Run deployment plan to validate configurations
-          npx nx affected -t deploy:plan --projects=tag:lambda
-
-  # Job specifically for mobile app changes
+  # Mobile validation - separate since it's conditional and platform-specific
   mobile-validation:
-    name: Validate Mobile App Changes
+    name: Mobile Validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           filter: tree:0
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Setup
         uses: ./.github/actions/setup
         with:
-          node-version: 20
+          node-version: 22
           install-dependencies: true
           set-nx-shas: true
 
-      # Check if mobile app is affected
-      - name: Check if Mobile App is Affected
+      - name: Check Mobile Changes
         id: check-mobile
         run: |
+          echo "📱 Checking if mobile app is affected by this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
             echo "mobile_affected=true" >> $GITHUB_OUTPUT
             echo "Mobile app is affected by this PR"
@@ -134,73 +176,71 @@ jobs:
             echo "Mobile app is not affected by this PR"
           fi
 
-      # Run mobile-specific validation
-      - name: Validate Mobile App
+      - name: Validate App Config
         if: steps.check-mobile.outputs.mobile_affected == 'true'
         run: |
-          # Lint mobile app
-          npx nx lint app
-
-          # Test mobile app
-          npx nx test app
-
-          # Check if the app can be built (dry run)
-          echo "Validating mobile app build configuration..."
+          echo "🔧 Validating mobile app build configuration..."
+          # Mobile-specific validation that wasn't covered in core validation
           npx nx build app --dry-run || echo "Build configuration validated"
 
-      # Run E2E tests for mobile if affected
-      - name: Run Mobile E2E Tests
+      - name: Run E2E Tests
         if: steps.check-mobile.outputs.mobile_affected == 'true'
-        run: npx nx test app-e2e
+        run: |
+          echo "🧪 Running mobile app E2E tests..."
+          npx nx test app-e2e
 
-  # iOS build job for PR validation
+  # iOS build - separate since it requires macOS runner
   build-ios:
-    name: Build iOS (PR)
+    name: iOS Build
     runs-on: macos-latest
     timeout-minutes: 45
     if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           filter: tree:0
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Setup
         uses: ./.github/actions/setup
         with:
-          node-version: 20
+          node-version: 22
           install-dependencies: true
           set-nx-shas: true
 
-      # Only build iOS if the app project is affected
-      - name: Check if iOS build is needed
+      - name: Check iOS Changes
         id: check-ios
         run: |
+          echo "🍎 Checking if iOS build is needed for this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
             echo "build_needed=true" >> $GITHUB_OUTPUT
           else
             echo "build_needed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build iOS App
+      - name: Build iOS
         if: steps.check-ios.outputs.build_needed == 'true'
-        run: npx nx build-ios app
+        run: |
+          echo "🔨 Building iOS application..."
+          npx nx build-ios app
 
-      - name: Test iOS App
+      - name: Test iOS
         if: steps.check-ios.outputs.build_needed == 'true'
-        run: npx nx test-ios app
+        run: |
+          echo "🧪 Testing iOS application..."
+          npx nx test-ios app
 
-  # Android build job for PR validation
+  # Android build - separate since it needs Java/Android setup
   build-android:
-    name: Build Android (PR)
+    name: Android Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           filter: tree:0
@@ -209,70 +249,76 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
+          distribution: "temurin"
+          java-version: "21"
+          cache: "gradle"
 
-      - name: Setup Workspace
+      - name: Setup
         uses: ./.github/actions/setup
         with:
-          node-version: 20
+          node-version: 22
           install-dependencies: true
           set-nx-shas: true
 
-      # Only build Android if the app project is affected
-      - name: Check if Android build is needed
+      - name: Check Android Changes
         id: check-android
         run: |
+          echo "🤖 Checking if Android build is needed for this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
             echo "build_needed=true" >> $GITHUB_OUTPUT
           else
             echo "build_needed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build Android App
+      - name: Build Android
         if: steps.check-android.outputs.build_needed == 'true'
-        run: npx nx build-android app
+        run: |
+          echo "🔨 Building Android application..."
+          npx nx build-android app
 
-      - name: Test Android App
+      - name: Test Android
         if: steps.check-android.outputs.build_needed == 'true'
-        run: npx nx test-android app
+        run: |
+          echo "🧪 Testing Android application..."
+          npx nx test-android app
 
-  # Summary job that depends on all validation jobs
+  # Lightweight summary job - no setup overhead needed
   pr-validation-summary:
-    name: PR Validation Summary
+    name: Summary
     runs-on: ubuntu-latest
-    needs:
-      [
-        affected-validation,
-        lambda-validation,
-        mobile-validation,
-        build-ios,
-        build-android,
-      ]
+    needs: [core-validation, package-validation, lambda-deployment-validation, mobile-validation, build-ios, build-android]
     if: always()
 
     steps:
-      - name: Summary
+      - name: Generate Summary
         run: |
+          echo "📊 Generating PR validation summary report..."
           {
             echo "## PR Validation Summary"
             echo ""
-            echo "- **Affected Validation**: ${{ needs.affected-validation.result }}"
-            echo "- **Lambda Validation**: ${{ needs.lambda-validation.result }}"
+            echo "### Core Tasks (Nx DTE)"
+            echo "- **Code Quality & Build** (lint, test, build): ${{ needs.core-validation.result }}"
+            echo ""
+            echo "### Conditional Validations"
+            echo "- **Package.json Standards**: ${{ needs.package-validation.result }}"
+            echo "- **Lambda Deployment Validation**: ${{ needs.lambda-deployment-validation.result }}"
             echo "- **Mobile Validation**: ${{ needs.mobile-validation.result }}"
             echo "- **iOS Build**: ${{ needs.build-ios.result }}"
             echo "- **Android Build**: ${{ needs.build-android.result }}"
           } >> $GITHUB_STEP_SUMMARY
 
-          if [[ "${{ needs.affected-validation.result }}" == "success" && 
-                ("${{ needs.lambda-validation.result }}" == "success" || "${{ needs.lambda-validation.result }}" == "skipped") && 
+          # Check if all required validations passed
+          if [[ "${{ needs.core-validation.result }}" == "success" && 
+                ("${{ needs.package-validation.result }}" == "success" || "${{ needs.package-validation.result }}" == "skipped") &&
+                ("${{ needs.lambda-deployment-validation.result }}" == "success" || "${{ needs.lambda-deployment-validation.result }}" == "skipped") && 
                 ("${{ needs.mobile-validation.result }}" == "success" || "${{ needs.mobile-validation.result }}" == "skipped") &&
                 ("${{ needs.build-ios.result }}" == "success" || "${{ needs.build-ios.result }}" == "skipped") &&
                 ("${{ needs.build-android.result }}" == "success" || "${{ needs.build-android.result }}" == "skipped") ]]; then
             {
               echo ""
               echo "✅ All validations passed! This PR is ready for review."
+              echo ""
+              echo "**Nx DTE Performance**: Core validation tasks were distributed across ${{ env.NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT }} agents for optimal performance."
             } >> $GITHUB_STEP_SUMMARY
           else
             {

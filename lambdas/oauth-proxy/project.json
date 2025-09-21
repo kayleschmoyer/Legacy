@@ -6,9 +6,7 @@
   "targets": {
     "build": {
       "executor": "@nx/vite:build",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "lambdas/oauth-proxy/dist",
@@ -25,21 +23,17 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
-          "powershell -Command \"Compress-Archive -Path 'lambdas/oauth-proxy/dist/index.js' -DestinationPath 'lambdas/oauth-proxy/dist/index.js.zip' -Force\""
+          "cd lambdas/oauth-proxy/dist && zip -j index.js.zip index.js"
         ],
         "parallel": false
       }
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "package"
-      ],
+      "dependsOn": ["package"],
       "options": {
         "commands": [
           "cd terraform",
@@ -52,9 +46,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "package"
-      ],
+      "dependsOn": ["package"],
       "options": {
         "commands": [
           "cd terraform && terraform plan -target=aws_lambda_function.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy -target=aws_api_gateway_resource.oauth_proxy_paths -target=aws_api_gateway_method.oauth_proxy_options -target=aws_api_gateway_method.oauth_proxy_any -target=aws_api_gateway_integration.oauth_proxy_options -target=aws_api_gateway_integration.oauth_proxy_any -target=aws_lambda_permission.oauth_proxy_api_gateway"
@@ -102,9 +94,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{projectRoot}"
-      ],
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
         "jestConfig": "lambdas/oauth-proxy/jest.config.ts"
       }
