@@ -2,13 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useEffect, useRef } from 'react';
-import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
-import {
-  Animated,
-  Dimensions,
-  Modal,
-  TouchableOpacity,
-} from '../../platform-components';
+import { Button, ScrollView, Sheet, Text, XStack, YStack } from 'tamagui';
+import { Animated, Dimensions } from '../../platform-components';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -304,23 +299,10 @@ function FilterDrawer({
   if (!visible && variant !== 'slide') return null;
 
   return (
-    <Modal visible={visible} transparent animationType="none">
-      <YStack
-        flex={1}
-        backgroundColor="rgba(0, 0, 0, 0.6)"
-        justifyContent="flex-end"
-      >
-        <TouchableOpacity
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-          onPress={onClose}
-          activeOpacity={1}
-        />
+    <Sheet modal open={visible} onOpenChange={onClose} snapPointsMode="fit">
+      <Sheet.Overlay />
+      <Sheet.Frame backgroundColor="#1a1a1a" borderRadius={20}>
+        <Sheet.Handle />
         <Animated.View
           style={[
             {
@@ -433,8 +415,8 @@ function FilterDrawer({
             </Button>
           </XStack>
         </Animated.View>
-      </YStack>
-    </Modal>
+      </Sheet.Frame>
+    </Sheet>
   );
 }
 

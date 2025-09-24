@@ -151,7 +151,7 @@ export const OAuthLoginComponent: React.FC<OAuthLoginProps> = ({
       };
 
       // Use platform-specific error handling
-      PlatformUtils.handleOAuthError(oauthError);
+      PlatformUtils.handleOAuthError?.(oauthError);
 
       onError?.(oauthError);
     } finally {

@@ -226,7 +226,7 @@ function SearchWithSuggestions({
           borderBottomRightRadius={8}
           maxHeight={200}
         >
-          <FlatList<SearchSuggestion>
+          <FlatList
             data={visibleSuggestions}
             keyExtractor={(item: SearchSuggestion) => item.id}
             renderItem={renderSuggestion}

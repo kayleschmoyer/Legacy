@@ -40,7 +40,7 @@
 // Import platform-specific module exports
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import platformComponents from '__PLATFORM_COMPONENTS__';
-import type { PlatformExports } from './types/platform-exports';
+import { validatePlatformExports } from './types/platform-exports';
 
 // Export shared types (available on all platforms)
 export * from './types';
@@ -61,23 +61,13 @@ export const {
   Animated,
   Dimensions,
   FlatList,
-  Image,
   KeyboardAvoidingView,
-  Modal,
   Picker,
   Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Vibration,
-  View,
 
   // Platform-specific components
   Icon,
   Table,
   SecureStorage,
-} = platformComponents as PlatformExports;
+} = validatePlatformExports(platformComponents);

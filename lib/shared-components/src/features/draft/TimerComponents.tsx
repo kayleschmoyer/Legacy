@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Text as TamaguiText, View as TamaguiView, YStack } from 'tamagui';
-import { Animated, Platform, Vibration, View } from '../../platform-components';
+import { Animated, Platform, Vibration } from '../../platform-components';
 
 export interface TimerProps {
   initialTime: number;
@@ -17,6 +17,7 @@ export interface TimerProps {
 export interface TimerBarProps {
   time: number;
   maxTime: number;
+  // React Native Animated.Value - complex type with interpolate, setValue, etc.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   colorAnim?: any;
   label?: string;
@@ -245,7 +246,7 @@ function TimerBar({
         backgroundColor="rgba(255,255,255,0.2)"
         borderRadius={2}
       >
-        <View
+        <TamaguiView
           style={{
             width: `${Math.max(0, (time / maxTime) * 100)}%`,
             height: '100%',

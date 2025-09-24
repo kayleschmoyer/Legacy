@@ -31,4 +31,6 @@ async function run(): Promise<void> {
   await populateGameHandler({} as PopulateGameStatsEvent);
 }
 
-run().catch((err) => LOGGER.error(err));
+run().catch((err: unknown) =>
+  LOGGER.error(err instanceof Error ? err.message : 'Unknown error'),
+);

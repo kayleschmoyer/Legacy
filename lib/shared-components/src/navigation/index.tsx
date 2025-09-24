@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { Platform, ScrollView } from '../platform-components';
+import { ScrollView } from 'tamagui';
+import { Platform } from '../platform-components';
 import { NavigationConfig } from '../types';
 
 export interface NavigationItem {

@@ -243,7 +243,7 @@ function DraftBoardGrid({
       borderColor="$gray700"
       borderRadius={variant === 'compact' ? 0 : 8}
     >
-      <FlatList<number>
+      <FlatList
         data={Array.from({ length: rounds }, (_, i) => i + 1)}
         keyExtractor={(item: number) => item.toString()}
         renderItem={({ item }: { item: number }) => renderDraftRound(item)}
@@ -405,7 +405,7 @@ function DraftPickHistory({
       <Text fontSize={16} fontWeight="600" color="$white" marginBottom={12}>
         Recent Picks
       </Text>
-      <FlatList<Pick>
+      <FlatList
         data={recentPicks}
         keyExtractor={(item: Pick) => item.id}
         renderItem={renderPickItem}
@@ -478,7 +478,7 @@ function TeamRoster({
         </Text>
       </YStack>
 
-      <FlatList<Pick>
+      <FlatList
         data={team.picks}
         keyExtractor={(item: Pick) => item.id}
         renderItem={renderRosterItem}

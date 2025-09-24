@@ -1,11 +1,7 @@
 import React from 'react';
-import {
-  Alert,
-  Platform,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../platform-components';
+import { Text, View } from '@tamagui/core';
+import { Button as TamaguiButton } from 'tamagui';
+import { Alert, Platform } from '../platform-components';
 
 // Temporary styles object to replace StyleSheet.create
 const styles = {
@@ -168,9 +164,9 @@ const Button = ({
   }
 
   return (
-    <TouchableOpacity style={buttonStyles} onPress={onPress}>
-      <Text style={textStyles}>{title}</Text>
-    </TouchableOpacity>
+    <TamaguiButton onPress={onPress} theme={variant} size="$4">
+      {title}
+    </TamaguiButton>
   );
 };
 
@@ -242,12 +238,12 @@ function DemoScreen() {
         <Text style={styles.listItem}>• Platform: {Platform.OS}</Text>
         <Text style={styles.listItem}>
           • Environment:{' '}
-          {Platform.select({
+          {Platform.select?.({
             web: 'Web Browser',
             ios: 'iOS Device',
             android: 'Android Device',
             default: 'Unknown',
-          })}
+          }) || 'Unknown'}
         </Text>
         <Text style={styles.listItem}>
           • Is Web: {Platform.OS === 'web' ? 'Yes' : 'No'}

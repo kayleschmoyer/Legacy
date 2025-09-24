@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Button, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
-  Alert,
-  FlatList,
-  Modal,
-  Platform,
-  TouchableOpacity,
-} from '../../platform-components';
+  Adapt,
+  Button,
+  Dialog,
+  Input,
+  ScrollView,
+  Sheet,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { Alert, FlatList, Platform } from '../../platform-components';
 import { League, User } from '../../types';
 import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
-import { safeStyle } from '../../utils/styles';
 import {
   CreateLeagueFormData,
   CreateLeagueModal,
@@ -103,17 +106,15 @@ function SportHome({
   };
 
   const renderLeague = ({ item }: { item: League }) => (
-    <TouchableOpacity
-      style={safeStyle([
-        {
-          backgroundColor: DEFAULT_COLORS.secondary,
-          borderRadius: 12,
-          padding: 16,
-          borderLeftWidth: 4,
-          borderLeftColor: sportConfig.colors.accent,
-        },
-      ])}
+    <Button
+      backgroundColor={DEFAULT_COLORS.secondary}
+      borderRadius="$3"
+      padding="$4"
+      borderLeftWidth={4}
+      borderLeftColor={sportConfig.colors.accent}
       onPress={() => onLeaguePress(item)}
+      unstyled
+      justifyContent="flex-start"
     >
       <XStack
         justifyContent="space-between"
@@ -146,23 +147,20 @@ function SportHome({
           {item.draftType} Draft
         </Text>
       </XStack>
-    </TouchableOpacity>
+    </Button>
   );
 
   const renderQuickAction = ({ item }: { item: QuickAction }) => (
-    <TouchableOpacity
-      style={safeStyle([
-        {
-          paddingVertical: 16,
-          paddingHorizontal: 20,
-          borderRadius: 12,
-          alignItems: 'center',
-          minWidth: 120,
-          backgroundColor: item.color || DEFAULT_COLORS.accent,
-        },
-      ])}
+    <Button
+      paddingVertical="$4"
+      paddingHorizontal="$5"
+      borderRadius="$3"
+      alignItems="center"
+      minWidth={120}
+      backgroundColor={item.color || DEFAULT_COLORS.accent}
       onPress={item.onPress}
       disabled={loading}
+      unstyled
     >
       {item.icon && (
         <Text fontSize="$6" marginBottom="$2">
@@ -172,7 +170,7 @@ function SportHome({
       <Text fontSize="$3" fontWeight="600" color="white" textAlign="center">
         {item.title}
       </Text>
-    </TouchableOpacity>
+    </Button>
   );
 
   return (
@@ -202,7 +200,7 @@ function SportHome({
         <Text fontSize="$6" fontWeight="bold" color="$gray12" marginBottom="$4">
           Quick Actions
         </Text>
-        <FlatList<QuickAction>
+        <FlatList
           data={defaultQuickActions}
           renderItem={renderQuickAction}
           horizontal
@@ -224,7 +222,7 @@ function SportHome({
             </Text>
           </YStack>
         ) : leagues.length > 0 ? (
-          <FlatList<League>
+          <FlatList
             data={leagues}
             renderItem={renderLeague}
             keyExtractor={(item: League) => item.id}
@@ -274,19 +272,53 @@ function SportHome({
 
       {/* Join League Modal */}
       {onJoinLeague && (
-        <Modal
-          visible={showJoinModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowJoinModal(false)}
+        <Dialog
+          modal
+          open={showJoinModal}
+          onOpenChange={(open) => !open && setShowJoinModal(false)}
         >
-          <YStack
-            flex={1}
-            backgroundColor="rgba(0, 0, 0, 0.7)"
-            justifyContent="center"
-            alignItems="center"
-          >
-            <YStack
+          <Adapt>
+            <Sheet
+              animation="medium"
+              zIndex={200000}
+              modal
+              dismissOnSnapToBottom
+            >
+              <Sheet.Frame padding="$4" gap="$4">
+                <Adapt.Contents />
+              </Sheet.Frame>
+              <Sheet.Overlay
+                animation="lazy"
+                enterStyle={{ opacity: 0 }}
+                exitStyle={{ opacity: 0 }}
+              />
+            </Sheet>
+          </Adapt>
+
+          <Dialog.Portal>
+            <Dialog.Overlay
+              key="overlay"
+              animation="slow"
+              opacity={0.7}
+              enterStyle={{ opacity: 0 }}
+              exitStyle={{ opacity: 0 }}
+            />
+            <Dialog.Content
+              bordered
+              elevate
+              key="content"
+              animateOnly={['transform', 'opacity']}
+              animation={[
+                'quicker',
+                {
+                  opacity: {
+                    overshootClamping: true,
+                  },
+                },
+              ]}
+              enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+              exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+              gap="$4"
               backgroundColor="$gray2"
               borderRadius="$4"
               padding="$6"
@@ -353,9 +385,9 @@ function SportHome({
                   </Text>
                 </Button>
               </XStack>
-            </YStack>
-          </YStack>
-        </Modal>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog>
       )}
     </ScrollView>
   );

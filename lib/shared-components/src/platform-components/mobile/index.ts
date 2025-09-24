@@ -1,17 +1,12 @@
 // Platform-specific mobile components
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   FlatList,
-  Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  TouchableOpacity,
   Vibration,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
@@ -33,34 +28,30 @@ const MODULE_EXPORTS = validatePlatformExports({
   SecureStorageProvider: mobileSecureStorage,
 
   // ===== REACT NATIVE COMPONENTS (NO TAMAGUI EQUIVALENT) =====
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   FlatList,
-  Image: Image as unknown as React.ComponentType<Record<string, unknown>>,
-  KeyboardAvoidingView: KeyboardAvoidingView as unknown as React.ComponentType<
-    Record<string, unknown>
-  >,
-  Modal: Modal as unknown as React.ComponentType<Record<string, unknown>>,
-  Picker: Picker as unknown as React.ComponentType<Record<string, unknown>>,
+  KeyboardAvoidingView,
+  Picker,
   Platform,
-  Pressable: Pressable as unknown as React.ComponentType<
-    Record<string, unknown>
-  >,
-  SafeAreaView: SafeAreaView as unknown as React.ComponentType<
-    Record<string, unknown>
-  >,
-  StyleSheet,
-  TouchableOpacity: TouchableOpacity as unknown as React.ComponentType<
-    Record<string, unknown>
-  >,
   Vibration,
 
   // ===== PLATFORM-SPECIFIC PROVIDERS =====
   PlatformProviders: MobileProviders,
 
   // ===== PLATFORM-SPECIFIC UTILITIES =====
-  PlatformUtils: PlatformUtilsImport,
+  PlatformUtils: PlatformUtilsImport as unknown as {
+    handleOAuthError?: (error: unknown) => void;
+    createAuthHandlers?: () => Record<string, string>;
+    getInteractiveButtonProps?: (disabled: boolean) => Record<string, unknown>;
+    isWeb?: boolean;
+    isNative?: boolean;
+    OS?: string;
+    select?: <T>(specifics: Record<string, T | undefined>) => T | undefined;
+    [key: string]: unknown;
+  },
 
   // ===== PLATFORM-SPECIFIC COMPONENTS =====
   Icon: IconsComponent,

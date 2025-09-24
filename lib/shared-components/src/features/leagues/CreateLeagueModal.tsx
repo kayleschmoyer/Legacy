@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
-  Alert,
-  Modal,
-  Platform,
-  TouchableOpacity,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+  Adapt,
+  Button,
+  Dialog,
+  Input,
+  ScrollView,
+  Sheet,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { Alert, Platform } from '../../platform-components';
 import {
   DRAFT_TYPES,
   DROPDOWN_TEAM_COUNT_ITEMS,
@@ -86,21 +90,44 @@ function CreateLeagueModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <YStack
-        flex={1}
-        backgroundColor="rgba(0, 0, 0, 0.7)"
-        justifyContent="center"
-        alignItems="center"
-      >
-        <YStack
-          backgroundColor="white"
-          borderRadius="$4"
+    <Dialog modal open={visible} onOpenChange={(open) => !open && onClose()}>
+      <Adapt>
+        <Sheet animation="medium" zIndex={200000} modal dismissOnSnapToBottom>
+          <Sheet.Frame padding="$4" gap="$4">
+            <Adapt.Contents />
+          </Sheet.Frame>
+          <Sheet.Overlay
+            animation="lazy"
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+        </Sheet>
+      </Adapt>
+
+      <Dialog.Portal>
+        <Dialog.Overlay
+          key="overlay"
+          animation="slow"
+          opacity={0.7}
+          enterStyle={{ opacity: 0 }}
+          exitStyle={{ opacity: 0 }}
+        />
+        <Dialog.Content
+          bordered
+          elevate
+          key="content"
+          animateOnly={['transform', 'opacity']}
+          animation={[
+            'quicker',
+            {
+              opacity: {
+                overshootClamping: true,
+              },
+            },
+          ]}
+          enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+          exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+          gap="$4"
           padding="$6"
           width={Platform.OS === 'web' ? 400 : '90%'}
           maxHeight="80%"
@@ -152,29 +179,27 @@ function CreateLeagueModal({
               >
                 Sport
               </Text>
-              <TouchableOpacity
-                style={safeStyle([
-                  {
-                    backgroundColor: '$gray1',
-                    borderRadius: 8,
-                    padding: 12,
-                    borderWidth: 1,
-                    borderColor: '$gray6',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  },
-                ])}
+              <Button
+                backgroundColor="$gray1"
+                borderRadius="$2"
+                borderWidth={1}
+                borderColor="$gray6"
+                paddingHorizontal="$3"
+                paddingVertical="$3"
+                justifyContent="space-between"
                 onPress={() => setShowSportDropdown(!showSportDropdown)}
                 disabled={loading}
+                unstyled
+                flexDirection="row"
+                alignItems="center"
               >
                 <Text fontSize="$4" color="$gray12">
                   {SPORT_CONFIGS[formData.sport].name}
                 </Text>
-                <Text fontSize="$3" color="$gray10">
+                <Text fontSize="$3" color="$gray10" marginLeft="auto">
                   ▼
                 </Text>
-              </TouchableOpacity>
+              </Button>
 
               {showSportDropdown && (
                 <YStack
@@ -185,15 +210,13 @@ function CreateLeagueModal({
                   marginTop="$1"
                 >
                   {sportOptions.map((sport) => (
-                    <TouchableOpacity
+                    <Button
                       key={sport}
-                      style={safeStyle([
-                        {
-                          padding: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '$gray4',
-                        },
-                      ])}
+                      padding="$3"
+                      borderBottomWidth={1}
+                      borderBottomColor="$gray4"
+                      backgroundColor="transparent"
+                      justifyContent="flex-start"
                       onPress={() => {
                         setFormData((prev) => ({
                           ...prev,
@@ -205,11 +228,13 @@ function CreateLeagueModal({
                         }));
                         setShowSportDropdown(false);
                       }}
+                      unstyled
+                      borderRadius={0}
                     >
                       <Text fontSize="$4" color="$gray12">
                         {SPORT_CONFIGS[sport].name}
                       </Text>
-                    </TouchableOpacity>
+                    </Button>
                   ))}
                 </YStack>
               )}
@@ -225,29 +250,27 @@ function CreateLeagueModal({
               >
                 Number of Teams
               </Text>
-              <TouchableOpacity
-                style={safeStyle([
-                  {
-                    backgroundColor: '$gray1',
-                    borderRadius: 8,
-                    padding: 12,
-                    borderWidth: 1,
-                    borderColor: '$gray6',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  },
-                ])}
+              <Button
+                backgroundColor="$gray1"
+                borderRadius="$2"
+                borderWidth={1}
+                borderColor="$gray6"
+                paddingHorizontal="$3"
+                paddingVertical="$3"
+                justifyContent="space-between"
                 onPress={() => setShowTeamCountDropdown(!showTeamCountDropdown)}
                 disabled={loading}
+                unstyled
+                flexDirection="row"
+                alignItems="center"
               >
                 <Text fontSize="$4" color="$gray12">
                   {formData.numberOfTeams} Teams
                 </Text>
-                <Text fontSize="$3" color="$gray10">
+                <Text fontSize="$3" color="$gray10" marginLeft="auto">
                   ▼
                 </Text>
-              </TouchableOpacity>
+              </Button>
 
               {showTeamCountDropdown && (
                 <YStack
@@ -258,15 +281,13 @@ function CreateLeagueModal({
                   marginTop="$1"
                 >
                   {DROPDOWN_TEAM_COUNT_ITEMS.map((item) => (
-                    <TouchableOpacity
+                    <Button
                       key={item.value}
-                      style={safeStyle([
-                        {
-                          padding: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '$gray4',
-                        },
-                      ])}
+                      padding="$3"
+                      borderBottomWidth={1}
+                      borderBottomColor="$gray4"
+                      backgroundColor="transparent"
+                      justifyContent="flex-start"
                       onPress={() => {
                         setFormData((prev) => ({
                           ...prev,
@@ -274,11 +295,13 @@ function CreateLeagueModal({
                         }));
                         setShowTeamCountDropdown(false);
                       }}
+                      unstyled
+                      borderRadius={0}
                     >
                       <Text fontSize="$4" color="$gray12">
                         {item.text}
                       </Text>
-                    </TouchableOpacity>
+                    </Button>
                   ))}
                 </YStack>
               )}
@@ -294,31 +317,29 @@ function CreateLeagueModal({
               >
                 Draft Type
               </Text>
-              <TouchableOpacity
-                style={safeStyle([
-                  {
-                    backgroundColor: '$gray1',
-                    borderRadius: 8,
-                    padding: 12,
-                    borderWidth: 1,
-                    borderColor: '$gray6',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  },
-                ])}
+              <Button
+                backgroundColor="$gray1"
+                borderRadius="$2"
+                borderWidth={1}
+                borderColor="$gray6"
+                paddingHorizontal="$3"
+                paddingVertical="$3"
+                justifyContent="space-between"
                 onPress={() => setShowDraftTypeDropdown(!showDraftTypeDropdown)}
                 disabled={loading}
+                unstyled
+                flexDirection="row"
+                alignItems="center"
               >
                 <Text fontSize="$4" color="$gray12">
                   {DRAFT_TYPES.find(
                     (type) => type.value === (formData.draftType as string),
                   )?.label || 'Normal'}
                 </Text>
-                <Text fontSize="$3" color="$gray10">
+                <Text fontSize="$3" color="$gray10" marginLeft="auto">
                   ▼
                 </Text>
-              </TouchableOpacity>
+              </Button>
 
               {showDraftTypeDropdown && (
                 <YStack
@@ -329,15 +350,13 @@ function CreateLeagueModal({
                   marginTop="$1"
                 >
                   {DRAFT_TYPES.map((type) => (
-                    <TouchableOpacity
+                    <Button
                       key={type.value}
-                      style={safeStyle([
-                        {
-                          padding: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: '$gray4',
-                        },
-                      ])}
+                      padding="$3"
+                      borderBottomWidth={1}
+                      borderBottomColor="$gray4"
+                      backgroundColor="transparent"
+                      justifyContent="flex-start"
                       onPress={() => {
                         setFormData((prev) => ({
                           ...prev,
@@ -345,11 +364,13 @@ function CreateLeagueModal({
                         }));
                         setShowDraftTypeDropdown(false);
                       }}
+                      unstyled
+                      borderRadius={0}
                     >
                       <Text fontSize="$4" color="$gray12">
                         {type.label}
                       </Text>
-                    </TouchableOpacity>
+                    </Button>
                   ))}
                 </YStack>
               )}
@@ -383,9 +404,9 @@ function CreateLeagueModal({
               </Text>
             </Button>
           </XStack>
-        </YStack>
-      </YStack>
-    </Modal>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog>
   );
 }
 

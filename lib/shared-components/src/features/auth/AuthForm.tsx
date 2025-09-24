@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Input, Text, YStack } from 'tamagui';
-import { TouchableOpacity } from '../../platform-components';
+import { Input, Text, YStack } from 'tamagui';
+import { Button } from '../../Button';
 import { AuthState } from '../../types';
 
 export interface LoginCredentials {
@@ -307,27 +307,25 @@ function AuthForm({
         <YStack alignItems="center" marginTop="$4" gap="$3">
           {mode === 'login' && (
             <>
-              <TouchableOpacity
+              <Button
                 onPress={() => switchMode('forgot')}
                 disabled={loading}
+                variant="secondary"
               >
-                <Text color="$blue10" fontSize="$3">
-                  Forgot Password?
-                </Text>
-              </TouchableOpacity>
+                Forgot Password?
+              </Button>
               {onRegister && (
                 <YStack alignItems="center">
                   <Text color="$gray10" fontSize="$3">
                     Don't have an account?{' '}
                   </Text>
-                  <TouchableOpacity
+                  <Button
                     onPress={() => switchMode('register')}
                     disabled={loading}
+                    variant="secondary"
                   >
-                    <Text color="$blue10" fontSize="$3" fontWeight="600">
-                      Sign Up
-                    </Text>
-                  </TouchableOpacity>
+                    Sign Up
+                  </Button>
                 </YStack>
               )}
             </>
@@ -338,14 +336,13 @@ function AuthForm({
               <Text color="$gray10" fontSize="$3">
                 Already have an account?{' '}
               </Text>
-              <TouchableOpacity
+              <Button
                 onPress={() => switchMode('login')}
                 disabled={loading}
+                variant="secondary"
               >
-                <Text color="$blue10" fontSize="$3" fontWeight="600">
-                  Sign In
-                </Text>
-              </TouchableOpacity>
+                Sign In
+              </Button>
             </YStack>
           )}
 
@@ -354,14 +351,13 @@ function AuthForm({
               <Text color="$gray10" fontSize="$3">
                 Remember your password?{' '}
               </Text>
-              <TouchableOpacity
+              <Button
                 onPress={() => switchMode('login')}
                 disabled={loading}
+                variant="secondary"
               >
-                <Text color="$blue10" fontSize="$3" fontWeight="600">
-                  Sign In
-                </Text>
-              </TouchableOpacity>
+                Sign In
+              </Button>
             </YStack>
           )}
         </YStack>

@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   StatusBar,
+  StyleSheet,
   TextInput,
   TouchableOpacity,
   Vibration,
@@ -764,3 +765,169 @@ const getPositionColor = (position: string, sport: string): string => {
   const colors = sport === 'baseball' ? baseballColors : footballColors;
   return colors[position] || '#6b7280';
 };
+
+// Styles for the modal components
+const styles = StyleSheet.create({
+  filterOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  filterBackdrop: {
+    flex: 1,
+  },
+  filterPanel: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  closeButton: {
+    fontSize: 18,
+    color: '#ffffff',
+    padding: 5,
+  },
+  filterContent: {
+    maxHeight: 400,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
+    marginBottom: 10,
+    marginTop: 15,
+  },
+  filterGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  filterChipText: {
+    color: '#ffffff',
+    fontSize: 12,
+  },
+  rangeContainer: {
+    paddingVertical: 10,
+  },
+  rangeLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  claimModal: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  playerSummary: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalPlayerName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
+    marginBottom: 5,
+  },
+  modalPlayerInfo: {
+    fontSize: 14,
+    color: '#cccccc',
+  },
+  claimForm: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 14,
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    padding: 12,
+    color: '#ffffff',
+    backgroundColor: '#2a2a2a',
+    marginBottom: 15,
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  priorityButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  priorityText: {
+    color: '#ffffff',
+    fontSize: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  submitButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});
+
+export default FreeAgents;

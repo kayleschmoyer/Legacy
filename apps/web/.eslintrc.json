@@ -20,8 +20,8 @@
     {
       "files": ["*.ts", "*.tsx"],
       "rules": {
-        "@typescript-eslint/no-unsafe-assignment": "warn",
-        "jsx-a11y/accessible-emoji": "warn"
+        "@typescript-eslint/no-unsafe-assignment": "error",
+        "jsx-a11y/accessible-emoji": "error"
       }
     },
     {

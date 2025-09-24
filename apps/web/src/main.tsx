@@ -57,6 +57,7 @@ root.render(
       <AppProvider
         apolloClient={apolloClient}
         colorScheme="dark"
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         tamaguiConfig={tamaguiConfig}
       >
         <App />

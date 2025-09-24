@@ -642,7 +642,7 @@ function FreeAgents({
       />
 
       {/* Player List */}
-      <FlatList<FreeAgentPlayer>
+      <FlatList
         data={filteredAndSortedPlayers}
         renderItem={renderPlayer}
         keyExtractor={(item: FreeAgentPlayer) => item.id}

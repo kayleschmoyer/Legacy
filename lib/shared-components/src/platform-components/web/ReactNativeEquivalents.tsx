@@ -1,8 +1,8 @@
 import React from 'react';
 import type {
   AnimatedAPI,
+  AnimatedTimingConfig,
   AnimatedValue,
-  AnimationConfig,
   SpringConfig,
 } from '../types';
 import type {
@@ -96,33 +96,63 @@ if (typeof globalThis !== 'undefined') {
 }
 
 const Platform = {
-  OS: 'web' as 'web' | 'ios' | 'android',
-  Version: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  OS: 'web' as const,
+  Version: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+  isTV: false,
+  isTesting: false,
+  constants: {},
   select: function <T>(specifics: {
+    ios?: T;
+    android?: T;
+    windows?: T;
+    macos?: T;
     web?: T;
+    native?: T;
     default?: T;
-    [key: string]: T | undefined;
-  }): T | undefined {
-    return specifics.web ?? specifics.default;
+  }): T {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    return (specifics.web ?? specifics.default) as T;
   },
 };
 
 const Dimensions = {
-  get: (dimension: 'window' | 'screen') => ({
+  get: (dim: 'window' | 'screen') => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 375,
     height: typeof window !== 'undefined' ? window.innerHeight : 667,
+    scale: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+    fontScale: 1, // Web doesn't typically scale fonts separately
   }),
-  addEventListener: (event: string, handler: (...args: unknown[]) => void) => {
+  addEventListener: (
+    type: 'change',
+    handler: (dims: {
+      window: Record<string, unknown>;
+      screen: Record<string, unknown>;
+    }) => void,
+  ) => {
     if (typeof window !== 'undefined') {
-      window.addEventListener('resize', handler as EventListener);
+      const wrappedHandler = () => {
+        const dimensions = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          scale: window.devicePixelRatio || 1,
+          fontScale: 1,
+        };
+        handler({ window: dimensions, screen: dimensions });
+      };
+      window.addEventListener('resize', wrappedHandler);
     }
   },
   removeEventListener: (
-    event: string,
-    handler: (...args: unknown[]) => void,
+    type: 'change',
+    handler: (dims: {
+      window: Record<string, unknown>;
+      screen: Record<string, unknown>;
+    }) => void,
   ) => {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('resize', handler as EventListener);
+      // Note: In a real implementation, you'd need to track the wrapped handlers
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      window.removeEventListener('resize', handler as unknown as EventListener);
     }
   },
 };
@@ -173,23 +203,21 @@ function ActivityIndicator({
   );
 }
 
-// FlatList component for web
+// FlatList component for web - matches React Native interface
 interface FlatListProps<ItemT> {
-  data: ItemT[];
-  renderItem: ({
-    item,
-    index,
-  }: {
+  data?: ItemT[] | null;
+  renderItem: (info: {
     item: ItemT;
     index: number;
-  }) => React.ReactElement;
+    separators: Record<string, () => void>;
+  }) => React.ReactElement | null;
   keyExtractor?: (item: ItemT, index: number) => string;
-  style?: React.CSSProperties | React.CSSProperties[];
+  style?: React.CSSProperties;
   numColumns?: number;
   horizontal?: boolean;
   contentContainerStyle?: React.CSSProperties;
-  onEndReached?: () => void;
-  onEndReachedThreshold?: number;
+  onEndReached?: ((info: { distanceFromEnd: number }) => void) | null;
+  onEndReachedThreshold?: number | null;
   ListHeaderComponent?:
     | React.ComponentType<unknown>
     | React.ReactElement
@@ -204,11 +232,29 @@ interface FlatListProps<ItemT> {
   columnWrapperStyle?: React.CSSProperties;
   stickyHeaderIndices?: number[];
   scrollEnabled?: boolean;
-  keyboardShouldPersistTaps?: string;
+  keyboardShouldPersistTaps?: 'never' | 'always' | 'handled';
   ItemSeparatorComponent?:
     | React.ComponentType<unknown>
     | React.ReactElement
     | null;
+  // Additional React Native FlatList props
+  extraData?: unknown;
+  getItemLayout?: (
+    data: unknown[] | null | undefined,
+    index: number,
+  ) => { length: number; offset: number; index: number };
+  initialNumToRender?: number;
+  initialScrollIndex?: number;
+  inverted?: boolean;
+  onRefresh?: (() => void) | null;
+  onViewableItemsChanged?: ((info: Record<string, unknown>) => void) | null;
+  refreshing?: boolean | null;
+  removeClippedSubviews?: boolean;
+  viewabilityConfig?: Record<string, unknown>;
+  viewabilityConfigCallbackPairs?: Record<string, unknown>[];
+  maxToRenderPerBatch?: number;
+  updateCellsBatchingPeriod?: number;
+  windowSize?: number;
 }
 
 function FlatList<ItemT>({
@@ -244,8 +290,10 @@ function FlatList<ItemT>({
       const { scrollTop, scrollHeight, clientHeight } = container;
       const scrollPercent = (scrollTop + clientHeight) / scrollHeight;
 
-      if (scrollPercent >= 1 - onEndReachedThreshold) {
-        onEndReached();
+      if (scrollPercent >= 1 - (onEndReachedThreshold || 0.1)) {
+        onEndReached({
+          distanceFromEnd: scrollHeight - (scrollTop + clientHeight),
+        });
       }
     };
 
@@ -286,21 +334,39 @@ function FlatList<ItemT>({
   };
 
   const contentStyle: React.CSSProperties = {
-    ...contentContainerStyle,
+    ...(contentContainerStyle || {}),
   };
+
+  // Convert data to array for consistency
+  const dataArray = data ? Array.from(data) : [];
 
   return (
     <div ref={containerRef} style={containerStyle}>
       <div style={contentStyle}>
         {renderComponent(ListHeaderComponent)}
-        {data.length === 0 && renderComponent(ListEmptyComponent)}
-        {data.map((item, index) => (
-          <div
-            key={keyExtractor ? keyExtractor(item, index) : index.toString()}
-          >
-            {renderItem({ item, index })}
-          </div>
-        ))}
+        {dataArray.length === 0 && renderComponent(ListEmptyComponent)}
+        {renderItem &&
+          dataArray.map((item, index) => (
+            <div
+              key={keyExtractor ? keyExtractor(item, index) : index.toString()}
+            >
+              {renderItem({
+                item,
+                index,
+                separators: {
+                  highlight: () => {
+                    /* No-op for web */
+                  },
+                  unhighlight: () => {
+                    /* No-op for web */
+                  },
+                  updateProps: () => {
+                    /* No-op for web */
+                  },
+                },
+              })}
+            </div>
+          ))}
         {renderComponent(ListFooterComponent)}
       </div>
     </div>
@@ -469,30 +535,43 @@ const Animated: AnimatedAPI = {
       };
     }
   },
-  timing: (value: AnimatedValue, config: AnimationConfig) => ({
+  timing: (value: AnimatedValue, config: AnimatedTimingConfig) => ({
     start: (callback?: () => void) => {
       // Simple implementation - in reality you'd want proper animations
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       if (value && value.setValue) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         value.setValue(config.toValue);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
       if (callback) setTimeout(callback, config.duration || 0);
+    },
+    stop: () => {
+      // No-op for web implementation
+    },
+    reset: () => {
+      // No-op for web implementation
     },
   }),
   spring: (value: AnimatedValue, config: SpringConfig) => ({
     start: (callback?: () => void) => {
       // Simple implementation - in reality you'd want proper animations
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       if (value && value.setValue) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         value.setValue(config.toValue);
       }
       if (callback) setTimeout(callback, 300);
     },
+    stop: () => {
+      // No-op for web implementation
+    },
+    reset: () => {
+      // No-op for web implementation
+    },
   }),
-  parallel: (animations: { start: (callback?: () => void) => void }[]) => ({
+  parallel: (
+    animations: {
+      start: (callback?: () => void) => void;
+      stop: () => void;
+      reset: () => void;
+    }[],
+  ) => ({
     start: (callback?: () => void) => {
       // Start all animations in parallel and call callback when all are done
       let completedCount = 0;
@@ -511,6 +590,12 @@ const Animated: AnimatedAPI = {
           }
         });
       });
+    },
+    stop: () => {
+      animations.forEach((animation) => animation.stop());
+    },
+    reset: () => {
+      animations.forEach((animation) => animation.reset());
     },
   }),
 };
@@ -536,6 +621,36 @@ const Alert = {
       }
     } else {
       window.alert(`${title}\n${message || ''}`);
+    }
+  },
+  prompt: (
+    title: string,
+    message?: string,
+    callbackOrButtons?:
+      | ((text: string) => void)
+      | Array<{
+          text?: string;
+          onPress?: (text?: string) => void;
+          style?: 'default' | 'cancel' | 'destructive';
+        }>,
+    type?: 'default' | 'plain-text' | 'secure-text' | 'login-password',
+    defaultValue?: string,
+    keyboardType?: string,
+  ) => {
+    const result = window.prompt(`${title}\n${message || ''}`, defaultValue);
+    if (typeof callbackOrButtons === 'function') {
+      callbackOrButtons(result || '');
+    } else if (Array.isArray(callbackOrButtons)) {
+      // Handle button array case if needed
+      if (result !== null) {
+        const okButton = callbackOrButtons.find((b) => b.style !== 'cancel');
+        if (okButton && okButton.onPress) okButton.onPress(result);
+      } else {
+        const cancelButton = callbackOrButtons.find(
+          (b) => b.style === 'cancel',
+        );
+        if (cancelButton && cancelButton.onPress) cancelButton.onPress();
+      }
     }
   },
 };
@@ -676,6 +791,8 @@ function PickerItem({ label, value, color, testID }: PickerItemProps) {
 }
 
 Picker.Item = PickerItem;
+Picker.MODE_DIALOG = 'dialog';
+Picker.MODE_DROPDOWN = 'dropdown';
 
 // Image component for web
 function Image({

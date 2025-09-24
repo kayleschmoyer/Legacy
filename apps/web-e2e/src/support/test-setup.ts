@@ -1,13 +1,11 @@
-import { server } from '../mocks/server';
+import { test } from '@playwright/test';
+import { resetMocks } from '../mocks/server';
 
-// Establish API mocking before each test
-beforeEach(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  server.resetHandlers();
+// Setup hooks for Playwright tests
+test.beforeEach(() => {
+  resetMocks();
 });
 
-// Clean up after each test
-afterEach(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  server.resetHandlers();
+test.afterEach(() => {
+  resetMocks();
 });

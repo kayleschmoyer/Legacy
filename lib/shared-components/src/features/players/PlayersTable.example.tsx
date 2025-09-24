@@ -6,7 +6,8 @@ import { PlayersTableDemo } from './PlayersTableDemo';
 import { apolloClient } from './apollo-client'; // Your Apollo client
 // import { tamaguiConfig } from '@legacy-sports/tamagui-config'; // Your Tamagui config
 
-// Placeholder tamagui config for example purposes
+// Placeholder tamagui config for example purposes - complex type, safe to use 'any' in examples
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const exampleTamaguiConfig = {} as any;
 
 // Logger setup with fallback
@@ -35,7 +36,7 @@ try {
 // Basic usage
 export function SimplePlayersTable() {
   return (
-    <TamaguiProvider config={exampleTamaguiConfig as any}>
+    <TamaguiProvider config={exampleTamaguiConfig}>
       <ApolloProvider client={apolloClient}>
         <PlayersTable />
       </ApolloProvider>
@@ -45,13 +46,19 @@ export function SimplePlayersTable() {
 
 // Advanced usage with selection
 export function PlayerSelectionTable() {
-  const handlePlayerSelect = (player: any) => {
+  const handlePlayerSelect = (player: {
+    firstName?: string | null;
+    lastName?: string | null;
+    [key: string]: unknown;
+  }) => {
     LOGGER.info('Selected player:', player);
-    alert(`Selected: ${player.firstName} ${player.lastName}`);
+    alert(
+      `Selected: ${player.firstName || 'Unknown'} ${player.lastName || 'Player'}`,
+    );
   };
 
   return (
-    <TamaguiProvider config={exampleTamaguiConfig as any}>
+    <TamaguiProvider config={exampleTamaguiConfig}>
       <ApolloProvider client={apolloClient}>
         <PlayersTable
           title="Choose a Player"
@@ -68,7 +75,7 @@ export function PlayerSelectionTable() {
 // Demo component with multiple examples
 export function PlayersTableShowcase() {
   return (
-    <TamaguiProvider config={exampleTamaguiConfig as any}>
+    <TamaguiProvider config={exampleTamaguiConfig}>
       <ApolloProvider client={apolloClient}>
         <PlayersTableDemo title="Players Table Examples" />
       </ApolloProvider>

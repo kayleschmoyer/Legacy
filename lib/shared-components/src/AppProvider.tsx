@@ -31,6 +31,7 @@ try {
 interface AppProviderProps {
   children: React.ReactNode;
   apolloClient: ApolloClient; // Apollo client instance
+  // Tamagui config has complex generic constraints that are difficult to type properly
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tamaguiConfig: any; // Tamagui configuration object
   colorScheme?: 'light' | 'dark';
