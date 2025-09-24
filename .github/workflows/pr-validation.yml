@@ -5,16 +5,19 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  merge_group:
 
-# Cancel in-progress runs for the same workflow on the same PR
+# Cancel in-progress runs for the same workflow on the same PR or merge group
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 permissions:
   actions: read
   contents: read
-  pull-requests: read
+  pull-requests: write
+  checks: read
+  issues: write # Explicitly needed for commenting on PRs
 
 env:
   # Nx Cloud with Distributed Task Execution - let Nx handle the parallelism
@@ -86,7 +89,6 @@ jobs:
     name: Package Standards
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: contains(github.event.pull_request.changed_files, 'package.json')
 
     permissions:
       contents: read
@@ -98,7 +100,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for package.json changes
+        id: check-changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            package:
+              - '**/package.json'
+
       - name: Setup
+        if: steps.check-changes.outputs.package == 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -106,16 +117,16 @@ jobs:
           set-nx-shas: false
 
       - name: Validate Standards
+        if: steps.check-changes.outputs.package == 'true'
         uses: ./.github/actions/validate-workspace
         with:
-          comment-on-failure: true
+          comment-on-failure: ${{ github.event_name == 'pull_request' && github.event.pull_request != null }}
 
   # Lambda deployment validation - separate since it needs AWS secrets for terraform plan
   lambda-deployment-validation:
     name: Lambda Deployment
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: contains(github.event.pull_request.changed_files, 'lambdas/')
 
     steps:
       - name: Checkout
@@ -124,7 +135,16 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
+      - name: Check for lambda changes
+        id: check-lambda-changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            lambdas:
+              - 'lambdas/**'
+
       - name: Setup
+        if: steps.check-lambda-changes.outputs.lambdas == 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -132,6 +152,7 @@ jobs:
           set-nx-shas: true
 
       - name: Run Deployment Plans
+        if: steps.check-lambda-changes.outputs.lambdas == 'true'
         run: |
           echo "🚀 Running Terraform deployment plans for affected lambda functions..."
           affected_lambdas=$(npx nx show projects --affected --json | jq -r '.[] | select(contains("lambda") or contains("db") or contains("oauth") or contains("game-selection"))')
@@ -148,7 +169,6 @@ jobs:
     name: Mobile Validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
       - name: Checkout
@@ -157,7 +177,18 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
+      - name: Check for mobile app changes
+        id: check-mobile-changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            app:
+              - 'apps/app/**'
+              - 'lib/shared-components/**'
+              - 'lib/tamagui-config/**'
+
       - name: Setup
+        if: steps.check-mobile-changes.outputs.app == 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -166,6 +197,7 @@ jobs:
 
       - name: Check Mobile Changes
         id: check-mobile
+        if: steps.check-mobile-changes.outputs.app == 'true'
         run: |
           echo "📱 Checking if mobile app is affected by this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
@@ -194,7 +226,6 @@ jobs:
     name: iOS Build
     runs-on: macos-latest
     timeout-minutes: 45
-    if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
       - name: Checkout
@@ -203,7 +234,18 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
+      - name: Check for mobile app changes
+        id: check-ios-changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            app:
+              - 'apps/app/**'
+              - 'lib/shared-components/**'
+              - 'lib/tamagui-config/**'
+
       - name: Setup
+        if: steps.check-ios-changes.outputs.app == 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -212,6 +254,7 @@ jobs:
 
       - name: Check iOS Changes
         id: check-ios
+        if: steps.check-ios-changes.outputs.app == 'true'
         run: |
           echo "🍎 Checking if iOS build is needed for this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
@@ -237,7 +280,6 @@ jobs:
     name: Android Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: contains(github.event.pull_request.changed_files, 'apps/app/')
 
     steps:
       - name: Checkout
@@ -246,7 +288,18 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
+      - name: Check for mobile app changes
+        id: check-android-changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            app:
+              - 'apps/app/**'
+              - 'lib/shared-components/**'
+              - 'lib/tamagui-config/**'
+
       - name: Setup Java
+        if: steps.check-android-changes.outputs.app == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -254,6 +307,7 @@ jobs:
           cache: "gradle"
 
       - name: Setup
+        if: steps.check-android-changes.outputs.app == 'true'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -262,6 +316,7 @@ jobs:
 
       - name: Check Android Changes
         id: check-android
+        if: steps.check-android-changes.outputs.app == 'true'
         run: |
           echo "🤖 Checking if Android build is needed for this PR..."
           if npx nx show projects --affected --json | grep -q '"app"'; then
