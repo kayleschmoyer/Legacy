@@ -1,0 +1,81 @@
+name: Custom Merge Queue
+
+on:
+  pull_request:
+    types: [labeled]
+  schedule:
+    - cron: "*/5 * * * *" # Check every 5 minutes
+
+jobs:
+  process-merge-queue:
+    if: contains(github.event.pull_request.labels.*.name, 'merge-when-ready') || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get ready PRs
+        id: ready-prs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc'
+            });
+
+            const readyPrs = prs.filter(pr => 
+              pr.labels.some(label => label.name === 'merge-when-ready') &&
+              pr.mergeable_state === 'ready'
+            );
+
+            core.setOutput('prs', JSON.stringify(readyPrs));
+
+      - name: Process merge queue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = JSON.parse('${{ steps.ready-prs.outputs.prs }}');
+
+            for (const pr of prs.slice(0, 1)) {  // Process one at a time
+              console.log(`Processing PR #${pr.number}: ${pr.title}`);
+              
+              // Check if all status checks pass
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+              
+              const allPassed = checks.check_runs.every(check => 
+                check.status === 'completed' && check.conclusion === 'success'
+              );
+              
+              if (allPassed) {
+                // Merge the PR
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  merge_method: 'squash'
+                });
+                
+                console.log(`✅ Merged PR #${pr.number}`);
+              } else {
+                console.log(`⏳ PR #${pr.number} not ready - waiting for checks`);
+              }
+            }

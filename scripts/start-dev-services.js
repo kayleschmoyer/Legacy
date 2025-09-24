@@ -38,7 +38,7 @@ const reset = '\x1b[0m';
 
 function startService(service) {
   console.log(
-    `${service.color}Starting ${service.name} on port ${service.port}...${reset}`
+    `${service.color}Starting ${service.name} on port ${service.port}...${reset}`,
   );
 
   const child = spawn(service.command, service.args, {
@@ -58,7 +58,7 @@ function startService(service) {
 
   child.on('close', (code) => {
     console.log(
-      `${service.color}[${service.name}]${reset} exited with code ${code}`
+      `${service.color}[${service.name}]${reset} exited with code ${code}`,
     );
   });
 

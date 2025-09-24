@@ -53,13 +53,13 @@ function updateEslintConfig(projectPath, configType) {
       existing.overrides.some((o) => o.files && o.files.includes('*.json'))
     ) {
       newConfig.overrides = existing.overrides.filter(
-        (o) => o.files && o.files.includes('*.json')
+        (o) => o.files && o.files.includes('*.json'),
       );
     }
   } catch (e) {
     console.warn(
       `Could not parse existing config for ${projectPath}:`,
-      e.message
+      e.message,
     );
   }
 

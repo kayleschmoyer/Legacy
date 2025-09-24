@@ -35,14 +35,14 @@ function checkEslintConfigs() {
       console.log(
         `❌ ${configPath} - Individual config (${
           JSON.stringify(config).length
-        } chars)`
+        } chars)`,
       );
       individualConfigs++;
     }
   });
 
   console.log(
-    `\n📊 ESLint Summary: ${sharedConfigs} shared, ${individualConfigs} individual`
+    `\n📊 ESLint Summary: ${sharedConfigs} shared, ${individualConfigs} individual`,
   );
   return { shared: sharedConfigs, individual: individualConfigs };
 }
@@ -72,14 +72,14 @@ function checkViteConfigs() {
       sharedConfigs++;
     } else {
       console.log(
-        `❌ ${configPath} - Individual config (${content.length} chars)`
+        `❌ ${configPath} - Individual config (${content.length} chars)`,
       );
       individualConfigs++;
     }
   });
 
   console.log(
-    `\n📊 Vite Summary: ${sharedConfigs} shared, ${individualConfigs} individual`
+    `\n📊 Vite Summary: ${sharedConfigs} shared, ${individualConfigs} individual`,
   );
   return { shared: sharedConfigs, individual: individualConfigs };
 }
@@ -114,10 +114,10 @@ function main() {
 
   console.log('\n📈 Overall Progress:');
   console.log(
-    `ESLint: ${eslintProgress}% migrated (${eslintStats.shared}/${totalProjects})`
+    `ESLint: ${eslintProgress}% migrated (${eslintStats.shared}/${totalProjects})`,
   );
   console.log(
-    `Vite: ${viteProgress}% migrated (${viteStats.shared}/${totalViteProjects})`
+    `Vite: ${viteProgress}% migrated (${viteStats.shared}/${totalViteProjects})`,
   );
 
   if (eslintProgress < 100 || viteProgress < 100) {

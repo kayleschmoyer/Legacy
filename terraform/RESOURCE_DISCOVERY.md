@@ -118,7 +118,6 @@ Do nothing with the discovered resources.
 2. **Review the output** to see what unmanaged resources exist
 
 3. **Choose import option** based on your needs:
-
    - Option 1: Import all (quickest)
    - Option 2: Import selected (safest)
    - Option 3: Generate commands (for review)

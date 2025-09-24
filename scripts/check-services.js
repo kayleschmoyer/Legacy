@@ -6,7 +6,7 @@ async function checkService(port, name) {
   return new Promise((resolve) => {
     const req = http.get(`http://localhost:${port}/health`, (res) => {
       console.log(
-        `✅ ${name} is running on port ${port} (status: ${res.statusCode})`
+        `✅ ${name} is running on port ${port} (status: ${res.statusCode})`,
       );
       resolve(true);
     });
@@ -35,7 +35,7 @@ async function checkAllServices() {
   ];
 
   const results = await Promise.all(
-    services.map((service) => checkService(service.port, service.name))
+    services.map((service) => checkService(service.port, service.name)),
   );
 
   const running = results.filter((r) => r).length;

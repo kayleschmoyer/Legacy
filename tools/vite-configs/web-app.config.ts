@@ -9,7 +9,7 @@ export function createWebAppConfig(
     baseUrl?: string;
     copyAssets?: string[];
     reactConfig?: object;
-  }
+  },
 ) {
   const { baseUrl, copyAssets, reactConfig } = options || {};
 

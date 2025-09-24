@@ -12,7 +12,7 @@ export function createLibConfig(
     copyAssets?: string[];
     generateDts?: boolean;
     customOutDir?: string;
-  }
+  },
 ) {
   const {
     hasReact = false,
