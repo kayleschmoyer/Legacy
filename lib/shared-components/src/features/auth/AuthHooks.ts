@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { AsyncHookResult, useAsyncHook } from '../../utils/HookHelpers';
-import { Platform, SecureStorage } from '../../platform-components';
+import { SecureStorageProvider } from '../../platform-components';
+// Type-safe cast for SecureStorageProvider
+const secureStorage = SecureStorageProvider;
 
 // Import dependencies with fallbacks for testing environment
 let LOGGER: {
@@ -68,7 +70,7 @@ function useLastUpdateTime(): number {
 
 export async function readSecureValue(secret: Secret): Promise<string | null> {
   try {
-    return await SecureStorage.getItem(secret);
+    return await secureStorage.getItem(secret);
   } catch (error) {
     LOGGER.error('Error reading secure storage', error);
     return null;
@@ -77,7 +79,7 @@ export async function readSecureValue(secret: Secret): Promise<string | null> {
 
 export async function getJwt(): Promise<LegacySportsJwt | null> {
   try {
-    const internalJwt = await SecureStorage.getItem(Secret.INTERNAL_JWT);
+    const internalJwt = await secureStorage.getItem(Secret.INTERNAL_JWT);
     return internalJwt === null ? null : jwtDecode(internalJwt);
   } catch (error) {
     LOGGER.error('Error getting JWT from secure storage', error);
@@ -87,7 +89,7 @@ export async function getJwt(): Promise<LegacySportsJwt | null> {
 
 async function resetToken(): Promise<void> {
   try {
-    await SecureStorage.clear();
+    await secureStorage.clear();
     // Trigger the react update
     KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
   } catch (error) {
@@ -95,7 +97,7 @@ async function resetToken(): Promise<void> {
   }
 }
 
-function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
+function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   const logout = useCallback(async () => {
     await resetToken();
   }, []);
@@ -105,22 +107,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   };
 }
 
-function useNativeAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  const logout = useCallback(async () => {
-    await resetToken();
-  }, []);
-
-  return {
-    logout,
-  };
-}
-
-export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  const webHandlers = useWebAuthHandlers(callbacks);
-  const nativeHandlers = useNativeAuthHandlers(callbacks);
-
-  return Platform.OS === 'web' ? webHandlers : nativeHandlers;
-}
+export { useAuthHandlers };
 
 export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
   const lastUpdate = useLastUpdateTime();

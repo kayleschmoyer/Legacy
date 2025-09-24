@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from '../../platform-components';
+import { ScrollView, Text, XStack, YStack } from 'tamagui';
 
 const TABLE_HEADER = [
   'Player',
@@ -44,9 +44,7 @@ export interface FieldingStatsTableProps {
   stats: readonly FieldingStatsRecord[];
 }
 
-function FieldingStatsTable({ 
-  stats,
- }: FieldingStatsTableProps) {
+function FieldingStatsTable({ stats }: FieldingStatsTableProps) {
   const data = useMemo(() => {
     return stats.map((record) => [
       record.player?.name || 'Unknown',
@@ -68,72 +66,60 @@ function FieldingStatsTable({
   }, [stats]);
 
   return (
-    <ScrollView horizontal style={styles.container}>
-      <View style={styles.table}>
+    <ScrollView horizontal flex={1}>
+      <YStack backgroundColor="$gray10">
         {/* Header */}
-        <View style={styles.row}>
+        <XStack>
           {TABLE_HEADER.map((header, index) => (
-            <View key={index} style={styles.headerCell}>
-              <Text style={styles.headerText}>{header}</Text>
-            </View>
+            <YStack
+              key={index}
+              width={80}
+              padding="$3"
+              backgroundColor="$gray8"
+              justifyContent="center"
+              alignItems="center"
+              borderRightWidth={1}
+              borderRightColor="$gray7"
+            >
+              <Text
+                color="$yellow10"
+                fontWeight="bold"
+                fontSize="$2"
+                textAlign="center"
+              >
+                {header}
+              </Text>
+            </YStack>
           ))}
-        </View>
+        </XStack>
 
         {/* Data Rows */}
         {data.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.row}>
+          <XStack
+            key={rowIndex}
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
             {row.map((cell, cellIndex) => (
-              <View key={cellIndex} style={styles.cell}>
-                <Text style={styles.cellText}>{cell}</Text>
-              </View>
+              <YStack
+                key={cellIndex}
+                width={80}
+                padding="$3"
+                justifyContent="center"
+                alignItems="center"
+                borderRightWidth={1}
+                borderRightColor="$gray8"
+              >
+                <Text color="$white" fontSize="$1" textAlign="center">
+                  {cell}
+                </Text>
+              </YStack>
             ))}
-          </View>
+          </XStack>
         ))}
-      </View>
+      </YStack>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  table: {
-    backgroundColor: '#1E1E1E',
-  },
-  row: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  headerCell: {
-    width: 80,
-    padding: 12,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#444',
-  },
-  cell: {
-    width: 80,
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#333',
-  },
-  headerText: {
-    color: '#FFD700',
-    fontWeight: 'bold',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  cellText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    textAlign: 'center',
-  },
-});
 
 export { FieldingStatsTable };

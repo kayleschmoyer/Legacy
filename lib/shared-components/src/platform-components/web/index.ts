@@ -1,15 +1,74 @@
 // Platform-specific web components
-// Initialize global StyleSheet for web platform (imports ReactNativeEquivalents)
-import './ReactNativeEquivalents';
+import { webOAuthProvider } from './WebOAuthProvider';
+import { webSecureStorage } from './WebSecureStorage';
+import IconsComponent from './Icons';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Picker,
+  Platform,
+  PlatformProviders,
+  PlatformUtils,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Table,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View,
+} from './ReactNativeEquivalents';
+import { validatePlatformExports } from '../types/platform-exports';
 
-export { default as WebIcons } from './Icons';
-export { default as WebTable } from './Table';
-export { LoadingPanel } from './LoadingPanel';
-export { SecureStorage } from './SecureStorage';
+// Export shared types (identical across all platforms)
+export * from '../types';
 
-// Re-export all React Native equivalents for web
-export * from './ReactNativeEquivalents';
+// Create and validate the module exports object using our utility function
+const MODULE_EXPORTS = validatePlatformExports({
+  // ===== PLATFORM-SPECIFIC IMPLEMENTATIONS =====
+  OAuthProvider: webOAuthProvider,
+  SecureStorageProvider: webSecureStorage,
 
-// Direct exports with common names for build-time resolution
-export { default as Icon } from './Icons';
-export { default as Table } from './Table';
+  // ===== REACT NATIVE COMPONENTS (NO TAMAGUI EQUIVALENT) =====
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Picker,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View,
+
+  // ===== PLATFORM-SPECIFIC PROVIDERS =====
+  PlatformProviders,
+
+  // ===== PLATFORM-SPECIFIC UTILITIES =====
+  PlatformUtils: PlatformUtils,
+
+  // ===== PLATFORM-SPECIFIC COMPONENTS =====
+  Icon: IconsComponent,
+  Table,
+  SecureStorage: webSecureStorage,
+});
+
+// Export the entire validated module as a default export
+export default MODULE_EXPORTS;

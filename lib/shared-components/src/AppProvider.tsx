@@ -1,7 +1,6 @@
 import React from 'react';
 import { ApolloClient, ApolloProvider } from '@apollo/client';
 import { TamaguiProvider } from 'tamagui';
-import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
@@ -32,6 +31,8 @@ try {
 interface AppProviderProps {
   children: React.ReactNode;
   apolloClient: ApolloClient; // Apollo client instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tamaguiConfig: any; // Tamagui configuration object
   colorScheme?: 'light' | 'dark';
   isLoading?: boolean;
 }
@@ -40,6 +41,7 @@ interface AppProviderProps {
 const NativeLayout = ({
   children,
   apolloClient,
+  tamaguiConfig,
   colorScheme,
   isLoading,
 }: AppProviderProps) => {
@@ -70,6 +72,7 @@ const NativeLayout = ({
 const WebLayout = ({
   children,
   apolloClient,
+  tamaguiConfig,
   colorScheme,
   isLoading,
 }: AppProviderProps) => {

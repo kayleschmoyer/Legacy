@@ -1,16 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Animated,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { DEFAULT_COLORS } from '../../config/sports';
+import { Button, Input, Text, YStack } from 'tamagui';
+import { TouchableOpacity } from '../../platform-components';
 import { AuthState } from '../../types';
-import { safeStyle } from '../../utils/styles';
 
 export interface LoginCredentials {
   email: string;
@@ -49,13 +40,11 @@ function AuthForm({
     confirmPassword: '',
   });
   const [fadeAnim, setFadeAnim] = useState(0);
-  const [slideAnim, setSlideAnim] = useState(50);
 
   useEffect(() => {
     // Simple animation using setTimeout
     setTimeout(() => {
       setFadeAnim(1);
-      setSlideAnim(0);
     }, 100);
   }, []);
 
@@ -192,254 +181,192 @@ function AuthForm({
   };
 
   return (
-    <div
-      style={{
-        maxWidth: '400px',
-        margin: '0 auto',
-        padding: '20px',
-        backgroundColor: '#fff',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        opacity: fadeAnim,
-        transform: `translateY(${slideAnim}px)`,
-        transition: 'opacity 0.6s ease, transform 0.6s ease',
-      }}
+    <YStack
+      maxWidth={400}
+      margin="auto"
+      padding="$5"
+      backgroundColor="white"
+      borderRadius="$3"
+      shadowColor="$shadowColor"
+      shadowOffset={{ width: 0, height: 2 }}
+      shadowOpacity={0.1}
+      shadowRadius={10}
+      elevation={5}
+      opacity={fadeAnim}
+      // Animation handled via state
     >
-      <Animated.View
-        style={safeStyle([
-          styles.formContainer,
-          {
-            opacity: 1,
-            transform: `translateY(0px)`,
-          },
-        ])}
-      >
+      <YStack>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{getTitle()}</Text>
-          <Text style={styles.subtitle}>Legacy Sports</Text>
-        </View>
+        <YStack alignItems="center" marginBottom="$6">
+          <Text
+            fontSize="$7"
+            fontWeight="bold"
+            color="$gray12"
+            marginBottom="$1"
+          >
+            {getTitle()}
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            Legacy Sports
+          </Text>
+        </YStack>
 
         {/* Form Fields */}
-        <View style={styles.inputContainer}>
+        <YStack gap="$4" marginBottom="$6">
           {mode === 'register' && (
-            <TextInput
-              style={styles.input}
+            <Input
+              backgroundColor="$gray1"
+              borderRadius="$2"
+              padding="$3"
+              fontSize="$4"
+              borderWidth={1}
+              borderColor="$gray6"
               placeholder="Full Name"
-              placeholderTextColor="#888"
               value={formData.name}
-              onChangeText={(text) => {
+              onChangeText={(text: string) => {
                 setFormData((prev) => ({ ...prev, name: text }));
               }}
               autoCapitalize="words"
-              {...(Platform.OS !== 'web' && { editable: !loading })}
+              editable={!loading}
             />
           )}
 
-          <TextInput
-            style={styles.input}
+          <Input
+            backgroundColor="$gray1"
+            borderRadius="$2"
+            padding="$3"
+            fontSize="$4"
+            borderWidth={1}
+            borderColor="$gray6"
             placeholder="Email Address"
-            placeholderTextColor="#888"
             value={formData.email}
-            onChangeText={(text) => {
+            onChangeText={(text: string) => {
               setFormData((prev) => ({ ...prev, email: text }));
             }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
-            editable={Platform.OS !== 'web' ? !loading : true}
+            editable={!loading}
           />
 
           {mode !== 'forgot' && (
-            <TextInput
-              style={styles.input}
+            <Input
+              backgroundColor="$gray1"
+              borderRadius="$2"
+              padding="$3"
+              fontSize="$4"
+              borderWidth={1}
+              borderColor="$gray6"
               placeholder="Password"
-              placeholderTextColor="#888"
               value={formData.password}
-              onChangeText={(text) =>
+              onChangeText={(text: string) =>
                 setFormData((prev) => ({ ...prev, password: text }))
               }
               secureTextEntry
               autoCapitalize="none"
               autoComplete="password"
-              editable={Platform.OS !== 'web' ? !loading : true}
+              editable={!loading}
             />
           )}
 
           {mode === 'register' && (
-            <TextInput
-              style={styles.input}
+            <Input
+              backgroundColor="$gray1"
+              borderRadius="$2"
+              padding="$3"
+              fontSize="$4"
+              borderWidth={1}
+              borderColor="$gray6"
               placeholder="Confirm Password"
-              placeholderTextColor="#888"
               value={formData.confirmPassword}
-              onChangeText={(text) =>
+              onChangeText={(text: string) =>
                 setFormData((prev) => ({ ...prev, confirmPassword: text }))
               }
               secureTextEntry
               autoCapitalize="none"
-              editable={Platform.OS !== 'web' ? !loading : true}
+              editable={!loading}
             />
           )}
-        </View>
+        </YStack>
 
         {/* Submit Button */}
-        <TouchableOpacity
-          style={safeStyle([
-            styles.submitButton,
-            loading && styles.disabledButton,
-          ])}
-          onPress={() => void handleSubmit()}
+        <Button
+          backgroundColor="$blue10"
+          borderRadius="$2"
+          padding="$4"
           disabled={loading}
+          onPress={() => void handleSubmit()}
+          opacity={loading ? 0.6 : 1}
         >
-          <Text style={styles.submitButtonText}>{getButtonText()}</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <Text fontSize="$4" fontWeight="600" color="white">
+            {getButtonText()}
+          </Text>
+        </Button>
 
-      {Platform.OS === 'web' && (
-        <div style={{ padding: '20px', maxWidth: '400px', margin: '0 auto' }}>
-          {mode !== 'forgot' && (
-            <input
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '15px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '16px',
-                boxSizing: 'border-box',
-              }}
-              placeholder="Password"
-              type="password"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, password: e.target.value }))
-              }
-              disabled={loading}
-            />
+        {/* Navigation Links */}
+        <YStack alignItems="center" marginTop="$4" gap="$3">
+          {mode === 'login' && (
+            <>
+              <TouchableOpacity
+                onPress={() => switchMode('forgot')}
+                disabled={loading}
+              >
+                <Text color="$blue10" fontSize="$3">
+                  Forgot Password?
+                </Text>
+              </TouchableOpacity>
+              {onRegister && (
+                <YStack alignItems="center">
+                  <Text color="$gray10" fontSize="$3">
+                    Don't have an account?{' '}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => switchMode('register')}
+                    disabled={loading}
+                  >
+                    <Text color="$blue10" fontSize="$3" fontWeight="600">
+                      Sign Up
+                    </Text>
+                  </TouchableOpacity>
+                </YStack>
+              )}
+            </>
           )}
 
           {mode === 'register' && (
-            <input
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '15px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '16px',
-                boxSizing: 'border-box',
-              }}
-              placeholder="Confirm Password"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  confirmPassword: e.target.value,
-                }))
-              }
-              disabled={loading}
-            />
+            <YStack alignItems="center">
+              <Text color="$gray10" fontSize="$3">
+                Already have an account?{' '}
+              </Text>
+              <TouchableOpacity
+                onPress={() => switchMode('login')}
+                disabled={loading}
+              >
+                <Text color="$blue10" fontSize="$3" fontWeight="600">
+                  Sign In
+                </Text>
+              </TouchableOpacity>
+            </YStack>
           )}
-        </div>
-      )}
 
-      {/* Submit Button */}
-      <button
-        style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: loading ? '#ccc' : '#007bff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          fontSize: '16px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          marginBottom: '20px',
-        }}
-        onClick={() => {
-          void handleSubmit();
-        }}
-        disabled={loading}
-      >
-        {loading ? 'Loading...' : getButtonText()}
-      </button>
-
-      {/* Mode Switchers */}
-      <div style={{ textAlign: 'center' }}>
-        {mode === 'login' && (
-          <>
-            <button
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#007bff',
-                cursor: 'pointer',
-                marginBottom: '10px',
-              }}
-              onClick={() => switchMode('forgot')}
-              disabled={loading}
-            >
-              Forgot Password?
-            </button>
-
-            {onRegister && (
-              <div style={{ marginTop: '10px' }}>
-                <span>Don't have an account? </span>
-                <button
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#007bff',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => switchMode('register')}
-                  disabled={loading}
-                >
-                  Sign Up
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {mode === 'register' && (
-          <div style={{ marginTop: '10px' }}>
-            <span>Already have an account? </span>
-            <button
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#007bff',
-                cursor: 'pointer',
-              }}
-              onClick={() => switchMode('login')}
-              disabled={loading}
-            >
-              Sign In
-            </button>
-          </div>
-        )}
-
-        {mode === 'forgot' && (
-          <div style={{ marginTop: '10px' }}>
-            <span>Remember your password? </span>
-            <button
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#007bff',
-                cursor: 'pointer',
-              }}
-              onClick={() => switchMode('login')}
-              disabled={loading}
-            >
-              Sign In
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+          {mode === 'forgot' && (
+            <YStack alignItems="center">
+              <Text color="$gray10" fontSize="$3">
+                Remember your password?{' '}
+              </Text>
+              <TouchableOpacity
+                onPress={() => switchMode('login')}
+                disabled={loading}
+              >
+                <Text color="$blue10" fontSize="$3" fontWeight="600">
+                  Sign In
+                </Text>
+              </TouchableOpacity>
+            </YStack>
+          )}
+        </YStack>
+      </YStack>
+    </YStack>
   );
 }
 
@@ -467,30 +394,26 @@ function AuthProvider({
 }: AuthProviderProps): React.ReactElement {
   if (authState.isLoading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '40px',
-        }}
+      <YStack
+        flex={1}
+        alignItems="center"
+        justifyContent="center"
+        padding="$10"
       >
-        <div
-          style={{
-            width: '40px',
-            height: '40px',
-            border: `4px solid ${DEFAULT_COLORS.accent}`,
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            marginBottom: '20px',
-          }}
+        <YStack
+          width={40}
+          height={40}
+          borderWidth={4}
+          borderColor="$blue10"
+          borderTopColor="transparent"
+          borderRadius="$round"
+          marginBottom="$5"
+          // Animation would be handled by CSS or animation library
         />
-        <p style={{ color: DEFAULT_COLORS.text, fontSize: '16px' }}>
+        <Text color="$gray12" fontSize="$4">
           Loading...
-        </p>
-      </div>
+        </Text>
+      </YStack>
     );
   }
 
@@ -510,115 +433,3 @@ function AuthProvider({
 }
 
 export { AuthProvider };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  formContainer: {
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 400 : undefined,
-    alignSelf: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: DEFAULT_COLORS.accent,
-    fontWeight: '600',
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-    ...(Platform.select({
-      web: {
-        outlineStyle: 'none' as const,
-      },
-    }) as { outlineStyle?: string }),
-  },
-  submitButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 24,
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  disabledButton: {
-    backgroundColor: DEFAULT_COLORS.border,
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  linksContainer: {
-    alignItems: 'center',
-  },
-  linkText: {
-    color: DEFAULT_COLORS.accent,
-    fontSize: 16,
-    fontWeight: '600',
-    textDecorationLine: Platform.OS === 'web' ? 'underline' : undefined,
-  },
-  switchModeContainer: {
-    marginTop: 16,
-  },
-  switchModeText: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  loadingText: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 16,
-    marginTop: 16,
-  },
-});

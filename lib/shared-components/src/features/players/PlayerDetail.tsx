@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from '../../platform-components';
+import { ScrollView, Text, XStack, YStack } from 'tamagui';
 
 // Generic player detail interface
 export interface PlayerDetailData {
@@ -60,123 +60,261 @@ const getPlayerDetails = (playerId: number): PlayerDetailData | undefined => {
 function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading player details...</Text>
-      </View>
+      <YStack flex={1} backgroundColor="$gray10" padding="$5">
+        <Text color="$white" fontSize="$4" textAlign="center">
+          Loading player details...
+        </Text>
+      </YStack>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-      </View>
+      <YStack flex={1} backgroundColor="$gray10" padding="$5">
+        <Text color="$red8" fontSize="$4" textAlign="center">
+          Error: {error}
+        </Text>
+      </YStack>
     );
   }
 
   if (!player) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Player not found</Text>
-      </View>
+      <YStack flex={1} backgroundColor="$gray10" padding="$5">
+        <Text color="$red8" fontSize="$4" textAlign="center">
+          Player not found
+        </Text>
+      </YStack>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.name}>{player.name}</Text>
-        <Text style={styles.position}>{player.position}</Text>
-        <Text style={styles.team}>{player.team}</Text>
-      </View>
+    <ScrollView flex={1} backgroundColor="$gray10" padding="$5">
+      <YStack
+        alignItems="center"
+        marginBottom="$7"
+        paddingBottom="$5"
+        borderBottomWidth={1}
+        borderBottomColor="$gray8"
+      >
+        <Text
+          fontSize="$8"
+          fontWeight="bold"
+          color="$yellow10"
+          marginBottom="$1"
+        >
+          {player.name}
+        </Text>
+        <Text fontSize="$5" color="$white" marginBottom="$1">
+          {player.position}
+        </Text>
+        <Text fontSize="$4" color="$gray6">
+          {player.team}
+        </Text>
+      </YStack>
 
-      <View style={styles.statsContainer}>
-        <Text style={styles.sectionTitle}>Batting Statistics</Text>
+      <YStack flex={1}>
+        <Text
+          fontSize="$6"
+          fontWeight="bold"
+          color="$yellow10"
+          marginBottom="$4"
+          marginTop="$2"
+        >
+          Batting Statistics
+        </Text>
 
         {player.battingAvg !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Batting Average:</Text>
-            <Text style={styles.statValue}>{player.battingAvg.toFixed(3)}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              Batting Average:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.battingAvg.toFixed(3)}
+            </Text>
+          </XStack>
         )}
 
         {player.homeRuns !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Home Runs:</Text>
-            <Text style={styles.statValue}>{player.homeRuns}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              Home Runs:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.homeRuns}
+            </Text>
+          </XStack>
         )}
 
         {player.rbi !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>RBIs:</Text>
-            <Text style={styles.statValue}>{player.rbi}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              RBIs:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.rbi}
+            </Text>
+          </XStack>
         )}
 
         {player.runs !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Runs:</Text>
-            <Text style={styles.statValue}>{player.runs}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              Runs:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.runs}
+            </Text>
+          </XStack>
         )}
 
         {player.hits !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Hits:</Text>
-            <Text style={styles.statValue}>{player.hits}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              Hits:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.hits}
+            </Text>
+          </XStack>
         )}
 
         {player.obp !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>On-Base Percentage:</Text>
-            <Text style={styles.statValue}>{player.obp.toFixed(3)}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              On-Base Percentage:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.obp.toFixed(3)}
+            </Text>
+          </XStack>
         )}
 
         {player.slg !== undefined && (
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Slugging Percentage:</Text>
-            <Text style={styles.statValue}>{player.slg.toFixed(3)}</Text>
-          </View>
+          <XStack
+            justifyContent="space-between"
+            paddingVertical="$2"
+            borderBottomWidth={1}
+            borderBottomColor="$gray8"
+          >
+            <Text fontSize="$4" color="$white">
+              Slugging Percentage:
+            </Text>
+            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+              {player.slg.toFixed(3)}
+            </Text>
+          </XStack>
         )}
 
         {/* Pitching Stats */}
         {(player.era !== undefined || player.wins !== undefined) && (
           <>
-            <Text style={styles.sectionTitle}>Pitching Statistics</Text>
+            <Text
+              fontSize="$6"
+              fontWeight="bold"
+              color="$yellow10"
+              marginBottom="$4"
+              marginTop="$2"
+            >
+              Pitching Statistics
+            </Text>
 
             {player.era !== undefined && (
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>ERA:</Text>
-                <Text style={styles.statValue}>{player.era.toFixed(2)}</Text>
-              </View>
+              <XStack
+                justifyContent="space-between"
+                paddingVertical="$2"
+                borderBottomWidth={1}
+                borderBottomColor="$gray8"
+              >
+                <Text fontSize="$4" color="$white">
+                  ERA:
+                </Text>
+                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+                  {player.era.toFixed(2)}
+                </Text>
+              </XStack>
             )}
 
             {player.wins !== undefined && (
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Wins:</Text>
-                <Text style={styles.statValue}>{player.wins}</Text>
-              </View>
+              <XStack
+                justifyContent="space-between"
+                paddingVertical="$2"
+                borderBottomWidth={1}
+                borderBottomColor="$gray8"
+              >
+                <Text fontSize="$4" color="$white">
+                  Wins:
+                </Text>
+                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+                  {player.wins}
+                </Text>
+              </XStack>
             )}
 
             {player.losses !== undefined && (
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Losses:</Text>
-                <Text style={styles.statValue}>{player.losses}</Text>
-              </View>
+              <XStack
+                justifyContent="space-between"
+                paddingVertical="$2"
+                borderBottomWidth={1}
+                borderBottomColor="$gray8"
+              >
+                <Text fontSize="$4" color="$white">
+                  Losses:
+                </Text>
+                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+                  {player.losses}
+                </Text>
+              </XStack>
             )}
 
             {player.saves !== undefined && (
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Saves:</Text>
-                <Text style={styles.statValue}>{player.saves}</Text>
-              </View>
+              <XStack
+                justifyContent="space-between"
+                paddingVertical="$2"
+                borderBottomWidth={1}
+                borderBottomColor="$gray8"
+              >
+                <Text fontSize="$4" color="$white">
+                  Saves:
+                </Text>
+                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
+                  {player.saves}
+                </Text>
+              </XStack>
             )}
           </>
         )}
-      </View>
+      </YStack>
     </ScrollView>
   );
 }
@@ -191,72 +329,6 @@ function PlayerDetailById({ playerId }: PlayerDetailByIdProps) {
 
   return <PlayerDetail player={player} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 5,
-  },
-  position: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    marginBottom: 5,
-  },
-  team: {
-    fontSize: 16,
-    color: '#CCCCCC',
-  },
-  statsContainer: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  statLabel: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  statValue: {
-    fontSize: 16,
-    color: '#FFD700',
-    fontWeight: 'bold',
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});
 
 export { PlayerDetail };
 export { PlayerDetailById };

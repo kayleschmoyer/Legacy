@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Table,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
+import { Button, Input, ScrollView, Spinner, Text, YStack } from 'tamagui';
+import { Platform, Table } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
-import { safeStyle } from '../../utils/styles';
 
 // Platform-agnostic React components (no React Native imports)
 // Using CSS-in-JS for styling instead of StyleSheet
@@ -150,139 +141,80 @@ function GameLogsTable({
     : [];
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Retrieve stats for a player</Text>
+    <ScrollView flex={1} padding="$4">
+      <Text
+        fontSize="$5"
+        fontWeight="bold"
+        marginBottom="$4"
+        textAlign="center"
+      >
+        Retrieve stats for a player
+      </Text>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Player ID:</Text>
-        <TextInput
-          style={styles.input}
+      <YStack marginBottom="$4">
+        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+          Player ID:
+        </Text>
+        <Input
+          borderWidth={1}
+          borderColor="$gray8"
+          borderRadius="$3"
+          padding="$3"
+          fontSize="$4"
+          backgroundColor="$white"
           value={player}
           onChangeText={setPlayer}
           placeholder="Enter player ID"
           editable={!loading}
         />
-      </View>
+      </YStack>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Date (optional):</Text>
-        <TextInput
-          style={styles.input}
+      <YStack marginBottom="$4">
+        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+          Date (optional):
+        </Text>
+        <Input
+          borderWidth={1}
+          borderColor="$gray8"
+          borderRadius="$3"
+          padding="$3"
+          fontSize="$4"
+          backgroundColor="$white"
           value={date}
           onChangeText={setDate}
           placeholder="YYYY-MM-DD"
           editable={!loading}
         />
-      </View>
+      </YStack>
 
-      <TouchableOpacity
-        style={safeStyle([styles.button, loading && styles.buttonDisabled])}
+      <Button
+        backgroundColor={loading ? '$gray8' : '$blue10'}
+        paddingVertical="$3"
+        paddingHorizontal="$6"
+        borderRadius="$3"
+        alignItems="center"
+        marginBottom="$4"
         onPress={() => void getGameLog()}
         disabled={loading}
+        opacity={loading ? 0.5 : 1}
       >
-        <Text style={styles.buttonText}>
-          {loading ? 'Loading...' : 'Get Player Data'}
-        </Text>
-      </TouchableOpacity>
+        {loading ? (
+          <Spinner size="small" color="$white" />
+        ) : (
+          <Text color="$white" fontSize="$4" fontWeight="600">
+            Get Player Data
+          </Text>
+        )}
+      </Button>
 
       {data && stats.length > 0 ? (
-        <View style={styles.tableWrapper}>
+        <YStack marginTop="$4">
           <CrossPlatformTable headers={stats} data={tableData} />
-        </View>
+        </YStack>
       ) : null}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tableWrapper: {
-    marginTop: 16,
-  },
-  // React Native table fallback styles
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
-  },
-  headerCell: {
-    flex: 1,
-    padding: 8,
-    fontWeight: 'bold',
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-  },
-  dataRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  dataCell: {
-    flex: 1,
-    padding: 8,
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-  },
-  // React Native table component styles
-  header: {
-    height: 40,
-    backgroundColor: '#f5f5f5',
-  },
-  headerText: {
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  row: {
-    height: 30,
-  },
-  text: {
-    textAlign: 'center',
-  },
-});
 
 export { GameLogsTable };
 export default GameLogsTable;

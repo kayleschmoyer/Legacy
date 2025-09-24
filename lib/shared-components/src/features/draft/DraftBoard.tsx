@@ -1,17 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Animated,
-  Dimensions,
-  StyleSheet,
-  Text,
-  View,
-} from '../../platform-components';
+import { Button, Card, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { DraftState, DraftTeam, Filter, Player } from '../../types';
-import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
-import { safeStyle } from '../../utils/styles';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_TABLET = SCREEN_WIDTH > 768;
+import { SPORT_CONFIGS } from '../../config/sports';
 
 // Utility function for position colors
 const getPositionColor = (position: string, sport: string): string => {
@@ -77,68 +67,93 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   isDrafted = false,
 }) => {
   return (
-    <Animated.View
-      style={safeStyle([
-        styles.playerCard,
-        isSelected && styles.selectedCard,
-        isDrafted && styles.draftedCard,
-      ])}
+    <Card
+      backgroundColor={isSelected ? '$blue4' : isDrafted ? '$gray4' : '$gray2'}
+      borderColor={isSelected ? '$blue8' : isDrafted ? '$gray6' : '$gray6'}
+      borderWidth={isSelected ? 2 : 1}
+      borderRadius="$3"
+      padding="$3"
+      margin="$1"
+      pressStyle={{
+        scale: isDrafted ? 1 : 0.98,
+        borderColor: '$blue10',
+      }}
+      onPress={isDrafted ? undefined : onSelect}
+      opacity={isDrafted ? 0.6 : 1}
+      cursor={isDrafted ? 'default' : 'pointer'}
+      position="relative"
     >
-      <button
-        onClick={onSelect}
-        style={{
-          ...styles.cardContent,
-          cursor: isDrafted ? 'default' : 'pointer',
-          opacity: isDrafted ? 0.6 : 1,
-        }}
-        disabled={isDrafted}
+      <XStack
+        justifyContent="space-between"
+        alignItems="center"
+        marginBottom="$2"
       >
-        <View style={styles.cardHeader}>
-          <Text
-            style={safeStyle([
-              styles.playerName,
-              isDrafted && styles.draftedText,
-            ])}
-          >
-            {`${player.firstName} ${player.lastName}`}
-          </Text>
-          <View
-            style={safeStyle([
-              styles.positionBadge,
-              { backgroundColor: getPositionColor(player.position, sport) },
-              ...(isDrafted ? [styles.draftedBadge] : []),
-            ])}
-          >
-            <Text style={styles.positionText}>{player.position}</Text>
-          </View>
-        </View>
         <Text
-          style={safeStyle([styles.teamText, isDrafted && styles.draftedText])}
+          fontSize="$4"
+          fontWeight="600"
+          color={isDrafted ? '$gray10' : '$gray12'}
+          numberOfLines={1}
         >
-          {player.team}
+          {`${player.firstName} ${player.lastName}`}
         </Text>
-        <View style={styles.cardFooter}>
-          <Text
-            style={safeStyle([styles.adpText, isDrafted && styles.draftedText])}
-          >
-            ADP: {player.adp}
+        <YStack
+          backgroundColor={getPositionColor(player.position, sport)}
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+          borderRadius="$2"
+          opacity={isDrafted ? 0.7 : 1}
+        >
+          <Text fontSize="$2" fontWeight="600" color="white">
+            {player.position}
           </Text>
+        </YStack>
+      </XStack>
+
+      <Text
+        fontSize="$3"
+        color={isDrafted ? '$gray9' : '$gray11'}
+        marginBottom="$2"
+      >
+        {player.team}
+      </Text>
+
+      <XStack justifyContent="space-between" alignItems="center">
+        <Text fontSize="$2" color={isDrafted ? '$gray8' : '$gray10'}>
+          ADP: {player.adp}
+        </Text>
+        <Text
+          fontSize="$2"
+          fontWeight="600"
+          color={isDrafted ? '$gray8' : '$gray11'}
+        >
+          #{player.rank}
+        </Text>
+      </XStack>
+
+      {isDrafted && (
+        <YStack
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          backgroundColor="$gray5"
+          opacity={0.8}
+          justifyContent="center"
+          alignItems="center"
+          borderRadius="$3"
+        >
           <Text
-            style={safeStyle([
-              styles.rankText,
-              isDrafted && styles.draftedText,
-            ])}
+            fontSize="$5"
+            fontWeight="700"
+            color="$red10"
+            textTransform="uppercase"
           >
-            #{player.rank}
+            DRAFTED
           </Text>
-        </View>
-        {isDrafted && (
-          <div style={styles.draftedOverlay}>
-            <span style={styles.draftedLabel}>DRAFTED</span>
-          </div>
-        )}
-      </button>
-    </Animated.View>
+        </YStack>
+      )}
+    </Card>
   );
 };
 
@@ -155,25 +170,27 @@ const Timer: React.FC<TimerProps> = ({ time, isActive }) => {
   const seconds = time % 60;
 
   const getTimerColor = () => {
-    if (time > 30) return DEFAULT_COLORS.success;
-    if (time > 10) return DEFAULT_COLORS.warning;
-    return DEFAULT_COLORS.error;
+    if (time > 30) return '$green10';
+    if (time > 10) return '$orange10';
+    return '$red10';
   };
 
   return (
-    <View
-      style={safeStyle([
-        styles.timerContainer,
-        { backgroundColor: getTimerColor() },
-      ])}
+    <YStack
+      backgroundColor={getTimerColor()}
+      borderRadius="$3"
+      padding="$3"
+      alignItems="center"
+      justifyContent="center"
+      minWidth={120}
     >
-      <Text style={styles.timerText}>
+      <Text fontSize="$6" fontWeight="700" color="white" fontFamily="$mono">
         {minutes}:{seconds.toString().padStart(2, '0')}
       </Text>
-      <Text style={styles.timerLabel}>
+      <Text fontSize="$2" color="white" opacity={0.9} marginTop="$1">
         {isActive ? 'Time Remaining' : 'Paused'}
       </Text>
-    </View>
+    </YStack>
   );
 };
 
@@ -198,36 +215,45 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   const allPositions = ['ALL', ...positions];
 
   return (
-    <div style={styles.filterControls}>
-      <input
-        style={styles.searchInput}
+    <YStack gap="$3" padding="$3" backgroundColor="$gray2">
+      <Input
         placeholder="Search players..."
         value={searchText}
-        onChange={(e) => onSearchChange(e.target.value)}
+        onChangeText={onSearchChange}
+        backgroundColor="$gray3"
+        borderColor="$gray6"
+        borderRadius="$2"
+        padding="$3"
+        fontSize="$3"
+        color="$gray12"
       />
 
-      <div style={styles.positionFilters}>
+      <XStack gap="$2" flexWrap="wrap">
         {allPositions.map((position) => (
-          <button
+          <Button
             key={position}
-            style={safeStyle([
-              styles.filterChip,
-              filters.position === position && styles.filterChipActive,
-            ])}
-            onClick={() => onFiltersChange({ ...filters, position })}
+            size="$2"
+            backgroundColor={
+              filters.position === position ? '$blue10' : '$gray4'
+            }
+            borderColor={filters.position === position ? '$blue10' : '$gray6'}
+            pressStyle={{
+              backgroundColor: '$blue8',
+              scale: 0.98,
+            }}
+            onPress={() => onFiltersChange({ ...filters, position })}
           >
             <Text
-              style={safeStyle([
-                styles.filterChipText,
-                filters.position === position && styles.filterChipTextActive,
-              ])}
+              fontSize="$2"
+              fontWeight="600"
+              color={filters.position === position ? 'white' : '$gray11'}
             >
               {position}
             </Text>
-          </button>
+          </Button>
         ))}
-      </div>
-    </div>
+      </XStack>
+    </YStack>
   );
 };
 
@@ -241,16 +267,40 @@ interface DraftStatusProps {
 
 const DraftStatus: React.FC<DraftStatusProps> = ({ draft, currentTeam }) => {
   return (
-    <div style={styles.draftStatus}>
-      <span style={styles.draftTitle}>{draft.name}</span>
-      <span style={styles.currentPick}>
+    <XStack
+      justifyContent="space-between"
+      alignItems="center"
+      padding="$3"
+      backgroundColor="$gray3"
+      borderBottomWidth={1}
+      borderBottomColor="$gray6"
+    >
+      <Text fontSize="$5" fontWeight="700" color="$gray12">
+        {draft.name}
+      </Text>
+
+      <Text fontSize="$3" color="$gray11">
         Pick #{draft.currentPick}
         {currentTeam && ` - ${currentTeam.name}`}
-      </span>
-      <div style={styles.statusBadge}>
-        <span style={styles.statusText}>{draft.status.toUpperCase()}</span>
-      </div>
-    </div>
+      </Text>
+
+      <YStack
+        backgroundColor={
+          draft.status === 'active'
+            ? '$green10'
+            : draft.status === 'paused'
+              ? '$orange10'
+              : '$gray8'
+        }
+        paddingHorizontal="$3"
+        paddingVertical="$1"
+        borderRadius="$2"
+      >
+        <Text fontSize="$2" fontWeight="600" color="white">
+          {draft.status.toUpperCase()}
+        </Text>
+      </YStack>
+    </XStack>
   );
 };
 
@@ -329,30 +379,36 @@ function DraftBoard({
   };
 
   return (
-    <div style={styles.container}>
+    <YStack flex={1} backgroundColor="$gray1">
       {/* Draft Status */}
       <DraftStatus draft={draft} currentTeam={currentTeam} />
 
       {/* Timer */}
-      <Timer time={time} isActive={isActive} />
+      <XStack justifyContent="center" padding="$3">
+        <Timer time={time} isActive={isActive} />
+      </XStack>
 
       {/* Timer Controls */}
-      <div style={styles.timerControls}>
-        <button
-          style={styles.timerButton}
-          onClick={() => handleTimerControl(isActive ? 'pause' : 'start')}
+      <XStack gap="$2" justifyContent="center" padding="$3">
+        <Button
+          size="$3"
+          backgroundColor="$blue10"
+          onPress={() => handleTimerControl(isActive ? 'pause' : 'start')}
         >
-          <span style={styles.timerButtonText}>
+          <Text color="white" fontWeight="600">
             {isActive ? 'Pause' : 'Start'}
-          </span>
-        </button>
-        <button
-          style={styles.timerButton}
-          onClick={() => handleTimerControl('reset')}
+          </Text>
+        </Button>
+        <Button
+          size="$3"
+          backgroundColor="$gray8"
+          onPress={() => handleTimerControl('reset')}
         >
-          <span style={styles.timerButtonText}>Reset</span>
-        </button>
-      </div>
+          <Text color="white" fontWeight="600">
+            Reset
+          </Text>
+        </Button>
+      </XStack>
 
       {/* Filters */}
       <FilterControls
@@ -364,333 +420,79 @@ function DraftBoard({
       />
 
       {/* Player List */}
-      <div
-        style={{
-          ...styles.playerList,
-          display: 'grid',
-          gridTemplateColumns: IS_TABLET ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
-          gap: '16px',
-          padding: '16px',
-          overflowY: 'auto',
-        }}
-      >
-        {filteredPlayers.map((player) => (
-          <PlayerCard
-            key={player.id}
-            player={player}
-            onSelect={() => handlePlayerSelect(player)}
-            isSelected={selectedPlayer?.id === player.id}
-            sport={draft.sport}
-            isDrafted={draftedPlayerIds.has(player.id)}
-          />
-        ))}
-      </div>
+      <ScrollView flex={1} padding="$3">
+        <YStack gap="$2">
+          {filteredPlayers.map((player) => (
+            <PlayerCard
+              key={player.id}
+              player={player}
+              onSelect={() => handlePlayerSelect(player)}
+              isSelected={selectedPlayer?.id === player.id}
+              sport={draft.sport}
+              isDrafted={draftedPlayerIds.has(player.id)}
+            />
+          ))}
+        </YStack>
+      </ScrollView>
 
       {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={styles.modalTitle}>Confirm Draft Pick</h3>
-            {selectedPlayer && (
-              <>
-                <Text style={styles.modalPlayerName}>
-                  {`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
-                </Text>
-                <Text style={styles.modalPlayerDetails}>
-                  {selectedPlayer.position} - {selectedPlayer.team}
-                </Text>
-                <Text style={styles.modalPlayerRank}>
-                  Rank: #{selectedPlayer.rank}
-                </Text>
-              </>
-            )}
-            <div style={styles.modalButtons}>
-              <button
-                style={styles.modalCancelButton}
-                onClick={() => setShowConfirmModal(false)}
+      {showConfirmModal && selectedPlayer && (
+        <YStack
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          backgroundColor="rgba(0, 0, 0, 0.7)"
+          justifyContent="center"
+          alignItems="center"
+          zIndex={1000}
+        >
+          <YStack
+            backgroundColor="$gray2"
+            borderRadius="$4"
+            padding="$4"
+            margin="$4"
+            gap="$3"
+            minWidth={300}
+            alignItems="center"
+          >
+            <Text fontSize="$6" fontWeight="700" color="$gray12">
+              Confirm Draft Pick
+            </Text>
+
+            <YStack alignItems="center" gap="$2">
+              <Text fontSize="$5" fontWeight="600" color="$gray12">
+                {`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
+              </Text>
+              <Text fontSize="$3" color="$gray11">
+                {selectedPlayer.position} - {selectedPlayer.team}
+              </Text>
+              <Text fontSize="$3" color="$gray10">
+                Rank: #{selectedPlayer.rank}
+              </Text>
+            </YStack>
+
+            <XStack gap="$3" justifyContent="center">
+              <Button
+                backgroundColor="$gray8"
+                onPress={() => setShowConfirmModal(false)}
               >
-                <span style={styles.modalCancelText}>Cancel</span>
-              </button>
-              <button
-                style={styles.modalConfirmButton}
-                onClick={handleConfirmDraft}
-              >
-                <span style={styles.modalConfirmText}>Draft Player</span>
-              </button>
-            </div>
-          </div>
-        </div>
+                <Text color="white" fontWeight="600">
+                  Cancel
+                </Text>
+              </Button>
+              <Button backgroundColor="$blue10" onPress={handleConfirmDraft}>
+                <Text color="white" fontWeight="600">
+                  Draft Player
+                </Text>
+              </Button>
+            </XStack>
+          </YStack>
+        </YStack>
       )}
-    </div>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  draftStatus: {
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  draftTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    flex: 1,
-  },
-  currentPick: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  statusBadge: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    borderRadius: 12,
-    paddingLeft: 8,
-    paddingRight: 8,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  timerContainer: {
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  timerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  timerLabel: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.text,
-    marginTop: 4,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  timerButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingLeft: 16,
-    paddingRight: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderRadius: 8,
-  },
-  timerButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  filterControls: {
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.secondary,
-  },
-  searchInput: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-  },
-  positionFilters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  filterChip: {
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingLeft: 12,
-    paddingRight: 12,
-    paddingTop: 6,
-    paddingBottom: 6,
-    borderRadius: 16,
-  },
-  filterChipActive: {
-    backgroundColor: DEFAULT_COLORS.accent,
-  },
-  filterChipText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: DEFAULT_COLORS.text,
-  },
-  playerList: {
-    flex: 1,
-    padding: 8,
-  },
-  row: {
-    justifyContent: 'space-around',
-  },
-  playerCard: {
-    flex: IS_TABLET ? 1 : 0.48,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    margin: 4,
-    overflow: 'hidden',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  },
-  selectedCard: {
-    borderWidth: 2,
-    borderColor: DEFAULT_COLORS.accent,
-  },
-  draftedCard: {
-    opacity: 0.6,
-  },
-  cardContent: {
-    padding: 12,
-    position: 'relative',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  playerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  positionBadge: {
-    borderRadius: 8,
-    paddingLeft: 6,
-    paddingRight: 6,
-    paddingTop: 2,
-    paddingBottom: 2,
-  },
-  draftedBadge: {
-    backgroundColor: DEFAULT_COLORS.border,
-  },
-  positionText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  teamText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  adpText: {
-    fontSize: 11,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  rankText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.accent,
-  },
-  draftedText: {
-    color: DEFAULT_COLORS.border,
-  },
-  draftedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  draftedLabel: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 16,
-    padding: 24,
-    width: 320,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-  },
-  modalPlayerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.accent,
-    marginBottom: 8,
-  },
-  modalPlayerDetails: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  modalPlayerRank: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalCancelButton: {
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingLeft: 20,
-    paddingRight: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  modalConfirmButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingLeft: 20,
-    paddingRight: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-});
 
 export { DraftBoard };

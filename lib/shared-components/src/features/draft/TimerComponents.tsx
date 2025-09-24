@@ -2,15 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useCallback, useEffect, useRef } from 'react';
-import {
-  Animated,
-  Platform,
-  StyleSheet,
-  Text,
-  Vibration,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Text as TamaguiText, View as TamaguiView, YStack } from 'tamagui';
+import { Animated, Platform, Vibration, View } from '../../platform-components';
 
 export interface TimerProps {
   initialTime: number;
@@ -183,35 +176,84 @@ function TimerBar({
     outputRange: ['#ef4444', '#f59e0b', '#10b981'], // Red, Yellow, Green
   });
 
-  const timerStyle = safeStyle([styles.timerBar, styles[`${variant}Timer`]]);
+  const getTimerHeight = () => {
+    switch (variant) {
+      case 'compact':
+        return 40;
+      case 'large':
+        return 80;
+      default:
+        return 60;
+    }
+  };
+
+  const getTextSize = () => {
+    switch (variant) {
+      case 'compact':
+        return '$3';
+      case 'large':
+        return '$6';
+      default:
+        return '$4';
+    }
+  };
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    <Animated.View style={safeStyle([timerStyle, { backgroundColor }])}>
-      <View style={styles.timerContent}>
-        <Text style={safeStyle([styles.timerText, styles[`${variant}Text`]])}>
+    <Animated.View
+      style={{
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: 12,
+        paddingBottom: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        marginBottom: 8,
+        minHeight: getTimerHeight(),
+        backgroundColor,
+      }}
+    >
+      <YStack alignItems="center" justifyContent="center" flex={1}>
+        <TamaguiText
+          fontSize={getTextSize()}
+          fontWeight="700"
+          color="white"
+          textAlign="center"
+        >
           {minutes}:{seconds.toString().padStart(2, '0')}
-        </Text>
+        </TamaguiText>
         {label && (
-          <Text
-            style={safeStyle([styles.timerLabel, styles[`${variant}Label`]])}
+          <TamaguiText
+            fontSize="$2"
+            color="rgba(255,255,255,0.8)"
+            textAlign="center"
+            marginTop="$1"
           >
             {label}
-          </Text>
+          </TamaguiText>
         )}
-      </View>
+      </YStack>
 
       {/* Progress indicator */}
-      <View style={styles.progressContainer}>
+      <TamaguiView
+        position="absolute"
+        bottom={0}
+        left={0}
+        right={0}
+        height={4}
+        backgroundColor="rgba(255,255,255,0.2)"
+        borderRadius={2}
+      >
         <View
-          style={safeStyle([
-            styles.progressBar,
-            {
-              width: `${Math.max(0, (time / maxTime) * 100)}%`,
-            },
-          ])}
+          style={{
+            width: `${Math.max(0, (time / maxTime) * 100)}%`,
+            height: '100%',
+            backgroundColor: 'rgba(255,255,255,0.6)',
+            borderRadius: 2,
+          }}
         />
-      </View>
+      </TamaguiView>
     </Animated.View>
   );
 }
@@ -255,106 +297,6 @@ function CountdownTimer({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  timerBar: {
-    paddingLeft: 20,
-    paddingRight: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 8,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
-    position: 'relative',
-  },
-
-  defaultTimer: {
-    minHeight: 60,
-  },
-
-  compactTimer: {
-    minHeight: 40,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-
-  largeTimer: {
-    minHeight: 80,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-
-  timerContent: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    flexDirection: 'column',
-  },
-
-  timerText: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    margin: 0,
-  },
-
-  defaultText: {
-    fontSize: '24px',
-  },
-
-  compactText: {
-    fontSize: '18px',
-  },
-
-  largeText: {
-    fontSize: '32px',
-  },
-
-  timerLabel: {
-    fontSize: '12px',
-    color: '#ffffff',
-    opacity: 0.8,
-    marginTop: 4,
-    textAlign: 'center',
-    margin: 0,
-  },
-
-  defaultLabel: {
-    fontSize: '12px',
-  },
-
-  compactLabel: {
-    fontSize: '10px',
-  },
-
-  largeLabel: {
-    fontSize: '14px',
-  },
-
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    overflow: 'hidden',
-  },
-
-  progressBar: {
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderBottomLeftRadius: 12,
-  },
-});
 
 export { TimerBar };
 export { CountdownTimer };

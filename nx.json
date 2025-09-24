@@ -15,7 +15,7 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/integration-build.yml"]
   },
-  "parallel": 8,
+  "parallel": 3,
   "plugins": [
     {
       "plugin": "@nx/jest/plugin",
@@ -122,13 +122,48 @@
       ],
       "outputs": ["{options.outputFile}"],
       "options": {
-        "command": "eslint ."
+        "command": "eslint . --max-warnings=0"
       },
       "configurations": {
         "dry-run": {
           "command": "eslint . --fix-dry-run"
         }
       }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/.prettierrc",
+        "{workspaceRoot}/prettier.config.js",
+        "{projectRoot}/.prettierrc"
+      ],
+      "outputs": [],
+      "options": {
+        "command": "prettier --write ."
+      },
+      "configurations": {
+        "check": {
+          "command": "prettier --check ."
+        }
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
+      "options": {
+        "command": "tsc --noEmit"
+      },
+      "parallelism": false
     }
   },
   "generators": {

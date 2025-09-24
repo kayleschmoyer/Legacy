@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { YStack } from 'tamagui';
 import RNPickerSelect from 'react-native-picker-select';
 
 const FilterOptions = () => {
   const [position, setPosition] = useState('');
 
   return (
-    <View style={styles.container}>
+    <YStack marginBottom="$5">
       <RNPickerSelect
         onValueChange={(value: string) => setPosition(value)}
         value={position}
@@ -18,14 +18,8 @@ const FilterOptions = () => {
         ]}
         placeholder={{ label: 'Select Position', value: '' }}
       />
-    </View>
+    </YStack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 20,
-  },
-});
 
 export default FilterOptions;

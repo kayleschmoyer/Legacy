@@ -3,7 +3,14 @@ export * from './AuthHooks';
 export { AuthProvider as AuthContextProvider } from './AuthProvider';
 export * from './AuthorizedUserContext';
 
-// Auth components
+// Enhanced auth system
+export * from './AuthService';
+export * from './useAuth';
+export * from './OAuthLoginComponent';
+export * from './EnhancedAuthGuard';
+export * from './authConfig';
+
+// Legacy auth components (kept for backward compatibility)
 export { AuthProvider as AuthFormProvider } from './AuthForm';
 export * from './LoginScreen';
 export * from './AuthGuard';

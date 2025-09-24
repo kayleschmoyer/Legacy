@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Button, Text, XStack, YStack } from 'tamagui';
 
 // Generic player interface for baseball cards
 export interface BaseballPlayer {
@@ -29,7 +23,6 @@ export interface PlayerCardProps {
   onPress?: (player: BaseballPlayer) => void;
   showStats?: 'batting' | 'pitching' | 'both';
   compact?: boolean;
-  style?: object;
 }
 
 function PlayerCard({
@@ -37,7 +30,6 @@ function PlayerCard({
   onPress,
   showStats = 'both',
   compact = false,
-  style,
 }: PlayerCardProps) {
   const isPitcher =
     player.position === 'P' ||
@@ -63,127 +55,186 @@ function PlayerCard({
     return era.toFixed(2);
   };
 
-  const CardComponent = onPress ? TouchableOpacity : View;
-
   return (
-    <CardComponent
-      style={safeStyle([styles.card, compact && styles.compactCard, style])}
+    <Button
+      backgroundColor="$gray9"
+      borderRadius="$4"
+      padding={compact ? '$3' : '$4'}
+      marginVertical={compact ? '$1' : '$2'}
+      marginHorizontal="$1"
+      borderWidth={1}
+      borderColor="$gray8"
+      shadowColor="$black"
+      shadowOffset={{ width: 0, height: 2 }}
+      shadowOpacity={0.25}
+      shadowRadius={3.84}
+      elevation={5}
       onPress={onPress ? handlePress : undefined}
+      pressStyle={onPress ? { scale: 0.98 } : undefined}
+      disabled={!onPress}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.playerInfo}>
-          <Text style={styles.name} numberOfLines={1}>
+      <XStack
+        justifyContent="space-between"
+        alignItems="flex-start"
+        marginBottom="$3"
+      >
+        <YStack flex={1}>
+          <Text
+            fontSize="$5"
+            fontWeight="bold"
+            color="$white"
+            marginBottom="$1"
+            numberOfLines={1}
+          >
             {player.name}
           </Text>
-          <View style={styles.positionTeam}>
-            <Text style={styles.position}>{player.position}</Text>
-            <Text style={styles.separator}>•</Text>
-            <Text style={styles.team}>{player.team}</Text>
-          </View>
-        </View>
+          <XStack alignItems="center">
+            <Text fontSize="$3" color="$yellow10" fontWeight="600">
+              {player.position}
+            </Text>
+            <Text color="$gray6" marginHorizontal="$2">
+              •
+            </Text>
+            <Text fontSize="$3" color="$gray4">
+              {player.team}
+            </Text>
+          </XStack>
+        </YStack>
 
         {player.jerseyNumber && (
-          <View style={styles.jerseyContainer}>
-            <Text style={styles.jerseyNumber}>#{player.jerseyNumber}</Text>
-          </View>
+          <YStack
+            backgroundColor="$yellow10"
+            borderRadius="$2"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+          >
+            <Text fontSize="$2" fontWeight="bold" color="$black">
+              #{player.jerseyNumber}
+            </Text>
+          </YStack>
         )}
-      </View>
+      </XStack>
 
       {/* Stats */}
       {!compact && (
-        <View style={styles.statsContainer}>
+        <YStack borderTopWidth={1} borderTopColor="$gray8" paddingTop="$3">
           {/* Batting Stats */}
           {(showStats === 'batting' || showStats === 'both') && !isPitcher && (
-            <View style={styles.statRow}>
+            <XStack justifyContent="space-around" marginBottom="$3">
               {player.battingAvg !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>AVG</Text>
-                  <Text style={styles.statValue}>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    AVG
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
                     {formatAverage(player.battingAvg)}
                   </Text>
-                </View>
+                </YStack>
               )}
               {player.homeRuns !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>HR</Text>
-                  <Text style={styles.statValue}>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    HR
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
                     {formatStat(player.homeRuns)}
                   </Text>
-                </View>
+                </YStack>
               )}
               {player.rbi !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>RBI</Text>
-                  <Text style={styles.statValue}>{formatStat(player.rbi)}</Text>
-                </View>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    RBI
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
+                    {formatStat(player.rbi)}
+                  </Text>
+                </YStack>
               )}
-            </View>
+            </XStack>
           )}
 
           {/* Pitching Stats */}
           {(showStats === 'pitching' || showStats === 'both') && isPitcher && (
-            <View style={styles.statRow}>
+            <XStack justifyContent="space-around" marginBottom="$3">
               {player.era !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>ERA</Text>
-                  <Text style={styles.statValue}>{formatERA(player.era)}</Text>
-                </View>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    ERA
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
+                    {formatERA(player.era)}
+                  </Text>
+                </YStack>
               )}
               {player.wins !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>W</Text>
-                  <Text style={styles.statValue}>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    W
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
                     {formatStat(player.wins)}
                   </Text>
-                </View>
+                </YStack>
               )}
               {player.saves !== undefined && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>SV</Text>
-                  <Text style={styles.statValue}>
+                <YStack alignItems="center" flex={1}>
+                  <Text fontSize="$2" color="$gray6" marginBottom="$0.5">
+                    SV
+                  </Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$white">
                     {formatStat(player.saves)}
                   </Text>
-                </View>
+                </YStack>
               )}
-            </View>
+            </XStack>
           )}
 
           {/* Fantasy Points */}
           {player.fantasyPoints !== undefined && (
-            <View style={styles.fantasyContainer}>
-              <Text style={styles.fantasyLabel}>Fantasy Points</Text>
-              <Text style={styles.fantasyValue}>
+            <YStack
+              alignItems="center"
+              backgroundColor="$blue10"
+              borderRadius="$3"
+              padding="$2"
+            >
+              <Text fontSize="$1" color="$blue1" marginBottom="$0.5">
+                Fantasy Points
+              </Text>
+              <Text fontSize="$3" fontWeight="bold" color="$blue1">
                 {formatStat(player.fantasyPoints)}
               </Text>
-            </View>
+            </YStack>
           )}
-        </View>
+        </YStack>
       )}
 
       {/* Compact mode - just key stats */}
       {compact && (
-        <View style={styles.compactStats}>
+        <XStack justifyContent="center" marginTop="$2">
           {isPitcher ? (
-            <Text style={styles.compactText}>
+            <Text fontSize="$2" color="$gray6">
               ERA: {formatERA(player.era)} | W: {formatStat(player.wins)}
             </Text>
           ) : (
-            <Text style={styles.compactText}>
+            <Text fontSize="$2" color="$gray6">
               AVG: {formatAverage(player.battingAvg)} | HR:{' '}
               {formatStat(player.homeRuns)}
             </Text>
           )}
-        </View>
+        </XStack>
       )}
 
       {/* Age indicator */}
       {player.age && (
-        <View style={styles.ageContainer}>
-          <Text style={styles.ageText}>Age {player.age}</Text>
-        </View>
+        <YStack alignItems="center" marginTop="$2">
+          <Text fontSize="$2" color="$gray6">
+            Age {player.age}
+          </Text>
+        </YStack>
       )}
-    </CardComponent>
+    </Button>
   );
 }
 
@@ -200,7 +251,7 @@ function PlayerCardList({
   showStats = 'both',
 }: PlayerCardListProps) {
   return (
-    <View style={styles.listContainer}>
+    <YStack space="$2" padding="$2">
       {players.map((player) => (
         <PlayerCard
           key={player.id}
@@ -208,145 +259,11 @@ function PlayerCardList({
           onPress={onPlayerPress}
           showStats={showStats}
           compact={true}
-          style={styles.listItem}
         />
       ))}
-    </View>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#3A3A3A',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  compactCard: {
-    padding: 12,
-    marginVertical: 4,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  positionTeam: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  position: {
-    fontSize: 14,
-    color: '#FFD700',
-    fontWeight: '600',
-  },
-  separator: {
-    color: '#666',
-    marginHorizontal: 6,
-  },
-  team: {
-    fontSize: 14,
-    color: '#CCCCCC',
-  },
-  jerseyContainer: {
-    backgroundColor: '#FFD700',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  jerseyNumber: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  statsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: '#3A3A3A',
-    paddingTop: 12,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-  },
-  stat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 2,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  fantasyContainer: {
-    alignItems: 'center',
-    backgroundColor: '#1A3A5C',
-    borderRadius: 8,
-    padding: 8,
-  },
-  fantasyLabel: {
-    fontSize: 11,
-    color: '#87CEEB',
-    marginBottom: 2,
-  },
-  fantasyValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#87CEEB',
-  },
-  compactStats: {
-    marginTop: 8,
-  },
-  compactText: {
-    fontSize: 12,
-    color: '#CCCCCC',
-  },
-  ageContainer: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#444',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  ageText: {
-    fontSize: 10,
-    color: '#CCCCCC',
-  },
-  listContainer: {
-    flex: 1,
-  },
-  listItem: {
-    marginHorizontal: 0,
-  },
-});
 
 export { PlayerCard };
 export { PlayerCardList };

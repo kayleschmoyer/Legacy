@@ -1,27 +1,20 @@
 import React from 'react';
-import { Platform } from './platform-components';
+import { PlatformProviders } from './platform-components';
 
-// Platform-specific providers
 interface ProvidersProps {
   children: React.ReactNode;
 }
 
-const WebProviders = ({ children }: ProvidersProps) => {
-  // For Storybook and development, just return children without OAuth
-  // In production, this would include the actual OAuth provider
-  return <div data-providers="web">{children}</div>;
+/**
+ * Cross-platform ConditionalProviders component
+ *
+ * Uses the platform-components architecture to automatically select
+ * the correct provider implementation based on the target platform.
+ *
+ * This replaces platform-specific logic with build-time resolution.
+ */
+export const ConditionalProviders: React.FC<ProvidersProps> = ({
+  children,
+}) => {
+  return <PlatformProviders>{children}</PlatformProviders>;
 };
-
-const NativeProviders = ({ children }: ProvidersProps) => {
-  // Add any React Native specific providers here
-  return <div data-providers="native">{children}</div>;
-};
-
-function ConditionalProviders({ children }: ProvidersProps) {
-  if (Platform.OS === 'web') {
-    return <WebProviders>{children}</WebProviders>;
-  }
-  return <NativeProviders>{children}</NativeProviders>;
-}
-
-export { ConditionalProviders };

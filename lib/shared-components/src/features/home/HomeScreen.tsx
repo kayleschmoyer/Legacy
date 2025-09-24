@@ -1,18 +1,23 @@
 import React from 'react';
-import {
-  Dimensions,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
-import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
+import { Button, H2, H4, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { Dimensions, Platform } from '../../platform-components';
+import { SPORT_CONFIGS } from '../../config/sports';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_TABLET = SCREEN_WIDTH > 768;
+// Use a function to get screen width to avoid module-level execution issues in tests
+const getScreenWidth = () => {
+  try {
+    return Dimensions?.get?.('window')?.width || 375;
+  } catch {
+    return 375; // Default width for tests
+  }
+};
+
+export interface ActionCardProps {
+  title: string;
+  icon?: string;
+  onPress: () => void;
+  color?: string;
+}
 
 export interface SportOption {
   key: string;
@@ -26,12 +31,7 @@ export interface HomeScreenProps {
   subtitle?: string;
   sports?: SportOption[];
   onSportPress: (sportKey: string) => void;
-  customActions?: Array<{
-    title: string;
-    icon?: string;
-    onPress: () => void;
-    color?: string;
-  }>;
+  customActions?: ActionCardProps[];
   showAllSports?: boolean;
 }
 
@@ -48,304 +48,170 @@ function HomeScreen({
     (key) => ({
       key,
       name: SPORT_CONFIGS[key].name,
+      icon: '🏆', // Default icon since SportConfig doesn't have icon property
       enabled: true,
     }),
   );
 
   const allSports = sports || defaultSports;
-  const availableSports = showAllSports
+  const sportsToShow = showAllSports
     ? allSports
     : allSports.filter((sport) => sport.enabled !== false);
 
-  const getSportIcon = (sportKey: string): string => {
-    const icons: Record<string, string> = {
-      baseball: '⚾',
-      football: '🏈',
-      basketball: '🏀',
-      hockey: '🏒',
-    };
-    return icons[sportKey] || '🏆';
-  };
+  const quickActions = [
+    {
+      title: 'Quick Pick',
+      icon: '⚡',
+      onPress: () => console.log('Quick Pick'),
+    },
+    {
+      title: 'Manage Teams',
+      icon: '👥',
+      onPress: () => console.log('Manage Teams'),
+    },
+    ...customActions,
+  ];
 
   const renderSportCard = (sport: SportOption) => {
-    const sportConfig = SPORT_CONFIGS[sport.key];
     const isEnabled = sport.enabled !== false;
 
     return (
-      <TouchableOpacity
+      <Button
         key={sport.key}
-        style={safeStyle([
-          styles.sportCard,
-          {
-            backgroundColor: isEnabled
-              ? sportConfig?.colors.secondary || DEFAULT_COLORS.secondary
-              : DEFAULT_COLORS.border,
-          },
-          !isEnabled && styles.disabledCard,
-        ])}
         onPress={() => isEnabled && onSportPress(sport.key)}
         disabled={!isEnabled}
+        backgroundColor="white"
+        borderRadius="$4"
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={120}
+        width={(getScreenWidth() - 60) / 2}
+        shadowColor="$shadowColor"
+        shadowOffset={{ width: 0, height: 2 }}
+        shadowOpacity={0.1}
+        shadowRadius={8}
+        elevation={3}
+        borderWidth={1}
+        borderColor="$gray4"
+        opacity={isEnabled ? 1 : 0.6}
+        unstyled
       >
-        <View style={styles.sportCardContent}>
-          <Text style={styles.sportIcon}>
-            {sport.icon || getSportIcon(sport.key)}
+        <YStack alignItems="center" gap="$2">
+          <Text fontSize="$8" color="$blue10">
+            {sport.icon || '🏆'}
           </Text>
           <Text
-            style={safeStyle([
-              styles.sportName,
-              !isEnabled && styles.disabledText,
-            ])}
+            fontSize="$4"
+            fontWeight="600"
+            color={isEnabled ? '$gray12' : '$gray8'}
+            textAlign="center"
           >
             {sport.name}
           </Text>
-          {sportConfig && (
-            <View
-              style={safeStyle([
-                styles.sportAccent,
-                { backgroundColor: sportConfig.colors.accent },
-              ])}
-            />
-          )}
-        </View>
-      </TouchableOpacity>
+        </YStack>
+      </Button>
     );
   };
 
-  const renderCustomAction = (
-    action: (typeof customActions)[0],
-    index: number,
-  ) => (
-    <TouchableOpacity
-      key={`action-${index}`}
-      style={safeStyle([
-        styles.actionCard,
-        { backgroundColor: action.color || DEFAULT_COLORS.accent },
-      ])}
+  const renderActionCard = (action: ActionCardProps, index: number) => (
+    <Button
+      key={index}
       onPress={action.onPress}
+      backgroundColor={action.color || '$gray3'}
+      borderRadius="$3"
+      padding="$4"
+      alignItems="center"
+      flex={1}
+      borderWidth={1}
+      borderColor="$gray5"
+      unstyled
     >
-      <View style={styles.actionCardContent}>
-        {action.icon && <Text style={styles.actionIcon}>{action.icon}</Text>}
-        <Text style={styles.actionText}>{action.title}</Text>
-      </View>
-    </TouchableOpacity>
+      <YStack alignItems="center" gap="$2">
+        {action.icon && (
+          <Text fontSize="$6" color="$blue10">
+            {action.icon}
+          </Text>
+        )}
+        <Text fontSize="$3" fontWeight="500" color="$gray12" textAlign="center">
+          {action.title}
+        </Text>
+      </YStack>
+    </Button>
   );
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.heading}>{title}</Text>
-        <Text style={styles.subHeading}>{subtitle}</Text>
-      </View>
+    <ScrollView flex={1} showsVerticalScrollIndicator={false}>
+      <YStack flexGrow={1} paddingBottom="$4">
+        {/* Header */}
+        <YStack
+          alignItems="center"
+          marginBottom="$7"
+          paddingTop="$4"
+          paddingHorizontal="$4"
+        >
+          <H2 color="$gray12" marginBottom="$2" textAlign="center">
+            {title}
+          </H2>
+          <Text color="$gray10" textAlign="center" lineHeight="$1">
+            {subtitle}
+          </Text>
+        </YStack>
 
-      {/* Custom Actions */}
-      {customActions.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsContainer}>
-            {customActions.map(renderCustomAction)}
-          </View>
-        </View>
-      )}
+        {/* Quick Actions */}
+        {quickActions.length > 0 && (
+          <YStack marginBottom="$7">
+            <H4 color="$gray12" marginBottom="$4" paddingHorizontal="$4">
+              Quick Actions
+            </H4>
+            <XStack paddingHorizontal="$3" gap="$3">
+              {quickActions.map(renderActionCard)}
+            </XStack>
+          </YStack>
+        )}
 
-      {/* Sports Grid */}
-      {availableSports.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sports</Text>
-          <View style={styles.sportsContainer}>
-            {availableSports.map(renderSportCard)}
-          </View>
-        </View>
-      )}
-
-      {/* Empty State */}
-      {availableSports.length === 0 && customActions.length === 0 && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>
-            {Platform.OS === 'web' ? (
-              <span role="img" aria-label="Trophy">
-                🏆
-              </span>
+        {/* Sports */}
+        <YStack marginBottom="$7">
+          <H4 color="$gray12" marginBottom="$4" paddingHorizontal="$4">
+            Sports
+          </H4>
+          <XStack flexWrap="wrap" paddingHorizontal="$3" gap="$3">
+            {sportsToShow.length > 0 ? (
+              sportsToShow.map(renderSportCard)
             ) : (
-              '🏆'
+              <YStack
+                alignItems="center"
+                justifyContent="center"
+                padding="$15"
+                flex={1}
+              >
+                <Text fontSize="$12" color="$gray6" marginBottom="$4">
+                  {Platform?.OS === 'web' ? '🚫' : '❌'}
+                </Text>
+                <Text
+                  fontSize="$5"
+                  fontWeight="600"
+                  color="$gray8"
+                  marginBottom="$2"
+                  textAlign="center"
+                >
+                  No Sports Available
+                </Text>
+                <Text
+                  fontSize="$3"
+                  color="$gray8"
+                  textAlign="center"
+                  lineHeight="$1"
+                >
+                  Check back later for available sports
+                </Text>
+              </YStack>
             )}
-          </Text>
-          <Text style={styles.emptyStateTitle}>No Sports Available</Text>
-          <Text style={styles.emptyStateText}>
-            Check back later for available fantasy sports.
-          </Text>
-        </View>
-      )}
+          </XStack>
+        </YStack>
+      </YStack>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-    paddingBottom: 20,
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  heading: {
-    fontSize: Platform.OS === 'web' ? 36 : 32,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subHeading: {
-    fontSize: 18,
-    color: DEFAULT_COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  section: {
-    marginHorizontal: 20,
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-  },
-  sportsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sportCard: {
-    width: IS_TABLET ? '23%' : '48%',
-    minWidth: 140,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  disabledCard: {
-    opacity: 0.5,
-  },
-  sportCardContent: {
-    padding: 20,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  sportIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  sportName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: DEFAULT_COLORS.text,
-    textAlign: 'center',
-  },
-  disabledText: {
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  sportAccent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionCard: {
-    flex: 1,
-    minWidth: 120,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  actionCardContent: {
-    alignItems: 'center',
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: DEFAULT_COLORS.text,
-    textAlign: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 64,
-    marginBottom: 20,
-  },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-});
 
 export { HomeScreen };

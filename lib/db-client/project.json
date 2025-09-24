@@ -4,6 +4,16 @@
   "sourceRoot": "lib/db-client/src",
   "projectType": "library",
   "tags": [],
-  "// targets": "to see all targets run: nx show project db-client --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/lib/db-client",
+        "main": "lib/db-client/src/index.ts",
+        "tsConfig": "lib/db-client/tsconfig.lib.json",
+        "assets": []
+      }
+    }
+  }
 }

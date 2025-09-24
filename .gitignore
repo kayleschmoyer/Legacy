@@ -56,6 +56,12 @@ cache/
 # poetry
 .cache
 .env
+.env.local
+.env.production
+.env.staging
+.env.development
+.env.working
+.env.*.local
 .venv
 __pycache__
 .coverage

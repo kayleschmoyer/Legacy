@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MockedProvider } from '@apollo/client/testing';
 import { PlayersTable } from './PlayersTable';
 import { GET_ALL_PLAYERS } from './PlayersApi';
+import { MockedProvider } from '../../test-utils/MockedProvider';
 
 // Mock data
 const mockPlayers = [
@@ -93,9 +93,8 @@ describe('PlayersTable', () => {
 
   it('shows sort dropdown when showSorting is true', () => {
     renderWithMocks({ showSorting: true });
-    expect(screen.getByDisplayValue('')).toBeInTheDocument(); // Select element should be present
-    // Or check for the select element structure
-    expect(document.querySelector('select')).toBeInTheDocument();
+    // Since our Select is mocked as a div, check for its presence using text content
+    expect(screen.getByText('Sort by...')).toBeInTheDocument();
   });
 
   it('handles player selection', () => {

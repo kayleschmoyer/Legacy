@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from 'react';
-import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import {
+  Button,
+  H4,
+  Input,
+  ScrollView,
+  Sheet,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 
 type FilterOption = {
   label: string;
@@ -31,7 +32,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState<{ [key: string]: string | null }>(
-    currentFilters
+    currentFilters,
   );
 
   const filterOptions: FilterOption[] = [
@@ -75,14 +76,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
     (text: string) => {
       onSearch(text);
     },
-    [onSearch]
+    [onSearch],
   );
 
   const handleFilterChange = useCallback(
     (key: string, value: string | null) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
     },
-    []
+    [],
   );
 
   const applyFilters = useCallback(() => {
@@ -90,175 +91,114 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setShowFilterModal(false);
   }, [filters, onFilter]);
 
-  const renderFilterOption = ({ item }: { item: FilterOption }) => (
-    <View style={styles.filterOptionContainer}>
-      <Text style={styles.filterOptionLabel}>{item.label}:</Text>
-      <TouchableOpacity
-        style={styles.filterOptionButton}
-        onPress={() => handleFilterChange(item.label.toLowerCase(), null)}
-      >
-        <Text style={styles.filterOptionButtonText}>Clear</Text>
-      </TouchableOpacity>
-      <FlatList
-        data={item.options}
-        horizontal
-        renderItem={({ item: option }) => (
-          <TouchableOpacity
-            style={[
-              styles.filterOption,
-              item.value === option.value ? styles.filterOptionSelected : null,
-            ]}
-            onPress={() =>
-              handleFilterChange(item.label.toLowerCase(), option.value)
-            }
-          >
-            <Text style={styles.filterOptionText}>{option.label}</Text>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.value || 'null'}
-      />
-    </View>
-  );
-
   return (
-    <View>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
+    <YStack>
+      <XStack
+        alignItems="center"
+        backgroundColor="$gray8"
+        borderRadius="$6"
+        paddingHorizontal="$3"
+        marginBottom="$3"
+      >
+        <Input
+          flex={1}
           placeholder="Search players..."
           value={value}
           onChangeText={handleSearch}
+          backgroundColor="transparent"
+          borderWidth={0}
+          color="$color"
+          placeholderTextColor="$gray10"
         />
-        <TouchableOpacity
-          style={styles.filterButton}
+        <Button
+          size="$3"
+          backgroundColor="transparent"
           onPress={() => setShowFilterModal(true)}
+          padding="$2"
         >
           <MaterialIcons name="filter-list" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+        </Button>
+      </XStack>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showFilterModal}
-        onRequestClose={() => setShowFilterModal(false)}
+      <Sheet
+        modal
+        open={showFilterModal}
+        onOpenChange={setShowFilterModal}
+        snapPoints={[80]}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Filter Players</Text>
-            <FlatList
-              data={filterOptions}
-              renderItem={renderFilterOption}
-              keyExtractor={(item) => item.label}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+        <Sheet.Overlay />
+        <Sheet.Frame>
+          <Sheet.Handle />
+          <YStack padding="$4" space="$4">
+            <H4 color="$color">Filter Players</H4>
+            <ScrollView>
+              <YStack space="$3">
+                {filterOptions.map((item) => (
+                  <YStack key={item.label} space="$2" marginBottom="$3">
+                    <XStack alignItems="center" space="$2">
+                      <Text color="$color" fontSize="$4">
+                        {item.label}:
+                      </Text>
+                      <Button
+                        size="$2"
+                        backgroundColor="$gray8"
+                        onPress={() =>
+                          handleFilterChange(item.label.toLowerCase(), null)
+                        }
+                      >
+                        <Text color="$white" fontSize="$3">
+                          Clear
+                        </Text>
+                      </Button>
+                    </XStack>
+                    <ScrollView horizontal>
+                      <XStack space="$2">
+                        {item.options.map((option) => (
+                          <Button
+                            key={option.value || 'null'}
+                            size="$3"
+                            backgroundColor={
+                              item.value === option.value ? '$blue8' : '$gray7'
+                            }
+                            onPress={() =>
+                              handleFilterChange(
+                                item.label.toLowerCase(),
+                                option.value,
+                              )
+                            }
+                          >
+                            <Text color="$white" fontSize="$3">
+                              {option.label}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </ScrollView>
+                  </YStack>
+                ))}
+              </YStack>
+            </ScrollView>
+            <XStack justifyContent="space-between" space="$3">
+              <Button
+                flex={1}
+                backgroundColor="$gray8"
                 onPress={() => setShowFilterModal(false)}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.applyButton]}
-                onPress={applyFilters}
-              >
-                <Text style={styles.modalButtonText}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+                <Text color="$white" fontWeight="bold">
+                  Cancel
+                </Text>
+              </Button>
+              <Button flex={1} backgroundColor="$blue9" onPress={applyFilters}>
+                <Text color="$white" fontWeight="bold">
+                  Apply
+                </Text>
+              </Button>
+            </XStack>
+          </YStack>
+        </Sheet.Frame>
+      </Sheet>
+    </YStack>
   );
 };
-
-const styles = StyleSheet.create({
-  applyButton: {
-    backgroundColor: '#007AFF',
-  },
-  cancelButton: {
-    backgroundColor: '#666',
-  },
-  filterButton: {
-    padding: 10,
-  },
-  filterOption: {
-    backgroundColor: '#333',
-    borderRadius: 5,
-    marginRight: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  filterOptionButton: {
-    backgroundColor: '#444',
-    borderRadius: 5,
-    marginLeft: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  filterOptionButtonText: {
-    color: '#fff',
-  },
-  filterOptionContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  filterOptionLabel: {
-    color: '#fff',
-    marginRight: 10,
-  },
-  filterOptionSelected: {
-    backgroundColor: '#555',
-  },
-  filterOptionText: {
-    color: '#fff',
-  },
-  modalButton: {
-    borderRadius: 5,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  modalContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#222',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    padding: 20,
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  searchContainer: {
-    alignItems: 'center',
-    backgroundColor: '#333',
-    borderRadius: 25,
-    flexDirection: 'row',
-    marginBottom: 10,
-    paddingHorizontal: 10,
-  },
-  searchInput: {
-    color: '#fff',
-    flex: 1,
-    height: 40,
-    paddingHorizontal: 10,
-  },
-});
 
 export default SearchBar;

@@ -1,28 +1,52 @@
-import './platform-aliases.d.ts';
 import './types/tamagui.d.ts';
 
 export * from './Button';
 export * from './Layout';
 export * from './screens/SportsScreens';
-export * from './screens/DemoScreen';
 export * from './screens/DraftBoardScreen';
 
-// Direct imports from platform components (no wrapper needed)
-export {
-  Icon,
-  Table,
-  LoadingPanel,
-  SecureStorage,
-} from './platform-components';
-
 // New shared components
-export * from './Dropdown';
 export * from './ConditionalProviders';
 export * from './AppProvider';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
-// Cross-platform components from new structure
-export * from './platform-components';
+// Cross-platform components from new structure (star export except Button)
+export {
+  // Platform-specific providers and utilities
+  OAuthProvider,
+  SecureStorageProvider,
+  PlatformProviders,
+  PlatformUtils,
+  // React Native equivalents (excluding Button to avoid conflict)
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Modal,
+  Picker,
+  ActivityIndicator,
+  SafeAreaView,
+  Image,
+  Pressable,
+  KeyboardAvoidingView,
+  Dimensions,
+  Platform,
+  Vibration,
+  Animated,
+} from './platform-components';
+
+// Import types separately from types directory
+export type {
+  OAuthConfig,
+  OAuthResponse,
+  OAuthError,
+  OAuthErrorCode,
+  ISecureStorage,
+} from './platform-components/types';
 
 // Export all shared components and types
 export * from './config/sports';
@@ -88,12 +112,10 @@ export * from './features/stats/CareerStatsViewer';
 export * from './navigation';
 
 // Enhanced components (final migration)
-export * from './features/auth/LoginWrapper';
-export * from './features/auth/WebProviders';
 export * from './navigation/TamaguiAppNavigator';
 
-// Tamagui config
-export { tamaguiConfig } from '@legacy-sports/tamagui-config';
+// Tamagui config - should be imported directly by consumers
+// export { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
 // Style utilities
 export * from './utils/styles';

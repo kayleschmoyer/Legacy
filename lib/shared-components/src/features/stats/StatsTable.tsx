@@ -1,15 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
+import { Platform } from 'react-native';
+import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { StatsTableColumn, StatsTableRow } from '../../types';
-import { DEFAULT_COLORS } from '../../config/sports';
-import { safeStyle } from '../../utils/styles';
 
 export interface StatsTableProps {
   columns: StatsTableColumn[];
@@ -71,141 +63,118 @@ function StatsTable({
   };
 
   const renderHeader = () => (
-    <View style={styles.headerRow}>
+    <XStack
+      backgroundColor="$secondary"
+      borderBottomWidth={2}
+      borderBottomColor="$accent"
+    >
       {columns.map((column) => (
-        <TouchableOpacity
+        <Button
           key={column.key}
-          style={safeStyle([styles.headerCell, { flex: 1 }])}
+          flex={1}
+          paddingVertical="$3"
+          paddingHorizontal="$2"
+          justifyContent="center"
+          minHeight={40}
+          backgroundColor="transparent"
+          borderWidth={0}
           onPress={() => handleSort(column.key)}
           disabled={!sortable || !column.sortable}
         >
-          <Text style={styles.headerText}>
+          <Text
+            color="$text"
+            fontSize="$3"
+            fontWeight="bold"
+            textAlign="center"
+            {...(Platform.OS === 'web' && {
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            })}
+          >
             {column.label}
             {getSortIndicator(column.key)}
           </Text>
-        </TouchableOpacity>
+        </Button>
       ))}
-    </View>
+    </XStack>
   );
 
   const renderRow = (row: StatsTableRow, index: number) => (
-    <TouchableOpacity
+    <Button
       key={index}
-      style={safeStyle([
-        styles.dataRow,
-        index % 2 === 0 ? styles.evenRow : styles.oddRow,
-      ])}
+      flexDirection="row"
+      borderBottomWidth={1}
+      borderBottomColor="$border"
+      backgroundColor={index % 2 === 0 ? '$primary' : '$secondary'}
       onPress={() => onRowPress?.(row, index)}
       disabled={!onRowPress}
+      borderWidth={0}
+      borderRadius={0}
     >
       {columns.map((column) => (
-        <View
+        <YStack
           key={column.key}
-          style={safeStyle([styles.dataCell, { flex: 1 }])}
+          paddingVertical="$2.5"
+          paddingHorizontal="$2"
+          justifyContent="center"
+          minHeight={36}
+          flex={1}
         >
-          <Text style={styles.dataText} numberOfLines={1}>
+          <Text
+            color="$textSecondary"
+            fontSize="$2"
+            textAlign="center"
+            numberOfLines={1}
+            {...(Platform.OS === 'web' && {
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            })}
+          >
             {String(row[column.key] ?? '')}
           </Text>
-        </View>
+        </YStack>
       ))}
-    </TouchableOpacity>
+    </Button>
   );
 
   return (
-    <View style={styles.container}>
+    <YStack
+      backgroundColor="$primary"
+      borderRadius="$3"
+      overflow="hidden"
+      marginVertical="$3"
+    >
       {title && (
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
-        </View>
+        <YStack
+          backgroundColor="$accent"
+          paddingVertical="$3"
+          paddingHorizontal="$4"
+        >
+          <Text
+            color="$text"
+            fontSize="$6"
+            fontWeight="bold"
+            textAlign="center"
+            {...(Platform.OS === 'web' && {
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            })}
+          >
+            {title}
+          </Text>
+        </YStack>
       )}
 
-      <View style={styles.tableContainer}>
+      <YStack flex={1}>
         {renderHeader()}
 
         <ScrollView
-          style={safeStyle([styles.scrollContainer, { maxHeight }])}
+          flex={1}
+          maxHeight={maxHeight}
           showsVerticalScrollIndicator={true}
         >
           {sortedData.map((row, index) => renderRow(row, index))}
         </ScrollView>
-      </View>
-    </View>
+      </YStack>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginVertical: 8,
-  },
-  titleContainer: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  title: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  tableContainer: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderBottomWidth: 2,
-    borderBottomColor: DEFAULT_COLORS.accent,
-  },
-  headerCell: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  headerText: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  dataRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: DEFAULT_COLORS.border,
-  },
-  evenRow: {
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  oddRow: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-  },
-  dataCell: {
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    minHeight: 36,
-  },
-  dataText: {
-    color: DEFAULT_COLORS.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-});
 
 export { StatsTable };

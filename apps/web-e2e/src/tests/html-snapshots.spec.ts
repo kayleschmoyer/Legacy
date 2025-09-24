@@ -40,10 +40,8 @@ test.describe('HTML Snapshots', () => {
       });
 
       // Remove data attributes that might be dynamic
-      const dynamicDataAttrs = document.querySelectorAll(
-        '[data-reactroot], [data-react-*]'
-      );
-      dynamicDataAttrs.forEach((el) => {
+      const elementsWithDataAttrs = document.querySelectorAll('*');
+      elementsWithDataAttrs.forEach((el) => {
         const attrs = el.attributes;
         for (let i = attrs.length - 1; i >= 0; i--) {
           const attr = attrs[i];
@@ -157,7 +155,7 @@ test.describe('HTML Snapshots', () => {
         .replace(/[^\w-]/g, '_')
         .replace(/^_+|_+$/g, '');
       expect(JSON.stringify(responseData, null, 2)).toMatchSnapshot(
-        `api-${cleanEndpoint}.json`
+        `api-${cleanEndpoint}.json`,
       );
     }
   });
@@ -169,7 +167,7 @@ test.describe('HTML Snapshots', () => {
     // Get the accessibility tree
     const accessibilityTree = await page.accessibility.snapshot();
     expect(JSON.stringify(accessibilityTree, null, 2)).toMatchSnapshot(
-      'accessibility-tree.json'
+      'accessibility-tree.json',
     );
   });
 
@@ -214,7 +212,7 @@ test.describe('HTML Snapshots', () => {
     });
 
     expect(JSON.stringify(metadata, null, 2)).toMatchSnapshot(
-      'page-metadata.json'
+      'page-metadata.json',
     );
   });
 });

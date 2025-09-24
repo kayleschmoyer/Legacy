@@ -1,13 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  FlatList,
+  Button,
+  Card,
   ScrollView,
-  StyleSheet,
+  Separator,
   Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+  XStack,
+  YStack,
+} from 'tamagui';
 import {
   canPlayerPlayPosition,
   getPositionDisplayName,
@@ -271,69 +271,81 @@ function LineupEditor(props: LineupEditorProps) {
           selectedPlayer !== teamMember);
 
       const getStatusColor = () => {
-        if (actualValue === undefined) return '#CCCCCC';
-        if (actualValue === projValue) return '#4A90E2';
-        if (actualValue > (projValue || 0)) return '#7ED321';
-        return '#D0021B';
+        if (actualValue === undefined) return '$gray10';
+        if (actualValue === projValue) return '$blue10';
+        if (actualValue > (projValue || 0)) return '$green10';
+        return '$red10';
       };
 
       return (
-        <TouchableOpacity
-          style={safeStyle([
-            styles.listItem,
-            isSelected && styles.selectedItem,
-            isDisabled && styles.disabledItem,
-          ])}
+        <Card
+          backgroundColor={isSelected ? '$blue3' : '$gray3'}
+          borderColor={isSelected ? '$yellow10' : '$gray6'}
+          borderWidth={isSelected ? 2 : 1}
+          padding="$3"
+          marginVertical="$1"
+          opacity={isDisabled ? 0.5 : 1}
+          pressStyle={{ scale: 0.98 }}
           onPress={() => onClick(item)}
           disabled={isDisabled}
+          cursor="pointer"
         >
-          {/* Position Button */}
-          <View style={styles.positionContainer}>
-            <TouchableOpacity
-              style={safeStyle([
-                styles.positionButton,
-                isDisabled && styles.positionButtonDisabled,
-              ])}
+          <XStack alignItems="center" space="$3">
+            {/* Position Button */}
+            <Button
+              backgroundColor={isDisabled ? '$gray7' : '$green9'}
+              width={60}
+              minHeight={36}
+              borderRadius="$2"
+              pressStyle={{ scale: 0.95 }}
               onPress={() => onClick(item)}
               disabled={isDisabled}
             >
-              <Text style={styles.positionText}>
+              <Text
+                color="$gray12"
+                fontWeight="bold"
+                fontSize="$2"
+                textAlign="center"
+              >
                 {positionSlot?.positionType
                   ? getPositionDisplayName(positionSlot.positionType)
                   : 'BE'}
               </Text>
-            </TouchableOpacity>
-          </View>
+            </Button>
 
-          {/* Player Info */}
-          <View style={styles.playerInfo}>
-            <Text style={styles.playerName}>
-              {teamMember?.player
-                ? `${teamMember.player.firstName} ${teamMember.player.lastName}`
-                : 'Empty'}
-            </Text>
-            {teamMember?.player?.eligiblePositions && (
-              <Text style={styles.eligiblePositions}>
-                {teamMember.player.eligiblePositions.join(', ')}
+            {/* Player Info */}
+            <YStack flex={1} marginRight="$3">
+              <Text
+                fontSize="$4"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$1"
+              >
+                {teamMember?.player
+                  ? `${teamMember.player.firstName} ${teamMember.player.lastName}`
+                  : 'Empty'}
               </Text>
-            )}
-          </View>
+              {teamMember?.player?.eligiblePositions && (
+                <Text fontSize="$2" color="$gray10">
+                  {teamMember.player.eligiblePositions.join(', ')}
+                </Text>
+              )}
+            </YStack>
 
-          {/* Stats */}
-          <View style={styles.statsContainer}>
-            <Text
-              style={safeStyle([styles.statsText, { color: getStatusColor() }])}
-            >
-              {actualValue
-                ? `${actualValue.toFixed(2)} (${
-                    projValue?.toFixed(2) || '0.00'
-                  })`
-                : projValue
-                  ? projValue.toFixed(2)
-                  : '--'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+            {/* Stats */}
+            <YStack alignItems="flex-end" minWidth={80}>
+              <Text fontSize="$3" fontWeight="500" color={getStatusColor()}>
+                {actualValue
+                  ? `${actualValue.toFixed(2)} (${
+                      projValue?.toFixed(2) || '0.00'
+                    })`
+                  : projValue
+                    ? projValue.toFixed(2)
+                    : '--'}
+              </Text>
+            </YStack>
+          </XStack>
+        </Card>
       );
     },
     [
@@ -349,145 +361,64 @@ function LineupEditor(props: LineupEditorProps) {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Lineup Editor</Text>
+    <ScrollView flex={1} backgroundColor="$gray1">
+      <YStack padding="$4">
+        <Text
+          fontSize="$8"
+          fontWeight="bold"
+          color="$yellow10"
+          marginBottom="$5"
+          textAlign="center"
+        >
+          Lineup Editor
+        </Text>
 
-        <FlatList
-          data={rosterSlots}
-          renderItem={renderItem}
-          keyExtractor={(item, index) => {
-            if (item.type === 'starter-data') {
-              return `starter-${item.positionMappingId}`;
-            } else if (item.type === 'bench-player-data') {
-              return `bench-${item.playerId}`;
-            } else {
-              return `empty-${index}`;
-            }
-          }}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          scrollEnabled={false}
-        />
+        <YStack space="$1">
+          {rosterSlots.map((item, index) => (
+            <React.Fragment
+              key={
+                item.type === 'starter-data'
+                  ? `starter-${item.positionMappingId}`
+                  : item.type === 'bench-player-data'
+                    ? `bench-${item.playerId}`
+                    : `empty-${index}`
+              }
+            >
+              {renderItem({ item })}
+              {index < rosterSlots.length - 1 && (
+                <Separator borderColor="$gray6" />
+              )}
+            </React.Fragment>
+          ))}
+        </YStack>
 
         {selectedPlayer && (
-          <View style={styles.selectedPlayerInfo}>
-            <Text style={styles.selectedPlayerText}>
+          <Card
+            marginTop="$5"
+            padding="$4"
+            backgroundColor="$gray3"
+            borderColor="$yellow10"
+            borderWidth={1}
+          >
+            <Text color="$gray12" fontSize="$4" fontWeight="600">
               Selected:{' '}
               {selectedPlayer.player
                 ? `${selectedPlayer.player.firstName} ${selectedPlayer.player.lastName}`
                 : 'Unknown'}
               {selectedPositionMapping && (
-                <Text style={styles.selectedPositionText}>
+                <Text color="$yellow10">
                   {' '}
                   →{' '}
                   {getPositionDisplayName(selectedPositionMapping.positionType)}
                 </Text>
               )}
             </Text>
-          </View>
+          </Card>
         )}
-      </View>
+      </YStack>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1E1E1E',
-  },
-  content: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 2,
-  },
-  selectedItem: {
-    backgroundColor: '#3A4A5C',
-    borderColor: '#FFD700',
-    borderWidth: 2,
-  },
-  disabledItem: {
-    opacity: 0.5,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#333',
-    marginVertical: 1,
-  },
-  positionContainer: {
-    width: 60,
-    marginRight: 12,
-  },
-  positionButton: {
-    backgroundColor: '#7ED321',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 36,
-  },
-  positionButtonDisabled: {
-    backgroundColor: '#666',
-  },
-  positionText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  playerInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  playerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  eligiblePositions: {
-    fontSize: 12,
-    color: '#CCCCCC',
-  },
-  statsContainer: {
-    alignItems: 'flex-end',
-    minWidth: 80,
-  },
-  statsText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  selectedPlayerInfo: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
-    borderColor: '#FFD700',
-    borderWidth: 1,
-  },
-  selectedPlayerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  selectedPositionText: {
-    color: '#FFD700',
-  },
-});
 
 export { humanizeString };
 export { LineupEditor };

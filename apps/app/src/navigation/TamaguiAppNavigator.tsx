@@ -4,7 +4,6 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import {
   BaseballScreen,
-  DemoScreen,
   FootballScreen,
   HomeScreen,
 } from '@legacy-sports/shared-components';
@@ -34,11 +33,6 @@ function HomeStack() {
         name="Baseball"
         component={BaseballScreen}
         options={{ title: 'Baseball' }}
-      />
-      <Stack.Screen
-        name="Demo"
-        component={DemoScreen}
-        options={{ title: 'Component Demo' }}
       />
     </Stack.Navigator>
   );

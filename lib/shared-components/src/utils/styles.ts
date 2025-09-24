@@ -1,13 +1,21 @@
-import { CSSProperties } from 'react';
+import type { ReactNativeStyleProperties } from '../platform-components/types/platform-exports';
 
 /**
  * Utility to safely combine style arrays for cross-platform compatibility.
  * Filters out falsy values and flattens nested arrays.
  */
 export function combineStyles(
-  ...styles: (CSSProperties | CSSProperties[] | false | undefined | null)[]
-): CSSProperties {
-  const flatStyles = styles.flat(Infinity).filter(Boolean) as CSSProperties[];
+  ...styles: (
+    | ReactNativeStyleProperties
+    | ReactNativeStyleProperties[]
+    | false
+    | undefined
+    | null
+  )[]
+): ReactNativeStyleProperties {
+  const flatStyles = styles
+    .flat(Infinity)
+    .filter(Boolean) as ReactNativeStyleProperties[];
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return Object.assign({}, ...flatStyles);
 }
@@ -24,8 +32,8 @@ export function filterStyles<T>(styles: (T | false | undefined | null)[]): T[] {
  * This function ensures TypeScript doesn't complain about filter methods on style arrays
  */
 export function createStyleArray(
-  ...styles: (CSSProperties | false | undefined | null)[]
-): CSSProperties {
+  ...styles: (ReactNativeStyleProperties | false | undefined | null)[]
+): ReactNativeStyleProperties {
   return combineStyles(...styles);
 }
 
@@ -35,17 +43,17 @@ export function createStyleArray(
  */
 export function safeStyle(
   styles:
-    | (CSSProperties | false | undefined | null)[]
-    | CSSProperties[]
-    | CSSProperties
+    | (ReactNativeStyleProperties | false | undefined | null)[]
+    | ReactNativeStyleProperties[]
+    | ReactNativeStyleProperties
     | false
     | undefined
     | null,
-): CSSProperties {
+): ReactNativeStyleProperties {
   if (!styles) return {};
   if (Array.isArray(styles)) {
     const filtered = styles.filter(
-      (style): style is CSSProperties =>
+      (style): style is ReactNativeStyleProperties =>
         style !== false && style !== null && style !== undefined,
     );
     if (filtered.length === 0) return {};
@@ -53,9 +61,9 @@ export function safeStyle(
       const firstStyle = filtered[0];
       return firstStyle || {};
     }
-    return Object.assign({}, ...filtered) as CSSProperties;
+    return Object.assign({}, ...filtered) as ReactNativeStyleProperties;
   }
-  // At this point, styles must be CSSProperties since we've ruled out array, false, null, undefined
+  // At this point, styles must be ReactNativeStyleProperties since we've ruled out array, false, null, undefined
   if (!styles) return {};
   return styles;
 }
@@ -64,7 +72,7 @@ export function safeStyle(
  * Safely handles single conditional styles that might be false
  */
 export function safeConditionalStyle(
-  style: false | CSSProperties | null | undefined,
-): CSSProperties {
+  style: false | ReactNativeStyleProperties | null | undefined,
+): ReactNativeStyleProperties {
   return style || {};
 }

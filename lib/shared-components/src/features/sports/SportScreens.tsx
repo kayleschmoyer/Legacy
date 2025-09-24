@@ -1,6 +1,6 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Text, YStack } from 'tamagui';
+import { Platform } from '../../platform-components';
 
 export interface SportScreenProps {
   /**
@@ -65,27 +65,37 @@ function SportScreen({
   const displayTitle = title || `${sportName} Fantasy`;
 
   return (
-    <View
-      style={safeStyle([styles.container, { backgroundColor }, containerStyle])}
+    <YStack
+      flex={1}
+      justifyContent="center"
+      alignItems="center"
+      padding="$5"
+      backgroundColor={backgroundColor}
+      style={containerStyle}
     >
       <Text
-        style={safeStyle([styles.title, { color: titleColor }, titleStyle])}
+        fontSize={Platform.OS === 'web' ? '$9' : '$8'}
+        fontWeight={700 as const}
+        marginBottom="$4"
+        textAlign="center"
+        color={titleColor}
+        style={titleStyle}
       >
         {displayTitle}
       </Text>
 
       <Text
-        style={safeStyle([
-          styles.subtitle,
-          { color: subtitleColor },
-          subtitleStyle,
-        ])}
+        fontSize={Platform.OS === 'web' ? '$6' : '$5'}
+        textAlign="center"
+        marginBottom="$6"
+        color={subtitleColor}
+        style={subtitleStyle}
       >
         {subtitle}
       </Text>
 
       {children}
-    </View>
+    </YStack>
   );
 }
 
@@ -113,26 +123,6 @@ export type HockeyScreenProps = Omit<SportScreenProps, 'sportName'>;
 function HockeyScreen(props: HockeyScreenProps) {
   return <SportScreen sportName="Hockey" {...props} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: Platform.OS === 'web' ? 28 : 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: Platform.OS === 'web' ? 18 : 16,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-});
 
 export { SportScreen };
 export { BaseballScreen };

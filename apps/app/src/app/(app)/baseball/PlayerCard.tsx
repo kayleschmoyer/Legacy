@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, YStack } from 'tamagui';
 
 interface Player {
   id: number;
@@ -15,27 +15,21 @@ interface PlayerCardProps {
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
   return (
-    <View style={styles.card}>
-      <Text style={styles.name}>{player.name}</Text>
-      <Text>
+    <YStack
+      backgroundColor="$gray1"
+      borderRadius="$2"
+      marginVertical="$3"
+      padding="$4"
+    >
+      <Text fontSize="$5" fontWeight="bold" marginBottom="$2">
+        {player.name}
+      </Text>
+      <Text marginBottom="$1">
         {player.position} - {player.team}
       </Text>
       <Text>Batting Average: {player.battingAvg}</Text>
-    </View>
+    </YStack>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    marginVertical: 10,
-    padding: 15,
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-});
 
 export default PlayerCard;

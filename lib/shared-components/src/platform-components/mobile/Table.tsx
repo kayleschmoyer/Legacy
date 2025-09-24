@@ -1,86 +1,69 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, XStack, YStack } from 'tamagui';
 import type { TableProps } from './LazyTable';
-import { safeStyle } from '../../utils/styles';
 
-// Native table implementation using basic React Native components
+// Native table implementation using Tamagui components
 const NativeTable: React.FC<TableProps> = ({ headers, data, title, style }) => {
   return (
-    // @ts-expect-error - Cross-platform style compatibility
-    <View style={safeStyle([styles.container, style])}>
-      {title && <Text style={styles.title}>{title}</Text>}
+    <YStack
+      marginBottom="$4"
+      borderWidth={1}
+      borderColor="$gray7"
+      borderRadius="$2"
+      style={style}
+    >
+      {title && (
+        <Text
+          fontSize="$6"
+          fontWeight="bold"
+          padding="$3"
+          backgroundColor="$gray2"
+          borderBottomWidth={1}
+          borderBottomColor="$gray7"
+        >
+          {title}
+        </Text>
+      )}
 
       {/* Header Row */}
-      <View style={styles.headerRow}>
+      <XStack
+        backgroundColor="$gray3"
+        borderBottomWidth={2}
+        borderBottomColor="$gray7"
+      >
         {headers.map((header, index) => (
-          // @ts-expect-error - Cross-platform style compatibility
-          <View key={index} style={safeStyle([styles.headerCell, { flex: 1 }])}>
-            <Text style={styles.headerText}>{header}</Text>
-          </View>
+          <YStack
+            key={index}
+            flex={1}
+            padding="$3"
+            borderRightWidth={1}
+            borderRightColor="$gray7"
+          >
+            <Text fontWeight="bold" fontSize="$4">
+              {header}
+            </Text>
+          </YStack>
         ))}
-      </View>
+      </XStack>
 
       {/* Data Rows */}
       {data.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.dataRow}>
+        <XStack key={rowIndex} borderBottomWidth={1} borderBottomColor="$gray5">
           {row.map((cell, cellIndex) => (
-            <View
+            <YStack
               key={cellIndex}
-              // @ts-expect-error - Cross-platform style compatibility
-              style={safeStyle([styles.dataCell, { flex: 1 }])}
+              flex={1}
+              padding="$2.5"
+              borderRightWidth={1}
+              borderRightColor="$gray5"
             >
-              <Text style={styles.cellText}>{cell}</Text>
-            </View>
+              <Text fontSize="$3">{cell}</Text>
+            </YStack>
           ))}
-        </View>
+        </XStack>
       ))}
-    </View>
+    </YStack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
-    borderBottomWidth: 2,
-    borderBottomColor: '#ddd',
-  },
-  headerCell: {
-    padding: 12,
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-  },
-  headerText: {
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  dataRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  dataCell: {
-    padding: 10,
-    borderRightWidth: 1,
-    borderRightColor: '#eee',
-  },
-  cellText: {
-    fontSize: 13,
-  },
-});
 
 export default NativeTable;

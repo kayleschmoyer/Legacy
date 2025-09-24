@@ -15,9 +15,11 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
+    "extra": {
+      "oauthProxyUrl": "http://localhost:5001",
+      "googleClientId": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.legacySports"
@@ -34,9 +36,7 @@
       "bundler": "metro",
       "build": {
         "babel": {
-          "include": [
-            "tamagui"
-          ]
+          "include": ["tamagui"]
         }
       }
     },
@@ -44,9 +44,7 @@
       [
         "expo-asset",
         {
-          "assets": [
-            "./assets"
-          ]
+          "assets": ["./assets"]
         }
       ],
       "expo-router",

@@ -1,8 +1,7 @@
 import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
-import { StyleSheet, View } from 'react-native';
-import { Spinner, Text } from 'tamagui';
+import { H3, Spinner, Text, YStack } from 'tamagui';
 import {
   LeagueFragment,
   TeamFragment,
@@ -20,7 +19,7 @@ function TeamName(props: TeamNameProps): React.JSX.Element {
 
   const owner = useMemo(() => {
     const member = leagueData.leagueMembers?.nodes.find(
-      (m) => m?.teamId === team.id
+      (m) => m?.teamId === team.id,
     );
 
     if (!member) {
@@ -31,12 +30,20 @@ function TeamName(props: TeamNameProps): React.JSX.Element {
   }, [leagueData.leagueMembers, team.id]);
 
   return (
-    <View>
-      <Text style={styles.teamCell}>{standing}</Text>
-      <Text style={styles.teamCell}>{team.name}</Text>
-      <Text style={styles.teamCell}>{owner || ''}</Text>
-      <Text style={styles.teamCell}>0-0</Text>
-    </View>
+    <YStack padding="$4">
+      <Text fontSize="$5" fontWeight="600" paddingVertical="$2">
+        {standing}
+      </Text>
+      <Text fontSize="$4" paddingVertical="$2">
+        {team.name}
+      </Text>
+      <Text fontSize="$4" color="$gray10" paddingVertical="$2">
+        {owner || ''}
+      </Text>
+      <Text fontSize="$4" paddingVertical="$2">
+        0-0
+      </Text>
+    </YStack>
   );
 }
 
@@ -49,8 +56,8 @@ export default function LeagueId(): React.JSX.Element {
     typeof leagueId === 'string'
       ? leagueId
       : Array.isArray(leagueId)
-      ? leagueId[0]
-      : '';
+        ? leagueId[0]
+        : '';
   const numLeagueId = parseInt(leagueIdStr, 10);
 
   const { data, loading } = useGetLeagueByIdQuery({
@@ -70,16 +77,16 @@ export default function LeagueId(): React.JSX.Element {
   }
 
   return (
-    <View>
-      <Text category="h3">Standings</Text>
-      <View>
+    <YStack padding="$4">
+      <H3 marginBottom="$3">Standings</H3>
+      <YStack space="$2">
         {league.teams?.nodes.map((t, idx) =>
           t ? (
             <TeamName key={t.id} team={t} standing={idx} leagueData={league} />
-          ) : null
+          ) : null,
         )}
-      </View>
-    </View>
+      </YStack>
+    </YStack>
   );
 }
 
@@ -92,8 +99,8 @@ export function LeagueIdHeader(props: HeaderTitleProps): React.JSX.Element {
     typeof leagueId === 'string'
       ? leagueId
       : Array.isArray(leagueId)
-      ? leagueId[0]
-      : '';
+        ? leagueId[0]
+        : '';
   const numLeagueId = parseInt(leagueIdStr, 10);
 
   const { data } = useGetLeagueByIdQuery({
@@ -103,11 +110,5 @@ export function LeagueIdHeader(props: HeaderTitleProps): React.JSX.Element {
     },
   });
 
-  return <Text category="h3">{data ? data.league?.name : ''}</Text>;
+  return <H3>{data ? data.league?.name : ''}</H3>;
 }
-
-const styles = StyleSheet.create({
-  teamCell: {
-    padding: 15,
-  },
-});

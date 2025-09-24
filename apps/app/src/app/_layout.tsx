@@ -1,18 +1,21 @@
 import * as React from 'react';
 import { useColorScheme } from 'react-native';
 import { TamaguiProvider } from 'tamagui';
+import Constants from 'expo-constants';
 import {
   AppNavigator,
   AppProvider,
   BaseballScreen,
-  DemoScreen,
+  createAuthConfig,
+  createAuthService,
+  EnhancedAuthGuard,
   FootballScreen,
   HomeScreen,
   NavigationRoute,
   tamaguiConfig,
+  validateAuthConfig,
 } from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
-import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 
 // Define your app routes
 const routes: NavigationRoute[] = [
@@ -31,15 +34,34 @@ const routes: NavigationRoute[] = [
     component: BaseballScreen,
     title: 'Baseball',
   },
-  {
-    name: 'Demo',
-    component: DemoScreen,
-    title: 'Component Demo',
-  },
 ];
 
-function InnerLayout(): React.JSX.Element {
-  const { loading } = useCurrentUserInfo();
+// Create authentication configuration for mobile
+const authConfig = createAuthConfig({
+  oauthProxyUrl:
+    (Constants.expoConfig?.extra?.oauthProxyUrl as string) ||
+    'http://localhost:5001',
+  googleClientId:
+    (Constants.expoConfig?.extra?.googleClientId as string) ||
+    '1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com',
+});
+
+// Initialize authentication service
+let authServiceInitialized = false;
+if (!authServiceInitialized) {
+  try {
+    validateAuthConfig(authConfig);
+    createAuthService(authConfig);
+    authServiceInitialized = true;
+  } catch (error) {
+    console.warn('Auth configuration validation failed:', error);
+    // Create auth service anyway for development
+    createAuthService(authConfig);
+    authServiceInitialized = true;
+  }
+}
+
+function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
   const colorScheme = useColorScheme();
 
@@ -47,10 +69,30 @@ function InnerLayout(): React.JSX.Element {
     <AppProvider
       apolloClient={client.apolloClient}
       colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
-      isLoading={loading}
+      isLoading={false}
     >
       <AppNavigator routes={routes} initialRoute="Home" />
     </AppProvider>
+  );
+}
+
+function InnerLayout(): React.JSX.Element {
+  return (
+    <EnhancedAuthGuard
+      oauthProxyUrl={authConfig.oauthProxyUrl}
+      googleClientId={authConfig.googleClientId}
+      loginTitle="Welcome to Legacy Sports!"
+      loginSubtitle="Sign in to access your fantasy leagues and stats"
+      testMode={__DEV__} // Enable test mode in development
+      onLoginSuccess={() => {
+        console.log('Mobile login successful!');
+      }}
+      onLoginFailure={(error) => {
+        console.error('Mobile login failed:', error);
+      }}
+    >
+      <AuthenticatedContent />
+    </EnhancedAuthGuard>
   );
 }
 

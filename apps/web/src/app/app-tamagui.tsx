@@ -3,11 +3,10 @@ import { Route, Routes } from 'react-router-dom';
 import { TamaguiProvider } from 'tamagui';
 import {
   BaseballScreen,
-  DemoScreen,
   FootballScreen,
   HomeScreen,
-  tamaguiConfig,
 } from '@legacy-sports/shared-components';
+import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
 export function App() {
   const handleSportPress = (sportKey: string): void => {
@@ -25,7 +24,6 @@ export function App() {
         />
         <Route path="/football" element={<FootballScreen />} />
         <Route path="/baseball" element={<BaseballScreen />} />
-        <Route path="/demo" element={<DemoScreen />} />
       </Routes>
     </TamaguiProvider>
   );

@@ -1,45 +1,27 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { H1, H2, ScrollView, Text, YStack } from 'tamagui';
 
 export default function BaseballHome() {
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Baseball Fantasy</Text>
-      <Text style={styles.subHeading}>Manage your leagues and drafts</Text>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack
+        alignItems="center"
+        backgroundColor="$background"
+        flexGrow={1}
+        padding="$5"
+        space="$4"
+      >
+        <H1 color="$orange10" fontSize="$9" fontWeight="bold" marginBottom="$2">
+          Baseball Fantasy
+        </H1>
+        <Text color="$color" fontSize="$6" marginBottom="$5">
+          Manage your leagues and drafts
+        </Text>
 
-      <Text style={styles.sectionTitle}>Upcoming Games</Text>
+        <H2 color="$color" fontSize="$8" fontWeight="600" marginBottom="$2">
+          Upcoming Games
+        </H2>
+      </YStack>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  bannerImage: {
-    borderRadius: 10,
-    height: 200,
-    marginBottom: 20,
-    width: '100%',
-  },
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#0D0D0D',
-    flexGrow: 1,
-    padding: 20,
-  },
-  heading: {
-    color: '#FF4500',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  subHeading: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    marginBottom: 20,
-  },
-});

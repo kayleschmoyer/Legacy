@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
+import { Button, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   Alert,
   FlatList,
   Modal,
   Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
-  View,
 } from '../../platform-components';
 import { League, User } from '../../types';
 import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
@@ -109,91 +105,135 @@ function SportHome({
   const renderLeague = ({ item }: { item: League }) => (
     <TouchableOpacity
       style={safeStyle([
-        styles.leagueCard,
-        { borderLeftColor: sportConfig.colors.accent },
+        {
+          backgroundColor: DEFAULT_COLORS.secondary,
+          borderRadius: 12,
+          padding: 16,
+          borderLeftWidth: 4,
+          borderLeftColor: sportConfig.colors.accent,
+        },
       ])}
       onPress={() => onLeaguePress(item)}
     >
-      <View style={styles.leagueHeader}>
-        <Text style={styles.leagueName}>{item.name}</Text>
-        <Text style={styles.sportName}>{sportConfig.name}</Text>
-      </View>
-
-      <View style={styles.leagueDetails}>
-        <Text style={styles.leagueInfo}>{item.numberOfTeams} Teams</Text>
-        <Text style={styles.leagueInfo}>
-          Draft: {new Date(item.draftDate).toLocaleDateString()}
+      <XStack
+        justifyContent="space-between"
+        alignItems="flex-start"
+        marginBottom="$2"
+      >
+        <Text fontSize="$5" fontWeight="bold" color="$gray12" flex={1}>
+          {item.name}
         </Text>
         <Text
-          style={safeStyle([
-            styles.draftType,
-            { color: sportConfig.colors.accent },
-          ])}
+          fontSize="$2"
+          color="$gray10"
+          backgroundColor="$gray4"
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+          borderRadius="$3"
         >
+          {sportConfig.name}
+        </Text>
+      </XStack>
+
+      <XStack justifyContent="space-between" alignItems="center">
+        <Text fontSize="$3" color="$gray10">
+          {item.numberOfTeams} Teams
+        </Text>
+        <Text fontSize="$3" color="$gray10">
+          Draft: {new Date(item.draftDate).toLocaleDateString()}
+        </Text>
+        <Text fontSize="$2" fontWeight="600" color={sportConfig.colors.accent}>
           {item.draftType} Draft
         </Text>
-      </View>
+      </XStack>
     </TouchableOpacity>
   );
 
   const renderQuickAction = ({ item }: { item: QuickAction }) => (
     <TouchableOpacity
       style={safeStyle([
-        styles.actionButton,
-        { backgroundColor: item.color || DEFAULT_COLORS.accent },
+        {
+          paddingVertical: 16,
+          paddingHorizontal: 20,
+          borderRadius: 12,
+          alignItems: 'center',
+          minWidth: 120,
+          backgroundColor: item.color || DEFAULT_COLORS.accent,
+        },
       ])}
       onPress={item.onPress}
       disabled={loading}
     >
-      {item.icon && <Text style={styles.actionIcon}>{item.icon}</Text>}
-      <Text style={styles.actionText}>{item.title}</Text>
+      {item.icon && (
+        <Text fontSize="$6" marginBottom="$2">
+          {item.icon}
+        </Text>
+      )}
+      <Text fontSize="$3" fontWeight="600" color="white" textAlign="center">
+        {item.title}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      flex={1}
+      backgroundColor="$gray1"
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
-      <View
-        style={safeStyle([
-          styles.header,
-          { backgroundColor: sportConfig.colors.primary },
-        ])}
+      <YStack
+        padding="$6"
+        paddingTop={Platform.OS === 'ios' ? 60 : '$6'}
+        backgroundColor={sportConfig.colors.primary}
+        borderBottomLeftRadius="$4"
+        borderBottomRightRadius="$4"
       >
-        <Text style={styles.title}>{sportConfig.name} Fantasy</Text>
-        <Text style={styles.subtitle}>Welcome back, {user.name}!</Text>
-      </View>
+        <Text fontSize="$8" fontWeight="bold" color="white" marginBottom="$1">
+          {sportConfig.name} Fantasy
+        </Text>
+        <Text fontSize="$4" color="white" opacity={0.8}>
+          Welcome back, {user.name}!
+        </Text>
+      </YStack>
 
       {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <FlatList
+      <YStack margin="$4">
+        <Text fontSize="$6" fontWeight="bold" color="$gray12" marginBottom="$4">
+          Quick Actions
+        </Text>
+        <FlatList<QuickAction>
           data={defaultQuickActions}
           renderItem={renderQuickAction}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.actionsContainer}
+          contentContainerStyle={{ gap: 12 }}
         />
-      </View>
+      </YStack>
 
       {/* My Leagues */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>My Leagues</Text>
+      <YStack margin="$4">
+        <Text fontSize="$6" fontWeight="bold" color="$gray12" marginBottom="$4">
+          My Leagues
+        </Text>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading leagues...</Text>
-          </View>
+          <YStack padding="$10" alignItems="center">
+            <Text fontSize="$4" color="$gray10">
+              Loading leagues...
+            </Text>
+          </YStack>
         ) : leagues.length > 0 ? (
-          <FlatList
+          <FlatList<League>
             data={leagues}
             renderItem={renderLeague}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: League) => item.id}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.leaguesContainer}
+            contentContainerStyle={{ gap: 12 }}
           />
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>
+          <YStack alignItems="center" padding="$10">
+            <Text fontSize="$12" marginBottom="$4">
               {Platform.OS === 'web' ? (
                 <span role="img" aria-label="Trophy">
                   🏆
@@ -202,13 +242,26 @@ function SportHome({
                 '🏆'
               )}
             </Text>
-            <Text style={styles.emptyStateTitle}>No Leagues Yet</Text>
-            <Text style={styles.emptyStateText}>
+            <Text
+              fontSize="$6"
+              fontWeight="bold"
+              color="$gray12"
+              marginBottom="$2"
+              textAlign="center"
+            >
+              No Leagues Yet
+            </Text>
+            <Text
+              fontSize="$4"
+              color="$gray10"
+              textAlign="center"
+              lineHeight="$1"
+            >
               Create your first league or join an existing one to get started!
             </Text>
-          </View>
+          </YStack>
         )}
-      </View>
+      </YStack>
 
       {/* Create League Modal */}
       <CreateLeagueModal
@@ -227,280 +280,85 @@ function SportHome({
           animationType="fade"
           onRequestClose={() => setShowJoinModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Join League</Text>
+          <YStack
+            flex={1}
+            backgroundColor="rgba(0, 0, 0, 0.7)"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <YStack
+              backgroundColor="$gray2"
+              borderRadius="$4"
+              padding="$6"
+              width={Platform.OS === 'web' ? 350 : '85%'}
+            >
+              <Text
+                fontSize="$6"
+                fontWeight="bold"
+                color="$gray12"
+                marginBottom="$5"
+                textAlign="center"
+              >
+                Join League
+              </Text>
 
-              <Text style={styles.inputLabel}>Enter Invite Code</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.textInput}
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$2"
+              >
+                Enter Invite Code
+              </Text>
+              <YStack marginBottom="$6">
+                <Input
+                  backgroundColor="$gray1"
+                  borderRadius="$2"
+                  padding="$3"
+                  fontSize="$4"
+                  color="$gray12"
+                  borderWidth={1}
+                  borderColor="$gray6"
                   value={inviteCode}
                   onChangeText={setInviteCode}
                   placeholder="ABC123XYZ"
-                  placeholderTextColor="#888"
+                  placeholderTextColor="$gray9"
                   autoCapitalize="characters"
                   editable={!loading}
                 />
-              </View>
+              </YStack>
 
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
+              <XStack gap="$3">
+                <Button
+                  flex={1}
+                  backgroundColor="$gray6"
+                  borderRadius="$2"
                   onPress={() => setShowJoinModal(false)}
                   disabled={loading}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
+                  <Text fontWeight="600" color="$gray12">
+                    Cancel
+                  </Text>
+                </Button>
 
-                <TouchableOpacity
-                  style={safeStyle([
-                    styles.submitButton,
-                    { backgroundColor: sportConfig.colors.accent },
-                  ])}
+                <Button
+                  flex={1}
+                  backgroundColor={sportConfig.colors.accent}
+                  borderRadius="$2"
                   onPress={handleJoinLeague}
                   disabled={loading}
                 >
-                  <Text style={styles.submitButtonText}>
+                  <Text fontWeight="600" color="white">
                     {loading ? 'Joining...' : 'Join League'}
                   </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+                </Button>
+              </XStack>
+            </YStack>
+          </YStack>
         </Modal>
       )}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  header: {
-    padding: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    opacity: 0.8,
-  },
-  section: {
-    margin: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-  },
-  actionsContainer: {
-    gap: 12,
-  },
-  actionButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    minWidth: 120,
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: DEFAULT_COLORS.textSecondary,
-    fontSize: 16,
-  },
-  leaguesContainer: {
-    gap: 12,
-  },
-  leagueCard: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  leagueHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  leagueName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    flex: 1,
-  },
-  sportName: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  leagueDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  leagueInfo: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  draftType: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 16,
-    padding: 24,
-    width: Platform.OS === 'web' ? 350 : '85%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  textInput: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-    textAlign: 'center',
-    letterSpacing: 2,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  submitButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-});
 
 export { SportHome };

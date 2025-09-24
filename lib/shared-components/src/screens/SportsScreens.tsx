@@ -1,107 +1,109 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from '../platform-components';
+import { Text } from 'tamagui';
+import { YStack } from '../Layout';
 
-// Football-specific styles matching mobile app
-const footballStyles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#121212',
-    flexGrow: 1,
-    padding: 20,
-    ...(Platform.OS === 'web' && {
-      minHeight: '60vh',
-      display: 'flex' as const,
-    }),
-  },
-  heading: {
-    color: '#FFD700',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  subHeading: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    marginBottom: 20,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 10,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-});
-
-// Baseball-specific styles matching mobile app
-const baseballStyles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#121212',
-    flexGrow: 1,
-    padding: 20,
-    ...(Platform.OS === 'web' && {
-      minHeight: '60vh',
-      display: 'flex' as const,
-    }),
-  },
-  heading: {
-    color: '#FFD700',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  subHeading: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    marginBottom: 20,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 10,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-});
+// Sports-themed color tokens
+const SPORTS_COLORS = {
+  background: '#121212',
+  gold: '#FFD700',
+  white: '#FFFFFF',
+} as const;
 
 function FootballScreen() {
   return (
-    <View style={footballStyles.container}>
-      <Text style={footballStyles.heading}>Football Fantasy</Text>
-      <Text style={footballStyles.subHeading}>
+    <YStack
+      ai="center"
+      bg={SPORTS_COLORS.background}
+      flexGrow={1}
+      p="$4"
+      $web={{
+        minHeight: '60vh',
+        display: 'flex',
+      }}
+    >
+      <Text
+        color={SPORTS_COLORS.gold}
+        fontSize="$8"
+        fontWeight="bold"
+        marginBottom="$2"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        Football Fantasy
+      </Text>
+      <Text
+        color={SPORTS_COLORS.white}
+        fontSize="$5"
+        marginBottom="$4"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
         Manage your leagues and drafts
       </Text>
 
-      <Text style={footballStyles.sectionTitle}>Upcoming Drafts</Text>
-    </View>
+      <Text
+        color={SPORTS_COLORS.white}
+        fontSize="$7"
+        fontWeight="600"
+        marginBottom="$2"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        Upcoming Drafts
+      </Text>
+    </YStack>
   );
 }
 
 function BaseballScreen() {
   return (
-    <View style={baseballStyles.container}>
-      <Text style={baseballStyles.heading}>Baseball Fantasy</Text>
-      <Text style={baseballStyles.subHeading}>Where Legends Are Made</Text>
+    <YStack
+      ai="center"
+      bg={SPORTS_COLORS.background}
+      flexGrow={1}
+      p="$4"
+      $web={{
+        minHeight: '60vh',
+        display: 'flex',
+      }}
+    >
+      <Text
+        color={SPORTS_COLORS.gold}
+        fontSize="$8"
+        fontWeight="bold"
+        marginBottom="$2"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        Baseball Fantasy
+      </Text>
+      <Text
+        color={SPORTS_COLORS.white}
+        fontSize="$5"
+        marginBottom="$4"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        Where Legends Are Made
+      </Text>
 
-      <Text style={baseballStyles.sectionTitle}>Manage Your Leagues</Text>
-    </View>
+      <Text
+        color={SPORTS_COLORS.white}
+        fontSize="$7"
+        fontWeight="600"
+        marginBottom="$2"
+        $web={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        Manage Your Leagues
+      </Text>
+    </YStack>
   );
 }
 

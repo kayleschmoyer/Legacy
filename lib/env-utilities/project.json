@@ -5,5 +5,15 @@
   "projectType": "library",
   "tags": [],
   "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/lib/env-utilities",
+        "main": "lib/env-utilities/src/index.ts",
+        "tsConfig": "lib/env-utilities/tsconfig.lib.json",
+        "assets": []
+      }
+    }
   }
 }

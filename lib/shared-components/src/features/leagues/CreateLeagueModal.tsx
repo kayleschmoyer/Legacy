@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { Button, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   Alert,
   Modal,
   Platform,
-  StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
-  View,
 } from '../../platform-components';
 import { safeStyle } from '../../utils/styles';
 import {
@@ -88,42 +85,6 @@ function CreateLeagueModal({
     }
   };
 
-  const renderDropdown = (
-    value: string,
-    options: Array<{ label: string; value: string }>,
-    onSelect: (value: string) => void,
-    isVisible: boolean,
-    onToggle: () => void,
-  ) => (
-    <View style={styles.dropdownContainer}>
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        onPress={onToggle}
-        disabled={loading}
-      >
-        <Text style={styles.dropdownButtonText}>{value}</Text>
-        <Text style={styles.dropdownArrow}>▼</Text>
-      </TouchableOpacity>
-
-      {isVisible && (
-        <View style={styles.dropdownMenu}>
-          {options.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={styles.dropdownMenuItem}
-              onPress={() => {
-                onSelect(option.value);
-                onToggle();
-              }}
-            >
-              <Text style={styles.dropdownMenuText}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
   return (
     <Modal
       visible={visible}
@@ -131,270 +92,301 @@ function CreateLeagueModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Create New League</Text>
+      <YStack
+        flex={1}
+        backgroundColor="rgba(0, 0, 0, 0.7)"
+        justifyContent="center"
+        alignItems="center"
+      >
+        <YStack
+          backgroundColor="white"
+          borderRadius="$4"
+          padding="$6"
+          width={Platform.OS === 'web' ? 400 : '90%'}
+          maxHeight="80%"
+        >
+          <Text
+            fontSize="$6"
+            fontWeight="bold"
+            color="$gray12"
+            marginBottom="$5"
+            textAlign="center"
+          >
+            Create New League
+          </Text>
 
-          {/* League Name Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>League Name</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.leagueName}
-              onChangeText={(text) =>
-                setFormData((prev) => ({ ...prev, leagueName: text }))
-              }
-              placeholder="Enter league name"
-              placeholderTextColor="#888"
-              editable={!loading}
-            />
-          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* League Name Input */}
+            <YStack marginBottom="$4">
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$2"
+              >
+                League Name
+              </Text>
+              <Input
+                backgroundColor="$gray1"
+                borderRadius="$2"
+                padding="$3"
+                fontSize="$4"
+                borderWidth={1}
+                borderColor="$gray6"
+                value={formData.leagueName}
+                onChangeText={(text: string) =>
+                  setFormData((prev) => ({ ...prev, leagueName: text }))
+                }
+                placeholder="Enter league name"
+                editable={!loading}
+              />
+            </YStack>
 
-          {/* Sport Selection */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Sport</Text>
-            {renderDropdown(
-              SPORT_CONFIGS[formData.sport].name,
-              sportOptions.map((sport) => ({
-                label: SPORT_CONFIGS[sport].name,
-                value: sport,
-              })),
-              (value) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  sport: value as
-                    | 'baseball'
-                    | 'football'
-                    | 'basketball'
-                    | 'hockey',
-                })),
-              showSportDropdown,
-              () => setShowSportDropdown(!showSportDropdown),
-            )}
-          </View>
+            {/* Sport Selection */}
+            <YStack marginBottom="$4">
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$2"
+              >
+                Sport
+              </Text>
+              <TouchableOpacity
+                style={safeStyle([
+                  {
+                    backgroundColor: '$gray1',
+                    borderRadius: 8,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '$gray6',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  },
+                ])}
+                onPress={() => setShowSportDropdown(!showSportDropdown)}
+                disabled={loading}
+              >
+                <Text fontSize="$4" color="$gray12">
+                  {SPORT_CONFIGS[formData.sport].name}
+                </Text>
+                <Text fontSize="$3" color="$gray10">
+                  ▼
+                </Text>
+              </TouchableOpacity>
 
-          {/* Number of Teams */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Number of Teams</Text>
-            {renderDropdown(
-              formData.numberOfTeams.toString(),
-              DROPDOWN_TEAM_COUNT_ITEMS.map((item) => ({
-                label: item.text,
-                value: item.value,
-              })),
-              (value) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  numberOfTeams: parseInt(value, 10),
-                })),
-              showTeamCountDropdown,
-              () => setShowTeamCountDropdown(!showTeamCountDropdown),
-            )}
-          </View>
+              {showSportDropdown && (
+                <YStack
+                  backgroundColor="white"
+                  borderRadius="$2"
+                  borderWidth={1}
+                  borderColor="$gray6"
+                  marginTop="$1"
+                >
+                  {sportOptions.map((sport) => (
+                    <TouchableOpacity
+                      key={sport}
+                      style={safeStyle([
+                        {
+                          padding: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '$gray4',
+                        },
+                      ])}
+                      onPress={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          sport: sport as
+                            | 'baseball'
+                            | 'football'
+                            | 'basketball'
+                            | 'hockey',
+                        }));
+                        setShowSportDropdown(false);
+                      }}
+                    >
+                      <Text fontSize="$4" color="$gray12">
+                        {SPORT_CONFIGS[sport].name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </YStack>
+              )}
+            </YStack>
 
-          {/* Draft Type */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Draft Type</Text>
-            {renderDropdown(
-              DRAFT_TYPES.find(
-                (type) => type.value === (formData.draftType as string),
-              )?.label || 'Normal',
-              [...DRAFT_TYPES],
-              (value) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  draftType: value as DraftType,
-                })),
-              showDraftTypeDropdown,
-              () => setShowDraftTypeDropdown(!showDraftTypeDropdown),
-            )}
-          </View>
+            {/* Number of Teams */}
+            <YStack marginBottom="$4">
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$2"
+              >
+                Number of Teams
+              </Text>
+              <TouchableOpacity
+                style={safeStyle([
+                  {
+                    backgroundColor: '$gray1',
+                    borderRadius: 8,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '$gray6',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  },
+                ])}
+                onPress={() => setShowTeamCountDropdown(!showTeamCountDropdown)}
+                disabled={loading}
+              >
+                <Text fontSize="$4" color="$gray12">
+                  {formData.numberOfTeams} Teams
+                </Text>
+                <Text fontSize="$3" color="$gray10">
+                  ▼
+                </Text>
+              </TouchableOpacity>
+
+              {showTeamCountDropdown && (
+                <YStack
+                  backgroundColor="white"
+                  borderRadius="$2"
+                  borderWidth={1}
+                  borderColor="$gray6"
+                  marginTop="$1"
+                >
+                  {DROPDOWN_TEAM_COUNT_ITEMS.map((item) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={safeStyle([
+                        {
+                          padding: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '$gray4',
+                        },
+                      ])}
+                      onPress={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          numberOfTeams: parseInt(item.value, 10),
+                        }));
+                        setShowTeamCountDropdown(false);
+                      }}
+                    >
+                      <Text fontSize="$4" color="$gray12">
+                        {item.text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </YStack>
+              )}
+            </YStack>
+
+            {/* Draft Type */}
+            <YStack marginBottom="$4">
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color="$gray12"
+                marginBottom="$2"
+              >
+                Draft Type
+              </Text>
+              <TouchableOpacity
+                style={safeStyle([
+                  {
+                    backgroundColor: '$gray1',
+                    borderRadius: 8,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '$gray6',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  },
+                ])}
+                onPress={() => setShowDraftTypeDropdown(!showDraftTypeDropdown)}
+                disabled={loading}
+              >
+                <Text fontSize="$4" color="$gray12">
+                  {DRAFT_TYPES.find(
+                    (type) => type.value === (formData.draftType as string),
+                  )?.label || 'Normal'}
+                </Text>
+                <Text fontSize="$3" color="$gray10">
+                  ▼
+                </Text>
+              </TouchableOpacity>
+
+              {showDraftTypeDropdown && (
+                <YStack
+                  backgroundColor="white"
+                  borderRadius="$2"
+                  borderWidth={1}
+                  borderColor="$gray6"
+                  marginTop="$1"
+                >
+                  {DRAFT_TYPES.map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={safeStyle([
+                        {
+                          padding: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '$gray4',
+                        },
+                      ])}
+                      onPress={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          draftType: type.value as DraftType,
+                        }));
+                        setShowDraftTypeDropdown(false);
+                      }}
+                    >
+                      <Text fontSize="$4" color="$gray12">
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </YStack>
+              )}
+            </YStack>
+          </ScrollView>
 
           {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={safeStyle([styles.button, styles.cancelButton])}
+          <XStack gap="$3" marginTop="$4">
+            <Button
+              flex={1}
+              backgroundColor="$gray6"
+              borderRadius="$2"
               onPress={onClose}
               disabled={loading}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              <Text fontWeight="600" color="$gray12">
+                Cancel
+              </Text>
+            </Button>
 
-            <TouchableOpacity
-              style={safeStyle([
-                styles.button,
-                styles.submitButton,
-                loading && styles.disabledButton,
-              ])}
+            <Button
+              flex={1}
+              backgroundColor="$blue10"
+              borderRadius="$2"
               onPress={() => void handleSubmit()}
               disabled={loading}
+              opacity={loading ? 0.6 : 1}
             >
-              <Text style={styles.submitButtonText}>
+              <Text fontWeight="600" color="white">
                 {loading ? 'Creating...' : 'Create League'}
               </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+            </Button>
+          </XStack>
+        </YStack>
+      </YStack>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: Platform.OS === 'web' ? 400 : '90%',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 15,
-    padding: 24,
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF8C00',
-    marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#555',
-  },
-  dropdownContainer: {
-    position: 'relative',
-    zIndex: 1000,
-  },
-  dropdownButton: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#555',
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  dropdownArrow: {
-    fontSize: 12,
-    color: '#888',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#555',
-    zIndex: 1001,
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  dropdownMenuItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#444',
-  },
-  dropdownMenuText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 24,
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#555',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#FF8C00',
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  disabledButton: {
-    backgroundColor: '#666',
-    opacity: 0.6,
-  },
-});
 
 export { CreateLeagueModal };

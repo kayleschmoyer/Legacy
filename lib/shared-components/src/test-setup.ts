@@ -24,15 +24,15 @@ jest.mock('react-native', () => ({
   SafeAreaView: 'SafeAreaView', // Add SafeAreaView mock
   TextInput: 'TextInput',
   StyleSheet: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
-    create: (styles: any) => styles,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
-    flatten: (style: any) => style,
+    create: (styles: Record<string, unknown>) => styles,
+    flatten: (style: Record<string, unknown>) => style,
   },
   Platform: {
     OS: 'ios',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-    select: jest.fn((platforms) => platforms.ios || platforms.default),
+    select: jest.fn(
+      (platforms: { ios?: unknown; default?: unknown }) =>
+        platforms.ios || platforms.default,
+    ),
   },
   Dimensions: {
     get: jest.fn(() => ({ width: 375, height: 667 })), // Default to mobile size
@@ -49,4 +49,4 @@ jest.mock('react-native-table-component', () => ({
 }));
 
 // Mock fetch globally
-global.fetch = jest.fn();
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;

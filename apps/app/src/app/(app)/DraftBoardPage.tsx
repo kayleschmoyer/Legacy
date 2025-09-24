@@ -11,15 +11,20 @@ import {
   FlatList,
   Modal,
   Platform,
-  ScrollView,
   StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   Vibration,
-  View,
 } from 'react-native';
+import {
+  Button,
+  Card,
+  Input,
+  ScrollView,
+  Text,
+  View,
+  XStack,
+  YStack,
+} from 'tamagui';
 
 // Sport configurations
 const SPORT_CONFIGS = {
@@ -138,7 +143,7 @@ const useTimer = (initialTime: number) => {
       setIsActive(false);
       colorAnim.setValue(1);
     },
-    [initialTime, colorAnim]
+    [initialTime, colorAnim],
   );
 
   return { colorAnim, isActive, pause, reset, start, time };
@@ -155,49 +160,61 @@ const PlayerCard: React.FC<{
 }> = ({ player, onSelect, isSelected, sport = 'baseball' }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
-
   return (
-    <Animated.View
-      style={[
-        styles.playerCard,
-        { transform: [{ scale: scaleAnim }] },
-        isSelected && styles.selectedCard,
-      ]}
-    >
-      <TouchableOpacity
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
+      <Card
+        backgroundColor="rgba(255,255,255,0.1)"
+        borderColor={isSelected ? '$white' : 'rgba(255,255,255,0.2)'}
+        borderRadius="$4"
+        borderWidth={isSelected ? 2 : 1}
+        flex={1}
+        margin="$2"
+        shadowColor="$shadowColor"
+        shadowOffset={{ height: 4, width: 0 }}
+        shadowOpacity={0.3}
+        shadowRadius={8}
+        elevation={8}
+        pressStyle={{ scale: 0.98 }}
         onPress={onSelect}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardContent}
-        activeOpacity={1}
+        padding="$4"
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.playerName}>{player.name}</Text>
-          <View
-            style={[
-              styles.positionBadge,
-              { backgroundColor: getPositionColor(player.position, sport) },
-            ]}
+        <XStack
+          alignItems="flex-start"
+          justifyContent="space-between"
+          marginBottom="$2"
+        >
+          <Text
+            color="$white"
+            flex={1}
+            fontSize="$4"
+            fontWeight="700"
+            marginRight="$2"
           >
-            <Text style={styles.positionText}>{player.position}</Text>
+            {player.name}
+          </Text>
+          <View
+            backgroundColor={getPositionColor(player.position, sport)}
+            borderRadius="$2"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+          >
+            <Text color="$white" fontSize="$1" fontWeight="700">
+              {player.position}
+            </Text>
           </View>
-        </View>
-        <Text style={styles.teamText}>{player.team}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.adpText}>ADP: {player.adp}</Text>
-          <Text style={styles.rankText}>#{player.rank}</Text>
-        </View>
-      </TouchableOpacity>
+        </XStack>
+        <Text color="rgba(255,255,255,0.7)" fontSize="$3" marginBottom="$3">
+          {player.team}
+        </Text>
+        <XStack justifyContent="space-between">
+          <Text color="rgba(255,255,255,0.6)" fontSize="$2">
+            ADP: {player.adp}
+          </Text>
+          <Text color="$white" fontSize="$2" fontWeight="600">
+            #{player.rank}
+          </Text>
+        </XStack>
+      </Card>
     </Animated.View>
   );
 };
@@ -218,11 +235,28 @@ const TimerBar: React.FC<{ time: number; colorAnim: Animated.Value }> = ({
   const seconds = time % 60;
 
   return (
-    <Animated.View style={[styles.timerBar, { backgroundColor }]}>
-      <Text style={styles.timerText}>
+    <Animated.View
+      style={{
+        alignItems: 'center',
+        height: 60,
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+        backgroundColor,
+      }}
+    >
+      <Text
+        color="$white"
+        fontSize="$8"
+        fontWeight="800"
+        textShadowColor="rgba(0,0,0,0.3)"
+        textShadowOffset={{ height: 1, width: 0 }}
+        textShadowRadius={2}
+      >
         {minutes}:{seconds.toString().padStart(2, '0')}
       </Text>
-      <Text style={styles.timerLabel}>Time Remaining</Text>
+      <Text color="rgba(255,255,255,0.8)" fontSize="$2" marginTop="$1">
+        Time Remaining
+      </Text>
     </Animated.View>
   );
 };
@@ -250,31 +284,54 @@ const FilterDrawer: React.FC<{
 
   return (
     <Modal visible={visible} transparent>
-      <View style={styles.drawerOverlay}>
-        <TouchableOpacity style={styles.drawerBackdrop} onPress={onClose} />
+      <View
+        backgroundColor="rgba(0, 0, 0, 0.5)"
+        position="absolute"
+        width="100%"
+        height="100%"
+      >
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           style={[
-            styles.filterDrawer,
+            {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '$background',
+              padding: 20,
+              paddingTop: 30,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+            },
             { transform: [{ translateY: slideAnim }] },
           ]}
         >
-          <Text style={styles.drawerTitle}>Filters</Text>
-          <ScrollView style={styles.drawerContent}>
-            <Text style={styles.filterLabel}>Position</Text>
-            <View style={styles.filterGrid}>
+          <Text fontSize="$6" fontWeight="600" marginBottom="$4">
+            Filters
+          </Text>
+          <ScrollView backgroundColor="$background" flex={1}>
+            <Text fontSize="$4" fontWeight="500" marginBottom="$3">
+              Position
+            </Text>
+            <XStack flexWrap="wrap" gap="$2" marginBottom="$4">
               {allPositions.map((pos) => (
-                <TouchableOpacity
+                <Button
                   key={pos}
-                  style={[
-                    styles.filterChip,
-                    filters.position === pos && styles.filterChipActive,
-                  ]}
+                  size="$3"
+                  backgroundColor={
+                    filters.position === pos ? '$blue10' : '$gray4'
+                  }
+                  color={filters.position === pos ? 'white' : '$gray11'}
+                  borderRadius="$3"
+                  paddingHorizontal="$3"
+                  paddingVertical="$2"
                   onPress={() => onFiltersChange({ ...filters, position: pos })}
                 >
-                  <Text style={styles.filterChipText}>{pos}</Text>
-                </TouchableOpacity>
+                  {pos}
+                </Button>
               ))}
-            </View>
+            </XStack>
           </ScrollView>
         </Animated.View>
       </View>
@@ -294,7 +351,7 @@ const DraftBoardPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [activeView, setActiveView] = useState<'draft' | 'teams' | 'myteam'>(
-    'draft'
+    'draft',
   );
   // Sport config
   const sportConfig = SPORT_CONFIGS[sport];
@@ -339,7 +396,7 @@ const DraftBoardPage: React.FC = () => {
       timer.reset(90);
       timer.start();
     },
-    [timer]
+    [timer],
   );
 
   const handleStartDraft = useCallback(() => {
@@ -360,26 +417,27 @@ const DraftBoardPage: React.FC = () => {
           sport={sport}
         />
       )}
-      contentContainerStyle={styles.playerGrid}
+      contentContainerStyle={{ padding: 16 }}
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>No players available</Text>
-          <Text style={styles.emptyStateSubtext}>
+        <YStack
+          alignItems="center"
+          justifyContent="center"
+          paddingVertical="$8"
+        >
+          <Text fontSize="$5" fontWeight="600" color="$gray11">
+            No players available
+          </Text>
+          <Text fontSize="$3" color="$gray10" textAlign="center" marginTop="$2">
             Players will appear when database is populated
           </Text>
-        </View>
+        </YStack>
       }
     />
   );
 
   const renderMobileLayout = () => (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: sportConfig.colors.primary },
-      ]}
-    >
+    <View backgroundColor={sportConfig.colors.primary} flex={1}>
       <StatusBar
         barStyle="light-content"
         backgroundColor={sportConfig.colors.primary}
@@ -387,42 +445,59 @@ const DraftBoardPage: React.FC = () => {
 
       {/* Header */}
       <View
-        style={[
-          styles.mobileHeader,
-          { backgroundColor: sportConfig.colors.secondary },
-        ]}
+        backgroundColor={sportConfig.colors.secondary}
+        paddingHorizontal="$4"
+        paddingVertical="$3"
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
       >
-        <Text style={styles.leagueName}>{draft.name}</Text>
-        <Text style={styles.sportBadge}>{sport.toUpperCase()}</Text>
-        <View style={styles.headerTabs}>
-          <TouchableOpacity
-            style={[
-              styles.headerTab,
-              activeView === 'draft' && styles.activeHeaderTab,
-            ]}
+        <Text fontSize="$6" fontWeight="600" color="white">
+          {draft.name}
+        </Text>
+        <Text
+          fontSize="$3"
+          backgroundColor="$blue10"
+          color="white"
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+          borderRadius="$2"
+        >
+          {sport.toUpperCase()}
+        </Text>
+        <XStack gap="$2">
+          <Button
+            size="$3"
+            backgroundColor={activeView === 'draft' ? '$blue10' : 'transparent'}
+            color={activeView === 'draft' ? 'white' : '$gray11'}
+            borderRadius="$2"
+            paddingHorizontal="$3"
             onPress={() => setActiveView('draft')}
           >
-            <Text style={styles.headerTabText}>Draft</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.headerTab,
-              activeView === 'myteam' && styles.activeHeaderTab,
-            ]}
+            Draft
+          </Button>
+          <Button
+            size="$3"
+            backgroundColor={
+              activeView === 'myteam' ? '$blue10' : 'transparent'
+            }
+            color={activeView === 'myteam' ? 'white' : '$gray11'}
+            borderRadius="$2"
+            paddingHorizontal="$3"
             onPress={() => setActiveView('myteam')}
           >
-            <Text style={styles.headerTabText}>My Team</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.headerTab,
-              activeView === 'teams' && styles.activeHeaderTab,
-            ]}
-            onPress={() => setActiveView('teams')}
+            My Team
+          </Button>
+          <Button
+            size="$3"
+            backgroundColor={activeView === 'teams' ? '$blue10' : 'transparent'}
+            color={activeView === 'teams' ? 'white' : '$gray11'}
+            borderRadius="$2"
+            paddingHorizontal="$3"
           >
-            <Text style={styles.headerTabText}>All Teams</Text>
-          </TouchableOpacity>
-        </View>
+            All Teams
+          </Button>
+        </XStack>
       </View>
 
       {activeView === 'draft' ? (
@@ -434,71 +509,114 @@ const DraftBoardPage: React.FC = () => {
 
           {/* Start Draft Button */}
           {draft.status === 'waiting' && (
-            <TouchableOpacity
-              style={[
-                styles.startDraftButton,
-                { backgroundColor: sportConfig.colors.accent },
-              ]}
+            <Button
+              backgroundColor={sportConfig.colors.accent}
+              color="white"
+              size="$5"
+              margin="$4"
               onPress={handleStartDraft}
             >
-              <Text style={styles.startDraftText}>Start Draft</Text>
-            </TouchableOpacity>
+              Start Draft
+            </Button>
           )}
 
           {/* Search & Filters */}
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={[
-                styles.searchInput,
-                { borderColor: sportConfig.colors.accent },
-              ]}
+          <XStack
+            paddingHorizontal="$4"
+            paddingVertical="$2"
+            gap="$2"
+            alignItems="center"
+          >
+            <Input
+              flex={1}
               placeholder={`Search ${sport} players...`}
-              placeholderTextColor="#64748b"
               value={searchText}
               onChangeText={setSearchText}
+              borderColor={sportConfig.colors.accent}
+              backgroundColor="$background"
+              borderRadius="$3"
             />
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                { backgroundColor: sportConfig.colors.accent },
-              ]}
+            <Button
+              backgroundColor={sportConfig.colors.accent}
+              color="white"
+              size="$3"
+              paddingHorizontal="$3"
               onPress={() => setShowFilters(true)}
             >
-              <Text style={styles.filterButtonText}>Filters</Text>
-            </TouchableOpacity>
-          </View>
+              Filters
+            </Button>
+          </XStack>
 
           {/* Player Grid */}
           {renderPlayerGrid()}
         </>
       ) : activeView === 'myteam' ? (
         /* My Team View */
-        <ScrollView style={styles.myTeamContainer}>
-          <Text style={styles.myTeamTitle}>My Roster</Text>
+        <ScrollView backgroundColor="$background" padding="$4">
+          <Text fontSize="$6" fontWeight="600" marginBottom="$4">
+            My Roster
+          </Text>
           {sportConfig.positions.map((position) => (
-            <View key={position} style={styles.rosterSlot}>
-              <Text style={styles.positionLabel}>{position}</Text>
-              <Text style={styles.playerSlot}>Empty</Text>
-            </View>
+            <XStack
+              key={position}
+              alignItems="center"
+              justifyContent="space-between"
+              marginBottom="$3"
+              padding="$3"
+              backgroundColor="$gray2"
+              borderRadius="$3"
+            >
+              <Text fontSize="$4" fontWeight="500">
+                {position}
+              </Text>
+              <Text fontSize="$3" color="$gray10">
+                Empty
+              </Text>
+            </XStack>
           ))}
 
-          <Text style={styles.benchTitle}>Bench</Text>
+          <Text fontSize="$5" fontWeight="600" marginTop="$4" marginBottom="$3">
+            Bench
+          </Text>
           {[1, 2, 3, 4, 5].map((benchSpot) => (
-            <View key={benchSpot} style={styles.rosterSlot}>
-              <Text style={styles.positionLabel}>BE{benchSpot}</Text>
-              <Text style={styles.playerSlot}>Empty</Text>
-            </View>
+            <XStack
+              key={benchSpot}
+              alignItems="center"
+              justifyContent="space-between"
+              marginBottom="$3"
+              padding="$3"
+              backgroundColor="$gray2"
+              borderRadius="$3"
+            >
+              <Text fontSize="$4" fontWeight="500">
+                BE{benchSpot}
+              </Text>
+              <Text fontSize="$3" color="$gray10">
+                Empty
+              </Text>
+            </XStack>
           ))}
         </ScrollView>
       ) : (
         /* Teams View */
-        <ScrollView style={styles.teamsContainer}>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No teams available</Text>
-            <Text style={styles.emptyStateSubtext}>
+        <ScrollView backgroundColor="$background" padding="$4">
+          <YStack
+            alignItems="center"
+            justifyContent="center"
+            paddingVertical="$8"
+          >
+            <Text fontSize="$5" fontWeight="600" color="$gray11">
+              No teams available
+            </Text>
+            <Text
+              fontSize="$3"
+              color="$gray10"
+              textAlign="center"
+              marginTop="$2"
+            >
               Teams will appear when database is populated
             </Text>
-          </View>
+          </YStack>
         </ScrollView>
       )}
 
@@ -538,302 +656,5 @@ const getPositionColor = (position: string, sport: string): string => {
   const colors = sport === 'baseball' ? baseballColors : footballColors;
   return colors[position] || '#6b7280';
 };
-
-// Styles
-const styles = StyleSheet.create({
-  activeHeaderTab: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  container: {
-    flex: 1,
-  },
-  headerTab: {
-    alignItems: 'center',
-    borderRadius: 6,
-    flex: 1,
-    minWidth: 60,
-    paddingVertical: 8,
-  },
-  headerTabText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerTabs: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 8,
-    flexDirection: 'row',
-    padding: 4,
-  },
-  leagueName: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  mobileHeader: {
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-  },
-  searchInput: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    color: '#ffffff',
-    flex: 1,
-    fontSize: 16,
-    height: 44,
-    paddingHorizontal: 16,
-  },
-  sportBadge: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  startDraftButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    elevation: 8,
-    margin: 20,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  filterButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    height: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  startDraftText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  filterButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timerBar: {
-    alignItems: 'center',
-    height: 60,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  timerText: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 2,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  cardHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  timerLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  playerCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 16,
-    borderWidth: 1,
-    elevation: 8,
-    flex: 1,
-    margin: 8,
-    shadowColor: '#000',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  playerGrid: {
-    padding: 8,
-  },
-  playerName: {
-    color: '#ffffff',
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    marginRight: 8,
-  },
-  positionBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  adpText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-  },
-  selectedCard: {
-    borderColor: '#ffffff',
-    borderWidth: 2,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  emptyState: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  positionText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  emptyStateSubtext: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  teamText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  emptyStateText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  myTeamContainer: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  myTeamContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  myTeamTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  positionLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  benchTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-    marginTop: 24,
-    textAlign: 'center',
-  },
-  positionText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  playerSlot: {
-    color: '#ffffff',
-    flex: 1,
-    fontSize: 16,
-    marginLeft: 16,
-  },
-  rankText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  drawerBackdrop: {
-    flex: 1,
-  },
-  drawerOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    flex: 1,
-  },
-  rosterSlot: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderColor: 'transparent',
-    borderRadius: 12,
-    borderWidth: 2,
-    flexDirection: 'row',
-    marginBottom: 8,
-    padding: 16,
-  },
-  drawerContent: {
-    padding: 20,
-  },
-  teamsContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  drawerTitle: {
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-    borderBottomWidth: 1,
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    paddingVertical: 20,
-    textAlign: 'center',
-  },
-  filterDrawer: {
-    backgroundColor: 'rgba(30,41,59,0.95)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: SCREEN_HEIGHT * 0.7,
-  },
-  filterChip: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  filterGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  filterChipActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderColor: '#ffffff',
-  },
-  filterLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  filterChipText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 export default DraftBoardPage;

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Platform } from 'react-native';
+import { Text, YStack } from 'tamagui';
 
 export interface MLBHomeProps {
   /**
@@ -13,66 +13,43 @@ export interface MLBHomeProps {
    */
   subtitle?: string;
   /**
-   * Custom styles for the container
-   */
-  containerStyle?: React.CSSProperties;
-  /**
-   * Custom styles for the title
-   */
-  titleStyle?: React.CSSProperties;
-  /**
-   * Custom styles for the subtitle
-   */
-  subtitleStyle?: React.CSSProperties;
-  /**
    * Additional content to render below the title
    */
   children?: React.ReactNode;
 }
 
-function MLBHome({
-  title = 'MLB Players',
-  subtitle,
-  containerStyle,
-  titleStyle,
-  subtitleStyle,
-  children,
-}: MLBHomeProps) {
+function MLBHome({ title = 'MLB Players', subtitle, children }: MLBHomeProps) {
   return (
-    <View style={safeStyle([styles.container, containerStyle])}>
-      <Text style={safeStyle([styles.title, titleStyle])}>{title}</Text>
+    <YStack
+      flex={1}
+      padding="$5"
+      backgroundColor="$gray1"
+      justifyContent="center"
+      alignItems="center"
+    >
+      <Text
+        fontSize={Platform.OS === 'web' ? '$9' : '$8'}
+        fontWeight="bold"
+        color="$gray12"
+        textAlign="center"
+        marginBottom="$4"
+      >
+        {title}
+      </Text>
       {subtitle && (
-        <Text style={safeStyle([styles.subtitle, subtitleStyle])}>
+        <Text
+          fontSize={Platform.OS === 'web' ? '$5' : '$4'}
+          color="$gray10"
+          textAlign="center"
+          marginBottom="$6"
+        >
           {subtitle}
         </Text>
       )}
       {children}
-    </View>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: Platform.OS === 'web' ? 32 : 28,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  subtitle: {
-    fontSize: Platform.OS === 'web' ? 18 : 16,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-});
 
 export { MLBHome };
 export default MLBHome;

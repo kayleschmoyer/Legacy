@@ -1,0 +1,5 @@
+{
+  "title": "Web",
+  "viewport": "width=device-width, initial-scale=1",
+  "links": "[{\"rel\":\"icon\",\"href\":\"/favicon.ico\",\"type\":\"image/x-icon\"},{\"rel\":\"stylesheet\",\"href\":\"/src/styles.css\"}]"
+}

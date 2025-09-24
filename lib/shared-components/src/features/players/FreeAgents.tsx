@@ -3,21 +3,18 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  Platform,
+  Button,
+  Card,
+  Input,
   ScrollView,
-  StyleSheet,
+  Sheet,
   Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+  XStack,
+  YStack,
+} from 'tamagui';
+import { Animated, Dimensions, FlatList } from '../../platform-components';
 import { Filter, Player } from '../../types';
-import { DEFAULT_COLORS, SPORT_CONFIGS } from '../../config/sports';
+import { SPORT_CONFIGS } from '../../config/sports';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
@@ -101,7 +98,6 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
   isSelected,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const sportConfig = SPORT_CONFIGS[sport] || SPORT_CONFIGS.baseball;
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -116,83 +112,123 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
   return (
     <Animated.View
-      style={safeStyle([
-        styles.playerCard,
-        // @ts-expect-error - Animated value for cross-platform compatibility
-        { transform: [{ scale: scaleAnim }] },
-        isSelected && {
-          borderColor: sportConfig.colors.accent,
-          borderWidth: 2,
-        },
-      ])}
+      style={
+        {
+          transform: [{ scale: scaleAnim }],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any
+      }
     >
-      <TouchableOpacity
+      <Card
+        backgroundColor="$gray3"
+        borderRadius="$4"
+        marginHorizontal="$2"
+        marginVertical="$1"
+        elevation={3}
+        shadowColor="$gray12"
+        shadowOffset={{ width: 0, height: 2 }}
+        shadowOpacity={0.25}
+        shadowRadius={4}
+        borderWidth={isSelected ? 2 : 1}
+        borderColor={isSelected ? '$blue8' : '$gray6'}
+        padding="$3"
+        pressStyle={{ scale: 0.98 }}
         onPress={onSelect}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.cardContent}
-        activeOpacity={1}
+        cursor="pointer"
       >
         {/* Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.playerInfo}>
+        <XStack
+          justifyContent="space-between"
+          alignItems="flex-start"
+          marginBottom="$2"
+        >
+          <YStack flex={1} marginRight="$2">
             <Text
-              style={styles.playerName}
-            >{`${player.firstName} ${player.lastName}`}</Text>
-            <View style={styles.playerMeta}>
-              <Text style={styles.teamText}>{player.team}</Text>
-              <View
-                style={safeStyle([
-                  styles.positionBadge,
-                  { backgroundColor: getPositionColor(player.position, sport) },
-                ])}
+              fontSize="$4"
+              fontWeight="bold"
+              color="$gray12"
+              marginBottom="$1"
+            >
+              {`${player.firstName} ${player.lastName}`}
+            </Text>
+            <XStack alignItems="center" space="$2">
+              <Text fontSize="$2" color="$gray10">
+                {player.team}
+              </Text>
+              <YStack
+                backgroundColor={getPositionColor(player.position, sport)}
+                borderRadius="$2"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                alignItems="center"
               >
-                <Text style={styles.positionText}>{player.position}</Text>
-              </View>
-              <View
-                style={safeStyle([
-                  styles.injuryBadge,
-                  { backgroundColor: getInjuryColor(player.injury) },
-                ])}
+                <Text fontSize="$1" fontWeight="bold" color="white">
+                  {player.position}
+                </Text>
+              </YStack>
+              <YStack
+                backgroundColor={getInjuryColor(player.injury)}
+                borderRadius="$2"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                alignItems="center"
               >
-                <Text style={styles.injuryText}>
+                <Text fontSize="$1" fontWeight="bold" color="white">
                   {player.injury.toUpperCase()}
                 </Text>
-              </View>
-            </View>
-          </View>
-          <View style={styles.cardActions}>
-            <TouchableOpacity onPress={onWatch} style={styles.watchButton}>
-              <Text style={styles.watchIcon}>
-                {player.isWatched ? '⭐' : '☆'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.trendingIcon}>
+              </YStack>
+            </XStack>
+          </YStack>
+          <XStack alignItems="center" space="$2">
+            <Button
+              size="$2"
+              variant="outlined"
+              onPress={onWatch}
+              color={player.isWatched ? '$yellow10' : '$gray9'}
+            >
+              {player.isWatched ? '⭐' : '☆'}
+            </Button>
+            <Text
+              fontSize="$3"
+              color={
+                player.trending === 'up'
+                  ? '$green10'
+                  : player.trending === 'down'
+                    ? '$red10'
+                    : '$gray10'
+              }
+            >
               {getTrendingIcon(player.trending)}
             </Text>
-          </View>
-        </View>
+          </XStack>
+        </XStack>
 
         {/* Stats Preview */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Rank: #{player.rank}</Text>
-            <Text style={styles.statLabel}>Own: {player.ownership}%</Text>
-            <Text style={styles.statLabel}>FAAB: ${player.faabValue}</Text>
-          </View>
-        </View>
+        <XStack justifyContent="space-between" marginBottom="$3">
+          <Text fontSize="$2" color="$blue10" fontWeight="600">
+            Rank: #{player.rank}
+          </Text>
+          <Text fontSize="$2" color="$gray10">
+            Own: {player.ownership}%
+          </Text>
+          <Text fontSize="$2" color="$green10" fontWeight="600">
+            FAAB: ${player.faabValue}
+          </Text>
+        </XStack>
 
         {/* Action Button */}
-        <TouchableOpacity
-          style={safeStyle([
-            styles.claimButton,
-            { backgroundColor: sportConfig.colors.accent },
-          ])}
+        <Button
+          backgroundColor="$blue9"
+          color="white"
+          fontWeight="600"
           onPress={onClaim}
+          borderRadius="$3"
         >
-          <Text style={styles.claimButtonText}>Claim Player</Text>
-        </TouchableOpacity>
-      </TouchableOpacity>
+          Claim Player
+        </Button>
+      </Card>
     </Animated.View>
   );
 };
@@ -227,114 +263,107 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
   const trendingOptions = ['ALL', 'Up', 'Down', 'Stable'];
 
   return (
-    <View style={styles.controlsContainer}>
+    <YStack space="$3" padding="$3" backgroundColor="$gray2">
       {/* Search Bar */}
-      <TextInput
-        style={styles.searchInput}
+      <Input
         placeholder="Search players..."
-        placeholderTextColor="#888"
         value={searchText}
         onChangeText={onSearchChange}
+        backgroundColor="$gray1"
+        borderRadius="$3"
+        fontSize="$4"
       />
 
       {/* Filter Chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersRow}
-      >
-        {/* Position Filter */}
-        <View style={styles.filterGroup}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <XStack space="$2" paddingHorizontal="$2">
+          {/* Position Filter */}
           {allPositions.map((position) => (
-            <TouchableOpacity
+            <Button
               key={position}
-              style={safeStyle([
-                styles.filterChip,
-                filters.position === position && styles.filterChipActive,
-              ])}
+              size="$3"
+              variant={filters.position === position ? 'outlined' : 'outlined'}
+              backgroundColor={
+                filters.position === position ? '$blue3' : '$gray1'
+              }
+              borderColor={filters.position === position ? '$blue7' : '$gray6'}
+              color={filters.position === position ? '$blue11' : '$gray11'}
               onPress={() => onFiltersChange({ ...filters, position })}
+              borderRadius="$6"
             >
-              <Text
-                style={safeStyle([
-                  styles.filterChipText,
-                  filters.position === position && styles.filterChipTextActive,
-                ])}
-              >
-                {position}
-              </Text>
-            </TouchableOpacity>
+              {position}
+            </Button>
           ))}
-        </View>
 
-        {/* Trending Filter */}
-        <View style={styles.filterGroup}>
+          {/* Trending Filter */}
           {trendingOptions.map((trending) => (
-            <TouchableOpacity
+            <Button
               key={trending}
-              style={safeStyle([
-                styles.filterChip,
-                filters.trending === trending && styles.filterChipActive,
-              ])}
+              size="$3"
+              variant={filters.trending === trending ? 'outlined' : 'outlined'}
+              backgroundColor={
+                filters.trending === trending ? '$green3' : '$gray1'
+              }
+              borderColor={filters.trending === trending ? '$green7' : '$gray6'}
+              color={filters.trending === trending ? '$green11' : '$gray11'}
               onPress={() => onFiltersChange({ ...filters, trending })}
+              borderRadius="$6"
             >
-              <Text
-                style={safeStyle([
-                  styles.filterChipText,
-                  filters.trending === trending && styles.filterChipTextActive,
-                ])}
-              >
-                {trending === 'ALL' ? 'All Trends' : `${trending} 📈`}
-              </Text>
-            </TouchableOpacity>
+              {trending === 'ALL' ? 'All Trends' : `${trending} 📈`}
+            </Button>
           ))}
-        </View>
+        </XStack>
       </ScrollView>
 
       {/* Sort Button */}
-      <TouchableOpacity
-        style={styles.sortButton}
+      <Button
+        variant="outlined"
+        size="$4"
         onPress={() => setShowSortModal(true)}
+        backgroundColor="$gray1"
+        borderColor="$gray6"
+        justifyContent="space-between"
       >
-        <Text style={styles.sortButtonText}>Sort: {sortBy}</Text>
-        <Text style={styles.sortArrow}>▼</Text>
-      </TouchableOpacity>
+        <XStack alignItems="center" justifyContent="space-between" flex={1}>
+          <Text color="$gray12">Sort: {sortBy}</Text>
+          <Text color="$gray10">▼</Text>
+        </XStack>
+      </Button>
 
       {/* Sort Modal */}
-      <Modal
-        visible={showSortModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSortModal(false)}
+      <Sheet
+        modal
+        open={showSortModal}
+        onOpenChange={setShowSortModal}
+        snapPoints={[40]}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.sortModalContent}>
-            <Text style={styles.sortModalTitle}>Sort By</Text>
+        <Sheet.Overlay />
+        <Sheet.Frame backgroundColor="$gray2" borderRadius="$4">
+          <Sheet.Handle />
+          <YStack padding="$4" space="$2">
+            <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+              Sort By
+            </Text>
             {sortOptions.map((option) => (
-              <TouchableOpacity
+              <Button
                 key={option}
-                style={safeStyle([
-                  styles.sortOption,
-                  sortBy === option && styles.sortOptionActive,
-                ])}
+                variant={sortBy === option ? 'outlined' : 'outlined'}
+                backgroundColor={sortBy === option ? '$blue3' : 'transparent'}
+                borderColor={sortBy === option ? '$blue7' : 'transparent'}
+                color={sortBy === option ? '$blue11' : '$gray11'}
+                justifyContent="flex-start"
                 onPress={() => {
                   onSortChange(option);
                   setShowSortModal(false);
                 }}
               >
-                <Text
-                  style={safeStyle([
-                    styles.sortOptionText,
-                    sortBy === option && styles.sortOptionTextActive,
-                  ])}
-                >
-                  {option}
-                </Text>
-              </TouchableOpacity>
+                {option}
+              </Button>
             ))}
-          </View>
-        </View>
-      </Modal>
-    </View>
+          </YStack>
+        </Sheet.Frame>
+      </Sheet>
+    </YStack>
   );
 };
 
@@ -384,95 +413,123 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   if (!player) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.claimModalContent}>
-          <Text style={styles.claimModalTitle}>Submit Waiver Claim</Text>
+    <Sheet
+      modal
+      open={visible}
+      onOpenChange={(open: boolean) => !open && onClose()}
+      snapPoints={[80]}
+    >
+      <Sheet.Overlay />
+      <Sheet.Frame backgroundColor="$gray2" borderRadius="$4">
+        <Sheet.Handle />
+        <YStack padding="$4" space="$3">
+          <Text fontSize="$5" fontWeight="600" textAlign="center">
+            Submit Waiver Claim
+          </Text>
 
-          <View style={styles.playerSummary}>
-            <Text
-              style={styles.claimPlayerName}
-            >{`${player.firstName} ${player.lastName}`}</Text>
-            <Text style={styles.claimPlayerDetails}>
+          <Card backgroundColor="$blue2" padding="$3" borderRadius="$3">
+            <Text fontSize="$4" fontWeight="bold" color="$blue12">
+              {`${player.firstName} ${player.lastName}`}
+            </Text>
+            <Text fontSize="$3" color="$blue11">
               {player.position} - {player.team}
             </Text>
-          </View>
+          </Card>
 
           {/* FAAB Bid */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>FAAB Bid (Max: ${maxFaab})</Text>
-            <TextInput
-              style={styles.textInput}
+          <YStack space="$2">
+            <Text fontSize="$3" fontWeight="600">
+              FAAB Bid (Max: ${maxFaab})
+            </Text>
+            <Input
               value={faabBid}
               onChangeText={setFaabBid}
               keyboardType="numeric"
               placeholder="Enter bid amount"
-              placeholderTextColor="#888"
+              backgroundColor="$gray1"
+              borderRadius="$3"
             />
-          </View>
+          </YStack>
 
           {/* Priority */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Claim Priority</Text>
-            <TextInput
-              style={styles.textInput}
+          <YStack space="$2">
+            <Text fontSize="$3" fontWeight="600">
+              Claim Priority
+            </Text>
+            <Input
               value={priority}
               onChangeText={setPriority}
               keyboardType="numeric"
               placeholder="1"
-              placeholderTextColor="#888"
+              backgroundColor="$gray1"
+              borderRadius="$3"
             />
-          </View>
+          </YStack>
 
           {/* Drop Player */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Drop Player (Optional)</Text>
-            <ScrollView style={styles.dropPlayerList}>
-              <TouchableOpacity
-                style={safeStyle([
-                  styles.dropPlayerOption,
-                  !dropPlayerId && styles.dropPlayerOptionSelected,
-                ])}
-                onPress={() => setDropPlayerId(undefined)}
-              >
-                <Text style={styles.dropPlayerText}>
-                  None (if roster space)
-                </Text>
-              </TouchableOpacity>
-              {rosterPlayers.map((rosterPlayer) => (
-                <TouchableOpacity
-                  key={rosterPlayer.id}
-                  style={safeStyle([
-                    styles.dropPlayerOption,
-                    dropPlayerId === rosterPlayer.id &&
-                      styles.dropPlayerOptionSelected,
-                  ])}
-                  onPress={() => setDropPlayerId(rosterPlayer.id)}
+          <YStack space="$2">
+            <Text fontSize="$3" fontWeight="600">
+              Drop Player (Optional)
+            </Text>
+            <ScrollView maxHeight={150}>
+              <YStack space="$1">
+                <Button
+                  variant={!dropPlayerId ? 'outlined' : 'outlined'}
+                  backgroundColor={!dropPlayerId ? '$gray4' : '$gray1'}
+                  borderColor={!dropPlayerId ? '$gray7' : '$gray5'}
+                  justifyContent="flex-start"
+                  onPress={() => setDropPlayerId(undefined)}
                 >
-                  <Text style={styles.dropPlayerText}>
+                  None (if roster space)
+                </Button>
+                {rosterPlayers.map((rosterPlayer) => (
+                  <Button
+                    key={rosterPlayer.id}
+                    variant={
+                      dropPlayerId === rosterPlayer.id ? 'outlined' : 'outlined'
+                    }
+                    backgroundColor={
+                      dropPlayerId === rosterPlayer.id ? '$gray4' : '$gray1'
+                    }
+                    borderColor={
+                      dropPlayerId === rosterPlayer.id ? '$gray7' : '$gray5'
+                    }
+                    justifyContent="flex-start"
+                    onPress={() => setDropPlayerId(rosterPlayer.id)}
+                  >
                     {`${rosterPlayer.firstName} ${rosterPlayer.lastName}`} (
                     {rosterPlayer.position})
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  </Button>
+                ))}
+              </YStack>
             </ScrollView>
-          </View>
+          </YStack>
 
           {/* Action Buttons */}
-          <View style={styles.claimModalButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.submitButton}
+          <XStack space="$2" marginTop="$3">
+            <Button
+              flex={1}
+              variant="outlined"
+              backgroundColor="$gray1"
+              borderColor="$gray6"
+              color="$gray11"
+              onPress={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              flex={1}
+              backgroundColor="$blue9"
+              color="white"
+              fontWeight="600"
               onPress={handleSubmit}
             >
-              <Text style={styles.submitButtonText}>Submit Claim</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
+              Submit Claim
+            </Button>
+          </XStack>
+        </YStack>
+      </Sheet.Frame>
+    </Sheet>
   );
 };
 
@@ -561,14 +618,16 @@ function FreeAgents({
   );
 
   return (
-    <View style={styles.container}>
+    <YStack flex={1} backgroundColor="$gray1">
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Free Agents</Text>
-        <Text style={styles.subtitle}>
+      <YStack padding="$4" backgroundColor="$gray2">
+        <Text fontSize="$6" fontWeight="bold" color="$gray12">
+          Free Agents
+        </Text>
+        <Text fontSize="$3" color="$gray10">
           {filteredAndSortedPlayers.length} available players
         </Text>
-      </View>
+      </YStack>
 
       {/* Controls */}
       <SortFilterControls
@@ -583,15 +642,20 @@ function FreeAgents({
       />
 
       {/* Player List */}
-      <FlatList
+      <FlatList<FreeAgentPlayer>
         data={filteredAndSortedPlayers}
         renderItem={renderPlayer}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: FreeAgentPlayer) => item.id}
         numColumns={IS_TABLET ? 2 : 1}
-        columnWrapperStyle={IS_TABLET ? styles.row : undefined}
-        style={styles.playerList}
+        {...(IS_TABLET && {
+          columnWrapperStyle: {
+            justifyContent: 'space-between',
+            paddingHorizontal: 8,
+          },
+        })}
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{ padding: 8 }}
       />
 
       {/* Waiver Claim Modal */}
@@ -603,336 +667,8 @@ function FreeAgents({
         maxFaab={maxFaab}
         rosterPlayers={rosterPlayers}
       />
-    </View>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  header: {
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.secondary,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginTop: 4,
-  },
-  controlsContainer: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  searchInput: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-  },
-  filtersRow: {
-    marginBottom: 12,
-  },
-  filterGroup: {
-    flexDirection: 'row',
-    marginRight: 16,
-  },
-  filterChip: {
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  filterChipActive: {
-    backgroundColor: DEFAULT_COLORS.accent,
-  },
-  filterChipText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: DEFAULT_COLORS.text,
-  },
-  sortButton: {
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sortButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  sortArrow: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 12,
-  },
-  playerList: {
-    flex: 1,
-  },
-  listContent: {
-    padding: 8,
-  },
-  row: {
-    justifyContent: 'space-around',
-  },
-  playerCard: {
-    flex: IS_TABLET ? 1 : undefined,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    margin: 4,
-    overflow: 'hidden',
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }) as {
-      shadowColor?: string;
-      shadowOffset?: { width: number; height: number };
-      shadowOpacity?: number;
-      shadowRadius?: number;
-      elevation?: number;
-      boxShadow?: string;
-    }),
-  },
-  cardContent: {
-    padding: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 4,
-  },
-  playerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  teamText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  positionBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  positionText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  injuryBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  injuryText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-  },
-  cardActions: {
-    alignItems: 'center',
-  },
-  watchButton: {
-    padding: 4,
-  },
-  watchIcon: {
-    fontSize: 16,
-  },
-  trendingIcon: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  statsContainer: {
-    marginBottom: 8,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  claimButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  claimButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sortModalContent: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 12,
-    padding: 16,
-    width: Platform.OS === 'web' ? 280 : '70%',
-  },
-  sortModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  sortOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  sortOptionActive: {
-    backgroundColor: DEFAULT_COLORS.accent,
-  },
-  sortOptionText: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  sortOptionTextActive: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  claimModalContent: {
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderRadius: 16,
-    padding: 24,
-    width: Platform.OS === 'web' ? 400 : '90%',
-    maxHeight: '80%',
-  },
-  claimModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  playerSummary: {
-    alignItems: 'center',
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-  },
-  claimPlayerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.accent,
-  },
-  claimPlayerDetails: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.textSecondary,
-    marginTop: 4,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: DEFAULT_COLORS.text,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-  },
-  dropPlayerList: {
-    maxHeight: 120,
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: DEFAULT_COLORS.border,
-  },
-  dropPlayerOption: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: DEFAULT_COLORS.border,
-  },
-  dropPlayerOptionSelected: {
-    backgroundColor: DEFAULT_COLORS.accent,
-  },
-  dropPlayerText: {
-    fontSize: 14,
-    color: DEFAULT_COLORS.text,
-  },
-  claimModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.border,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.accent,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-});
 
 export { FreeAgents };

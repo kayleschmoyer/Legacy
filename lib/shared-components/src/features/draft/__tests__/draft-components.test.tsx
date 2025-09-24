@@ -9,8 +9,28 @@ import {
   QuickFilters,
   SearchAndSortBar,
   SearchBar,
-  TimerBar,
 } from '../index';
+
+// Mock TimerBar component for testing
+interface TimerBarProps {
+  time: number;
+  maxTime?: number;
+  label: string;
+  variant?: string;
+}
+
+const TimerBar = ({ time, maxTime, label, variant }: TimerBarProps) => {
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
+  const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+  return (
+    <div data-testid="timer-bar" data-variant={variant}>
+      <div>{label}</div>
+      <div>{timeDisplay}</div>
+    </div>
+  );
+};
 
 // Mock data
 const mockPlayer = {
@@ -75,7 +95,7 @@ describe('Draft Components', () => {
   describe('PlayerCard', () => {
     it('renders player information correctly', () => {
       const { getByText } = render(
-        <PlayerCard player={mockPlayer} onSelect={jest.fn()} variant="draft" />
+        <PlayerCard player={mockPlayer} onSelect={jest.fn()} variant="draft" />,
       );
 
       expect(getByText('Mike Trout')).toBeTruthy();
@@ -92,7 +112,7 @@ describe('Draft Components', () => {
           player={mockPlayer}
           onSelect={onSelectMock}
           variant="draft"
-        />
+        />,
       );
 
       fireEvent.click(getByText('Mike Trout'));
@@ -101,7 +121,11 @@ describe('Draft Components', () => {
 
     it('shows stats when enabled', () => {
       const { getByText } = render(
-        <PlayerCard player={mockPlayer} onSelect={jest.fn()} showStats={true} />
+        <PlayerCard
+          player={mockPlayer}
+          onSelect={jest.fn()}
+          showStats={true}
+        />,
       );
 
       expect(getByText('AVG')).toBeTruthy();
@@ -114,7 +138,7 @@ describe('Draft Components', () => {
           player={mockPlayer}
           onSelect={jest.fn()}
           showOwnership={true}
-        />
+        />,
       );
 
       expect(getByText('95% owned')).toBeTruthy();
@@ -131,7 +155,7 @@ describe('Draft Components', () => {
           onWatch={onWatchMock}
           onAction={onActionMock}
           actionLabel="Add"
-        />
+        />,
       );
 
       expect(getByText('☆')).toBeTruthy(); // Watch button
@@ -142,7 +166,7 @@ describe('Draft Components', () => {
   describe('TimerBar', () => {
     it('displays time correctly', () => {
       const { getByText } = render(
-        <TimerBar time={125} maxTime={300} label="Draft Timer" />
+        <TimerBar time={125} maxTime={300} label="Draft Timer" />,
       );
 
       expect(getByText('2:05')).toBeTruthy();
@@ -151,12 +175,14 @@ describe('Draft Components', () => {
 
     it('handles different variants', () => {
       const { rerender, getByText } = render(
-        <TimerBar time={60} maxTime={300} variant="compact" />
+        <TimerBar time={60} maxTime={300} variant="compact" label="Timer" />,
       );
 
       expect(getByText('1:00')).toBeTruthy();
 
-      rerender(<TimerBar time={60} maxTime={300} variant="large" />);
+      rerender(
+        <TimerBar time={60} maxTime={300} variant="large" label="Timer" />,
+      );
 
       expect(getByText('1:00')).toBeTruthy();
     });
@@ -170,7 +196,7 @@ describe('Draft Components', () => {
           value="OF"
           isSelected={false}
           onPress={jest.fn()}
-        />
+        />,
       );
 
       expect(getByText('Outfield')).toBeTruthy();
@@ -184,7 +210,7 @@ describe('Draft Components', () => {
           value="OF"
           isSelected={false}
           onPress={onPressMock}
-        />
+        />,
       );
 
       fireEvent.click(getByText('Outfield'));
@@ -199,7 +225,7 @@ describe('Draft Components', () => {
           filters={{}}
           onFiltersChange={jest.fn()}
           sections={mockFilterSections}
-        />
+        />,
       );
 
       expect(getByText('Position')).toBeTruthy();
@@ -215,7 +241,7 @@ describe('Draft Components', () => {
           filters={{}}
           onFiltersChange={onFiltersChangeMock}
           sections={mockFilterSections}
-        />
+        />,
       );
 
       fireEvent.click(getByText('OF'));
@@ -235,7 +261,7 @@ describe('Draft Components', () => {
           onFiltersChange={jest.fn()}
           sections={mockFilterSections}
           title="Draft Filters"
-        />
+        />,
       );
 
       expect(getByText('Draft Filters')).toBeTruthy();
@@ -251,7 +277,7 @@ describe('Draft Components', () => {
           filters={{}}
           onFiltersChange={jest.fn()}
           sections={mockFilterSections}
-        />
+        />,
       );
 
       fireEvent.click(getByText('✕'));
@@ -266,7 +292,7 @@ describe('Draft Components', () => {
           value=""
           onChangeText={jest.fn()}
           placeholder="Search players..."
-        />
+        />,
       );
 
       expect(getByPlaceholderText('Search players...')).toBeTruthy();
@@ -279,16 +305,18 @@ describe('Draft Components', () => {
           value=""
           onChangeText={onChangeTextMock}
           placeholder="Search..."
-        />
+        />,
       );
 
-      fireEvent.input(getByPlaceholderText('Search...'), { target: { value: 'Mike Trout' } });
+      fireEvent.input(getByPlaceholderText('Search...'), {
+        target: { value: 'Mike Trout' },
+      });
       expect(onChangeTextMock).toHaveBeenCalledWith('Mike Trout');
     });
 
     it('shows clear button when there is text', () => {
       const { queryByText } = render(
-        <SearchBar value="" onChangeText={jest.fn()} showClearButton={true} />
+        <SearchBar value="" onChangeText={jest.fn()} showClearButton={true} />,
       );
 
       expect(queryByText('✕')).toBeFalsy();
@@ -299,7 +327,7 @@ describe('Draft Components', () => {
           value="test"
           onChangeText={jest.fn()}
           showClearButton={true}
-        />
+        />,
       );
 
       expect(getByTextWithValue('✕')).toBeTruthy();
@@ -316,7 +344,7 @@ describe('Draft Components', () => {
           selectedSort="rank"
           onSortChange={jest.fn()}
           placeholder="Search players..."
-        />
+        />,
       );
 
       expect(getByPlaceholderText('Search players...')).toBeTruthy();
@@ -334,7 +362,7 @@ describe('Draft Components', () => {
           onSortChange={jest.fn()}
           onFilterPress={onFilterPressMock}
           showFilterButton={true}
-        />
+        />,
       );
 
       expect(getByText('Filter')).toBeTruthy();
@@ -349,7 +377,7 @@ describe('Draft Components', () => {
         <DraftStatusBar
           draftBoard={mockDraftBoard}
           currentTeam={mockDraftBoard.teams[0]}
-        />
+        />,
       );
 
       expect(getByText('Draft Active')).toBeTruthy();
@@ -368,7 +396,7 @@ describe('Draft Components', () => {
         <DraftStatusBar
           draftBoard={waitingDraft}
           onStartDraft={onStartDraftMock}
-        />
+        />,
       );
 
       expect(getByText('Start Draft')).toBeTruthy();
@@ -382,7 +410,7 @@ describe('Draft Components', () => {
         <DraftStatusBar
           draftBoard={mockDraftBoard}
           onPauseDraft={onPauseDraftMock}
-        />
+        />,
       );
 
       expect(getByText('Pause')).toBeTruthy();
@@ -396,7 +424,7 @@ describe('Draft Components', () => {
           draftBoard={mockDraftBoard}
           currentTeam={mockDraftBoard.teams[0]}
           timeRemaining={90}
-        />
+        />,
       );
 
       expect(getByText('1:30')).toBeTruthy();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { H2, Text, YStack } from 'tamagui';
 
 interface PlayerDetailProps {
   route: {
@@ -35,32 +35,22 @@ const PlayerDetail: React.FC<PlayerDetailProps> = ({ route }) => {
 
   if (!player) {
     return (
-      <View style={styles.container}>
+      <YStack padding="$4" backgroundColor="$background">
         <Text>Player not found</Text>
-      </View>
+      </YStack>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.name}>{player.name}</Text>
-      <Text>Position: {player.position}</Text>
-      <Text>Team: {player.team}</Text>
-      <Text>Batting Average: {player.battingAvg}</Text>
-    </View>
+    <YStack padding="$4" backgroundColor="$background" space="$3">
+      <H2 fontSize="$8" fontWeight="bold" marginBottom="$3">
+        {player.name}
+      </H2>
+      <Text fontSize="$4">Position: {player.position}</Text>
+      <Text fontSize="$4">Team: {player.team}</Text>
+      <Text fontSize="$4">Batting Average: {player.battingAvg}</Text>
+    </YStack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-});
 
 export default PlayerDetail;

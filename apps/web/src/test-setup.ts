@@ -23,6 +23,89 @@ import '@testing-library/jest-dom';
 // Mock global __DEV__ variable for React Native
 (global as any).__DEV__ = true;
 
+// Mock platform-components to resolve build-time magic string replacement
+jest.mock('__PLATFORM_COMPONENTS__', () => {
+  const React = require('react');
+
+  // Mock component that handles platform-specific functionality
+  const createMockComponent = (displayName: string) => {
+    const Component = ({ children, ...props }: any) =>
+      React.createElement('div', props, children);
+    Component.displayName = displayName;
+    return Component;
+  };
+
+  return {
+    // Platform providers
+    OAuthProvider: ({ children }: any) =>
+      React.createElement('div', {}, children),
+    SecureStorageProvider: ({ children }: any) =>
+      React.createElement('div', {}, children),
+    PlatformProviders: ({ children }: any) =>
+      React.createElement('div', {}, children),
+
+    // Platform utilities
+    PlatformUtils: {
+      signInWithGoogle: jest
+        .fn()
+        .mockResolvedValue({ success: true, user: { id: '1', name: 'Test' } }),
+      signOut: jest.fn().mockResolvedValue({ success: true }),
+      getSecureValue: jest.fn().mockResolvedValue('mock-value'),
+      setSecureValue: jest.fn().mockResolvedValue(true),
+      removeSecureValue: jest.fn().mockResolvedValue(true),
+    },
+
+    // Platform components - create React Native equivalents for web
+    Platform: {
+      OS: 'web',
+      Version: '1.0',
+      select: (obj: any) => obj.web || obj.default,
+    },
+
+    Dimensions: {
+      get: () => ({ width: 1024, height: 768 }),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    },
+
+    // Mock all the standard React Native components
+    View: createMockComponent('View'),
+    Text: createMockComponent('Text'),
+    ScrollView: createMockComponent('ScrollView'),
+    TouchableOpacity: createMockComponent('TouchableOpacity'),
+    TouchableHighlight: createMockComponent('TouchableHighlight'),
+    TextInput: createMockComponent('TextInput'),
+    Image: createMockComponent('Image'),
+    Button: createMockComponent('Button'),
+    Switch: createMockComponent('Switch'),
+    ActivityIndicator: createMockComponent('ActivityIndicator'),
+    Modal: createMockComponent('Modal'),
+    Pressable: createMockComponent('Pressable'),
+
+    // Default export for compatibility
+    default: {
+      OAuthProvider: ({ children }: any) =>
+        React.createElement('div', {}, children),
+      SecureStorageProvider: ({ children }: any) =>
+        React.createElement('div', {}, children),
+      PlatformProviders: ({ children }: any) =>
+        React.createElement('div', {}, children),
+      PlatformUtils: {
+        signInWithGoogle: jest.fn().mockResolvedValue({
+          success: true,
+          user: { id: '1', name: 'Test' },
+        }),
+        signOut: jest.fn().mockResolvedValue({ success: true }),
+        getSecureValue: jest.fn().mockResolvedValue('mock-value'),
+        setSecureValue: jest.fn().mockResolvedValue(true),
+        removeSecureValue: jest.fn().mockResolvedValue(true),
+      },
+      Platform: { OS: 'web', select: (obj: any) => obj.web || obj.default },
+      Dimensions: { get: () => ({ width: 1024, height: 768 }) },
+    },
+  };
+});
+
 // Mock React Native components that might not be available in web environment
 jest.mock('react-native', () => {
   const RN = jest.requireActual('react-native-web');

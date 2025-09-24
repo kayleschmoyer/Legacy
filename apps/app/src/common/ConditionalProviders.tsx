@@ -1,14 +1,14 @@
-import { Platform } from 'react-native';
 import * as React from 'react';
-import { WebProviders } from './providers/web/WebProviders';
+import { ConditionalProviders as SharedConditionalProviders } from '@legacy-sports/shared-components';
 
+/**
+ * App-specific ConditionalProviders
+ *
+ * Uses the shared-components ConditionalProviders which implements
+ * the platform-components architecture for automatic platform selection.
+ */
 export function ConditionalProviders({
   children,
 }: React.PropsWithChildren): React.ReactNode {
-  switch (Platform.OS) {
-    case 'web':
-      return <WebProviders>{children}</WebProviders>;
-    default:
-      return children;
-  }
+  return <SharedConditionalProviders>{children}</SharedConditionalProviders>;
 }

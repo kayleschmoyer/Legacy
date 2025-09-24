@@ -7,9 +7,11 @@ import {
   UseGoogleLoginOptionsAuthCodeFlow,
 } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import {
+  ISecureStorage,
+  SecureStorageProvider,
+} from '@legacy-sports/shared-components';
 import {
   getEnvVarOptional,
   getEnvVarRequired,
@@ -47,23 +49,18 @@ export enum Secret {
 
 let KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
 
+// Use platform-specific secure storage from platform-components
+const secureStorage: ISecureStorage = SecureStorageProvider;
+
 function useLastUpdateTime(): number {
   return KEYCHAIN_LAST_UPDATE;
 }
 
 export async function readKeychainValue(
-  secret: Secret
+  secret: Secret,
 ): Promise<string | null> {
   try {
-    if (Platform.OS === 'web') {
-      // On web, use sessionStorage
-      return typeof sessionStorage !== 'undefined'
-        ? sessionStorage.getItem(secret)
-        : null;
-    } else {
-      // On mobile, use Expo SecureStore
-      return await SecureStore.getItemAsync(secret);
-    }
+    return await secureStorage.getItem(secret);
   } catch (error) {
     console.error('Error reading secure storage:', error);
     return null;
@@ -71,32 +68,13 @@ export async function readKeychainValue(
 }
 
 export async function getJwt(): Promise<LegacySportsJwt | null> {
-  let internalJwt: string | null;
-
-  switch (Platform.OS) {
-    case 'web':
-      internalJwt = sessionStorage.getItem(Secret.INTERNAL_JWT);
-      break;
-    default:
-      internalJwt = await readKeychainValue(Secret.INTERNAL_JWT);
-      break;
-  }
-
+  const internalJwt = await readKeychainValue(Secret.INTERNAL_JWT);
   return internalJwt === null ? null : jwtDecode(internalJwt);
 }
 
 async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
   try {
-    if (Platform.OS === 'web') {
-      // On web, use sessionStorage
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
-      }
-    } else {
-      // On mobile, use Expo SecureStore
-      await SecureStore.setItemAsync(Secret.INTERNAL_JWT, tokens.jwt);
-    }
-
+    await secureStorage.setItem(Secret.INTERNAL_JWT, tokens.jwt);
     // Trigger the react update
     KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
   } catch (error) {
@@ -106,21 +84,14 @@ async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
 
 async function resetToken(): Promise<void> {
   try {
-    if (Platform.OS === 'web') {
-      // On web, use sessionStorage
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.clear();
-      }
-    } else {
-      // On mobile, use Expo SecureStore - delete individual keys
-      const keysToDelete = [Secret.GOOGLE_JWT, Secret.INTERNAL_JWT];
-      for (const key of keysToDelete) {
-        try {
-          await SecureStore.deleteItemAsync(key);
-        } catch (error) {
-          // Ignore errors for keys that don't exist
-          console.debug(`Key ${key} not found in SecureStore`);
-        }
+    // Clear all secrets using platform-agnostic secure storage
+    const keysToDelete = [Secret.GOOGLE_JWT, Secret.INTERNAL_JWT];
+    for (const key of keysToDelete) {
+      try {
+        await secureStorage.removeItem(key);
+      } catch {
+        // Ignore errors for keys that don't exist
+        console.debug(`Key ${key} not found in SecureStorage`);
       }
     }
 
@@ -146,7 +117,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         `${oauthProxy}/google/auth`,
         {
           code: response.code,
-        }
+        },
       );
 
       await storeToken(tokenResponse.data);
@@ -155,7 +126,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         onSuccess();
       }
     },
-    [onSuccess]
+    [onSuccess],
   );
 
   const failureHandler = useCallback<
@@ -166,7 +137,7 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         onFailure(err.error_description);
       }
     },
-    [onFailure]
+    [onFailure],
   );
 
   const logout = useCallback(async () => {
@@ -193,19 +164,16 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  switch (Platform.OS) {
-    case 'web':
-      return useWebAuthHandlers(callbacks);
-    default:
-      throw new Error('Auth callbacks not configured for apps');
-  }
+  // Only web auth is implemented in this app-specific version
+  // Mobile auth should use the shared-components version
+  return useWebAuthHandlers(callbacks);
 }
 
 const refreshJwt = memoizeOne(async (keychainLastUpdate: number) => {
   const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
   const tokenResponse = await axios.post<OAuthProxyTokens>(
     `${oauthProxy}/google/refresh`,
-    {}
+    {},
   );
   await storeToken(tokenResponse.data);
 });

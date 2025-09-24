@@ -89,23 +89,10 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             aria-label="players"
             role="img"
           >
-            👥
+            👤
           </span>
            
           Players
-        </a>
-        <a
-          href="/demo"
-          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
-        >
-          <span
-            aria-label="demo"
-            role="img"
-          >
-            🎨
-          </span>
-           
-          Demo
         </a>
       </div>
     </div>
@@ -233,23 +220,10 @@ exports[`App FootballScreen should render football screen with navigation and la
             aria-label="players"
             role="img"
           >
-            👥
+            👤
           </span>
            
           Players
-        </a>
-        <a
-          href="/demo"
-          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
-        >
-          <span
-            aria-label="demo"
-            role="img"
-          >
-            🎨
-          </span>
-           
-          Demo
         </a>
       </div>
     </div>
@@ -276,121 +250,284 @@ exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `
   style="padding: 2rem;"
 >
   <div
-    style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
+    flex="1"
+    style="overflow: auto;"
   >
     <div
-      style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
+      flexgrow="1"
+      paddingbottom="$4"
+      style="display: flex; flex-direction: column;"
     >
-      <span
-        style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
-      >
-        Fantasy Sports Hub
-      </span>
-      <span
-        style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
-      >
-        Choose your sport
-      </span>
-    </div>
-    <div
-      style="margin-bottom: 30px;"
-    >
-      <span
-        style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
-      >
-        Sports
-      </span>
       <div
-        style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+        alignitems="center"
+        marginbottom="$7"
+        paddinghorizontal="$4"
+        paddingtop="$4"
+        style="display: flex; flex-direction: column;"
       >
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
-          type="button"
+        <h2
+          color="$gray12"
+          marginbottom="$2"
+          textalign="center"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              ⚾
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Baseball
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
-          type="button"
+          Fantasy Sports Hub
+        </h2>
+        <span
+          color="$gray10"
+          lineheight="$1"
+          textalign="center"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏈
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Football
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
-          type="button"
+          Choose your sport
+        </span>
+      </div>
+      <div
+        marginbottom="$7"
+        style="display: flex; flex-direction: column;"
+      >
+        <h4
+          color="$gray12"
+          marginbottom="$4"
+          paddinghorizontal="$4"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏀
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Basketball
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
-          type="button"
+          Quick Actions
+        </h4>
+        <div
+          gap="$3"
+          paddinghorizontal="$3"
+          style="display: flex; flex-direction: row;"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
+          <button
+            alignitems="center"
+            backgroundcolor="$gray3"
+            bordercolor="$gray5"
+            borderradius="$3"
+            borderwidth="1"
+            flex="1"
+            padding="$4"
           >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏒
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Hockey
-            </span>
             <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
-            />
-          </div>
-        </button>
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$6"
+              >
+                ⚡
+              </span>
+              <span
+                color="$gray12"
+                font-size="$3"
+                font-weight="500"
+                textalign="center"
+              >
+                Quick Pick
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="$gray3"
+            bordercolor="$gray5"
+            borderradius="$3"
+            borderwidth="1"
+            flex="1"
+            padding="$4"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$6"
+              >
+                👥
+              </span>
+              <span
+                color="$gray12"
+                font-size="$3"
+                font-weight="500"
+                textalign="center"
+              >
+                Manage Teams
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div
+        marginbottom="$7"
+        style="display: flex; flex-direction: column;"
+      >
+        <h4
+          color="$gray12"
+          marginbottom="$4"
+          paddinghorizontal="$4"
+        >
+          Sports
+        </h4>
+        <div
+          flexwrap="wrap"
+          gap="$3"
+          paddinghorizontal="$3"
+          style="display: flex; flex-direction: row;"
+        >
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Baseball
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Football
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Basketball
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Hockey
+              </span>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -469,23 +606,10 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             aria-label="players"
             role="img"
           >
-            👥
+            👤
           </span>
            
           Players
-        </a>
-        <a
-          href="/demo"
-          style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
-        >
-          <span
-            aria-label="demo"
-            role="img"
-          >
-            🎨
-          </span>
-           
-          Demo
         </a>
       </div>
     </div>
@@ -494,121 +618,284 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     style="padding: 2rem;"
   >
     <div
-      style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
+      flex="1"
+      style="overflow: auto;"
     >
       <div
-        style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
+        flexgrow="1"
+        paddingbottom="$4"
+        style="display: flex; flex-direction: column;"
       >
-        <span
-          style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
-        >
-          Fantasy Sports Hub
-        </span>
-        <span
-          style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
-        >
-          Choose your sport
-        </span>
-      </div>
-      <div
-        style="margin-bottom: 30px;"
-      >
-        <span
-          style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
-        >
-          Sports
-        </span>
         <div
-          style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+          alignitems="center"
+          marginbottom="$7"
+          paddinghorizontal="$4"
+          paddingtop="$4"
+          style="display: flex; flex-direction: column;"
         >
-          <button
-            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
-            type="button"
+          <h2
+            color="$gray12"
+            marginbottom="$2"
+            textalign="center"
           >
-            <div
-              style="padding: 20px; align-items: center; position: relative;"
-            >
-              <span
-                style="font-size: 48px; margin-bottom: 12px;"
-              >
-                ⚾
-              </span>
-              <span
-                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-              >
-                Baseball
-              </span>
-              <div
-                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
-              />
-            </div>
-          </button>
-          <button
-            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
-            type="button"
+            Fantasy Sports Hub
+          </h2>
+          <span
+            color="$gray10"
+            lineheight="$1"
+            textalign="center"
           >
-            <div
-              style="padding: 20px; align-items: center; position: relative;"
-            >
-              <span
-                style="font-size: 48px; margin-bottom: 12px;"
-              >
-                🏈
-              </span>
-              <span
-                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-              >
-                Football
-              </span>
-              <div
-                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
-              />
-            </div>
-          </button>
-          <button
-            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
-            type="button"
+            Choose your sport
+          </span>
+        </div>
+        <div
+          marginbottom="$7"
+          style="display: flex; flex-direction: column;"
+        >
+          <h4
+            color="$gray12"
+            marginbottom="$4"
+            paddinghorizontal="$4"
           >
-            <div
-              style="padding: 20px; align-items: center; position: relative;"
-            >
-              <span
-                style="font-size: 48px; margin-bottom: 12px;"
-              >
-                🏀
-              </span>
-              <span
-                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-              >
-                Basketball
-              </span>
-              <div
-                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
-              />
-            </div>
-          </button>
-          <button
-            style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
-            type="button"
+            Quick Actions
+          </h4>
+          <div
+            gap="$3"
+            paddinghorizontal="$3"
+            style="display: flex; flex-direction: row;"
           >
-            <div
-              style="padding: 20px; align-items: center; position: relative;"
+            <button
+              alignitems="center"
+              backgroundcolor="$gray3"
+              bordercolor="$gray5"
+              borderradius="$3"
+              borderwidth="1"
+              flex="1"
+              padding="$4"
             >
-              <span
-                style="font-size: 48px; margin-bottom: 12px;"
-              >
-                🏒
-              </span>
-              <span
-                style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-              >
-                Hockey
-              </span>
               <div
-                style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
-              />
-            </div>
-          </button>
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$6"
+                >
+                  ⚡
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$3"
+                  font-weight="500"
+                  textalign="center"
+                >
+                  Quick Pick
+                </span>
+              </div>
+            </button>
+            <button
+              alignitems="center"
+              backgroundcolor="$gray3"
+              bordercolor="$gray5"
+              borderradius="$3"
+              borderwidth="1"
+              flex="1"
+              padding="$4"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$6"
+                >
+                  👥
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$3"
+                  font-weight="500"
+                  textalign="center"
+                >
+                  Manage Teams
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+        <div
+          marginbottom="$7"
+          style="display: flex; flex-direction: column;"
+        >
+          <h4
+            color="$gray12"
+            marginbottom="$4"
+            paddinghorizontal="$4"
+          >
+            Sports
+          </h4>
+          <div
+            flexwrap="wrap"
+            gap="$3"
+            paddinghorizontal="$3"
+            style="display: flex; flex-direction: row;"
+          >
+            <button
+              alignitems="center"
+              backgroundcolor="white"
+              bordercolor="$gray4"
+              borderradius="$4"
+              borderwidth="1"
+              elevation="3"
+              justifycontent="center"
+              minheight="120"
+              opacity="1"
+              padding="$4"
+              shadowcolor="$shadowColor"
+              shadowoffset="[object Object]"
+              shadowopacity="0.1"
+              shadowradius="8"
+              width="482"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$8"
+                >
+                  🏆
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$4"
+                  font-weight="600"
+                  textalign="center"
+                >
+                  Baseball
+                </span>
+              </div>
+            </button>
+            <button
+              alignitems="center"
+              backgroundcolor="white"
+              bordercolor="$gray4"
+              borderradius="$4"
+              borderwidth="1"
+              elevation="3"
+              justifycontent="center"
+              minheight="120"
+              opacity="1"
+              padding="$4"
+              shadowcolor="$shadowColor"
+              shadowoffset="[object Object]"
+              shadowopacity="0.1"
+              shadowradius="8"
+              width="482"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$8"
+                >
+                  🏆
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$4"
+                  font-weight="600"
+                  textalign="center"
+                >
+                  Football
+                </span>
+              </div>
+            </button>
+            <button
+              alignitems="center"
+              backgroundcolor="white"
+              bordercolor="$gray4"
+              borderradius="$4"
+              borderwidth="1"
+              elevation="3"
+              justifycontent="center"
+              minheight="120"
+              opacity="1"
+              padding="$4"
+              shadowcolor="$shadowColor"
+              shadowoffset="[object Object]"
+              shadowopacity="0.1"
+              shadowradius="8"
+              width="482"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$8"
+                >
+                  🏆
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$4"
+                  font-weight="600"
+                  textalign="center"
+                >
+                  Basketball
+                </span>
+              </div>
+            </button>
+            <button
+              alignitems="center"
+              backgroundcolor="white"
+              bordercolor="$gray4"
+              borderradius="$4"
+              borderwidth="1"
+              elevation="3"
+              justifycontent="center"
+              minheight="120"
+              opacity="1"
+              padding="$4"
+              shadowcolor="$shadowColor"
+              shadowoffset="[object Object]"
+              shadowopacity="0.1"
+              shadowradius="8"
+              width="482"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+                style="display: flex; flex-direction: column;"
+              >
+                <span
+                  color="$blue10"
+                  font-size="$8"
+                >
+                  🏆
+                </span>
+                <span
+                  color="$gray12"
+                  font-size="$4"
+                  font-weight="600"
+                  textalign="center"
+                >
+                  Hockey
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -685,23 +972,10 @@ exports[`App Navigation should match navigation snapshot 1`] = `
           aria-label="players"
           role="img"
         >
-          👥
+          👤
         </span>
          
         Players
-      </a>
-      <a
-        href="/demo"
-        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
-      >
-        <span
-          aria-label="demo"
-          role="img"
-        >
-          🎨
-        </span>
-         
-        Demo
       </a>
     </div>
   </div>
@@ -777,23 +1051,10 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           aria-label="players"
           role="img"
         >
-          👥
+          👤
         </span>
          
         Players
-      </a>
-      <a
-        href="/demo"
-        style="color: rgb(255, 255, 255); text-decoration: none; padding: 0.5rem 1rem; margin: 0px 0.5rem; border-radius: 4px; border: 1px solid #3366ff; background-color: transparent; transition: all 0.2s;"
-      >
-        <span
-          aria-label="demo"
-          role="img"
-        >
-          🎨
-        </span>
-         
-        Demo
       </a>
     </div>
   </div>
@@ -805,121 +1066,284 @@ exports[`App should render homepage after loading completes 1`] = `
   style="padding: 2rem;"
 >
   <div
-    style="overflow: auto; flex-grow: 1; background-color: rgb(30, 30, 30); padding-bottom: 20px;"
+    flex="1"
+    style="overflow: auto;"
   >
     <div
-      style="align-items: center; padding-top: 40px; padding-bottom: 30px;"
+      flexgrow="1"
+      paddingbottom="$4"
+      style="display: flex; flex-direction: column;"
     >
-      <span
-        style="font-size: 36px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 8px; text-align: center;"
-      >
-        Fantasy Sports Hub
-      </span>
-      <span
-        style="font-size: 18px; color: rgb(204, 204, 204); text-align: center;"
-      >
-        Choose your sport
-      </span>
-    </div>
-    <div
-      style="margin-bottom: 30px;"
-    >
-      <span
-        style="font-size: 20px; font-weight: bold; color: rgb(255, 255, 255); margin-bottom: 16px;"
-      >
-        Sports
-      </span>
       <div
-        style="flex-direction: row; flex-wrap: wrap; justify-content: space-between; gap: 12px;"
+        alignitems="center"
+        marginbottom="$7"
+        paddinghorizontal="$4"
+        paddingtop="$4"
+        style="display: flex; flex-direction: column;"
       >
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(45, 45, 45);"
-          type="button"
+        <h2
+          color="$gray12"
+          marginbottom="$2"
+          textalign="center"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              ⚾
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Baseball
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 107, 53);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(234, 88, 12);"
-          type="button"
+          Fantasy Sports Hub
+        </h2>
+        <span
+          color="$gray10"
+          lineheight="$1"
+          textalign="center"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏈
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Football
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(249, 115, 22);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(74, 60, 140);"
-          type="button"
+          Choose your sport
+        </span>
+      </div>
+      <div
+        marginbottom="$7"
+        style="display: flex; flex-direction: column;"
+      >
+        <h4
+          color="$gray12"
+          marginbottom="$4"
+          paddinghorizontal="$4"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
-          >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏀
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Basketball
-            </span>
-            <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(255, 140, 0);"
-            />
-          </div>
-        </button>
-        <button
-          style="background: none; cursor: pointer; width: 23%; min-width: 140px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); background-color: rgb(42, 47, 58);"
-          type="button"
+          Quick Actions
+        </h4>
+        <div
+          gap="$3"
+          paddinghorizontal="$3"
+          style="display: flex; flex-direction: row;"
         >
-          <div
-            style="padding: 20px; align-items: center; position: relative;"
+          <button
+            alignitems="center"
+            backgroundcolor="$gray3"
+            bordercolor="$gray5"
+            borderradius="$3"
+            borderwidth="1"
+            flex="1"
+            padding="$4"
           >
-            <span
-              style="font-size: 48px; margin-bottom: 12px;"
-            >
-              🏒
-            </span>
-            <span
-              style="font-size: 18px; font-weight: 600; color: rgb(255, 255, 255); text-align: center;"
-            >
-              Hockey
-            </span>
             <div
-              style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 4px; background-color: rgb(30, 144, 255);"
-            />
-          </div>
-        </button>
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$6"
+              >
+                ⚡
+              </span>
+              <span
+                color="$gray12"
+                font-size="$3"
+                font-weight="500"
+                textalign="center"
+              >
+                Quick Pick
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="$gray3"
+            bordercolor="$gray5"
+            borderradius="$3"
+            borderwidth="1"
+            flex="1"
+            padding="$4"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$6"
+              >
+                👥
+              </span>
+              <span
+                color="$gray12"
+                font-size="$3"
+                font-weight="500"
+                textalign="center"
+              >
+                Manage Teams
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div
+        marginbottom="$7"
+        style="display: flex; flex-direction: column;"
+      >
+        <h4
+          color="$gray12"
+          marginbottom="$4"
+          paddinghorizontal="$4"
+        >
+          Sports
+        </h4>
+        <div
+          flexwrap="wrap"
+          gap="$3"
+          paddinghorizontal="$3"
+          style="display: flex; flex-direction: row;"
+        >
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Baseball
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Football
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Basketball
+              </span>
+            </div>
+          </button>
+          <button
+            alignitems="center"
+            backgroundcolor="white"
+            bordercolor="$gray4"
+            borderradius="$4"
+            borderwidth="1"
+            elevation="3"
+            justifycontent="center"
+            minheight="120"
+            opacity="1"
+            padding="$4"
+            shadowcolor="$shadowColor"
+            shadowoffset="[object Object]"
+            shadowopacity="0.1"
+            shadowradius="8"
+            width="482"
+          >
+            <div
+              alignitems="center"
+              gap="$2"
+              style="display: flex; flex-direction: column;"
+            >
+              <span
+                color="$blue10"
+                font-size="$8"
+              >
+                🏆
+              </span>
+              <span
+                color="$gray12"
+                font-size="$4"
+                font-weight="600"
+                textalign="center"
+              >
+                Hockey
+              </span>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   </div>

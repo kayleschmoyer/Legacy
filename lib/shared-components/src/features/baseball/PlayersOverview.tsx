@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   BattingStatsTableWithData,
   FieldingStatsTableWithData,
@@ -44,88 +36,56 @@ function PlayersOverview({
   const [selectedView, setSelectedView] = useState(initialView);
 
   const renderTabButton = (view: TableView, label: string) => (
-    <TouchableOpacity
-      style={safeStyle([
-        styles.tab,
-        tabStyle,
-        ...(selectedView === view ? [styles.activeTab] : []),
-      ])}
+    <Button
+      flex={1}
+      height="$5"
+      borderRadius={0}
+      borderRightWidth={1}
+      borderRightColor="$gray7"
+      backgroundColor={selectedView === view ? '$blue10' : '$gray2'}
+      pressStyle={{
+        backgroundColor: selectedView === view ? '$blue9' : '$gray3',
+      }}
       onPress={() => setSelectedView(view)}
     >
       <Text
-        style={safeStyle([
-          styles.tabText,
-          ...(selectedView === view ? [styles.activeTabText] : []),
-        ])}
+        fontSize="$5"
+        fontWeight="bold"
+        color={selectedView === view ? '$white' : '$blue10'}
       >
         {label}
       </Text>
-    </TouchableOpacity>
+    </Button>
   );
 
-  const Container = Platform.OS === 'web' ? View : SafeAreaView;
-
   return (
-    <Container style={safeStyle([styles.container, containerStyle])}>
-      <View style={styles.tabBar}>
+    <YStack flex={1} backgroundColor="lightcyan" style={containerStyle}>
+      <XStack
+        borderTopColor="$gray8"
+        borderTopWidth={1}
+        backgroundColor="$white"
+        elevation={2}
+        shadowColor="$black"
+        shadowOffset={{ width: 0, height: 2 }}
+        shadowOpacity={0.1}
+        shadowRadius={2}
+      >
         {renderTabButton(TableView.BATTING, 'Batting')}
         {renderTabButton(TableView.PITCHING, 'Pitching')}
         {renderTabButton(TableView.FIELDING, 'Fielding')}
-      </View>
+      </XStack>
 
-      <View style={styles.content}>
+      <YStack flex={1} padding="$4">
         {selectedView === TableView.BATTING && <BattingStatsTableWithData />}
         {selectedView === TableView.PITCHING && <PitchingStatsTableWithData />}
         {selectedView === TableView.FIELDING && <FieldingStatsTableWithData />}
-      </View>
-    </Container>
+      </YStack>
+    </YStack>
   );
 }
 
 // Export the enum for external use
 export { TableView };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'lightcyan',
-    flex: 1,
-  },
-  tabBar: {
-    borderTopColor: '#333333',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  tab: {
-    alignItems: 'center',
-    flex: 1,
-    height: 50,
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRightWidth: 1,
-    borderRightColor: '#e9ecef',
-  },
-  activeTab: {
-    backgroundColor: '#007AFF',
-  },
-  tabText: {
-    color: 'darkblue',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-});
 
 export { PlayersOverview };
 export default PlayersOverview;

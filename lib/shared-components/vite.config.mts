@@ -133,7 +133,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       outDir: `dist/${platform}`,
       lib: {
-        entry: platform === 'web' ? 'src/index.web.ts' : 'src/index.ts',
+        entry: 'src/index.ts', // Use same entry point for all platforms
         name: 'SharedComponents',
         fileName: (format) => `index.${format}.js`,
         formats: ['es', 'cjs'],
@@ -154,6 +154,9 @@ export default defineConfig(({ mode }) => {
                 'react-native-safe-area-context',
                 'react-native-gesture-handler',
                 'react-native-reanimated',
+                // Exclude all React Native internal modules
+                /^react-native\/Libraries\/.*/,
+                /^react-native\/.*\/.*\.js$/,
               ]),
           '@tamagui/core',
           '@tamagui/config',

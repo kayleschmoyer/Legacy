@@ -32,12 +32,13 @@ const NativeIcons: React.FC<IconProps> = ({
   style,
 }) => {
   // Try to dynamically import MaterialIcons if available
-  const [IconComponent, setIconComponent] = React.useState<React.ComponentType<{
+  const useState = React.useState<React.ComponentType<{
     name: string;
     size: number;
     color: string;
     style?: unknown;
-  }> | null>(null);
+  }> | null>;
+  const [IconComponent, setIconComponent] = useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -48,8 +49,14 @@ const NativeIcons: React.FC<IconProps> = ({
         // Dynamic import with error handling
         const { MaterialIcons } = await import('@expo/vector-icons');
         if (mounted) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          setIconComponent(MaterialIcons as any);
+          setIconComponent(
+            MaterialIcons as React.ComponentType<{
+              name: string;
+              size: number;
+              color: string;
+              style?: unknown;
+            }>,
+          );
         }
       } catch {
         LOGGER.info('MaterialIcons not available, using fallback');

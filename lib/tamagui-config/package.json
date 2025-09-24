@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "type": "commonjs",
-  "main": "./src/index.js",
-  "types": "./src/index.ts",
+  "main": "../../dist/lib/tamagui-config/src/index.js",
+  "types": "../../dist/lib/tamagui-config/src/index.d.ts",
   "dependencies": {
     "tslib": "*",
     "@tamagui/config": "*",

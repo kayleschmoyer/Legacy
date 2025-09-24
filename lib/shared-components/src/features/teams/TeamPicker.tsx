@@ -1,8 +1,7 @@
 import React from 'react';
 import { Picker } from '@react-native-picker/picker';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { Platform, StyleSheet, Text, View } from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Select, Text, YStack } from 'tamagui';
+import { Platform } from '../../platform-components';
 
 // Generic team interface
 export interface TeamData {
@@ -32,32 +31,40 @@ function TeamPicker({
   style,
 }: TeamPickerProps) {
   if ((Platform.OS as string) === 'web') {
-    // Web implementation using HTML select
+    // Web implementation using Tamagui Select
     return (
-      <View style={safeStyle([styles.container, style])}>
-        <select
-          value={selectedTeam}
-          onChange={(e) => onSelect(Number(e.target.value))}
-          style={{
-            ...styles.webSelect,
-            backgroundColor: '#333',
-            color: '#fff',
-            border: '1px solid #555',
-            borderRadius: '8px',
-            padding: '10px',
-            fontSize: '16px',
-          }}
+      <YStack minHeight={50} justifyContent="center" style={style}>
+        <Select
+          value={selectedTeam.toString()}
+          onValueChange={(value) => onSelect(Number(value))}
         >
-          <option value={0} disabled>
-            {placeholder}
-          </option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-      </View>
+          <Select.Trigger
+            backgroundColor="$gray8"
+            borderColor="$gray6"
+            borderRadius="$3"
+            padding="$3"
+          >
+            <Select.Value placeholder={placeholder} />
+          </Select.Trigger>
+
+          <Select.Content>
+            <Select.Viewport>
+              <Select.Item value="0" disabled index={0}>
+                <Select.ItemText>{placeholder}</Select.ItemText>
+              </Select.Item>
+              {teams.map((team, index) => (
+                <Select.Item
+                  key={team.id}
+                  value={team.id.toString()}
+                  index={index + 1}
+                >
+                  <Select.ItemText>{team.name}</Select.ItemText>
+                </Select.Item>
+              ))}
+            </Select.Viewport>
+          </Select.Content>
+        </Select>
+      </YStack>
     );
   }
 
@@ -66,11 +73,14 @@ function TeamPicker({
     // Only try to load picker in React Native environment
     if ((Platform.OS as string) !== 'web' && typeof require !== 'undefined') {
       return (
-        <View style={safeStyle([styles.container, style])}>
+        <YStack minHeight={50} justifyContent="center" style={style}>
           <Picker
             selectedValue={selectedTeam}
             onValueChange={(itemValue: number) => onSelect(itemValue)}
-            style={styles.picker}
+            style={{
+              backgroundColor: '#333',
+              color: '#fff',
+            }}
             dropdownIconColor="#FFD700"
           >
             <Picker.Item label={placeholder} value={0} color="#999" />
@@ -83,7 +93,7 @@ function TeamPicker({
               />
             ))}
           </Picker>
-        </View>
+        </YStack>
       );
     }
   } catch {
@@ -94,14 +104,23 @@ function TeamPicker({
   const selectedTeamData = teams.find((team) => team.id === selectedTeam);
 
   return (
-    <View
-      style={safeStyle([styles.container, styles.fallbackContainer, style])}
+    <YStack
+      minHeight={50}
+      justifyContent="center"
+      backgroundColor="$gray8"
+      borderRadius="$3"
+      padding="$4"
+      borderWidth={1}
+      borderColor="$gray6"
+      style={style}
     >
-      <Text style={styles.fallbackText}>
+      <Text color="white" fontSize="$4" textAlign="center">
         {selectedTeamData ? selectedTeamData.name : placeholder}
       </Text>
-      <Text style={styles.fallbackHint}>(Picker component not available)</Text>
-    </View>
+      <Text color="$gray9" fontSize="$2" textAlign="center" marginTop="$1">
+        (Picker component not available)
+      </Text>
+    </YStack>
   );
 }
 
@@ -155,48 +174,50 @@ function AdvancedTeamPicker({
 
   if ((Platform.OS as string) === 'web') {
     return (
-      <View style={safeStyle([styles.container, style])}>
-        <select
-          value={selectedTeam}
-          onChange={(e) => onSelect(Number(e.target.value))}
-          disabled={disabled}
-          style={{
-            ...styles.webSelect,
-            backgroundColor: disabled ? '#222' : '#333',
-            color: disabled ? '#666' : '#fff',
-            border: '1px solid #555',
-            borderRadius: '8px',
-            padding: '10px',
-            fontSize: '16px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-          }}
+      <YStack minHeight={50} justifyContent="center" style={style}>
+        <Select
+          value={selectedTeam.toString()}
+          onValueChange={(value) => onSelect(Number(value))}
+          {...(!disabled && {})}
         >
-          <option value={0} disabled>
-            {placeholder}
-          </option>
-          {Object.entries(organizedTeams).map(
-            ([divisionName, divisionTeams]) => {
-              if (groupByDivision && divisionTeams.length > 0) {
-                return (
-                  <optgroup key={divisionName} label={divisionName}>
-                    {divisionTeams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {formatTeamLabel(team)}
-                      </option>
+          <Select.Trigger
+            backgroundColor={disabled ? '$gray7' : '$gray8'}
+            borderColor="$gray6"
+            borderRadius="$3"
+            padding="$3"
+            opacity={disabled ? 0.6 : 1}
+          >
+            <Select.Value placeholder={placeholder} />
+          </Select.Trigger>
+
+          <Select.Content>
+            <Select.Viewport>
+              <Select.Item value="0" disabled index={0}>
+                <Select.ItemText>{placeholder}</Select.ItemText>
+              </Select.Item>
+
+              {Object.entries(organizedTeams).map(
+                ([division, divisionTeams], divisionIndex) => (
+                  <Select.Group key={division}>
+                    {groupByDivision && <Select.Label>{division}</Select.Label>}
+                    {divisionTeams.map((team, teamIndex) => (
+                      <Select.Item
+                        key={team.id}
+                        value={team.id.toString()}
+                        index={divisionIndex * 10 + teamIndex + 1}
+                      >
+                        <Select.ItemText>
+                          {formatTeamLabel(team)}
+                        </Select.ItemText>
+                      </Select.Item>
                     ))}
-                  </optgroup>
-                );
-              } else {
-                return divisionTeams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {formatTeamLabel(team)}
-                  </option>
-                ));
-              }
-            },
-          )}
-        </select>
-      </View>
+                  </Select.Group>
+                ),
+              )}
+            </Select.Viewport>
+          </Select.Content>
+        </Select>
+      </YStack>
     );
   }
 
@@ -205,14 +226,17 @@ function AdvancedTeamPicker({
     // Only try to load picker in React Native environment
     if ((Platform.OS as string) !== 'web' && typeof require !== 'undefined') {
       return (
-        <View style={safeStyle([styles.container, style])}>
+        <YStack minHeight={50} justifyContent="center" style={style}>
           <Picker
             selectedValue={selectedTeam}
-            onValueChange={(itemValue: number) => !disabled && onSelect(itemValue)}
-            style={[
-              styles.picker,
-              disabled && styles.pickerDisabled,
-            ] as StyleProp<ViewStyle>}
+            onValueChange={(itemValue: number) =>
+              !disabled && onSelect(itemValue)
+            }
+            style={{
+              backgroundColor: disabled ? '#222' : '#333',
+              color: disabled ? '#666' : '#fff',
+              opacity: disabled ? 0.6 : 1,
+            }}
             dropdownIconColor="#FFD700"
             enabled={!disabled}
           >
@@ -226,7 +250,7 @@ function AdvancedTeamPicker({
               />
             ))}
           </Picker>
-        </View>
+        </YStack>
       );
     }
   } catch {
@@ -237,61 +261,30 @@ function AdvancedTeamPicker({
   const selectedTeamData = teams.find((team) => team.id === selectedTeam);
 
   return (
-    <View
-      style={safeStyle([styles.container, styles.fallbackContainer, style])}
+    <YStack
+      minHeight={50}
+      justifyContent="center"
+      backgroundColor="$gray8"
+      borderRadius="$3"
+      padding="$4"
+      borderWidth={1}
+      borderColor="$gray6"
+      opacity={disabled ? 0.6 : 1}
+      style={style}
     >
       <Text
-        style={safeStyle([
-          styles.fallbackText,
-          disabled && styles.fallbackTextDisabled,
-        ])}
+        color={disabled ? '$gray10' : 'white'}
+        fontSize="$4"
+        textAlign="center"
       >
         {selectedTeamData ? formatTeamLabel(selectedTeamData) : placeholder}
       </Text>
-      <Text style={styles.fallbackHint}>(Picker component not available)</Text>
-    </View>
+      <Text color="$gray9" fontSize="$2" textAlign="center" marginTop="$1">
+        (Picker component not available)
+      </Text>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    minHeight: 50,
-    justifyContent: 'center',
-  },
-  picker: {
-    backgroundColor: '#333',
-    color: '#fff',
-  },
-  pickerDisabled: {
-    backgroundColor: '#222',
-    opacity: 0.6,
-  },
-  webSelect: {
-    width: '100%',
-    outline: 'none',
-  },
-  fallbackContainer: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#555',
-  },
-  fallbackText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  fallbackTextDisabled: {
-    color: '#666',
-  },
-  fallbackHint: {
-    color: '#999',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 5,
-  },
-});
 
 export { TeamPicker };
 export { AdvancedTeamPicker };

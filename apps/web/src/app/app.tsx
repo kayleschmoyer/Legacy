@@ -10,7 +10,6 @@ import { HomeScreen } from '@legacy-sports/shared-components';
 
 import {
   BaseballScreen,
-  DemoScreen,
   FootballScreen,
   PlayersScreen,
 } from '../components/screens';
@@ -98,18 +97,9 @@ function Navigation() {
             }
           >
             <span role="img" aria-label="players">
-              👥
+              👤
             </span>{' '}
             Players
-          </Link>
-          <Link
-            to="/demo"
-            style={location.pathname === '/demo' ? activeLinkStyle : linkStyle}
-          >
-            <span role="img" aria-label="demo">
-              🎨
-            </span>{' '}
-            Demo
           </Link>
         </div>
       </div>
@@ -179,7 +169,6 @@ export function App() {
         <Route path="/football" element={<FootballScreen />} />
         <Route path="/baseball" element={<BaseballScreen />} />
         <Route path="/players" element={<PlayersScreen />} />
-        <Route path="/demo" element={<DemoScreen />} />
       </Routes>
     </AppLayout>
   );

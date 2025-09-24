@@ -2,14 +2,13 @@ import React from 'react';
 import {
   Alert,
   Platform,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from '../platform-components';
-import { safeStyle } from '../utils/styles';
 
-const styles = StyleSheet.create({
+// Temporary styles object to replace StyleSheet.create
+const styles = {
   container: {
     flex: 1,
     backgroundColor: '#1E1E1E',
@@ -24,7 +23,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#3366FF',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     ...(Platform.OS === 'web' && {
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }),
@@ -32,7 +31,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#CCCCCC',
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: 32,
     ...(Platform.OS === 'web' && {
       fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -64,8 +63,8 @@ const styles = StyleSheet.create({
     }),
   },
   buttonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
     gap: 12,
     marginBottom: 16,
   },
@@ -109,7 +108,7 @@ const styles = StyleSheet.create({
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }),
   },
-});
+};
 
 const Button = ({
   title,
@@ -120,23 +119,38 @@ const Button = ({
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger' | 'success';
 }) => {
-  const buttonStyle = safeStyle([
+  const buttonStyles = [
     styles.button,
     variant === 'secondary' && styles.buttonSecondary,
     variant === 'danger' && styles.buttonDanger,
     variant === 'success' && styles.buttonSuccess,
-  ]);
+  ];
 
-  const textStyle = safeStyle([
+  const textStyles = [
     styles.buttonText,
     variant === 'secondary' && styles.buttonTextSecondary,
-  ]);
+  ];
 
   if (Platform.OS === 'web') {
+    // For web, we need to flatten styles for the div element
+    const validButtonStyles = buttonStyles.filter(
+      Boolean,
+    ) as React.CSSProperties[];
+    const validTextStyles = textStyles.filter(Boolean) as React.CSSProperties[];
+
+    const flatButtonStyle = validButtonStyles.reduce(
+      (acc, style) => ({ ...acc, ...style }),
+      {} as React.CSSProperties,
+    );
+    const flatTextStyle = validTextStyles.reduce(
+      (acc, style) => ({ ...acc, ...style }),
+      {} as React.CSSProperties,
+    );
+
     return (
       <div
         style={{
-          ...buttonStyle,
+          ...flatButtonStyle,
           cursor: 'pointer',
           userSelect: 'none',
         }}
@@ -148,14 +162,14 @@ const Button = ({
           e.currentTarget.style.opacity = '1';
         }}
       >
-        <span style={textStyle}>{title}</span>
+        <span style={flatTextStyle}>{title}</span>
       </div>
     );
   }
 
   return (
-    <TouchableOpacity style={buttonStyle} onPress={onPress}>
-      <Text style={textStyle}>{title}</Text>
+    <TouchableOpacity style={buttonStyles} onPress={onPress}>
+      <Text style={textStyles}>{title}</Text>
     </TouchableOpacity>
   );
 };
@@ -227,7 +241,13 @@ function DemoScreen() {
 
         <Text style={styles.listItem}>• Platform: {Platform.OS}</Text>
         <Text style={styles.listItem}>
-          • Version: {Platform.Version || 'N/A'}
+          • Environment:{' '}
+          {Platform.select({
+            web: 'Web Browser',
+            ios: 'iOS Device',
+            android: 'Android Device',
+            default: 'Unknown',
+          })}
         </Text>
         <Text style={styles.listItem}>
           • Is Web: {Platform.OS === 'web' ? 'Yes' : 'No'}

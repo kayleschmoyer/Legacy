@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
+import { Button, Input, ScrollView, Spinner, Text, YStack } from 'tamagui';
+import { Platform } from '../../platform-components';
 import { Table } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
-import { safeStyle } from '../../utils/styles';
 
 // API response interface
 interface CareerStatsResponse {
@@ -80,9 +72,9 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
 
   // React Native implementation
   return (
-    <View style={styles.tableSection}>
+    <YStack marginBottom="$4">
       <Table headers={headers} data={data} title={title} />
-    </View>
+    </YStack>
   );
 };
 
@@ -175,29 +167,53 @@ function CareerStatsViewer({
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Player Career Stats</Text>
+    <ScrollView flex={1} padding="$4">
+      <Text
+        fontSize="$5"
+        fontWeight="bold"
+        marginBottom="$4"
+        textAlign="center"
+      >
+        Player Career Stats
+      </Text>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Player ID:</Text>
-        <TextInput
-          style={styles.input}
+      <YStack marginBottom="$4">
+        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+          Player ID:
+        </Text>
+        <Input
+          borderWidth={1}
+          borderColor="$gray8"
+          borderRadius="$3"
+          padding="$3"
+          fontSize="$4"
+          backgroundColor="$white"
           value={player}
           onChangeText={setPlayer}
           placeholder="Enter player ID"
           editable={!loading}
         />
-      </View>
+      </YStack>
 
-      <TouchableOpacity
-        style={safeStyle([styles.button, loading && styles.buttonDisabled])}
+      <Button
+        backgroundColor={loading ? '$gray8' : '$blue10'}
+        paddingVertical="$3"
+        paddingHorizontal="$6"
+        borderRadius="$3"
+        alignItems="center"
+        marginBottom="$4"
         onPress={() => void getCareerStats()}
         disabled={loading}
+        opacity={loading ? 0.5 : 1}
       >
-        <Text style={styles.buttonText}>
-          {loading ? 'Loading...' : 'Get Career Stats'}
-        </Text>
-      </TouchableOpacity>
+        {loading ? (
+          <Spinner size="small" color="$white" />
+        ) : (
+          <Text color="$white" fontSize="$4" fontWeight="600">
+            Get Career Stats
+          </Text>
+        )}
+      </Button>
 
       {/* Batting Stats */}
       {battingStats.length > 0 && battingHeaders.length > 0 && (
@@ -231,121 +247,13 @@ function CareerStatsViewer({
         pitchingStats.length === 0 &&
         fieldingStats.length === 0 &&
         player && (
-          <Text style={styles.noDataText}>
+          <Text fontSize="$4" textAlign="center" color="$gray10" marginTop="$4">
             No career stats found for this player.
           </Text>
         )}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tableSection: {
-    marginBottom: 24,
-  },
-  tableTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
-  },
-  noDataText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#666',
-    marginTop: 20,
-  },
-  // React Native table fallback styles
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
-  },
-  headerCell: {
-    flex: 1,
-    padding: 6,
-    fontWeight: 'bold',
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-    fontSize: 12,
-  },
-  dataRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  dataCell: {
-    flex: 1,
-    padding: 6,
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
-    fontSize: 11,
-  },
-  // React Native table component styles
-  header: {
-    height: 40,
-    backgroundColor: '#f5f5f5',
-  },
-  headerText: {
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  row: {
-    height: 30,
-  },
-  text: {
-    textAlign: 'center',
-    fontSize: 11,
-  },
-});
 
 export { CareerStatsViewer };
 export default CareerStatsViewer;

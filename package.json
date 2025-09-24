@@ -1,83 +1,42 @@
 {
-  "name": "@legacy-sports/source",
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "all": "nx affected -t build lint:fix lint format test make-cache bundle",
+    "all": "nx affected -t build lint:fix lint format test make-cache bundle typecheck",
+    "android": "nx run-android app",
+    "build-android": "nx build-android app",
+    "build-ios": "nx build-ios app",
+    "check:services": "node scripts/check-services.js",
     "clean:node": "npkill -d",
     "clean:python": "rimraf --glob **/.venv",
     "clean": "npm run clean:python && npm run clean:node",
     "cli": "nx start cli",
     "codegen": "nx run-many -t codegen",
     "create-python-project": "nx generate @nxlv/python:poetry-project",
+    "dev:db": "nx run db:serve",
+    "dev:game-selection": "nx run game-selection:serve",
+    "dev:lambdas": "node scripts/start-dev-services.js",
+    "dev:oauth": "nx run oauth-proxy:serve",
+    "dev:stats": "nx run stats-lambda:serve",
     "graphiql": "nx serve graphql-explorer",
     "install-all": "npm run install:node && npm run install:poetry",
     "install:node": "npm ci",
     "install:poetry": "poetry install",
+    "ios": "nx run-ios app",
     "setup:node": "npm ci",
     "setup:python": "poetry install --sync",
     "setup": "npm run setup:node && npm run setup:python",
     "start": "nx start app",
-    "dev:lambdas": "node scripts/start-dev-services.js",
-    "dev:db": "nx run db:serve",
-    "dev:oauth": "nx run oauth-proxy:serve",
-    "dev:stats": "nx run stats-lambda:serve",
-    "dev:game-selection": "nx run game-selection:serve",
-    "check:services": "node scripts/check-services.js",
-    "validate:package-json": "node scripts/validate-package-json-standards.js",
-    "validate:workspace-deps": "node scripts/validate-workspace-deps.js",
-    "validate": "npm run validate:package-json && npm run validate:workspace-deps",
-    "test": "echo 'Use test:changed or test:all for running tests'",
+    "storybook:build": "cd lib/shared-components && npm run build-storybook",
+    "storybook": "cd lib/shared-components && npm run storybook",
     "test:all": "nx run-many -t test",
     "test:changed": "nx affected -t test",
     "test:watch": "nx run-many -t test --watch",
-    "android": "nx run-android app",
-    "ios": "nx run-ios app",
-    "build-android": "nx build-android app",
-    "build-ios": "nx build-ios app",
-    "storybook": "cd lib/shared-components && npm run storybook",
-    "storybook:build": "cd lib/shared-components && npm run build-storybook"
-  },
-  "nx": {
-    "targets": {
-      "all": {
-        "inputs": [
-          "^build",
-          "^lint",
-          "^format",
-          "^test",
-          "^bundle"
-        ]
-      },
-      "dev": {
-        "dependsOn": [
-          {
-            "projects": [
-              "app"
-            ],
-            "target": "start"
-          },
-          {
-            "projects": [
-              "graphql-explorer"
-            ],
-            "target": "serve"
-          },
-          {
-            "projects": [
-              "oauth-proxy"
-            ],
-            "target": "dev"
-          },
-          {
-            "projects": [
-              "db"
-            ],
-            "target": "dev"
-          }
-        ]
-      }
-    }
+    "test": "echo 'Use test:changed or test:all for running tests'",
+    "typecheck": "nx run-many -t typecheck",
+    "validate:package-json": "node scripts/validate-package-json-standards.js",
+    "validate:workspace-deps": "node scripts/validate-workspace-deps.js",
+    "validate": "npm run validate:package-json && npm run validate:workspace-deps"
   },
   "private": true,
   "dependencies": {

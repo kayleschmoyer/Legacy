@@ -5,12 +5,11 @@ export default {
   moduleNameMapper: {
     '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
       'identity-obj-proxy',
+    '^__PLATFORM_COMPONENTS__$': '<rootDir>/src/platform-components/web',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
   },
-  setupFilesAfterEnv: [
-    '<rootDir>/jest-setup.js',
-  ],
+  setupFilesAfterEnv: ['<rootDir>/jest-setup.js'],
   testEnvironment: 'jsdom',
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': [

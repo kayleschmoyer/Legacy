@@ -2,14 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useCallback, useRef } from 'react';
-import {
-  Animated,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Button, Card, Text, XStack, YStack } from 'tamagui';
+import { Animated } from '../../platform-components';
 
 // Types
 export interface Player {
@@ -90,10 +84,9 @@ const TrendingIndicator: React.FC<{ trending?: string }> = ({ trending }) => {
 
   return (
     <Text
-      style={[
-        styles.trendingIcon,
-        { color: trending === 'up' ? '#22c55e' : '#ef4444' },
-      ]}
+      fontSize="$3"
+      color={trending === 'up' ? '$green10' : '$red10'}
+      fontWeight="bold"
     >
       {trending === 'up' ? '↗' : '↘'}
     </Text>
@@ -132,339 +125,191 @@ function PlayerCard({
     }).start();
   }, [scaleAnim]);
 
-  const cardStyle = [
-    styles.playerCard,
-    styles[`${variant}Card`],
-    ...(isSelected ? [styles.selectedCard] : []),
-  ];
+  // Variant-specific height mappings
+  const getMinHeight = () => {
+    switch (variant) {
+      case 'freeagent':
+        return '$12'; // ~160px
+      case 'roster':
+        return '$10'; // ~120px
+      case 'compact':
+        return '$8'; // ~100px
+      default:
+        return '$11'; // ~140px for draft
+    }
+  };
 
   return (
-    <Animated.View style={safeStyle([...cardStyle, { transform: 'scale(1)' }])}>
-      <TouchableOpacity
+    <Animated.View
+      style={
+        {
+          transform: [{ scale: scaleAnim }],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any
+      }
+    >
+      <Card
+        borderRadius="$4"
+        marginHorizontal="$1.5"
+        marginVertical="$1"
+        elevation={3}
+        shadowColor="$gray12"
+        shadowOffset={{ width: 0, height: 2 }}
+        shadowOpacity={0.25}
+        shadowRadius={4}
+        borderWidth={isSelected ? 2 : 1}
+        borderColor={isSelected ? '$blue8' : '$gray6'}
+        backgroundColor={isSelected ? '$blue2' : '$gray3'}
+        minHeight={getMinHeight()}
+        pressStyle={{
+          scale: 0.98,
+        }}
         onPress={onSelect}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.cardContent}
-        activeOpacity={1}
+        cursor="pointer"
+        padding="$3"
       >
         {/* Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.playerInfo}>
-            <Text style={styles.playerName} numberOfLines={1}>
+        <XStack
+          justifyContent="space-between"
+          alignItems="flex-start"
+          marginBottom="$2"
+        >
+          <YStack flex={1} marginRight="$2">
+            <Text
+              fontSize="$4"
+              fontWeight="bold"
+              color="$gray12"
+              marginBottom="$1"
+              numberOfLines={1}
+            >
               {player.name}
             </Text>
-            <Text style={styles.teamText}>{player.team}</Text>
-          </View>
+            <Text fontSize="$2" color="$gray10">
+              {player.team}
+            </Text>
+          </YStack>
 
-          <View style={styles.badgeContainer}>
-            <View
-              style={safeStyle([
-                styles.positionBadge,
-                { backgroundColor: getPositionColor(player.position, sport) },
-              ])}
+          <XStack alignItems="center" space="$1">
+            <YStack
+              backgroundColor={getPositionColor(player.position, sport)}
+              borderRadius="$2"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              alignItems="center"
+              justifyContent="center"
             >
-              <Text style={styles.positionText}>{player.position}</Text>
-            </View>
+              <Text fontSize="$1" fontWeight="bold" color="white">
+                {player.position}
+              </Text>
+            </YStack>
 
             {player.injury && player.injury !== 'healthy' && (
-              <View
-                style={safeStyle([
-                  styles.injuryBadge,
-                  { backgroundColor: getInjuryColor(player.injury) },
-                ])}
+              <YStack
+                backgroundColor={getInjuryColor(player.injury)}
+                borderRadius="$2"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                alignItems="center"
+                justifyContent="center"
+                marginLeft="$1"
               >
-                <Text style={styles.injuryText}>
+                <Text fontSize="$1" fontWeight="bold" color="white">
                   {player.injury.charAt(0).toUpperCase()}
                 </Text>
-              </View>
+              </YStack>
             )}
-          </View>
-        </View>
+          </XStack>
+        </XStack>
 
         {/* Stats Row */}
         {showStats && player.stats && (
-          <View style={styles.statsRow}>
+          <XStack justifyContent="space-between" marginBottom="$2">
             {Object.entries(player.stats)
               .slice(0, 3)
               .map(([key, value]) => (
-                <View key={key} style={styles.statItem}>
-                  <Text style={styles.statLabel}>{key}</Text>
-                  <Text style={styles.statValue}>
+                <YStack key={key} alignItems="center" flex={1}>
+                  <Text fontSize="$1" color="$gray9" fontWeight="600">
+                    {key}
+                  </Text>
+                  <Text fontSize="$3" color="$gray12" fontWeight="bold">
                     {typeof value === 'string' || typeof value === 'number'
                       ? value
                       : value != null
                         ? JSON.stringify(value)
                         : '-'}
                   </Text>
-                </View>
+                </YStack>
               ))}
-          </View>
+          </XStack>
         )}
 
         {/* Footer */}
-        <View style={styles.cardFooter}>
-          <View style={styles.footerLeft}>
-            {player.rank && <Text style={styles.rankText}>#{player.rank}</Text>}
+        <XStack justifyContent="space-between" alignItems="center">
+          <XStack alignItems="center" space="$2">
+            {player.rank && (
+              <Text fontSize="$2" color="$blue10" fontWeight="600">
+                #{player.rank}
+              </Text>
+            )}
             {player.adp && (
-              <Text style={styles.adpText}>ADP: {player.adp}</Text>
+              <Text fontSize="$2" color="$gray10">
+                ADP: {player.adp}
+              </Text>
             )}
             {showOwnership && player.ownership !== undefined && (
-              <Text style={styles.ownershipText}>
+              <Text fontSize="$2" color="$gray10">
                 {player.ownership}% owned
               </Text>
             )}
-          </View>
+          </XStack>
 
-          <View style={styles.footerRight}>
+          <XStack alignItems="center" space="$2">
             <TrendingIndicator trending={player.trending} />
 
             {variant === 'freeagent' && player.faabValue && (
-              <Text style={styles.faabText}>${player.faabValue}</Text>
+              <Text fontSize="$2" color="$green10" fontWeight="600">
+                ${player.faabValue}
+              </Text>
             )}
-          </View>
-        </View>
+          </XStack>
+        </XStack>
 
         {/* Action Buttons */}
         {(onWatch || onAction) && (
-          <View style={styles.actionRow}>
+          <XStack space="$2" marginTop="$2">
             {onWatch && (
-              <TouchableOpacity
-                style={safeStyle([
-                  styles.actionButton,
-                  styles.watchButton,
-                  player.isWatched && styles.watchedButton,
-                ])}
+              <Button
+                size="$2"
+                variant={player.isWatched ? 'outlined' : 'outlined'}
+                backgroundColor={player.isWatched ? '$yellow3' : 'transparent'}
+                borderColor={player.isWatched ? '$yellow8' : '$gray6'}
+                color={player.isWatched ? '$yellow11' : '$gray10'}
                 onPress={onWatch}
+                flex={1}
               >
-                <Text style={styles.actionButtonText}>
-                  {player.isWatched ? '★' : '☆'}
-                </Text>
-              </TouchableOpacity>
+                {player.isWatched ? '★' : '☆'}
+              </Button>
             )}
 
             {onAction && (
-              <TouchableOpacity
-                style={safeStyle([styles.actionButton, styles.primaryAction])}
+              <Button
+                size="$2"
+                backgroundColor="$blue9"
+                color="white"
+                fontWeight="600"
                 onPress={onAction}
+                flex={2}
               >
-                <Text style={styles.actionButtonText}>{actionLabel}</Text>
-              </TouchableOpacity>
+                {actionLabel}
+              </Button>
             )}
-          </View>
+          </XStack>
         )}
-      </TouchableOpacity>
+      </Card>
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  playerCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    marginHorizontal: 6,
-    marginVertical: 4,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-
-  draftCard: {
-    minHeight: 140,
-  },
-
-  freeagentCard: {
-    minHeight: 160,
-  },
-
-  rosterCard: {
-    minHeight: 120,
-  },
-
-  compactCard: {
-    minHeight: 100,
-    marginVertical: 2,
-  },
-
-  selectedCard: {
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    backgroundColor: '#1e3a8a',
-  },
-
-  cardContent: {
-    padding: 12,
-    flex: 1,
-  },
-
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-
-  playerInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-
-  playerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-
-  teamText: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-
-  badgeContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-
-  positionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    minWidth: 32,
-    alignItems: 'center',
-  },
-
-  positionText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-
-  injuryBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 10,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-
-  injuryText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#374151',
-  },
-
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-
-  statLabel: {
-    fontSize: 10,
-    color: '#9ca3af',
-    marginBottom: 2,
-  },
-
-  statValue: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-
-  footerLeft: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-
-  footerRight: {
-    flexDirection: 'row',
-    gap: 4,
-    alignItems: 'center',
-  },
-
-  rankText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-
-  adpText: {
-    fontSize: 11,
-    color: '#9ca3af',
-  },
-
-  ownershipText: {
-    fontSize: 11,
-    color: '#eab308',
-  },
-
-  faabText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#22c55e',
-  },
-
-  trendingIcon: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#374151',
-  },
-
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 60,
-  },
-
-  watchButton: {
-    backgroundColor: '#374151',
-    flex: 1,
-  },
-
-  watchedButton: {
-    backgroundColor: '#eab308',
-  },
-
-  primaryAction: {
-    backgroundColor: '#3b82f6',
-    flex: 2,
-  },
-
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-});
 
 export { PlayerCard };

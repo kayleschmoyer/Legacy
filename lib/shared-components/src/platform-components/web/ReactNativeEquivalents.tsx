@@ -5,93 +5,29 @@ import type {
   AnimationConfig,
   SpringConfig,
 } from '../types';
+import type {
+  StyleProp,
+  TextProps,
+  ViewProps,
+} from '../types/react-native-props';
+import type { ReactNativeStyleProperties } from '../types/platform-exports';
 
-// Helper function to flatten style arrays
-const flattenStyles = (
-  style?: React.CSSProperties | React.CSSProperties[],
-): React.CSSProperties => {
+// Web equivalents for React Native components that don't have direct Tamagui equivalents
+
+// Helper function to flatten style arrays - still needed for some components
+const flattenStyles = (style?: StyleProp): ReactNativeStyleProperties => {
   if (!style) return {};
   if (Array.isArray(style)) {
-    return style.reduce((acc, s) => ({ ...acc, ...s }), {});
+    const filtered = style.filter(
+      (s) => s != null && typeof s === 'object',
+    ) as ReactNativeStyleProperties[];
+    return filtered.reduce((acc, s) => ({ ...acc, ...s }), {});
   }
   return style;
 };
 
-// Web equivalents for React Native components
-function View({
-  style,
-  children,
-  ...props
-}: React.HTMLProps<HTMLDivElement> & {
-  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
-}) {
-  return (
-    <div style={flattenStyles(style as React.CSSProperties | React.CSSProperties[])} {...props}>
-      {children}
-    </div>
-  );
-}
-
-interface TextProps extends Omit<React.HTMLProps<HTMLSpanElement>, 'style'> {
-  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
-  numberOfLines?: number;
-}
-
-function Text({ style, numberOfLines, children, ...props }: TextProps) {
-  const flatStyle = flattenStyles(style as React.CSSProperties | React.CSSProperties[]);
-  const textStyle: React.CSSProperties = {
-    ...flatStyle,
-    ...(numberOfLines && {
-      display: '-webkit-box',
-      WebkitBoxOrient: 'vertical',
-      WebkitLineClamp: numberOfLines,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-    }),
-  };
-
-  return (
-    <span style={textStyle} {...props}>
-      {children}
-    </span>
-  );
-}
-
-interface ScrollViewProps {
-  style?: React.CSSProperties;
-  contentContainerStyle?: React.CSSProperties;
-  children?: React.ReactNode;
-  className?: string;
-  showsVerticalScrollIndicator?: boolean;
-  showsHorizontalScrollIndicator?: boolean;
-  horizontal?: boolean;
-}
-
-function ScrollView({
-  style,
-  children,
-  contentContainerStyle,
-  className,
-  showsVerticalScrollIndicator = true,
-  showsHorizontalScrollIndicator = true,
-  horizontal = false,
-}: ScrollViewProps) {
-  return (
-    <div
-      className={className}
-      style={{
-        overflow: 'auto',
-        ...style,
-        ...contentContainerStyle,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 interface TouchableOpacityProps {
-  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
+  style?: StyleProp;
   children?: React.ReactNode;
   onPress?: () => void;
   onPressIn?: () => void;
@@ -101,6 +37,7 @@ interface TouchableOpacityProps {
   className?: string;
 }
 
+// Simple TouchableOpacity implementation for web
 function TouchableOpacity({
   style,
   children,
@@ -111,187 +48,37 @@ function TouchableOpacity({
   disabled,
   className,
 }: TouchableOpacityProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={className}
-      style={{
-        background: 'none',
-        border: 'none',
-        cursor: disabled ? 'default' : 'pointer',
-        ...flattenStyles(style as React.CSSProperties | React.CSSProperties[]),
-      }}
-      onClick={disabled ? undefined : onPress}
-      onMouseDown={
-        disabled
-          ? undefined
-          : (e) => {
-              (e.target as HTMLElement).style.opacity =
-                activeOpacity.toString();
-              onPressIn?.();
-            }
-      }
-      onMouseUp={
-        disabled
-          ? undefined
-          : (e) => {
-              (e.target as HTMLElement).style.opacity = '1';
-              onPressOut?.();
-            }
-      }
-      onMouseLeave={
-        disabled
-          ? undefined
-          : (e) => {
-              (e.target as HTMLElement).style.opacity = '1';
-              onPressOut?.();
-            }
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-function ActivityIndicator({
-  size = 'small',
-  color = '#007AFF',
-  style,
-}: {
-  size?: 'small' | 'large';
-  color?: string;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div
-      style={{
-        display: 'inline-block',
-        width: size === 'large' ? '36px' : '20px',
-        height: size === 'large' ? '36px' : '20px',
-        border: `3px solid ${color}`,
-        borderTopColor: 'transparent',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-        ...style,
-      }}
-    />
-  );
-}
-
-interface TextInputProps {
-  ref?: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
-  style?: React.CSSProperties | React.CSSProperties[];
-  onChangeText?: (text: string) => void;
-  multiline?: boolean;
-  placeholder?: string;
-  placeholderTextColor?: string;
-  value?: string;
-  defaultValue?: string;
-  disabled?: boolean;
-  className?: string;
-  onFocus?: () => void;
-  onBlur?: () => void;
-  autoFocus?: boolean;
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
-  secureTextEntry?: boolean;
-  editable?: boolean;
-  autoComplete?: string;
-  autoCorrect?: boolean;
-  onSubmitEditing?: () => void;
-  returnKeyType?: string;
-}
-
-function TextInput({
-  ref,
-  style,
-  onChangeText,
-  multiline,
-  placeholder,
-  placeholderTextColor,
-  value,
-  defaultValue,
-  disabled,
-  className,
-  onFocus,
-  onBlur,
-  autoFocus,
-  autoCapitalize,
-  keyboardType,
-  secureTextEntry,
-  editable = true,
-  autoComplete,
-  autoCorrect,
-  onSubmitEditing,
-  returnKeyType,
-}: TextInputProps) {
   const flatStyle = flattenStyles(style);
 
-  const commonProps = {
-    className,
-    placeholder,
-    value,
-    defaultValue,
-    disabled: disabled || !editable,
-    style: {
-      padding: '8px',
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      ...flatStyle,
-      // Note: placeholderTextColor requires CSS-in-JS or styled-components for full support
-      // For now, we'll apply it via inline styles when possible
-    },
-    onChange: (
-      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => {
-      onChangeText?.(e.target.value);
-    },
-    onFocus,
-    onBlur,
-    autoFocus,
-  };
-
-  return multiline ? (
-    <textarea
-      ref={ref as React.RefObject<HTMLTextAreaElement>}
-      {...commonProps}
-      autoComplete={autoComplete}
-      spellCheck={autoCorrect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && returnKeyType === 'search') {
-          onSubmitEditing?.();
+  return (
+    <div
+      onClick={disabled ? undefined : onPress}
+      onMouseDown={onPressIn}
+      onMouseUp={onPressOut}
+      className={className}
+      style={{
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        transition: 'opacity 0.2s ease',
+        ...flatStyle,
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.opacity = activeOpacity.toString();
         }
       }}
-    />
-  ) : (
-    <input
-      ref={ref as React.RefObject<HTMLInputElement>}
-      {...commonProps}
-      type={secureTextEntry ? 'password' : 'text'}
-      inputMode={
-        keyboardType === 'email-address'
-          ? 'email'
-          : keyboardType === 'numeric'
-            ? 'numeric'
-            : undefined
-      }
-      autoCapitalize={autoCapitalize}
-      autoComplete={autoComplete}
-      spellCheck={autoCorrect}
-      onKeyDown={(e) => {
-        if (
-          e.key === 'Enter' &&
-          (returnKeyType === 'search' || returnKeyType === 'done')
-        ) {
-          onSubmitEditing?.();
+      onMouseLeave={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.opacity = '1';
         }
       }}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
-export const StyleSheet = {
+const StyleSheet = {
   create: <T extends Record<string, React.CSSProperties>>(styles: T): T =>
     styles,
 };
@@ -308,7 +95,7 @@ if (typeof globalThis !== 'undefined') {
   (globalThis as any).StyleSheet = StyleSheet;
 }
 
-export const Platform = {
+const Platform = {
   OS: 'web' as 'web' | 'ios' | 'android',
   Version: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
   select: function <T>(specifics: {
@@ -320,7 +107,7 @@ export const Platform = {
   },
 };
 
-export const Dimensions = {
+const Dimensions = {
   get: (dimension: 'window' | 'screen') => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 375,
     height: typeof window !== 'undefined' ? window.innerHeight : 667,
@@ -350,6 +137,40 @@ if (typeof document !== 'undefined') {
     }
   `;
   document.head.appendChild(style);
+}
+
+// ActivityIndicator component for web
+interface ActivityIndicatorProps {
+  size?: 'small' | 'large' | number;
+  color?: string;
+  animating?: boolean;
+  style?: React.CSSProperties;
+}
+
+function ActivityIndicator({
+  size = 'small',
+  color = '#007AFF',
+  animating = true,
+  style,
+}: ActivityIndicatorProps) {
+  const spinnerSize =
+    typeof size === 'number' ? size : size === 'large' ? 36 : 20;
+
+  if (!animating) return null;
+
+  return (
+    <div
+      style={{
+        width: spinnerSize,
+        height: spinnerSize,
+        border: `${Math.max(2, spinnerSize / 10)}px solid ${color}20`,
+        borderTop: `${Math.max(2, spinnerSize / 10)}px solid ${color}`,
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+        ...style,
+      }}
+    />
+  );
 }
 
 // FlatList component for web
@@ -461,7 +282,7 @@ function FlatList<ItemT>({
     ...(showsVerticalScrollIndicator === false
       ? { scrollbarWidth: 'none', msOverflowStyle: 'none' }
       : {}),
-    ...flattenStyles(style),
+    ...(flattenStyles(style as StyleProp) as React.CSSProperties),
   };
 
   const contentStyle: React.CSSProperties = {
@@ -556,25 +377,25 @@ function Modal({
 }
 
 // Basic Animated API for web
-export const Animated: AnimatedAPI = {
+const Animated: AnimatedAPI = {
   View: ({
     style,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & {
-    style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
+  }: ViewProps & {
+    style?:
+      | React.CSSProperties
+      | React.CSSProperties[]
+      | (React.CSSProperties & { transform?: { scale: AnimatedValue }[] })[];
   }) => {
     // Handle animated values and complex style arrays
-    const processedStyle = Array.isArray(style)
-      ? flattenStyles(style)
-      : style;
+    const processedStyle = Array.isArray(style) ? flattenStyles(style) : style;
     return <div style={processedStyle} {...props} />;
   },
-  Text: ({
-    style,
-    ...props
-  }: React.HTMLAttributes<HTMLSpanElement> & {
-    style?: React.CSSProperties;
-  }) => <span style={style} {...props} />,
+  Text: ({ style, ...props }: TextProps) => {
+    // Handle style arrays for Text component
+    const processedStyle = Array.isArray(style) ? flattenStyles(style) : style;
+    return <span style={processedStyle} {...props} />;
+  },
   Value: class implements AnimatedValue {
     private value: number;
     private listeners: Map<string, (value: { value: number }) => void> =
@@ -695,7 +516,7 @@ export const Animated: AnimatedAPI = {
 };
 
 // Alert API for web
-export const Alert = {
+const Alert = {
   alert: (
     title: string,
     message?: string,
@@ -742,7 +563,7 @@ function SafeAreaView({
 }
 
 // Vibration API for web (no-op since web doesn't support vibration)
-export const Vibration = {
+const Vibration = {
   vibrate: (pattern?: number | number[]) => {
     // No-op for web, or could use navigator.vibrate if available
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -759,7 +580,12 @@ export const Vibration = {
 
 // KeyboardAvoidingView component for web (simplified)
 interface KeyboardAvoidingViewProps {
-  style?: React.CSSProperties | React.CSSProperties[] | false | null | undefined;
+  style?:
+    | React.CSSProperties
+    | React.CSSProperties[]
+    | false
+    | null
+    | undefined;
   children?: React.ReactNode;
   behavior?: 'height' | 'position' | 'padding';
   keyboardVerticalOffset?: number;
@@ -776,7 +602,10 @@ function KeyboardAvoidingView({
 }: KeyboardAvoidingViewProps) {
   // For web, we can just render a div since keyboard handling is different
   return (
-    <div style={flattenStyles(style as React.CSSProperties | React.CSSProperties[])} {...props}>
+    <div
+      style={flattenStyles(style as StyleProp) as React.CSSProperties}
+      {...props}
+    >
       {children}
     </div>
   );
@@ -848,22 +677,284 @@ function PickerItem({ label, value, color, testID }: PickerItemProps) {
 
 Picker.Item = PickerItem;
 
-// Named exports for compatibility
+// Image component for web
+function Image({
+  source,
+  style,
+  alt = '',
+  ...props
+}: {
+  source: { uri: string } | number;
+  style?: React.CSSProperties;
+  alt?: string;
+  [key: string]: unknown;
+}) {
+  const src =
+    typeof source === 'object' && 'uri' in source ? source.uri : source;
+  return (
+    <img
+      src={src as string}
+      alt={alt}
+      style={{
+        maxWidth: '100%',
+        height: 'auto',
+        ...style,
+      }}
+      {...props}
+    />
+  );
+}
+
+// Pressable component (alias for TouchableOpacity on web)
+const Pressable = TouchableOpacity;
+
+// Basic View component for web
+function View({
+  style,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  style?: React.CSSProperties | React.CSSProperties[];
+}) {
+  return (
+    <div
+      style={flattenStyles(style as StyleProp) as React.CSSProperties}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Basic Text component for web
+function Text({
+  style,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement> & {
+  style?: React.CSSProperties | React.CSSProperties[];
+}) {
+  return (
+    <span
+      style={flattenStyles(style as StyleProp) as React.CSSProperties}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ScrollView component for web
+interface ScrollViewProps {
+  style?: React.CSSProperties | React.CSSProperties[];
+  children?: React.ReactNode;
+  horizontal?: boolean;
+  showsVerticalScrollIndicator?: boolean;
+  showsHorizontalScrollIndicator?: boolean;
+  contentContainerStyle?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
+function ScrollView({
+  style,
+  children,
+  horizontal = false,
+  showsVerticalScrollIndicator = true,
+  showsHorizontalScrollIndicator = true,
+  contentContainerStyle,
+  ...props
+}: ScrollViewProps) {
+  const flatStyle = flattenStyles(style as StyleProp);
+
+  return (
+    <div
+      style={{
+        overflow: 'auto',
+        ...(!showsVerticalScrollIndicator && {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }),
+        ...(!showsHorizontalScrollIndicator && {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }),
+        ...(horizontal && {
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          whiteSpace: 'nowrap',
+        }),
+        ...(flatStyle as React.CSSProperties),
+      }}
+      {...props}
+    >
+      <div style={contentContainerStyle}>{children}</div>
+    </div>
+  );
+}
+
+// TextInput component for web
+interface TextInputProps {
+  style?: React.CSSProperties | React.CSSProperties[];
+  value?: string;
+  onChangeText?: (text: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  multiline?: boolean;
+  numberOfLines?: number;
+  autoFocus?: boolean;
+  editable?: boolean;
+  keyboardType?: string;
+  returnKeyType?: string;
+  onSubmitEditing?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  [key: string]: unknown;
+}
+
+function TextInput({
+  style,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry = false,
+  multiline = false,
+  numberOfLines = 1,
+  autoFocus = false,
+  editable = true,
+  onSubmitEditing,
+  onFocus,
+  onBlur,
+  ...props
+}: TextInputProps) {
+  const flatStyle = flattenStyles(style as StyleProp);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    onChangeText?.(e.target.value);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !multiline) {
+      onSubmitEditing?.();
+    }
+  };
+
+  const inputStyle = {
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    padding: '8px',
+    fontSize: '16px',
+    outline: 'none',
+    ...(flatStyle as React.CSSProperties),
+  };
+
+  if (multiline) {
+    return (
+      <textarea
+        style={{
+          ...inputStyle,
+          resize: 'vertical',
+          minHeight: numberOfLines ? numberOfLines * 20 : undefined,
+        }}
+        value={value}
+        onChange={handleChange}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        disabled={!editable}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        {...props}
+      />
+    );
+  }
+
+  return (
+    <input
+      type={secureTextEntry ? 'password' : 'text'}
+      style={inputStyle}
+      value={value}
+      onChange={handleChange}
+      onKeyPress={handleKeyPress}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      disabled={!editable}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      {...props}
+    />
+  );
+}
+
+// Table component for web
+interface TableProps {
+  style?: React.CSSProperties;
+  children?: React.ReactNode;
+  [key: string]: unknown;
+}
+
+function Table({ style, children, ...props }: TableProps) {
+  return (
+    <table
+      style={{
+        borderCollapse: 'collapse',
+        width: '100%',
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </table>
+  );
+}
+
+// PlatformProviders - a simple wrapper for web
+interface PlatformProvidersProps {
+  children?: React.ReactNode;
+}
+
+function PlatformProviders({ children }: PlatformProvidersProps) {
+  // On web, this is just a passthrough
+  return children;
+}
+
+// PlatformUtils - utility functions for platform-specific operations
+const PlatformUtils = {
+  isWeb: true,
+  isNative: false,
+  OS: 'web' as const,
+  select: <T,>(specifics: { web?: T; native?: T; default?: T }) => {
+    return specifics.web ?? specifics.default;
+  },
+};
+
+// Named exports - only components without direct Tamagui equivalents
 export {
   ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Picker,
+  Platform,
+  PlatformProviders,
+  PlatformUtils,
+  Pressable,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Table,
   Text,
   TextInput,
   TouchableOpacity,
+  Vibration,
   View,
 };
 
-// Update the default export to include new components
+// Update the default export to include only the necessary components
 const ReactNativeEquivalents = {
   ActivityIndicator,
   Alert,
@@ -871,13 +962,18 @@ const ReactNativeEquivalents = {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Picker,
   Platform,
+  PlatformProviders,
+  PlatformUtils,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Table,
   Text,
   TextInput,
   TouchableOpacity,
@@ -888,4 +984,4 @@ const ReactNativeEquivalents = {
 export default ReactNativeEquivalents;
 
 // Export types
-export type { TouchableOpacityProps, FlatListProps, ScrollViewProps };
+export type { TouchableOpacityProps, FlatListProps };

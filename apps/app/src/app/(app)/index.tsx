@@ -1,13 +1,7 @@
 import React from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { Button, H1, ScrollView, Text, XStack, YStack } from 'tamagui';
 
 const sports = [
   { name: 'Football', route: 'Football' as const },
@@ -26,65 +20,45 @@ export default function Home() {
   const navigation = useNavigation<NavigationProp>();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Fantasy Sports Hub</Text>
-      <Text style={styles.subHeading}>Choose your sport</Text>
-      <View style={styles.sportsContainer}>
-        {sports.map((sport, index) => (
-          <TouchableOpacity
-            key={sport.route}
-            style={styles.sportCard}
-            onPress={() => navigation.navigate(sport.route)}
-          >
-            <Text style={styles.sportName}>{sport.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack
+        alignItems="center"
+        backgroundColor="$background"
+        flexGrow={1}
+        justifyContent="center"
+        padding="$5"
+        space="$5"
+      >
+        <H1 color="$color" fontSize="$10" fontWeight="bold">
+          Fantasy Sports Hub
+        </H1>
+        <Text color="$gray11" fontSize="$6">
+          Choose your sport
+        </Text>
+        <XStack
+          flexWrap="wrap"
+          justifyContent="space-around"
+          width="100%"
+          space="$4"
+        >
+          {sports.map((sport) => (
+            <Button
+              key={sport.route}
+              alignItems="center"
+              backgroundColor="$gray8"
+              borderRadius="$4"
+              padding="$5"
+              width="45%"
+              marginBottom="$5"
+              onPress={() => navigation.navigate(sport.route)}
+            >
+              <Text color="$color" fontSize="$6" fontWeight="600">
+                {sport.name}
+              </Text>
+            </Button>
+          ))}
+        </XStack>
+      </YStack>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  heading: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  sportCard: {
-    alignItems: 'center',
-    backgroundColor: '#292929',
-    borderRadius: 12,
-    marginBottom: 20,
-    padding: 20,
-    width: '45%',
-  },
-  sportImage: {
-    height: 100,
-    marginBottom: 10,
-    width: 100,
-  },
-  sportName: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  sportsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    width: '100%',
-  },
-  subHeading: {
-    color: '#BBBBBB',
-    fontSize: 18,
-    marginBottom: 20,
-  },
-});

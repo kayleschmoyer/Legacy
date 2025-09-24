@@ -1,15 +1,7 @@
 import React from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../platform-components';
+import { Button, Text, XStack, YStack } from 'tamagui';
+import { Platform, ScrollView } from '../platform-components';
 import { NavigationConfig } from '../types';
-import { safeStyle } from '../utils/styles';
-import { DEFAULT_COLORS } from '../config/sports';
 
 export interface NavigationItem {
   title: string;
@@ -46,53 +38,91 @@ function NavigationDrawer({
   };
 
   return (
-    <View style={styles.drawerContainer}>
+    <YStack flex={1} backgroundColor="$gray1">
       {/* Header */}
-      <View style={styles.drawerHeader}>
-        <Text style={styles.appTitle}>Legacy Sports</Text>
+      <YStack
+        padding="$4"
+        backgroundColor="$blue4"
+        borderBottomWidth={1}
+        borderBottomColor="$gray5"
+      >
+        <Text fontSize="$6" fontWeight="bold" color="$gray12" marginBottom="$2">
+          Legacy Sports
+        </Text>
         {userInfo && (
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{userInfo.name}</Text>
-            <Text style={styles.userEmail}>{userInfo.email}</Text>
-          </View>
+          <YStack>
+            <Text fontSize="$4" fontWeight="600" color="$gray11">
+              {userInfo.name}
+            </Text>
+            <Text fontSize="$3" color="$gray10">
+              {userInfo.email}
+            </Text>
+          </YStack>
         )}
-      </View>
+      </YStack>
 
       {/* Navigation Items */}
-      <ScrollView style={styles.navItems}>
-        {items.map((item, index) => (
-          <React.Fragment key={`${item.route}-${index}`}>
-            {item.divider && <View style={styles.divider} />}
+      <ScrollView style={{ flex: 1 }}>
+        <YStack padding="$2">
+          {items.map((item, index) => (
+            <React.Fragment key={`${item.route}-${index}`}>
+              {item.divider && (
+                <YStack
+                  height={1}
+                  backgroundColor="$gray5"
+                  marginVertical="$2"
+                  marginHorizontal="$4"
+                />
+              )}
 
-            <TouchableOpacity
-              style={safeStyle([
-                styles.navItem,
-                currentRoute === item.route && styles.navItemActive,
-              ])}
-              onPress={() => handleItemPress(item.route)}
-            >
-              {item.icon && <Text style={styles.navIcon}>{item.icon}</Text>}
-              <Text
-                style={safeStyle([
-                  currentRoute === item.route && styles.navTextActive,
-                ])}
+              <Button
+                variant={currentRoute === item.route ? 'outlined' : 'outlined'}
+                size="$4"
+                justifyContent="flex-start"
+                onPress={() => handleItemPress(item.route)}
+                backgroundColor={
+                  currentRoute === item.route ? '$blue3' : 'transparent'
+                }
+                borderColor={
+                  currentRoute === item.route ? '$blue7' : 'transparent'
+                }
+                margin="$1"
+                paddingHorizontal="$3"
               >
-                {item.title}
-              </Text>
-            </TouchableOpacity>
-          </React.Fragment>
-        ))}
+                <XStack alignItems="center" space="$3">
+                  {item.icon && (
+                    <Text fontSize="$5" color="$blue10">
+                      {item.icon}
+                    </Text>
+                  )}
+                  <Text
+                    fontSize="$4"
+                    color={currentRoute === item.route ? '$blue11' : '$gray11'}
+                    fontWeight={currentRoute === item.route ? '600' : 'normal'}
+                  >
+                    {item.title}
+                  </Text>
+                </XStack>
+              </Button>
+            </React.Fragment>
+          ))}
+        </YStack>
       </ScrollView>
 
       {/* Footer */}
       {userInfo && onLogout && (
-        <View style={styles.drawerFooter}>
-          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-            <Text style={styles.logoutText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
+        <YStack padding="$4" borderTopWidth={1} borderTopColor="$gray5">
+          <Button
+            backgroundColor="$red9"
+            onPress={onLogout}
+            color="$gray1"
+            fontWeight="600"
+          >
+            Sign Out
+          </Button>
+        </YStack>
       )}
-    </View>
+    </YStack>
   );
 }
 
@@ -117,28 +147,47 @@ function TabNavigation({
   onNavigate,
 }: TabNavigationProps) {
   return (
-    <View style={styles.tabContainer}>
+    <XStack
+      backgroundColor="$gray3"
+      borderTopWidth={1}
+      borderTopColor="$gray6"
+      paddingVertical={Platform.OS === 'ios' ? '$5' : '$2'}
+      paddingBottom={Platform.OS === 'ios' ? '$8' : '$2'} // Safe area for iOS
+    >
       {items.map((item) => (
-        <TouchableOpacity
+        <Button
           key={item.route}
-          style={safeStyle([
-            styles.tabItem,
-            currentRoute === item.route && styles.tabItemActive,
-          ])}
+          flex={1}
+          backgroundColor={
+            currentRoute === item.route ? '$blue4' : 'transparent'
+          }
+          borderRadius={currentRoute === item.route ? '$2' : 0}
+          marginHorizontal={currentRoute === item.route ? '$1' : 0}
+          paddingVertical="$2"
+          borderWidth={0}
+          pressStyle={{
+            backgroundColor: '$gray4',
+            scale: 0.98,
+          }}
           onPress={() => onNavigate(item.route)}
         >
-          {item.icon && <Text style={styles.tabIcon}>{item.icon}</Text>}
-          <Text
-            style={safeStyle([
-              styles.tabText,
-              currentRoute === item.route && styles.tabTextActive,
-            ])}
-          >
-            {item.title}
-          </Text>
-        </TouchableOpacity>
+          <YStack alignItems="center" gap="$1">
+            {item.icon && (
+              <Text fontSize="$5" marginBottom="$1">
+                {item.icon}
+              </Text>
+            )}
+            <Text
+              fontSize="$2"
+              color={currentRoute === item.route ? '$blue11' : '$gray10'}
+              fontWeight={currentRoute === item.route ? '600' : '400'}
+            >
+              {item.title}
+            </Text>
+          </YStack>
+        </Button>
       ))}
-    </View>
+    </XStack>
   );
 }
 
@@ -160,23 +209,42 @@ function BreadcrumbNavigation({
   onNavigate,
 }: BreadcrumbNavigationProps) {
   return (
-    <View style={styles.breadcrumbContainer}>
+    <XStack
+      paddingHorizontal="$4"
+      paddingVertical="$2"
+      backgroundColor="$gray2"
+      borderBottomWidth={1}
+      borderBottomColor="$gray5"
+      alignItems="center"
+    >
       {items.map((item, index) => (
         <React.Fragment key={`${item.title}-${index}`}>
-          {index > 0 && <Text style={styles.breadcrumbSeparator}>/</Text>}
+          {index > 0 && (
+            <Text color="$gray9" marginHorizontal="$2" fontSize="$3">
+              /
+            </Text>
+          )}
 
           {item.route ? (
-            <TouchableOpacity
+            <Button
+              variant="outlined"
+              size="$2"
               onPress={() => item.route && onNavigate(item.route)}
+              padding="$1"
+              minHeight="auto"
+              color="$blue10"
+              fontSize="$3"
             >
-              <Text style={styles.breadcrumbLink}>{item.title}</Text>
-            </TouchableOpacity>
+              {item.title}
+            </Button>
           ) : (
-            <Text style={styles.breadcrumbText}>{item.title}</Text>
+            <Text color="$gray12" fontSize="$3" fontWeight="600">
+              {item.title}
+            </Text>
           )}
         </React.Fragment>
       ))}
-    </View>
+    </XStack>
   );
 }
 
@@ -297,146 +365,6 @@ export function useNavigation(): NavigationContextValue {
   }
   return context;
 }
-
-const styles = StyleSheet.create({
-  // Drawer Styles
-  drawerContainer: {
-    flex: 1,
-    backgroundColor: DEFAULT_COLORS.secondary,
-  },
-  drawerHeader: {
-    padding: 20,
-    backgroundColor: DEFAULT_COLORS.accent,
-    borderBottomWidth: 1,
-    borderBottomColor: DEFAULT_COLORS.border,
-  },
-  appTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: DEFAULT_COLORS.text,
-    marginBottom: 8,
-  },
-  userInfo: {
-    marginTop: 8,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: DEFAULT_COLORS.text,
-  },
-  userEmail: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.text,
-    opacity: 0.8,
-  },
-  navItems: {
-    flex: 1,
-    paddingVertical: 8,
-  },
-  navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  navItemActive: {
-    backgroundColor: DEFAULT_COLORS.primary,
-  },
-  navIcon: {
-    fontSize: 18,
-    marginRight: 12,
-    width: 24,
-    textAlign: 'center',
-  },
-  navText: {
-    fontSize: 16,
-    color: DEFAULT_COLORS.textSecondary,
-    flex: 1,
-  },
-  navTextActive: {
-    color: DEFAULT_COLORS.accent,
-    fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: DEFAULT_COLORS.border,
-    marginVertical: 8,
-    marginHorizontal: 20,
-  },
-  drawerFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: DEFAULT_COLORS.border,
-  },
-  logoutButton: {
-    backgroundColor: DEFAULT_COLORS.error,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: DEFAULT_COLORS.text,
-    fontWeight: '600',
-  },
-
-  // Tab Styles
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderTopWidth: 1,
-    borderTopColor: DEFAULT_COLORS.border,
-    paddingVertical: Platform.OS === 'ios' ? 20 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 8, // Safe area for iOS
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  tabItemActive: {
-    backgroundColor: DEFAULT_COLORS.primary,
-    borderRadius: 8,
-    marginHorizontal: 4,
-  },
-  tabIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  tabText: {
-    fontSize: 12,
-    color: DEFAULT_COLORS.textSecondary,
-  },
-  tabTextActive: {
-    color: DEFAULT_COLORS.accent,
-    fontWeight: '600',
-  },
-
-  // Breadcrumb Styles
-  breadcrumbContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: DEFAULT_COLORS.secondary,
-    borderBottomWidth: 1,
-    borderBottomColor: DEFAULT_COLORS.border,
-  },
-  breadcrumbSeparator: {
-    color: DEFAULT_COLORS.textSecondary,
-    marginHorizontal: 8,
-  },
-  breadcrumbLink: {
-    color: DEFAULT_COLORS.accent,
-    fontSize: 14,
-    textDecorationLine: Platform.OS === 'web' ? 'underline' : undefined,
-  },
-  breadcrumbText: {
-    color: DEFAULT_COLORS.text,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 export { NavigationDrawer };
 export { TabNavigation };

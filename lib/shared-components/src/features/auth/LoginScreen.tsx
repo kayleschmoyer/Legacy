@@ -2,18 +2,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
+import { Button, H2, Paragraph, Spinner, Text, YStack } from 'tamagui';
+import { Animated, KeyboardAvoidingView } from 'react-native';
+import { Platform } from '../../platform-components';
 import { DEFAULT_COLORS } from '../../config/sports';
-import { safeStyle } from '../../utils/styles';
 
 export interface LoginScreenProps {
   /**
@@ -79,108 +71,54 @@ function LoginScreen({
 
   return (
     <KeyboardAvoidingView
-      style={safeStyle([styles.container, containerStyle])}
+      style={{ flex: 1, backgroundColor: '#1E1E1E' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      <YStack flex={1} alignItems="center" justifyContent="center" padding="$4">
+        <H2 color="white" marginBottom="$2" textAlign="center">
+          {title}
+        </H2>
 
-        <Animated.View
-          style={safeStyle([styles.formContainer, { opacity: 1 }])}
-        >
-          {errorMessage ? (
-            <Text style={styles.errorMessage}>{errorMessage}</Text>
-          ) : null}
+        {subtitle && (
+          <Paragraph color="$gray10" marginBottom="$6" textAlign="center">
+            {subtitle}
+          </Paragraph>
+        )}
 
-          <TouchableOpacity
-            style={safeStyle([styles.loginButton, buttonStyle])}
+        <YStack width="100%" maxWidth={400} gap="$4">
+          {errorMessage && (
+            <Text color="$red10" textAlign="center" fontSize="$3">
+              {errorMessage}
+            </Text>
+          )}
+
+          <Button
             onPress={handleLogin}
             disabled={isLoading}
+            backgroundColor="$blue9"
+            borderRadius="$3"
+            paddingVertical="$3"
+            paddingHorizontal="$6"
+            shadowColor="$shadowColor"
+            shadowOffset={{ width: 0, height: 2 }}
+            shadowOpacity={0.1}
+            shadowRadius={4}
+            elevation={2}
           >
-            <Text style={styles.loginButtonText}>{buttonText}</Text>
-          </TouchableOpacity>
+            <Text color="white" fontSize="$4" fontWeight="600">
+              {buttonText}
+            </Text>
+          </Button>
 
           {isLoading && (
-            <ActivityIndicator
-              size="large"
-              color={DEFAULT_COLORS.primary}
-              style={styles.loadingIndicator}
-            />
+            <YStack alignItems="center" marginTop="$4">
+              <Spinner size="large" color={DEFAULT_COLORS.primary} />
+            </YStack>
           )}
-        </Animated.View>
-      </View>
+        </YStack>
+      </YStack>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1E1E1E',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 10,
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#CCCCCC',
-    marginBottom: 30,
-    textAlign: 'center',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  formContainer: {
-    width: '100%',
-    maxWidth: 400,
-  },
-  errorMessage: {
-    color: '#FF6B6B',
-    marginBottom: 15,
-    textAlign: 'center',
-    fontSize: 14,
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  loginButton: {
-    backgroundColor: '#4285F4',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    ...(Platform.OS === 'web' && {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }),
-  },
-  loadingIndicator: {
-    marginTop: 20,
-  },
-});
 
 export { LoginScreen };

@@ -2,18 +2,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useRef } from 'react';
+import type { TextInput } from 'react-native';
 import { Search } from '@tamagui/lucide-icons';
-import {
-  Animated,
-  FlatList,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from '../../platform-components';
-import { safeStyle } from '../../utils/styles';
+import { Button, Input, Text, XStack, YStack } from 'tamagui';
+import { Animated, FlatList } from '../../platform-components';
 
 export interface SearchBarProps {
   value: string;
@@ -83,7 +75,7 @@ function SearchBar({
   showClearButton = true,
   autoFocus = false,
 }: SearchBarProps) {
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const inputRef = useRef<TextInput>(null);
   const focusAnim = useRef(new Animated.Value(0)).current;
 
   const handleFocus = () => {
@@ -109,26 +101,33 @@ function SearchBar({
     inputRef.current?.focus();
   };
 
-  // Animation disabled for web compatibility
-  // const borderColor = focusAnim?.interpolate?.({
-  //   inputRange: [0, 1],
-  //   outputRange: ['#374151', '#3b82f6'],
-  // }) || '#374151';
+  const getContainerProps = () => {
+    const baseProps = {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      paddingHorizontal: 12,
+      paddingVertical: variant === 'prominent' ? 12 : 8,
+      borderWidth: 1,
+      borderColor: '#374151',
+      borderRadius: variant === 'prominent' ? 12 : 8,
+      backgroundColor: '$gray800',
+      gap: 8,
+    };
 
-  const containerStyle = [
-    styles.searchContainer,
-    styles[`${variant}Container`],
-  ];
+    return baseProps;
+  };
 
   return (
-    <Animated.View
-      style={safeStyle([...containerStyle, { borderColor: '#374151' }])}
-    >
+    <XStack {...getContainerProps()}>
       {showSearchIcon && <Search size={20} color="#6b7280" />}
 
-      <TextInput
+      <Input
         ref={inputRef}
-        style={safeStyle([styles.searchInput, styles[`${variant}Input`]])}
+        flex={1}
+        fontSize={variant === 'prominent' ? 16 : 14}
+        color="$white"
+        backgroundColor="transparent"
+        borderWidth={0}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -138,14 +137,22 @@ function SearchBar({
         onSubmitEditing={onSubmit}
         autoFocus={autoFocus}
         returnKeyType="search"
+        unstyled
       />
 
       {showClearButton && value.length > 0 && (
-        <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
-          <Text style={styles.clearIcon}>✕</Text>
-        </TouchableOpacity>
+        <Button
+          padding={4}
+          onPress={handleClear}
+          backgroundColor="transparent"
+          unstyled
+        >
+          <Text fontSize={16} color="$gray400">
+            ✕
+          </Text>
+        </Button>
       )}
-    </Animated.View>
+    </XStack>
   );
 }
 
@@ -166,36 +173,69 @@ function SearchWithSuggestions({
     visibleSuggestions.length > 0;
 
   const renderSuggestion = ({ item }: { item: SearchSuggestion }) => (
-    <TouchableOpacity
-      style={styles.suggestionItem}
+    <Button
+      paddingHorizontal={16}
+      paddingVertical={12}
+      backgroundColor="transparent"
+      borderBottomWidth={1}
+      borderBottomColor="$gray700"
       onPress={() => onSuggestionPress(item)}
+      justifyContent="flex-start"
+      unstyled
     >
-      <View style={styles.suggestionContent}>
-        <Text style={styles.suggestionText}>{item.text}</Text>
-        {item.subtitle && (
-          <Text style={styles.suggestionSubtitle}>{item.subtitle}</Text>
+      <XStack justifyContent="space-between" alignItems="center" flex={1}>
+        <YStack flex={1}>
+          <Text fontSize={14} color="$white" fontWeight="500">
+            {item.text}
+          </Text>
+          {item.subtitle && (
+            <Text fontSize={12} color="$gray400" marginTop={2}>
+              {item.subtitle}
+            </Text>
+          )}
+        </YStack>
+        {item.type && (
+          <Text
+            fontSize={10}
+            color="$gray500"
+            backgroundColor="$gray700"
+            paddingHorizontal={6}
+            paddingVertical={2}
+            borderRadius={4}
+            fontWeight="500"
+            textTransform="uppercase"
+          >
+            {item.type}
+          </Text>
         )}
-      </View>
-      {item.type && <Text style={styles.suggestionType}>{item.type}</Text>}
-    </TouchableOpacity>
+      </XStack>
+    </Button>
   );
 
   return (
-    <View style={styles.searchWithSuggestions}>
+    <YStack>
       <SearchBar {...searchProps} />
 
       {showSuggestionsList && (
-        <View style={styles.suggestionsContainer}>
-          <FlatList
+        <YStack
+          backgroundColor="$gray800"
+          borderWidth={1}
+          borderColor="$gray700"
+          borderTopWidth={0}
+          borderBottomLeftRadius={8}
+          borderBottomRightRadius={8}
+          maxHeight={200}
+        >
+          <FlatList<SearchSuggestion>
             data={visibleSuggestions}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: SearchSuggestion) => item.id}
             renderItem={renderSuggestion}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           />
-        </View>
+        </YStack>
       )}
-    </View>
+    </YStack>
   );
 }
 
@@ -213,77 +253,120 @@ function SortSelector({
 
   if (variant === 'tabs') {
     return (
-      <View style={styles.sortTabs}>
-        {label && <Text style={styles.sortLabel}>{label}</Text>}
-        <View style={styles.sortTabsContainer}>
+      <YStack paddingHorizontal={16} paddingVertical={8}>
+        {label && (
+          <Text
+            fontSize={12}
+            fontWeight="600"
+            color="$gray400"
+            marginBottom={8}
+          >
+            {label}
+          </Text>
+        )}
+        <XStack gap={8}>
           {options.map((option) => (
-            <TouchableOpacity
+            <Button
               key={option.key}
-              style={[
-                styles.sortTab,
-                ...(selectedSort === option.key ? [styles.sortTabActive] : []),
-              ]}
+              paddingHorizontal={16}
+              paddingVertical={8}
+              borderRadius={8}
+              borderWidth={1}
+              backgroundColor={
+                selectedSort === option.key ? '$blue500' : 'transparent'
+              }
+              borderColor={
+                selectedSort === option.key ? '$blue500' : '$gray600'
+              }
               onPress={() => onSortChange(option.key)}
+              unstyled
             >
               <Text
-                style={[
-                  styles.sortTabText,
-                  ...(selectedSort === option.key
-                    ? [styles.sortTabTextActive]
-                    : []),
-                ]}
+                fontSize={14}
+                fontWeight="500"
+                color={selectedSort === option.key ? '$white' : '$gray300'}
               >
                 {option.label}
               </Text>
-            </TouchableOpacity>
+            </Button>
           ))}
-        </View>
-      </View>
+        </XStack>
+      </YStack>
     );
   }
 
   if (variant === 'chips') {
     return (
-      <View style={styles.sortChips}>
-        {label && <Text style={styles.sortLabel}>{label}</Text>}
-        <View style={styles.sortChipsContainer}>
+      <YStack paddingHorizontal={16} paddingVertical={8}>
+        {label && (
+          <Text
+            fontSize={12}
+            fontWeight="600"
+            color="$gray400"
+            marginBottom={8}
+          >
+            {label}
+          </Text>
+        )}
+        <XStack flexWrap="wrap" gap={8}>
           {options.map((option) => (
-            <TouchableOpacity
+            <Button
               key={option.key}
-              style={[
-                styles.sortChip,
-                ...(selectedSort === option.key ? [styles.sortChipActive] : []),
-              ]}
+              paddingHorizontal={12}
+              paddingVertical={6}
+              borderRadius={16}
+              borderWidth={1}
+              backgroundColor={
+                selectedSort === option.key ? '$blue500' : 'transparent'
+              }
+              borderColor={
+                selectedSort === option.key ? '$blue500' : '$gray600'
+              }
               onPress={() => onSortChange(option.key)}
+              unstyled
             >
               <Text
-                style={[
-                  styles.sortChipText,
-                  ...(selectedSort === option.key
-                    ? [styles.sortChipTextActive]
-                    : []),
-                ]}
+                fontSize={12}
+                fontWeight="500"
+                color={selectedSort === option.key ? '$white' : '$gray300'}
               >
                 {option.label}
               </Text>
-            </TouchableOpacity>
+            </Button>
           ))}
-        </View>
-      </View>
+        </XStack>
+      </YStack>
     );
   }
 
   // Default dropdown variant
   return (
-    <View style={styles.sortDropdown}>
-      {label && <Text style={styles.sortLabel}>{label}</Text>}
-      <TouchableOpacity style={styles.sortDropdownButton}>
-        <Text style={styles.sortDropdownText}>
+    <YStack paddingHorizontal={16} paddingVertical={8}>
+      {label && (
+        <Text fontSize={12} fontWeight="600" color="$gray400" marginBottom={8}>
+          {label}
+        </Text>
+      )}
+      <Button
+        flexDirection="row"
+        justifyContent="space-between"
+        alignItems="center"
+        paddingHorizontal={12}
+        paddingVertical={8}
+        borderWidth={1}
+        borderColor="$gray600"
+        borderRadius={8}
+        backgroundColor="$gray800"
+        unstyled
+      >
+        <Text fontSize={14} color="$white">
           {selectedOption?.label || 'Select...'}
         </Text>
-        <Text style={styles.sortDropdownArrow}>▼</Text>
-      </TouchableOpacity>
-    </View>
+        <Text fontSize={12} color="$gray400">
+          ▼
+        </Text>
+      </Button>
+    </YStack>
   );
 }
 
@@ -301,23 +384,21 @@ function SearchAndSortBar({
   showFilterButton = true,
   variant = 'default',
 }: SearchAndSortBarProps) {
-  const containerStyle = safeStyle([
-    styles.searchAndSortContainer,
-    styles[`${variant}SearchAndSort`],
-  ]);
-
   return (
-    <View style={containerStyle}>
-      <View style={styles.searchSection}>
-        <SearchBar
-          value={searchValue}
-          onChangeText={onSearchChange}
-          placeholder={placeholder}
-          variant={variant === 'compact' ? 'compact' : 'default'}
-        />
-      </View>
+    <YStack
+      paddingHorizontal={16}
+      paddingVertical={variant === 'compact' ? 8 : 12}
+      backgroundColor="$gray900"
+      gap={variant === 'compact' ? 8 : 12}
+    >
+      <SearchBar
+        value={searchValue}
+        onChangeText={onSearchChange}
+        placeholder={placeholder}
+        variant={variant === 'compact' ? 'compact' : 'default'}
+      />
 
-      <View style={styles.controlsSection}>
+      <XStack justifyContent="space-between" alignItems="center">
         <SortSelector
           options={sortOptions}
           selectedSort={selectedSort}
@@ -326,286 +407,29 @@ function SearchAndSortBar({
         />
 
         {showFilterButton && onFilterPress && (
-          <TouchableOpacity style={styles.filterButton} onPress={onFilterPress}>
-            <Text style={styles.filterButtonIcon}>⚙</Text>
-            <Text style={styles.filterButtonText}>Filter</Text>
-          </TouchableOpacity>
+          <Button
+            flexDirection="row"
+            alignItems="center"
+            gap={4}
+            paddingHorizontal={12}
+            paddingVertical={8}
+            borderRadius={8}
+            backgroundColor="$gray700"
+            onPress={onFilterPress}
+            unstyled
+          >
+            <Text fontSize={14} color="$gray300">
+              ⚙
+            </Text>
+            <Text fontSize={14} color="$gray300" fontWeight="500">
+              Filter
+            </Text>
+          </Button>
         )}
-      </View>
-    </View>
+      </XStack>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  // Search Bar
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-  },
-
-  defaultContainer: {
-    minHeight: 48,
-  },
-
-  compactContainer: {
-    minHeight: 40,
-    borderRadius: 8,
-  },
-
-  prominentContainer: {
-    minHeight: 56,
-    borderRadius: 16,
-  },
-
-  searchIcon: {
-    fontSize: 16,
-    color: '#9ca3af',
-    marginRight: 8,
-  },
-
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#ffffff',
-    padding: 0,
-  },
-
-  defaultInput: {
-    fontSize: 16,
-  },
-
-  compactInput: {
-    fontSize: 14,
-  },
-
-  prominentInput: {
-    fontSize: 18,
-  },
-
-  clearButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-
-  clearIcon: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-
-  // Search with Suggestions
-  searchWithSuggestions: {
-    position: 'relative',
-  },
-
-  suggestionsContainer: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 200,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    zIndex: 1000,
-  },
-
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#374151',
-  },
-
-  suggestionContent: {
-    flex: 1,
-  },
-
-  suggestionText: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-
-  suggestionSubtitle: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
-
-  suggestionType: {
-    fontSize: 10,
-    color: '#6b7280',
-    backgroundColor: '#374151',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-
-  // Sort Selector
-  sortDropdown: {
-    minWidth: 120,
-  },
-
-  sortLabel: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginBottom: 4,
-  },
-
-  sortDropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-
-  sortDropdownText: {
-    fontSize: 14,
-    color: '#ffffff',
-  },
-
-  sortDropdownArrow: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginLeft: 8,
-  },
-
-  // Sort Tabs
-  sortTabs: {
-    flex: 1,
-  },
-
-  sortTabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 2,
-  },
-
-  sortTab: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-
-  sortTabActive: {
-    backgroundColor: '#3b82f6',
-  },
-
-  sortTabText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
-
-  sortTabTextActive: {
-    color: '#ffffff',
-  },
-
-  // Sort Chips
-  sortChips: {
-    flex: 1,
-  },
-
-  sortChipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-
-  sortChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-
-  sortChipActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-  },
-
-  sortChipText: {
-    fontSize: 11,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
-
-  sortChipTextActive: {
-    color: '#ffffff',
-  },
-
-  // Search and Sort Bar
-  searchAndSortContainer: {
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-
-  defaultSearchAndSort: {
-    gap: 12,
-  },
-
-  compactSearchAndSort: {
-    gap: 8,
-    paddingVertical: 8,
-  },
-
-  searchSection: {
-    flex: 1,
-  },
-
-  controlsSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-    gap: 6,
-  },
-
-  filterButtonIcon: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-
-  filterButtonText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-});
 
 export { SearchBar };
 export { SearchWithSuggestions };

@@ -1,30 +1,20 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, YStack } from 'tamagui';
 
 export default function BaseballScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Baseball Fantasy</Text>
-      <Text style={styles.subtitle}>Coming soon...</Text>
-    </View>
+    <YStack
+      flex={1}
+      justifyContent="center"
+      alignItems="center"
+      backgroundColor="$gray12"
+    >
+      <Text fontSize="$7" fontWeight="bold" color="$white" marginBottom="$3">
+        Baseball Fantasy
+      </Text>
+      <Text fontSize="$4" color="$gray8">
+        Coming soon...
+      </Text>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#CCCCCC',
-  },
-});

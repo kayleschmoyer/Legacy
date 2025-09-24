@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-} from 'react-native';
+import { Animated, Platform } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native';
+import { Button, Input, Spinner, Text, YStack } from 'tamagui';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -42,113 +35,92 @@ const Login: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={{
+        alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
+        padding: 20,
+      }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Text style={styles.title}>Welcome to Legacy Sports!</Text>
+      <Text
+        fontSize="$8"
+        fontWeight="bold"
+        marginBottom="$8"
+        textAlign="center"
+      >
+        Welcome to Legacy Sports!
+      </Text>
 
-      <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
-        <TextInput
-          style={styles.input}
+      <Animated.View style={[{ width: '100%' }, { opacity: fadeAnim }]}>
+        <Input
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          borderColor="$gray8"
+          borderWidth={1}
+          height={40}
+          marginBottom="$3"
+          paddingHorizontal="$3"
+          width="100%"
         />
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Password"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
+          borderColor="$gray8"
+          borderWidth={1}
+          height={40}
+          marginBottom="$3"
+          paddingHorizontal="$3"
+          width="100%"
         />
 
         {errorMessage ? (
-          <Text style={styles.errorMessage}>{errorMessage}</Text>
+          <Text color="$red10" marginTop="$3" textAlign="center">
+            {errorMessage}
+          </Text>
         ) : null}
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
+        <Button
+          backgroundColor="$green10"
+          borderRadius="$2"
+          marginTop="$6"
+          paddingHorizontal="$5"
+          paddingVertical="$3"
+          onPress={handleLogin}
+        >
+          <Text color="$white" fontSize="$5" fontWeight="bold">
+            Login
+          </Text>
+        </Button>
 
         {isLoading && (
-          <ActivityIndicator
-            size="large"
-            color="blue"
-            style={styles.loadingIndicator}
-          />
+          <YStack alignItems="center" marginTop="$5">
+            <Spinner size="large" color="$blue10" />
+          </YStack>
         )}
 
-        <TouchableOpacity style={styles.registerLinkContainer}>
-          <Text style={styles.registerLinkText}>
+        <Button
+          backgroundColor="transparent"
+          marginTop="$4"
+          onPress={() => {
+            // TODO: Implement registration navigation
+          }}
+        >
+          <Text fontSize="$4" textAlign="center">
             Don't have an account?{' '}
-            <Text style={styles.registerLink}>Register here</Text>
+            <Text color="$blue10" textDecorationLine="underline">
+              Register here
+            </Text>
           </Text>
-        </TouchableOpacity>
+        </Button>
       </Animated.View>
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  errorMessage: {
-    color: 'red',
-    marginTop: 10,
-  },
-  formContainer: {
-    width: '100%',
-  },
-
-  input: {
-    borderColor: 'gray',
-    borderWidth: 1,
-    height: 40,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    width: '100%',
-  },
-  loadingIndicator: {
-    marginTop: 20,
-  },
-  loginButton: {
-    backgroundColor: 'green',
-    borderRadius: 5,
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  logo: {
-    height: 200,
-    marginBottom: 20,
-    width: 200,
-  },
-  registerLink: {
-    color: 'blue',
-    textDecorationLine: 'underline',
-  },
-  registerLinkContainer: {
-    marginTop: 15,
-  },
-  registerLinkText: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-  },
-});
 
 export default Login;
