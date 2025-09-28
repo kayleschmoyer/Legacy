@@ -45,6 +45,12 @@ interface LoginPageProps {
   logo?: React.ReactNode;
   /** OAuth login method from AuthProvider (optional, for better state management) */
   loginWithOAuth?: (oauthResponse: OAuthResponse) => Promise<void>;
+  /** Maximum width of the login card (default: 400 for mobile, 600 for desktop) */
+  maxWidth?: number;
+  /** Use wide layout for desktop screens */
+  useWideLayout?: boolean;
+  /** Hide background decorations for cleaner embedding */
+  hideDecorations?: boolean;
 }
 
 /**
@@ -68,6 +74,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   appName = 'Legacy Sports',
   logo,
   loginWithOAuth,
+  maxWidth,
+  useWideLayout = false,
+  hideDecorations = false,
 }) => {
   // State management
   const [isLoading, setIsLoading] = useState(false);
@@ -79,6 +88,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Animation state for Tamagui
   const [isVisible, setIsVisible] = useState(false);
+
+  // Responsive breakpoint detection
+  const [screenWidth, setScreenWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1024,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-detect wide layout based on screen size (768px is tablet breakpoint)
+  const shouldUseWideLayout = useWideLayout || screenWidth >= 768;
 
   // Initialize auth service with useMemo to prevent recreation
   const authService = useMemo(() => new AuthService(config), [config]);
@@ -229,38 +257,54 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     animation: 'bouncy',
   };
 
+  // Responsive layout calculations
+  const cardMaxWidth = maxWidth || (shouldUseWideLayout ? 600 : 400);
+  const cardPadding = shouldUseWideLayout ? '$8' : '$6';
+
   return (
-    <Theme name="light">
+    <Theme name="legacy_dark">
       <YStack
         flex={1}
         alignItems="center"
         justifyContent="center"
         padding="$4"
+        backgroundColor="$background"
         style={[
           {
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             minHeight: '100vh',
           },
           style,
         ]}
       >
         {/* Background decoration */}
-        <Circle
-          position="absolute"
-          top={-100}
-          right={-100}
-          size={300}
-          backgroundColor="$blue4"
-          opacity={0.1}
-        />
-        <Circle
-          position="absolute"
-          bottom={-150}
-          left={-150}
-          size={400}
-          backgroundColor="$purple4"
-          opacity={0.1}
-        />
+        {!hideDecorations && (
+          <>
+            <Circle
+              position="absolute"
+              top={-100}
+              right={-100}
+              size={300}
+              backgroundColor="$blue4"
+              opacity={0.15}
+            />
+            <Circle
+              position="absolute"
+              bottom={-150}
+              left={-150}
+              size={400}
+              backgroundColor="$purple4"
+              opacity={0.1}
+            />
+            <Circle
+              position="absolute"
+              top="30%"
+              left={-50}
+              size={150}
+              backgroundColor="$green4"
+              opacity={0.08}
+            />
+          </>
+        )}
 
         {/* Main login card */}
         <Card
@@ -270,185 +314,401 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {...containerAnimation}
           hoverStyle={{ scale: 1.02 }}
           pressStyle={{ scale: 0.98 }}
-          padding="$6"
-          maxWidth={400}
+          padding={cardPadding}
+          maxWidth={cardMaxWidth}
           width="100%"
-          backgroundColor="rgba(255, 255, 255, 0.95)"
-          backdropFilter="blur(20px)"
+          backgroundColor="$backgroundTransparent"
           borderRadius="$6"
-          shadowColor="rgba(0,0,0,0.1)"
-          shadowOffset={{ width: 0, height: 10 }}
-          shadowOpacity={0.3}
-          shadowRadius={20}
+          borderColor="$borderColor"
+          borderWidth={1}
+          shadowColor="$shadowColor"
+          shadowOffset={{ width: 0, height: 20 }}
+          shadowOpacity={0.6}
+          shadowRadius={30}
         >
-          <YStack space="$5" alignItems="center">
-            {/* Header */}
-            <YStack space="$3" alignItems="center">
-              {logo || (
-                <Circle size={80} backgroundColor="$blue10" elevate>
-                  <Text fontSize="$8" color="white" fontWeight="bold">
-                    {appName.charAt(0)}
+          {shouldUseWideLayout ? (
+            /* Wide layout for desktop - horizontal split */
+            <XStack space="$8" alignItems="center" width="100%">
+              {/* Left side - Branding */}
+              <YStack space="$4" alignItems="center" flex={1} minWidth={250}>
+                {logo || (
+                  <Circle
+                    size={100}
+                    backgroundColor="$blue6"
+                    elevate
+                    borderColor="$blue7"
+                    borderWidth={2}
+                  >
+                    <Text fontSize="$9" color="$color" fontWeight="bold">
+                      {appName.charAt(0)}
+                    </Text>
+                  </Circle>
+                )}
+
+                <YStack space="$2" alignItems="center">
+                  <Text fontSize="$8" fontWeight="bold" color="$color">
+                    Welcome to {appName}
                   </Text>
-                </Circle>
-              )}
+                  <Text
+                    fontSize="$4"
+                    color="$color11"
+                    textAlign="center"
+                    maxWidth={300}
+                  >
+                    Sign in to access your personalized sports experience and
+                    track your favorite teams and players
+                  </Text>
+                </YStack>
+              </YStack>
 
-              <Text fontSize="$7" fontWeight="bold" color="$gray12">
-                Welcome to {appName}
-              </Text>
+              {/* Right side - Login form */}
+              <YStack space="$5" flex={1} minWidth={300}>
+                {/* Error message */}
+                {errorMessage && (
+                  <Card
+                    backgroundColor="$red2"
+                    padding="$3"
+                    width="100%"
+                    borderColor="$red5"
+                    borderWidth={1}
+                  >
+                    <Text fontSize="$3" color="$red10" textAlign="center">
+                      {errorMessage}
+                    </Text>
+                  </Card>
+                )}
 
-              <Text fontSize="$4" color="$gray10" textAlign="center">
-                Sign in to access your personalized sports experience
-              </Text>
-            </YStack>
+                {/* Social login section */}
+                {authMethod === 'social' && (
+                  <YStack space="$4" width="100%">
+                    <Button
+                      size="$5"
+                      backgroundColor="$blue6"
+                      color="$color"
+                      fontWeight="600"
+                      borderRadius="$4"
+                      borderColor="$blue7"
+                      borderWidth={1}
+                      disabled={!isConfigured || isLoading}
+                      opacity={!isConfigured || isLoading ? 0.6 : 1}
+                      onPress={() => {
+                        void handleGoogleLogin();
+                      }}
+                      icon={
+                        isLoading ? (
+                          <Spinner size="small" color="$color" />
+                        ) : undefined
+                      }
+                      width="100%"
+                      elevate
+                      pressStyle={{ scale: 0.98, backgroundColor: '$blue5' }}
+                      hoverStyle={{ backgroundColor: '$blue7' }}
+                      animation="bouncy"
+                    >
+                      <XStack space="$3" alignItems="center">
+                        {!isLoading && (
+                          <Text fontSize="$2">
+                            <span role="img" aria-label="star">
+                              🌟
+                            </span>
+                          </Text>
+                        )}
+                        <Text fontSize="$4" color="$color">
+                          {isLoading ? 'Signing in...' : 'Continue with Google'}
+                        </Text>
+                      </XStack>
+                    </Button>
 
-            {/* Error message */}
-            {errorMessage && (
-              <Card backgroundColor="$red2" padding="$3" width="100%">
-                <Text fontSize="$3" color="$red11" textAlign="center">
-                  {errorMessage}
-                </Text>
-              </Card>
-            )}
-
-            {/* Social login section */}
-            {authMethod === 'social' && (
-              <YStack space="$4" width="100%">
-                <Button
-                  size="$5"
-                  backgroundColor="$blue10"
-                  color="white"
-                  fontWeight="600"
-                  borderRadius="$4"
-                  disabled={!isConfigured || isLoading}
-                  opacity={!isConfigured || isLoading ? 0.6 : 1}
-                  onPress={() => {
-                    void handleGoogleLogin();
-                  }}
-                  icon={
-                    isLoading ? (
-                      <Spinner size="small" color="white" />
-                    ) : undefined
-                  }
-                  width="100%"
-                  elevate
-                  pressStyle={{ scale: 0.98 }}
-                  animation="bouncy"
-                >
-                  <XStack space="$3" alignItems="center">
-                    {!isLoading && (
-                      <Text fontSize="$2">
-                        <span role="img" aria-label="star">
-                          🌟
-                        </span>
+                    <XStack alignItems="center" space="$3">
+                      <Separator flex={1} borderColor="$borderColor" />
+                      <Text fontSize="$2" color="$color11">
+                        or
                       </Text>
-                    )}
-                    <Text fontSize="$4" color="white">
-                      {isLoading ? 'Signing in...' : 'Continue with Google'}
+                      <Separator flex={1} borderColor="$borderColor" />
+                    </XStack>
+
+                    <Button
+                      size="$4"
+                      variant="outlined"
+                      color="$color11"
+                      borderColor="$borderColor"
+                      backgroundColor="transparent"
+                      hoverStyle={{ borderColor: '$borderColorHover' }}
+                      pressStyle={{ scale: 0.98 }}
+                      onPress={() => setAuthMethod('email')}
+                      width="100%"
+                    >
+                      Sign in with Email
+                    </Button>
+                  </YStack>
+                )}
+
+                {/* Email login section */}
+                {authMethod === 'email' && (
+                  <YStack space="$4" width="100%">
+                    <YStack space="$3">
+                      <Input
+                        placeholder="Email address"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        size="$4"
+                        borderRadius="$3"
+                        backgroundColor="$color2"
+                        borderColor="$borderColor"
+                        color="$color"
+                        placeholderTextColor="$color11"
+                      />
+                      <Input
+                        placeholder="Password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                        size="$4"
+                        borderRadius="$3"
+                        backgroundColor="$color2"
+                        borderColor="$borderColor"
+                        color="$color"
+                        placeholderTextColor="$color11"
+                      />
+                    </YStack>
+
+                    <Button
+                      size="$5"
+                      backgroundColor="$purple6"
+                      color="$color"
+                      fontWeight="600"
+                      borderColor="$purple7"
+                      borderWidth={1}
+                      disabled={isLoading || !email || !password}
+                      onPress={() => {
+                        void handleEmailLogin();
+                      }}
+                      width="100%"
+                      elevate
+                      hoverStyle={{ backgroundColor: '$purple7' }}
+                      pressStyle={{ scale: 0.98 }}
+                      icon={
+                        isLoading ? (
+                          <Spinner size="small" color="$color" />
+                        ) : undefined
+                      }
+                    >
+                      {isLoading ? 'Signing in...' : 'Sign In'}
+                    </Button>
+
+                    <Button
+                      size="$3"
+                      variant="outlined"
+                      color="$color11"
+                      borderColor="$borderColor"
+                      backgroundColor="transparent"
+                      hoverStyle={{ borderColor: '$borderColorHover' }}
+                      pressStyle={{ scale: 0.98 }}
+                      onPress={() => {
+                        setAuthMethod('social');
+                        setErrorMessage('');
+                      }}
+                      width="100%"
+                    >
+                      <span role="img" aria-label="arrow left">
+                        ←
+                      </span>{' '}
+                      Back to Social Login
+                    </Button>
+                  </YStack>
+                )}
+
+                {/* Configuration status */}
+                {!isConfigured && (
+                  <XStack space="$2" alignItems="center">
+                    <Spinner size="small" color="$color11" />
+                    <Text fontSize="$2" color="$color11">
+                      Initializing authentication...
                     </Text>
                   </XStack>
-                </Button>
-
-                <XStack alignItems="center" space="$3">
-                  <Separator flex={1} />
-                  <Text fontSize="$2" color="$gray8">
-                    or
-                  </Text>
-                  <Separator flex={1} />
-                </XStack>
-
-                <Button
-                  size="$4"
-                  variant="outlined"
-                  color="$gray11"
-                  borderColor="$gray6"
-                  onPress={() => setAuthMethod('email')}
-                  width="100%"
-                >
-                  Sign in with Email
-                </Button>
+                )}
               </YStack>
-            )}
+            </XStack>
+          ) : (
+            /* Standard vertical layout for mobile */
+            <YStack space="$5" alignItems="center">
+              {/* Header */}
+              <YStack space="$3" alignItems="center">
+                {logo || (
+                  <Circle
+                    size={80}
+                    backgroundColor="$blue6"
+                    elevate
+                    borderColor="$blue7"
+                    borderWidth={2}
+                  >
+                    <Text fontSize="$8" color="$color" fontWeight="bold">
+                      {appName.charAt(0)}
+                    </Text>
+                  </Circle>
+                )}
 
-            {/* Email login section */}
-            {authMethod === 'email' && (
-              <YStack space="$4" width="100%">
-                <YStack space="$3">
-                  <Input
-                    placeholder="Email address"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    size="$4"
-                    borderRadius="$3"
-                  />
-                  <Input
-                    placeholder="Password"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    size="$4"
-                    borderRadius="$3"
-                  />
-                </YStack>
-
-                <Button
-                  size="$5"
-                  backgroundColor="$purple10"
-                  color="white"
-                  fontWeight="600"
-                  disabled={isLoading || !email || !password}
-                  onPress={() => {
-                    void handleEmailLogin();
-                  }}
-                  width="100%"
-                  elevate
-                  icon={
-                    isLoading ? (
-                      <Spinner size="small" color="white" />
-                    ) : undefined
-                  }
-                >
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-
-                <Button
-                  size="$3"
-                  variant="outlined"
-                  color="$gray11"
-                  onPress={() => {
-                    setAuthMethod('social');
-                    setErrorMessage('');
-                  }}
-                  width="100%"
-                >
-                  <span role="img" aria-label="arrow left">
-                    ←
-                  </span>{' '}
-                  Back to Social Login
-                </Button>
-              </YStack>
-            )}
-
-            {/* Configuration status */}
-            {!isConfigured && (
-              <XStack space="$2" alignItems="center">
-                <Spinner size="small" />
-                <Text fontSize="$2" color="$gray10">
-                  Initializing authentication...
+                <Text fontSize="$7" fontWeight="bold" color="$color">
+                  Welcome to {appName}
                 </Text>
-              </XStack>
-            )}
-          </YStack>
+
+                <Text fontSize="$4" color="$color11" textAlign="center">
+                  Sign in to access your personalized sports experience
+                </Text>
+              </YStack>
+
+              {/* Error message */}
+              {errorMessage && (
+                <Card
+                  backgroundColor="$red2"
+                  padding="$3"
+                  width="100%"
+                  borderColor="$red5"
+                  borderWidth={1}
+                >
+                  <Text fontSize="$3" color="$red10" textAlign="center">
+                    {errorMessage}
+                  </Text>
+                </Card>
+              )}
+
+              {/* Social login section */}
+              {authMethod === 'social' && (
+                <YStack space="$4" width="100%">
+                  <Button
+                    size="$5"
+                    backgroundColor="$blue10"
+                    color="white"
+                    fontWeight="600"
+                    borderRadius="$4"
+                    disabled={!isConfigured || isLoading}
+                    opacity={!isConfigured || isLoading ? 0.6 : 1}
+                    onPress={() => {
+                      void handleGoogleLogin();
+                    }}
+                    icon={
+                      isLoading ? (
+                        <Spinner size="small" color="white" />
+                      ) : undefined
+                    }
+                    width="100%"
+                    elevate
+                    pressStyle={{ scale: 0.98 }}
+                    animation="bouncy"
+                  >
+                    <XStack space="$3" alignItems="center">
+                      {!isLoading && (
+                        <Text fontSize="$2">
+                          <span role="img" aria-label="star">
+                            🌟
+                          </span>
+                        </Text>
+                      )}
+                      <Text fontSize="$4" color="white">
+                        {isLoading ? 'Signing in...' : 'Continue with Google'}
+                      </Text>
+                    </XStack>
+                  </Button>
+
+                  <XStack alignItems="center" space="$3">
+                    <Separator flex={1} />
+                    <Text fontSize="$2" color="$gray8">
+                      or
+                    </Text>
+                    <Separator flex={1} />
+                  </XStack>
+
+                  <Button
+                    size="$4"
+                    variant="outlined"
+                    color="$gray11"
+                    borderColor="$gray6"
+                    onPress={() => setAuthMethod('email')}
+                    width="100%"
+                  >
+                    Sign in with Email
+                  </Button>
+                </YStack>
+              )}
+
+              {/* Email login section */}
+              {authMethod === 'email' && (
+                <YStack space="$4" width="100%">
+                  <YStack space="$3">
+                    <Input
+                      placeholder="Email address"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      size="$4"
+                      borderRadius="$3"
+                    />
+                    <Input
+                      placeholder="Password"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      size="$4"
+                      borderRadius="$3"
+                    />
+                  </YStack>
+
+                  <Button
+                    size="$5"
+                    backgroundColor="$purple10"
+                    color="white"
+                    fontWeight="600"
+                    disabled={isLoading || !email || !password}
+                    onPress={() => {
+                      void handleEmailLogin();
+                    }}
+                    width="100%"
+                    elevate
+                    icon={
+                      isLoading ? (
+                        <Spinner size="small" color="white" />
+                      ) : undefined
+                    }
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+
+                  <Button
+                    size="$3"
+                    variant="outlined"
+                    color="$gray11"
+                    onPress={() => {
+                      setAuthMethod('social');
+                      setErrorMessage('');
+                    }}
+                    width="100%"
+                  >
+                    <span role="img" aria-label="arrow left">
+                      ←
+                    </span>{' '}
+                    Back to Social Login
+                  </Button>
+                </YStack>
+              )}
+
+              {/* Configuration status */}
+              {!isConfigured && (
+                <XStack space="$2" alignItems="center">
+                  <Spinner size="small" color="$color11" />
+                  <Text fontSize="$2" color="$color11">
+                    Initializing authentication...
+                  </Text>
+                </XStack>
+              )}
+            </YStack>
+          )}
         </Card>
 
         {/* Footer */}
-        <Text
-          fontSize="$2"
-          color="rgba(255, 255, 255, 0.7)"
-          textAlign="center"
-          marginTop="$6"
-        >
+        <Text fontSize="$2" color="$color11" textAlign="center" marginTop="$6">
           Secure authentication powered by Google OAuth 2.0
         </Text>
       </YStack>
