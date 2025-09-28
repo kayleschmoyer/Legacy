@@ -1,0 +1,24 @@
+# Development environment configuration
+aws_region     = "us-east-1"
+environment    = "dev"
+project_name   = "legacy-sports"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# Database Configuration
+database_name     = "postgres"
+database_username = "postgres"
+db_instance_class = "db.t3.micro"
+db_allocated_storage = 20
+
+# Lambda Configuration
+lambda_timeout = 30
+
+# Google OAuth Configuration - REPLACE WITH YOUR ACTUAL CLIENT ID
+google_oauth_client_id = "your-google-client-id.apps.googleusercontent.com"
+
+# Public IP addresses allowed to access database for migrations
+# Add your actual public IPs here
+allowed_public_ips = ["0.0.0.0"]

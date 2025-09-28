@@ -27,7 +27,7 @@ export async function readSecret(config: SecretConfiguration): Promise<string> {
 
   if (secretKeyPath === undefined) {
     throw new Error(
-      `A value must be provided to retrieve secret configuration. Secret Path: ${config.secretPathEnvVar}`
+      `A value must be provided to retrieve secret configuration. Secret Path: ${config.secretPathEnvVar}`,
     );
   }
 
@@ -35,13 +35,13 @@ export async function readSecret(config: SecretConfiguration): Promise<string> {
 }
 
 export async function retrieveSecretParameterValue(
-  secret_name: string
+  secret_name: string,
 ): Promise<string> {
   const response = await secretsClient.send(
     new GetSecretValueCommand({
       SecretId: secret_name,
       VersionStage: 'AWSCURRENT', // VersionStage defaults to AWSCURRENT if unspecified
-    })
+    }),
   );
 
   if (response.SecretString === undefined) {

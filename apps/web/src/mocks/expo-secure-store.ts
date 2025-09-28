@@ -13,10 +13,7 @@ export const getItemAsync = (key: string): Promise<string | null> => {
   }
 };
 
-export const setItemAsync = (
-  key: string,
-  value: string,
-): Promise<void> => {
+export const setItemAsync = (key: string, value: string): Promise<void> => {
   try {
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(key, value);

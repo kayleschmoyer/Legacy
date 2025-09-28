@@ -55,6 +55,20 @@ jobs:
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
+      - name: Configure Basic Nx Environment
+        shell: bash
+        run: |
+          echo "🔧 Configuring basic Nx environment for deployment..."
+          # Set conservative local settings for deployment builds
+          echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false" >> $GITHUB_ENV
+          echo "NX_LOCAL_FALLBACK=true" >> $GITHUB_ENV
+          echo "NX_PARALLEL=2" >> $GITHUB_ENV
+          echo "NX_DAEMON=false" >> $GITHUB_ENV
+          echo "NX_VERBOSE_LOGGING=false" >> $GITHUB_ENV
+          # Clear cloud access token to prevent failed connection attempts
+          echo "NX_CLOUD_ACCESS_TOKEN=" >> $GITHUB_ENV
+          echo "✅ Basic Nx environment configured for deployment"
+
       - name: Setup AWS
         uses: ./.github/workflows/setup-aws
         id: setup-aws
@@ -97,7 +111,13 @@ jobs:
           terraform plan -target=aws_lambda_function.oauth_proxy
           terraform apply -target=aws_lambda_function.oauth_proxy -auto-approve
 
-      # Enable Nx Cloud Self-Healing CI for any build issues
+      # Enable Nx Cloud Self-Healing CI (if available)
       - name: Fix CI Issues
-        run: npx nx-cloud fix-ci
+        run: |
+          echo "🔧 Running Nx Cloud self-healing (if available)..."
+          if [ -n "${{ env.NX_CLOUD_ACCESS_TOKEN }}" ]; then
+            npx nx-cloud fix-ci || echo "⚠️  Nx Cloud fix-ci failed (quota exceeded or unavailable)"
+          else
+            echo "ℹ️  Nx Cloud not configured, skipping fix-ci"
+          fi
         if: always()

@@ -11,3 +11,7 @@ export * from './lib/services';
 // Types and configuration
 export * from './types';
 export * from './config/database';
+export * from './config/credentials';
+
+// Migration system
+export * from './migrations/migration-runner';

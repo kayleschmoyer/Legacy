@@ -2,6 +2,9 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 
+// Create a single database service instance to reuse across all resolvers
+const dbService = createDatabaseService(getDbOptions());
+
 // Player type
 const PlayerRef = builder.objectRef<{
   id: number;
@@ -30,8 +33,6 @@ builder.queryField('players', (t) =>
       orderDirection: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
-      const dbService = createDatabaseService(getDbOptions());
-
       const orderBy = args.orderBy as
         | 'id'
         | 'firstName'
@@ -47,7 +48,7 @@ builder.queryField('players', (t) =>
         orderDirection: orderDirection || 'asc',
       });
     },
-  })
+  }),
 );
 
 builder.queryField('player', (t) =>
@@ -58,11 +59,9 @@ builder.queryField('player', (t) =>
       id: t.arg.int({ required: true }),
     },
     resolve: async (parent, { id }) => {
-      const dbService = createDatabaseService(getDbOptions());
-
       return dbService.players.getPlayerById(id);
     },
-  })
+  }),
 );
 
 builder.queryField('playerByBrefId', (t) =>
@@ -73,11 +72,9 @@ builder.queryField('playerByBrefId', (t) =>
       brefId: t.arg.string({ required: true }),
     },
     resolve: async (parent, { brefId }) => {
-      const dbService = createDatabaseService(getDbOptions());
-
       return dbService.players.getPlayerByBrefId(brefId);
     },
-  })
+  }),
 );
 
 builder.queryField('searchPlayers', (t) =>
@@ -88,9 +85,7 @@ builder.queryField('searchPlayers', (t) =>
       limit: t.arg.int({ required: false }),
     },
     resolve: async (parent, args) => {
-      const dbService = createDatabaseService(getDbOptions());
-
       return dbService.players.searchPlayers(args.searchTerm, args.limit || 10);
     },
-  })
+  }),
 );

@@ -28,7 +28,9 @@ export interface BattingStatsTableProps {
   stats: readonly CareerBattingStatsWithPlayerFragment[];
 }
 
-export function BattingStatsTable(props: BattingStatsTableProps): React.JSX.Element {
+export function BattingStatsTable(
+  props: BattingStatsTableProps,
+): React.JSX.Element {
   const { stats } = props;
 
   const data = useMemo(() => {

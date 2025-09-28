@@ -21,7 +21,7 @@ describe('Sports Functionality', () => {
     beforeEach(async () => {
       // Navigate to football section if it exists
       const footballTab = element(
-        by.id('football-tab').or(by.text('Football'))
+        by.id('football-tab').or(by.text('Football')),
       );
 
       try {
@@ -65,7 +65,7 @@ describe('Sports Functionality', () => {
     it('should handle football game selection', async () => {
       // Try to select a football game
       const gameCard = element(
-        by.id('football-game-card').or(by.id('game-card'))
+        by.id('football-game-card').or(by.id('game-card')),
       );
 
       try {
@@ -109,7 +109,7 @@ describe('Sports Functionality', () => {
     beforeEach(async () => {
       // Navigate to baseball section if it exists
       const baseballTab = element(
-        by.id('baseball-tab').or(by.text('Baseball'))
+        by.id('baseball-tab').or(by.text('Baseball')),
       );
 
       try {
@@ -153,7 +153,7 @@ describe('Sports Functionality', () => {
     it('should handle baseball game selection', async () => {
       // Try to select a baseball game
       const gameCard = element(
-        by.id('baseball-game-card').or(by.id('game-card'))
+        by.id('baseball-game-card').or(by.id('game-card')),
       );
 
       try {
@@ -274,7 +274,7 @@ describe('Sports Functionality', () => {
       // Look for offline indicators
       try {
         await expect(
-          element(by.id('offline-indicator').or(by.text('Offline'))).atIndex(0)
+          element(by.id('offline-indicator').or(by.text('Offline'))).atIndex(0),
         ).toBeVisible();
       } catch {
         // No offline indicator, that's okay

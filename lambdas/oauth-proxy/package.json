@@ -1,0 +1,38 @@
+{
+  "name": "@legacy-sports/oauth-proxy",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "dev:no-watch": "tsx src/dev.ts",
+    "build": "vite build",
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
+  },
+  "dependencies": {
+    "@apollo/client": "*",
+    "@aws-sdk/client-secrets-manager": "*",
+    "@legacy-sports/db-client": "*",
+    "@legacy-sports/env-utilities": "*",
+    "@legacy-sports/logging": "*",
+    "@legacy-sports/utils": "*",
+    "aws-lambda": "*",
+    "bcryptjs": "*",
+    "google-auth-library": "*",
+    "jsonwebtoken": "*",
+    "jwt-decode": "*",
+    "memoize-one": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "*",
+    "@types/bcryptjs": "*",
+    "@types/jsonwebtoken": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "tsx": "*",
+    "typescript": "*",
+    "vite": "*"
+  }
+}

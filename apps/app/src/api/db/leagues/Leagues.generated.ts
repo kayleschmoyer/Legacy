@@ -5,7 +5,6 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-
 /**
  * __useGetLeagueByIdQuery__
  *
@@ -25,23 +24,68 @@ const defaultOptions = {} as const;
  *   },
  * });
  */
-export function useGetLeagueByIdQuery(baseOptions: Apollo.QueryHookOptions<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables> & ({ variables: Types.GetLeagueByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>(Operations.GetLeagueById, options);
-      }
-export function useGetLeagueByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>(Operations.GetLeagueById, options);
-        }
-export function useGetLeagueByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>(Operations.GetLeagueById, options);
-        }
-export type GetLeagueByIdQueryHookResult = ReturnType<typeof useGetLeagueByIdQuery>;
-export type GetLeagueByIdLazyQueryHookResult = ReturnType<typeof useGetLeagueByIdLazyQuery>;
-export type GetLeagueByIdSuspenseQueryHookResult = ReturnType<typeof useGetLeagueByIdSuspenseQuery>;
-export type GetLeagueByIdQueryResult = Apollo.QueryResult<Types.GetLeagueByIdQuery, Types.GetLeagueByIdQueryVariables>;
-export type CreateLeagueMutationFn = Apollo.MutationFunction<Types.CreateLeagueMutation, Types.CreateLeagueMutationVariables>;
+export function useGetLeagueByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    Types.GetLeagueByIdQuery,
+    Types.GetLeagueByIdQueryVariables
+  > &
+    (
+      | { variables: Types.GetLeagueByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetLeagueByIdQuery,
+    Types.GetLeagueByIdQueryVariables
+  >(Operations.GetLeagueById, options);
+}
+export function useGetLeagueByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetLeagueByIdQuery,
+    Types.GetLeagueByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetLeagueByIdQuery,
+    Types.GetLeagueByIdQueryVariables
+  >(Operations.GetLeagueById, options);
+}
+export function useGetLeagueByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetLeagueByIdQuery,
+        Types.GetLeagueByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetLeagueByIdQuery,
+    Types.GetLeagueByIdQueryVariables
+  >(Operations.GetLeagueById, options);
+}
+export type GetLeagueByIdQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdQuery
+>;
+export type GetLeagueByIdLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdLazyQuery
+>;
+export type GetLeagueByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdSuspenseQuery
+>;
+export type GetLeagueByIdQueryResult = Apollo.QueryResult<
+  Types.GetLeagueByIdQuery,
+  Types.GetLeagueByIdQueryVariables
+>;
+export type CreateLeagueMutationFn = Apollo.MutationFunction<
+  Types.CreateLeagueMutation,
+  Types.CreateLeagueMutationVariables
+>;
 
 /**
  * __useCreateLeagueMutation__
@@ -63,13 +107,27 @@ export type CreateLeagueMutationFn = Apollo.MutationFunction<Types.CreateLeagueM
  *   },
  * });
  */
-export function useCreateLeagueMutation(baseOptions?: Apollo.MutationHookOptions<Types.CreateLeagueMutation, Types.CreateLeagueMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.CreateLeagueMutation, Types.CreateLeagueMutationVariables>(Operations.CreateLeague, options);
-      }
-export type CreateLeagueMutationHookResult = ReturnType<typeof useCreateLeagueMutation>;
-export type CreateLeagueMutationResult = Apollo.MutationResult<Types.CreateLeagueMutation>;
-export type CreateLeagueMutationOptions = Apollo.BaseMutationOptions<Types.CreateLeagueMutation, Types.CreateLeagueMutationVariables>;
+export function useCreateLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.CreateLeagueMutation,
+    Types.CreateLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.CreateLeagueMutation,
+    Types.CreateLeagueMutationVariables
+  >(Operations.CreateLeague, options);
+}
+export type CreateLeagueMutationHookResult = ReturnType<
+  typeof useCreateLeagueMutation
+>;
+export type CreateLeagueMutationResult =
+  Apollo.MutationResult<Types.CreateLeagueMutation>;
+export type CreateLeagueMutationOptions = Apollo.BaseMutationOptions<
+  Types.CreateLeagueMutation,
+  Types.CreateLeagueMutationVariables
+>;
 
 /**
  * __useGetPositionsForLeagueQuery__
@@ -87,19 +145,61 @@ export type CreateLeagueMutationOptions = Apollo.BaseMutationOptions<Types.Creat
  *   },
  * });
  */
-export function useGetPositionsForLeagueQuery(baseOptions: Apollo.QueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables> & ({ variables: Types.GetPositionsForLeagueQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
-      }
-export function useGetPositionsForLeagueLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
-        }
-export function useGetPositionsForLeagueSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>(Operations.GetPositionsForLeague, options);
-        }
-export type GetPositionsForLeagueQueryHookResult = ReturnType<typeof useGetPositionsForLeagueQuery>;
-export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<typeof useGetPositionsForLeagueLazyQuery>;
-export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<typeof useGetPositionsForLeagueSuspenseQuery>;
-export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<Types.GetPositionsForLeagueQuery, Types.GetPositionsForLeagueQueryVariables>;
+export function useGetPositionsForLeagueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    Types.GetPositionsForLeagueQuery,
+    Types.GetPositionsForLeagueQueryVariables
+  > &
+    (
+      | { variables: Types.GetPositionsForLeagueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetPositionsForLeagueQuery,
+    Types.GetPositionsForLeagueQueryVariables
+  >(Operations.GetPositionsForLeague, options);
+}
+export function useGetPositionsForLeagueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetPositionsForLeagueQuery,
+    Types.GetPositionsForLeagueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetPositionsForLeagueQuery,
+    Types.GetPositionsForLeagueQueryVariables
+  >(Operations.GetPositionsForLeague, options);
+}
+export function useGetPositionsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetPositionsForLeagueQuery,
+        Types.GetPositionsForLeagueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetPositionsForLeagueQuery,
+    Types.GetPositionsForLeagueQueryVariables
+  >(Operations.GetPositionsForLeague, options);
+}
+export type GetPositionsForLeagueQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueQuery
+>;
+export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueLazyQuery
+>;
+export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueSuspenseQuery
+>;
+export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<
+  Types.GetPositionsForLeagueQuery,
+  Types.GetPositionsForLeagueQueryVariables
+>;

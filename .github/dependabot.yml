@@ -1,197 +1,197 @@
 version: 2
 updates:
   # NPM dependencies
-  - package-ecosystem: 'npm'
-    directory: '/'
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-      time: '09:00'
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
     commit-message:
-      prefix: 'chore'
-      include: 'scope'
+      prefix: "chore"
+      include: "scope"
     reviewers:
-      - 'bkrupa'
+      - "bkrupa"
     assignees:
-      - 'bkrupa'
+      - "bkrupa"
     open-pull-requests-limit: 3
     # Reduce frequency for major updates to avoid peer dependency conflicts
-    target-branch: 'main'
+    target-branch: "main"
 
     # Ignore problematic major version updates that commonly cause peer dependency conflicts
     ignore:
       # TypeScript ESLint ecosystem - major updates often break peer dependencies
-      - dependency-name: '@typescript-eslint/eslint-plugin'
-        update-types: ['version-update:semver-major']
-      - dependency-name: '@typescript-eslint/parser'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'eslint'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "@typescript-eslint/eslint-plugin"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@typescript-eslint/parser"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
       # React ecosystem - major updates require careful coordination
-      - dependency-name: 'react'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'react-dom'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'react-native'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
 
       # NX ecosystem - major updates often require migration scripts
-      - dependency-name: 'nx'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "nx"
+        update-types: ["version-update:semver-major"]
 
       # Jest ecosystem - major updates can break testing setup
-      - dependency-name: 'jest'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "jest"
+        update-types: ["version-update:semver-major"]
 
       # Expo - major updates require careful React Native version coordination
-      - dependency-name: 'expo'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
 
       # Storybook - major updates often require migration
-      - dependency-name: '@storybook/react'
-        update-types: ['version-update:semver-major']
-      - dependency-name: '@storybook/react-vite'
-        update-types: ['version-update:semver-major']
+      - dependency-name: "@storybook/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@storybook/react-vite"
+        update-types: ["version-update:semver-major"]
     groups:
       # TypeScript ESLint ecosystem - keep these together to avoid peer dependency conflicts
       typescript-eslint:
         patterns:
-          - '@typescript-eslint/*'
-          - 'eslint'
-          - '@eslint/*'
+          - "@typescript-eslint/*"
+          - "eslint"
+          - "@eslint/*"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
       # React ecosystem - critical to keep versions aligned
       react-ecosystem:
         patterns:
-          - 'react'
-          - 'react-dom'
-          - '@types/react'
-          - '@types/react-dom'
-          - 'react-router*'
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router*"
         update-types:
-          - 'patch'
+          - "patch"
 
       # React Native ecosystem - very sensitive to version mismatches
       react-native-ecosystem:
         patterns:
-          - 'react-native'
-          - '@react-native*'
-          - '@react-native-community/*'
-          - 'react-native-*'
-          - 'expo*'
-          - '@expo/*'
-          - 'metro*'
+          - "react-native"
+          - "@react-native*"
+          - "@react-native-community/*"
+          - "react-native-*"
+          - "expo*"
+          - "@expo/*"
+          - "metro*"
         update-types:
-          - 'patch'
+          - "patch"
 
       # NX ecosystem - keep NX packages together
       nx-ecosystem:
         patterns:
-          - 'nx'
-          - '@nx/*'
-          - '@nrwl/*'
+          - "nx"
+          - "@nx/*"
+          - "@nrwl/*"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
       # Jest ecosystem
       jest-ecosystem:
         patterns:
-          - 'jest'
-          - '@jest/*'
-          - 'jest-*'
-          - '@types/jest'
+          - "jest"
+          - "@jest/*"
+          - "jest-*"
+          - "@types/jest"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
       # Apollo GraphQL ecosystem
       apollo-ecosystem:
         patterns:
-          - '@apollo/*'
-          - 'graphql'
-          - '@graphql-*'
-          - 'graphile*'
-          - 'postgraphile'
-          - 'grafast'
-          - 'grafserv'
+          - "@apollo/*"
+          - "graphql"
+          - "@graphql-*"
+          - "graphile*"
+          - "postgraphile"
+          - "grafast"
+          - "grafserv"
         update-types:
-          - 'patch'
+          - "patch"
 
       # Storybook ecosystem
       storybook-ecosystem:
         patterns:
-          - '@storybook/*'
-          - 'storybook'
+          - "@storybook/*"
+          - "storybook"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
       # Tamagui ecosystem
       tamagui-ecosystem:
         patterns:
-          - 'tamagui'
-          - '@tamagui/*'
+          - "tamagui"
+          - "@tamagui/*"
         update-types:
-          - 'patch'
+          - "patch"
 
       # AWS SDK ecosystem
       aws-ecosystem:
         patterns:
-          - '@aws-sdk/*'
-          - 'aws-*'
+          - "@aws-sdk/*"
+          - "aws-*"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
       # Development tools and types (safer to update)
       dev-tools:
         patterns:
-          - '@types/*'
-          - 'prettier'
-          - 'typescript'
-          - 'rimraf'
-          - 'npkill'
-          - '@swc*'
-          - 'esbuild'
-          - 'vite*'
-          - '@vitejs/*'
+          - "@types/*"
+          - "prettier"
+          - "typescript"
+          - "rimraf"
+          - "npkill"
+          - "@swc*"
+          - "esbuild"
+          - "vite*"
+          - "@vitejs/*"
         update-types:
-          - 'minor'
-          - 'patch'
+          - "minor"
+          - "patch"
 
   # GitHub Actions - separate schedule to avoid conflicts
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: 'weekly'
-      day: 'tuesday'
-      time: '09:00'
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
     commit-message:
-      prefix: 'ci'
-      include: 'scope'
+      prefix: "ci"
+      include: "scope"
     reviewers:
-      - 'bkrupa'
+      - "bkrupa"
     assignees:
-      - 'bkrupa'
+      - "bkrupa"
     open-pull-requests-limit: 2
 
   # Docker - least frequent updates
-  - package-ecosystem: 'docker'
-    directory: '/'
+  - package-ecosystem: "docker"
+    directory: "/"
     schedule:
-      interval: 'monthly'
-      day: 'first-monday'
-      time: '09:00'
+      interval: "monthly"
+      day: "first-monday"
+      time: "09:00"
     commit-message:
-      prefix: 'docker'
-      include: 'scope'
+      prefix: "docker"
+      include: "scope"
     reviewers:
-      - 'bkrupa'
+      - "bkrupa"
     assignees:
-      - 'bkrupa'
+      - "bkrupa"
     open-pull-requests-limit: 1

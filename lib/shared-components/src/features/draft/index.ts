@@ -6,26 +6,13 @@ export * from './SearchComponents';
 export * from './DraftBoardComponents';
 
 // Re-export commonly used types
-export type {
-  Player,
-  PlayerCardProps,
-} from './PlayerCard';
+export type { Player, PlayerCardProps } from './PlayerCard';
 
-export type {
-  Filter,
-  FilterSection,
-} from './FilterComponents';
+export type { Filter, FilterSection } from './FilterComponents';
 
-export type {
-  SearchSuggestion,
-  SortOption,
-} from './SearchComponents';
+export type { SearchSuggestion, SortOption } from './SearchComponents';
 
-export type {
-  DraftTeam,
-  Pick,
-  DraftBoard,
-} from './DraftBoardComponents';
+export type { DraftTeam, Pick, DraftBoard } from './DraftBoardComponents';
 
 export type {
   TimerProps,

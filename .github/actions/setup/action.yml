@@ -94,29 +94,23 @@ runs:
         main-branch-name: "main"
         error-on-no-successful-workflow: false
 
-    - name: Configure Nx Cloud (Aggressive Performance)
+    - name: Configure Basic Nx Environment
       shell: bash
       run: |
-        echo "Configuring Nx Cloud for maximum performance..."
+        echo "🔧 Configuring basic Nx environment..."
 
-        # Use official Nx Cloud environment variables with aggressive settings
-        echo "NX_CLOUD_NO_TIMEOUTS=true" >> $GITHUB_ENV
-        echo "NX_VERBOSE_LOGGING=false" >> $GITHUB_ENV
+        # Set conservative defaults for Nx execution
         echo "NX_DAEMON=false" >> $GITHUB_ENV
+        echo "NX_PARALLEL=2" >> $GITHUB_ENV
 
-        # Aggressive distributed execution settings for speed
-        echo "NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT=6" >> $GITHUB_ENV
-        echo "NX_PARALLEL=8" >> $GITHUB_ENV
+        echo "✅ Basic Nx environment configured"
 
-        echo "✅ Nx Cloud configured for maximum performance"
-
-    - name: Start Nx Cloud Distributed CI
+    - name: Nx Setup Complete
       shell: bash
       run: |
-        if [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
-          echo "Starting Nx Cloud distributed CI run..."
-          npx nx-cloud start-ci-run --distribute-on="6 linux-medium-js" --stop-agents-after="build,test,lint"
-          echo "✅ Distributed CI run started with 6 agents"
-        else
-          echo "Distributed execution not enabled, skipping agent startup"
-        fi
+        echo "✅ Basic Nx setup complete"
+        echo "   Node.js: $(node --version)"
+        echo "   NPM: $(npm --version)" 
+        echo "   Dependencies: ${{ steps.cached-dependencies.outputs.cache-hit == 'true' && 'Restored from cache' || 'Installed fresh' }}"
+        echo ""
+        echo "ℹ️  Nx Cloud configuration will be handled by individual workflows"

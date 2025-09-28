@@ -11,6 +11,7 @@
 build/
 
 # Sensitive files
+terraform.tfvars
 secrets.auto.tfvars
 *.pem
 *.key

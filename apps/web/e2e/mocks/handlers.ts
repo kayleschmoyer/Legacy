@@ -5,7 +5,10 @@ export const graphqlHandlers = [
   // Example GraphQL query mock
   http.post('/graphql', async ({ request }) => {
     const body = await request.json();
-    const { query } = body as { query: string; variables?: Record<string, unknown> };
+    const { query } = body as {
+      query: string;
+      variables?: Record<string, unknown>;
+    };
 
     // Mock user authentication query
     if (query.includes('currentUser')) {

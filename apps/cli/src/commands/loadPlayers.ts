@@ -23,7 +23,7 @@ export async function handleLoadPlayers(): Promise<void> {
     LOGGER.info('Connecting to database...');
     await runWithPublicClient(opts, async (db) => {
       LOGGER.info(
-        'Database connection established, starting player loading...'
+        'Database connection established, starting player loading...',
       );
 
       // Start with just letter 'A' for testing
@@ -41,7 +41,7 @@ export async function handleLoadPlayers(): Promise<void> {
         LOGGER.info(
           `Found ${
             letterPlayers.length
-          } players for letter ${letter.toUpperCase()}`
+          } players for letter ${letter.toUpperCase()}`,
         );
         const createdPlayers = await bulkCreatePlayers(db, letterPlayers);
         totalPlayersCreated += createdPlayers.length;
@@ -49,13 +49,13 @@ export async function handleLoadPlayers(): Promise<void> {
         LOGGER.info(
           `Letter ${letter.toUpperCase()}: Created/updated ${
             createdPlayers.length
-          } players`
+          } players`,
         );
       } catch (error) {
         LOGGER.error(
           `Error loading players for letter ${letter.toUpperCase()}: ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
         );
         throw error; // Re-throw to stop the process on error
       }
@@ -71,7 +71,7 @@ export async function handleLoadPlayers(): Promise<void> {
     LOGGER.error(
       `Fatal error in handleLoadPlayers: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
     if (error instanceof Error && error.stack) {
       LOGGER.error(`Stack trace: ${error.stack}`);

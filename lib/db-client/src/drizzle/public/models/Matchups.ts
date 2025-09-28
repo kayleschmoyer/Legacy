@@ -25,7 +25,7 @@ export const matchups = pgTable(
       }),
       matchupsWeekUk: unique().on(table.leagueId, table.weekNumber),
     };
-  }
+  },
 );
 
 export const matchupPlayers = pgTable(
@@ -49,7 +49,7 @@ export const matchupPlayers = pgTable(
         name: 'matchup_players_player_fk',
       }),
     };
-  }
+  },
 );
 
 export const matchupPlayerGames = pgTable(
@@ -71,5 +71,5 @@ export const matchupPlayerGames = pgTable(
         name: 'matchup_player_games_matchup_player_fk',
       }),
     };
-  }
+  },
 );

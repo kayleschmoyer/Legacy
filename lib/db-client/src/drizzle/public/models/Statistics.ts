@@ -59,7 +59,7 @@ export const seasonFielding = pgTable(
       playerIdPosIdx: index().using(
         'btree',
         table.playerId.asc().nullsLast(),
-        table.pos.asc().nullsLast()
+        table.pos.asc().nullsLast(),
       ),
       poIdx: index().using('btree', table.po.asc().nullsLast()),
       seasonFieldingPlayersIdFk: foreignKey({
@@ -78,7 +78,7 @@ export const seasonFielding = pgTable(
         name: 'season_fielding_pk',
       }),
     };
-  }
+  },
 );
 
 export const seasonBatting = pgTable(
@@ -130,7 +130,7 @@ export const seasonBatting = pgTable(
         name: 'season_batting_pk',
       }),
     };
-  }
+  },
 );
 
 export const seasonPitching = pgTable(
@@ -173,7 +173,7 @@ export const seasonPitching = pgTable(
     team: varchar('team', { length: 20 }).notNull(),
     lgId: varchar('lg_id', { length: 20 }),
     outsRecorded: integer('outs_recorded').generatedAlwaysAs(
-      sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`
+      sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`,
     ),
   },
   (table) => {
@@ -190,7 +190,7 @@ export const seasonPitching = pgTable(
         name: 'season_pitching_pk',
       }),
     };
-  }
+  },
 );
 
 export const careerBatting = pgView('career_batting', {
@@ -490,7 +490,7 @@ export const gameBatting = pgTable(
   },
   (table) => {
     return {};
-  }
+  },
 );
 
 export const gamePitching = pgTable(
@@ -518,12 +518,12 @@ export const gamePitching = pgTable(
     hbp: integer('hbp'),
     battersFaced: integer('batters_faced'),
     outsRecorded: integer('outs_recorded').generatedAlwaysAs(
-      sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`
+      sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`,
     ),
   },
   (table) => {
     return {};
-  }
+  },
 );
 
 export const gameFielding = pgTable(
@@ -542,7 +542,7 @@ export const gameFielding = pgTable(
   },
   (table) => {
     return {};
-  }
+  },
 );
 
 export const aggregateSeasonPitching = pgView('aggregate_season_pitching', {
@@ -607,7 +607,7 @@ export const aggregateSeasonFieldingByPos = pgView(
     cs: integer('cs'),
     pickoffs: integer('pickoffs'),
     wp: integer('wp'),
-  }
+  },
 ).as(sql``);
 
 export const aggregateSeasonBatting = pgView('aggregate_season_batting', {

@@ -95,7 +95,6 @@
    ```
 
 2. **Review Generated SQL**
-
    - Check that all tables are created correctly
    - Verify foreign key constraints
    - Ensure indexes are properly generated

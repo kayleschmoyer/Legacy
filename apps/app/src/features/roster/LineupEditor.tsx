@@ -13,11 +13,11 @@ export interface LineupEditorProps {
   availableRosterSlots: readonly LeaguePositionFragment[];
   onPlayerAdded: (
     player: TeamMemberFragment,
-    position: LeaguePositionFragment
+    position: LeaguePositionFragment,
   ) => void;
   onPlayerMoved: (
     playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment
+    playerTwo: TeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly TeamMemberWithPositionsFragment[];
@@ -63,7 +63,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     switch (selectedPlayerData?.type) {
       case 'starter-data':
         return availableRosterSlots.find(
-          (r) => r.id === selectedPlayerData.positionMappingId
+          (r) => r.id === selectedPlayerData.positionMappingId,
         );
       case 'bench-player-data':
       default:
@@ -75,7 +75,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     switch (selectedPlayerData?.type) {
       case 'starter-data':
         return team.find(
-          (t) => t.positionId === selectedPlayerData.positionMappingId
+          (t) => t.positionId === selectedPlayerData.positionMappingId,
         );
       case 'bench-player-data':
         return team.find((t) => t.playerId === selectedPlayerData.playerId);
@@ -119,7 +119,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       selectedPlayer,
       selectedPositionMapping,
       onPlayerAdded,
-    ]
+    ],
   );
 
   const onRosterSlotClicked = useCallback(
@@ -135,7 +135,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
 
       const thisPlayer = team.find((t) => t.playerId === playerId);
       const thisPositionMapping = availableRosterSlots.find(
-        (s) => s.id === positionId
+        (s) => s.id === positionId,
       );
 
       // Swap with the existing player
@@ -160,7 +160,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       selectedPlayerData,
       selectedPositionMapping,
       team,
-    ]
+    ],
   );
 
   const rosterSlots = useMemo<Array<PlayerData>>(() => {
@@ -204,7 +204,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       switch (item.type) {
         case 'starter-data':
           mapping = availableRosterSlots.find(
-            (m) => m.id === item.positionMappingId
+            (m) => m.id === item.positionMappingId,
           );
           teamMember = team.find((t) => t.positionId === mapping?.id);
 
@@ -234,18 +234,18 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       onRosterSlotClicked,
       selectedPositionMapping,
       team,
-    ]
+    ],
   );
 
   const onRenderItem = useCallback<ListRenderItem<PlayerData>>(
     ({ item }) => {
       const positionSlot = availableRosterSlots.find(
-        (s) => item.type === 'starter-data' && s.id === item.positionMappingId
+        (s) => item.type === 'starter-data' && s.id === item.positionMappingId,
       );
       const teamMember = team.find(
         (t) =>
           (item.type === 'bench-player-data' || item.type === 'starter-data') &&
-          t.playerId === item.playerId
+          t.playerId === item.playerId,
       );
 
       const projValue = teamMember
@@ -293,17 +293,17 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
               actualValue === undefined
                 ? '$color'
                 : actualValue === projValue
-                ? '$blue10'
-                : actualValue > (projValue || 0)
-                ? '$green10'
-                : '$red10'
+                  ? '$blue10'
+                  : actualValue > (projValue || 0)
+                    ? '$green10'
+                    : '$red10'
             }
           >
             {actualValue
               ? `${actualValue.toFixed(2)} (${projValue?.toFixed(2)})`
               : projValue
-              ? projValue.toFixed(2)
-              : ''}
+                ? projValue.toFixed(2)
+                : ''}
           </Text>
         </YStack>
       );
@@ -317,7 +317,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       selectedPlayerData,
       selectedPositionMapping,
       team,
-    ]
+    ],
   );
 
   return (

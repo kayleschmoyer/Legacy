@@ -18,7 +18,7 @@ interface CreateMatchupEvent {
 
 async function createMatchup(
   db: PublicDb,
-  event: CreateMatchupEvent
+  event: CreateMatchupEvent,
 ): Promise<void> {
   const matchup = await getMatchup(db, event.league, event.week);
 
@@ -41,7 +41,7 @@ async function createMatchup(
     };
 
     LOGGER.debug(
-      `Creating matchup record: ${matchup.id}, ${player.id}, ${season.season}`
+      `Creating matchup record: ${matchup.id}, ${player.id}, ${season.season}`,
     );
 
     await createMatchupRecord(db, record);

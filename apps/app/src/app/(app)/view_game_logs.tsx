@@ -15,11 +15,12 @@ export default function ViewGameLogs(): React.JSX.Element {
   const getGameLog = () => {
     axios
       .post<Record<string, Record<string, string | number>>>(
-        'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
+        process.env.EXPO_PUBLIC_STATS_API_URL ||
+          'http://localhost:5000/baseball-game-logs',
         {
           game_date: date,
           player_id: player,
-        }
+        },
       )
       .then((response) => {
         const serverData = response.data;

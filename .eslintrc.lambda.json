@@ -1,49 +1,28 @@
 {
   "root": false,
-  "extends": [
-    "./.eslintrc.base.json"
-  ],
-  "ignorePatterns": [
-    "dist",
-    "node_modules"
-  ],
+  "extends": ["./.eslintrc.base.json"],
+  "ignorePatterns": ["dist", "node_modules"],
   "overrides": [
     {
-      "files": [
-        "*.ts",
-        "*.tsx",
-        "*.js",
-        "*.jsx"
-      ],
+      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
       "rules": {
         "@nx/enforce-module-boundaries": [
           "error",
           {
-            "allow": [
-              "@apollo/server",
-              "@as-integrations/aws-lambda"
-            ]
+            "allow": ["@apollo/server", "@as-integrations/aws-lambda"]
           }
         ]
       }
     },
     {
-      "files": [
-        "*.ts",
-        "*.tsx"
-      ],
+      "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": [
-          "tsconfig.*?.json"
-        ]
+        "project": ["tsconfig.*?.json"]
       },
       "rules": {}
     },
     {
-      "files": [
-        "*.js",
-        "*.jsx"
-      ],
+      "files": ["*.js", "*.jsx"],
       "rules": {}
     }
   ]

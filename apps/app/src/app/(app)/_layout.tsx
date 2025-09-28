@@ -1,18 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
 import { Redirect, useRouter } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, YStack } from 'tamagui';
-import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
-import Team, { TeamIdHeader } from './baseball/team/[teamId]';
-import ViewGameLogs from './view_game_logs';
-import ViewCareerStats from './view_career_stats';
-import FootballHome from './football';
+
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
+import FootballHome from './football';
+import PlayerDetail from './PlayerDetail';
+import PlayerStats from './PlayerStats';
+import ViewCareerStats from './view_career_stats';
+import ViewGameLogs from './view_game_logs';
+import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
+import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
@@ -23,13 +26,15 @@ import {
 import Home from '.';
 
 export type AppDrawerParamList = {
-  '/': undefined;
+  index: undefined;
   view_game_logs: undefined;
   view_career_stats: undefined;
-  baseball: undefined;
-  football: undefined;
+  'baseball/index': undefined;
+  'football/index': undefined;
   DraftBoardPage: undefined;
   FreeAgents: undefined;
+  PlayerStats: undefined;
+  PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
 };
@@ -43,7 +48,7 @@ interface Route {
 
 const ROUTES = Object.freeze<Route[]>([
   {
-    route: '/',
+    route: 'index',
     title: 'Home',
   },
   {
@@ -55,11 +60,15 @@ const ROUTES = Object.freeze<Route[]>([
     title: 'View Career Stats',
   },
   {
-    route: 'baseball',
+    route: 'PlayerStats',
+    title: 'Player Statistics',
+  },
+  {
+    route: 'baseball/index',
     title: 'Baseball',
   },
   {
-    route: 'football',
+    route: 'football/index',
     title: 'Football',
   },
   {
@@ -72,7 +81,9 @@ const ROUTES = Object.freeze<Route[]>([
   },
 ]);
 
-function CustomDrawerContent(props: DrawerContentComponentProps): React.JSX.Element {
+function CustomDrawerContent(
+  props: DrawerContentComponentProps,
+): React.JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
 
@@ -136,9 +147,6 @@ export default function Layout() {
             headerStyle: {
               backgroundColor: '#f5f5f5',
             },
-            sceneContainerStyle: {
-              backgroundColor: '#ffffff',
-            },
           }}
         >
           <Screen
@@ -180,6 +188,16 @@ export default function Layout() {
             name="FreeAgents"
             options={{ title: 'Free Agents' }}
             component={FreeAgents}
+          />
+          <Screen
+            name="PlayerStats"
+            options={{ title: 'Player Statistics' }}
+            component={PlayerStats}
+          />
+          <Screen
+            name="PlayerDetail"
+            options={{ title: 'Player Details' }}
+            component={PlayerDetail}
           />
         </Navigator>
       </GestureHandlerRootView>

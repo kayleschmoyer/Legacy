@@ -282,12 +282,39 @@ npm install
 3. Ensure you're using the correct Node.js version
 4. Verify all prerequisites are installed
 
+## 🏗️ Infrastructure
+
+The Legacy Sports backend runs on AWS serverless infrastructure managed with Terraform.
+
+### Current Architecture
+
+- **API Gateway**: `https://dtx9mcsty1.execute-api.us-east-1.amazonaws.com/dev`
+- **Lambda Functions**: GraphQL, OAuth, Statistics, Game Selection, User Management
+- **Database**: PostgreSQL RDS with VPC networking
+- **Storage**: S3 buckets for deployment artifacts
+
+### Recent Updates
+
+**September 26, 2025**: Completed infrastructure cleanup
+
+- Removed 2 legacy API Gateway instances
+- Decommissioned unused Lambda function and S3 bucket
+- Simplified architecture with cost optimization
+- Zero downtime during cleanup process
+
+### Documentation
+
+- [`terraform/README.md`](terraform/README.md) - Infrastructure setup and deployment
+- [`AWS_INFRASTRUCTURE_DOCUMENTATION.md`](AWS_INFRASTRUCTURE_DOCUMENTATION.md) - Comprehensive architecture guide
+- [`INFRASTRUCTURE_CHANGELOG.md`](INFRASTRUCTURE_CHANGELOG.md) - Detailed change history
+
 ## 📚 Additional Resources
 
 - **NX Documentation**: https://nx.dev
 - **React Native**: https://reactnative.dev
 - **Tamagui UI**: https://tamagui.dev
 - **AWS Lambda**: https://docs.aws.amazon.com/lambda/
+- **Terraform**: https://terraform.io
 
 ---
 

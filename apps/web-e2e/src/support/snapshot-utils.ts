@@ -57,7 +57,7 @@ export class SnapshotUtils {
     await page.evaluate(() => {
       // Remove dynamic React attributes
       const reactElements = document.querySelectorAll(
-        '[data-reactroot], [data-react-*]'
+        '[data-reactroot], [data-react-*]',
       );
       reactElements.forEach((el) => {
         const attrs = el.attributes;
@@ -112,7 +112,7 @@ export class SnapshotUtils {
   static async takeComponentScreenshot(
     page: Page,
     selector: string,
-    name: string
+    name: string,
   ): Promise<void> {
     await this.preparePage(page);
     const element = page.locator(selector);
@@ -131,7 +131,7 @@ export class SnapshotUtils {
   static async takeHtmlSnapshot(
     page: Page,
     selector: string,
-    name: string
+    name: string,
   ): Promise<void> {
     await this.cleanDynamicAttributes(page);
     const element = page.locator(selector);
@@ -147,7 +147,7 @@ export class SnapshotUtils {
    */
   static async captureResponsiveSnapshots(
     page: Page,
-    name: string
+    name: string,
   ): Promise<void> {
     const viewports = [
       { name: 'mobile', width: 375, height: 667 },
@@ -178,7 +178,7 @@ export class SnapshotUtils {
             img.addEventListener('load', resolve);
             img.addEventListener('error', reject);
           });
-        })
+        }),
       );
     });
   }
@@ -189,7 +189,7 @@ export class SnapshotUtils {
   static async captureComponentStates(
     page: Page,
     selector: string,
-    baseName: string
+    baseName: string,
   ): Promise<void> {
     const element = page.locator(selector);
 
@@ -198,7 +198,7 @@ export class SnapshotUtils {
       await this.takeComponentScreenshot(
         page,
         selector,
-        `${baseName}-default.png`
+        `${baseName}-default.png`,
       );
 
       // Hover state
@@ -206,7 +206,7 @@ export class SnapshotUtils {
       await this.takeComponentScreenshot(
         page,
         selector,
-        `${baseName}-hover.png`
+        `${baseName}-hover.png`,
       );
 
       // Focus state (if focusable)
@@ -215,7 +215,7 @@ export class SnapshotUtils {
         await this.takeComponentScreenshot(
           page,
           selector,
-          `${baseName}-focus.png`
+          `${baseName}-focus.png`,
         );
       } catch {
         // Element might not be focusable, skip
@@ -251,7 +251,7 @@ export class SnapshotUtils {
           await this.captureComponentStates(
             page,
             `${component.selector}:nth-child(${i + 1})`,
-            `${component.name}${suffix}`
+            `${component.name}${suffix}`,
           );
         }
       }

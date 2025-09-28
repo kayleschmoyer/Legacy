@@ -32,7 +32,7 @@ describe('Build and Performance Verification', () => {
       // Check that navigation is functional
       try {
         await expect(
-          element(by.id('main-navigator').or(by.id('tab-navigator')))
+          element(by.id('main-navigator').or(by.id('tab-navigator'))),
         ).toBeVisible();
       } catch {
         // Navigation might use different IDs, just ensure app root is visible
@@ -193,8 +193,8 @@ describe('Build and Performance Verification', () => {
         // Should show loading state briefly
         await expect(
           element(
-            by.id('loading-panel').or(by.id('loading-indicator'))
-          ).atIndex(0)
+            by.id('loading-panel').or(by.id('loading-indicator')),
+          ).atIndex(0),
         ).toBeVisible();
       } catch {
         // Loading might be too fast to catch

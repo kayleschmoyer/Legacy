@@ -21,7 +21,7 @@ export class DbClient {
   }
 
   public async getUserById(
-    id: number
+    id: number,
   ): Promise<UserFragment | undefined | null> {
     const response = await this.apolloClient.query({
       query: GetUserById,

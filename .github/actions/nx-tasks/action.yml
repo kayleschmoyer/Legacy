@@ -17,10 +17,16 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  error-output:
+    description: "Captured error output if tasks fail"
+    value: ${{ steps.run-tasks.outputs.error_output }}
+
 runs:
   using: "composite"
   steps:
     - name: Run Nx Tasks
+      id: run-tasks
       shell: bash
       run: |
         tasks="${{ inputs.tasks }}"
@@ -32,22 +38,103 @@ runs:
           verbose_flag="--verbose"
         fi
 
-        echo "Running tasks: $tasks"
-        echo "Scope: $scope"
-        echo "Parallel: $parallel"
+        # Determine execution mode and adjust settings
+        if [ "${NX_LOCAL_FALLBACK}" = "true" ]; then
+          echo "🔧 Running in LOCAL FALLBACK MODE (Nx Cloud unavailable)"
+          execution_mode="Local"
+          
+          # Use conservative local settings for stability
+          effective_parallel="${NX_PARALLEL:-2}"
+          
+          # Disable Nx Cloud specific flags for local execution
+          unset NX_CLOUD_NO_TIMEOUTS
+          export NX_VERBOSE_LOGGING=true
+          
+        elif [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
+          echo "🚀 Running in NX CLOUD DISTRIBUTED MODE"
+          execution_mode="Nx Cloud Distributed"
+          
+          # Use provided parallel setting or default
+          effective_parallel="${parallel}"
+          
+          # Set Nx Cloud environment variables
+          export NX_CLOUD_NO_TIMEOUTS=true
+          export NX_VERBOSE_LOGGING=true
+          
+        else
+          echo "🔧 Running in LOCAL MODE (distributed execution disabled)"
+          execution_mode="Local"
+          
+          # Use conservative local settings
+          effective_parallel="${parallel:-2}"
+          
+          # Local execution settings
+          export NX_VERBOSE_LOGGING=true
+        fi
 
-        # Set Nx Cloud environment variables following official recommendations
-        export NX_CLOUD_NO_TIMEOUTS=true
-        export NX_VERBOSE_LOGGING=true
+        echo ""
+        echo "📋 Execution Configuration:"
+        echo "  Mode: $execution_mode"
+        echo "  Tasks: $tasks"
+        echo "  Scope: $scope"
+        echo "  Parallel: $effective_parallel"
+        echo "  NX_LOCAL_FALLBACK: ${NX_LOCAL_FALLBACK:-false}"
+        echo "  NX_CLOUD_DISTRIBUTED_EXECUTION: ${NX_CLOUD_DISTRIBUTED_EXECUTION:-false}"
+        echo ""
 
         # Build the nx command following Nx best practices
         if [[ "$scope" == "affected" ]]; then
-          nx_cmd="npx nx affected --parallel=$parallel -t $tasks $verbose_flag"
+          nx_cmd="npx nx affected --parallel=$effective_parallel -t $tasks $verbose_flag"
         else
-          nx_cmd="npx nx run-many --parallel=$parallel -t $tasks $verbose_flag"
+          nx_cmd="npx nx run-many --parallel=$effective_parallel -t $tasks $verbose_flag"
         fi
 
         echo "Executing: $nx_cmd"
 
-        # Run the command and let Nx Cloud handle its own retry logic
-        eval "$nx_cmd"
+        # Run the command with appropriate error handling and capture output
+        if task_output=$(eval "$nx_cmd" 2>&1); then
+          echo "✅ Nx tasks completed successfully in $execution_mode mode"
+          echo "$task_output"
+        else
+          echo "❌ Nx tasks failed in $execution_mode mode"
+          echo "$task_output"
+          
+          # Capture error output for PR commenting
+          echo "error_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$task_output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # If we were using Nx Cloud and it failed, try local fallback as last resort
+          if [ "${NX_LOCAL_FALLBACK}" != "true" ] && [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
+            echo "🔄 Attempting local fallback after Nx Cloud failure..."
+            
+            # Reconfigure for local execution
+            export NX_CLOUD_DISTRIBUTED_EXECUTION=false
+            export NX_LOCAL_FALLBACK=true
+            export NX_CLOUD_ACCESS_TOKEN=""  # Clear token to prevent cloud connection attempts
+            export NX_CLOUD_ID=""  # Clear cloud ID to prevent cloud initialization
+            unset NX_CLOUD_NO_TIMEOUTS
+            
+            # Retry with local execution and capture output
+            local_cmd="npx nx run-many --parallel=2 -t $tasks $verbose_flag"
+            echo "Retrying with local execution: $local_cmd"
+            
+            if local_output=$(eval "$local_cmd" 2>&1); then
+              echo "✅ Local fallback succeeded"
+              echo "$local_output"
+            else
+              echo "❌ Local fallback also failed"
+              echo "$local_output"
+              
+              # Update error output with local fallback result
+              echo "error_output<<EOF" >> $GITHUB_OUTPUT
+              echo "Nx Cloud execution failed, local fallback also failed:" >> $GITHUB_OUTPUT
+              echo "$local_output" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              
+              exit 1
+            fi
+          else
+            exit 1
+          fi
+        fi

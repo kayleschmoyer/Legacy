@@ -23,8 +23,10 @@ export default {
       '<rootDir>/src/__mocks__/tamagui-lucide-icons.js',
     '^@tamagui/config/v4$': '<rootDir>/src/__mocks__/@tamagui/config/v4.js',
     '^@tamagui/(.*)$': '<rootDir>/src/__mocks__/tamagui.js',
-    '^__PLATFORM_COMPONENTS__$': '<rootDir>/../../lib/shared-components/src/platform-components',
-    '^@legacy-sports/shared-components$': '<rootDir>/../../lib/shared-components/src',
+    '^__PLATFORM_COMPONENTS__$':
+      '<rootDir>/../../lib/shared-components/src/platform-components',
+    '^@legacy-sports/shared-components$':
+      '<rootDir>/../../lib/shared-components/src',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/utils$': '<rootDir>/../../lib/utils/src',
   },

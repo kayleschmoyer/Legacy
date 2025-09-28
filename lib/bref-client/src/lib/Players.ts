@@ -4,7 +4,7 @@ import { getPlayers as getPlayersFromBref } from './BRefSession';
 
 const BREF_CODE_GROUP = 'brefId';
 const BREF_URL_REGEX = new RegExp(
-  `.*\\/(?<${BREF_CODE_GROUP}>[a-z'_\\.]+[0-9]+).shtml$`
+  `.*\\/(?<${BREF_CODE_GROUP}>[a-z'_\\.]+[0-9]+).shtml$`,
 );
 
 export interface PlayerInfo {
@@ -66,7 +66,7 @@ export async function getPlayers(letter: Letter): Promise<PlayerInfo[]> {
         JSON.stringify({
           href: anchor.getAttribute('href'),
           regex: BREF_URL_REGEX.toString(),
-        })
+        }),
       );
       throw new Error('Error');
     }

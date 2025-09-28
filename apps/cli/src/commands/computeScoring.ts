@@ -29,7 +29,7 @@ type HandleComputeScoringArgs = ArgsType<
 >;
 
 export async function handleComputeScoring(
-  args: HandleComputeScoringArgs
+  args: HandleComputeScoringArgs,
 ): Promise<void> {
   LOGGER.debug(`Computing scoring for player ${args.player}`);
 
@@ -51,11 +51,11 @@ export async function handleComputeScoring(
     const battingScore = computeScoring(battingStats, DEFAULT_BATTING_SCORING);
     const fieldingScore = computeScoring(
       fieldingStats,
-      DEFAULT_FIELDING_SCORING
+      DEFAULT_FIELDING_SCORING,
     );
     const pitchingScore = computeScoring(
       pitchingStats,
-      DEFAULT_PITCHING_SCORING
+      DEFAULT_PITCHING_SCORING,
     );
 
     const battingScorePerGame =
@@ -73,7 +73,7 @@ export async function handleComputeScoring(
         fieldingScorePerGame,
         pitchingScore,
         pitchingScorePerGame,
-      })
+      }),
     );
   });
 }

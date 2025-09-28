@@ -1,0 +1,257 @@
+name: "Comment PR Errors"
+description: "Comment build, test, or lint errors back to the PR with proper formatting"
+
+inputs:
+  error-type:
+    description: "Type of error (lint, test, build, format, ios, android)"
+    required: true
+  error-output:
+    description: "The captured error output from the failed step"
+    required: true
+  job-name:
+    description: "Name of the job that failed"
+    required: true
+  step-name:
+    description: "Name of the step that failed"
+    required: false
+    default: ""
+  github-token:
+    description: "GitHub token for API access"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Comment Error on PR
+      if: github.event_name == 'pull_request' && github.event.pull_request != null
+      uses: actions/github-script@v7
+      env:
+        ERROR_OUTPUT: ${{ inputs.error-output }}
+        ERROR_TYPE: ${{ inputs.error-type }}
+        JOB_NAME: ${{ inputs.job-name }}
+        STEP_NAME: ${{ inputs.step-name }}
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const errorType = process.env.ERROR_TYPE || '';
+          const errorOutput = process.env.ERROR_OUTPUT || '';
+          const jobName = process.env.JOB_NAME || '';
+          const stepName = process.env.STEP_NAME || '';
+
+          // Validate required inputs
+          if (!errorType || !jobName) {
+            console.log('❌ Missing required inputs: errorType or jobName');
+            return;
+          }
+
+          console.log('🔍 Debug info:');
+          console.log('  Event name:', context.eventName);
+          console.log('  PR number:', issue_number);
+          console.log('  Owner:', owner);
+          console.log('  Repo:', repo);
+          console.log('  Error type:', errorType);
+          console.log('  Job name:', jobName);
+          console.log('  Step name:', stepName);
+          console.log('  Error output length:', errorOutput.length);
+
+          // Function to format different types of errors
+          function formatErrorComment(type, output, job, step) {
+            const stepInfo = step ? ` (${step})` : '';
+            const header = `## ❌ ${type.toUpperCase()} Error in ${job}${stepInfo}`;
+            
+            let icon = '🔍';
+            let description = '';
+            let suggestions = '';
+            
+            switch (type) {
+              case 'lint':
+                icon = '🔍';
+                description = 'ESLint found code quality issues that need to be addressed.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Run lint locally** to see all issues:
+             \`\`\`bash
+             npx nx affected -t lint
+             # or for all projects
+             npx nx run-many -t lint
+             \`\`\`
+
+          2. **Auto-fix what's possible**:
+             \`\`\`bash
+             npx nx affected -t lint --fix
+             \`\`\`
+
+          3. **Manual fixes** for remaining issues - follow the error messages above
+          4. **Consider** if you need to update ESLint rules (avoid disabling unless necessary)`;
+                break;
+                
+              case 'test':
+                icon = '🧪';
+                description = 'Unit tests are failing. Please review and fix the failing tests.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Run tests locally** to reproduce the issue:
+             \`\`\`bash
+             npx nx affected -t test
+             # or for specific project
+             npx nx test <project-name>
+             \`\`\`
+
+          2. **Debug failing tests** - check the error messages above
+          3. **Update test expectations** if the behavior change is intentional
+          4. **Fix the underlying code** if tests are revealing bugs`;
+                break;
+                
+              case 'build':
+                icon = '🔨';
+                description = 'Build process failed. This typically indicates TypeScript errors or missing dependencies.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Run build locally** to reproduce:
+             \`\`\`bash
+             npx nx affected -t build
+             # or for specific project
+             npx nx build <project-name>
+             \`\`\`
+
+          2. **Check TypeScript errors** - fix type issues shown above
+          3. **Verify dependencies** are properly installed and imported
+          4. **Run type check** for more detailed error info:
+             \`\`\`bash
+             npx nx affected -t typecheck
+             \`\`\``;
+                break;
+                
+              case 'format':
+                icon = '🎨';
+                description = 'Code formatting issues detected. Files need to be formatted with Prettier.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Auto-fix formatting**:
+             \`\`\`bash
+             npx nx format:write
+             \`\`\`
+
+          2. **Check specific files**:
+             \`\`\`bash
+             npx nx format:check --base=origin/main --head=HEAD
+             \`\`\`
+
+          3. **Commit the formatting changes** and push`;
+                break;
+                
+              case 'ios':
+                icon = '🍎';
+                description = 'iOS build failed. This could be due to Xcode configuration, dependencies, or code signing issues.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Check iOS configuration** in \`apps/app/ios/\`
+          2. **Verify Xcode scheme** and workspace settings
+          3. **Update iOS dependencies**:
+             \`\`\`bash
+             cd apps/app/ios && pod install
+             \`\`\`
+          4. **Test locally** if you have access to macOS/Xcode
+          5. **Check for React Native compatibility** issues`;
+                break;
+                
+              case 'android':
+                icon = '🤖';
+                description = 'Android build failed. This could be due to Gradle configuration, dependencies, or Android SDK issues.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Check Android configuration** in \`apps/app/android/\`
+          2. **Verify Gradle dependencies** and version compatibility
+          3. **Clean and rebuild**:
+             \`\`\`bash
+             cd apps/app/android && ./gradlew clean
+             npx nx build-android app
+             \`\`\`
+          4. **Check Java/Android SDK** versions
+          5. **Review React Native Android** specific requirements`;
+                break;
+                
+              default:
+                icon = '⚠️';
+                description = 'An error occurred during the CI process.';
+                suggestions = `### 🔧 How to Fix:
+
+          1. **Review the error details** above
+          2. **Reproduce locally** if possible
+          3. **Check recent changes** that might have caused this issue
+          4. **Contact the team** if you need help debugging`;
+            }
+
+            // Truncate very long output to avoid GitHub comment limits
+            let formattedOutput = output;
+            if (output.length > 8000) {
+              const truncated = output.substring(0, 8000);
+              const lastNewline = truncated.lastIndexOf('\n');
+              formattedOutput = truncated.substring(0, lastNewline) + '\n\n... (output truncated)';
+            }
+
+            return `${header}
+
+          ${icon} ${description}
+
+          <details>
+          <summary>📋 Click to view error details</summary>
+
+          \`\`\`
+          ${formattedOutput}
+          \`\`\`
+
+          </details>
+
+          ${suggestions}
+
+          ---
+          💡 **Need help?** Check our [troubleshooting guide](../docs) or ask in the team chat.
+          `;
+          }
+
+          const comment = formatErrorComment(errorType, errorOutput, jobName, stepName);
+
+          try {
+            // Check if we already commented on this PR for the same error type and job
+            console.log('📝 Checking for existing comments...');
+            const existingComments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+            });
+
+            const errorSignature = `${errorType.toUpperCase()} Error in ${jobName}`;
+            const existingComment = existingComments.data.find(c => 
+              c.body && c.body.includes(errorSignature)
+            );
+
+            if (existingComment) {
+              // Update existing comment instead of creating a new one
+              console.log('🔄 Updating existing comment...');
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+              console.log(`✅ Updated existing error comment for ${errorType} in ${jobName}`);
+            } else {
+              // Create new comment
+              console.log('📝 Creating new comment...');
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: comment
+              });
+              console.log(`✅ Created new error comment for ${errorType} in ${jobName}`);
+            }
+          } catch (error) {
+            console.error('❌ Failed to comment on PR:', error);
+            console.error('Error details:', error.message);
+            // Don't fail the entire workflow just because commenting failed
+          }

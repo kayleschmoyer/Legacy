@@ -28,11 +28,11 @@ export const usersInAppInternal = appInternal.table(
     return {
       idx: index('users__index').using(
         'btree',
-        table.username.asc().nullsLast()
+        table.username.asc().nullsLast(),
       ),
       emailIdx: index().using('btree', table.email.asc().nullsLast()),
       usersUsernameUk: unique('users_username_uk').on(table.username),
       usersEmailUk: unique('users_email_uk').on(table.email),
     };
-  }
+  },
 );

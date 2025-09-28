@@ -29,15 +29,14 @@ import { usersInAppInternal } from '../drizzle/internal/schema';
 type ViewSelection<T> = T extends View ? T['_']['selectedFields'] : never;
 
 type InferModelFromView<
-  T extends View<string, boolean, Record<string, Column>>
+  T extends View<string, boolean, Record<string, Column>>,
 > = InferModelFromColumns<ViewSelection<T>, 'select'>;
 
-type InferEnumValue<T> = T extends PgEnum<infer TValues>
-  ? TValues[number]
-  : never;
+type InferEnumValue<T> =
+  T extends PgEnum<infer TValues> ? TValues[number] : never;
 
 export type CareerBatting = InferModelFromView<typeof careerBatting>;
-export type careerFielding = InferModelFromView<typeof careerFielding>;
+export type CareerFielding = InferModelFromView<typeof careerFielding>;
 export type CareerPitching = InferModelFromView<typeof careerPitching>;
 export type GameBatting = typeof gameBatting.$inferSelect;
 export type GameFielding = typeof gameFielding.$inferSelect;

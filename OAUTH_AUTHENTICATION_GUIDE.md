@@ -1,84 +1,126 @@
-# OAuth Authentication System - Usage Guide
+# OAuth Authentication System - Modern Architecture Guide
 
 ## Overview
 
-I've successfully created a modern, cross-platform OAuth authentication system for Legacy Sports that includes:
+Legacy Sports now uses a modern, React Context-based OAuth authentication system that provides:
 
-1. **OAuthLoginComponent** - A modern login component using Google OAuth
-2. **AuthService** - A service to manage authentication state and JWT tokens
-3. **EnhancedAuthGuard** - A component that protects routes and shows login when needed
-4. **Integration with both web and mobile apps**
+1. **AuthProvider** - React Context provider for authentication state management
+2. **useAuth** - Modern React hook for accessing authentication state
+3. **ModernLoginPage** - A modern login page using Google OAuth with elegant UI
+4. **EnhancedAuthGuard** - A component that protects routes and shows login when needed
+5. **Cross-platform compatibility** - Unified system for web and mobile apps
 
 ## Features
 
+✅ **React Context Architecture** - Modern declarative pattern using React Context
 ✅ **Cross-platform support** - Works on both web and React Native mobile apps
-✅ **Google OAuth integration** - Connects to your existing OAuth proxy lambda
+✅ **Google Identity Services (GSI)** - Modern OAuth with One Tap sign-in enabled by default
+✅ **One Tap Sign-In** - Seamless authentication without popups or redirects
+✅ **No Popup Blockers** - Clean GSI implementation eliminates popup blocker issues
 ✅ **JWT token management** - Secure storage and automatic token handling
 ✅ **Test mode** - Mock authentication for development
 ✅ **Modern UI** - Built with Tamagui for consistent styling across platforms
-✅ **TypeScript support** - Full type safety
+✅ **TypeScript support** - Full type safety throughout
 
 ## Quick Start
 
 ### 1. Web Application (apps/web)
 
-The web app has been updated to use the new authentication system:
+The web app uses the modern AuthProvider pattern:
 
 ```typescript
-// Main entry point now initializes auth service
-import {
-  createAuthService,
-  createAuthConfig,
-} from '@legacy-sports/shared-components';
+// Main entry point - apps/web/src/main.tsx
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { AuthProvider } from '@legacy-sports/shared-components';
+import type { OAuthConfig } from '@legacy-sports/shared-components';
+import { AppWithAuth } from './AppWithAuth';
 
-const authConfig = createAuthConfig({
-  oauthProxyUrl: 'http://localhost:5001',
-  googleClientId: 'your-google-client-id',
-});
+const oauthConfig: OAuthConfig = {
+  oauthProxyUrl: import.meta.env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001',
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id',
+  gsi: {
+    oneTap: true,           // Enable One Tap (default: true)
+    autoSelect: true,       // Auto-select single account (default: true)
+    cancelOnTapOutside: true, // Close One Tap when clicking outside (default: true)
+    uxMode: 'popup',        // Use popup mode for auth flow (default: 'popup')
+  },
+};
 
-createAuthService(authConfig);
+const container = document.getElementById('root')!;
+const root = createRoot(container);
+
+root.render(
+  <AuthProvider config={oauthConfig}>
+    <AppWithAuth />
+  </AuthProvider>
+);
 ```
 
-**Key changes made:**
+**Key features:**
 
-- Updated `main.tsx` to initialize the auth service
-- Created `app-with-auth.tsx` that uses `EnhancedAuthGuard`
-- Added environment variables in `.env.local`
+- **Declarative**: Wrap your app in `AuthProvider` with configuration
+- **Environment variables**: Uses Vite environment variables for configuration
+- **Type-safe**: Full TypeScript support with `OAuthConfig` interface
 
 ### 2. Mobile Application (apps/app)
 
-The mobile app has been updated in `_layout.tsx`:
+The mobile app uses the same modern AuthProvider pattern:
 
 ```typescript
-// Mobile app now uses EnhancedAuthGuard
-import { EnhancedAuthGuard, createAuthService } from '@legacy-sports/shared-components';
+// Mobile app - apps/app/src/app/_layout.tsx
+import React from 'react';
+import { AuthProvider, EnhancedAuthGuard } from '@legacy-sports/shared-components';
+import type { OAuthConfig } from '@legacy-sports/shared-components';
 
-// Auth service is initialized with config from app.json
-<EnhancedAuthGuard
-  oauthProxyUrl={authConfig.oauthProxyUrl}
-  googleClientId={authConfig.googleClientId}
-  testMode={__DEV__}
->
-  <AuthenticatedContent />
-</EnhancedAuthGuard>
+const oauthConfig: OAuthConfig = {
+  oauthProxyUrl: 'http://localhost:5001', // Your OAuth proxy URL
+  googleClientId: 'your-google-client-id', // Your Google Client ID
+};
+
+export default function RootLayout() {
+  return (
+    <AuthProvider config={oauthConfig}>
+      <EnhancedAuthGuard testMode={__DEV__}>
+        <AuthenticatedContent />
+      </EnhancedAuthGuard>
+    </AuthProvider>
+  );
+}
 ```
 
-**Key changes made:**
+**Key features:**
 
-- Updated `_layout.tsx` to use the new auth system
-- Added OAuth configuration to `app.json`
-- Set up expo-constants for environment variable access
+- **Same Pattern**: Uses identical `AuthProvider` pattern as web app
+- **Simplified Interface**: `EnhancedAuthGuard` gets config from context automatically
+- **Cross-platform**: Leverages platform-components system for React Native compatibility
 
 ## Components Reference
 
+### AuthProvider
+
+The React Context provider that manages authentication state:
+
+```typescript
+import { AuthProvider } from '@legacy-sports/shared-components';
+import type { OAuthConfig } from '@legacy-sports/shared-components';
+
+const config: OAuthConfig = {
+  oauthProxyUrl: 'https://your-oauth-proxy.amazonaws.com/oauth',
+  googleClientId: 'your-google-client-id.apps.googleusercontent.com',
+};
+
+<AuthProvider config={config}>
+  <YourApp />
+</AuthProvider>
+```
+
 ### EnhancedAuthGuard
 
-The main component that protects your app content:
+The component that protects your app content (now gets config from AuthProvider context):
 
 ```typescript
 <EnhancedAuthGuard
-  oauthProxyUrl="http://localhost:5001"
-  googleClientId="your-google-client-id"
   loginTitle="Welcome to Legacy Sports!"
   loginSubtitle="Sign in to access your fantasy leagues"
   testMode={true} // Enable for development
@@ -89,19 +131,23 @@ The main component that protects your app content:
 </EnhancedAuthGuard>
 ```
 
-### OAuthLoginComponent
+### ModernLoginPage
 
-The login form component (used internally by EnhancedAuthGuard):
+The modern login page component (used internally by EnhancedAuthGuard):
 
 ```typescript
-<OAuthLoginComponent
-  oauthProxyUrl="http://localhost:5001"
-  googleClientId="your-google-client-id"
-  title="Welcome!"
-  subtitle="Sign in to continue"
-  testMode={false}
-  onLoginSuccess={() => {}}
-  onLoginFailure={(error) => {}}
+<ModernLoginPage
+  config={{
+    googleClientId: "your-google-client-id"
+  }}
+  onSuccess={(user) => {
+    console.log('Login successful:', user);
+  }}
+  onError={(error) => {
+    console.error('Login failed:', error);
+  }}
+  appName="Legacy Sports"
+  style={{ margin: 20 }}
 />
 ```
 
@@ -131,7 +177,20 @@ function MyComponent() {
 
 ### Environment Variables
 
-**Web (.env.local):**
+**Production (Automatically Configured):**
+
+The `sync-env` script automatically configures production OAuth proxy URLs from Terraform:
+
+```bash
+# Run this to sync production environment variables
+npm run sync-env
+
+# This will set:
+VITE_OAUTH_PROXY_URL=https://your-api-gateway.execute-api.us-east-1.amazonaws.com/dev/oauth
+VITE_GOOGLE_CLIENT_ID=your-production-client-id
+```
+
+**Development (.env.local):**
 
 ```bash
 VITE_OAUTH_PROXY_URL=http://localhost:5001
@@ -150,6 +209,97 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id
   }
 }
 ```
+
+### Google Sign-In (GSI) Configuration
+
+The web platform now uses **Google Identity Services** for modern, seamless authentication. GSI provides several advantages over the previous popup-based flow:
+
+**Benefits:**
+
+- ✅ **One Tap Sign-In** - Users can authenticate with a single click
+- ✅ **No Popup Blockers** - Eliminates browser popup blocker issues
+- ✅ **Better UX** - Faster, more intuitive sign-in experience
+- ✅ **Modern Standards** - Uses Google's recommended authentication approach
+- ✅ **Credential Manager Integration** - Leverages browser's built-in credential storage
+
+**GSI Configuration Options:**
+
+```typescript
+interface GSIConfig {
+  oneTap?: boolean; // Enable One Tap sign-in (default: true)
+  autoSelect?: boolean; // Auto-select single account (default: true)
+  cancelOnTapOutside?: boolean; // Close One Tap when clicking outside (default: true)
+  uxMode?: 'popup' | 'redirect'; // Authentication flow mode (default: 'popup')
+}
+```
+
+**Complete Configuration Example:**
+
+```typescript
+const oauthConfig: OAuthConfig = {
+  oauthProxyUrl: 'https://your-api.amazonaws.com/oauth',
+  googleClientId: 'your-client-id.apps.googleusercontent.com',
+
+  // GSI configuration (all optional - defaults are shown)
+  gsi: {
+    oneTap: true, // Show One Tap for returning users
+    autoSelect: true, // Automatically select account if only one available
+    cancelOnTapOutside: true, // Allow canceling One Tap by clicking outside
+    uxMode: 'popup', // Use popup for OAuth consent (vs full redirect)
+  },
+
+  // Additional OAuth scopes (optional)
+  additionalScopes: ['profile', 'email'], // Already included by default
+  offlineAccess: true, // Request refresh tokens
+};
+```
+
+**One Tap Behavior:**
+
+- **Automatic Display**: One Tap appears immediately on page load (no button click needed)
+- **Returning users**: See One Tap prompt for instant sign-in with previously used accounts
+- **First-time users**: Can use One Tap if they have Google accounts in their browser
+- **Manual Fallback**: Sign-in button available if One Tap is dismissed or unavailable
+- **Multiple accounts**: Users can choose which account to use
+- **Privacy-focused**: One Tap respects user privacy preferences and browser settings
+
+**Requirements:**
+
+- Google Identity Services library (automatically loaded)
+- Valid Google OAuth Client ID configured for your domain
+- HTTPS in production (required by Google for GSI)
+
+### Technical Implementation Details
+
+**Two Authentication Flows:**
+
+1. **One Tap Flow** (Automatic - ID Token):
+
+   ```
+   User visits page → GSI One Tap appears → User clicks →
+   ID Token generated → Sent to OAuth Proxy as 'credential' →
+   JWT tokens returned → User authenticated
+   ```
+
+2. **Manual Sign-In Flow** (Button Click - Authorization Code):
+   ```
+   User clicks button → GSI authorization popup → User consents →
+   Authorization Code generated → Sent to OAuth Proxy as 'code' →
+   JWT tokens returned → User authenticated
+   ```
+
+**OAuth Proxy Compatibility:**
+
+- Supports both `credential` (ID token) and `code` (authorization code) fields
+- Automatic detection of flow type in the backend
+- Same JWT token response for both flows
+- Seamless user experience regardless of authentication method
+
+**Event System:**
+
+- One Tap success/failure emits custom browser events
+- `ModernLoginPage` automatically listens for these events
+- No manual integration needed - works out of the box
 
 ## Test Mode
 
@@ -219,12 +369,13 @@ Use Expo Go or development build to test on device/simulator.
 
 ### Common Issues
 
-1. **"AuthService not initialized" error**
-   - Ensure `createAuthService()` is called before using `useAuth()`
-   - Check that imports are correct in main entry files
+1. **"AuthProvider is required" error**
+   - Ensure your app is wrapped in `<AuthProvider config={...}>` in the root component
+   - Check that the AuthProvider import is correct
+   - Verify that the config object is properly structured
 
 2. **OAuth proxy connection failed**
-   - Verify the OAuth proxy URL is correct
+   - Verify the OAuth proxy URL is correct in your config
    - Ensure the lambda is running (for local development)
    - Check network connectivity
 
@@ -242,9 +393,14 @@ Use Expo Go or development build to test on device/simulator.
 Enable console logging to debug authentication flow:
 
 ```typescript
-// In your app initialization
+// In your AuthProvider configuration
+const config: OAuthConfig = {
+  oauthProxyUrl: process.env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001',
+  googleClientId: process.env.VITE_GOOGLE_CLIENT_ID || 'your-client-id',
+};
+
 if (__DEV__) {
-  console.log('Auth config:', authConfig);
+  console.log('OAuth config:', config);
 }
 ```
 
@@ -265,25 +421,62 @@ if (__DEV__) {
    - Implement social login options beyond Google
    - Add user profile management screens
 
-## Files Modified/Created
+## Architecture Overview
 
-### New Components:
+### Modern React Context Pattern
 
-- `lib/shared-components/src/features/auth/OAuthLoginComponent.tsx`
-- `lib/shared-components/src/features/auth/AuthService.ts`
-- `lib/shared-components/src/features/auth/useAuth.ts`
-- `lib/shared-components/src/features/auth/EnhancedAuthGuard.tsx`
-- `lib/shared-components/src/features/auth/authConfig.ts`
+The authentication system now uses a modern React Context architecture:
 
-### Web App Updates:
+```
+AuthProvider (Context Provider)
+├── Provides: config, isAuthenticated, user, isLoading, etc.
+├── Used by: EnhancedAuthGuard, useAuth hook
+└── Manages: AuthService instance, authentication state
+```
 
-- `apps/web/src/main.tsx` - Added auth service initialization
-- `apps/web/src/app/app-with-auth.tsx` - New authenticated app component
-- `apps/web/.env.local` - Environment variables
+### Key Components:
 
-### Mobile App Updates:
+- **`AuthProvider`** - React Context provider for authentication state
+- **`useAuth`** - Hook for accessing authentication from any component
+- **`ModernLoginPage`** - Modern login UI component
+- **`EnhancedAuthGuard`** - Route protection component
+- **`AuthService`** - Service layer for authentication operations
 
-- `apps/app/src/app/_layout.tsx` - Added auth guard integration
-- `apps/app/app.json` - Added OAuth configuration
+### Web App Architecture:
 
-The authentication system is now fully integrated and ready for use! Both web and mobile applications will show the login screen when users are not authenticated, and provide secure access to the app content once logged in.
+- `apps/web/src/main.tsx` - Wraps app in AuthProvider
+- `apps/web/src/AppWithAuth.tsx` - Protected app content
+- **Google Identity Services** - Modern GSI library with One Tap enabled
+- Environment: Uses Vite environment variables
+- Authentication: GSI authorization code flow → OAuth proxy → JWT tokens
+
+### Mobile App Architecture:
+
+- `apps/app/src/app/_layout.tsx` - Wraps app in AuthProvider
+- Uses same AuthProvider pattern as web
+- **React Native Google Sign-In** - Native mobile authentication
+- Platform-specific OAuth providers via platform-components system
+
+### Cross-Platform OAuth Flow:
+
+```
+1. User initiates sign-in
+   ├── Web: GSI One Tap or authorization code flow
+   └── Mobile: React Native Google Sign-In
+
+2. Platform abstraction layer
+   ├── WebOAuthProvider (GSI implementation)
+   └── MobileOAuthProvider (RN Google Sign-In)
+
+3. Authorization code obtained
+   └── Both platforms get authorization codes
+
+4. OAuth Proxy Lambda
+   └── Exchanges codes for JWT tokens
+
+5. Secure token storage
+   ├── Web: localStorage (with GSI state management)
+   └── Mobile: Expo SecureStore (encrypted)
+```
+
+The authentication system provides a unified, modern React Context-based architecture that works consistently across both web and mobile platforms, with **Google Identity Services** bringing enhanced security and user experience to the web platform while maintaining full type safety and React best practices.

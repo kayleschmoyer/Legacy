@@ -46,7 +46,7 @@ async function getCookieKey(): Promise<Buffer> {
 }
 
 export async function encryptCookies(
-  cookies: Record<string, string | null | undefined>
+  cookies: Record<string, string | null | undefined>,
 ): Promise<string> {
   const cookieKey = await getCookieKey();
   const parts: string[] = [];
@@ -61,7 +61,7 @@ export async function encryptCookies(
 }
 
 export async function decryptCookies(
-  cookies: string
+  cookies: string,
 ): Promise<Record<string, string | null | undefined>> {
   const cookieKey = await getCookieKey();
 

@@ -3,25 +3,25 @@ description: Install NPM dependencies without Node.js setup (assumes Node.js is 
 
 inputs:
   working-directory:
-    description: 'Working directory for npm operations'
+    description: "Working directory for npm operations"
     required: false
-    default: '.'
+    default: "."
   skip-cache:
-    description: 'Skip cache and force fresh install'
+    description: "Skip cache and force fresh install"
     required: false
-    default: 'false'
+    default: "false"
   legacy-peer-deps:
-    description: 'Use --legacy-peer-deps flag'
+    description: "Use --legacy-peer-deps flag"
     required: false
-    default: 'true'
+    default: "true"
 
 outputs:
   cache-hit:
-    description: 'Whether dependencies were restored from cache'
+    description: "Whether dependencies were restored from cache"
     value: ${{ steps.install-deps.outputs.cache-hit }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Install Dependencies
       id: install-deps
@@ -29,4 +29,4 @@ runs:
       with:
         working-directory: ${{ inputs.working-directory }}
         skip-cache: ${{ inputs.skip-cache }}
-        cache-prefix: 'deps-only'
+        cache-prefix: "deps-only"

@@ -27,7 +27,7 @@ function selectGameNumber(stats: { g: number | null } | null): number | null {
 async function selectGamesForMatchup(
   db: PublicDb,
   matchupId: number,
-  gameNumber: number
+  gameNumber: number,
 ): Promise<void> {
   const result = await db
     .select()
@@ -44,14 +44,14 @@ async function selectGamesForMatchup(
                 and(
                   eq(
                     PublicSchema.matchupPlayerGames.matchupPlayerId,
-                    PublicSchema.matchupPlayers.id
+                    PublicSchema.matchupPlayers.id,
                   ),
-                  eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber)
-                )
-              )
-          )
-        )
-      )
+                  eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
+                ),
+              ),
+          ),
+        ),
+      ),
     );
 
   LOGGER.debug(`Fetching ${result.length} matchup records`);
@@ -60,19 +60,19 @@ async function selectGamesForMatchup(
     const battingStats = await getSeasonBattingStatsForPlayerSeason(
       db,
       matchupPlayer.playerId,
-      matchupPlayer.season
+      matchupPlayer.season,
     );
     const pitchingStats = await getSeasonPitchingStatsForPlayerSeason(
       db,
       matchupPlayer.playerId,
-      matchupPlayer.season
+      matchupPlayer.season,
     );
 
     // Fielding stats are segmented by position
     const fieldingStatsArray = await getSeasonFieldingStatsForPlayerSeason(
       db,
       matchupPlayer.playerId,
-      matchupPlayer.season
+      matchupPlayer.season,
     );
 
     const fieldingStats =
@@ -88,7 +88,7 @@ async function selectGamesForMatchup(
     }
 
     LOGGER.debug(
-      `Selected Games ${battingGameNum} ${pitchingGameNum} ${fieldingGameNum}`
+      `Selected Games ${battingGameNum} ${pitchingGameNum} ${fieldingGameNum}`,
     );
 
     await db.insert(PublicSchema.matchupPlayerGames).values({

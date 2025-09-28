@@ -5,7 +5,6 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-
 /**
  * __useGetCareerBattingStatsQuery__
  *
@@ -23,22 +22,60 @@ const defaultOptions = {} as const;
  *   },
  * });
  */
-export function useGetCareerBattingStatsQuery(baseOptions?: Apollo.QueryHookOptions<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>(Operations.GetCareerBattingStats, options);
-      }
-export function useGetCareerBattingStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>(Operations.GetCareerBattingStats, options);
-        }
-export function useGetCareerBattingStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>(Operations.GetCareerBattingStats, options);
-        }
-export type GetCareerBattingStatsQueryHookResult = ReturnType<typeof useGetCareerBattingStatsQuery>;
-export type GetCareerBattingStatsLazyQueryHookResult = ReturnType<typeof useGetCareerBattingStatsLazyQuery>;
-export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<typeof useGetCareerBattingStatsSuspenseQuery>;
-export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<Types.GetCareerBattingStatsQuery, Types.GetCareerBattingStatsQueryVariables>;
+export function useGetCareerBattingStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    Types.GetCareerBattingStatsQuery,
+    Types.GetCareerBattingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetCareerBattingStatsQuery,
+    Types.GetCareerBattingStatsQueryVariables
+  >(Operations.GetCareerBattingStats, options);
+}
+export function useGetCareerBattingStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetCareerBattingStatsQuery,
+    Types.GetCareerBattingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetCareerBattingStatsQuery,
+    Types.GetCareerBattingStatsQueryVariables
+  >(Operations.GetCareerBattingStats, options);
+}
+export function useGetCareerBattingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetCareerBattingStatsQuery,
+        Types.GetCareerBattingStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetCareerBattingStatsQuery,
+    Types.GetCareerBattingStatsQueryVariables
+  >(Operations.GetCareerBattingStats, options);
+}
+export type GetCareerBattingStatsQueryHookResult = ReturnType<
+  typeof useGetCareerBattingStatsQuery
+>;
+export type GetCareerBattingStatsLazyQueryHookResult = ReturnType<
+  typeof useGetCareerBattingStatsLazyQuery
+>;
+export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetCareerBattingStatsSuspenseQuery
+>;
+export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<
+  Types.GetCareerBattingStatsQuery,
+  Types.GetCareerBattingStatsQueryVariables
+>;
 
 /**
  * __useGetCareerFieldingStatsQuery__
@@ -57,22 +94,60 @@ export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<Types.GetCaree
  *   },
  * });
  */
-export function useGetCareerFieldingStatsQuery(baseOptions?: Apollo.QueryHookOptions<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>(Operations.GetCareerFieldingStats, options);
-      }
-export function useGetCareerFieldingStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>(Operations.GetCareerFieldingStats, options);
-        }
-export function useGetCareerFieldingStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>(Operations.GetCareerFieldingStats, options);
-        }
-export type GetCareerFieldingStatsQueryHookResult = ReturnType<typeof useGetCareerFieldingStatsQuery>;
-export type GetCareerFieldingStatsLazyQueryHookResult = ReturnType<typeof useGetCareerFieldingStatsLazyQuery>;
-export type GetCareerFieldingStatsSuspenseQueryHookResult = ReturnType<typeof useGetCareerFieldingStatsSuspenseQuery>;
-export type GetCareerFieldingStatsQueryResult = Apollo.QueryResult<Types.GetCareerFieldingStatsQuery, Types.GetCareerFieldingStatsQueryVariables>;
+export function useGetCareerFieldingStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    Types.GetCareerFieldingStatsQuery,
+    Types.GetCareerFieldingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetCareerFieldingStatsQuery,
+    Types.GetCareerFieldingStatsQueryVariables
+  >(Operations.GetCareerFieldingStats, options);
+}
+export function useGetCareerFieldingStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetCareerFieldingStatsQuery,
+    Types.GetCareerFieldingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetCareerFieldingStatsQuery,
+    Types.GetCareerFieldingStatsQueryVariables
+  >(Operations.GetCareerFieldingStats, options);
+}
+export function useGetCareerFieldingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetCareerFieldingStatsQuery,
+        Types.GetCareerFieldingStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetCareerFieldingStatsQuery,
+    Types.GetCareerFieldingStatsQueryVariables
+  >(Operations.GetCareerFieldingStats, options);
+}
+export type GetCareerFieldingStatsQueryHookResult = ReturnType<
+  typeof useGetCareerFieldingStatsQuery
+>;
+export type GetCareerFieldingStatsLazyQueryHookResult = ReturnType<
+  typeof useGetCareerFieldingStatsLazyQuery
+>;
+export type GetCareerFieldingStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetCareerFieldingStatsSuspenseQuery
+>;
+export type GetCareerFieldingStatsQueryResult = Apollo.QueryResult<
+  Types.GetCareerFieldingStatsQuery,
+  Types.GetCareerFieldingStatsQueryVariables
+>;
 
 /**
  * __useGetCareerPitchingStatsQuery__
@@ -91,19 +166,57 @@ export type GetCareerFieldingStatsQueryResult = Apollo.QueryResult<Types.GetCare
  *   },
  * });
  */
-export function useGetCareerPitchingStatsQuery(baseOptions?: Apollo.QueryHookOptions<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>(Operations.GetCareerPitchingStats, options);
-      }
-export function useGetCareerPitchingStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>(Operations.GetCareerPitchingStats, options);
-        }
-export function useGetCareerPitchingStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>(Operations.GetCareerPitchingStats, options);
-        }
-export type GetCareerPitchingStatsQueryHookResult = ReturnType<typeof useGetCareerPitchingStatsQuery>;
-export type GetCareerPitchingStatsLazyQueryHookResult = ReturnType<typeof useGetCareerPitchingStatsLazyQuery>;
-export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<typeof useGetCareerPitchingStatsSuspenseQuery>;
-export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<Types.GetCareerPitchingStatsQuery, Types.GetCareerPitchingStatsQueryVariables>;
+export function useGetCareerPitchingStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    Types.GetCareerPitchingStatsQuery,
+    Types.GetCareerPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetCareerPitchingStatsQuery,
+    Types.GetCareerPitchingStatsQueryVariables
+  >(Operations.GetCareerPitchingStats, options);
+}
+export function useGetCareerPitchingStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetCareerPitchingStatsQuery,
+    Types.GetCareerPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetCareerPitchingStatsQuery,
+    Types.GetCareerPitchingStatsQueryVariables
+  >(Operations.GetCareerPitchingStats, options);
+}
+export function useGetCareerPitchingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetCareerPitchingStatsQuery,
+        Types.GetCareerPitchingStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetCareerPitchingStatsQuery,
+    Types.GetCareerPitchingStatsQueryVariables
+  >(Operations.GetCareerPitchingStats, options);
+}
+export type GetCareerPitchingStatsQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsQuery
+>;
+export type GetCareerPitchingStatsLazyQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsLazyQuery
+>;
+export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsSuspenseQuery
+>;
+export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<
+  Types.GetCareerPitchingStatsQuery,
+  Types.GetCareerPitchingStatsQueryVariables
+>;

@@ -32,9 +32,22 @@ import {
   handleComputeScoring,
 } from './commands/computeScoring';
 import {
-  runMigrations,
+  handleRunMigrations,
   runMigrationsCommandBuilder,
 } from './commands/runMigrations';
+import {
+  inspectDatabase,
+  inspectDatabaseCommandBuilder,
+} from './commands/inspectDatabase';
+
+import {
+  fixUsersTable,
+  fixUsersTableCommandBuilder,
+} from './commands/fixUsersTable';
+import {
+  testInternal,
+  testInternalCommandBuilder,
+} from './commands/testInternal';
 import {
   createMatchupCommandBuilder,
   handleCreateMatchup,
@@ -59,56 +72,67 @@ async function run(): Promise<void> {
       'load-career-stats',
       '',
       loadCareerStatsCommandBuilder,
-      handleLoadCareerStats
+      handleLoadCareerStats,
     )
     .command(
       'load-single-player-stats',
       'Load career stats for a specific player',
       loadSinglePlayerStatsCommandBuilder,
-      handleLoadSinglePlayerStats
+      handleLoadSinglePlayerStats,
     )
     .command(
       'list-players',
       'List players from the database',
       listPlayersCommandBuilder,
-      handleListPlayers
+      handleListPlayers,
     )
     .command(
       'test-add-player',
       'Test adding a player to the database',
       testAddPlayerCommandBuilder,
-      handleTestAddPlayer
+      handleTestAddPlayer,
     )
     .command(
       'test-connection',
       'Test database connection and environment variables',
       testConnectionCommandBuilder,
-      handleTestConnection
+      handleTestConnection,
     )
     .command(
       'compute-scoring',
       '',
       computeScoringCommandBuilder,
-      handleComputeScoring
+      handleComputeScoring,
     )
-    .command('run-migrations', '', runMigrationsCommandBuilder, runMigrations)
+    .command(
+      'run-migrations',
+      'Run database migrations (new system)',
+      runMigrationsCommandBuilder,
+      handleRunMigrations,
+    )
+    .command(
+      'inspect-database',
+      'Inspect current database state and migration status',
+      inspectDatabaseCommandBuilder,
+      inspectDatabase,
+    )
     .command(
       'create-matchup',
       'Creates the matchup records for players in the matchup',
       createMatchupCommandBuilder,
-      handleCreateMatchup
+      handleCreateMatchup,
     )
     .command(
       'test-db',
       'Tests database connectivity',
       testDbCommandBuilder,
-      handleTestDb
+      handleTestDb,
     )
     .command(
       'test-raw-connection',
       'Test raw PostgreSQL connection using pg package',
       testRawConnectionCommandBuilder,
-      handleTestRawConnection
+      handleTestRawConnection,
     )
     .command(
       'test-database',
@@ -116,7 +140,19 @@ async function run(): Promise<void> {
       {},
       async () => {
         await testDatabase();
-      }
+      },
+    )
+    .command(
+      'fix-users-table',
+      'Create missing app_internal.users table',
+      fixUsersTableCommandBuilder,
+      fixUsersTable,
+    )
+    .command(
+      'test-internal',
+      'Test internal schema state',
+      testInternalCommandBuilder,
+      testInternal,
     )
     .demandCommand()
     .help()

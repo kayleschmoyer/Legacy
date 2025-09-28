@@ -61,9 +61,34 @@ runs:
 
           Once you've fixed the issues, the check will pass automatically! 🎉`;
 
-          await github.rest.issues.createComment({
+          // Check if we already commented on this PR for package standards
+          const existingComments = await github.rest.issues.listComments({
             owner,
             repo,
             issue_number,
-            body: comment
           });
+
+          const packageStandardsSignature = "📦 Package.json Standards Check Failed";
+          const existingComment = existingComments.data.find(c => 
+            c.body && c.body.includes(packageStandardsSignature)
+          );
+
+          if (existingComment) {
+            // Update existing comment instead of creating a new one
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: existingComment.id,
+              body: comment
+            });
+            console.log('Updated existing package standards comment');
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: comment
+            });
+            console.log('Created new package standards comment');
+          }

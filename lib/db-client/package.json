@@ -5,18 +5,20 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "generate:migration:public": "drizzle-kit generate --config drizzle.config.public.ts",
-    "generate:migration:internal": "drizzle-kit generate --config drizzle.config.internal.ts",
-    "migrate:public": "drizzle-kit migrate --config drizzle.config.public.ts",
-    "migrate:internal": "drizzle-kit migrate --config drizzle.config.internal.ts",
-    "migrate": "powershell -ExecutionPolicy Bypass -File ./scripts/migrate-basic.ps1",
-    "migrate:dry-run": "powershell -ExecutionPolicy Bypass -File ./scripts/migrate-basic.ps1 -DryRun",
-    "migrate:public-only": "powershell -ExecutionPolicy Bypass -File ./scripts/migrate-basic.ps1 -PublicOnly",
-    "migrate:internal-only": "powershell -ExecutionPolicy Bypass -File ./scripts/migrate-basic.ps1 -InternalOnly",
-    "introspect:public": "drizzle-kit introspect --config drizzle.config.public.ts",
-    "introspect:internal": "drizzle-kit introspect --config drizzle.config.internal.ts",
-    "studio:public": "drizzle-kit studio --config drizzle.config.public.ts",
-    "studio:internal": "drizzle-kit studio --config drizzle.config.internal.ts",
-    "db:reset": "echo 'This will reset your database. Make sure you want to do this!' && npm run generate:migration:public && npm run generate:migration:internal"
+    "db:test": "tsx src/cli/db-cli.ts test",
+    "db:test:production": "tsx src/cli/db-cli.ts test --production",
+    "db:url": "tsx src/cli/db-cli.ts url",
+    "db:url:production": "tsx src/cli/db-cli.ts url --production",
+    "db:psql": "tsx src/cli/db-cli.ts psql",
+    "db:psql:production": "tsx src/cli/db-cli.ts psql --production",
+    "db:credentials": "tsx src/cli/db-cli.ts credentials",
+    "db:credentials:production": "tsx src/cli/db-cli.ts credentials --production",
+    "db:migrate": "tsx src/scripts/run-migrations.ts",
+    "db:migrate:dry-run": "tsx src/scripts/run-migrations.ts --dry-run",
+    "db:migrate:production": "tsx src/scripts/run-migrations.ts --production",
+    "db:migrate:verbose": "tsx src/scripts/run-migrations.ts --verbose"
+  },
+  "dependencies": {
+    "dotenv": "*"
   }
 }

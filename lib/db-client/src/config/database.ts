@@ -2,9 +2,9 @@ import {
   getEnvVarOptional,
   getEnvVarRequired,
 } from '@legacy-sports/env-utilities';
-import { retrieveSecretParameterValue } from '@legacy-sports/utils';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { CredentialConfig, resolveDatabaseCredentials } from './credentials';
 import { EnvironmentVariable } from '../types/EnvironmentVariable';
 
 /**
@@ -15,6 +15,7 @@ export interface DatabaseConfig {
   host: string;
   password: string;
   user: string;
+  port?: number;
   ssl?: {
     ca?: Buffer;
     rejectUnauthorized?: boolean;
@@ -22,64 +23,47 @@ export interface DatabaseConfig {
 }
 
 /**
- * Database credentials from AWS Secrets Manager
- */
-interface AwsSecretCredentials {
-  username: string;
-  password: string;
-  engine: string;
-  host: string;
-  port: number;
-  dbname: string;
-  dbInstanceIdentifier: string;
-}
-
-/**
- * Get database configuration, preferring AWS Secrets Manager when available
+ * Get database configuration using the new unified credential system
  */
 export async function getDatabaseConfig(): Promise<DatabaseConfig> {
-  const dbHost = getEnvVarRequired(EnvironmentVariable.DB_HOST);
-  const dbCredsPath = getEnvVarOptional(EnvironmentVariable.DB_CREDS_PATH);
-
-  let dbUser: string;
-  let dbPassword: string;
-
-  if (dbCredsPath) {
-    // Use AWS Secrets Manager
-    console.log(
-      'Loading database credentials from AWS Secrets Manager:',
-      dbCredsPath,
-    );
-    const secretString = await retrieveSecretParameterValue(dbCredsPath);
-    const credentials = JSON.parse(secretString) as AwsSecretCredentials;
-
-    dbUser = credentials.username;
-    dbPassword = credentials.password;
-    console.log('Successfully loaded credentials from AWS Secrets Manager');
-  } else {
-    // Fall back to environment variables
-    console.log('Loading database credentials from environment variables');
-    dbUser = getEnvVarRequired(EnvironmentVariable.DB_USER);
-    dbPassword = getEnvVarRequired(EnvironmentVariable.DB_PASSWORD);
-  }
-
-  const config: DatabaseConfig = {
-    database: 'postgres',
-    host: dbHost.replace(':5432', ''), // Remove port from hostname if present
-    password: dbPassword,
-    user: dbUser,
+  // Determine credential configuration based on environment
+  const credentialConfig: CredentialConfig = {
+    secretName:
+      getEnvVarOptional(EnvironmentVariable.DB_SECRET_NAME) ??
+      getEnvVarOptional(EnvironmentVariable.DB_CREDS_PATH), // Legacy support
+    useLocalCredentials:
+      getEnvVarOptional(EnvironmentVariable.USE_LOCAL_CREDENTIALS) === 'true',
+    defaultDatabase: 'postgres',
   };
 
-  // Add SSL configuration if cert path is provided
+  // Resolve credentials using the new unified system
+  const credentials = await resolveDatabaseCredentials(credentialConfig);
+
+  const config: DatabaseConfig = {
+    database: credentials.database,
+    host: credentials.host,
+    port: credentials.port,
+    password: credentials.password,
+    user: credentials.user,
+  };
+
+  // Add SSL configuration
   try {
-    const certPath = getEnvVarRequired(EnvironmentVariable.DB_CERT_PATH);
-    config.ssl = {
-      ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
-    };
+    const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
+    if (certPath) {
+      config.ssl = {
+        ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
+      };
+    } else {
+      // For AWS RDS, require SSL but allow self-signed certificates
+      config.ssl = {
+        rejectUnauthorized: false,
+      };
+    }
   } catch {
-    // For AWS RDS, require SSL but allow self-signed certificates
+    // Fallback to basic SSL for AWS RDS
     config.ssl = {
-      rejectUnauthorized: false, // Allow self-signed certificates for AWS RDS
+      rejectUnauthorized: false,
     };
   }
 
@@ -91,27 +75,42 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
  * Used for build-time operations like Drizzle schema generation
  */
 export function getDatabaseConfigSync(): DatabaseConfig {
-  const dbHost = getEnvVarRequired(EnvironmentVariable.DB_HOST);
-  const dbUser = getEnvVarRequired(EnvironmentVariable.DB_USER);
-  const dbPassword = getEnvVarRequired(EnvironmentVariable.DB_PASSWORD);
+  console.log(
+    'Using synchronous database configuration from environment variables',
+  );
+
+  // Parse host and port from DB_HOST
+  const hostEnv =
+    getEnvVarOptional(EnvironmentVariable.DB_HOST) || 'localhost:5432';
+  const [host, portStr] = hostEnv.includes(':')
+    ? hostEnv.split(':')
+    : [hostEnv, '5432'];
 
   const config: DatabaseConfig = {
-    database: 'postgres',
-    host: dbHost.replace(':5432', ''), // Remove port from hostname if present
-    password: dbPassword,
-    user: dbUser,
+    database: getEnvVarOptional('DB_NAME') || 'postgres',
+    host,
+    port: parseInt(portStr, 10),
+    user: getEnvVarOptional(EnvironmentVariable.DB_USER) || 'postgres',
+    password: getEnvVarRequired(EnvironmentVariable.DB_PASSWORD),
   };
 
   // Add SSL configuration if cert path is provided
   try {
-    const certPath = getEnvVarRequired(EnvironmentVariable.DB_CERT_PATH);
-    config.ssl = {
-      ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
-    };
+    const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
+    if (certPath) {
+      config.ssl = {
+        ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
+      };
+    } else {
+      // For AWS RDS, require SSL but allow self-signed certificates
+      config.ssl = {
+        rejectUnauthorized: false,
+      };
+    }
   } catch {
-    // For AWS RDS, require SSL but allow self-signed certificates
+    // Fallback to basic SSL for AWS RDS
     config.ssl = {
-      rejectUnauthorized: false, // Allow self-signed certificates for AWS RDS
+      rejectUnauthorized: false,
     };
   }
 

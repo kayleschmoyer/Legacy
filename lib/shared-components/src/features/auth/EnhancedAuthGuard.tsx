@@ -1,21 +1,13 @@
 import React from 'react';
 import { Spinner, Text, YStack } from 'tamagui';
-import { useAuth } from './useAuth';
-import { OAuthLoginComponent } from './OAuthLoginComponent';
+import { useAuth } from './hooks/useAuth';
+import { LoginPage } from './LoginPage';
 
 export interface EnhancedAuthGuardProps {
   /**
    * Content to render when user is authenticated
    */
   children: React.ReactNode;
-  /**
-   * OAuth proxy lambda endpoint URL
-   */
-  oauthProxyUrl: string;
-  /**
-   * Google OAuth Client ID
-   */
-  googleClientId: string;
   /**
    * Custom loading component
    */
@@ -52,8 +44,6 @@ export interface EnhancedAuthGuardProps {
 
 export function EnhancedAuthGuard({
   children,
-  oauthProxyUrl,
-  googleClientId,
   loadingComponent,
   loginComponent,
   loginTitle,
@@ -63,7 +53,7 @@ export function EnhancedAuthGuard({
   onLoginFailure,
   onLogoutSuccess,
 }: EnhancedAuthGuardProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, config } = useAuth();
 
   // Show loading state
   if (isLoading) {
@@ -87,19 +77,29 @@ export function EnhancedAuthGuard({
   if (!isAuthenticated) {
     return (
       loginComponent || (
-        <OAuthLoginComponent
-          config={{
-            googleClientId,
+        <LoginPage
+          config={config}
+          onSuccess={(user: { id: number; email: string; name?: string }) => {
+            try {
+              // User is already authenticated through ModernLoginPage
+              // Call the optional callback if provided
+              onLoginSuccess?.();
+            } catch (error) {
+              console.error('Authentication callback failed:', error);
+              const errorMessage =
+                error instanceof Error
+                  ? error.message
+                  : 'Authentication failed';
+              onLoginFailure?.(errorMessage);
+            }
           }}
-          onSuccess={(response) => {
-            // Call the optional callback if provided
-            onLoginSuccess?.();
+          onError={(error: Error) => {
+            console.error('Authentication Error:', error);
+            const errorMessage =
+              error instanceof Error ? error.message : 'Authentication failed';
+            onLoginFailure?.(errorMessage);
           }}
-          onError={(error) => {
-            // Call the optional callback if provided
-            onLoginFailure?.(error.message);
-          }}
-          buttonText={loginTitle}
+          appName="Legacy Sports"
         />
       )
     );

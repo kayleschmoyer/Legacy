@@ -31,7 +31,7 @@ export const leagues = pgTable(
   },
   (table) => {
     return {};
-  }
+  },
 );
 
 export const teams = pgTable(
@@ -50,10 +50,10 @@ export const teams = pgTable(
       }),
       teamsUkIdLeagueId: unique('teams_uk_id_league_id').on(
         table.id,
-        table.leagueId
+        table.leagueId,
       ),
     };
-  }
+  },
 );
 
 export const drafts = pgTable(
@@ -73,7 +73,7 @@ export const drafts = pgTable(
         name: 'drafts_leagues_id_fk',
       }),
     };
-  }
+  },
 );
 
 export const leagueMessages = pgTable(
@@ -91,7 +91,7 @@ export const leagueMessages = pgTable(
       leagueIdTimestampIdx: index().using(
         'btree',
         table.leagueId.asc().nullsLast(),
-        table.timestamp.asc().nullsLast()
+        table.timestamp.asc().nullsLast(),
       ),
       leagueMessagesLeaguesIdFk: foreignKey({
         columns: [table.leagueId],
@@ -99,7 +99,7 @@ export const leagueMessages = pgTable(
         name: 'league_messages_leagues_id_fk',
       }),
     };
-  }
+  },
 );
 
 export const leagueMembers = pgTable(
@@ -122,7 +122,7 @@ export const leagueMembers = pgTable(
         name: 'league_members_pk',
       }),
     };
-  }
+  },
 );
 
 export const draftTeams = pgTable(
@@ -151,10 +151,10 @@ export const draftTeams = pgTable(
       }),
       draftTeamsUkOrder: unique('draft_teams_uk_order').on(
         table.draftId,
-        table.draftOrder
+        table.draftOrder,
       ),
     };
-  }
+  },
 );
 
 export const leaguePosition = pgTable(
@@ -172,7 +172,7 @@ export const leaguePosition = pgTable(
         name: 'league_position_league_fk',
       }),
     };
-  }
+  },
 );
 
 export const teamMembers = pgTable(
@@ -208,5 +208,5 @@ export const teamMembers = pgTable(
         name: 'team_members_position_fk',
       }),
     };
-  }
+  },
 );

@@ -11,7 +11,7 @@ export type InternalDb = GenericDatabase<typeof Schema>;
 export async function createUser(
   db: InternalDb,
   email: string,
-  password?: string
+  password?: string,
 ): Promise<InternalUser> {
   const internalUser = {
     email: email,
@@ -28,7 +28,7 @@ export async function createUser(
 
 export async function getUserByEmail(
   db: InternalDb,
-  email: string
+  email: string,
 ): Promise<InternalUser | null> {
   return await db
     .select()

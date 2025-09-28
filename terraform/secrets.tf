@@ -1,7 +1,36 @@
+# =============================================================================
+# SECRET VALUE VARIABLES (Set via secrets.auto.tfvars - never committed to git)
+# =============================================================================
+
+variable "google_oauth_client_secret" {
+  description = "Google OAuth client secret for authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "jwt_secret_key" {
+  description = "JWT signing secret key for token validation (optional - will use random generation if not provided)"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "oauth_proxy_cookie_secret" {
+  description = "Cookie signing secret for OAuth proxy sessions (optional - will use random generation if not provided)"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+# =============================================================================
+# GENERATED SECRETS
+# =============================================================================
+
 # Random password for database
 resource "random_password" "database_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?" # Exclude problematic chars: /, @, ", space
 }
 
 # AWS Secrets Manager secrets
@@ -28,8 +57,8 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
 }
 
 resource "aws_secretsmanager_secret_version" "jwt_secret" {
-  secret_id = aws_secretsmanager_secret.jwt_secret.id
-  secret_string = random_password.jwt_secret.result
+  secret_id     = aws_secretsmanager_secret.jwt_secret.id
+  secret_string = var.jwt_secret_key != null ? var.jwt_secret_key : random_password.jwt_secret.result
 }
 
 resource "random_password" "jwt_secret" {
@@ -45,8 +74,8 @@ resource "aws_secretsmanager_secret" "google_oauth_client_secret" {
 }
 
 resource "aws_secretsmanager_secret_version" "google_oauth_client_secret" {
-  secret_id = aws_secretsmanager_secret.google_oauth_client_secret.id
-  secret_string = "REPLACE_WITH_ACTUAL_GOOGLE_OAUTH_CLIENT_SECRET"
+  secret_id     = aws_secretsmanager_secret.google_oauth_client_secret.id
+  secret_string = var.google_oauth_client_secret
 }
 
 resource "aws_secretsmanager_secret" "oauth_proxy_cookie_secret" {
@@ -57,11 +86,14 @@ resource "aws_secretsmanager_secret" "oauth_proxy_cookie_secret" {
 }
 
 resource "aws_secretsmanager_secret_version" "oauth_proxy_cookie_secret" {
-  secret_id = aws_secretsmanager_secret.oauth_proxy_cookie_secret.id
-  secret_string = random_password.oauth_proxy_cookie_secret.result
+  secret_id     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.id
+  secret_string = var.oauth_proxy_cookie_secret != null ? var.oauth_proxy_cookie_secret : random_bytes.oauth_proxy_cookie_key.base64
 }
 
-resource "random_password" "oauth_proxy_cookie_secret" {
-  length  = 32
-  special = false
+resource "random_bytes" "oauth_proxy_cookie_key" {
+  length = 32 # 32 bytes = 256 bits for AES-256-GCM encryption
+  keepers = {
+    # Force recreation if we want to rotate the key
+    version = "v1"
+  }
 }

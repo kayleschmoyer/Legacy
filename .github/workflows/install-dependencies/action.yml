@@ -3,28 +3,28 @@ description: Install NPM dependencies with caching and legacy peer deps support
 
 inputs:
   cache-prefix:
-    description: 'Cache key prefix for the dependencies'
+    description: "Cache key prefix for the dependencies"
     required: false
-    default: 'node_modules'
+    default: "node_modules"
   working-directory:
-    description: 'Working directory for npm operations'
+    description: "Working directory for npm operations"
     required: false
-    default: '.'
+    default: "."
   skip-cache:
-    description: 'Skip cache and force fresh install'
+    description: "Skip cache and force fresh install"
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   cache-hit:
-    description: 'Whether dependencies were restored from cache'
+    description: "Whether dependencies were restored from cache"
     value: ${{ steps.cached-dependencies.outputs.cache-hit }}
   node-version:
-    description: 'The Node.js version being used'
+    description: "The Node.js version being used"
     value: ${{ steps.node-version.outputs.version }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Get Node Version
       id: node-version

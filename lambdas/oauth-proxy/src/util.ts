@@ -27,5 +27,5 @@ export const SECRET_CONFIG = Object.freeze<Record<Secret, SecretConfiguration>>(
       localEnvVar: 'GOOGLE_OAUTH_CLIENT_SECRET',
       secretPathEnvVar: 'GOOGLE_OAUTH_CLIENT_SECRET_PATH',
     },
-  }
+  },
 );

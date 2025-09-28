@@ -58,12 +58,12 @@ export interface PitchingStatsTableProps {
   onPlayerPress?: (playerData: PitchingStatsData) => void;
 }
 
-function PitchingStatsTable({ 
+function PitchingStatsTable({
   stats,
   title = 'Pitching Statistics',
   maxHeight,
   onPlayerPress,
- }: PitchingStatsTableProps) {
+}: PitchingStatsTableProps) {
   // Transform the data to match the table format
   const tableData: StatsTableRow[] = stats.map((record) => ({
     player: record.player?.name || 'Unknown',

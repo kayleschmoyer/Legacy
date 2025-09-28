@@ -5,16 +5,15 @@ import Constants from 'expo-constants';
 import {
   AppNavigator,
   AppProvider,
+  AuthProvider,
   BaseballScreen,
-  createAuthConfig,
-  createAuthService,
   EnhancedAuthGuard,
   FootballScreen,
   HomeScreen,
   NavigationRoute,
-  tamaguiConfig,
-  validateAuthConfig,
 } from '@legacy-sports/shared-components';
+import { tamaguiConfig } from '@legacy-sports/tamagui-config';
+import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
 
 // Define your app routes
@@ -36,30 +35,14 @@ const routes: NavigationRoute[] = [
   },
 ];
 
-// Create authentication configuration for mobile
-const authConfig = createAuthConfig({
-  oauthProxyUrl:
-    (Constants.expoConfig?.extra?.oauthProxyUrl as string) ||
-    'http://localhost:5001',
+// Create modern OAuth configuration for mobile
+const authConfig: OAuthConfig = {
   googleClientId:
     (Constants.expoConfig?.extra?.googleClientId as string) ||
     '1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com',
-});
-
-// Initialize authentication service
-let authServiceInitialized = false;
-if (!authServiceInitialized) {
-  try {
-    validateAuthConfig(authConfig);
-    createAuthService(authConfig);
-    authServiceInitialized = true;
-  } catch (error) {
-    console.warn('Auth configuration validation failed:', error);
-    // Create auth service anyway for development
-    createAuthService(authConfig);
-    authServiceInitialized = true;
-  }
-}
+  additionalScopes: ['openid', 'profile', 'email'],
+  offlineAccess: true,
+};
 
 function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
@@ -70,6 +53,8 @@ function AuthenticatedContent(): React.JSX.Element {
       apolloClient={client.apolloClient}
       colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
       isLoading={false}
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      tamaguiConfig={tamaguiConfig}
     >
       <AppNavigator routes={routes} initialRoute="Home" />
     </AppProvider>
@@ -78,21 +63,21 @@ function AuthenticatedContent(): React.JSX.Element {
 
 function InnerLayout(): React.JSX.Element {
   return (
-    <EnhancedAuthGuard
-      oauthProxyUrl={authConfig.oauthProxyUrl}
-      googleClientId={authConfig.googleClientId}
-      loginTitle="Welcome to Legacy Sports!"
-      loginSubtitle="Sign in to access your fantasy leagues and stats"
-      testMode={__DEV__} // Enable test mode in development
-      onLoginSuccess={() => {
-        console.log('Mobile login successful!');
-      }}
-      onLoginFailure={(error) => {
-        console.error('Mobile login failed:', error);
-      }}
-    >
-      <AuthenticatedContent />
-    </EnhancedAuthGuard>
+    <AuthProvider config={authConfig}>
+      <EnhancedAuthGuard
+        loginTitle="Welcome to Legacy Sports!"
+        loginSubtitle="Sign in to access your fantasy leagues and stats"
+        testMode={__DEV__} // Enable test mode in development
+        onLoginSuccess={() => {
+          console.log('Mobile login successful!');
+        }}
+        onLoginFailure={(error) => {
+          console.error('Mobile login failed:', error);
+        }}
+      >
+        <AuthenticatedContent />
+      </EnhancedAuthGuard>
+    </AuthProvider>
   );
 }
 

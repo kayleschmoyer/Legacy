@@ -229,6 +229,21 @@ export interface PlatformExports {
     [key: string]: unknown;
   };
 
+  // Additional React Native Components
+  Image: React.ComponentType<Record<string, unknown>>;
+  Modal: React.ComponentType<Record<string, unknown>>;
+  Pressable: React.ComponentType<Record<string, unknown>>;
+  SafeAreaView: React.ComponentType<Record<string, unknown>>;
+  ScrollView: React.ComponentType<Record<string, unknown>>;
+  StyleSheet: {
+    create: <T extends Record<string, React.CSSProperties>>(styles: T) => T;
+    [key: string]: unknown;
+  };
+  Text: React.ComponentType<Record<string, unknown>>;
+  TextInput: React.ComponentType<Record<string, unknown>>;
+  TouchableOpacity: React.ComponentType<Record<string, unknown>>;
+  View: React.ComponentType<Record<string, unknown>>;
+
   // Platform-specific components
   Icon: React.ComponentType<{ name: string; size?: number; color?: string }>;
   Table: React.ComponentType<{

@@ -24,22 +24,22 @@ export async function getFromBaseballReference(url: string): Promise<string> {
 
 export function getPlayers(letter: string): Promise<string> {
   return getFromBaseballReference(
-    `https://www.baseball-reference.com/players/${letter}/`
+    `https://www.baseball-reference.com/players/${letter}/`,
   );
 }
 
 export function getCareerStats(brefId: string): Promise<string> {
   return getFromBaseballReference(
-    `https://www.baseball-reference.com/players/${brefId[0]}/${brefId}.shtml`
+    `https://www.baseball-reference.com/players/${brefId[0]}/${brefId}.shtml`,
   );
 }
 
 export function getGameStats(
   brefId: string,
   statType: 'b' | 'p' | 'f',
-  season: number
+  season: number,
 ): Promise<string> {
   return getFromBaseballReference(
-    `https://www.baseball-reference.com/players/gl.fcgi?id=${brefId}&t=${statType}&year=${season}`
+    `https://www.baseball-reference.com/players/gl.fcgi?id=${brefId}&t=${statType}&year=${season}`,
   );
 }

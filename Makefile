@@ -231,9 +231,9 @@ build-ios: ## Build iOS application
 db-migrate: ## Run database migrations
 	@$(call echo_blue,Running database migrations...)
 ifeq ($(DETECTED_OS),Windows)
-	scripts$(PATH_SEP)run-migrations.ps1
+	cd lib$(PATH_SEP)db-client && npm run db:migrate
 else
-	scripts$(PATH_SEP)run-migrations.sh
+	cd lib$(PATH_SEP)db-client && npm run db:migrate
 endif
 
 db-studio: ## Open database studio

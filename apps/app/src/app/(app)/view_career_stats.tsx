@@ -13,10 +13,11 @@ export default function ViewCareerStats(): React.JSX.Element {
   const getGameLog = () => {
     axios
       .post<Record<string, Record<string, string | number>>>(
-        'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
+        process.env.EXPO_PUBLIC_STATS_API_URL ||
+          'http://localhost:5000/career-stats',
         {
           player_id: player,
-        }
+        },
       )
       .then((r) => {
         setData(r.data);

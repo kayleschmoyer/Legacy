@@ -1,33 +1,15 @@
-// Auth hooks and utilities
-export * from './AuthHooks';
-export { AuthProvider as AuthContextProvider } from './AuthProvider';
-export * from './AuthorizedUserContext';
-
-// Enhanced auth system
-export * from './AuthService';
-export * from './useAuth';
-export * from './OAuthLoginComponent';
+// Modern authentication system (recommended for new code)
+export { LoginPage } from './LoginPage';
+export { AuthProvider, useAuth } from './hooks/useAuth';
+export type { UseAuthResult } from './hooks/useAuth';
+export { AuthService } from './services/AuthService';
 export * from './EnhancedAuthGuard';
-export * from './authConfig';
 
-// Legacy auth components (kept for backward compatibility)
-export { AuthProvider as AuthFormProvider } from './AuthForm';
-export * from './LoginScreen';
-export * from './AuthGuard';
-
-// Types
+// Platform types (convenience re-exports)
 export type {
-  AuthHandlers,
-  AuthCallbacks,
-  OAuthProxyTokens,
-  LegacySportsJwt,
-  Secret,
-} from './AuthHooks';
+  OAuthConfig,
+  OAuthResponse,
+  OAuthError,
+} from '../../platform-components/types';
 
-export type { AuthContextValue, AuthProviderProps } from './AuthProvider';
-
-export type { AuthorizedUserContextProviderProps } from './AuthorizedUserContext';
-
-export type { LoginScreenProps } from './LoginScreen';
-
-export type { AuthGuardProps } from './AuthGuard';
+// Legacy infrastructure completely removed - now using modern AuthProvider pattern

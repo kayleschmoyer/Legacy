@@ -42,35 +42,35 @@ The magic happens through Vite's alias resolution:
 ### Basic Usage
 
 ```tsx
-import { OAuthLoginComponent } from '@legacy-sports/shared-components';
-import type {
-  OAuthConfig,
-  OAuthResponse,
-  OAuthError,
-} from '@legacy-sports/shared-components';
+import { ModernLoginPage } from '@legacy-sports/shared-components';
+import type { OAuthConfig } from '@legacy-sports/shared-components';
 
 const config: OAuthConfig = {
-  clientId: 'your-google-client-id.apps.googleusercontent.com',
-  redirectUri: 'https://your-app.com/auth/callback',
-  scopes: ['openid', 'profile', 'email'],
-  serverAuthCode: true,
+  googleClientId: 'your-google-client-id.apps.googleusercontent.com',
+  additionalScopes: ['openid', 'profile', 'email'],
+  offlineAccess: true,
 };
 
 function LoginScreen() {
-  const handleSuccess = (response: OAuthResponse) => {
-    console.log('Login successful:', response.user);
-    // Tokens are automatically stored securely
+  const handleSuccess = (user: {
+    id: number;
+    email: string;
+    name?: string;
+  }) => {
+    console.log('Login successful:', user);
+    // User is automatically authenticated through the modern system
   };
 
-  const handleError = (error: OAuthError) => {
+  const handleError = (error: Error) => {
     console.error('Login failed:', error.message);
   };
 
   return (
-    <OAuthLoginComponent
+    <ModernLoginPage
       config={config}
       onSuccess={handleSuccess}
       onError={handleError}
+      appName="Your App Name"
     />
   );
 }
@@ -191,47 +191,46 @@ The component is designed to work with your existing oauth-proxy lambda. The OAu
 
 ## Migration from Old Component
 
-If you're migrating from the old OAuthLoginComponent:
+If you're migrating from OAuthLoginComponent to ModernLoginPage:
 
 1. **Update imports**:
 
    ```tsx
-   // Old
-   import { OAuthLoginComponent } from './old/path';
-
-   // New
+   // Legacy (deprecated)
    import { OAuthLoginComponent } from '@legacy-sports/shared-components';
-   import type {
-     OAuthConfig,
-     OAuthResponse,
-     OAuthError,
-   } from '@legacy-sports/shared-components';
+
+   // Modern (recommended)
+   import { ModernLoginPage } from '@legacy-sports/shared-components';
+   import type { OAuthConfig } from '@legacy-sports/shared-components';
    ```
 
 2. **Update configuration**:
 
    ```tsx
-   // Old
-   <OAuthLoginComponent
-     oauthProxyUrl="https://..."
-     googleClientId="..."
-     onLoginSuccess={() => {}}
-     onLoginFailure={(error) => {}}
-   />
-
-   // New
+   // Legacy (deprecated)
    <OAuthLoginComponent
      config={{
-       clientId: "...",
-       redirectUri: "...",
-       scopes: ['openid', 'profile', 'email']
+       googleClientId: "...",
+       additionalScopes: ['openid', 'profile', 'email']
      }}
      onSuccess={(response) => {}}
      onError={(error) => {}}
    />
+
+   // Modern (recommended)
+   <ModernLoginPage
+     config={{
+       googleClientId: "...",
+       additionalScopes: ['openid', 'profile', 'email'],
+       offlineAccess: true
+     }}
+     onSuccess={(user) => {}}
+     onError={(error) => {}}
+     appName="Your App"
+   />
    ```
 
-3. **Update error handling**: The new component provides structured error objects instead of string messages.
+3. **Update callback signatures**: ModernLoginPage provides simplified user object and handles OAuth flow internally.
 
 ## Dependencies
 
@@ -248,4 +247,4 @@ Make sure these dependencies are properly configured in your mobile app setup.
 
 ## Examples
 
-See `examples/auth/OAuthLoginExample.tsx` for a complete working example.
+See the ModernLoginPage component documentation above for usage examples.

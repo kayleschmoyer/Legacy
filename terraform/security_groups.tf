@@ -49,33 +49,14 @@ resource "aws_security_group_rule" "rds_from_proxy" {
   security_group_id        = aws_security_group.rds.id
 }
 
-# Allow public access for database migrations (when IPs are specified)
-resource "aws_security_group_rule" "rds_from_public_ips" {
-  count             = length(var.allowed_public_ips) > 0 ? 1 : 0
-  type              = "ingress"
-  from_port         = 5432
-  to_port           = 5432
-  protocol          = "tcp"
-  cidr_blocks       = [for ip in var.allowed_public_ips : "${ip}/32"]
-  security_group_id = aws_security_group.rds.id
-  description       = "Allow database access from specified public IPs for migrations"
-}
-
-# Temporary rule to allow all public access for migrations
-resource "aws_security_group_rule" "rds_from_all_public" {
-  type              = "ingress"
-  from_port         = 5432
-  to_port           = 5432
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.rds.id
-  description       = "TEMPORARY: Allow database access from all IPs for migrations - REMOVE AFTER MIGRATION"
-}
+# RDS now secured in private subnets - no public access
+# Database access only through RDS proxy from Lambda functions in private subnets
+# Migrations should use database tunneling or VPN for secure access
 
 # RDS Proxy Security Group - Optional for dev cost savings
 resource "aws_security_group" "rds_proxy" {
   count = var.enable_rds_proxy ? 1 : 0
-  
+
   name_prefix = "${local.name_prefix}-rds-proxy-"
   vpc_id      = aws_vpc.main.id
   description = "Security group for RDS Proxy"
@@ -85,7 +66,7 @@ resource "aws_security_group" "rds_proxy" {
   })
 }
 
-# RDS Proxy Security Group Rules
+# RDS Proxy Security Group Rules - Allow Lambda to RDS Proxy communication
 resource "aws_security_group_rule" "rds_proxy_from_lambda" {
   count                    = var.enable_rds_proxy ? 1 : 0
   type                     = "ingress"
@@ -94,6 +75,7 @@ resource "aws_security_group_rule" "rds_proxy_from_lambda" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.lambda.id
   security_group_id        = aws_security_group.rds_proxy[0].id
+  description              = "Allow GraphQL Lambda to access RDS Proxy"
 }
 
 resource "aws_security_group_rule" "rds_proxy_to_rds" {
@@ -104,6 +86,7 @@ resource "aws_security_group_rule" "rds_proxy_to_rds" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.rds.id
   security_group_id        = aws_security_group.rds_proxy[0].id
+  description              = "Allow RDS Proxy to access RDS instance"
 }
 
 # API Gateway security group removed - not needed since API Gateways are managed by Serverless Framework

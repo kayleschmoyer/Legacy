@@ -5,7 +5,10 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-export type BulkCreatePlayersMutationFn = Apollo.MutationFunction<Types.BulkCreatePlayersMutation, Types.BulkCreatePlayersMutationVariables>;
+export type BulkCreatePlayersMutationFn = Apollo.MutationFunction<
+  Types.BulkCreatePlayersMutation,
+  Types.BulkCreatePlayersMutationVariables
+>;
 
 /**
  * __useBulkCreatePlayersMutation__
@@ -24,13 +27,27 @@ export type BulkCreatePlayersMutationFn = Apollo.MutationFunction<Types.BulkCrea
  *   },
  * });
  */
-export function useBulkCreatePlayersMutation(baseOptions?: Apollo.MutationHookOptions<Types.BulkCreatePlayersMutation, Types.BulkCreatePlayersMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.BulkCreatePlayersMutation, Types.BulkCreatePlayersMutationVariables>(Operations.BulkCreatePlayers, options);
-      }
-export type BulkCreatePlayersMutationHookResult = ReturnType<typeof useBulkCreatePlayersMutation>;
-export type BulkCreatePlayersMutationResult = Apollo.MutationResult<Types.BulkCreatePlayersMutation>;
-export type BulkCreatePlayersMutationOptions = Apollo.BaseMutationOptions<Types.BulkCreatePlayersMutation, Types.BulkCreatePlayersMutationVariables>;
+export function useBulkCreatePlayersMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.BulkCreatePlayersMutation,
+    Types.BulkCreatePlayersMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.BulkCreatePlayersMutation,
+    Types.BulkCreatePlayersMutationVariables
+  >(Operations.BulkCreatePlayers, options);
+}
+export type BulkCreatePlayersMutationHookResult = ReturnType<
+  typeof useBulkCreatePlayersMutation
+>;
+export type BulkCreatePlayersMutationResult =
+  Apollo.MutationResult<Types.BulkCreatePlayersMutation>;
+export type BulkCreatePlayersMutationOptions = Apollo.BaseMutationOptions<
+  Types.BulkCreatePlayersMutation,
+  Types.BulkCreatePlayersMutationVariables
+>;
 
 /**
  * __useGetAllPlayersQuery__
@@ -48,19 +65,52 @@ export type BulkCreatePlayersMutationOptions = Apollo.BaseMutationOptions<Types.
  *   },
  * });
  */
-export function useGetAllPlayersQuery(baseOptions?: Apollo.QueryHookOptions<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>(Operations.GetAllPlayers, options);
-      }
-export function useGetAllPlayersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>(Operations.GetAllPlayers, options);
-        }
-export function useGetAllPlayersSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>(Operations.GetAllPlayers, options);
-        }
-export type GetAllPlayersQueryHookResult = ReturnType<typeof useGetAllPlayersQuery>;
-export type GetAllPlayersLazyQueryHookResult = ReturnType<typeof useGetAllPlayersLazyQuery>;
-export type GetAllPlayersSuspenseQueryHookResult = ReturnType<typeof useGetAllPlayersSuspenseQuery>;
-export type GetAllPlayersQueryResult = Apollo.QueryResult<Types.GetAllPlayersQuery, Types.GetAllPlayersQueryVariables>;
+export function useGetAllPlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >(Operations.GetAllPlayers, options);
+}
+export function useGetAllPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >(Operations.GetAllPlayers, options);
+}
+export function useGetAllPlayersSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetAllPlayersQuery,
+    Types.GetAllPlayersQueryVariables
+  >(Operations.GetAllPlayers, options);
+}
+export type GetAllPlayersQueryHookResult = ReturnType<
+  typeof useGetAllPlayersQuery
+>;
+export type GetAllPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetAllPlayersLazyQuery
+>;
+export type GetAllPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllPlayersSuspenseQuery
+>;
+export type GetAllPlayersQueryResult = Apollo.QueryResult<
+  Types.GetAllPlayersQuery,
+  Types.GetAllPlayersQueryVariables
+>;

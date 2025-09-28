@@ -5,7 +5,6 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-
 /**
  * __useGetTeamByIdQuery__
  *
@@ -23,23 +22,66 @@ const defaultOptions = {} as const;
  *   },
  * });
  */
-export function useGetTeamByIdQuery(baseOptions: Apollo.QueryHookOptions<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables> & ({ variables: Types.GetTeamByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>(Operations.GetTeamById, options);
-      }
-export function useGetTeamByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>(Operations.GetTeamById, options);
-        }
-export function useGetTeamByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>(Operations.GetTeamById, options);
-        }
+export function useGetTeamByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    Types.GetTeamByIdQuery,
+    Types.GetTeamByIdQueryVariables
+  > &
+    (
+      | { variables: Types.GetTeamByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetTeamByIdQuery,
+    Types.GetTeamByIdQueryVariables
+  >(Operations.GetTeamById, options);
+}
+export function useGetTeamByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetTeamByIdQuery,
+    Types.GetTeamByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetTeamByIdQuery,
+    Types.GetTeamByIdQueryVariables
+  >(Operations.GetTeamById, options);
+}
+export function useGetTeamByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetTeamByIdQuery,
+        Types.GetTeamByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetTeamByIdQuery,
+    Types.GetTeamByIdQueryVariables
+  >(Operations.GetTeamById, options);
+}
 export type GetTeamByIdQueryHookResult = ReturnType<typeof useGetTeamByIdQuery>;
-export type GetTeamByIdLazyQueryHookResult = ReturnType<typeof useGetTeamByIdLazyQuery>;
-export type GetTeamByIdSuspenseQueryHookResult = ReturnType<typeof useGetTeamByIdSuspenseQuery>;
-export type GetTeamByIdQueryResult = Apollo.QueryResult<Types.GetTeamByIdQuery, Types.GetTeamByIdQueryVariables>;
-export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<Types.UpdateTeamMemberPositionMutation, Types.UpdateTeamMemberPositionMutationVariables>;
+export type GetTeamByIdLazyQueryHookResult = ReturnType<
+  typeof useGetTeamByIdLazyQuery
+>;
+export type GetTeamByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamByIdSuspenseQuery
+>;
+export type GetTeamByIdQueryResult = Apollo.QueryResult<
+  Types.GetTeamByIdQuery,
+  Types.GetTeamByIdQueryVariables
+>;
+export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<
+  Types.UpdateTeamMemberPositionMutation,
+  Types.UpdateTeamMemberPositionMutationVariables
+>;
 
 /**
  * __useUpdateTeamMemberPositionMutation__
@@ -59,10 +101,25 @@ export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<Types.U
  *   },
  * });
  */
-export function useUpdateTeamMemberPositionMutation(baseOptions?: Apollo.MutationHookOptions<Types.UpdateTeamMemberPositionMutation, Types.UpdateTeamMemberPositionMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.UpdateTeamMemberPositionMutation, Types.UpdateTeamMemberPositionMutationVariables>(Operations.UpdateTeamMemberPosition, options);
-      }
-export type UpdateTeamMemberPositionMutationHookResult = ReturnType<typeof useUpdateTeamMemberPositionMutation>;
-export type UpdateTeamMemberPositionMutationResult = Apollo.MutationResult<Types.UpdateTeamMemberPositionMutation>;
-export type UpdateTeamMemberPositionMutationOptions = Apollo.BaseMutationOptions<Types.UpdateTeamMemberPositionMutation, Types.UpdateTeamMemberPositionMutationVariables>;
+export function useUpdateTeamMemberPositionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.UpdateTeamMemberPositionMutation,
+    Types.UpdateTeamMemberPositionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.UpdateTeamMemberPositionMutation,
+    Types.UpdateTeamMemberPositionMutationVariables
+  >(Operations.UpdateTeamMemberPosition, options);
+}
+export type UpdateTeamMemberPositionMutationHookResult = ReturnType<
+  typeof useUpdateTeamMemberPositionMutation
+>;
+export type UpdateTeamMemberPositionMutationResult =
+  Apollo.MutationResult<Types.UpdateTeamMemberPositionMutation>;
+export type UpdateTeamMemberPositionMutationOptions =
+  Apollo.BaseMutationOptions<
+    Types.UpdateTeamMemberPositionMutation,
+    Types.UpdateTeamMemberPositionMutationVariables
+  >;

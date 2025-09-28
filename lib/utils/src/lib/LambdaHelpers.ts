@@ -9,13 +9,13 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 
 export type ApiGatewayHandler = (
-  event: APIGatewayEvent
+  event: APIGatewayEvent,
 ) => Promise<APIGatewayProxyResult>;
 
 export function proxyLambdaToExpress(
   req: express.Request,
   res: express.Response,
-  handler: ApiGatewayHandler
+  handler: ApiGatewayHandler,
 ): void {
   const event: APIGatewayEvent = {
     body: JSON.stringify(req.body),
@@ -48,7 +48,7 @@ type SqsHandler = (event: SQSEvent) => Promise<SQSBatchResponse>;
 export function proxySqsToExpress(
   req: express.Request,
   res: express.Response,
-  handler: SqsHandler
+  handler: SqsHandler,
 ): void {
   const event: SQSEvent = {
     Records: [{ body: JSON.stringify(req.body) } as SQSRecord],

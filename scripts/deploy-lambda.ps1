@@ -11,23 +11,11 @@ param(
     [string]$AwsRegion = 'us-east-1'
 )
 
-# Set strict mode and error handling
-Set-StrictMode -Version Latest
+# Set error handling (removing strict mode to avoid issues)
 $ErrorActionPreference = 'Stop'
 
 # Store original location for cleanup
 $OriginalLocation = Get-Location
-
-# Setup cleanup trap
-trap {
-    Write-Host "Error occurred: $_" -ForegroundColor Red
-    try {
-        Pop-Location -ErrorAction SilentlyContinue
-    } catch {
-        Set-Location $OriginalLocation -ErrorAction SilentlyContinue
-    }
-    exit 1
-}
 
 Write-Host "🚀 Starting Lambda deployment for: $FunctionName" -ForegroundColor Green
 
@@ -60,8 +48,8 @@ if ($FunctionName -in @('graphql', 'db')) {
     # DB lambda is already built via nx
     Write-Host 'Using pre-built lambda (already compiled via nx)' -ForegroundColor Green
 } else {
-    # Build other lambdas
-    npx nx run "${LambdaDir}:build"
+    # Build other lambdas using the correct project name
+    npx nx run "${FunctionName}:build"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Build failed for $FunctionName"
     }

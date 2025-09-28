@@ -95,6 +95,8 @@ output "game_selection_endpoint" {
   value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/games"
 }
 
+
+
 # Lambda function outputs
 output "graphql_lambda_function_name" {
   description = "Name of the GraphQL Lambda function"
@@ -139,14 +141,14 @@ output "game_selection_lambda_function_arn" {
 output "environment_variables_summary" {
   description = "Summary of key environment variables for application configuration"
   value = {
-    aws_region                   = var.aws_region
-    environment                 = var.environment
-    db_host                     = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-    db_creds_secret_name        = aws_secretsmanager_secret.database_credentials.name
-    jwt_secret_name             = aws_secretsmanager_secret.jwt_secret.name
+    aws_region                      = var.aws_region
+    environment                     = var.environment
+    db_host                         = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+    db_creds_secret_name            = aws_secretsmanager_secret.database_credentials.name
+    jwt_secret_name                 = aws_secretsmanager_secret.jwt_secret.name
     google_oauth_client_secret_name = aws_secretsmanager_secret.google_oauth_client_secret.name
-    oauth_proxy_cookie_secret_name = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
-    sqs_queue_url               = aws_sqs_queue.load_season_stats.url
-    google_oauth_client_id      = var.google_oauth_client_id
+    oauth_proxy_cookie_secret_name  = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
+    sqs_queue_url                   = aws_sqs_queue.load_season_stats.url
+    google_oauth_client_id          = var.google_oauth_client_id
   }
 }

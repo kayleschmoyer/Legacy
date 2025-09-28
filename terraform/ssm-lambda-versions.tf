@@ -19,7 +19,7 @@ resource "aws_ssm_parameter" "graphql_lambda_version" {
   description = "Current version of the GraphQL Lambda function"
   type        = "String"
   value       = "initial"
-  
+
   lifecycle {
     ignore_changes = [value]
   }
@@ -35,7 +35,7 @@ resource "aws_ssm_parameter" "stats_lambda_version" {
   description = "Current version of the Stats Lambda function"
   type        = "String"
   value       = "initial"
-  
+
   lifecycle {
     ignore_changes = [value]
   }
@@ -51,7 +51,7 @@ resource "aws_ssm_parameter" "oauth_proxy_lambda_version" {
   description = "Current version of the OAuth Proxy Lambda function"
   type        = "String"
   value       = "initial"
-  
+
   lifecycle {
     ignore_changes = [value]
   }
@@ -67,7 +67,7 @@ resource "aws_ssm_parameter" "game_selection_lambda_version" {
   description = "Current version of the Game Selection Lambda function"
   type        = "String"
   value       = "initial"
-  
+
   lifecycle {
     ignore_changes = [value]
   }
@@ -77,6 +77,8 @@ resource "aws_ssm_parameter" "game_selection_lambda_version" {
     Function  = "game-selection"
   })
 }
+
+
 
 # Outputs for easy access to parameter names
 output "lambda_version_parameters" {

@@ -5,36 +5,81 @@ import {
   OAuthResponse,
 } from '../types/auth';
 
-// Google Identity Services types
-interface GoogleCredentialResponse {
-  credential?: string;
+// Google Identity Services global types
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: GoogleIdConfiguration) => void;
+          prompt: (
+            momentListener?: (notification: PromptMomentNotification) => void,
+          ) => void;
+          cancel: () => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: GsiButtonConfiguration,
+          ) => void;
+        };
+        oauth2: {
+          initCodeClient: (config: CodeClientConfig) => CodeClient;
+        };
+      };
+    };
+  }
+}
+
+interface GoogleIdConfiguration {
+  client_id: string;
+  callback: (credentialResponse: CredentialResponse) => void;
+  auto_select?: boolean;
+  cancel_on_tap_outside?: boolean;
+}
+
+interface CredentialResponse {
+  credential: string;
   select_by?: string;
 }
 
-interface GooglePromptNotification {
-  isDisplayed: () => boolean;
-  isNotDisplayed: () => boolean;
-  isSkippedMoment: () => boolean;
-  isDismissedMoment: () => boolean;
+interface PromptMomentNotification {
   getMomentType: () => string;
+  getDismissedReason?: () => string;
+  getNotDisplayedReason?: () => string;
+  getSkippedReason?: () => string;
 }
 
-interface GoogleIdentityServices {
-  google?: {
-    accounts?: {
-      id?: {
-        initialize: (config: {
-          client_id: string;
-          auto_select: boolean;
-          callback: (response: GoogleCredentialResponse) => void;
-        }) => void;
-        disableAutoSelect: () => void;
-        prompt: (
-          callback?: (notification: GooglePromptNotification) => void,
-        ) => void;
-      };
-    };
-  };
+interface CodeClientConfig {
+  client_id: string;
+  scope: string;
+  ux_mode?: 'popup' | 'redirect';
+  callback: (response: CodeResponse) => void;
+  error_callback?: (error: CodeError) => void;
+}
+
+interface CodeResponse {
+  code: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface CodeError {
+  error: string;
+  error_description?: string;
+}
+
+interface CodeClient {
+  requestCode: () => void;
+}
+
+interface GsiButtonConfiguration {
+  type?: 'standard' | 'icon';
+  theme?: 'outline' | 'filled_blue' | 'filled_black';
+  size?: 'large' | 'medium' | 'small';
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square';
+  logo_alignment?: 'left' | 'center';
+  width?: string | number;
+  locale?: string;
 }
 
 class OAuthErrorClass extends Error {
@@ -48,60 +93,54 @@ class OAuthErrorClass extends Error {
   }
 }
 
-declare global {
-  interface Window {
-    google?: GoogleIdentityServices['google'];
-  }
-}
-
 /**
- * Web OAuth implementation using Google Identity Services
+ * Web OAuth implementation using Google Identity Services (GSI)
+ *
+ * Features:
+ * - One Tap sign-in enabled by default for seamless UX
+ * - Authorization code flow for secure backend authentication
+ * - Auto-loading of GSI library
+ * - Clean, modern authentication without popup blockers
  */
 export class WebOAuthProvider implements OAuthProvider {
   private isConfigured = false;
   private config?: OAuthConfig;
+  private gsiLoaded = false;
+  private codeClient?: CodeClient;
+  private oneTapInitialized = false;
 
   async configure(config: OAuthConfig): Promise<void> {
     this.config = config;
 
-    try {
-      // Load Google Identity Services if not already loaded
-      await this.loadGoogleIdentityServices();
+    // Load GSI library if not already loaded
+    if (typeof window !== 'undefined' && !this.gsiLoaded) {
+      await this.loadGSILibrary();
+    }
 
-      // Initialize Google OAuth
-      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-        window.google.accounts.id.initialize({
-          client_id: config.googleClientId,
-          auto_select: false,
-          callback: () => {
-            // No-op callback for initial configuration
-          },
-        });
-        this.isConfigured = true;
-      } else {
-        throw new Error('Google Identity Services not available');
-      }
-    } catch (error) {
-      throw this.createOAuthError(
-        OAuthErrorCode.CONFIGURATION_ERROR,
-        'Failed to configure OAuth provider',
-        error,
-      );
+    this.isConfigured = true;
+
+    // Initialize One Tap immediately if enabled (for page load experience)
+    if (this.shouldEnableOneTap() && !this.oneTapInitialized) {
+      // Add small delay to ensure DOM is ready and GSI is fully loaded
+      setTimeout(() => {
+        this.initializeOneTap();
+      }, 100);
     }
   }
 
-  async isAvailable(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
-
-    try {
-      await this.loadGoogleIdentityServices();
-      return !!window.google?.accounts?.id;
-    } catch {
-      return false;
-    }
+  isAvailable(): Promise<boolean> {
+    return Promise.resolve(
+      typeof window !== 'undefined' &&
+        this.gsiLoaded &&
+        !!window.google?.accounts,
+    );
   }
 
   async signIn(): Promise<OAuthResponse> {
+    console.log(
+      'WebOAuthProvider.signIn() called - using Google Identity Services authorization code flow',
+    );
+
     if (!this.isConfigured || !this.config) {
       throw this.createOAuthError(
         OAuthErrorCode.CONFIGURATION_ERROR,
@@ -109,65 +148,162 @@ export class WebOAuthProvider implements OAuthProvider {
       );
     }
 
-    const config = this.config; // Capture config for TypeScript flow analysis
+    if (!(await this.isAvailable())) {
+      throw this.createOAuthError(
+        OAuthErrorCode.CONFIGURATION_ERROR,
+        'Google Identity Services not available',
+      );
+    }
+
+    // Use authorization code flow for secure authentication
+    // Note: One Tap is already initialized on page load in configure()
+    return this.signInWithAuthCode();
+  }
+
+  private async loadGSILibrary(): Promise<void> {
+    if (window.google?.accounts) {
+      this.gsiLoaded = true;
+      return;
+    }
 
     return new Promise((resolve, reject) => {
-      try {
-        if (typeof window === 'undefined' || !window.google?.accounts?.id) {
-          reject(
-            this.createOAuthError(
-              OAuthErrorCode.CONFIGURATION_ERROR,
-              'Google Identity Services not available',
-            ),
-          );
-          return;
-        }
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        this.gsiLoaded = true;
+        resolve();
+      };
+      script.onerror = () => {
+        reject(new Error('Failed to load Google Identity Services'));
+      };
+      document.head.appendChild(script);
+    });
+  }
 
-        // Set up the callback for the credential response
-        window.google.accounts.id.initialize({
-          client_id: config.googleClientId,
-          auto_select: false,
-          callback: (response: GoogleCredentialResponse) => {
-            if (response.credential) {
+  private shouldEnableOneTap(): boolean {
+    // Enable One Tap by default, unless explicitly disabled
+    return this.config?.gsi?.oneTap !== false;
+  }
+
+  private initializeOneTap(): void {
+    if (
+      !window.google?.accounts?.id ||
+      !this.config ||
+      this.oneTapInitialized
+    ) {
+      return;
+    }
+
+    try {
+      window.google.accounts.id.initialize({
+        client_id: this.config.googleClientId,
+        callback: (response: CredentialResponse) => {
+          console.log(
+            'One Tap sign-in successful - handling ID token directly',
+          );
+          // One Tap provides ID token - send it directly to OAuth proxy
+          // The OAuth proxy supports both code (mobile) and credential (web) flows
+          void this.handleOneTapResponse(response)
+            .then((authResponse) => {
+              // Emit a custom event that the auth system can listen to
+              window.dispatchEvent(
+                new CustomEvent('gsi-one-tap-success', {
+                  detail: { authResponse },
+                }),
+              );
+            })
+            .catch((error: unknown) => {
+              console.error('One Tap ID token authentication failed:', error);
+              window.dispatchEvent(
+                new CustomEvent('gsi-one-tap-error', {
+                  detail: { error },
+                }),
+              );
+            });
+        },
+        auto_select: this.config.gsi?.autoSelect ?? true,
+        cancel_on_tap_outside: this.config.gsi?.cancelOnTapOutside ?? true,
+      });
+
+      // Show One Tap prompt
+      window.google.accounts.id.prompt(
+        (notification: PromptMomentNotification) => {
+          console.log('One Tap notification:', notification.getMomentType());
+        },
+      );
+
+      this.oneTapInitialized = true;
+    } catch (error) {
+      console.warn('Failed to initialize One Tap:', error);
+    }
+  }
+
+  private async signInWithAuthCode(): Promise<OAuthResponse> {
+    return new Promise((resolve, reject) => {
+      if (!window.google?.accounts?.oauth2 || !this.config) {
+        reject(
+          this.createOAuthError(
+            OAuthErrorCode.CONFIGURATION_ERROR,
+            'GSI OAuth2 not available',
+          ),
+        );
+        return;
+      }
+
+      try {
+        // Initialize the code client for authorization code flow
+        this.codeClient = window.google.accounts.oauth2.initCodeClient({
+          client_id: this.config.googleClientId,
+          scope: [
+            'openid',
+            'email',
+            'profile',
+            ...(this.config.additionalScopes || []),
+          ].join(' '),
+          ux_mode: this.config.gsi?.uxMode || 'popup',
+          callback: (response: CodeResponse) => {
+            if (response.error) {
+              reject(
+                this.createOAuthError(
+                  OAuthErrorCode.UNKNOWN_ERROR,
+                  response.error_description || response.error,
+                ),
+              );
+              return;
+            }
+
+            if (response.code) {
               resolve({
-                credential: response.credential,
-                code: response.credential, // Use credential as code for consistency
+                code: response.code,
               });
             } else {
               reject(
                 this.createOAuthError(
                   OAuthErrorCode.UNKNOWN_ERROR,
-                  'No credential received from Google',
+                  'No authorization code received',
                 ),
               );
             }
+          },
+          error_callback: (error: CodeError) => {
+            reject(
+              this.createOAuthError(
+                OAuthErrorCode.UNKNOWN_ERROR,
+                error.error_description || error.error,
+              ),
+            );
           },
         });
 
-        // Show the One Tap prompt
-        window.google.accounts.id.prompt(
-          (notification: GooglePromptNotification) => {
-            if (notification.isNotDisplayed()) {
-              // Fallback to popup if One Tap is not displayed
-              this.showPopupSignIn().then(resolve).catch(reject);
-            } else if (notification.isSkippedMoment()) {
-              // User closed the prompt, show popup as fallback
-              this.showPopupSignIn().then(resolve).catch(reject);
-            } else if (notification.isDismissedMoment()) {
-              reject(
-                this.createOAuthError(
-                  OAuthErrorCode.SIGN_IN_CANCELLED,
-                  'Sign-in was dismissed by user',
-                ),
-              );
-            }
-          },
-        );
+        // Request the authorization code
+        this.codeClient.requestCode();
       } catch (error) {
         reject(
           this.createOAuthError(
-            OAuthErrorCode.UNKNOWN_ERROR,
-            'Failed to initiate sign-in',
+            OAuthErrorCode.CONFIGURATION_ERROR,
+            'Failed to initialize GSI code client',
             error,
           ),
         );
@@ -175,108 +311,32 @@ export class WebOAuthProvider implements OAuthProvider {
     });
   }
 
-  private async showPopupSignIn(): Promise<OAuthResponse> {
-    return new Promise((resolve, reject) => {
-      if (!this.config) {
-        reject(
-          this.createOAuthError(
-            OAuthErrorCode.CONFIGURATION_ERROR,
-            'OAuth provider not configured',
-          ),
-        );
-        return;
-      }
-
-      // Create a popup window for OAuth flow
-      const authUrl =
-        `https://accounts.google.com/oauth/authorize?` +
-        `client_id=${encodeURIComponent(this.config.googleClientId)}&` +
-        `redirect_uri=${encodeURIComponent(window.location.origin)}&` +
-        `response_type=code&` +
-        `scope=${encodeURIComponent('openid email profile')}&` +
-        `access_type=${this.config.offlineAccess ? 'offline' : 'online'}`;
-
-      const popup = window.open(
-        authUrl,
-        'google-oauth',
-        'width=500,height=600,scrollbars=yes,resizable=yes',
-      );
-
-      if (!popup) {
-        reject(
-          this.createOAuthError(
-            OAuthErrorCode.CONFIGURATION_ERROR,
-            'Failed to open popup window',
-          ),
-        );
-        return;
-      }
-
-      // Listen for the popup to close or return with code
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          reject(
-            this.createOAuthError(
-              OAuthErrorCode.SIGN_IN_CANCELLED,
-              'Sign-in popup was closed',
-            ),
-          );
-        }
-      }, 1000);
-
-      // Listen for postMessage from popup
-      const messageListener = (event: MessageEvent<unknown>) => {
-        if (event.origin !== window.location.origin) return;
-
-        const data = event.data;
-        if (typeof data === 'object' && data !== null && 'type' in data) {
-          const typedData = data as {
-            type: string;
-            code?: string;
-            error?: string;
-          };
-          if (
-            typedData.type === 'GOOGLE_OAUTH_SUCCESS' &&
-            typeof typedData.code === 'string'
-          ) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', messageListener);
-            popup.close();
-            resolve({
-              code: typedData.code,
-            });
-          } else if (typedData.type === 'GOOGLE_OAUTH_ERROR') {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', messageListener);
-            popup.close();
-            reject(
-              this.createOAuthError(
-                OAuthErrorCode.UNKNOWN_ERROR,
-                typedData.error || 'OAuth failed',
-              ),
-            );
-          }
-        }
-      };
-
-      window.addEventListener('message', messageListener);
-    });
+  private async handleOneTapResponse(
+    response: CredentialResponse,
+  ): Promise<OAuthResponse> {
+    // One Tap provides an ID token (credential) - send it directly to OAuth proxy
+    // The OAuth proxy handles this via the credential field
+    const result = {
+      credential: response.credential,
+      user: {
+        id: 'one-tap-user', // Will be populated by backend from ID token
+        email: undefined, // Will be populated by backend from ID token
+        name: undefined, // Will be populated by backend from ID token
+      },
+    };
+    return await Promise.resolve(result);
   }
 
   signOut(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // Cancel One Tap if active
+    if (window.google?.accounts?.id) {
       try {
-        if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-          window.google.accounts.id.disableAutoSelect();
-        }
-        resolve();
+        window.google.accounts.id.cancel();
       } catch (error) {
-        // Ignore sign-out errors as they're not critical
-        console.warn('Failed to sign out from Google:', error);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        console.warn('Error canceling One Tap:', error);
       }
-    });
+    }
+    return Promise.resolve();
   }
 
   isSignedIn(): Promise<boolean> {
@@ -287,43 +347,6 @@ export class WebOAuthProvider implements OAuthProvider {
   getCurrentUser(): Promise<OAuthResponse['user'] | null> {
     // For web, we get user info from the JWT token rather than Google
     return Promise.resolve(null);
-  }
-
-  private async loadGoogleIdentityServices(): Promise<void> {
-    if (typeof window === 'undefined') {
-      throw new Error('Window not available');
-    }
-
-    // Check if already loaded
-    if (window.google?.accounts?.id) {
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      // Create script element
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-
-      script.onload = () => {
-        // Wait a bit for the library to initialize
-        setTimeout(() => {
-          if (window.google?.accounts?.id) {
-            resolve();
-          } else {
-            reject(new Error('Google Identity Services failed to load'));
-          }
-        }, 100);
-      };
-
-      script.onerror = () => {
-        reject(new Error('Failed to load Google Identity Services script'));
-      };
-
-      // Add to document
-      document.head.appendChild(script);
-    });
   }
 
   private createOAuthError(

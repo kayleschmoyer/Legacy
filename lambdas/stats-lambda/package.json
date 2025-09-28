@@ -1,0 +1,29 @@
+{
+  "name": "@legacy-sports/stats-lambda",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "dev:no-watch": "tsx src/dev.ts",
+    "build": "vite build",
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
+  },
+  "dependencies": {
+    "@legacy-sports/db-client": "*",
+    "@legacy-sports/env-utilities": "*",
+    "@legacy-sports/logging": "*",
+    "@legacy-sports/utils": "*",
+    "aws-lambda": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "tsx": "*",
+    "typescript": "*",
+    "vite": "*"
+  }
+}

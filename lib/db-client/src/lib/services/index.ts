@@ -6,14 +6,20 @@
 import { DbOptions } from '@legacy-sports/utils';
 import { createPlayerService, PlayerService } from './PlayerService';
 import { createUserService, UserService } from './UserService';
+import {
+  createStatisticsService,
+  StatisticsService,
+} from './StatisticsService';
 
 export class DatabaseService {
   public readonly users: UserService;
   public readonly players: PlayerService;
+  public readonly statistics: StatisticsService;
 
   constructor(private options: DbOptions) {
     this.users = createUserService(options);
     this.players = createPlayerService(options);
+    this.statistics = createStatisticsService(options);
   }
 
   /**
@@ -34,7 +40,15 @@ export function createDatabaseService(options: DbOptions): DatabaseService {
 // Re-export individual services for direct usage
 export { UserService, createUserService } from './UserService';
 export { PlayerService, createPlayerService } from './PlayerService';
+export {
+  StatisticsService,
+  createStatisticsService,
+} from './StatisticsService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
 export type { PlayerFilters, PlayerQueryOptions } from './PlayerService';
+export type {
+  StatisticsFilters,
+  StatisticsQueryOptions,
+} from './StatisticsService';

@@ -21,6 +21,8 @@ import {
   User,
 } from '@tamagui/lucide-icons';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+// TODO: Import PlayersCareerStatsTable when it's available
+// import { PlayersCareerStatsTable } from './PlayersCareerStatsTable';
 
 export interface PlayersTableProps {
   onPlayerSelect?: (player: PlayerFragment) => void;
@@ -31,6 +33,10 @@ export interface PlayersTableProps {
   title?: string;
   selectable?: boolean;
   compact?: boolean;
+  useCareerStats?: boolean; // New prop to enable career statistics mode
+  minGames?: number; // For career stats filtering
+  minHomeRuns?: number; // For career stats filtering
+  minRBI?: number; // For career stats filtering
 }
 
 interface SortOption {
@@ -59,7 +65,12 @@ export function PlayersTable({
   title = 'Players',
   selectable = false,
   compact = false,
+  useCareerStats = false,
+  minGames,
+  minHomeRuns,
+  minRBI,
 }: PlayersTableProps): React.ReactElement {
+  // All hooks must be called before any conditional logic
   const [searchTerm, setSearchTerm] = useState('');
   const [currentSort, setCurrentSort] = useState<SortOption>(SORT_OPTIONS[0]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -130,6 +141,17 @@ export function PlayersTable({
   const getFullName = useCallback((player: PlayerFragment) => {
     return `${player.firstName || ''} ${player.lastName || ''}`.trim();
   }, []);
+
+  // If career stats mode is enabled, use the dedicated career stats table
+  if (useCareerStats) {
+    // TODO: Implement PlayersCareerStatsTable component
+    return (
+      <YStack p="$4" gap="$3" ai="center">
+        <Text>Career stats view not implemented yet</Text>
+        <Text color="$gray10">Please disable useCareerStats prop</Text>
+      </YStack>
+    );
+  }
 
   if (error) {
     return (

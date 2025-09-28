@@ -1,57 +1,366 @@
 /* eslint-disable */
 import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
-import { FieldPolicy, FieldReadFunction, TypePolicies, TypePolicy } from '@apollo/client/cache';
+import {
+  FieldPolicy,
+  FieldReadFunction,
+  TypePolicies,
+  TypePolicy,
+} from '@apollo/client/cache';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
-export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
-export const UserFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<UserFragment, unknown>;
-export const GetUserByEmail = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserByEmail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userByEmail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByEmailQuery, GetUserByEmailQueryVariables>;
-export const GetUserById = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUserById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<GetUserByIdQuery, GetUserByIdQueryVariables>;
-export const CreateUser = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateUserInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"User"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"User"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"User"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"about"}},{"kind":"Field","name":{"kind":"Name","value":"isAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"username"}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
-export type UserFragment = { __typename?: 'User', id: number, email: string, createdAt: string, about?: string | null, isAdmin: boolean, name: string, username: string };
+export type Exact<T extends { [key: string]: unknown }> = {
+  [K in keyof T]: T[K];
+};
+export type MakeOptional<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]?: Maybe<T[SubKey]>;
+};
+export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]: Maybe<T[SubKey]>;
+};
+export type MakeEmpty<
+  T extends { [key: string]: unknown },
+  K extends keyof T,
+> = { [_ in K]?: never };
+export type Incremental<T> =
+  | T
+  | {
+      [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never;
+    };
+export const UserFragmentDoc = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'FragmentDefinition',
+      name: { kind: 'Name', value: 'User' },
+      typeCondition: {
+        kind: 'NamedType',
+        name: { kind: 'Name', value: 'User' },
+      },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'email' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'about' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'isAdmin' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'username' } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UserFragment, unknown>;
+export const GetUserByEmail = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetUserByEmail' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: {
+            kind: 'Variable',
+            name: { kind: 'Name', value: 'email' },
+          },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'String' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'userByEmail' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'email' },
+                value: {
+                  kind: 'Variable',
+                  name: { kind: 'Name', value: 'email' },
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'FragmentSpread',
+                  name: { kind: 'Name', value: 'User' },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: 'FragmentDefinition',
+      name: { kind: 'Name', value: 'User' },
+      typeCondition: {
+        kind: 'NamedType',
+        name: { kind: 'Name', value: 'User' },
+      },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'email' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'about' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'isAdmin' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'username' } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetUserByEmailQuery, GetUserByEmailQueryVariables>;
+export const GetUserById = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetUserById' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'user' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: {
+                  kind: 'Variable',
+                  name: { kind: 'Name', value: 'id' },
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'FragmentSpread',
+                  name: { kind: 'Name', value: 'User' },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: 'FragmentDefinition',
+      name: { kind: 'Name', value: 'User' },
+      typeCondition: {
+        kind: 'NamedType',
+        name: { kind: 'Name', value: 'User' },
+      },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'email' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'about' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'isAdmin' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'username' } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetUserByIdQuery, GetUserByIdQueryVariables>;
+export const CreateUser = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateUser' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: {
+            kind: 'Variable',
+            name: { kind: 'Name', value: 'input' },
+          },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'CreateUserInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createUser' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'Variable',
+                  name: { kind: 'Name', value: 'input' },
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'user' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'FragmentSpread',
+                        name: { kind: 'Name', value: 'User' },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: 'FragmentDefinition',
+      name: { kind: 'Name', value: 'User' },
+      typeCondition: {
+        kind: 'NamedType',
+        name: { kind: 'Name', value: 'User' },
+      },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'email' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'about' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'isAdmin' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+          { kind: 'Field', name: { kind: 'Name', value: 'username' } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;
+export type UserFragment = {
+  __typename?: 'User';
+  id: number;
+  email: string;
+  createdAt: string;
+  about?: string | null;
+  isAdmin: boolean;
+  name: string;
+  username: string;
+};
 
 export type GetUserByEmailQueryVariables = Exact<{
   email: Scalars['String']['input'];
 }>;
 
-
-export type GetUserByEmailQuery = { __typename?: 'Query', userByEmail?: { __typename?: 'User', id: number, email: string, createdAt: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null };
+export type GetUserByEmailQuery = {
+  __typename?: 'Query';
+  userByEmail?: {
+    __typename?: 'User';
+    id: number;
+    email: string;
+    createdAt: string;
+    about?: string | null;
+    isAdmin: boolean;
+    name: string;
+    username: string;
+  } | null;
+};
 
 export type GetUserByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
 
-
-export type GetUserByIdQuery = { __typename?: 'Query', user?: { __typename?: 'User', id: number, email: string, createdAt: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null };
+export type GetUserByIdQuery = {
+  __typename?: 'Query';
+  user?: {
+    __typename?: 'User';
+    id: number;
+    email: string;
+    createdAt: string;
+    about?: string | null;
+    isAdmin: boolean;
+    name: string;
+    username: string;
+  } | null;
+};
 
 export type CreateUserMutationVariables = Exact<{
   input: CreateUserInput;
 }>;
 
-
-export type CreateUserMutation = { __typename?: 'Mutation', createUser?: { __typename?: 'CreateUserPayload', user?: { __typename?: 'User', id: number, email: string, createdAt: string, about?: string | null, isAdmin: boolean, name: string, username: string } | null } | null };
+export type CreateUserMutation = {
+  __typename?: 'Mutation';
+  createUser?: {
+    __typename?: 'CreateUserPayload';
+    user?: {
+      __typename?: 'User';
+      id: number;
+      email: string;
+      createdAt: string;
+      about?: string | null;
+      isAdmin: boolean;
+      name: string;
+      username: string;
+    } | null;
+  } | null;
+};
 
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
-  ID: { input: string; output: string; }
-  String: { input: string; output: string; }
-  Boolean: { input: boolean; output: boolean; }
-  Int: { input: number; output: number; }
-  Float: { input: number; output: number; }
-  BigFloat: { input: any; output: any; }
-  BigInt: { input: string; output: string; }
-  Cursor: { input: string; output: string; }
-  Date: { input: any; output: any; }
-  Datetime: { input: string; output: string; }
+  ID: { input: string; output: string };
+  String: { input: string; output: string };
+  Boolean: { input: boolean; output: boolean };
+  Int: { input: number; output: number };
+  Float: { input: number; output: number };
+  BigFloat: { input: any; output: any };
+  BigInt: { input: string; output: string };
+  Cursor: { input: string; output: string };
+  Date: { input: any; output: any };
+  Datetime: { input: string; output: string };
 };
 
 export enum AccessLevel {
   Admin = 'ADMIN',
-  None = 'NONE'
+  None = 'NONE',
 }
 
 /** All input for the `bulkUpdateStats` mutation. */
@@ -211,7 +520,7 @@ export enum CareerBattingsOrderBy {
   TbAsc = 'TB_ASC',
   TbDesc = 'TB_DESC',
   TriplesAsc = 'TRIPLES_ASC',
-  TriplesDesc = 'TRIPLES_DESC'
+  TriplesDesc = 'TRIPLES_DESC',
 }
 
 export type CareerFielding = {
@@ -347,7 +656,7 @@ export enum CareerFieldingByPosOrderBy {
   SbAsc = 'SB_ASC',
   SbDesc = 'SB_DESC',
   WpAsc = 'WP_ASC',
-  WpDesc = 'WP_DESC'
+  WpDesc = 'WP_DESC',
 }
 
 /**
@@ -441,7 +750,7 @@ export enum CareerFieldingsOrderBy {
   SbAsc = 'SB_ASC',
   SbDesc = 'SB_DESC',
   WpAsc = 'WP_ASC',
-  WpDesc = 'WP_DESC'
+  WpDesc = 'WP_DESC',
 }
 
 export type CareerPitching = {
@@ -596,7 +905,7 @@ export enum CareerPitchingsOrderBy {
   WpAsc = 'WP_ASC',
   WpDesc = 'WP_DESC',
   WAsc = 'W_ASC',
-  WDesc = 'W_DESC'
+  WDesc = 'W_DESC',
 }
 
 /** All input for the create `Draft` mutation. */
@@ -627,7 +936,6 @@ export type CreateDraftPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our create `Draft` mutation. */
 export type CreateDraftPayloadDraftEdgeArgs = {
@@ -667,7 +975,6 @@ export type CreateDraftTeamPayload = {
   teamLeague?: Maybe<Team>;
 };
 
-
 /** The output of our create `DraftTeam` mutation. */
 export type CreateDraftTeamPayloadDraftTeamEdgeArgs = {
   orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
@@ -701,7 +1008,6 @@ export type CreateLeagueAndTeamsPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our `createLeagueAndTeams` mutation. */
 export type CreateLeagueAndTeamsPayloadLeagueEdgeArgs = {
@@ -750,7 +1056,6 @@ export type CreateLeagueMemberPayload = {
   user?: Maybe<User>;
 };
 
-
 /** The output of our create `LeagueMember` mutation. */
 export type CreateLeagueMemberPayloadLeagueMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
@@ -789,7 +1094,6 @@ export type CreateLeagueMessagePayload = {
   userLeague?: Maybe<LeagueMember>;
 };
 
-
 /** The output of our create `LeagueMessage` mutation. */
 export type CreateLeagueMessagePayloadLeagueMessageEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
@@ -810,7 +1114,6 @@ export type CreateLeaguePayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our create `League` mutation. */
 export type CreateLeaguePayloadLeagueEdgeArgs = {
@@ -849,7 +1152,6 @@ export type CreatePlayerPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our create `Player` mutation. */
 export type CreatePlayerPayloadPlayerEdgeArgs = {
@@ -908,7 +1210,6 @@ export type CreateSeasonBattingPayload = {
   seasonBattingEdge?: Maybe<SeasonBattingsEdge>;
 };
 
-
 /** The output of our create `SeasonBatting` mutation. */
 export type CreateSeasonBattingPayloadSeasonBattingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonBattingsOrderBy>>;
@@ -942,7 +1243,6 @@ export type CreateSeasonFieldingPayload = {
   /** An edge for our `SeasonFielding`. May be used by Relay 1. */
   seasonFieldingEdge?: Maybe<SeasonFieldingsEdge>;
 };
-
 
 /** The output of our create `SeasonFielding` mutation. */
 export type CreateSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
@@ -978,7 +1278,6 @@ export type CreateSeasonPitchingPayload = {
   seasonPitchingEdge?: Maybe<SeasonPitchingsEdge>;
 };
 
-
 /** The output of our create `SeasonPitching` mutation. */
 export type CreateSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonPitchingsOrderBy>>;
@@ -1013,7 +1312,6 @@ export type CreateTeamPayload = {
   teamEdge?: Maybe<TeamsEdge>;
 };
 
-
 /** The output of our create `Team` mutation. */
 export type CreateTeamPayloadTeamEdgeArgs = {
   orderBy?: InputMaybe<Array<TeamsOrderBy>>;
@@ -1045,7 +1343,6 @@ export type CreateUserPayload = {
   /** An edge for our `User`. May be used by Relay 1. */
   userEdge?: Maybe<UsersEdge>;
 };
-
 
 /** The output of our create `User` mutation. */
 export type CreateUserPayloadUserEdgeArgs = {
@@ -1091,7 +1388,6 @@ export type DeleteDraftPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our delete `Draft` mutation. */
 export type DeleteDraftPayloadDraftEdgeArgs = {
@@ -1154,7 +1450,6 @@ export type DeleteDraftTeamPayload = {
   /** Reads a single `Team` that is related to this `DraftTeam`. */
   teamLeague?: Maybe<Team>;
 };
-
 
 /** The output of our delete `DraftTeam` mutation. */
 export type DeleteDraftTeamPayloadDraftTeamEdgeArgs = {
@@ -1225,7 +1520,6 @@ export type DeleteLeagueMemberPayload = {
   user?: Maybe<User>;
 };
 
-
 /** The output of our delete `LeagueMember` mutation. */
 export type DeleteLeagueMemberPayloadLeagueMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
@@ -1275,7 +1569,6 @@ export type DeleteLeagueMessagePayload = {
   userLeague?: Maybe<LeagueMember>;
 };
 
-
 /** The output of our delete `LeagueMessage` mutation. */
 export type DeleteLeagueMessagePayloadLeagueMessageEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
@@ -1297,7 +1590,6 @@ export type DeleteLeaguePayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our delete `League` mutation. */
 export type DeleteLeaguePayloadLeagueEdgeArgs = {
@@ -1352,7 +1644,6 @@ export type DeletePlayerPayload = {
   query?: Maybe<Query>;
 };
 
-
 /** The output of our delete `Player` mutation. */
 export type DeletePlayerPayloadPlayerEdgeArgs = {
   orderBy?: InputMaybe<Array<PlayersOrderBy>>;
@@ -1399,7 +1690,6 @@ export type DeleteSeasonBattingPayload = {
   /** An edge for our `SeasonBatting`. May be used by Relay 1. */
   seasonBattingEdge?: Maybe<SeasonBattingsEdge>;
 };
-
 
 /** The output of our delete `SeasonBatting` mutation. */
 export type DeleteSeasonBattingPayloadSeasonBattingEdgeArgs = {
@@ -1449,7 +1739,6 @@ export type DeleteSeasonFieldingPayload = {
   seasonFieldingEdge?: Maybe<SeasonFieldingsEdge>;
 };
 
-
 /** The output of our delete `SeasonFielding` mutation. */
 export type DeleteSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonFieldingsOrderBy>>;
@@ -1496,7 +1785,6 @@ export type DeleteSeasonPitchingPayload = {
   /** An edge for our `SeasonPitching`. May be used by Relay 1. */
   seasonPitchingEdge?: Maybe<SeasonPitchingsEdge>;
 };
-
 
 /** The output of our delete `SeasonPitching` mutation. */
 export type DeleteSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
@@ -1553,7 +1841,6 @@ export type DeleteTeamPayload = {
   /** An edge for our `Team`. May be used by Relay 1. */
   teamEdge?: Maybe<TeamsEdge>;
 };
-
 
 /** The output of our delete `Team` mutation. */
 export type DeleteTeamPayloadTeamEdgeArgs = {
@@ -1618,7 +1905,6 @@ export type DeleteUserPayload = {
   userEdge?: Maybe<UsersEdge>;
 };
 
-
 /** The output of our delete `User` mutation. */
 export type DeleteUserPayloadUserEdgeArgs = {
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
@@ -1638,7 +1924,6 @@ export type Draft = Node & {
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
 };
-
 
 export type DraftDraftTeamsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1675,7 +1960,7 @@ export type DraftInput = {
 
 export enum DraftOrder {
   Normal = 'NORMAL',
-  Snake = 'SNAKE'
+  Snake = 'SNAKE',
 }
 
 /** Represents an update to a `Draft`. Fields that are set will be updated. */
@@ -1768,13 +2053,13 @@ export enum DraftTeamsOrderBy {
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
   TeamIdAsc = 'TEAM_ID_ASC',
-  TeamIdDesc = 'TEAM_ID_DESC'
+  TeamIdDesc = 'TEAM_ID_DESC',
 }
 
 export enum DraftType {
   Blind = 'BLIND',
   Legacy = 'LEGACY',
-  Normal = 'NORMAL'
+  Normal = 'NORMAL',
 }
 
 /** A connection to a list of `Draft` values. */
@@ -1813,7 +2098,7 @@ export enum DraftsOrderBy {
   LeagueIdDesc = 'LEAGUE_ID_DESC',
   Natural = 'NATURAL',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
-  PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
 }
 
 export type League = Node & {
@@ -1835,7 +2120,6 @@ export type League = Node & {
   teams: TeamsConnection;
 };
 
-
 export type LeagueDraftTeamsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1845,7 +2129,6 @@ export type LeagueDraftTeamsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
 };
-
 
 export type LeagueDraftsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1857,7 +2140,6 @@ export type LeagueDraftsArgs = {
   orderBy?: InputMaybe<Array<DraftsOrderBy>>;
 };
 
-
 export type LeagueLeagueMembersArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1868,7 +2150,6 @@ export type LeagueLeagueMembersArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
 };
 
-
 export type LeagueLeagueMessagesArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1878,7 +2159,6 @@ export type LeagueLeagueMessagesArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
 };
-
 
 export type LeagueTeamsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1922,7 +2202,6 @@ export type LeagueMember = Node & {
   user?: Maybe<User>;
   userId: Scalars['Int']['output'];
 };
-
 
 export type LeagueMemberLeagueMessagesByUserIdAndLeagueIdArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -1999,7 +2278,7 @@ export enum LeagueMembersOrderBy {
   TeamIdAsc = 'TEAM_ID_ASC',
   TeamIdDesc = 'TEAM_ID_DESC',
   UserIdAsc = 'USER_ID_ASC',
-  UserIdDesc = 'USER_ID_DESC'
+  UserIdDesc = 'USER_ID_DESC',
 }
 
 export type LeagueMessage = Node & {
@@ -2090,7 +2369,7 @@ export enum LeagueMessagesOrderBy {
   TimestampAsc = 'TIMESTAMP_ASC',
   TimestampDesc = 'TIMESTAMP_DESC',
   UserIdAsc = 'USER_ID_ASC',
-  UserIdDesc = 'USER_ID_DESC'
+  UserIdDesc = 'USER_ID_DESC',
 }
 
 /** Represents an update to a `League`. Fields that are set will be updated. */
@@ -2102,7 +2381,7 @@ export type LeaguePatch = {
 
 export enum LeaguePermissionLevel {
   Commissioner = 'COMMISSIONER',
-  Owner = 'OWNER'
+  Owner = 'OWNER',
 }
 
 /** A connection to a list of `League` values. */
@@ -2137,7 +2416,7 @@ export enum LeaguesOrderBy {
   OwnerAsc = 'OWNER_ASC',
   OwnerDesc = 'OWNER_DESC',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
-  PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
 }
 
 /** The root mutation type which contains root level fields which mutate data. */
@@ -2301,414 +2580,345 @@ export type Mutation = {
   upsertUser?: Maybe<UpsertUserPayload>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationBulkUpdateStatsArgs = {
   input: BulkUpdateStatsInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateDraftArgs = {
   input: CreateDraftInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateDraftTeamArgs = {
   input: CreateDraftTeamInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateLeagueArgs = {
   input: CreateLeagueInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateLeagueMemberArgs = {
   input: CreateLeagueMemberInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateLeagueMessageArgs = {
   input: CreateLeagueMessageInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreatePlayerArgs = {
   input: CreatePlayerInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreatePlayersArgs = {
   input: CreatePlayersInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateSeasonBattingArgs = {
   input: CreateSeasonBattingInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateSeasonFieldingArgs = {
   input: CreateSeasonFieldingInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateSeasonPitchingArgs = {
   input: CreateSeasonPitchingInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateTeamArgs = {
   input: CreateTeamInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteDraftArgs = {
   input: DeleteDraftInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteDraftByNodeIdArgs = {
   input: DeleteDraftByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteDraftTeamArgs = {
   input: DeleteDraftTeamInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteDraftTeamByDraftIdAndDraftOrderArgs = {
   input: DeleteDraftTeamByDraftIdAndDraftOrderInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteDraftTeamByNodeIdArgs = {
   input: DeleteDraftTeamByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueArgs = {
   input: DeleteLeagueInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueByNodeIdArgs = {
   input: DeleteLeagueByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueMemberArgs = {
   input: DeleteLeagueMemberInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueMemberByNodeIdArgs = {
   input: DeleteLeagueMemberByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueMessageArgs = {
   input: DeleteLeagueMessageInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteLeagueMessageByNodeIdArgs = {
   input: DeleteLeagueMessageByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeletePlayerArgs = {
   input: DeletePlayerInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeletePlayerByBrefIdArgs = {
   input: DeletePlayerByBrefIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeletePlayerByNodeIdArgs = {
   input: DeletePlayerByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonBattingArgs = {
   input: DeleteSeasonBattingInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonBattingByNodeIdArgs = {
   input: DeleteSeasonBattingByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonFieldingArgs = {
   input: DeleteSeasonFieldingInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonFieldingByNodeIdArgs = {
   input: DeleteSeasonFieldingByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonPitchingArgs = {
   input: DeleteSeasonPitchingInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteSeasonPitchingByNodeIdArgs = {
   input: DeleteSeasonPitchingByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteTeamArgs = {
   input: DeleteTeamInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteTeamByIdAndLeagueIdArgs = {
   input: DeleteTeamByIdAndLeagueIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteTeamByNodeIdArgs = {
   input: DeleteTeamByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserArgs = {
   input: DeleteUserInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserByEmailArgs = {
   input: DeleteUserByEmailInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserByNodeIdArgs = {
   input: DeleteUserByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteUserByUsernameArgs = {
   input: DeleteUserByUsernameInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateDraftArgs = {
   input: UpdateDraftInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateDraftByNodeIdArgs = {
   input: UpdateDraftByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateDraftTeamArgs = {
   input: UpdateDraftTeamInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateDraftTeamByDraftIdAndDraftOrderArgs = {
   input: UpdateDraftTeamByDraftIdAndDraftOrderInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateDraftTeamByNodeIdArgs = {
   input: UpdateDraftTeamByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueArgs = {
   input: UpdateLeagueInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueByNodeIdArgs = {
   input: UpdateLeagueByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueMemberArgs = {
   input: UpdateLeagueMemberInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueMemberByNodeIdArgs = {
   input: UpdateLeagueMemberByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueMessageArgs = {
   input: UpdateLeagueMessageInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateLeagueMessageByNodeIdArgs = {
   input: UpdateLeagueMessageByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdatePlayerArgs = {
   input: UpdatePlayerInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdatePlayerByBrefIdArgs = {
   input: UpdatePlayerByBrefIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdatePlayerByNodeIdArgs = {
   input: UpdatePlayerByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonBattingArgs = {
   input: UpdateSeasonBattingInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonBattingByNodeIdArgs = {
   input: UpdateSeasonBattingByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonFieldingArgs = {
   input: UpdateSeasonFieldingInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonFieldingByNodeIdArgs = {
   input: UpdateSeasonFieldingByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonPitchingArgs = {
   input: UpdateSeasonPitchingInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateSeasonPitchingByNodeIdArgs = {
   input: UpdateSeasonPitchingByNodeIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateTeamArgs = {
   input: UpdateTeamInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateTeamByIdAndLeagueIdArgs = {
   input: UpdateTeamByIdAndLeagueIdInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateTeamByNodeIdArgs = {
   input: UpdateTeamByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserArgs = {
   input: UpdateUserInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserByEmailArgs = {
   input: UpdateUserByEmailInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserByNodeIdArgs = {
   input: UpdateUserByNodeIdInput;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpdateUserByUsernameArgs = {
   input: UpdateUserByUsernameInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertDraftArgs = {
@@ -2716,13 +2926,11 @@ export type MutationUpsertDraftArgs = {
   where?: InputMaybe<UpsertDraftWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertDraftTeamArgs = {
   input: UpsertDraftTeamInput;
   where?: InputMaybe<UpsertDraftTeamWhere>;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertLeagueArgs = {
@@ -2730,13 +2938,11 @@ export type MutationUpsertLeagueArgs = {
   where?: InputMaybe<UpsertLeagueWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertLeagueMemberArgs = {
   input: UpsertLeagueMemberInput;
   where?: InputMaybe<UpsertLeagueMemberWhere>;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertLeagueMessageArgs = {
@@ -2744,13 +2950,11 @@ export type MutationUpsertLeagueMessageArgs = {
   where?: InputMaybe<UpsertLeagueMessageWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertPlayerArgs = {
   input: UpsertPlayerInput;
   where?: InputMaybe<UpsertPlayerWhere>;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertSeasonBattingArgs = {
@@ -2758,13 +2962,11 @@ export type MutationUpsertSeasonBattingArgs = {
   where?: InputMaybe<UpsertSeasonBattingWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertSeasonFieldingArgs = {
   input: UpsertSeasonFieldingInput;
   where?: InputMaybe<UpsertSeasonFieldingWhere>;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertSeasonPitchingArgs = {
@@ -2772,19 +2974,16 @@ export type MutationUpsertSeasonPitchingArgs = {
   where?: InputMaybe<UpsertSeasonPitchingWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertTeamArgs = {
   input: UpsertTeamInput;
   where?: InputMaybe<UpsertTeamWhere>;
 };
 
-
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertTypeIntoTableArgs = {
   input: UpsertTypeIntoTableInput;
 };
-
 
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationUpsertUserArgs = {
@@ -2886,7 +3085,6 @@ export type Player = Node & {
   seasonPitchings: SeasonPitchingsConnection;
 };
 
-
 export type PlayerCareerBattingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2896,7 +3094,6 @@ export type PlayerCareerBattingsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<CareerBattingsOrderBy>>;
 };
-
 
 export type PlayerCareerFieldingByPosArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2908,7 +3105,6 @@ export type PlayerCareerFieldingByPosArgs = {
   orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
 };
 
-
 export type PlayerCareerFieldingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2918,7 +3114,6 @@ export type PlayerCareerFieldingsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<CareerFieldingsOrderBy>>;
 };
-
 
 export type PlayerCareerPitchingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2930,7 +3125,6 @@ export type PlayerCareerPitchingsArgs = {
   orderBy?: InputMaybe<Array<CareerPitchingsOrderBy>>;
 };
 
-
 export type PlayerSeasonBattingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2941,7 +3135,6 @@ export type PlayerSeasonBattingsArgs = {
   orderBy?: InputMaybe<Array<SeasonBattingsOrderBy>>;
 };
 
-
 export type PlayerSeasonFieldingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -2951,7 +3144,6 @@ export type PlayerSeasonFieldingsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<SeasonFieldingsOrderBy>>;
 };
-
 
 export type PlayerSeasonPitchingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3019,7 +3211,7 @@ export enum PlayersOrderBy {
   NameDesc = 'NAME_DESC',
   Natural = 'NATURAL',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
-  PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
 }
 
 /** The root query type which gives access points into the data universe. */
@@ -3108,7 +3300,6 @@ export type Query = Node & {
   usersInternals?: Maybe<UsersInternalsConnection>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryCareerBattingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3119,7 +3310,6 @@ export type QueryCareerBattingsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<CareerBattingsOrderBy>>;
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryCareerFieldingByPosArgs = {
@@ -3132,7 +3322,6 @@ export type QueryCareerFieldingByPosArgs = {
   orderBy?: InputMaybe<Array<CareerFieldingByPosOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryCareerFieldingsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3143,7 +3332,6 @@ export type QueryCareerFieldingsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<CareerFieldingsOrderBy>>;
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryCareerPitchingsArgs = {
@@ -3156,18 +3344,15 @@ export type QueryCareerPitchingsArgs = {
   orderBy?: InputMaybe<Array<CareerPitchingsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftTeamArgs = {
@@ -3176,19 +3361,16 @@ export type QueryDraftTeamArgs = {
   teamId: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftTeamByDraftIdAndDraftOrderArgs = {
   draftId: Scalars['Int']['input'];
   draftOrder: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftTeamByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftTeamsArgs = {
@@ -3201,7 +3383,6 @@ export type QueryDraftTeamsArgs = {
   orderBy?: InputMaybe<Array<DraftTeamsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryDraftsArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3213,7 +3394,6 @@ export type QueryDraftsArgs = {
   orderBy?: InputMaybe<Array<DraftsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryGetColumnsForTypeArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3224,18 +3404,15 @@ export type QueryGetColumnsForTypeArgs = {
   typeName: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMemberArgs = {
@@ -3243,12 +3420,10 @@ export type QueryLeagueMemberArgs = {
   userId: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMemberByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMembersArgs = {
@@ -3261,18 +3436,15 @@ export type QueryLeagueMembersArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMessageArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMessageByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryLeagueMessagesArgs = {
@@ -3285,7 +3457,6 @@ export type QueryLeagueMessagesArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryLeaguesArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -3297,30 +3468,25 @@ export type QueryLeaguesArgs = {
   orderBy?: InputMaybe<Array<LeaguesOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryNodeArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryPlayerByBrefIdArgs = {
   brefId: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryPlayerByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryPlayersArgs = {
@@ -3333,7 +3499,6 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Array<PlayersOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonBattingArgs = {
   playerId: Scalars['Int']['input'];
@@ -3341,12 +3506,10 @@ export type QuerySeasonBattingArgs = {
   team: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonBattingByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonBattingsArgs = {
@@ -3359,7 +3522,6 @@ export type QuerySeasonBattingsArgs = {
   orderBy?: InputMaybe<Array<SeasonBattingsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonFieldingArgs = {
   playerId: Scalars['Int']['input'];
@@ -3368,12 +3530,10 @@ export type QuerySeasonFieldingArgs = {
   team: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonFieldingByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonFieldingsArgs = {
@@ -3386,7 +3546,6 @@ export type QuerySeasonFieldingsArgs = {
   orderBy?: InputMaybe<Array<SeasonFieldingsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonPitchingArgs = {
   playerId: Scalars['Int']['input'];
@@ -3394,12 +3553,10 @@ export type QuerySeasonPitchingArgs = {
   team: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonPitchingByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QuerySeasonPitchingsArgs = {
@@ -3412,12 +3569,10 @@ export type QuerySeasonPitchingsArgs = {
   orderBy?: InputMaybe<Array<SeasonPitchingsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryTeamArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryTeamByIdAndLeagueIdArgs = {
@@ -3425,12 +3580,10 @@ export type QueryTeamByIdAndLeagueIdArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryTeamByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryTeamsArgs = {
@@ -3443,30 +3596,25 @@ export type QueryTeamsArgs = {
   orderBy?: InputMaybe<Array<TeamsOrderBy>>;
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryUserArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryUserByNodeIdArgs = {
   nodeId: Scalars['ID']['input'];
 };
 
-
 /** The root query type which gives access points into the data universe. */
 export type QueryUserByUsernameArgs = {
   username: Scalars['String']['input'];
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryUsersArgs = {
@@ -3478,7 +3626,6 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
 };
-
 
 /** The root query type which gives access points into the data universe. */
 export type QueryUsersInternalsArgs = {
@@ -3750,7 +3897,7 @@ export enum SeasonBattingsOrderBy {
   TeamAsc = 'TEAM_ASC',
   TeamDesc = 'TEAM_DESC',
   TriplesAsc = 'TRIPLES_ASC',
-  TriplesDesc = 'TRIPLES_DESC'
+  TriplesDesc = 'TRIPLES_DESC',
 }
 
 export type SeasonFielding = Node & {
@@ -3998,7 +4145,7 @@ export enum SeasonFieldingsOrderBy {
   TeamAsc = 'TEAM_ASC',
   TeamDesc = 'TEAM_DESC',
   WpAsc = 'WP_ASC',
-  WpDesc = 'WP_DESC'
+  WpDesc = 'WP_DESC',
 }
 
 export type SeasonPitching = Node & {
@@ -4302,7 +4449,7 @@ export enum SeasonPitchingsOrderBy {
   WpAsc = 'WP_ASC',
   WpDesc = 'WP_DESC',
   WAsc = 'W_ASC',
-  WDesc = 'W_DESC'
+  WDesc = 'W_DESC',
 }
 
 export type Team = Node & {
@@ -4317,7 +4464,6 @@ export type Team = Node & {
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
 };
-
 
 export type TeamDraftTeamsByTeamIdAndLeagueIdArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -4385,7 +4531,7 @@ export enum TeamsOrderBy {
   NameDesc = 'NAME_DESC',
   Natural = 'NATURAL',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
-  PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
+  PrimaryKeyDesc = 'PRIMARY_KEY_DESC',
 }
 
 /** An input for mutations affecting `UpdateBattingStatsInputRecord` */
@@ -4462,7 +4608,6 @@ export type UpdateDraftPayload = {
   query?: Maybe<Query>;
 };
 
-
 /** The output of our update `Draft` mutation. */
 export type UpdateDraftPayloadDraftEdgeArgs = {
   orderBy?: InputMaybe<Array<DraftsOrderBy>>;
@@ -4529,7 +4674,6 @@ export type UpdateDraftTeamPayload = {
   /** Reads a single `Team` that is related to this `DraftTeam`. */
   teamLeague?: Maybe<Team>;
 };
-
 
 /** The output of our update `DraftTeam` mutation. */
 export type UpdateDraftTeamPayloadDraftTeamEdgeArgs = {
@@ -4637,7 +4781,6 @@ export type UpdateLeagueMemberPayload = {
   user?: Maybe<User>;
 };
 
-
 /** The output of our update `LeagueMember` mutation. */
 export type UpdateLeagueMemberPayloadLeagueMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
@@ -4690,7 +4833,6 @@ export type UpdateLeagueMessagePayload = {
   userLeague?: Maybe<LeagueMember>;
 };
 
-
 /** The output of our update `LeagueMessage` mutation. */
 export type UpdateLeagueMessagePayloadLeagueMessageEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
@@ -4711,7 +4853,6 @@ export type UpdateLeaguePayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our update `League` mutation. */
 export type UpdateLeaguePayloadLeagueEdgeArgs = {
@@ -4807,7 +4948,6 @@ export type UpdatePlayerPayload = {
   query?: Maybe<Query>;
 };
 
-
 /** The output of our update `Player` mutation. */
 export type UpdatePlayerPayloadPlayerEdgeArgs = {
   orderBy?: InputMaybe<Array<PlayersOrderBy>>;
@@ -4857,7 +4997,6 @@ export type UpdateSeasonBattingPayload = {
   /** An edge for our `SeasonBatting`. May be used by Relay 1. */
   seasonBattingEdge?: Maybe<SeasonBattingsEdge>;
 };
-
 
 /** The output of our update `SeasonBatting` mutation. */
 export type UpdateSeasonBattingPayloadSeasonBattingEdgeArgs = {
@@ -4910,7 +5049,6 @@ export type UpdateSeasonFieldingPayload = {
   seasonFieldingEdge?: Maybe<SeasonFieldingsEdge>;
 };
 
-
 /** The output of our update `SeasonFielding` mutation. */
 export type UpdateSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonFieldingsOrderBy>>;
@@ -4960,7 +5098,6 @@ export type UpdateSeasonPitchingPayload = {
   /** An edge for our `SeasonPitching`. May be used by Relay 1. */
   seasonPitchingEdge?: Maybe<SeasonPitchingsEdge>;
 };
-
 
 /** The output of our update `SeasonPitching` mutation. */
 export type UpdateSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
@@ -5022,7 +5159,6 @@ export type UpdateTeamPayload = {
   /** An edge for our `Team`. May be used by Relay 1. */
   teamEdge?: Maybe<TeamsEdge>;
 };
-
 
 /** The output of our update `Team` mutation. */
 export type UpdateTeamPayloadTeamEdgeArgs = {
@@ -5094,7 +5230,6 @@ export type UpdateUserPayload = {
   userEdge?: Maybe<UsersEdge>;
 };
 
-
 /** The output of our update `User` mutation. */
 export type UpdateUserPayloadUserEdgeArgs = {
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
@@ -5122,7 +5257,6 @@ export type UpsertDraftPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our upsert `Draft` mutation. */
 export type UpsertDraftPayloadDraftEdgeArgs = {
@@ -5155,7 +5289,6 @@ export type UpsertDraftTeamPayload = {
   /** Reads a single `Team` that is related to this `DraftTeam`. */
   teamLeague?: Maybe<Team>;
 };
-
 
 /** The output of our upsert `DraftTeam` mutation. */
 export type UpsertDraftTeamPayloadDraftTeamEdgeArgs = {
@@ -5208,7 +5341,6 @@ export type UpsertLeagueMemberPayload = {
   user?: Maybe<User>;
 };
 
-
 /** The output of our upsert `LeagueMember` mutation. */
 export type UpsertLeagueMemberPayloadLeagueMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
@@ -5247,7 +5379,6 @@ export type UpsertLeagueMessagePayload = {
   userLeague?: Maybe<LeagueMember>;
 };
 
-
 /** The output of our upsert `LeagueMessage` mutation. */
 export type UpsertLeagueMessagePayloadLeagueMessageEdgeArgs = {
   orderBy?: InputMaybe<Array<LeagueMessagesOrderBy>>;
@@ -5270,7 +5401,6 @@ export type UpsertLeaguePayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our upsert `League` mutation. */
 export type UpsertLeaguePayloadLeagueEdgeArgs = {
@@ -5302,7 +5432,6 @@ export type UpsertPlayerPayload = {
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
 
 /** The output of our upsert `Player` mutation. */
 export type UpsertPlayerPayloadPlayerEdgeArgs = {
@@ -5338,7 +5467,6 @@ export type UpsertSeasonBattingPayload = {
   seasonBattingEdge?: Maybe<SeasonBattingsEdge>;
 };
 
-
 /** The output of our upsert `SeasonBatting` mutation. */
 export type UpsertSeasonBattingPayloadSeasonBattingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonBattingsOrderBy>>;
@@ -5373,7 +5501,6 @@ export type UpsertSeasonFieldingPayload = {
   /** An edge for our `SeasonFielding`. May be used by Relay 1. */
   seasonFieldingEdge?: Maybe<SeasonFieldingsEdge>;
 };
-
 
 /** The output of our upsert `SeasonFielding` mutation. */
 export type UpsertSeasonFieldingPayloadSeasonFieldingEdgeArgs = {
@@ -5411,7 +5538,6 @@ export type UpsertSeasonPitchingPayload = {
   seasonPitchingEdge?: Maybe<SeasonPitchingsEdge>;
 };
 
-
 /** The output of our upsert `SeasonPitching` mutation. */
 export type UpsertSeasonPitchingPayloadSeasonPitchingEdgeArgs = {
   orderBy?: InputMaybe<Array<SeasonPitchingsOrderBy>>;
@@ -5446,7 +5572,6 @@ export type UpsertTeamPayload = {
   /** An edge for our `Team`. May be used by Relay 1. */
   teamEdge?: Maybe<TeamsEdge>;
 };
-
 
 /** The output of our upsert `Team` mutation. */
 export type UpsertTeamPayloadTeamEdgeArgs = {
@@ -5505,7 +5630,6 @@ export type UpsertUserPayload = {
   userEdge?: Maybe<UsersEdge>;
 };
 
-
 /** The output of our upsert `User` mutation. */
 export type UpsertUserPayloadUserEdgeArgs = {
   orderBy?: InputMaybe<Array<UsersOrderBy>>;
@@ -5536,7 +5660,6 @@ export type User = Node & {
   username: Scalars['String']['output'];
 };
 
-
 export type UserLeagueMembersArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   before?: InputMaybe<Scalars['Cursor']['input']>;
@@ -5546,7 +5669,6 @@ export type UserLeagueMembersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Array<LeagueMembersOrderBy>>;
 };
-
 
 export type UserLeagueMessagesArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
@@ -5679,7 +5801,7 @@ export enum UsersInternalsOrderBy {
   IdDesc = 'ID_DESC',
   Natural = 'NATURAL',
   UsernameAsc = 'USERNAME_ASC',
-  UsernameDesc = 'USERNAME_DESC'
+  UsernameDesc = 'USERNAME_DESC',
 }
 
 /** Methods to use when ordering `User`. */
@@ -5702,1491 +5824,2759 @@ export enum UsersOrderBy {
   UpdatedAtAsc = 'UPDATED_AT_ASC',
   UpdatedAtDesc = 'UPDATED_AT_DESC',
   UsernameAsc = 'USERNAME_ASC',
-  UsernameDesc = 'USERNAME_DESC'
+  UsernameDesc = 'USERNAME_DESC',
 }
 
-export type BulkUpdateStatsPayloadKeySpecifier = ('clientMutationId' | 'players' | 'query' | BulkUpdateStatsPayloadKeySpecifier)[];
+export type BulkUpdateStatsPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'players'
+  | 'query'
+  | BulkUpdateStatsPayloadKeySpecifier
+)[];
 export type BulkUpdateStatsPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	players?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  players?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerBattingKeySpecifier = ('ab' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'pa' | 'player' | 'playerId' | 'r' | 'rbi' | 'sb' | 'sh' | 'so' | 'tb' | 'triples' | CareerBattingKeySpecifier)[];
+export type CareerBattingKeySpecifier = (
+  | 'ab'
+  | 'bb'
+  | 'cs'
+  | 'doubles'
+  | 'g'
+  | 'gidp'
+  | 'h'
+  | 'hbp'
+  | 'hr'
+  | 'ibb'
+  | 'pa'
+  | 'player'
+  | 'playerId'
+  | 'r'
+  | 'rbi'
+  | 'sb'
+  | 'sh'
+  | 'so'
+  | 'tb'
+  | 'triples'
+  | CareerBattingKeySpecifier
+)[];
 export type CareerBattingFieldPolicy = {
-	ab?: FieldPolicy<any> | FieldReadFunction<any>,
-	bb?: FieldPolicy<any> | FieldReadFunction<any>,
-	cs?: FieldPolicy<any> | FieldReadFunction<any>,
-	doubles?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gidp?: FieldPolicy<any> | FieldReadFunction<any>,
-	h?: FieldPolicy<any> | FieldReadFunction<any>,
-	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
-	hr?: FieldPolicy<any> | FieldReadFunction<any>,
-	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
-	pa?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	r?: FieldPolicy<any> | FieldReadFunction<any>,
-	rbi?: FieldPolicy<any> | FieldReadFunction<any>,
-	sb?: FieldPolicy<any> | FieldReadFunction<any>,
-	sh?: FieldPolicy<any> | FieldReadFunction<any>,
-	so?: FieldPolicy<any> | FieldReadFunction<any>,
-	tb?: FieldPolicy<any> | FieldReadFunction<any>,
-	triples?: FieldPolicy<any> | FieldReadFunction<any>
+  ab?: FieldPolicy<any> | FieldReadFunction<any>;
+  bb?: FieldPolicy<any> | FieldReadFunction<any>;
+  cs?: FieldPolicy<any> | FieldReadFunction<any>;
+  doubles?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gidp?: FieldPolicy<any> | FieldReadFunction<any>;
+  h?: FieldPolicy<any> | FieldReadFunction<any>;
+  hbp?: FieldPolicy<any> | FieldReadFunction<any>;
+  hr?: FieldPolicy<any> | FieldReadFunction<any>;
+  ibb?: FieldPolicy<any> | FieldReadFunction<any>;
+  pa?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  r?: FieldPolicy<any> | FieldReadFunction<any>;
+  rbi?: FieldPolicy<any> | FieldReadFunction<any>;
+  sb?: FieldPolicy<any> | FieldReadFunction<any>;
+  sh?: FieldPolicy<any> | FieldReadFunction<any>;
+  so?: FieldPolicy<any> | FieldReadFunction<any>;
+  tb?: FieldPolicy<any> | FieldReadFunction<any>;
+  triples?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerBattingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerBattingsConnectionKeySpecifier)[];
+export type CareerBattingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | CareerBattingsConnectionKeySpecifier
+)[];
 export type CareerBattingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerBattingsEdgeKeySpecifier = ('cursor' | 'node' | CareerBattingsEdgeKeySpecifier)[];
+export type CareerBattingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | CareerBattingsEdgeKeySpecifier
+)[];
 export type CareerBattingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingKeySpecifier)[];
+export type CareerFieldingKeySpecifier = (
+  | 'a'
+  | 'cg'
+  | 'chances'
+  | 'cs'
+  | 'dpDef'
+  | 'eDef'
+  | 'g'
+  | 'gs'
+  | 'innDef'
+  | 'pickoffs'
+  | 'player'
+  | 'playerId'
+  | 'po'
+  | 'pos'
+  | 'sb'
+  | 'wp'
+  | CareerFieldingKeySpecifier
+)[];
 export type CareerFieldingFieldPolicy = {
-	a?: FieldPolicy<any> | FieldReadFunction<any>,
-	cg?: FieldPolicy<any> | FieldReadFunction<any>,
-	chances?: FieldPolicy<any> | FieldReadFunction<any>,
-	cs?: FieldPolicy<any> | FieldReadFunction<any>,
-	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gs?: FieldPolicy<any> | FieldReadFunction<any>,
-	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	po?: FieldPolicy<any> | FieldReadFunction<any>,
-	pos?: FieldPolicy<any> | FieldReadFunction<any>,
-	sb?: FieldPolicy<any> | FieldReadFunction<any>,
-	wp?: FieldPolicy<any> | FieldReadFunction<any>
+  a?: FieldPolicy<any> | FieldReadFunction<any>;
+  cg?: FieldPolicy<any> | FieldReadFunction<any>;
+  chances?: FieldPolicy<any> | FieldReadFunction<any>;
+  cs?: FieldPolicy<any> | FieldReadFunction<any>;
+  dpDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  eDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gs?: FieldPolicy<any> | FieldReadFunction<any>;
+  innDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  pickoffs?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  po?: FieldPolicy<any> | FieldReadFunction<any>;
+  pos?: FieldPolicy<any> | FieldReadFunction<any>;
+  sb?: FieldPolicy<any> | FieldReadFunction<any>;
+  wp?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingByPoKeySpecifier = ('a' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'g' | 'gs' | 'innDef' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'sb' | 'wp' | CareerFieldingByPoKeySpecifier)[];
+export type CareerFieldingByPoKeySpecifier = (
+  | 'a'
+  | 'cg'
+  | 'chances'
+  | 'cs'
+  | 'dpDef'
+  | 'eDef'
+  | 'g'
+  | 'gs'
+  | 'innDef'
+  | 'pickoffs'
+  | 'player'
+  | 'playerId'
+  | 'po'
+  | 'pos'
+  | 'sb'
+  | 'wp'
+  | CareerFieldingByPoKeySpecifier
+)[];
 export type CareerFieldingByPoFieldPolicy = {
-	a?: FieldPolicy<any> | FieldReadFunction<any>,
-	cg?: FieldPolicy<any> | FieldReadFunction<any>,
-	chances?: FieldPolicy<any> | FieldReadFunction<any>,
-	cs?: FieldPolicy<any> | FieldReadFunction<any>,
-	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gs?: FieldPolicy<any> | FieldReadFunction<any>,
-	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	po?: FieldPolicy<any> | FieldReadFunction<any>,
-	pos?: FieldPolicy<any> | FieldReadFunction<any>,
-	sb?: FieldPolicy<any> | FieldReadFunction<any>,
-	wp?: FieldPolicy<any> | FieldReadFunction<any>
+  a?: FieldPolicy<any> | FieldReadFunction<any>;
+  cg?: FieldPolicy<any> | FieldReadFunction<any>;
+  chances?: FieldPolicy<any> | FieldReadFunction<any>;
+  cs?: FieldPolicy<any> | FieldReadFunction<any>;
+  dpDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  eDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gs?: FieldPolicy<any> | FieldReadFunction<any>;
+  innDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  pickoffs?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  po?: FieldPolicy<any> | FieldReadFunction<any>;
+  pos?: FieldPolicy<any> | FieldReadFunction<any>;
+  sb?: FieldPolicy<any> | FieldReadFunction<any>;
+  wp?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingByPosConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingByPosConnectionKeySpecifier)[];
+export type CareerFieldingByPosConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | CareerFieldingByPosConnectionKeySpecifier
+)[];
 export type CareerFieldingByPosConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingByPosEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingByPosEdgeKeySpecifier)[];
+export type CareerFieldingByPosEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | CareerFieldingByPosEdgeKeySpecifier
+)[];
 export type CareerFieldingByPosEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerFieldingsConnectionKeySpecifier)[];
+export type CareerFieldingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | CareerFieldingsConnectionKeySpecifier
+)[];
 export type CareerFieldingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerFieldingsEdgeKeySpecifier = ('cursor' | 'node' | CareerFieldingsEdgeKeySpecifier)[];
+export type CareerFieldingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | CareerFieldingsEdgeKeySpecifier
+)[];
 export type CareerFieldingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerPitchingKeySpecifier = ('battersFaced' | 'bb' | 'bk' | 'cg' | 'er' | 'era' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hr' | 'ibb' | 'l' | 'outRate' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'sho' | 'so' | 'sv' | 'w' | 'wp' | CareerPitchingKeySpecifier)[];
+export type CareerPitchingKeySpecifier = (
+  | 'battersFaced'
+  | 'bb'
+  | 'bk'
+  | 'cg'
+  | 'er'
+  | 'era'
+  | 'g'
+  | 'gf'
+  | 'gs'
+  | 'h'
+  | 'hbp'
+  | 'hr'
+  | 'ibb'
+  | 'l'
+  | 'outRate'
+  | 'outsRecorded'
+  | 'player'
+  | 'playerId'
+  | 'r'
+  | 'sho'
+  | 'so'
+  | 'sv'
+  | 'w'
+  | 'wp'
+  | CareerPitchingKeySpecifier
+)[];
 export type CareerPitchingFieldPolicy = {
-	battersFaced?: FieldPolicy<any> | FieldReadFunction<any>,
-	bb?: FieldPolicy<any> | FieldReadFunction<any>,
-	bk?: FieldPolicy<any> | FieldReadFunction<any>,
-	cg?: FieldPolicy<any> | FieldReadFunction<any>,
-	er?: FieldPolicy<any> | FieldReadFunction<any>,
-	era?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gf?: FieldPolicy<any> | FieldReadFunction<any>,
-	gs?: FieldPolicy<any> | FieldReadFunction<any>,
-	h?: FieldPolicy<any> | FieldReadFunction<any>,
-	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
-	hr?: FieldPolicy<any> | FieldReadFunction<any>,
-	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
-	l?: FieldPolicy<any> | FieldReadFunction<any>,
-	outRate?: FieldPolicy<any> | FieldReadFunction<any>,
-	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	r?: FieldPolicy<any> | FieldReadFunction<any>,
-	sho?: FieldPolicy<any> | FieldReadFunction<any>,
-	so?: FieldPolicy<any> | FieldReadFunction<any>,
-	sv?: FieldPolicy<any> | FieldReadFunction<any>,
-	w?: FieldPolicy<any> | FieldReadFunction<any>,
-	wp?: FieldPolicy<any> | FieldReadFunction<any>
+  battersFaced?: FieldPolicy<any> | FieldReadFunction<any>;
+  bb?: FieldPolicy<any> | FieldReadFunction<any>;
+  bk?: FieldPolicy<any> | FieldReadFunction<any>;
+  cg?: FieldPolicy<any> | FieldReadFunction<any>;
+  er?: FieldPolicy<any> | FieldReadFunction<any>;
+  era?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gf?: FieldPolicy<any> | FieldReadFunction<any>;
+  gs?: FieldPolicy<any> | FieldReadFunction<any>;
+  h?: FieldPolicy<any> | FieldReadFunction<any>;
+  hbp?: FieldPolicy<any> | FieldReadFunction<any>;
+  hr?: FieldPolicy<any> | FieldReadFunction<any>;
+  ibb?: FieldPolicy<any> | FieldReadFunction<any>;
+  l?: FieldPolicy<any> | FieldReadFunction<any>;
+  outRate?: FieldPolicy<any> | FieldReadFunction<any>;
+  outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  r?: FieldPolicy<any> | FieldReadFunction<any>;
+  sho?: FieldPolicy<any> | FieldReadFunction<any>;
+  so?: FieldPolicy<any> | FieldReadFunction<any>;
+  sv?: FieldPolicy<any> | FieldReadFunction<any>;
+  w?: FieldPolicy<any> | FieldReadFunction<any>;
+  wp?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerPitchingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | CareerPitchingsConnectionKeySpecifier)[];
+export type CareerPitchingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | CareerPitchingsConnectionKeySpecifier
+)[];
 export type CareerPitchingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CareerPitchingsEdgeKeySpecifier = ('cursor' | 'node' | CareerPitchingsEdgeKeySpecifier)[];
+export type CareerPitchingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | CareerPitchingsEdgeKeySpecifier
+)[];
 export type CareerPitchingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateDraftPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftEdge' | 'league' | 'query' | CreateDraftPayloadKeySpecifier)[];
+export type CreateDraftPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftEdge'
+  | 'league'
+  | 'query'
+  | CreateDraftPayloadKeySpecifier
+)[];
 export type CreateDraftPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | CreateDraftTeamPayloadKeySpecifier)[];
+export type CreateDraftTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftTeam'
+  | 'draftTeamEdge'
+  | 'league'
+  | 'query'
+  | 'teamLeague'
+  | CreateDraftTeamPayloadKeySpecifier
+)[];
 export type CreateDraftTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateLeagueAndTeamsPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | CreateLeagueAndTeamsPayloadKeySpecifier)[];
+export type CreateLeagueAndTeamsPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueEdge'
+  | 'query'
+  | CreateLeagueAndTeamsPayloadKeySpecifier
+)[];
 export type CreateLeagueAndTeamsPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateLeagueMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMember' | 'leagueMemberEdge' | 'query' | 'user' | CreateLeagueMemberPayloadKeySpecifier)[];
+export type CreateLeagueMemberPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMember'
+  | 'leagueMemberEdge'
+  | 'query'
+  | 'user'
+  | CreateLeagueMemberPayloadKeySpecifier
+)[];
 export type CreateLeagueMemberPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | CreateLeagueMessagePayloadKeySpecifier)[];
+export type CreateLeagueMessagePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMessage'
+  | 'leagueMessageEdge'
+  | 'query'
+  | 'user'
+  | 'userLeague'
+  | CreateLeagueMessagePayloadKeySpecifier
+)[];
 export type CreateLeagueMessagePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | CreateLeaguePayloadKeySpecifier)[];
+export type CreateLeaguePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueEdge'
+  | 'query'
+  | CreateLeaguePayloadKeySpecifier
+)[];
 export type CreateLeaguePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreatePlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | CreatePlayerPayloadKeySpecifier)[];
+export type CreatePlayerPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'playerEdge'
+  | 'query'
+  | CreatePlayerPayloadKeySpecifier
+)[];
 export type CreatePlayerPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreatePlayersPayloadKeySpecifier = ('clientMutationId' | 'players' | 'query' | CreatePlayersPayloadKeySpecifier)[];
+export type CreatePlayersPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'players'
+  | 'query'
+  | CreatePlayersPayloadKeySpecifier
+)[];
 export type CreatePlayersPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	players?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  players?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateSeasonBattingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonBatting' | 'seasonBattingEdge' | CreateSeasonBattingPayloadKeySpecifier)[];
+export type CreateSeasonBattingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonBatting'
+  | 'seasonBattingEdge'
+  | CreateSeasonBattingPayloadKeySpecifier
+)[];
 export type CreateSeasonBattingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateSeasonFieldingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonFielding' | 'seasonFieldingEdge' | CreateSeasonFieldingPayloadKeySpecifier)[];
+export type CreateSeasonFieldingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonFielding'
+  | 'seasonFieldingEdge'
+  | CreateSeasonFieldingPayloadKeySpecifier
+)[];
 export type CreateSeasonFieldingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | CreateSeasonPitchingPayloadKeySpecifier)[];
+export type CreateSeasonPitchingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonPitching'
+  | 'seasonPitchingEdge'
+  | CreateSeasonPitchingPayloadKeySpecifier
+)[];
 export type CreateSeasonPitchingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | CreateTeamPayloadKeySpecifier)[];
+export type CreateTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'query'
+  | 'team'
+  | 'teamEdge'
+  | CreateTeamPayloadKeySpecifier
+)[];
 export type CreateTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type CreateUserPayloadKeySpecifier = ('clientMutationId' | 'query' | 'user' | 'userEdge' | CreateUserPayloadKeySpecifier)[];
+export type CreateUserPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'query'
+  | 'user'
+  | 'userEdge'
+  | CreateUserPayloadKeySpecifier
+)[];
 export type CreateUserPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteDraftPayloadKeySpecifier = ('clientMutationId' | 'deletedDraftNodeId' | 'draft' | 'draftEdge' | 'league' | 'query' | DeleteDraftPayloadKeySpecifier)[];
+export type DeleteDraftPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedDraftNodeId'
+  | 'draft'
+  | 'draftEdge'
+  | 'league'
+  | 'query'
+  | DeleteDraftPayloadKeySpecifier
+)[];
 export type DeleteDraftPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedDraftNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedDraftNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'deletedDraftTeamNodeId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | DeleteDraftTeamPayloadKeySpecifier)[];
+export type DeleteDraftTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedDraftTeamNodeId'
+  | 'draft'
+  | 'draftTeam'
+  | 'draftTeamEdge'
+  | 'league'
+  | 'query'
+  | 'teamLeague'
+  | DeleteDraftTeamPayloadKeySpecifier
+)[];
 export type DeleteDraftTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedDraftTeamNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedDraftTeamNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteLeagueMemberPayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueMemberNodeId' | 'league' | 'leagueMember' | 'leagueMemberEdge' | 'query' | 'user' | DeleteLeagueMemberPayloadKeySpecifier)[];
+export type DeleteLeagueMemberPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedLeagueMemberNodeId'
+  | 'league'
+  | 'leagueMember'
+  | 'leagueMemberEdge'
+  | 'query'
+  | 'user'
+  | DeleteLeagueMemberPayloadKeySpecifier
+)[];
 export type DeleteLeagueMemberPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedLeagueMemberNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedLeagueMemberNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueMessageNodeId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | DeleteLeagueMessagePayloadKeySpecifier)[];
+export type DeleteLeagueMessagePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedLeagueMessageNodeId'
+  | 'league'
+  | 'leagueMessage'
+  | 'leagueMessageEdge'
+  | 'query'
+  | 'user'
+  | 'userLeague'
+  | DeleteLeagueMessagePayloadKeySpecifier
+)[];
 export type DeleteLeagueMessagePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedLeagueMessageNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedLeagueMessageNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteLeaguePayloadKeySpecifier = ('clientMutationId' | 'deletedLeagueNodeId' | 'league' | 'leagueEdge' | 'query' | DeleteLeaguePayloadKeySpecifier)[];
+export type DeleteLeaguePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedLeagueNodeId'
+  | 'league'
+  | 'leagueEdge'
+  | 'query'
+  | DeleteLeaguePayloadKeySpecifier
+)[];
 export type DeleteLeaguePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedLeagueNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedLeagueNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeletePlayerPayloadKeySpecifier = ('clientMutationId' | 'deletedPlayerNodeId' | 'player' | 'playerEdge' | 'query' | DeletePlayerPayloadKeySpecifier)[];
+export type DeletePlayerPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedPlayerNodeId'
+  | 'player'
+  | 'playerEdge'
+  | 'query'
+  | DeletePlayerPayloadKeySpecifier
+)[];
 export type DeletePlayerPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedPlayerNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedPlayerNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteSeasonBattingPayloadKeySpecifier = ('clientMutationId' | 'deletedSeasonBattingNodeId' | 'player' | 'query' | 'seasonBatting' | 'seasonBattingEdge' | DeleteSeasonBattingPayloadKeySpecifier)[];
+export type DeleteSeasonBattingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedSeasonBattingNodeId'
+  | 'player'
+  | 'query'
+  | 'seasonBatting'
+  | 'seasonBattingEdge'
+  | DeleteSeasonBattingPayloadKeySpecifier
+)[];
 export type DeleteSeasonBattingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedSeasonBattingNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedSeasonBattingNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteSeasonFieldingPayloadKeySpecifier = ('clientMutationId' | 'deletedSeasonFieldingNodeId' | 'player' | 'query' | 'seasonFielding' | 'seasonFieldingEdge' | DeleteSeasonFieldingPayloadKeySpecifier)[];
+export type DeleteSeasonFieldingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedSeasonFieldingNodeId'
+  | 'player'
+  | 'query'
+  | 'seasonFielding'
+  | 'seasonFieldingEdge'
+  | DeleteSeasonFieldingPayloadKeySpecifier
+)[];
 export type DeleteSeasonFieldingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedSeasonFieldingNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedSeasonFieldingNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'deletedSeasonPitchingNodeId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | DeleteSeasonPitchingPayloadKeySpecifier)[];
+export type DeleteSeasonPitchingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedSeasonPitchingNodeId'
+  | 'player'
+  | 'query'
+  | 'seasonPitching'
+  | 'seasonPitchingEdge'
+  | DeleteSeasonPitchingPayloadKeySpecifier
+)[];
 export type DeleteSeasonPitchingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedSeasonPitchingNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedSeasonPitchingNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteTeamPayloadKeySpecifier = ('clientMutationId' | 'deletedTeamNodeId' | 'league' | 'query' | 'team' | 'teamEdge' | DeleteTeamPayloadKeySpecifier)[];
+export type DeleteTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedTeamNodeId'
+  | 'league'
+  | 'query'
+  | 'team'
+  | 'teamEdge'
+  | DeleteTeamPayloadKeySpecifier
+)[];
 export type DeleteTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedTeamNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedTeamNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DeleteUserPayloadKeySpecifier = ('clientMutationId' | 'deletedUserNodeId' | 'query' | 'user' | 'userEdge' | DeleteUserPayloadKeySpecifier)[];
+export type DeleteUserPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'deletedUserNodeId'
+  | 'query'
+  | 'user'
+  | 'userEdge'
+  | DeleteUserPayloadKeySpecifier
+)[];
 export type DeleteUserPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletedUserNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletedUserNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftKeySpecifier = ('date' | 'draftOrder' | 'draftTeams' | 'draftType' | 'id' | 'league' | 'leagueId' | 'nodeId' | DraftKeySpecifier)[];
+export type DraftKeySpecifier = (
+  | 'date'
+  | 'draftOrder'
+  | 'draftTeams'
+  | 'draftType'
+  | 'id'
+  | 'league'
+  | 'leagueId'
+  | 'nodeId'
+  | DraftKeySpecifier
+)[];
 export type DraftFieldPolicy = {
-	date?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeams?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftType?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>
+  date?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftOrder?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeams?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftType?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftTeamKeySpecifier = ('draft' | 'draftId' | 'draftOrder' | 'league' | 'leagueId' | 'nodeId' | 'teamId' | 'teamLeague' | DraftTeamKeySpecifier)[];
+export type DraftTeamKeySpecifier = (
+  | 'draft'
+  | 'draftId'
+  | 'draftOrder'
+  | 'league'
+  | 'leagueId'
+  | 'nodeId'
+  | 'teamId'
+  | 'teamLeague'
+  | DraftTeamKeySpecifier
+)[];
 export type DraftTeamFieldPolicy = {
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamId?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftOrder?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamId?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftTeamsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | DraftTeamsConnectionKeySpecifier)[];
+export type DraftTeamsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | DraftTeamsConnectionKeySpecifier
+)[];
 export type DraftTeamsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftTeamsEdgeKeySpecifier = ('cursor' | 'node' | DraftTeamsEdgeKeySpecifier)[];
+export type DraftTeamsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | DraftTeamsEdgeKeySpecifier
+)[];
 export type DraftTeamsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | DraftsConnectionKeySpecifier)[];
+export type DraftsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | DraftsConnectionKeySpecifier
+)[];
 export type DraftsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type DraftsEdgeKeySpecifier = ('cursor' | 'node' | DraftsEdgeKeySpecifier)[];
+export type DraftsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | DraftsEdgeKeySpecifier
+)[];
 export type DraftsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueKeySpecifier = ('draftTeams' | 'drafts' | 'id' | 'leagueMembers' | 'leagueMessages' | 'name' | 'nodeId' | 'owner' | 'teams' | LeagueKeySpecifier)[];
+export type LeagueKeySpecifier = (
+  | 'draftTeams'
+  | 'drafts'
+  | 'id'
+  | 'leagueMembers'
+  | 'leagueMessages'
+  | 'name'
+  | 'nodeId'
+  | 'owner'
+  | 'teams'
+  | LeagueKeySpecifier
+)[];
 export type LeagueFieldPolicy = {
-	draftTeams?: FieldPolicy<any> | FieldReadFunction<any>,
-	drafts?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	owner?: FieldPolicy<any> | FieldReadFunction<any>,
-	teams?: FieldPolicy<any> | FieldReadFunction<any>
+  draftTeams?: FieldPolicy<any> | FieldReadFunction<any>;
+  drafts?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>;
+  name?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  owner?: FieldPolicy<any> | FieldReadFunction<any>;
+  teams?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMemberKeySpecifier = ('league' | 'leagueId' | 'leagueMessagesByUserIdAndLeagueId' | 'nodeId' | 'permissionLevel' | 'teamId' | 'user' | 'userId' | LeagueMemberKeySpecifier)[];
+export type LeagueMemberKeySpecifier = (
+  | 'league'
+  | 'leagueId'
+  | 'leagueMessagesByUserIdAndLeagueId'
+  | 'nodeId'
+  | 'permissionLevel'
+  | 'teamId'
+  | 'user'
+  | 'userId'
+  | LeagueMemberKeySpecifier
+)[];
 export type LeagueMemberFieldPolicy = {
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessagesByUserIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	permissionLevel?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamId?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userId?: FieldPolicy<any> | FieldReadFunction<any>
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessagesByUserIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  permissionLevel?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamId?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userId?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMembersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | LeagueMembersConnectionKeySpecifier)[];
+export type LeagueMembersConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | LeagueMembersConnectionKeySpecifier
+)[];
 export type LeagueMembersConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMembersEdgeKeySpecifier = ('cursor' | 'node' | LeagueMembersEdgeKeySpecifier)[];
+export type LeagueMembersEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | LeagueMembersEdgeKeySpecifier
+)[];
 export type LeagueMembersEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMessageKeySpecifier = ('id' | 'league' | 'leagueId' | 'messageText' | 'nodeId' | 'timestamp' | 'user' | 'userId' | 'userLeague' | LeagueMessageKeySpecifier)[];
+export type LeagueMessageKeySpecifier = (
+  | 'id'
+  | 'league'
+  | 'leagueId'
+  | 'messageText'
+  | 'nodeId'
+  | 'timestamp'
+  | 'user'
+  | 'userId'
+  | 'userLeague'
+  | LeagueMessageKeySpecifier
+)[];
 export type LeagueMessageFieldPolicy = {
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	messageText?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	timestamp?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userId?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  messageText?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  timestamp?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userId?: FieldPolicy<any> | FieldReadFunction<any>;
+  userLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMessagesConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | LeagueMessagesConnectionKeySpecifier)[];
+export type LeagueMessagesConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | LeagueMessagesConnectionKeySpecifier
+)[];
 export type LeagueMessagesConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeagueMessagesEdgeKeySpecifier = ('cursor' | 'node' | LeagueMessagesEdgeKeySpecifier)[];
+export type LeagueMessagesEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | LeagueMessagesEdgeKeySpecifier
+)[];
 export type LeagueMessagesEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeaguesConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | LeaguesConnectionKeySpecifier)[];
+export type LeaguesConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | LeaguesConnectionKeySpecifier
+)[];
 export type LeaguesConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type LeaguesEdgeKeySpecifier = ('cursor' | 'node' | LeaguesEdgeKeySpecifier)[];
+export type LeaguesEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | LeaguesEdgeKeySpecifier
+)[];
 export type LeaguesEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type MutationKeySpecifier = ('bulkUpdateStats' | 'createDraft' | 'createDraftTeam' | 'createLeague' | 'createLeagueAndTeams' | 'createLeagueMember' | 'createLeagueMessage' | 'createPlayer' | 'createPlayers' | 'createSeasonBatting' | 'createSeasonFielding' | 'createSeasonPitching' | 'createTeam' | 'createUser' | 'deleteDraft' | 'deleteDraftByNodeId' | 'deleteDraftTeam' | 'deleteDraftTeamByDraftIdAndDraftOrder' | 'deleteDraftTeamByNodeId' | 'deleteLeague' | 'deleteLeagueByNodeId' | 'deleteLeagueMember' | 'deleteLeagueMemberByNodeId' | 'deleteLeagueMessage' | 'deleteLeagueMessageByNodeId' | 'deletePlayer' | 'deletePlayerByBrefId' | 'deletePlayerByNodeId' | 'deleteSeasonBatting' | 'deleteSeasonBattingByNodeId' | 'deleteSeasonFielding' | 'deleteSeasonFieldingByNodeId' | 'deleteSeasonPitching' | 'deleteSeasonPitchingByNodeId' | 'deleteTeam' | 'deleteTeamByIdAndLeagueId' | 'deleteTeamByNodeId' | 'deleteUser' | 'deleteUserByEmail' | 'deleteUserByNodeId' | 'deleteUserByUsername' | 'updateDraft' | 'updateDraftByNodeId' | 'updateDraftTeam' | 'updateDraftTeamByDraftIdAndDraftOrder' | 'updateDraftTeamByNodeId' | 'updateLeague' | 'updateLeagueByNodeId' | 'updateLeagueMember' | 'updateLeagueMemberByNodeId' | 'updateLeagueMessage' | 'updateLeagueMessageByNodeId' | 'updatePlayer' | 'updatePlayerByBrefId' | 'updatePlayerByNodeId' | 'updateSeasonBatting' | 'updateSeasonBattingByNodeId' | 'updateSeasonFielding' | 'updateSeasonFieldingByNodeId' | 'updateSeasonPitching' | 'updateSeasonPitchingByNodeId' | 'updateTeam' | 'updateTeamByIdAndLeagueId' | 'updateTeamByNodeId' | 'updateUser' | 'updateUserByEmail' | 'updateUserByNodeId' | 'updateUserByUsername' | 'upsertDraft' | 'upsertDraftTeam' | 'upsertLeague' | 'upsertLeagueMember' | 'upsertLeagueMessage' | 'upsertPlayer' | 'upsertSeasonBatting' | 'upsertSeasonFielding' | 'upsertSeasonPitching' | 'upsertTeam' | 'upsertTypeIntoTable' | 'upsertUser' | MutationKeySpecifier)[];
+export type MutationKeySpecifier = (
+  | 'bulkUpdateStats'
+  | 'createDraft'
+  | 'createDraftTeam'
+  | 'createLeague'
+  | 'createLeagueAndTeams'
+  | 'createLeagueMember'
+  | 'createLeagueMessage'
+  | 'createPlayer'
+  | 'createPlayers'
+  | 'createSeasonBatting'
+  | 'createSeasonFielding'
+  | 'createSeasonPitching'
+  | 'createTeam'
+  | 'createUser'
+  | 'deleteDraft'
+  | 'deleteDraftByNodeId'
+  | 'deleteDraftTeam'
+  | 'deleteDraftTeamByDraftIdAndDraftOrder'
+  | 'deleteDraftTeamByNodeId'
+  | 'deleteLeague'
+  | 'deleteLeagueByNodeId'
+  | 'deleteLeagueMember'
+  | 'deleteLeagueMemberByNodeId'
+  | 'deleteLeagueMessage'
+  | 'deleteLeagueMessageByNodeId'
+  | 'deletePlayer'
+  | 'deletePlayerByBrefId'
+  | 'deletePlayerByNodeId'
+  | 'deleteSeasonBatting'
+  | 'deleteSeasonBattingByNodeId'
+  | 'deleteSeasonFielding'
+  | 'deleteSeasonFieldingByNodeId'
+  | 'deleteSeasonPitching'
+  | 'deleteSeasonPitchingByNodeId'
+  | 'deleteTeam'
+  | 'deleteTeamByIdAndLeagueId'
+  | 'deleteTeamByNodeId'
+  | 'deleteUser'
+  | 'deleteUserByEmail'
+  | 'deleteUserByNodeId'
+  | 'deleteUserByUsername'
+  | 'updateDraft'
+  | 'updateDraftByNodeId'
+  | 'updateDraftTeam'
+  | 'updateDraftTeamByDraftIdAndDraftOrder'
+  | 'updateDraftTeamByNodeId'
+  | 'updateLeague'
+  | 'updateLeagueByNodeId'
+  | 'updateLeagueMember'
+  | 'updateLeagueMemberByNodeId'
+  | 'updateLeagueMessage'
+  | 'updateLeagueMessageByNodeId'
+  | 'updatePlayer'
+  | 'updatePlayerByBrefId'
+  | 'updatePlayerByNodeId'
+  | 'updateSeasonBatting'
+  | 'updateSeasonBattingByNodeId'
+  | 'updateSeasonFielding'
+  | 'updateSeasonFieldingByNodeId'
+  | 'updateSeasonPitching'
+  | 'updateSeasonPitchingByNodeId'
+  | 'updateTeam'
+  | 'updateTeamByIdAndLeagueId'
+  | 'updateTeamByNodeId'
+  | 'updateUser'
+  | 'updateUserByEmail'
+  | 'updateUserByNodeId'
+  | 'updateUserByUsername'
+  | 'upsertDraft'
+  | 'upsertDraftTeam'
+  | 'upsertLeague'
+  | 'upsertLeagueMember'
+  | 'upsertLeagueMessage'
+  | 'upsertPlayer'
+  | 'upsertSeasonBatting'
+  | 'upsertSeasonFielding'
+  | 'upsertSeasonPitching'
+  | 'upsertTeam'
+  | 'upsertTypeIntoTable'
+  | 'upsertUser'
+  | MutationKeySpecifier
+)[];
 export type MutationFieldPolicy = {
-	bulkUpdateStats?: FieldPolicy<any> | FieldReadFunction<any>,
-	createDraft?: FieldPolicy<any> | FieldReadFunction<any>,
-	createDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	createLeague?: FieldPolicy<any> | FieldReadFunction<any>,
-	createLeagueAndTeams?: FieldPolicy<any> | FieldReadFunction<any>,
-	createLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	createLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	createPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
-	createPlayers?: FieldPolicy<any> | FieldReadFunction<any>,
-	createSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	createSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	createSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	createTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	createUser?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteDraft?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteDraftTeamByDraftIdAndDraftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteDraftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeague?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletePlayer?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deletePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteSeasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteUser?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	deleteUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateDraft?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateDraftTeamByDraftIdAndDraftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateDraftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeague?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updatePlayer?: FieldPolicy<any> | FieldReadFunction<any>,
-	updatePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updatePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateSeasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateUser?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updateUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertDraft?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertLeague?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertPlayer?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertTypeIntoTable?: FieldPolicy<any> | FieldReadFunction<any>,
-	upsertUser?: FieldPolicy<any> | FieldReadFunction<any>
+  bulkUpdateStats?: FieldPolicy<any> | FieldReadFunction<any>;
+  createDraft?: FieldPolicy<any> | FieldReadFunction<any>;
+  createDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  createLeague?: FieldPolicy<any> | FieldReadFunction<any>;
+  createLeagueAndTeams?: FieldPolicy<any> | FieldReadFunction<any>;
+  createLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  createLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  createPlayer?: FieldPolicy<any> | FieldReadFunction<any>;
+  createPlayers?: FieldPolicy<any> | FieldReadFunction<any>;
+  createSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  createSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  createSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  createTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  createUser?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteDraft?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteDraftTeamByDraftIdAndDraftOrder?:
+    | FieldPolicy<any>
+    | FieldReadFunction<any>;
+  deleteDraftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeague?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletePlayer?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deletePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteSeasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteUser?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  deleteUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateDraft?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateDraftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateDraftTeamByDraftIdAndDraftOrder?:
+    | FieldPolicy<any>
+    | FieldReadFunction<any>;
+  updateDraftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeague?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateLeagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updatePlayer?: FieldPolicy<any> | FieldReadFunction<any>;
+  updatePlayerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updatePlayerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateSeasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateTeamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateUser?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateUserByEmail?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateUserByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updateUserByUsername?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertDraft?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertDraftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertLeague?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertLeagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertLeagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertPlayer?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertSeasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertSeasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertSeasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertTypeIntoTable?: FieldPolicy<any> | FieldReadFunction<any>;
+  upsertUser?: FieldPolicy<any> | FieldReadFunction<any>;
 };
 export type NodeKeySpecifier = ('nodeId' | NodeKeySpecifier)[];
 export type NodeFieldPolicy = {
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PageInfoKeySpecifier = ('endCursor' | 'hasNextPage' | 'hasPreviousPage' | 'startCursor' | PageInfoKeySpecifier)[];
+export type PageInfoKeySpecifier = (
+  | 'endCursor'
+  | 'hasNextPage'
+  | 'hasPreviousPage'
+  | 'startCursor'
+  | PageInfoKeySpecifier
+)[];
 export type PageInfoFieldPolicy = {
-	endCursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	hasNextPage?: FieldPolicy<any> | FieldReadFunction<any>,
-	hasPreviousPage?: FieldPolicy<any> | FieldReadFunction<any>,
-	startCursor?: FieldPolicy<any> | FieldReadFunction<any>
+  endCursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  hasNextPage?: FieldPolicy<any> | FieldReadFunction<any>;
+  hasPreviousPage?: FieldPolicy<any> | FieldReadFunction<any>;
+  startCursor?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PgAttributeKeySpecifier = ('attacl' | 'attalign' | 'attbyval' | 'attcacheoff' | 'attcollation' | 'attcompression' | 'attfdwoptions' | 'attgenerated' | 'atthasdef' | 'atthasmissing' | 'attidentity' | 'attinhcount' | 'attisdropped' | 'attislocal' | 'attlen' | 'attmissingval' | 'attname' | 'attndims' | 'attnotnull' | 'attnum' | 'attoptions' | 'attrelid' | 'attstattarget' | 'attstorage' | 'atttypid' | 'atttypmod' | PgAttributeKeySpecifier)[];
+export type PgAttributeKeySpecifier = (
+  | 'attacl'
+  | 'attalign'
+  | 'attbyval'
+  | 'attcacheoff'
+  | 'attcollation'
+  | 'attcompression'
+  | 'attfdwoptions'
+  | 'attgenerated'
+  | 'atthasdef'
+  | 'atthasmissing'
+  | 'attidentity'
+  | 'attinhcount'
+  | 'attisdropped'
+  | 'attislocal'
+  | 'attlen'
+  | 'attmissingval'
+  | 'attname'
+  | 'attndims'
+  | 'attnotnull'
+  | 'attnum'
+  | 'attoptions'
+  | 'attrelid'
+  | 'attstattarget'
+  | 'attstorage'
+  | 'atttypid'
+  | 'atttypmod'
+  | PgAttributeKeySpecifier
+)[];
 export type PgAttributeFieldPolicy = {
-	attacl?: FieldPolicy<any> | FieldReadFunction<any>,
-	attalign?: FieldPolicy<any> | FieldReadFunction<any>,
-	attbyval?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcacheoff?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcollation?: FieldPolicy<any> | FieldReadFunction<any>,
-	attcompression?: FieldPolicy<any> | FieldReadFunction<any>,
-	attfdwoptions?: FieldPolicy<any> | FieldReadFunction<any>,
-	attgenerated?: FieldPolicy<any> | FieldReadFunction<any>,
-	atthasdef?: FieldPolicy<any> | FieldReadFunction<any>,
-	atthasmissing?: FieldPolicy<any> | FieldReadFunction<any>,
-	attidentity?: FieldPolicy<any> | FieldReadFunction<any>,
-	attinhcount?: FieldPolicy<any> | FieldReadFunction<any>,
-	attisdropped?: FieldPolicy<any> | FieldReadFunction<any>,
-	attislocal?: FieldPolicy<any> | FieldReadFunction<any>,
-	attlen?: FieldPolicy<any> | FieldReadFunction<any>,
-	attmissingval?: FieldPolicy<any> | FieldReadFunction<any>,
-	attname?: FieldPolicy<any> | FieldReadFunction<any>,
-	attndims?: FieldPolicy<any> | FieldReadFunction<any>,
-	attnotnull?: FieldPolicy<any> | FieldReadFunction<any>,
-	attnum?: FieldPolicy<any> | FieldReadFunction<any>,
-	attoptions?: FieldPolicy<any> | FieldReadFunction<any>,
-	attrelid?: FieldPolicy<any> | FieldReadFunction<any>,
-	attstattarget?: FieldPolicy<any> | FieldReadFunction<any>,
-	attstorage?: FieldPolicy<any> | FieldReadFunction<any>,
-	atttypid?: FieldPolicy<any> | FieldReadFunction<any>,
-	atttypmod?: FieldPolicy<any> | FieldReadFunction<any>
+  attacl?: FieldPolicy<any> | FieldReadFunction<any>;
+  attalign?: FieldPolicy<any> | FieldReadFunction<any>;
+  attbyval?: FieldPolicy<any> | FieldReadFunction<any>;
+  attcacheoff?: FieldPolicy<any> | FieldReadFunction<any>;
+  attcollation?: FieldPolicy<any> | FieldReadFunction<any>;
+  attcompression?: FieldPolicy<any> | FieldReadFunction<any>;
+  attfdwoptions?: FieldPolicy<any> | FieldReadFunction<any>;
+  attgenerated?: FieldPolicy<any> | FieldReadFunction<any>;
+  atthasdef?: FieldPolicy<any> | FieldReadFunction<any>;
+  atthasmissing?: FieldPolicy<any> | FieldReadFunction<any>;
+  attidentity?: FieldPolicy<any> | FieldReadFunction<any>;
+  attinhcount?: FieldPolicy<any> | FieldReadFunction<any>;
+  attisdropped?: FieldPolicy<any> | FieldReadFunction<any>;
+  attislocal?: FieldPolicy<any> | FieldReadFunction<any>;
+  attlen?: FieldPolicy<any> | FieldReadFunction<any>;
+  attmissingval?: FieldPolicy<any> | FieldReadFunction<any>;
+  attname?: FieldPolicy<any> | FieldReadFunction<any>;
+  attndims?: FieldPolicy<any> | FieldReadFunction<any>;
+  attnotnull?: FieldPolicy<any> | FieldReadFunction<any>;
+  attnum?: FieldPolicy<any> | FieldReadFunction<any>;
+  attoptions?: FieldPolicy<any> | FieldReadFunction<any>;
+  attrelid?: FieldPolicy<any> | FieldReadFunction<any>;
+  attstattarget?: FieldPolicy<any> | FieldReadFunction<any>;
+  attstorage?: FieldPolicy<any> | FieldReadFunction<any>;
+  atttypid?: FieldPolicy<any> | FieldReadFunction<any>;
+  atttypmod?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PgAttributesConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PgAttributesConnectionKeySpecifier)[];
+export type PgAttributesConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | PgAttributesConnectionKeySpecifier
+)[];
 export type PgAttributesConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PgAttributesEdgeKeySpecifier = ('cursor' | 'node' | PgAttributesEdgeKeySpecifier)[];
+export type PgAttributesEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | PgAttributesEdgeKeySpecifier
+)[];
 export type PgAttributesEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PlayerKeySpecifier = ('brefId' | 'careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'id' | 'name' | 'nodeId' | 'seasonBattings' | 'seasonFieldings' | 'seasonPitchings' | PlayerKeySpecifier)[];
+export type PlayerKeySpecifier = (
+  | 'brefId'
+  | 'careerBattings'
+  | 'careerFieldingByPos'
+  | 'careerFieldings'
+  | 'careerPitchings'
+  | 'id'
+  | 'name'
+  | 'nodeId'
+  | 'seasonBattings'
+  | 'seasonFieldings'
+  | 'seasonPitchings'
+  | PlayerKeySpecifier
+)[];
 export type PlayerFieldPolicy = {
-	brefId?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>
+  brefId?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerBattings?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  name?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PlayersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | PlayersConnectionKeySpecifier)[];
+export type PlayersConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | PlayersConnectionKeySpecifier
+)[];
 export type PlayersConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type PlayersEdgeKeySpecifier = ('cursor' | 'node' | PlayersEdgeKeySpecifier)[];
+export type PlayersEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | PlayersEdgeKeySpecifier
+)[];
 export type PlayersEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type QueryKeySpecifier = ('careerBattings' | 'careerFieldingByPos' | 'careerFieldings' | 'careerPitchings' | 'draft' | 'draftByNodeId' | 'draftTeam' | 'draftTeamByDraftIdAndDraftOrder' | 'draftTeamByNodeId' | 'draftTeams' | 'drafts' | 'getColumnsForType' | 'league' | 'leagueByNodeId' | 'leagueMember' | 'leagueMemberByNodeId' | 'leagueMembers' | 'leagueMessage' | 'leagueMessageByNodeId' | 'leagueMessages' | 'leagues' | 'node' | 'nodeId' | 'player' | 'playerByBrefId' | 'playerByNodeId' | 'players' | 'query' | 'seasonBatting' | 'seasonBattingByNodeId' | 'seasonBattings' | 'seasonFielding' | 'seasonFieldingByNodeId' | 'seasonFieldings' | 'seasonPitching' | 'seasonPitchingByNodeId' | 'seasonPitchings' | 'team' | 'teamByIdAndLeagueId' | 'teamByNodeId' | 'teams' | 'user' | 'userByEmail' | 'userByNodeId' | 'userByUsername' | 'users' | 'usersInternals' | QueryKeySpecifier)[];
+export type QueryKeySpecifier = (
+  | 'careerBattings'
+  | 'careerFieldingByPos'
+  | 'careerFieldings'
+  | 'careerPitchings'
+  | 'draft'
+  | 'draftByNodeId'
+  | 'draftTeam'
+  | 'draftTeamByDraftIdAndDraftOrder'
+  | 'draftTeamByNodeId'
+  | 'draftTeams'
+  | 'drafts'
+  | 'getColumnsForType'
+  | 'league'
+  | 'leagueByNodeId'
+  | 'leagueMember'
+  | 'leagueMemberByNodeId'
+  | 'leagueMembers'
+  | 'leagueMessage'
+  | 'leagueMessageByNodeId'
+  | 'leagueMessages'
+  | 'leagues'
+  | 'node'
+  | 'nodeId'
+  | 'player'
+  | 'playerByBrefId'
+  | 'playerByNodeId'
+  | 'players'
+  | 'query'
+  | 'seasonBatting'
+  | 'seasonBattingByNodeId'
+  | 'seasonBattings'
+  | 'seasonFielding'
+  | 'seasonFieldingByNodeId'
+  | 'seasonFieldings'
+  | 'seasonPitching'
+  | 'seasonPitchingByNodeId'
+  | 'seasonPitchings'
+  | 'team'
+  | 'teamByIdAndLeagueId'
+  | 'teamByNodeId'
+  | 'teams'
+  | 'user'
+  | 'userByEmail'
+  | 'userByNodeId'
+  | 'userByUsername'
+  | 'users'
+  | 'usersInternals'
+  | QueryKeySpecifier
+)[];
 export type QueryFieldPolicy = {
-	careerBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamByDraftIdAndDraftOrder?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeams?: FieldPolicy<any> | FieldReadFunction<any>,
-	drafts?: FieldPolicy<any> | FieldReadFunction<any>,
-	getColumnsForType?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagues?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	players?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	teams?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userByEmail?: FieldPolicy<any> | FieldReadFunction<any>,
-	userByNodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	userByUsername?: FieldPolicy<any> | FieldReadFunction<any>,
-	users?: FieldPolicy<any> | FieldReadFunction<any>,
-	usersInternals?: FieldPolicy<any> | FieldReadFunction<any>
+  careerBattings?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerFieldingByPos?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerFieldings?: FieldPolicy<any> | FieldReadFunction<any>;
+  careerPitchings?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamByDraftIdAndDraftOrder?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeams?: FieldPolicy<any> | FieldReadFunction<any>;
+  drafts?: FieldPolicy<any> | FieldReadFunction<any>;
+  getColumnsForType?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMemberByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessageByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagues?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerByBrefId?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  players?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattings?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldings?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchingByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchings?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamByIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  teams?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userByEmail?: FieldPolicy<any> | FieldReadFunction<any>;
+  userByNodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  userByUsername?: FieldPolicy<any> | FieldReadFunction<any>;
+  users?: FieldPolicy<any> | FieldReadFunction<any>;
+  usersInternals?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonBattingKeySpecifier = ('ab' | 'awardSummary' | 'battingAvg' | 'bb' | 'cs' | 'doubles' | 'g' | 'gidp' | 'h' | 'hbp' | 'hr' | 'ibb' | 'lgId' | 'nodeId' | 'onbasePerc' | 'onbasePlusSlugging' | 'onbasePlusSluggingPlus' | 'pa' | 'player' | 'playerId' | 'posSeason' | 'r' | 'rbi' | 'sb' | 'season' | 'sf' | 'sh' | 'sluggingPerc' | 'so' | 'tb' | 'team' | 'triples' | SeasonBattingKeySpecifier)[];
+export type SeasonBattingKeySpecifier = (
+  | 'ab'
+  | 'awardSummary'
+  | 'battingAvg'
+  | 'bb'
+  | 'cs'
+  | 'doubles'
+  | 'g'
+  | 'gidp'
+  | 'h'
+  | 'hbp'
+  | 'hr'
+  | 'ibb'
+  | 'lgId'
+  | 'nodeId'
+  | 'onbasePerc'
+  | 'onbasePlusSlugging'
+  | 'onbasePlusSluggingPlus'
+  | 'pa'
+  | 'player'
+  | 'playerId'
+  | 'posSeason'
+  | 'r'
+  | 'rbi'
+  | 'sb'
+  | 'season'
+  | 'sf'
+  | 'sh'
+  | 'sluggingPerc'
+  | 'so'
+  | 'tb'
+  | 'team'
+  | 'triples'
+  | SeasonBattingKeySpecifier
+)[];
 export type SeasonBattingFieldPolicy = {
-	ab?: FieldPolicy<any> | FieldReadFunction<any>,
-	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
-	battingAvg?: FieldPolicy<any> | FieldReadFunction<any>,
-	bb?: FieldPolicy<any> | FieldReadFunction<any>,
-	cs?: FieldPolicy<any> | FieldReadFunction<any>,
-	doubles?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gidp?: FieldPolicy<any> | FieldReadFunction<any>,
-	h?: FieldPolicy<any> | FieldReadFunction<any>,
-	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
-	hr?: FieldPolicy<any> | FieldReadFunction<any>,
-	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
-	lgId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	onbasePerc?: FieldPolicy<any> | FieldReadFunction<any>,
-	onbasePlusSlugging?: FieldPolicy<any> | FieldReadFunction<any>,
-	onbasePlusSluggingPlus?: FieldPolicy<any> | FieldReadFunction<any>,
-	pa?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	posSeason?: FieldPolicy<any> | FieldReadFunction<any>,
-	r?: FieldPolicy<any> | FieldReadFunction<any>,
-	rbi?: FieldPolicy<any> | FieldReadFunction<any>,
-	sb?: FieldPolicy<any> | FieldReadFunction<any>,
-	season?: FieldPolicy<any> | FieldReadFunction<any>,
-	sf?: FieldPolicy<any> | FieldReadFunction<any>,
-	sh?: FieldPolicy<any> | FieldReadFunction<any>,
-	sluggingPerc?: FieldPolicy<any> | FieldReadFunction<any>,
-	so?: FieldPolicy<any> | FieldReadFunction<any>,
-	tb?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	triples?: FieldPolicy<any> | FieldReadFunction<any>
+  ab?: FieldPolicy<any> | FieldReadFunction<any>;
+  awardSummary?: FieldPolicy<any> | FieldReadFunction<any>;
+  battingAvg?: FieldPolicy<any> | FieldReadFunction<any>;
+  bb?: FieldPolicy<any> | FieldReadFunction<any>;
+  cs?: FieldPolicy<any> | FieldReadFunction<any>;
+  doubles?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gidp?: FieldPolicy<any> | FieldReadFunction<any>;
+  h?: FieldPolicy<any> | FieldReadFunction<any>;
+  hbp?: FieldPolicy<any> | FieldReadFunction<any>;
+  hr?: FieldPolicy<any> | FieldReadFunction<any>;
+  ibb?: FieldPolicy<any> | FieldReadFunction<any>;
+  lgId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  onbasePerc?: FieldPolicy<any> | FieldReadFunction<any>;
+  onbasePlusSlugging?: FieldPolicy<any> | FieldReadFunction<any>;
+  onbasePlusSluggingPlus?: FieldPolicy<any> | FieldReadFunction<any>;
+  pa?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  posSeason?: FieldPolicy<any> | FieldReadFunction<any>;
+  r?: FieldPolicy<any> | FieldReadFunction<any>;
+  rbi?: FieldPolicy<any> | FieldReadFunction<any>;
+  sb?: FieldPolicy<any> | FieldReadFunction<any>;
+  season?: FieldPolicy<any> | FieldReadFunction<any>;
+  sf?: FieldPolicy<any> | FieldReadFunction<any>;
+  sh?: FieldPolicy<any> | FieldReadFunction<any>;
+  sluggingPerc?: FieldPolicy<any> | FieldReadFunction<any>;
+  so?: FieldPolicy<any> | FieldReadFunction<any>;
+  tb?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  triples?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonBattingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | SeasonBattingsConnectionKeySpecifier)[];
+export type SeasonBattingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | SeasonBattingsConnectionKeySpecifier
+)[];
 export type SeasonBattingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonBattingsEdgeKeySpecifier = ('cursor' | 'node' | SeasonBattingsEdgeKeySpecifier)[];
+export type SeasonBattingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | SeasonBattingsEdgeKeySpecifier
+)[];
 export type SeasonBattingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonFieldingKeySpecifier = ('a' | 'awardSummary' | 'caughtStealingPerc' | 'caughtStealingPercLg' | 'cg' | 'chances' | 'cs' | 'dpDef' | 'eDef' | 'fieldingPerc' | 'fieldingPercLg' | 'g' | 'gOfParts' | 'gs' | 'innDef' | 'lgId' | 'nodeId' | 'pickoffs' | 'player' | 'playerId' | 'po' | 'pos' | 'rangeFactorPerGame' | 'rangeFactorPerGameLg' | 'rangeFactorPerNine' | 'rangeFactorPerNineLg' | 'sb' | 'season' | 'team' | 'wp' | SeasonFieldingKeySpecifier)[];
+export type SeasonFieldingKeySpecifier = (
+  | 'a'
+  | 'awardSummary'
+  | 'caughtStealingPerc'
+  | 'caughtStealingPercLg'
+  | 'cg'
+  | 'chances'
+  | 'cs'
+  | 'dpDef'
+  | 'eDef'
+  | 'fieldingPerc'
+  | 'fieldingPercLg'
+  | 'g'
+  | 'gOfParts'
+  | 'gs'
+  | 'innDef'
+  | 'lgId'
+  | 'nodeId'
+  | 'pickoffs'
+  | 'player'
+  | 'playerId'
+  | 'po'
+  | 'pos'
+  | 'rangeFactorPerGame'
+  | 'rangeFactorPerGameLg'
+  | 'rangeFactorPerNine'
+  | 'rangeFactorPerNineLg'
+  | 'sb'
+  | 'season'
+  | 'team'
+  | 'wp'
+  | SeasonFieldingKeySpecifier
+)[];
 export type SeasonFieldingFieldPolicy = {
-	a?: FieldPolicy<any> | FieldReadFunction<any>,
-	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
-	caughtStealingPerc?: FieldPolicy<any> | FieldReadFunction<any>,
-	caughtStealingPercLg?: FieldPolicy<any> | FieldReadFunction<any>,
-	cg?: FieldPolicy<any> | FieldReadFunction<any>,
-	chances?: FieldPolicy<any> | FieldReadFunction<any>,
-	cs?: FieldPolicy<any> | FieldReadFunction<any>,
-	dpDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	eDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	fieldingPerc?: FieldPolicy<any> | FieldReadFunction<any>,
-	fieldingPercLg?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gOfParts?: FieldPolicy<any> | FieldReadFunction<any>,
-	gs?: FieldPolicy<any> | FieldReadFunction<any>,
-	innDef?: FieldPolicy<any> | FieldReadFunction<any>,
-	lgId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	pickoffs?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	po?: FieldPolicy<any> | FieldReadFunction<any>,
-	pos?: FieldPolicy<any> | FieldReadFunction<any>,
-	rangeFactorPerGame?: FieldPolicy<any> | FieldReadFunction<any>,
-	rangeFactorPerGameLg?: FieldPolicy<any> | FieldReadFunction<any>,
-	rangeFactorPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
-	rangeFactorPerNineLg?: FieldPolicy<any> | FieldReadFunction<any>,
-	sb?: FieldPolicy<any> | FieldReadFunction<any>,
-	season?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	wp?: FieldPolicy<any> | FieldReadFunction<any>
+  a?: FieldPolicy<any> | FieldReadFunction<any>;
+  awardSummary?: FieldPolicy<any> | FieldReadFunction<any>;
+  caughtStealingPerc?: FieldPolicy<any> | FieldReadFunction<any>;
+  caughtStealingPercLg?: FieldPolicy<any> | FieldReadFunction<any>;
+  cg?: FieldPolicy<any> | FieldReadFunction<any>;
+  chances?: FieldPolicy<any> | FieldReadFunction<any>;
+  cs?: FieldPolicy<any> | FieldReadFunction<any>;
+  dpDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  eDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  fieldingPerc?: FieldPolicy<any> | FieldReadFunction<any>;
+  fieldingPercLg?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gOfParts?: FieldPolicy<any> | FieldReadFunction<any>;
+  gs?: FieldPolicy<any> | FieldReadFunction<any>;
+  innDef?: FieldPolicy<any> | FieldReadFunction<any>;
+  lgId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  pickoffs?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  po?: FieldPolicy<any> | FieldReadFunction<any>;
+  pos?: FieldPolicy<any> | FieldReadFunction<any>;
+  rangeFactorPerGame?: FieldPolicy<any> | FieldReadFunction<any>;
+  rangeFactorPerGameLg?: FieldPolicy<any> | FieldReadFunction<any>;
+  rangeFactorPerNine?: FieldPolicy<any> | FieldReadFunction<any>;
+  rangeFactorPerNineLg?: FieldPolicy<any> | FieldReadFunction<any>;
+  sb?: FieldPolicy<any> | FieldReadFunction<any>;
+  season?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  wp?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonFieldingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | SeasonFieldingsConnectionKeySpecifier)[];
+export type SeasonFieldingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | SeasonFieldingsConnectionKeySpecifier
+)[];
 export type SeasonFieldingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonFieldingsEdgeKeySpecifier = ('cursor' | 'node' | SeasonFieldingsEdgeKeySpecifier)[];
+export type SeasonFieldingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | SeasonFieldingsEdgeKeySpecifier
+)[];
 export type SeasonFieldingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonPitchingKeySpecifier = ('awardSummary' | 'basesOnBallsPerNine' | 'battersFaced' | 'bb' | 'bk' | 'cg' | 'earnedRunAvg' | 'earnedRunAvgPlus' | 'er' | 'fip' | 'g' | 'gf' | 'gs' | 'h' | 'hbp' | 'hitsPerNine' | 'homeRunsPerNine' | 'hr' | 'ibb' | 'ip' | 'l' | 'lgId' | 'nodeId' | 'outsRecorded' | 'player' | 'playerId' | 'r' | 'season' | 'sho' | 'so' | 'strikeoutsPerBaseOnBalls' | 'strikeoutsPerNine' | 'sv' | 'team' | 'w' | 'whip' | 'winLossPerc' | 'wp' | SeasonPitchingKeySpecifier)[];
+export type SeasonPitchingKeySpecifier = (
+  | 'awardSummary'
+  | 'basesOnBallsPerNine'
+  | 'battersFaced'
+  | 'bb'
+  | 'bk'
+  | 'cg'
+  | 'earnedRunAvg'
+  | 'earnedRunAvgPlus'
+  | 'er'
+  | 'fip'
+  | 'g'
+  | 'gf'
+  | 'gs'
+  | 'h'
+  | 'hbp'
+  | 'hitsPerNine'
+  | 'homeRunsPerNine'
+  | 'hr'
+  | 'ibb'
+  | 'ip'
+  | 'l'
+  | 'lgId'
+  | 'nodeId'
+  | 'outsRecorded'
+  | 'player'
+  | 'playerId'
+  | 'r'
+  | 'season'
+  | 'sho'
+  | 'so'
+  | 'strikeoutsPerBaseOnBalls'
+  | 'strikeoutsPerNine'
+  | 'sv'
+  | 'team'
+  | 'w'
+  | 'whip'
+  | 'winLossPerc'
+  | 'wp'
+  | SeasonPitchingKeySpecifier
+)[];
 export type SeasonPitchingFieldPolicy = {
-	awardSummary?: FieldPolicy<any> | FieldReadFunction<any>,
-	basesOnBallsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
-	battersFaced?: FieldPolicy<any> | FieldReadFunction<any>,
-	bb?: FieldPolicy<any> | FieldReadFunction<any>,
-	bk?: FieldPolicy<any> | FieldReadFunction<any>,
-	cg?: FieldPolicy<any> | FieldReadFunction<any>,
-	earnedRunAvg?: FieldPolicy<any> | FieldReadFunction<any>,
-	earnedRunAvgPlus?: FieldPolicy<any> | FieldReadFunction<any>,
-	er?: FieldPolicy<any> | FieldReadFunction<any>,
-	fip?: FieldPolicy<any> | FieldReadFunction<any>,
-	g?: FieldPolicy<any> | FieldReadFunction<any>,
-	gf?: FieldPolicy<any> | FieldReadFunction<any>,
-	gs?: FieldPolicy<any> | FieldReadFunction<any>,
-	h?: FieldPolicy<any> | FieldReadFunction<any>,
-	hbp?: FieldPolicy<any> | FieldReadFunction<any>,
-	hitsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
-	homeRunsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
-	hr?: FieldPolicy<any> | FieldReadFunction<any>,
-	ibb?: FieldPolicy<any> | FieldReadFunction<any>,
-	ip?: FieldPolicy<any> | FieldReadFunction<any>,
-	l?: FieldPolicy<any> | FieldReadFunction<any>,
-	lgId?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerId?: FieldPolicy<any> | FieldReadFunction<any>,
-	r?: FieldPolicy<any> | FieldReadFunction<any>,
-	season?: FieldPolicy<any> | FieldReadFunction<any>,
-	sho?: FieldPolicy<any> | FieldReadFunction<any>,
-	so?: FieldPolicy<any> | FieldReadFunction<any>,
-	strikeoutsPerBaseOnBalls?: FieldPolicy<any> | FieldReadFunction<any>,
-	strikeoutsPerNine?: FieldPolicy<any> | FieldReadFunction<any>,
-	sv?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	w?: FieldPolicy<any> | FieldReadFunction<any>,
-	whip?: FieldPolicy<any> | FieldReadFunction<any>,
-	winLossPerc?: FieldPolicy<any> | FieldReadFunction<any>,
-	wp?: FieldPolicy<any> | FieldReadFunction<any>
+  awardSummary?: FieldPolicy<any> | FieldReadFunction<any>;
+  basesOnBallsPerNine?: FieldPolicy<any> | FieldReadFunction<any>;
+  battersFaced?: FieldPolicy<any> | FieldReadFunction<any>;
+  bb?: FieldPolicy<any> | FieldReadFunction<any>;
+  bk?: FieldPolicy<any> | FieldReadFunction<any>;
+  cg?: FieldPolicy<any> | FieldReadFunction<any>;
+  earnedRunAvg?: FieldPolicy<any> | FieldReadFunction<any>;
+  earnedRunAvgPlus?: FieldPolicy<any> | FieldReadFunction<any>;
+  er?: FieldPolicy<any> | FieldReadFunction<any>;
+  fip?: FieldPolicy<any> | FieldReadFunction<any>;
+  g?: FieldPolicy<any> | FieldReadFunction<any>;
+  gf?: FieldPolicy<any> | FieldReadFunction<any>;
+  gs?: FieldPolicy<any> | FieldReadFunction<any>;
+  h?: FieldPolicy<any> | FieldReadFunction<any>;
+  hbp?: FieldPolicy<any> | FieldReadFunction<any>;
+  hitsPerNine?: FieldPolicy<any> | FieldReadFunction<any>;
+  homeRunsPerNine?: FieldPolicy<any> | FieldReadFunction<any>;
+  hr?: FieldPolicy<any> | FieldReadFunction<any>;
+  ibb?: FieldPolicy<any> | FieldReadFunction<any>;
+  ip?: FieldPolicy<any> | FieldReadFunction<any>;
+  l?: FieldPolicy<any> | FieldReadFunction<any>;
+  lgId?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  outsRecorded?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerId?: FieldPolicy<any> | FieldReadFunction<any>;
+  r?: FieldPolicy<any> | FieldReadFunction<any>;
+  season?: FieldPolicy<any> | FieldReadFunction<any>;
+  sho?: FieldPolicy<any> | FieldReadFunction<any>;
+  so?: FieldPolicy<any> | FieldReadFunction<any>;
+  strikeoutsPerBaseOnBalls?: FieldPolicy<any> | FieldReadFunction<any>;
+  strikeoutsPerNine?: FieldPolicy<any> | FieldReadFunction<any>;
+  sv?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  w?: FieldPolicy<any> | FieldReadFunction<any>;
+  whip?: FieldPolicy<any> | FieldReadFunction<any>;
+  winLossPerc?: FieldPolicy<any> | FieldReadFunction<any>;
+  wp?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonPitchingsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | SeasonPitchingsConnectionKeySpecifier)[];
+export type SeasonPitchingsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | SeasonPitchingsConnectionKeySpecifier
+)[];
 export type SeasonPitchingsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type SeasonPitchingsEdgeKeySpecifier = ('cursor' | 'node' | SeasonPitchingsEdgeKeySpecifier)[];
+export type SeasonPitchingsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | SeasonPitchingsEdgeKeySpecifier
+)[];
 export type SeasonPitchingsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type TeamKeySpecifier = ('draftTeamsByTeamIdAndLeagueId' | 'id' | 'league' | 'leagueId' | 'name' | 'nodeId' | TeamKeySpecifier)[];
+export type TeamKeySpecifier = (
+  | 'draftTeamsByTeamIdAndLeagueId'
+  | 'id'
+  | 'league'
+  | 'leagueId'
+  | 'name'
+  | 'nodeId'
+  | TeamKeySpecifier
+)[];
 export type TeamFieldPolicy = {
-	draftTeamsByTeamIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueId?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>
+  draftTeamsByTeamIdAndLeagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueId?: FieldPolicy<any> | FieldReadFunction<any>;
+  name?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type TeamsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | TeamsConnectionKeySpecifier)[];
+export type TeamsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | TeamsConnectionKeySpecifier
+)[];
 export type TeamsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type TeamsEdgeKeySpecifier = ('cursor' | 'node' | TeamsEdgeKeySpecifier)[];
+export type TeamsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | TeamsEdgeKeySpecifier
+)[];
 export type TeamsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateDraftPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftEdge' | 'league' | 'query' | UpdateDraftPayloadKeySpecifier)[];
+export type UpdateDraftPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftEdge'
+  | 'league'
+  | 'query'
+  | UpdateDraftPayloadKeySpecifier
+)[];
 export type UpdateDraftPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | UpdateDraftTeamPayloadKeySpecifier)[];
+export type UpdateDraftTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftTeam'
+  | 'draftTeamEdge'
+  | 'league'
+  | 'query'
+  | 'teamLeague'
+  | UpdateDraftTeamPayloadKeySpecifier
+)[];
 export type UpdateDraftTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateLeagueMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMember' | 'leagueMemberEdge' | 'query' | 'user' | UpdateLeagueMemberPayloadKeySpecifier)[];
+export type UpdateLeagueMemberPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMember'
+  | 'leagueMemberEdge'
+  | 'query'
+  | 'user'
+  | UpdateLeagueMemberPayloadKeySpecifier
+)[];
 export type UpdateLeagueMemberPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | UpdateLeagueMessagePayloadKeySpecifier)[];
+export type UpdateLeagueMessagePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMessage'
+  | 'leagueMessageEdge'
+  | 'query'
+  | 'user'
+  | 'userLeague'
+  | UpdateLeagueMessagePayloadKeySpecifier
+)[];
 export type UpdateLeagueMessagePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | UpdateLeaguePayloadKeySpecifier)[];
+export type UpdateLeaguePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueEdge'
+  | 'query'
+  | UpdateLeaguePayloadKeySpecifier
+)[];
 export type UpdateLeaguePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdatePlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | UpdatePlayerPayloadKeySpecifier)[];
+export type UpdatePlayerPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'playerEdge'
+  | 'query'
+  | UpdatePlayerPayloadKeySpecifier
+)[];
 export type UpdatePlayerPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateSeasonBattingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonBatting' | 'seasonBattingEdge' | UpdateSeasonBattingPayloadKeySpecifier)[];
+export type UpdateSeasonBattingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonBatting'
+  | 'seasonBattingEdge'
+  | UpdateSeasonBattingPayloadKeySpecifier
+)[];
 export type UpdateSeasonBattingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateSeasonFieldingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonFielding' | 'seasonFieldingEdge' | UpdateSeasonFieldingPayloadKeySpecifier)[];
+export type UpdateSeasonFieldingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonFielding'
+  | 'seasonFieldingEdge'
+  | UpdateSeasonFieldingPayloadKeySpecifier
+)[];
 export type UpdateSeasonFieldingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpdateSeasonPitchingPayloadKeySpecifier)[];
+export type UpdateSeasonPitchingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonPitching'
+  | 'seasonPitchingEdge'
+  | UpdateSeasonPitchingPayloadKeySpecifier
+)[];
 export type UpdateSeasonPitchingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | UpdateTeamPayloadKeySpecifier)[];
+export type UpdateTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'query'
+  | 'team'
+  | 'teamEdge'
+  | UpdateTeamPayloadKeySpecifier
+)[];
 export type UpdateTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpdateUserPayloadKeySpecifier = ('clientMutationId' | 'query' | 'user' | 'userEdge' | UpdateUserPayloadKeySpecifier)[];
+export type UpdateUserPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'query'
+  | 'user'
+  | 'userEdge'
+  | UpdateUserPayloadKeySpecifier
+)[];
 export type UpdateUserPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertDraftPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftEdge' | 'league' | 'query' | UpsertDraftPayloadKeySpecifier)[];
+export type UpsertDraftPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftEdge'
+  | 'league'
+  | 'query'
+  | UpsertDraftPayloadKeySpecifier
+)[];
 export type UpsertDraftPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertDraftTeamPayloadKeySpecifier = ('clientMutationId' | 'draft' | 'draftTeam' | 'draftTeamEdge' | 'league' | 'query' | 'teamLeague' | UpsertDraftTeamPayloadKeySpecifier)[];
+export type UpsertDraftTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'draft'
+  | 'draftTeam'
+  | 'draftTeamEdge'
+  | 'league'
+  | 'query'
+  | 'teamLeague'
+  | UpsertDraftTeamPayloadKeySpecifier
+)[];
 export type UpsertDraftTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	draft?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeam?: FieldPolicy<any> | FieldReadFunction<any>,
-	draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  draft?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeam?: FieldPolicy<any> | FieldReadFunction<any>;
+  draftTeamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertLeagueMemberPayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMember' | 'leagueMemberEdge' | 'query' | 'user' | UpsertLeagueMemberPayloadKeySpecifier)[];
+export type UpsertLeagueMemberPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMember'
+  | 'leagueMemberEdge'
+  | 'query'
+  | 'user'
+  | UpsertLeagueMemberPayloadKeySpecifier
+)[];
 export type UpsertLeagueMemberPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMember?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMember?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMemberEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertLeagueMessagePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueMessage' | 'leagueMessageEdge' | 'query' | 'user' | 'userLeague' | UpsertLeagueMessagePayloadKeySpecifier)[];
+export type UpsertLeagueMessagePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueMessage'
+  | 'leagueMessageEdge'
+  | 'query'
+  | 'user'
+  | 'userLeague'
+  | UpsertLeagueMessagePayloadKeySpecifier
+)[];
 export type UpsertLeagueMessagePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userLeague?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessage?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessageEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userLeague?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertLeaguePayloadKeySpecifier = ('clientMutationId' | 'league' | 'leagueEdge' | 'query' | UpsertLeaguePayloadKeySpecifier)[];
+export type UpsertLeaguePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'leagueEdge'
+  | 'query'
+  | UpsertLeaguePayloadKeySpecifier
+)[];
 export type UpsertLeaguePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertPlayerPayloadKeySpecifier = ('clientMutationId' | 'player' | 'playerEdge' | 'query' | UpsertPlayerPayloadKeySpecifier)[];
+export type UpsertPlayerPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'playerEdge'
+  | 'query'
+  | UpsertPlayerPayloadKeySpecifier
+)[];
 export type UpsertPlayerPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	playerEdge?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  playerEdge?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertSeasonBattingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonBatting' | 'seasonBattingEdge' | UpsertSeasonBattingPayloadKeySpecifier)[];
+export type UpsertSeasonBattingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonBatting'
+  | 'seasonBattingEdge'
+  | UpsertSeasonBattingPayloadKeySpecifier
+)[];
 export type UpsertSeasonBattingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBatting?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonBattingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertSeasonFieldingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonFielding' | 'seasonFieldingEdge' | UpsertSeasonFieldingPayloadKeySpecifier)[];
+export type UpsertSeasonFieldingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonFielding'
+  | 'seasonFieldingEdge'
+  | UpsertSeasonFieldingPayloadKeySpecifier
+)[];
 export type UpsertSeasonFieldingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFielding?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonFieldingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertSeasonPitchingPayloadKeySpecifier = ('clientMutationId' | 'player' | 'query' | 'seasonPitching' | 'seasonPitchingEdge' | UpsertSeasonPitchingPayloadKeySpecifier)[];
+export type UpsertSeasonPitchingPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'player'
+  | 'query'
+  | 'seasonPitching'
+  | 'seasonPitchingEdge'
+  | UpsertSeasonPitchingPayloadKeySpecifier
+)[];
 export type UpsertSeasonPitchingPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	player?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>,
-	seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  player?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitching?: FieldPolicy<any> | FieldReadFunction<any>;
+  seasonPitchingEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertTeamPayloadKeySpecifier = ('clientMutationId' | 'league' | 'query' | 'team' | 'teamEdge' | UpsertTeamPayloadKeySpecifier)[];
+export type UpsertTeamPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'league'
+  | 'query'
+  | 'team'
+  | 'teamEdge'
+  | UpsertTeamPayloadKeySpecifier
+)[];
 export type UpsertTeamPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	league?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	team?: FieldPolicy<any> | FieldReadFunction<any>,
-	teamEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  league?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  team?: FieldPolicy<any> | FieldReadFunction<any>;
+  teamEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertTypeIntoTablePayloadKeySpecifier = ('clientMutationId' | 'query' | UpsertTypeIntoTablePayloadKeySpecifier)[];
+export type UpsertTypeIntoTablePayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'query'
+  | UpsertTypeIntoTablePayloadKeySpecifier
+)[];
 export type UpsertTypeIntoTablePayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UpsertUserPayloadKeySpecifier = ('clientMutationId' | 'query' | 'user' | 'userEdge' | UpsertUserPayloadKeySpecifier)[];
+export type UpsertUserPayloadKeySpecifier = (
+  | 'clientMutationId'
+  | 'query'
+  | 'user'
+  | 'userEdge'
+  | UpsertUserPayloadKeySpecifier
+)[];
 export type UpsertUserPayloadFieldPolicy = {
-	clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>,
-	query?: FieldPolicy<any> | FieldReadFunction<any>,
-	user?: FieldPolicy<any> | FieldReadFunction<any>,
-	userEdge?: FieldPolicy<any> | FieldReadFunction<any>
+  clientMutationId?: FieldPolicy<any> | FieldReadFunction<any>;
+  query?: FieldPolicy<any> | FieldReadFunction<any>;
+  user?: FieldPolicy<any> | FieldReadFunction<any>;
+  userEdge?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UserKeySpecifier = ('about' | 'createdAt' | 'email' | 'id' | 'isAdmin' | 'leagueMembers' | 'leagueMessages' | 'name' | 'nodeId' | 'updatedAt' | 'username' | UserKeySpecifier)[];
+export type UserKeySpecifier = (
+  | 'about'
+  | 'createdAt'
+  | 'email'
+  | 'id'
+  | 'isAdmin'
+  | 'leagueMembers'
+  | 'leagueMessages'
+  | 'name'
+  | 'nodeId'
+  | 'updatedAt'
+  | 'username'
+  | UserKeySpecifier
+)[];
 export type UserFieldPolicy = {
-	about?: FieldPolicy<any> | FieldReadFunction<any>,
-	createdAt?: FieldPolicy<any> | FieldReadFunction<any>,
-	email?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	isAdmin?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>,
-	leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>,
-	name?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodeId?: FieldPolicy<any> | FieldReadFunction<any>,
-	updatedAt?: FieldPolicy<any> | FieldReadFunction<any>,
-	username?: FieldPolicy<any> | FieldReadFunction<any>
+  about?: FieldPolicy<any> | FieldReadFunction<any>;
+  createdAt?: FieldPolicy<any> | FieldReadFunction<any>;
+  email?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  isAdmin?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMembers?: FieldPolicy<any> | FieldReadFunction<any>;
+  leagueMessages?: FieldPolicy<any> | FieldReadFunction<any>;
+  name?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodeId?: FieldPolicy<any> | FieldReadFunction<any>;
+  updatedAt?: FieldPolicy<any> | FieldReadFunction<any>;
+  username?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UsersConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | UsersConnectionKeySpecifier)[];
+export type UsersConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | UsersConnectionKeySpecifier
+)[];
 export type UsersConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UsersEdgeKeySpecifier = ('cursor' | 'node' | UsersEdgeKeySpecifier)[];
+export type UsersEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | UsersEdgeKeySpecifier
+)[];
 export type UsersEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UsersInternalKeySpecifier = ('accessLevel' | 'email' | 'id' | 'username' | UsersInternalKeySpecifier)[];
+export type UsersInternalKeySpecifier = (
+  | 'accessLevel'
+  | 'email'
+  | 'id'
+  | 'username'
+  | UsersInternalKeySpecifier
+)[];
 export type UsersInternalFieldPolicy = {
-	accessLevel?: FieldPolicy<any> | FieldReadFunction<any>,
-	email?: FieldPolicy<any> | FieldReadFunction<any>,
-	id?: FieldPolicy<any> | FieldReadFunction<any>,
-	username?: FieldPolicy<any> | FieldReadFunction<any>
+  accessLevel?: FieldPolicy<any> | FieldReadFunction<any>;
+  email?: FieldPolicy<any> | FieldReadFunction<any>;
+  id?: FieldPolicy<any> | FieldReadFunction<any>;
+  username?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UsersInternalsConnectionKeySpecifier = ('edges' | 'nodes' | 'pageInfo' | 'totalCount' | UsersInternalsConnectionKeySpecifier)[];
+export type UsersInternalsConnectionKeySpecifier = (
+  | 'edges'
+  | 'nodes'
+  | 'pageInfo'
+  | 'totalCount'
+  | UsersInternalsConnectionKeySpecifier
+)[];
 export type UsersInternalsConnectionFieldPolicy = {
-	edges?: FieldPolicy<any> | FieldReadFunction<any>,
-	nodes?: FieldPolicy<any> | FieldReadFunction<any>,
-	pageInfo?: FieldPolicy<any> | FieldReadFunction<any>,
-	totalCount?: FieldPolicy<any> | FieldReadFunction<any>
+  edges?: FieldPolicy<any> | FieldReadFunction<any>;
+  nodes?: FieldPolicy<any> | FieldReadFunction<any>;
+  pageInfo?: FieldPolicy<any> | FieldReadFunction<any>;
+  totalCount?: FieldPolicy<any> | FieldReadFunction<any>;
 };
-export type UsersInternalsEdgeKeySpecifier = ('cursor' | 'node' | UsersInternalsEdgeKeySpecifier)[];
+export type UsersInternalsEdgeKeySpecifier = (
+  | 'cursor'
+  | 'node'
+  | UsersInternalsEdgeKeySpecifier
+)[];
 export type UsersInternalsEdgeFieldPolicy = {
-	cursor?: FieldPolicy<any> | FieldReadFunction<any>,
-	node?: FieldPolicy<any> | FieldReadFunction<any>
+  cursor?: FieldPolicy<any> | FieldReadFunction<any>;
+  node?: FieldPolicy<any> | FieldReadFunction<any>;
 };
 export type StrictTypedTypePolicies = {
-	BulkUpdateStatsPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | BulkUpdateStatsPayloadKeySpecifier | (() => undefined | BulkUpdateStatsPayloadKeySpecifier),
-		fields?: BulkUpdateStatsPayloadFieldPolicy,
-	},
-	CareerBatting?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerBattingKeySpecifier | (() => undefined | CareerBattingKeySpecifier),
-		fields?: CareerBattingFieldPolicy,
-	},
-	CareerBattingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerBattingsConnectionKeySpecifier | (() => undefined | CareerBattingsConnectionKeySpecifier),
-		fields?: CareerBattingsConnectionFieldPolicy,
-	},
-	CareerBattingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerBattingsEdgeKeySpecifier | (() => undefined | CareerBattingsEdgeKeySpecifier),
-		fields?: CareerBattingsEdgeFieldPolicy,
-	},
-	CareerFielding?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingKeySpecifier | (() => undefined | CareerFieldingKeySpecifier),
-		fields?: CareerFieldingFieldPolicy,
-	},
-	CareerFieldingByPo?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPoKeySpecifier | (() => undefined | CareerFieldingByPoKeySpecifier),
-		fields?: CareerFieldingByPoFieldPolicy,
-	},
-	CareerFieldingByPosConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPosConnectionKeySpecifier | (() => undefined | CareerFieldingByPosConnectionKeySpecifier),
-		fields?: CareerFieldingByPosConnectionFieldPolicy,
-	},
-	CareerFieldingByPosEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingByPosEdgeKeySpecifier | (() => undefined | CareerFieldingByPosEdgeKeySpecifier),
-		fields?: CareerFieldingByPosEdgeFieldPolicy,
-	},
-	CareerFieldingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingsConnectionKeySpecifier | (() => undefined | CareerFieldingsConnectionKeySpecifier),
-		fields?: CareerFieldingsConnectionFieldPolicy,
-	},
-	CareerFieldingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerFieldingsEdgeKeySpecifier | (() => undefined | CareerFieldingsEdgeKeySpecifier),
-		fields?: CareerFieldingsEdgeFieldPolicy,
-	},
-	CareerPitching?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerPitchingKeySpecifier | (() => undefined | CareerPitchingKeySpecifier),
-		fields?: CareerPitchingFieldPolicy,
-	},
-	CareerPitchingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerPitchingsConnectionKeySpecifier | (() => undefined | CareerPitchingsConnectionKeySpecifier),
-		fields?: CareerPitchingsConnectionFieldPolicy,
-	},
-	CareerPitchingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CareerPitchingsEdgeKeySpecifier | (() => undefined | CareerPitchingsEdgeKeySpecifier),
-		fields?: CareerPitchingsEdgeFieldPolicy,
-	},
-	CreateDraftPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateDraftPayloadKeySpecifier | (() => undefined | CreateDraftPayloadKeySpecifier),
-		fields?: CreateDraftPayloadFieldPolicy,
-	},
-	CreateDraftTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateDraftTeamPayloadKeySpecifier | (() => undefined | CreateDraftTeamPayloadKeySpecifier),
-		fields?: CreateDraftTeamPayloadFieldPolicy,
-	},
-	CreateLeagueAndTeamsPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateLeagueAndTeamsPayloadKeySpecifier | (() => undefined | CreateLeagueAndTeamsPayloadKeySpecifier),
-		fields?: CreateLeagueAndTeamsPayloadFieldPolicy,
-	},
-	CreateLeagueMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateLeagueMemberPayloadKeySpecifier | (() => undefined | CreateLeagueMemberPayloadKeySpecifier),
-		fields?: CreateLeagueMemberPayloadFieldPolicy,
-	},
-	CreateLeagueMessagePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateLeagueMessagePayloadKeySpecifier | (() => undefined | CreateLeagueMessagePayloadKeySpecifier),
-		fields?: CreateLeagueMessagePayloadFieldPolicy,
-	},
-	CreateLeaguePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateLeaguePayloadKeySpecifier | (() => undefined | CreateLeaguePayloadKeySpecifier),
-		fields?: CreateLeaguePayloadFieldPolicy,
-	},
-	CreatePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreatePlayerPayloadKeySpecifier | (() => undefined | CreatePlayerPayloadKeySpecifier),
-		fields?: CreatePlayerPayloadFieldPolicy,
-	},
-	CreatePlayersPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreatePlayersPayloadKeySpecifier | (() => undefined | CreatePlayersPayloadKeySpecifier),
-		fields?: CreatePlayersPayloadFieldPolicy,
-	},
-	CreateSeasonBattingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateSeasonBattingPayloadKeySpecifier | (() => undefined | CreateSeasonBattingPayloadKeySpecifier),
-		fields?: CreateSeasonBattingPayloadFieldPolicy,
-	},
-	CreateSeasonFieldingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateSeasonFieldingPayloadKeySpecifier | (() => undefined | CreateSeasonFieldingPayloadKeySpecifier),
-		fields?: CreateSeasonFieldingPayloadFieldPolicy,
-	},
-	CreateSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateSeasonPitchingPayloadKeySpecifier | (() => undefined | CreateSeasonPitchingPayloadKeySpecifier),
-		fields?: CreateSeasonPitchingPayloadFieldPolicy,
-	},
-	CreateTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateTeamPayloadKeySpecifier | (() => undefined | CreateTeamPayloadKeySpecifier),
-		fields?: CreateTeamPayloadFieldPolicy,
-	},
-	CreateUserPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | CreateUserPayloadKeySpecifier | (() => undefined | CreateUserPayloadKeySpecifier),
-		fields?: CreateUserPayloadFieldPolicy,
-	},
-	DeleteDraftPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteDraftPayloadKeySpecifier | (() => undefined | DeleteDraftPayloadKeySpecifier),
-		fields?: DeleteDraftPayloadFieldPolicy,
-	},
-	DeleteDraftTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteDraftTeamPayloadKeySpecifier | (() => undefined | DeleteDraftTeamPayloadKeySpecifier),
-		fields?: DeleteDraftTeamPayloadFieldPolicy,
-	},
-	DeleteLeagueMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteLeagueMemberPayloadKeySpecifier | (() => undefined | DeleteLeagueMemberPayloadKeySpecifier),
-		fields?: DeleteLeagueMemberPayloadFieldPolicy,
-	},
-	DeleteLeagueMessagePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteLeagueMessagePayloadKeySpecifier | (() => undefined | DeleteLeagueMessagePayloadKeySpecifier),
-		fields?: DeleteLeagueMessagePayloadFieldPolicy,
-	},
-	DeleteLeaguePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteLeaguePayloadKeySpecifier | (() => undefined | DeleteLeaguePayloadKeySpecifier),
-		fields?: DeleteLeaguePayloadFieldPolicy,
-	},
-	DeletePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeletePlayerPayloadKeySpecifier | (() => undefined | DeletePlayerPayloadKeySpecifier),
-		fields?: DeletePlayerPayloadFieldPolicy,
-	},
-	DeleteSeasonBattingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteSeasonBattingPayloadKeySpecifier | (() => undefined | DeleteSeasonBattingPayloadKeySpecifier),
-		fields?: DeleteSeasonBattingPayloadFieldPolicy,
-	},
-	DeleteSeasonFieldingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteSeasonFieldingPayloadKeySpecifier | (() => undefined | DeleteSeasonFieldingPayloadKeySpecifier),
-		fields?: DeleteSeasonFieldingPayloadFieldPolicy,
-	},
-	DeleteSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteSeasonPitchingPayloadKeySpecifier | (() => undefined | DeleteSeasonPitchingPayloadKeySpecifier),
-		fields?: DeleteSeasonPitchingPayloadFieldPolicy,
-	},
-	DeleteTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteTeamPayloadKeySpecifier | (() => undefined | DeleteTeamPayloadKeySpecifier),
-		fields?: DeleteTeamPayloadFieldPolicy,
-	},
-	DeleteUserPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DeleteUserPayloadKeySpecifier | (() => undefined | DeleteUserPayloadKeySpecifier),
-		fields?: DeleteUserPayloadFieldPolicy,
-	},
-	Draft?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftKeySpecifier | (() => undefined | DraftKeySpecifier),
-		fields?: DraftFieldPolicy,
-	},
-	DraftTeam?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftTeamKeySpecifier | (() => undefined | DraftTeamKeySpecifier),
-		fields?: DraftTeamFieldPolicy,
-	},
-	DraftTeamsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftTeamsConnectionKeySpecifier | (() => undefined | DraftTeamsConnectionKeySpecifier),
-		fields?: DraftTeamsConnectionFieldPolicy,
-	},
-	DraftTeamsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftTeamsEdgeKeySpecifier | (() => undefined | DraftTeamsEdgeKeySpecifier),
-		fields?: DraftTeamsEdgeFieldPolicy,
-	},
-	DraftsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftsConnectionKeySpecifier | (() => undefined | DraftsConnectionKeySpecifier),
-		fields?: DraftsConnectionFieldPolicy,
-	},
-	DraftsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | DraftsEdgeKeySpecifier | (() => undefined | DraftsEdgeKeySpecifier),
-		fields?: DraftsEdgeFieldPolicy,
-	},
-	League?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueKeySpecifier | (() => undefined | LeagueKeySpecifier),
-		fields?: LeagueFieldPolicy,
-	},
-	LeagueMember?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMemberKeySpecifier | (() => undefined | LeagueMemberKeySpecifier),
-		fields?: LeagueMemberFieldPolicy,
-	},
-	LeagueMembersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMembersConnectionKeySpecifier | (() => undefined | LeagueMembersConnectionKeySpecifier),
-		fields?: LeagueMembersConnectionFieldPolicy,
-	},
-	LeagueMembersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMembersEdgeKeySpecifier | (() => undefined | LeagueMembersEdgeKeySpecifier),
-		fields?: LeagueMembersEdgeFieldPolicy,
-	},
-	LeagueMessage?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMessageKeySpecifier | (() => undefined | LeagueMessageKeySpecifier),
-		fields?: LeagueMessageFieldPolicy,
-	},
-	LeagueMessagesConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMessagesConnectionKeySpecifier | (() => undefined | LeagueMessagesConnectionKeySpecifier),
-		fields?: LeagueMessagesConnectionFieldPolicy,
-	},
-	LeagueMessagesEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeagueMessagesEdgeKeySpecifier | (() => undefined | LeagueMessagesEdgeKeySpecifier),
-		fields?: LeagueMessagesEdgeFieldPolicy,
-	},
-	LeaguesConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeaguesConnectionKeySpecifier | (() => undefined | LeaguesConnectionKeySpecifier),
-		fields?: LeaguesConnectionFieldPolicy,
-	},
-	LeaguesEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | LeaguesEdgeKeySpecifier | (() => undefined | LeaguesEdgeKeySpecifier),
-		fields?: LeaguesEdgeFieldPolicy,
-	},
-	Mutation?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | MutationKeySpecifier | (() => undefined | MutationKeySpecifier),
-		fields?: MutationFieldPolicy,
-	},
-	Node?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | NodeKeySpecifier | (() => undefined | NodeKeySpecifier),
-		fields?: NodeFieldPolicy,
-	},
-	PageInfo?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PageInfoKeySpecifier | (() => undefined | PageInfoKeySpecifier),
-		fields?: PageInfoFieldPolicy,
-	},
-	PgAttribute?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributeKeySpecifier | (() => undefined | PgAttributeKeySpecifier),
-		fields?: PgAttributeFieldPolicy,
-	},
-	PgAttributesConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributesConnectionKeySpecifier | (() => undefined | PgAttributesConnectionKeySpecifier),
-		fields?: PgAttributesConnectionFieldPolicy,
-	},
-	PgAttributesEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PgAttributesEdgeKeySpecifier | (() => undefined | PgAttributesEdgeKeySpecifier),
-		fields?: PgAttributesEdgeFieldPolicy,
-	},
-	Player?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PlayerKeySpecifier | (() => undefined | PlayerKeySpecifier),
-		fields?: PlayerFieldPolicy,
-	},
-	PlayersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PlayersConnectionKeySpecifier | (() => undefined | PlayersConnectionKeySpecifier),
-		fields?: PlayersConnectionFieldPolicy,
-	},
-	PlayersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | PlayersEdgeKeySpecifier | (() => undefined | PlayersEdgeKeySpecifier),
-		fields?: PlayersEdgeFieldPolicy,
-	},
-	Query?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | QueryKeySpecifier | (() => undefined | QueryKeySpecifier),
-		fields?: QueryFieldPolicy,
-	},
-	SeasonBatting?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonBattingKeySpecifier | (() => undefined | SeasonBattingKeySpecifier),
-		fields?: SeasonBattingFieldPolicy,
-	},
-	SeasonBattingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonBattingsConnectionKeySpecifier | (() => undefined | SeasonBattingsConnectionKeySpecifier),
-		fields?: SeasonBattingsConnectionFieldPolicy,
-	},
-	SeasonBattingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonBattingsEdgeKeySpecifier | (() => undefined | SeasonBattingsEdgeKeySpecifier),
-		fields?: SeasonBattingsEdgeFieldPolicy,
-	},
-	SeasonFielding?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonFieldingKeySpecifier | (() => undefined | SeasonFieldingKeySpecifier),
-		fields?: SeasonFieldingFieldPolicy,
-	},
-	SeasonFieldingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonFieldingsConnectionKeySpecifier | (() => undefined | SeasonFieldingsConnectionKeySpecifier),
-		fields?: SeasonFieldingsConnectionFieldPolicy,
-	},
-	SeasonFieldingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonFieldingsEdgeKeySpecifier | (() => undefined | SeasonFieldingsEdgeKeySpecifier),
-		fields?: SeasonFieldingsEdgeFieldPolicy,
-	},
-	SeasonPitching?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonPitchingKeySpecifier | (() => undefined | SeasonPitchingKeySpecifier),
-		fields?: SeasonPitchingFieldPolicy,
-	},
-	SeasonPitchingsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonPitchingsConnectionKeySpecifier | (() => undefined | SeasonPitchingsConnectionKeySpecifier),
-		fields?: SeasonPitchingsConnectionFieldPolicy,
-	},
-	SeasonPitchingsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | SeasonPitchingsEdgeKeySpecifier | (() => undefined | SeasonPitchingsEdgeKeySpecifier),
-		fields?: SeasonPitchingsEdgeFieldPolicy,
-	},
-	Team?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | TeamKeySpecifier | (() => undefined | TeamKeySpecifier),
-		fields?: TeamFieldPolicy,
-	},
-	TeamsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | TeamsConnectionKeySpecifier | (() => undefined | TeamsConnectionKeySpecifier),
-		fields?: TeamsConnectionFieldPolicy,
-	},
-	TeamsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | TeamsEdgeKeySpecifier | (() => undefined | TeamsEdgeKeySpecifier),
-		fields?: TeamsEdgeFieldPolicy,
-	},
-	UpdateDraftPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateDraftPayloadKeySpecifier | (() => undefined | UpdateDraftPayloadKeySpecifier),
-		fields?: UpdateDraftPayloadFieldPolicy,
-	},
-	UpdateDraftTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateDraftTeamPayloadKeySpecifier | (() => undefined | UpdateDraftTeamPayloadKeySpecifier),
-		fields?: UpdateDraftTeamPayloadFieldPolicy,
-	},
-	UpdateLeagueMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateLeagueMemberPayloadKeySpecifier | (() => undefined | UpdateLeagueMemberPayloadKeySpecifier),
-		fields?: UpdateLeagueMemberPayloadFieldPolicy,
-	},
-	UpdateLeagueMessagePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateLeagueMessagePayloadKeySpecifier | (() => undefined | UpdateLeagueMessagePayloadKeySpecifier),
-		fields?: UpdateLeagueMessagePayloadFieldPolicy,
-	},
-	UpdateLeaguePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateLeaguePayloadKeySpecifier | (() => undefined | UpdateLeaguePayloadKeySpecifier),
-		fields?: UpdateLeaguePayloadFieldPolicy,
-	},
-	UpdatePlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdatePlayerPayloadKeySpecifier | (() => undefined | UpdatePlayerPayloadKeySpecifier),
-		fields?: UpdatePlayerPayloadFieldPolicy,
-	},
-	UpdateSeasonBattingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateSeasonBattingPayloadKeySpecifier | (() => undefined | UpdateSeasonBattingPayloadKeySpecifier),
-		fields?: UpdateSeasonBattingPayloadFieldPolicy,
-	},
-	UpdateSeasonFieldingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateSeasonFieldingPayloadKeySpecifier | (() => undefined | UpdateSeasonFieldingPayloadKeySpecifier),
-		fields?: UpdateSeasonFieldingPayloadFieldPolicy,
-	},
-	UpdateSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateSeasonPitchingPayloadKeySpecifier | (() => undefined | UpdateSeasonPitchingPayloadKeySpecifier),
-		fields?: UpdateSeasonPitchingPayloadFieldPolicy,
-	},
-	UpdateTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateTeamPayloadKeySpecifier | (() => undefined | UpdateTeamPayloadKeySpecifier),
-		fields?: UpdateTeamPayloadFieldPolicy,
-	},
-	UpdateUserPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpdateUserPayloadKeySpecifier | (() => undefined | UpdateUserPayloadKeySpecifier),
-		fields?: UpdateUserPayloadFieldPolicy,
-	},
-	UpsertDraftPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertDraftPayloadKeySpecifier | (() => undefined | UpsertDraftPayloadKeySpecifier),
-		fields?: UpsertDraftPayloadFieldPolicy,
-	},
-	UpsertDraftTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertDraftTeamPayloadKeySpecifier | (() => undefined | UpsertDraftTeamPayloadKeySpecifier),
-		fields?: UpsertDraftTeamPayloadFieldPolicy,
-	},
-	UpsertLeagueMemberPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertLeagueMemberPayloadKeySpecifier | (() => undefined | UpsertLeagueMemberPayloadKeySpecifier),
-		fields?: UpsertLeagueMemberPayloadFieldPolicy,
-	},
-	UpsertLeagueMessagePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertLeagueMessagePayloadKeySpecifier | (() => undefined | UpsertLeagueMessagePayloadKeySpecifier),
-		fields?: UpsertLeagueMessagePayloadFieldPolicy,
-	},
-	UpsertLeaguePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertLeaguePayloadKeySpecifier | (() => undefined | UpsertLeaguePayloadKeySpecifier),
-		fields?: UpsertLeaguePayloadFieldPolicy,
-	},
-	UpsertPlayerPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertPlayerPayloadKeySpecifier | (() => undefined | UpsertPlayerPayloadKeySpecifier),
-		fields?: UpsertPlayerPayloadFieldPolicy,
-	},
-	UpsertSeasonBattingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertSeasonBattingPayloadKeySpecifier | (() => undefined | UpsertSeasonBattingPayloadKeySpecifier),
-		fields?: UpsertSeasonBattingPayloadFieldPolicy,
-	},
-	UpsertSeasonFieldingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertSeasonFieldingPayloadKeySpecifier | (() => undefined | UpsertSeasonFieldingPayloadKeySpecifier),
-		fields?: UpsertSeasonFieldingPayloadFieldPolicy,
-	},
-	UpsertSeasonPitchingPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertSeasonPitchingPayloadKeySpecifier | (() => undefined | UpsertSeasonPitchingPayloadKeySpecifier),
-		fields?: UpsertSeasonPitchingPayloadFieldPolicy,
-	},
-	UpsertTeamPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertTeamPayloadKeySpecifier | (() => undefined | UpsertTeamPayloadKeySpecifier),
-		fields?: UpsertTeamPayloadFieldPolicy,
-	},
-	UpsertTypeIntoTablePayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertTypeIntoTablePayloadKeySpecifier | (() => undefined | UpsertTypeIntoTablePayloadKeySpecifier),
-		fields?: UpsertTypeIntoTablePayloadFieldPolicy,
-	},
-	UpsertUserPayload?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UpsertUserPayloadKeySpecifier | (() => undefined | UpsertUserPayloadKeySpecifier),
-		fields?: UpsertUserPayloadFieldPolicy,
-	},
-	User?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UserKeySpecifier | (() => undefined | UserKeySpecifier),
-		fields?: UserFieldPolicy,
-	},
-	UsersConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersConnectionKeySpecifier | (() => undefined | UsersConnectionKeySpecifier),
-		fields?: UsersConnectionFieldPolicy,
-	},
-	UsersEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersEdgeKeySpecifier | (() => undefined | UsersEdgeKeySpecifier),
-		fields?: UsersEdgeFieldPolicy,
-	},
-	UsersInternal?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalKeySpecifier | (() => undefined | UsersInternalKeySpecifier),
-		fields?: UsersInternalFieldPolicy,
-	},
-	UsersInternalsConnection?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalsConnectionKeySpecifier | (() => undefined | UsersInternalsConnectionKeySpecifier),
-		fields?: UsersInternalsConnectionFieldPolicy,
-	},
-	UsersInternalsEdge?: Omit<TypePolicy, "fields" | "keyFields"> & {
-		keyFields?: false | UsersInternalsEdgeKeySpecifier | (() => undefined | UsersInternalsEdgeKeySpecifier),
-		fields?: UsersInternalsEdgeFieldPolicy,
-	}
+  BulkUpdateStatsPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | BulkUpdateStatsPayloadKeySpecifier
+      | (() => undefined | BulkUpdateStatsPayloadKeySpecifier);
+    fields?: BulkUpdateStatsPayloadFieldPolicy;
+  };
+  CareerBatting?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerBattingKeySpecifier
+      | (() => undefined | CareerBattingKeySpecifier);
+    fields?: CareerBattingFieldPolicy;
+  };
+  CareerBattingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerBattingsConnectionKeySpecifier
+      | (() => undefined | CareerBattingsConnectionKeySpecifier);
+    fields?: CareerBattingsConnectionFieldPolicy;
+  };
+  CareerBattingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerBattingsEdgeKeySpecifier
+      | (() => undefined | CareerBattingsEdgeKeySpecifier);
+    fields?: CareerBattingsEdgeFieldPolicy;
+  };
+  CareerFielding?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingKeySpecifier
+      | (() => undefined | CareerFieldingKeySpecifier);
+    fields?: CareerFieldingFieldPolicy;
+  };
+  CareerFieldingByPo?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingByPoKeySpecifier
+      | (() => undefined | CareerFieldingByPoKeySpecifier);
+    fields?: CareerFieldingByPoFieldPolicy;
+  };
+  CareerFieldingByPosConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingByPosConnectionKeySpecifier
+      | (() => undefined | CareerFieldingByPosConnectionKeySpecifier);
+    fields?: CareerFieldingByPosConnectionFieldPolicy;
+  };
+  CareerFieldingByPosEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingByPosEdgeKeySpecifier
+      | (() => undefined | CareerFieldingByPosEdgeKeySpecifier);
+    fields?: CareerFieldingByPosEdgeFieldPolicy;
+  };
+  CareerFieldingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingsConnectionKeySpecifier
+      | (() => undefined | CareerFieldingsConnectionKeySpecifier);
+    fields?: CareerFieldingsConnectionFieldPolicy;
+  };
+  CareerFieldingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerFieldingsEdgeKeySpecifier
+      | (() => undefined | CareerFieldingsEdgeKeySpecifier);
+    fields?: CareerFieldingsEdgeFieldPolicy;
+  };
+  CareerPitching?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerPitchingKeySpecifier
+      | (() => undefined | CareerPitchingKeySpecifier);
+    fields?: CareerPitchingFieldPolicy;
+  };
+  CareerPitchingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerPitchingsConnectionKeySpecifier
+      | (() => undefined | CareerPitchingsConnectionKeySpecifier);
+    fields?: CareerPitchingsConnectionFieldPolicy;
+  };
+  CareerPitchingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CareerPitchingsEdgeKeySpecifier
+      | (() => undefined | CareerPitchingsEdgeKeySpecifier);
+    fields?: CareerPitchingsEdgeFieldPolicy;
+  };
+  CreateDraftPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateDraftPayloadKeySpecifier
+      | (() => undefined | CreateDraftPayloadKeySpecifier);
+    fields?: CreateDraftPayloadFieldPolicy;
+  };
+  CreateDraftTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateDraftTeamPayloadKeySpecifier
+      | (() => undefined | CreateDraftTeamPayloadKeySpecifier);
+    fields?: CreateDraftTeamPayloadFieldPolicy;
+  };
+  CreateLeagueAndTeamsPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateLeagueAndTeamsPayloadKeySpecifier
+      | (() => undefined | CreateLeagueAndTeamsPayloadKeySpecifier);
+    fields?: CreateLeagueAndTeamsPayloadFieldPolicy;
+  };
+  CreateLeagueMemberPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateLeagueMemberPayloadKeySpecifier
+      | (() => undefined | CreateLeagueMemberPayloadKeySpecifier);
+    fields?: CreateLeagueMemberPayloadFieldPolicy;
+  };
+  CreateLeagueMessagePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateLeagueMessagePayloadKeySpecifier
+      | (() => undefined | CreateLeagueMessagePayloadKeySpecifier);
+    fields?: CreateLeagueMessagePayloadFieldPolicy;
+  };
+  CreateLeaguePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateLeaguePayloadKeySpecifier
+      | (() => undefined | CreateLeaguePayloadKeySpecifier);
+    fields?: CreateLeaguePayloadFieldPolicy;
+  };
+  CreatePlayerPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreatePlayerPayloadKeySpecifier
+      | (() => undefined | CreatePlayerPayloadKeySpecifier);
+    fields?: CreatePlayerPayloadFieldPolicy;
+  };
+  CreatePlayersPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreatePlayersPayloadKeySpecifier
+      | (() => undefined | CreatePlayersPayloadKeySpecifier);
+    fields?: CreatePlayersPayloadFieldPolicy;
+  };
+  CreateSeasonBattingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateSeasonBattingPayloadKeySpecifier
+      | (() => undefined | CreateSeasonBattingPayloadKeySpecifier);
+    fields?: CreateSeasonBattingPayloadFieldPolicy;
+  };
+  CreateSeasonFieldingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateSeasonFieldingPayloadKeySpecifier
+      | (() => undefined | CreateSeasonFieldingPayloadKeySpecifier);
+    fields?: CreateSeasonFieldingPayloadFieldPolicy;
+  };
+  CreateSeasonPitchingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateSeasonPitchingPayloadKeySpecifier
+      | (() => undefined | CreateSeasonPitchingPayloadKeySpecifier);
+    fields?: CreateSeasonPitchingPayloadFieldPolicy;
+  };
+  CreateTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateTeamPayloadKeySpecifier
+      | (() => undefined | CreateTeamPayloadKeySpecifier);
+    fields?: CreateTeamPayloadFieldPolicy;
+  };
+  CreateUserPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | CreateUserPayloadKeySpecifier
+      | (() => undefined | CreateUserPayloadKeySpecifier);
+    fields?: CreateUserPayloadFieldPolicy;
+  };
+  DeleteDraftPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteDraftPayloadKeySpecifier
+      | (() => undefined | DeleteDraftPayloadKeySpecifier);
+    fields?: DeleteDraftPayloadFieldPolicy;
+  };
+  DeleteDraftTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteDraftTeamPayloadKeySpecifier
+      | (() => undefined | DeleteDraftTeamPayloadKeySpecifier);
+    fields?: DeleteDraftTeamPayloadFieldPolicy;
+  };
+  DeleteLeagueMemberPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteLeagueMemberPayloadKeySpecifier
+      | (() => undefined | DeleteLeagueMemberPayloadKeySpecifier);
+    fields?: DeleteLeagueMemberPayloadFieldPolicy;
+  };
+  DeleteLeagueMessagePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteLeagueMessagePayloadKeySpecifier
+      | (() => undefined | DeleteLeagueMessagePayloadKeySpecifier);
+    fields?: DeleteLeagueMessagePayloadFieldPolicy;
+  };
+  DeleteLeaguePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteLeaguePayloadKeySpecifier
+      | (() => undefined | DeleteLeaguePayloadKeySpecifier);
+    fields?: DeleteLeaguePayloadFieldPolicy;
+  };
+  DeletePlayerPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeletePlayerPayloadKeySpecifier
+      | (() => undefined | DeletePlayerPayloadKeySpecifier);
+    fields?: DeletePlayerPayloadFieldPolicy;
+  };
+  DeleteSeasonBattingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteSeasonBattingPayloadKeySpecifier
+      | (() => undefined | DeleteSeasonBattingPayloadKeySpecifier);
+    fields?: DeleteSeasonBattingPayloadFieldPolicy;
+  };
+  DeleteSeasonFieldingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteSeasonFieldingPayloadKeySpecifier
+      | (() => undefined | DeleteSeasonFieldingPayloadKeySpecifier);
+    fields?: DeleteSeasonFieldingPayloadFieldPolicy;
+  };
+  DeleteSeasonPitchingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteSeasonPitchingPayloadKeySpecifier
+      | (() => undefined | DeleteSeasonPitchingPayloadKeySpecifier);
+    fields?: DeleteSeasonPitchingPayloadFieldPolicy;
+  };
+  DeleteTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteTeamPayloadKeySpecifier
+      | (() => undefined | DeleteTeamPayloadKeySpecifier);
+    fields?: DeleteTeamPayloadFieldPolicy;
+  };
+  DeleteUserPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DeleteUserPayloadKeySpecifier
+      | (() => undefined | DeleteUserPayloadKeySpecifier);
+    fields?: DeleteUserPayloadFieldPolicy;
+  };
+  Draft?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftKeySpecifier
+      | (() => undefined | DraftKeySpecifier);
+    fields?: DraftFieldPolicy;
+  };
+  DraftTeam?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftTeamKeySpecifier
+      | (() => undefined | DraftTeamKeySpecifier);
+    fields?: DraftTeamFieldPolicy;
+  };
+  DraftTeamsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftTeamsConnectionKeySpecifier
+      | (() => undefined | DraftTeamsConnectionKeySpecifier);
+    fields?: DraftTeamsConnectionFieldPolicy;
+  };
+  DraftTeamsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftTeamsEdgeKeySpecifier
+      | (() => undefined | DraftTeamsEdgeKeySpecifier);
+    fields?: DraftTeamsEdgeFieldPolicy;
+  };
+  DraftsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftsConnectionKeySpecifier
+      | (() => undefined | DraftsConnectionKeySpecifier);
+    fields?: DraftsConnectionFieldPolicy;
+  };
+  DraftsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | DraftsEdgeKeySpecifier
+      | (() => undefined | DraftsEdgeKeySpecifier);
+    fields?: DraftsEdgeFieldPolicy;
+  };
+  League?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueKeySpecifier
+      | (() => undefined | LeagueKeySpecifier);
+    fields?: LeagueFieldPolicy;
+  };
+  LeagueMember?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMemberKeySpecifier
+      | (() => undefined | LeagueMemberKeySpecifier);
+    fields?: LeagueMemberFieldPolicy;
+  };
+  LeagueMembersConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMembersConnectionKeySpecifier
+      | (() => undefined | LeagueMembersConnectionKeySpecifier);
+    fields?: LeagueMembersConnectionFieldPolicy;
+  };
+  LeagueMembersEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMembersEdgeKeySpecifier
+      | (() => undefined | LeagueMembersEdgeKeySpecifier);
+    fields?: LeagueMembersEdgeFieldPolicy;
+  };
+  LeagueMessage?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMessageKeySpecifier
+      | (() => undefined | LeagueMessageKeySpecifier);
+    fields?: LeagueMessageFieldPolicy;
+  };
+  LeagueMessagesConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMessagesConnectionKeySpecifier
+      | (() => undefined | LeagueMessagesConnectionKeySpecifier);
+    fields?: LeagueMessagesConnectionFieldPolicy;
+  };
+  LeagueMessagesEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeagueMessagesEdgeKeySpecifier
+      | (() => undefined | LeagueMessagesEdgeKeySpecifier);
+    fields?: LeagueMessagesEdgeFieldPolicy;
+  };
+  LeaguesConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeaguesConnectionKeySpecifier
+      | (() => undefined | LeaguesConnectionKeySpecifier);
+    fields?: LeaguesConnectionFieldPolicy;
+  };
+  LeaguesEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | LeaguesEdgeKeySpecifier
+      | (() => undefined | LeaguesEdgeKeySpecifier);
+    fields?: LeaguesEdgeFieldPolicy;
+  };
+  Mutation?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | MutationKeySpecifier
+      | (() => undefined | MutationKeySpecifier);
+    fields?: MutationFieldPolicy;
+  };
+  Node?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?: false | NodeKeySpecifier | (() => undefined | NodeKeySpecifier);
+    fields?: NodeFieldPolicy;
+  };
+  PageInfo?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PageInfoKeySpecifier
+      | (() => undefined | PageInfoKeySpecifier);
+    fields?: PageInfoFieldPolicy;
+  };
+  PgAttribute?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PgAttributeKeySpecifier
+      | (() => undefined | PgAttributeKeySpecifier);
+    fields?: PgAttributeFieldPolicy;
+  };
+  PgAttributesConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PgAttributesConnectionKeySpecifier
+      | (() => undefined | PgAttributesConnectionKeySpecifier);
+    fields?: PgAttributesConnectionFieldPolicy;
+  };
+  PgAttributesEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PgAttributesEdgeKeySpecifier
+      | (() => undefined | PgAttributesEdgeKeySpecifier);
+    fields?: PgAttributesEdgeFieldPolicy;
+  };
+  Player?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PlayerKeySpecifier
+      | (() => undefined | PlayerKeySpecifier);
+    fields?: PlayerFieldPolicy;
+  };
+  PlayersConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PlayersConnectionKeySpecifier
+      | (() => undefined | PlayersConnectionKeySpecifier);
+    fields?: PlayersConnectionFieldPolicy;
+  };
+  PlayersEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | PlayersEdgeKeySpecifier
+      | (() => undefined | PlayersEdgeKeySpecifier);
+    fields?: PlayersEdgeFieldPolicy;
+  };
+  Query?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | QueryKeySpecifier
+      | (() => undefined | QueryKeySpecifier);
+    fields?: QueryFieldPolicy;
+  };
+  SeasonBatting?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonBattingKeySpecifier
+      | (() => undefined | SeasonBattingKeySpecifier);
+    fields?: SeasonBattingFieldPolicy;
+  };
+  SeasonBattingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonBattingsConnectionKeySpecifier
+      | (() => undefined | SeasonBattingsConnectionKeySpecifier);
+    fields?: SeasonBattingsConnectionFieldPolicy;
+  };
+  SeasonBattingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonBattingsEdgeKeySpecifier
+      | (() => undefined | SeasonBattingsEdgeKeySpecifier);
+    fields?: SeasonBattingsEdgeFieldPolicy;
+  };
+  SeasonFielding?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonFieldingKeySpecifier
+      | (() => undefined | SeasonFieldingKeySpecifier);
+    fields?: SeasonFieldingFieldPolicy;
+  };
+  SeasonFieldingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonFieldingsConnectionKeySpecifier
+      | (() => undefined | SeasonFieldingsConnectionKeySpecifier);
+    fields?: SeasonFieldingsConnectionFieldPolicy;
+  };
+  SeasonFieldingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonFieldingsEdgeKeySpecifier
+      | (() => undefined | SeasonFieldingsEdgeKeySpecifier);
+    fields?: SeasonFieldingsEdgeFieldPolicy;
+  };
+  SeasonPitching?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonPitchingKeySpecifier
+      | (() => undefined | SeasonPitchingKeySpecifier);
+    fields?: SeasonPitchingFieldPolicy;
+  };
+  SeasonPitchingsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonPitchingsConnectionKeySpecifier
+      | (() => undefined | SeasonPitchingsConnectionKeySpecifier);
+    fields?: SeasonPitchingsConnectionFieldPolicy;
+  };
+  SeasonPitchingsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | SeasonPitchingsEdgeKeySpecifier
+      | (() => undefined | SeasonPitchingsEdgeKeySpecifier);
+    fields?: SeasonPitchingsEdgeFieldPolicy;
+  };
+  Team?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?: false | TeamKeySpecifier | (() => undefined | TeamKeySpecifier);
+    fields?: TeamFieldPolicy;
+  };
+  TeamsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | TeamsConnectionKeySpecifier
+      | (() => undefined | TeamsConnectionKeySpecifier);
+    fields?: TeamsConnectionFieldPolicy;
+  };
+  TeamsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | TeamsEdgeKeySpecifier
+      | (() => undefined | TeamsEdgeKeySpecifier);
+    fields?: TeamsEdgeFieldPolicy;
+  };
+  UpdateDraftPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateDraftPayloadKeySpecifier
+      | (() => undefined | UpdateDraftPayloadKeySpecifier);
+    fields?: UpdateDraftPayloadFieldPolicy;
+  };
+  UpdateDraftTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateDraftTeamPayloadKeySpecifier
+      | (() => undefined | UpdateDraftTeamPayloadKeySpecifier);
+    fields?: UpdateDraftTeamPayloadFieldPolicy;
+  };
+  UpdateLeagueMemberPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateLeagueMemberPayloadKeySpecifier
+      | (() => undefined | UpdateLeagueMemberPayloadKeySpecifier);
+    fields?: UpdateLeagueMemberPayloadFieldPolicy;
+  };
+  UpdateLeagueMessagePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateLeagueMessagePayloadKeySpecifier
+      | (() => undefined | UpdateLeagueMessagePayloadKeySpecifier);
+    fields?: UpdateLeagueMessagePayloadFieldPolicy;
+  };
+  UpdateLeaguePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateLeaguePayloadKeySpecifier
+      | (() => undefined | UpdateLeaguePayloadKeySpecifier);
+    fields?: UpdateLeaguePayloadFieldPolicy;
+  };
+  UpdatePlayerPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdatePlayerPayloadKeySpecifier
+      | (() => undefined | UpdatePlayerPayloadKeySpecifier);
+    fields?: UpdatePlayerPayloadFieldPolicy;
+  };
+  UpdateSeasonBattingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateSeasonBattingPayloadKeySpecifier
+      | (() => undefined | UpdateSeasonBattingPayloadKeySpecifier);
+    fields?: UpdateSeasonBattingPayloadFieldPolicy;
+  };
+  UpdateSeasonFieldingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateSeasonFieldingPayloadKeySpecifier
+      | (() => undefined | UpdateSeasonFieldingPayloadKeySpecifier);
+    fields?: UpdateSeasonFieldingPayloadFieldPolicy;
+  };
+  UpdateSeasonPitchingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateSeasonPitchingPayloadKeySpecifier
+      | (() => undefined | UpdateSeasonPitchingPayloadKeySpecifier);
+    fields?: UpdateSeasonPitchingPayloadFieldPolicy;
+  };
+  UpdateTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateTeamPayloadKeySpecifier
+      | (() => undefined | UpdateTeamPayloadKeySpecifier);
+    fields?: UpdateTeamPayloadFieldPolicy;
+  };
+  UpdateUserPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpdateUserPayloadKeySpecifier
+      | (() => undefined | UpdateUserPayloadKeySpecifier);
+    fields?: UpdateUserPayloadFieldPolicy;
+  };
+  UpsertDraftPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertDraftPayloadKeySpecifier
+      | (() => undefined | UpsertDraftPayloadKeySpecifier);
+    fields?: UpsertDraftPayloadFieldPolicy;
+  };
+  UpsertDraftTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertDraftTeamPayloadKeySpecifier
+      | (() => undefined | UpsertDraftTeamPayloadKeySpecifier);
+    fields?: UpsertDraftTeamPayloadFieldPolicy;
+  };
+  UpsertLeagueMemberPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertLeagueMemberPayloadKeySpecifier
+      | (() => undefined | UpsertLeagueMemberPayloadKeySpecifier);
+    fields?: UpsertLeagueMemberPayloadFieldPolicy;
+  };
+  UpsertLeagueMessagePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertLeagueMessagePayloadKeySpecifier
+      | (() => undefined | UpsertLeagueMessagePayloadKeySpecifier);
+    fields?: UpsertLeagueMessagePayloadFieldPolicy;
+  };
+  UpsertLeaguePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertLeaguePayloadKeySpecifier
+      | (() => undefined | UpsertLeaguePayloadKeySpecifier);
+    fields?: UpsertLeaguePayloadFieldPolicy;
+  };
+  UpsertPlayerPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertPlayerPayloadKeySpecifier
+      | (() => undefined | UpsertPlayerPayloadKeySpecifier);
+    fields?: UpsertPlayerPayloadFieldPolicy;
+  };
+  UpsertSeasonBattingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertSeasonBattingPayloadKeySpecifier
+      | (() => undefined | UpsertSeasonBattingPayloadKeySpecifier);
+    fields?: UpsertSeasonBattingPayloadFieldPolicy;
+  };
+  UpsertSeasonFieldingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertSeasonFieldingPayloadKeySpecifier
+      | (() => undefined | UpsertSeasonFieldingPayloadKeySpecifier);
+    fields?: UpsertSeasonFieldingPayloadFieldPolicy;
+  };
+  UpsertSeasonPitchingPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertSeasonPitchingPayloadKeySpecifier
+      | (() => undefined | UpsertSeasonPitchingPayloadKeySpecifier);
+    fields?: UpsertSeasonPitchingPayloadFieldPolicy;
+  };
+  UpsertTeamPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertTeamPayloadKeySpecifier
+      | (() => undefined | UpsertTeamPayloadKeySpecifier);
+    fields?: UpsertTeamPayloadFieldPolicy;
+  };
+  UpsertTypeIntoTablePayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertTypeIntoTablePayloadKeySpecifier
+      | (() => undefined | UpsertTypeIntoTablePayloadKeySpecifier);
+    fields?: UpsertTypeIntoTablePayloadFieldPolicy;
+  };
+  UpsertUserPayload?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UpsertUserPayloadKeySpecifier
+      | (() => undefined | UpsertUserPayloadKeySpecifier);
+    fields?: UpsertUserPayloadFieldPolicy;
+  };
+  User?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?: false | UserKeySpecifier | (() => undefined | UserKeySpecifier);
+    fields?: UserFieldPolicy;
+  };
+  UsersConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UsersConnectionKeySpecifier
+      | (() => undefined | UsersConnectionKeySpecifier);
+    fields?: UsersConnectionFieldPolicy;
+  };
+  UsersEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UsersEdgeKeySpecifier
+      | (() => undefined | UsersEdgeKeySpecifier);
+    fields?: UsersEdgeFieldPolicy;
+  };
+  UsersInternal?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UsersInternalKeySpecifier
+      | (() => undefined | UsersInternalKeySpecifier);
+    fields?: UsersInternalFieldPolicy;
+  };
+  UsersInternalsConnection?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UsersInternalsConnectionKeySpecifier
+      | (() => undefined | UsersInternalsConnectionKeySpecifier);
+    fields?: UsersInternalsConnectionFieldPolicy;
+  };
+  UsersInternalsEdge?: Omit<TypePolicy, 'fields' | 'keyFields'> & {
+    keyFields?:
+      | false
+      | UsersInternalsEdgeKeySpecifier
+      | (() => undefined | UsersInternalsEdgeKeySpecifier);
+    fields?: UsersInternalsEdgeFieldPolicy;
+  };
 };
 export type TypedTypePolicies = StrictTypedTypePolicies & TypePolicies;

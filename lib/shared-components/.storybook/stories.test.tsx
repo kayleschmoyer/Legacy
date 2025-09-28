@@ -20,7 +20,7 @@ describe('Storybook Stories', () => {
     it('should render Welcome story without errors', () => {
       render(<Welcome />);
       expect(
-        screen.getByText('Legacy Sports Shared Components')
+        screen.getByText('Legacy Sports Shared Components'),
       ).toBeInTheDocument();
     });
   });

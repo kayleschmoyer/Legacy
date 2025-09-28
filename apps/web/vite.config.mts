@@ -1,5 +1,5 @@
 /// <reference types='vitest' />
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
@@ -7,13 +7,22 @@ import { resolve } from 'path';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ mode }) => {
+  // Load environment variables from workspace root and merge with process.env
+  const env = loadEnv(mode, resolve(__dirname, '../../'), '');
+
+  // Merge environment variables into process.env so Vite can pick them up
+  Object.assign(process.env, env);
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/web',
     base: process.env.NODE_ENV === 'production' ? '/legacy-sports/' : '/',
+    // Read environment variables from workspace root
+    envDir: resolve(__dirname, '../../'),
     // Help Tamagui find the correct paths
     publicDir: 'public',
+    // Define environment variables explicitly
+
     server: {
       port: 4200,
       host: 'localhost',
@@ -23,6 +32,8 @@ export default defineConfig(async () => {
       host: 'localhost',
     },
     plugins: [
+      // Load TS paths first to ensure proper resolution
+      nxViteTsPaths(),
       reactNativeWeb(),
       tamaguiPlugin({
         config: resolve(
@@ -36,7 +47,6 @@ export default defineConfig(async () => {
         useReactNativeWebLite: false,
       }),
       react(),
-      nxViteTsPaths(),
       nxCopyAssetsPlugin(['*.md']),
     ],
 
@@ -75,6 +85,11 @@ export default defineConfig(async () => {
           __dirname,
           '../../lib/shared-components/src/platform-components/web/index.ts',
         ),
+        // Add explicit alias for platform components to avoid resolution issues in CI
+        'platform-components': resolve(
+          __dirname,
+          '../../lib/shared-components/src/platform-components/index.ts',
+        ),
       },
       extensions: [
         '.web.tsx',
@@ -95,6 +110,17 @@ export default defineConfig(async () => {
       ),
       'process.env.PLATFORM': JSON.stringify('web'),
       __DEV__: process.env.NODE_ENV === 'development',
+
+      // Define environment variables for browser access
+      'import.meta.env.VITE_OAUTH_PROXY_URL': JSON.stringify(
+        env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001',
+      ),
+      'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(
+        env.VITE_GOOGLE_CLIENT_ID || 'placeholder-google-client-id',
+      ),
+      'import.meta.env.VITE_GRAPHQL_HOST': JSON.stringify(
+        env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
+      ),
     },
   };
 });

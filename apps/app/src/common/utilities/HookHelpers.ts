@@ -8,7 +8,7 @@ export interface AsyncHookResult<T> {
 }
 
 export function useAsyncHook<T>(
-  promiseCreator: () => Promise<T>
+  promiseCreator: () => Promise<T>,
 ): AsyncHookResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);

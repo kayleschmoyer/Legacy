@@ -4,7 +4,8 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx src/dev.ts",
+    "dev": "tsx watch src/dev.ts",
+    "dev:no-watch": "tsx src/dev.ts",
     "build": "vite build",
     "test": "jest --onlyChanged",
     "test:watch": "jest --watch --onlyChanged",

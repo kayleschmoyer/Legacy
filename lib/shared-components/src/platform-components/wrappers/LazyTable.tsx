@@ -9,12 +9,7 @@ export interface TableProps {
 }
 
 // Simple HTML table implementation for web
-function LazyTable({
-  headers,
-  data,
-  title,
-  style,
-}: TableProps) {
+function LazyTable({ headers, data, title, style }: TableProps) {
   return (
     <div style={{ ...style, marginBottom: 24 }}>
       {title && <h3 style={{ marginBottom: 16, color: '#333' }}>{title}</h3>}
@@ -67,6 +62,6 @@ function LazyTable({
       </table>
     </div>
   );
-};
+}
 
 export { LazyTable };

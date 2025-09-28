@@ -41,44 +41,44 @@ export const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP']));
 export type PositionType = keyof typeof ALLOWED_POSITIONS;
 
 export function isPitchingSlot(
-  value: LeaguePositionFragment | null
+  value: LeaguePositionFragment | null,
 ): value is LeaguePositionFragment {
   return value !== null && PITCHING_POSITIONS.has(value.positionType);
 }
 
 export function isBattingSlot(
-  value: LeaguePositionFragment | null
+  value: LeaguePositionFragment | null,
 ): value is LeaguePositionFragment {
   return value !== null && !PITCHING_POSITIONS.has(value.positionType);
 }
 
 export function isPitcher(
-  teamMember: TeamMemberWithPositionsFragment | null
+  teamMember: TeamMemberWithPositionsFragment | null,
 ): teamMember is TeamMemberWithPositionsFragment {
   return (
     teamMember !== null &&
     teamMember.player?.playerEligiblePositions !== undefined &&
     teamMember.player.playerEligiblePositions.nodes.some(
-      (p) => p?.position && PITCHING_POSITIONS.has(p.position)
+      (p) => p?.position && PITCHING_POSITIONS.has(p.position),
     )
   );
 }
 
 export function isBatter(
-  teamMember: TeamMemberWithPositionsFragment | null
+  teamMember: TeamMemberWithPositionsFragment | null,
 ): teamMember is TeamMemberWithPositionsFragment {
   return (
     teamMember !== null &&
     teamMember.player?.playerEligiblePositions !== undefined &&
     teamMember.player.playerEligiblePositions.nodes.some(
-      (p) => p?.position && !PITCHING_POSITIONS.has(p.position)
+      (p) => p?.position && !PITCHING_POSITIONS.has(p.position),
     )
   );
 }
 
 export function canPlayerPlayPosition(
   player: TeamMemberWithPositionsFragment | undefined,
-  positionMapping: LeaguePositionFragment | undefined
+  positionMapping: LeaguePositionFragment | undefined,
 ): boolean {
   if (player === undefined || positionMapping === undefined) {
     return true;
@@ -89,7 +89,7 @@ export function canPlayerPlayPosition(
   for (const pos of allowedPositions) {
     if (
       player.player?.playerEligiblePositions?.nodes.some(
-        (e) => e !== null && e.position === pos
+        (e) => e !== null && e.position === pos,
       )
     ) {
       return true;

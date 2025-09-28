@@ -19,7 +19,7 @@ describe('CareerStatsViewer', () => {
 
   it('renders correctly with custom API endpoint', () => {
     const { getByPlaceholderText, getByText } = render(
-      <CareerStatsViewer apiEndpoint="https://custom-api.com/career-stats" />
+      <CareerStatsViewer apiEndpoint="https://custom-api.com/career-stats" />,
     );
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();

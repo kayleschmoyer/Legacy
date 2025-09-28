@@ -5,6 +5,7 @@
 All Lambda deployment workflows now have secure trigger configurations:
 
 ### ✅ **Automatic Deployment Triggers**
+
 - **Main Branch Merge**: Deployments automatically run when code is merged into `main`
 - **Path-Based Filtering**: Only triggers when relevant files change:
   - `lambdas/db/**` → GraphQL Lambda deployment
@@ -13,17 +14,20 @@ All Lambda deployment workflows now have secure trigger configurations:
   - Workflow file changes also trigger deployments
 
 ### ✅ **Manual Deployment Triggers**
+
 - **GitHub UI Button**: `workflow_dispatch` allows manual triggering from GitHub Actions tab
 - **Branch Verification**: Additional safety check ensures deployment only runs from `main` branch
 
 ## 🛡️ Security Safeguards
 
 ### Environment Protection
+
 - All deployment jobs run in `production` environment
 - Requires environment approval rules (if configured in GitHub)
 - Provides audit trail for all deployments
 
 ### Branch Verification
+
 ```yaml
 - name: Verify Main Branch
   run: |
@@ -36,6 +40,7 @@ All Lambda deployment workflows now have secure trigger configurations:
 ```
 
 ### Concurrency Control
+
 ```yaml
 concurrency:
   group: ${{ github.workflow }}
@@ -45,41 +50,45 @@ concurrency:
 ## 📋 Updated Workflows
 
 ### 1. **GraphQL Lambda** (`publish-gql.yml`)
+
 ```yaml
 on:
-  workflow_dispatch:          # Manual trigger via GitHub UI
+  workflow_dispatch: # Manual trigger via GitHub UI
   push:
-    branches: [main]          # Only main branch
+    branches: [main] # Only main branch
     paths:
-      - 'lambdas/db/**'       # Only when GraphQL code changes
+      - 'lambdas/db/**' # Only when GraphQL code changes
       - '.github/workflows/publish-gql.yml'
 ```
 
 ### 2. **Stats Lambda** (`publish-stats-lambda.yml`)
+
 ```yaml
 on:
-  workflow_dispatch:          # Manual trigger via GitHub UI
+  workflow_dispatch: # Manual trigger via GitHub UI
   push:
-    branches: [main]          # Only main branch
+    branches: [main] # Only main branch
     paths:
-      - 'lambdas/stats-lambda/**'  # Only when Stats code changes
+      - 'lambdas/stats-lambda/**' # Only when Stats code changes
       - '.github/workflows/publish-stats-lambda.yml'
 ```
 
 ### 3. **OAuth Proxy Lambda** (`publish-oauth-proxy.yml`)
+
 ```yaml
 on:
-  workflow_dispatch:          # Manual trigger via GitHub UI
+  workflow_dispatch: # Manual trigger via GitHub UI
   push:
-    branches: [main]          # Only main branch
+    branches: [main] # Only main branch
     paths:
-      - 'lambdas/oauth-proxy/**'   # Only when OAuth code changes
+      - 'lambdas/oauth-proxy/**' # Only when OAuth code changes
       - '.github/workflows/publish-oauth-proxy.yml'
 ```
 
 ## 🎯 Deployment Flow
 
 ### **Automatic Flow (Main Branch Merge)**
+
 1. Developer creates PR with Lambda changes
 2. PR is reviewed and approved
 3. PR is merged into `main` branch
@@ -90,6 +99,7 @@ on:
 8. Lambda is built, uploaded to S3, and deployed
 
 ### **Manual Flow (GitHub UI)**
+
 1. Navigate to GitHub Actions tab
 2. Select desired Lambda deployment workflow
 3. Click "Run workflow" button

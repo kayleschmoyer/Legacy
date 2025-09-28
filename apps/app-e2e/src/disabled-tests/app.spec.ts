@@ -40,7 +40,7 @@ describe('Legacy Sports App', () => {
     it('should navigate to Football screen', async () => {
       // Look for football navigation element
       const footballTab = element(
-        by.id('football-tab').or(by.text('Football'))
+        by.id('football-tab').or(by.text('Football')),
       );
 
       if (await footballTab.isVisible()) {
@@ -52,7 +52,7 @@ describe('Legacy Sports App', () => {
     it('should navigate to Baseball screen', async () => {
       // Look for baseball navigation element
       const baseballTab = element(
-        by.id('baseball-tab').or(by.text('Baseball'))
+        by.id('baseball-tab').or(by.text('Baseball')),
       );
 
       if (await baseballTab.isVisible()) {
@@ -87,7 +87,7 @@ describe('Legacy Sports App', () => {
 
       if (await loginForm.isVisible()) {
         await expect(
-          element(by.id('email-input').or(by.id('username-input')))
+          element(by.id('email-input').or(by.id('username-input'))),
         ).toBeVisible();
         await expect(element(by.id('password-input'))).toBeVisible();
         await expect(element(by.id('login-button'))).toBeVisible();
@@ -134,8 +134,8 @@ describe('Legacy Sports App', () => {
       try {
         await expect(
           element(by.id('loading-indicator').or(by.text('Loading...'))).atIndex(
-            0
-          )
+            0,
+          ),
         ).toBeVisible();
       } catch {
         // Loading might be too fast, that's okay
@@ -204,7 +204,7 @@ describe('Legacy Sports App', () => {
     it('should handle scrolling', async () => {
       // Test scrolling functionality
       const scrollView = element(
-        by.type('RCTScrollView').or(by.id('scroll-view'))
+        by.type('RCTScrollView').or(by.id('scroll-view')),
       );
 
       try {
@@ -226,7 +226,7 @@ describe('Legacy Sports App', () => {
       // Look for error messages or offline indicators
       try {
         await expect(
-          element(by.id('error-message').or(by.text('Error'))).atIndex(0)
+          element(by.id('error-message').or(by.text('Error'))).atIndex(0),
         ).toBeVisible();
       } catch {
         // No error state visible, which is good
@@ -256,7 +256,7 @@ describe('Legacy Sports App', () => {
 
       // Look for theme toggle if available
       const themeToggle = element(
-        by.id('theme-toggle').or(by.text('Dark').or(by.text('Light')))
+        by.id('theme-toggle').or(by.text('Dark').or(by.text('Light'))),
       );
 
       try {
@@ -272,7 +272,7 @@ describe('Legacy Sports App', () => {
     it('should have accessible elements', async () => {
       // Check for accessibility labels and traits
       const accessibleElements = element(
-        by.traits(['button', 'link', 'header'])
+        by.traits(['button', 'link', 'header']),
       );
 
       try {

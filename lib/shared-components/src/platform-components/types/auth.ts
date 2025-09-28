@@ -1,13 +1,31 @@
 /**
+ * Google Sign-In (GSI) specific configuration
+ */
+export interface GSIConfig {
+  /** Enable One Tap sign-in for returning users */
+  oneTap?: boolean;
+  /** Auto-select single account when available */
+  autoSelect?: boolean;
+  /** Close One Tap when user clicks outside */
+  cancelOnTapOutside?: boolean;
+  /** Use popup mode for OAuth flow */
+  uxMode?: 'popup' | 'redirect';
+}
+
+/**
  * OAuth configuration interface
  */
 export interface OAuthConfig {
   /** Google OAuth Client ID */
   googleClientId: string;
+  /** OAuth Proxy Lambda URL (optional - will auto-detect from environment if not provided) */
+  oauthProxyUrl?: string;
   /** Additional configuration options */
   additionalScopes?: string[];
   /** Offline access for refresh tokens */
   offlineAccess?: boolean;
+  /** Google Sign-In (GSI) configuration - One Tap enabled by default */
+  gsi?: GSIConfig;
 }
 
 /**

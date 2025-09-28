@@ -90,7 +90,7 @@ test.describe('Web Application', () => {
         // Clean selector name for filename
         const cleanSelector = selector.replace(/[^\w-]/g, '_');
         await expect(element).toHaveScreenshot(
-          `component-${cleanSelector}.png`
+          `component-${cleanSelector}.png`,
         );
       }
     }

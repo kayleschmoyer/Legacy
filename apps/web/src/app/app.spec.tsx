@@ -103,10 +103,14 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      // Check navigation exists and take snapshot for structure/content verification
+      // Since user is not authenticated, should show OAuth login instead of navigation
       const nav = container.querySelector('nav');
-      expect(nav).toBeInTheDocument();
-      expect(nav).toMatchSnapshot();
+      expect(nav).not.toBeInTheDocument();
+
+      // Should show OAuth login form instead
+      const oauthLogin = container.querySelector('div'); // OAuth login container
+      expect(oauthLogin).toBeInTheDocument();
+      expect(oauthLogin).toMatchSnapshot();
     });
 
     it('should match navigation snapshot', () => {
@@ -192,11 +196,15 @@ describe('App', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      // Check that basic layout elements are present and take snapshot for structure verification
-      expect(container.querySelector('nav')).toBeInTheDocument();
+      // Since user is not authenticated, should show OAuth login instead of navigation
+      expect(container.querySelector('nav')).not.toBeInTheDocument();
       expect(container.querySelector('main')).toBeInTheDocument();
-      
-      // Snapshot ensures navigation content and layout are correct
+
+      // Should show OAuth login form when accessing protected routes
+      const oauthLogin = container.querySelector('div'); // OAuth login container
+      expect(oauthLogin).toBeInTheDocument();
+
+      // Snapshot ensures OAuth login layout is correct for protected routes
       expect(container.firstChild).toMatchSnapshot();
     });
 

@@ -28,7 +28,7 @@ const config: TestRunnerConfig = {
       (log: any) =>
         log.level === 'error' &&
         !log.message.includes('deprecated') &&
-        !log.message.includes('CJS build of Vite')
+        !log.message.includes('CJS build of Vite'),
     );
 
     if (errors.length > 0) {

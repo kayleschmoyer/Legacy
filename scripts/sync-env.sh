@@ -3,10 +3,11 @@
 # Legacy Sports Environment Variables Sync Script (Bash)
 # This script pulls environment variables from AWS and updates the .env file
 #
-# Database Connection Strategy:
-# - DB_HOST: RDS Proxy endpoint (use for runtime/production)
-# - DB_HOST_DIRECT: Direct RDS endpoint (use for migrations and admin tasks)
-# - The script updates both values for flexibility
+# New Unified Database Credential Strategy:
+# - USE_LOCAL_CREDENTIALS=false (use AWS Secrets Manager for production)
+# - DB_SECRET_NAME: Points to AWS Secrets Manager secret
+# - DB_HOST: Database endpoint (proxy preferred for production)
+# - Credentials are automatically resolved by the new credential system
 
 set -e
 
@@ -15,7 +16,7 @@ TERRAFORM_DIR=${2:-terraform}
 ENV_FILE=${3:-.env}
 DRY_RUN=${DRY_RUN:-false}
 BACKUP=${BACKUP:-false}
-DATABASE_ENDPOINT=${DATABASE_ENDPOINT:-direct}  # Use direct endpoint by default for migrations
+DATABASE_ENDPOINT=${DATABASE_ENDPOINT:-proxy}  # Use proxy endpoint for production by default
 
 echo "Legacy Sports Environment Sync"
 echo "================================="
@@ -54,28 +55,27 @@ DB_HOST=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value
 AWS_REGION=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.aws_region')
 RDS_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.rds_proxy_endpoint.value')
 SQS_QUEUE_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_queue_url')
+OAUTH_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.oauth_proxy_endpoint.value')
+GRAPHQL_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.graphql_endpoint.value')
 
 # Get direct database endpoint for migrations (if available)
 cd "$TERRAFORM_DIR"
 DB_HOST_DIRECT=$(terraform output -raw rds_instance_endpoint 2>/dev/null || echo "")
 cd ..
 
-# Set main DB_HOST based on preference
+# Set main DB_HOST based on preference (proxy is preferred for production)
 if [ "$DATABASE_ENDPOINT" = "direct" ] && [ -n "$DB_HOST_DIRECT" ]; then
     DB_HOST_MAIN="$DB_HOST_DIRECT"
-    echo "Using direct database endpoint for DB_HOST"
+    echo "Using direct database endpoint for DB_HOST (for migrations/admin)"
 else
     DB_HOST_MAIN="$DB_HOST"
-    echo "Using RDS proxy endpoint for DB_HOST"
+    echo "Using RDS proxy endpoint for DB_HOST (recommended for production)"
 fi
 
 echo "Fetching secrets from AWS..."
 
-# Get database credentials
-echo "  Database credentials from: $DB_CREDS_SECRET_NAME"
-DB_CREDS=$(aws secretsmanager get-secret-value --secret-id "$DB_CREDS_SECRET_NAME" --query "SecretString" --output text)
-DB_USER=$(echo "$DB_CREDS" | jq -r '.username')
-DB_PASSWORD=$(echo "$DB_CREDS" | jq -r '.password')
+# Note: With the new credential system, we store the secret NAME, not the actual credentials
+# This allows the credential resolver to fetch them securely at runtime
 
 # Get JWT secret
 echo "  JWT secret from: $JWT_SECRET_NAME"
@@ -95,21 +95,34 @@ echo "Building environment variables..."
 # Create a temporary file with the new values
 TEMP_ENV=$(mktemp)
 
-# Define the variables we want to update
+# Define the variables we want to update (New Unified Credential System)
 cat > "$TEMP_ENV" << EOF
+# OAuth Configuration
 EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_CLIENT_ID
 CLIENT_ID=$GOOGLE_CLIENT_ID
+VITE_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET=$GOOGLE_SECRET
+VITE_OAUTH_PROXY_URL=$OAUTH_PROXY_ENDPOINT
+
+# Lambda Endpoints
+VITE_GRAPHQL_HOST=$GRAPHQL_ENDPOINT
+
+# Database Configuration (New Unified System)
+USE_LOCAL_CREDENTIALS=false
+DB_SECRET_NAME=$DB_CREDS_SECRET_NAME
 DB_HOST=$DB_HOST_MAIN
-DB_USER=$DB_USER
-DB_PASSWORD=$DB_PASSWORD
+
+# Legacy Database Variables (for backward compatibility)
+DB_CREDS_PATH=$DB_CREDS_SECRET_NAME
+
+# Application Secrets
 JWT_SECRET=$JWT_SECRET
 COOKIE_SECRET=$COOKIE_SECRET
+
+# AWS Configuration
 AWS_REGION=$AWS_REGION
-DB_CREDENTIALS_SECRET_NAME=$DB_CREDS_SECRET_NAME
 RDS_PROXY_ENDPOINT=$RDS_PROXY_ENDPOINT
 SQS_QUEUE_URL=$SQS_QUEUE_URL
-USE_LOCAL_CREDS=true
 EOF
 
 # Add direct database endpoint if available
@@ -191,16 +204,23 @@ rm "$TEMP_ENV"
 echo ""
 echo "✓ Environment file updated successfully!"
 echo ""
-echo "Summary:"
-echo "  Database Type: PG_REMOTE"
-echo "  Database Host (Active): $DB_HOST_MAIN"
-echo "  Database Host (Proxy): $RDS_PROXY_ENDPOINT"
-echo "  Database Host (Direct): $DB_HOST_DIRECT"
-echo "  Database User: $DB_USER"
+echo "Summary (New Unified Credential System):"
+echo "  Credential Mode: AWS Secrets Manager (USE_LOCAL_CREDENTIALS=false)"
+echo "  Database Secret: $DB_CREDS_SECRET_NAME"
+echo "  Database Host: $DB_HOST_MAIN"
+echo "  RDS Proxy Endpoint: $RDS_PROXY_ENDPOINT"
+echo "  Direct RDS Endpoint: $DB_HOST_DIRECT"
 echo "  AWS Region: $AWS_REGION"
 echo "  SQS Queue URL: $SQS_QUEUE_URL"
 echo "  Google Client ID: $GOOGLE_CLIENT_ID"
-echo "  Secrets updated: JWT, Google OAuth, Cookie, Database Password"
+echo "  Secrets configured: JWT, Google OAuth, Cookie"
 echo ""
-echo "Note: Set DATABASE_ENDPOINT=proxy for runtime, DATABASE_ENDPOINT=direct for migrations."
-echo "Note: Local development URLs are preserved. Update manually if needed."
+echo "Database Credential Resolution:"
+echo "  ✓ Production apps will automatically fetch DB credentials from AWS Secrets Manager"
+echo "  ✓ Use 'npm run db:test:production' to validate database connectivity"
+echo "  ✓ Use 'npm run db:credentials:production' to view resolved credentials"
+echo ""
+echo "Migration Notes:"
+echo "  - Set DATABASE_ENDPOINT=direct for database migrations and admin tasks"
+echo "  - Set DATABASE_ENDPOINT=proxy (default) for production applications"
+echo "  - Local development settings preserved (update .env.local separately)"

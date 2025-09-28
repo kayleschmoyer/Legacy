@@ -100,7 +100,7 @@ builder.queryField('users', (t) =>
         await connection.close();
       }
     },
-  })
+  }),
 );
 ```
 
@@ -127,7 +127,7 @@ builder.queryField('users', (t) =>
         orderDirection: (args.orderDirection as 'asc' | 'desc') || 'asc',
       });
     },
-  })
+  }),
 );
 ```
 

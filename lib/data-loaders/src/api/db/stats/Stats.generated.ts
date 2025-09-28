@@ -5,7 +5,10 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-export type UpsertSeasonBattingMutationFn = Apollo.MutationFunction<Types.UpsertSeasonBattingMutation, Types.UpsertSeasonBattingMutationVariables>;
+export type UpsertSeasonBattingMutationFn = Apollo.MutationFunction<
+  Types.UpsertSeasonBattingMutation,
+  Types.UpsertSeasonBattingMutationVariables
+>;
 
 /**
  * __useUpsertSeasonBattingMutation__
@@ -25,14 +28,31 @@ export type UpsertSeasonBattingMutationFn = Apollo.MutationFunction<Types.Upsert
  *   },
  * });
  */
-export function useUpsertSeasonBattingMutation(baseOptions?: Apollo.MutationHookOptions<Types.UpsertSeasonBattingMutation, Types.UpsertSeasonBattingMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.UpsertSeasonBattingMutation, Types.UpsertSeasonBattingMutationVariables>(Operations.UpsertSeasonBatting, options);
-      }
-export type UpsertSeasonBattingMutationHookResult = ReturnType<typeof useUpsertSeasonBattingMutation>;
-export type UpsertSeasonBattingMutationResult = Apollo.MutationResult<Types.UpsertSeasonBattingMutation>;
-export type UpsertSeasonBattingMutationOptions = Apollo.BaseMutationOptions<Types.UpsertSeasonBattingMutation, Types.UpsertSeasonBattingMutationVariables>;
-export type UpsertSeasonFieldingMutationFn = Apollo.MutationFunction<Types.UpsertSeasonFieldingMutation, Types.UpsertSeasonFieldingMutationVariables>;
+export function useUpsertSeasonBattingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.UpsertSeasonBattingMutation,
+    Types.UpsertSeasonBattingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.UpsertSeasonBattingMutation,
+    Types.UpsertSeasonBattingMutationVariables
+  >(Operations.UpsertSeasonBatting, options);
+}
+export type UpsertSeasonBattingMutationHookResult = ReturnType<
+  typeof useUpsertSeasonBattingMutation
+>;
+export type UpsertSeasonBattingMutationResult =
+  Apollo.MutationResult<Types.UpsertSeasonBattingMutation>;
+export type UpsertSeasonBattingMutationOptions = Apollo.BaseMutationOptions<
+  Types.UpsertSeasonBattingMutation,
+  Types.UpsertSeasonBattingMutationVariables
+>;
+export type UpsertSeasonFieldingMutationFn = Apollo.MutationFunction<
+  Types.UpsertSeasonFieldingMutation,
+  Types.UpsertSeasonFieldingMutationVariables
+>;
 
 /**
  * __useUpsertSeasonFieldingMutation__
@@ -52,14 +72,31 @@ export type UpsertSeasonFieldingMutationFn = Apollo.MutationFunction<Types.Upser
  *   },
  * });
  */
-export function useUpsertSeasonFieldingMutation(baseOptions?: Apollo.MutationHookOptions<Types.UpsertSeasonFieldingMutation, Types.UpsertSeasonFieldingMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.UpsertSeasonFieldingMutation, Types.UpsertSeasonFieldingMutationVariables>(Operations.UpsertSeasonFielding, options);
-      }
-export type UpsertSeasonFieldingMutationHookResult = ReturnType<typeof useUpsertSeasonFieldingMutation>;
-export type UpsertSeasonFieldingMutationResult = Apollo.MutationResult<Types.UpsertSeasonFieldingMutation>;
-export type UpsertSeasonFieldingMutationOptions = Apollo.BaseMutationOptions<Types.UpsertSeasonFieldingMutation, Types.UpsertSeasonFieldingMutationVariables>;
-export type UpsertSeasonPitchingMutationFn = Apollo.MutationFunction<Types.UpsertSeasonPitchingMutation, Types.UpsertSeasonPitchingMutationVariables>;
+export function useUpsertSeasonFieldingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.UpsertSeasonFieldingMutation,
+    Types.UpsertSeasonFieldingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.UpsertSeasonFieldingMutation,
+    Types.UpsertSeasonFieldingMutationVariables
+  >(Operations.UpsertSeasonFielding, options);
+}
+export type UpsertSeasonFieldingMutationHookResult = ReturnType<
+  typeof useUpsertSeasonFieldingMutation
+>;
+export type UpsertSeasonFieldingMutationResult =
+  Apollo.MutationResult<Types.UpsertSeasonFieldingMutation>;
+export type UpsertSeasonFieldingMutationOptions = Apollo.BaseMutationOptions<
+  Types.UpsertSeasonFieldingMutation,
+  Types.UpsertSeasonFieldingMutationVariables
+>;
+export type UpsertSeasonPitchingMutationFn = Apollo.MutationFunction<
+  Types.UpsertSeasonPitchingMutation,
+  Types.UpsertSeasonPitchingMutationVariables
+>;
 
 /**
  * __useUpsertSeasonPitchingMutation__
@@ -79,10 +116,24 @@ export type UpsertSeasonPitchingMutationFn = Apollo.MutationFunction<Types.Upser
  *   },
  * });
  */
-export function useUpsertSeasonPitchingMutation(baseOptions?: Apollo.MutationHookOptions<Types.UpsertSeasonPitchingMutation, Types.UpsertSeasonPitchingMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.UpsertSeasonPitchingMutation, Types.UpsertSeasonPitchingMutationVariables>(Operations.UpsertSeasonPitching, options);
-      }
-export type UpsertSeasonPitchingMutationHookResult = ReturnType<typeof useUpsertSeasonPitchingMutation>;
-export type UpsertSeasonPitchingMutationResult = Apollo.MutationResult<Types.UpsertSeasonPitchingMutation>;
-export type UpsertSeasonPitchingMutationOptions = Apollo.BaseMutationOptions<Types.UpsertSeasonPitchingMutation, Types.UpsertSeasonPitchingMutationVariables>;
+export function useUpsertSeasonPitchingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.UpsertSeasonPitchingMutation,
+    Types.UpsertSeasonPitchingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.UpsertSeasonPitchingMutation,
+    Types.UpsertSeasonPitchingMutationVariables
+  >(Operations.UpsertSeasonPitching, options);
+}
+export type UpsertSeasonPitchingMutationHookResult = ReturnType<
+  typeof useUpsertSeasonPitchingMutation
+>;
+export type UpsertSeasonPitchingMutationResult =
+  Apollo.MutationResult<Types.UpsertSeasonPitchingMutation>;
+export type UpsertSeasonPitchingMutationOptions = Apollo.BaseMutationOptions<
+  Types.UpsertSeasonPitchingMutation,
+  Types.UpsertSeasonPitchingMutationVariables
+>;

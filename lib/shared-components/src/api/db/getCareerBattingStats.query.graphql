@@ -1,0 +1,24 @@
+# Query to fetch career batting statistics with pagination and sorting support
+#import "./careerBatting.fragment.graphql"
+
+query GetCareerBattingStats(
+  $limit: Int
+  $offset: Int
+  $orderBy: String
+  $orderDirection: String
+  $minGames: Int
+  $minHomeRuns: Int
+  $minRBI: Int
+) {
+  careerBattingStats(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    minGames: $minGames
+    minHomeRuns: $minHomeRuns
+    minRBI: $minRBI
+  ) {
+    ...CareerBatting
+  }
+}

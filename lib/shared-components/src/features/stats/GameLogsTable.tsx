@@ -64,13 +64,14 @@ const CrossPlatformTable: React.FC<TableProps> = ({ headers, data, title }) => {
 export interface GameLogsTableProps {
   /**
    * API endpoint for fetching game logs
-   * @default 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs'
+   * @default 'http://localhost:5000/baseball-game-logs'
    */
   apiEndpoint?: string;
 }
 
 function GameLogsTable({
-  apiEndpoint = 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/baseball-game-logs',
+  apiEndpoint = process.env.VITE_STATS_API_URL ||
+    'http://localhost:5000/baseball-game-logs',
 }: GameLogsTableProps) {
   const [player, setPlayer] = useState('');
   const [date, setDate] = useState('');

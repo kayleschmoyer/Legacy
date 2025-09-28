@@ -1,5 +1,5 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Force LF line endings for all text files (consistent across platforms)
+* text=auto eol=lf
 
 # Explicitly declare text files you want to always be normalized and converted
 # to native line endings on checkout.
@@ -17,9 +17,9 @@
 *.scss text
 *.less text
 
-# Declare files that will always have CRLF line endings on checkout.
-*.bat text eol=crlf
-*.cmd text eol=crlf
+# Declare files that will always have lf line endings on checkout.
+*.bat text eol=lf
+*.cmd text eol=lf
 
 # Declare files that will always have LF line endings on checkout.
 *.sh text eol=lf

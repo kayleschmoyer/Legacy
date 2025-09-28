@@ -2,7 +2,7 @@ import htmlParser, { HTMLElement, Node, NodeType } from 'node-html-parser';
 
 function checkChildrenForTable(
   node: Node,
-  tableId: string
+  tableId: string,
 ): HTMLElement | null {
   let table: HTMLElement | null = null;
 
@@ -28,7 +28,7 @@ function checkChildrenForTable(
 
 export function getTable(
   root: HTMLElement,
-  tableId: string
+  tableId: string,
 ): HTMLElement | null {
   const table = root.getElementById(tableId);
 

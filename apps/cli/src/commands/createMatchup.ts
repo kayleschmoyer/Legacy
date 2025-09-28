@@ -19,7 +19,7 @@ type HandleCreateMatchupArgs = ArgsType<
 >;
 
 export async function handleCreateMatchup(
-  args: HandleCreateMatchupArgs
+  args: HandleCreateMatchupArgs,
 ): Promise<void> {
   LOGGER.debug('Creating Matchups');
 

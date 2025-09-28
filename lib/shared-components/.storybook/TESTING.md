@@ -156,17 +156,14 @@ Coverage reports are generated in:
 ## Best Practices
 
 1. **Tag stories appropriately**:
-
    - Use `tags: ['test']` for stories with interaction tests
    - Use `tags: ['skip-test']` to exclude from automated testing
 
 2. **Mock external dependencies**:
-
    - Mock API calls and external services in stories
    - Use `fn()` for function props that should be tracked
 
 3. **Test user interactions**:
-
    - Include `play` functions for interactive components
    - Test both happy path and error scenarios
 
@@ -179,12 +176,10 @@ Coverage reports are generated in:
 ### Common Issues
 
 1. **"No tests found"**:
-
    - Check that Storybook is running on the correct port
    - Verify story files have correct extensions (.stories.tsx)
 
 2. **React Native errors in tests**:
-
    - Mocks are configured in `jest-setup.ts`
    - Ensure React Native Web aliases are working
 

@@ -4,9 +4,9 @@ inputs:
   build-type:
     required: true
     type: choice
-    options: 
-    - deploy
-    - development
+    options:
+      - deploy
+      - development
     default: development
 
 runs:
@@ -15,12 +15,12 @@ runs:
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12' 
-  
+        python-version: "3.12"
+
     - name: Get Python Version
       id: full-python-version
       shell: bash
-      run: echo "version=$(python --version)" >> "$GITHUB_OUTPUT"  
+      run: echo "version=$(python --version)" >> "$GITHUB_OUTPUT"
 
     - name: Install and configure Poetry
       uses: snok/install-poetry@v1
@@ -42,6 +42,6 @@ runs:
       run: poetry install
 
     - name: Install Poetry Dependencies
-      if: inputs.build-type == 'deploy' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true' 
+      if: inputs.build-type == 'deploy' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       shell: bash
       run: poetry install --only main --sync

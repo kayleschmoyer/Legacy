@@ -1,5 +1,5 @@
 describe('Players', () => {
-  it('should run', () =>{ 
+  it('should run', () => {
     expect(true).toBe(true);
-  })
+  });
 });

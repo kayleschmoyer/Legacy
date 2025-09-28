@@ -30,7 +30,7 @@ export function useAuthorizedUserInfo(): LegacySportsJwt {
 
   if (value === null) {
     throw new Error(
-      'This component must be rendered inside an AuthorizedUserContextProvider'
+      'This component must be rendered inside an AuthorizedUserContextProvider',
     );
   }
 

@@ -1,13 +1,14 @@
-# Legacy Sports Environment Variables Sync Script
+# Legacy Sports Environment Variables Sync Script (PowerShell)
 # This script pulls environment variables from AWS and updates the .env file
 #
-# Database Connection Strategy:
-# - DB_HOST: RDS Proxy endpoint (use for runtime/production)
-# - DB_HOST_DIRECT: Direct RDS endpoint (use for migrations and admin tasks)
-# - The script updates both values for flexibility
+# New Unified Database Credential Strategy:
+# - USE_LOCAL_CREDENTIALS=false (use AWS Secrets Manager for production)
+# - DB_SECRET_NAME: Points to AWS Secrets Manager secret
+# - DB_HOST: Database endpoint (proxy preferred for production)
+# - Credentials are automatically resolved by the new credential system
 #
 # Special Character Handling:
-# - Automatically escapes dollar signs ($) in DB_PASSWORD for proper dotenv parsing
+# - Automatically escapes dollar signs ($) in secrets for proper dotenv parsing
 # - Adds SSL configuration for secure database connections
 
 param(
@@ -17,7 +18,7 @@ param(
     [switch]$DryRun,
     [switch]$Backup,
     [ValidateSet("proxy", "direct")]
-    [string]$DatabaseEndpoint = "direct"  # Use direct endpoint by default for migrations
+    [string]$DatabaseEndpoint = "proxy"  # Use proxy endpoint for production by default
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,11 +55,11 @@ try {
 
 Write-Host "Fetching secrets from AWS..." -ForegroundColor Yellow
 
-# Get database credentials
+# Note: With the new credential system, we store the secret NAME, not the actual credentials
+# This allows the credential resolver to fetch them securely at runtime
+
 $dbCredsSecretName = $terraformOutput.environment_variables_summary.value.db_creds_secret_name
-Write-Host "  Database credentials from: $dbCredsSecretName" -ForegroundColor Gray
-$dbCredsJson = aws secretsmanager get-secret-value --secret-id $dbCredsSecretName --query "SecretString" --output text
-$dbCreds = $dbCredsJson | ConvertFrom-Json
+Write-Host "  Database secret name: $dbCredsSecretName (will be resolved at runtime)" -ForegroundColor Gray
 
 # Get JWT secret
 $jwtSecretName = $terraformOutput.environment_variables_summary.value.jwt_secret_name
@@ -78,26 +79,34 @@ $cookieSecret = aws secretsmanager get-secret-value --secret-id $cookieSecretNam
 Write-Host ""
 Write-Host "Building environment variables..." -ForegroundColor Yellow
 
-# Build the new environment variables
+# Build the new environment variables (New Unified Credential System)
 $newEnvVars = @{}
+
+# OAuth Configuration
 $newEnvVars["EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.google_oauth_client_id
 $newEnvVars["CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.google_oauth_client_id
+$newEnvVars["VITE_GOOGLE_CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.google_oauth_client_id
 $newEnvVars["GOOGLE_OAUTH_CLIENT_SECRET"] = $googleSecret
-$newEnvVars["DB_USER"] = $dbCreds.username
-$newEnvVars["DB_PASSWORD"] = $dbCreds.password
-$newEnvVars["DB_PORT"] = "5432"
-$newEnvVars["DB_SSL_MODE"] = "require"
-$newEnvVars["DB_CERT_PATH"] = "C:/code/legacy-sports/certs/us-east-1-bundle.pem"
+$newEnvVars["VITE_OAUTH_PROXY_URL"] = $terraformOutput.oauth_proxy_endpoint.value
+
+# Lambda Endpoints
+$newEnvVars["VITE_GRAPHQL_HOST"] = $terraformOutput.graphql_endpoint.value
+
+# Database Configuration (New Unified System)
+$newEnvVars["USE_LOCAL_CREDENTIALS"] = "false"
+$newEnvVars["DB_SECRET_NAME"] = $dbCredsSecretName
+$newEnvVars["DB_CERT_PATH"] = "certs/us-east-1-bundle.pem"
+
+# Legacy Database Variables (for backward compatibility)
+$newEnvVars["DB_CREDS_PATH"] = $dbCredsSecretName
+
+# Application Secrets
 $newEnvVars["JWT_SECRET"] = $jwtSecret
 $newEnvVars["COOKIE_SECRET"] = $cookieSecret
 
-# Add new AWS-specific environment variables
+# AWS Configuration
 $newEnvVars["AWS_REGION"] = $terraformOutput.environment_variables_summary.value.aws_region
-$newEnvVars["DB_CREDENTIALS_SECRET_NAME"] = $terraformOutput.environment_variables_summary.value.db_creds_secret_name
 $newEnvVars["RDS_PROXY_ENDPOINT"] = $terraformOutput.rds_proxy_endpoint.value
-$newEnvVars["USE_LOCAL_CREDS"] = "true"
-
-# Add SQS environment variables
 $newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_queue_url
 
 # Get direct database endpoint for migrations (if available)
@@ -110,15 +119,15 @@ try {
     $directDbHost = $directDbEndpoint -replace ':.*$', ''
     $newEnvVars["DB_HOST_DIRECT"] = $directDbHost
     
-    # Set main DB_HOST based on user preference
+    # Set main DB_HOST based on user preference (proxy is preferred for production)
     if ($DatabaseEndpoint -eq "direct") {
         $newEnvVars["DB_HOST"] = $directDbHost
-        Write-Host "Using direct database endpoint for DB_HOST" -ForegroundColor Yellow
+        Write-Host "Using direct database endpoint for DB_HOST (for migrations/admin)" -ForegroundColor Yellow
     } else {
         $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
         $proxyHost = $proxyEndpoint -replace ':.*$', ''
         $newEnvVars["DB_HOST"] = $proxyHost
-        Write-Host "Using RDS proxy endpoint for DB_HOST" -ForegroundColor Yellow
+        Write-Host "Using RDS proxy endpoint for DB_HOST (recommended for production)" -ForegroundColor Yellow
     }
 } catch {
     Write-Warning "Could not retrieve direct database endpoint. Using proxy endpoint."
@@ -226,16 +235,23 @@ $newContent | Out-File -FilePath $EnvFile -Encoding UTF8
 Write-Host ""
 Write-Host "Environment file updated successfully!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Summary:" -ForegroundColor Yellow
-Write-Host "  Database Type: PG_REMOTE" -ForegroundColor Gray
-Write-Host "  Database Host (Active): $($newEnvVars["DB_HOST"])" -ForegroundColor Gray
-Write-Host "  Database Host (Proxy): $($terraformOutput.rds_proxy_endpoint.value)" -ForegroundColor Gray
-Write-Host "  Database Host (Direct): $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
-Write-Host "  Database User: $($dbCreds.username)" -ForegroundColor Gray
+Write-Host "Summary (New Unified Credential System):" -ForegroundColor Yellow
+Write-Host "  Credential Mode: AWS Secrets Manager (USE_LOCAL_CREDENTIALS=false)" -ForegroundColor Gray
+Write-Host "  Database Secret: $($newEnvVars["DB_SECRET_NAME"])" -ForegroundColor Gray
+Write-Host "  Database Host: $($newEnvVars["DB_HOST"])" -ForegroundColor Gray
+Write-Host "  RDS Proxy Endpoint: $($terraformOutput.rds_proxy_endpoint.value)" -ForegroundColor Gray
+Write-Host "  Direct RDS Endpoint: $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
 Write-Host "  AWS Region: $($terraformOutput.environment_variables_summary.value.aws_region)" -ForegroundColor Gray
 Write-Host "  SQS Queue URL: $($terraformOutput.environment_variables_summary.value.sqs_queue_url)" -ForegroundColor Gray
 Write-Host "  Google Client ID: $($terraformOutput.environment_variables_summary.value.google_oauth_client_id)" -ForegroundColor Gray
-Write-Host "  Secrets updated: JWT, Google OAuth, Cookie, Database Password" -ForegroundColor Gray
+Write-Host "  Secrets configured: JWT, Google OAuth, Cookie" -ForegroundColor Gray
 Write-Host ""
-Write-Host "Note: Use -DatabaseEndpoint proxy for runtime, -DatabaseEndpoint direct for migrations." -ForegroundColor Cyan
-Write-Host "Note: Local development URLs are preserved. Update manually if needed." -ForegroundColor Cyan
+Write-Host "Database Credential Resolution:" -ForegroundColor Cyan
+Write-Host "  Production apps will automatically fetch DB credentials from AWS Secrets Manager" -ForegroundColor Green
+Write-Host "  Use 'npm run db:test:production' to validate database connectivity" -ForegroundColor Green
+Write-Host "  Use 'npm run db:credentials:production' to view resolved credentials" -ForegroundColor Green
+Write-Host ""
+Write-Host "Migration Notes:" -ForegroundColor Yellow
+Write-Host "  Set -DatabaseEndpoint direct for database migrations and admin tasks"
+Write-Host "  Set -DatabaseEndpoint proxy (default) for production applications"  
+Write-Host "  Local development settings preserved (update .env.local separately)"

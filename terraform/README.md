@@ -47,21 +47,25 @@ terraform apply
 
 Central entry point for all API requests:
 
-- **Base URL**: `https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev`
+- **Base URL**: `https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev`
 - **Endpoints**:
   - `/graphql` - GraphQL API
-  - `/oauth` - Authentication
+  - `/oauth` - Authentication and user management
   - `/stats` - Statistics processing
   - `/games` - Game selection
 
+> **Note**: Legacy API Gateways (`u65oy98s9d`, `89vohxs7ta`) were decommissioned on September 26, 2025.
+
 ### Lambda Functions
 
-| Function           | Purpose                     | Endpoint   |
-| ------------------ | --------------------------- | ---------- |
-| **GraphQL**        | Main API for data queries   | `/graphql` |
-| **OAuth Proxy**    | Google OAuth authentication | `/oauth`   |
-| **Stats Lambda**   | Statistics processing       | `/stats`   |
-| **Game Selection** | Game data management        | `/games`   |
+| Function           | Purpose                   | Endpoint   | Status    |
+| ------------------ | ------------------------- | ---------- | --------- |
+| **GraphQL**        | Main API for data queries | `/graphql` | ✅ Active |
+| **OAuth Proxy**    | OAuth + user management   | `/oauth`   | ✅ Active |
+| **Stats Lambda**   | Statistics processing     | `/stats`   | ✅ Active |
+| **Game Selection** | Game data management      | `/games`   | ✅ Active |
+
+> **Legacy**: `legacy-sports-graphql-dev-graphql` Lambda was decommissioned on September 26, 2025.
 
 ### Database
 
@@ -268,7 +272,29 @@ terraform apply -target=aws_lambda_function.graphql
 - **Production**: Separate Terraform workspace
 - **Staging**: Optional environment
 
-## 📚 Resources
+## � Recent Changes
+
+### September 26, 2025 - Infrastructure Cleanup
+
+**Legacy Resource Decommissioning**: Removed unused AWS resources to optimize costs and simplify architecture.
+
+**Resources Removed**:
+
+- 2x Legacy API Gateway instances (`u65oy98s9d`, `89vohxs7ta`)
+- 1x Legacy Lambda function (`legacy-sports-graphql-dev-graphql`)
+- 1x Legacy S3 bucket (`legacy-sports-dev-lambdas-f3d4b778`)
+- Associated IAM roles and policies
+
+**Current Active Infrastructure**:
+
+- API Gateway: `dtx9mcsty1.execute-api.us-east-1.amazonaws.com/dev`
+- 4x Lambda functions (GraphQL, OAuth with user management, Stats, Games)
+- PostgreSQL RDS with VPC networking
+- S3 deployment bucket: `legacy-sports-dev-lambdas-cca20ad9`
+
+**Impact**: Cost reduction, simplified maintenance, no functional changes.
+
+## �📚 Resources
 
 - [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
 - [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)

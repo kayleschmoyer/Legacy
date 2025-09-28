@@ -20,12 +20,14 @@ This document describes the new S3-based Lambda deployment approach that elimina
 ## 🔄 Deployment Flow
 
 ### 1. Build Phase (CI/CD)
+
 - Build Lambda function code
 - Create versioned ZIP package (`function-YYYYMMDD-HHMMSS-githash.zip`)
 - Upload package to S3 with versioned key
 - Update SSM parameter with new version
 
 ### 2. Deploy Phase (Terraform)
+
 - Read current version from SSM parameter
 - Reference S3 object in Lambda function configuration
 - Apply infrastructure changes
@@ -33,6 +35,7 @@ This document describes the new S3-based Lambda deployment approach that elimina
 ## 📦 Components
 
 ### S3 Bucket Structure
+
 ```
 legacy-sports-dev-lambdas-{random}/
 ├── graphql/
@@ -47,6 +50,7 @@ legacy-sports-dev-lambdas-{random}/
 ```
 
 ### SSM Parameters
+
 ```
 /legacy-sports/dev/s3/lambda-deployments-bucket
 /legacy-sports/dev/lambda/graphql/version
@@ -73,6 +77,7 @@ terraform apply
 ```
 
 ### PowerShell (Windows)
+
 ```powershell
 # Deploy single function
 .\scripts\deploy-lambda.ps1 -FunctionName graphql
@@ -89,6 +94,7 @@ terraform apply
 ### CI/CD Deployment
 
 GitHub Actions workflows automatically:
+
 1. Build Lambda packages
 2. Upload to S3 with versioned names
 3. Update SSM parameters
@@ -97,6 +103,7 @@ GitHub Actions workflows automatically:
 ## 🎯 Benefits
 
 ### ✅ Advantages
+
 - **No commits back to repo**: Clean git history
 - **Versioned artifacts**: Easy rollback capability
 - **Audit trail**: S3 versioning shows deployment history
@@ -107,6 +114,7 @@ GitHub Actions workflows automatically:
 ### 🔧 Configuration
 
 #### Lambda Function (Terraform)
+
 ```hcl
 data "aws_ssm_parameter" "graphql_lambda_version" {
   name = "/legacy-sports/${var.environment}/lambda/graphql/version"
@@ -121,6 +129,7 @@ resource "aws_lambda_function" "graphql" {
 ```
 
 #### CI/CD Workflow
+
 ```yaml
 - name: Deploy Lambda
   run: |
@@ -136,14 +145,17 @@ resource "aws_lambda_function" "graphql" {
 ### Common Issues
 
 **SSM Parameter not found**:
+
 - Ensure Terraform is applied to create SSM parameters
 - Check parameter name format matches environment
 
 **S3 bucket access denied**:
+
 - Verify IAM permissions for S3 and SSM
 - Check bucket policy and CORS settings
 
 **Lambda deployment fails**:
+
 - Verify ZIP package structure
 - Check CloudWatch logs for execution errors
 - Ensure environment variables are set correctly
@@ -173,6 +185,7 @@ terraform apply -target=aws_lambda_function.graphql -auto-approve
 ### Next Steps After Implementation
 
 1. **Apply Terraform changes**:
+
    ```bash
    cd terraform
    terraform init
@@ -181,6 +194,7 @@ terraform apply -target=aws_lambda_function.graphql -auto-approve
    ```
 
 2. **Initial deployment**:
+
    ```bash
    ./scripts/deploy-lambda-all.sh
    ```

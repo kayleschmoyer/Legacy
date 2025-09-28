@@ -1,86 +1,293 @@
-name: Custom Merge Queue
+name: Enhanced Merge Queue
 
 on:
+  schedule:
+    - cron: '*/10 * * * *'  # Run every 10 minutes (reduced frequency for efficiency)
+  workflow_dispatch:      # Allow manual triggering
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no actual merging)'
+        type: boolean
+        default: false
+      force_check:
+        description: 'Force check all PRs even if not labeled'  
+        type: boolean
+        default: false
+  # Trigger on status check completion for faster response
+  status:
+  check_run:
+    types: [completed]
+  # Trigger when merge-when-ready label is added for immediate processing
   pull_request:
     types: [labeled]
-  schedule:
-    - cron: "*/5 * * * *" # Check every 5 minutes
-
-permissions:
-  contents: write
-  pull-requests: write
-  checks: read
 
 jobs:
   process-merge-queue:
-    if: contains(github.event.pull_request.labels.*.name, 'merge-when-ready') || github.event_name == 'schedule'
+    if: |
+      github.repository_owner == 'bkrupa' && 
+      (github.event_name != 'pull_request' || github.event.label.name == 'merge-when-ready')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+
     steps:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Get ready PRs
-        id: ready-prs
+      - name: Process Enhanced Merge Queue
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              sort: 'created',
-              direction: 'asc'
+            const { owner, repo } = context.repo;
+            const isDryRun = ${{ github.event.inputs.dry_run || false }};
+            const forceCheck = ${{ github.event.inputs.force_check || false }};
+            const isTriggeredByStatus = context.eventName === 'status' || context.eventName === 'check_run';
+            
+            console.log(`🔄 Starting merge queue processing (${isDryRun ? 'DRY RUN' : 'LIVE'})...`);
+            if (isTriggeredByStatus) {
+              console.log(`⚡ Triggered by status/check completion - faster response mode`);
+            }
+            
+            // Get PRs with merge-when-ready label (or all if force_check is true)
+            const prs = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open'
             });
-
-            const readyPrs = prs.filter(pr => 
-              pr.labels.some(label => label.name === 'merge-when-ready') &&
-              pr.mergeable_state === 'ready'
-            );
-
-            core.setOutput('prs', JSON.stringify(readyPrs));
-
-      - name: Process merge queue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prs = JSON.parse('${{ steps.ready-prs.outputs.prs }}');
-
-            for (const pr of prs.slice(0, 1)) {  // Process one at a time
-              console.log(`Processing PR #${pr.number}: ${pr.title}`);
+            
+            const mergeReadyPRs = forceCheck 
+              ? prs.data 
+              : prs.data.filter(pr => 
+                  pr.labels.some(label => label.name === 'merge-when-ready')
+                );
+            
+            console.log(`📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label`);
+            
+            for (const pr of mergeReadyPRs) {
+              console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
               
-              // Check if all status checks pass
-              const { data: checks } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: pr.head.sha
-              });
-              
-              const allPassed = checks.check_runs.every(check => 
-                check.status === 'completed' && check.conclusion === 'success'
-              );
-              
-              if (allPassed) {
-                // Merge the PR
-                await github.rest.pulls.merge({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pr.number,
-                  merge_method: 'squash'
+              try {
+                // Get fresh PR details
+                const prDetails = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: pr.number
                 });
                 
-                console.log(`✅ Merged PR #${pr.number}`);
-              } else {
-                console.log(`⏳ PR #${pr.number} not ready - waiting for checks`);
+                // Validate PR state
+                const validationResult = await validatePRForMerge(prDetails.data);
+                
+                if (validationResult.canMerge) {
+                  console.log(`✅ PR #${pr.number} is ready for merge`);
+                  
+                  if (!isDryRun) {
+                    await performMerge(prDetails.data);
+                  } else {
+                    console.log(`🏃 DRY RUN: Would merge PR #${pr.number}`);
+                  }
+                } else {
+                  console.log(`❌ PR #${pr.number} cannot be merged: ${validationResult.reason}`);
+                  await reportMergeBlocker(prDetails.data, validationResult);
+                }
+                
+              } catch (error) {
+                console.error(`💥 Error processing PR #${pr.number}: ${error.message}`);
+                await reportProcessingError(pr, error);
               }
+            }
+            
+            console.log(`\n🏁 Merge queue processing complete`);
+            
+            // Helper Functions
+            async function validatePRForMerge(pr) {
+              // Check if PR is draft
+              if (pr.draft) {
+                return { canMerge: false, reason: 'PR is in draft state' };
+              }
+              
+              // Check mergeable state
+              if (pr.mergeable === false) {
+                return { canMerge: false, reason: 'PR has merge conflicts that must be resolved' };
+              }
+              
+              if (pr.mergeable === null) {
+                return { canMerge: false, reason: 'GitHub is still calculating mergeable state, will retry next cycle' };
+              }
+              
+              // Check for required reviews
+              const reviews = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: pr.number
+              });
+              
+              const approvals = reviews.data.filter(review => 
+                review.state === 'APPROVED' && review.user.type === 'User'
+              );
+              
+              if (approvals.length === 0) {
+                return { canMerge: false, reason: 'PR requires at least one approval from a reviewer' };
+              }
+              
+              // Check status checks
+              const checksResult = await validateStatusChecks(pr.head.sha);
+              if (!checksResult.allPassing) {
+                return { 
+                  canMerge: false, 
+                  reason: "Status checks failing: " + checksResult.failingChecks.join(', '),
+                  failingChecks: checksResult.failingChecks
+                };
+              }
+              
+              return { canMerge: true };
+            }
+            
+            async function validateStatusChecks(sha) {
+              // Get check runs
+              const checks = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: sha
+              });
+              
+              // Get commit statuses  
+              const statuses = await github.rest.repos.listCommitStatusesForRef({
+                owner,
+                repo,
+                ref: sha
+              });
+              
+              const failingChecks = [];
+              
+              // Validate check runs
+              for (const check of checks.data.check_runs) {
+                if (check.status !== 'completed' || check.conclusion !== 'success') {
+                  if (check.conclusion === 'failure' || check.conclusion === 'cancelled' || check.conclusion === 'timed_out') {
+                    failingChecks.push(check.name + " (" + check.conclusion + ")");
+                  } else if (check.status !== 'completed') {
+                    failingChecks.push(check.name + " (" + check.status + ")");
+                  }
+                }
+              }
+              
+              // Validate commit statuses
+              const statusesByContext = {};
+              for (const status of statuses.data) {
+                if (!statusesByContext[status.context] || 
+                    new Date(status.created_at) > new Date(statusesByContext[status.context].created_at)) {
+                  statusesByContext[status.context] = status;
+                }
+              }
+              
+              for (const [context, status] of Object.entries(statusesByContext)) {
+                if (status.state !== 'success') {
+                  failingChecks.push(context + " (" + status.state + ")");
+                }
+              }
+              
+              return {
+                allPassing: failingChecks.length === 0,
+                failingChecks
+              };
+            }
+            
+            async function performMerge(pr) {
+              try {
+                console.log(`🚀 Merging PR #${pr.number}...`);
+                
+                const mergeResult = await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  merge_method: 'squash',
+                  commit_title: pr.title + " (#" + pr.number + ")",
+                  commit_message: "Merged via automated merge queue\n\n" + (pr.body || '')
+                });
+                
+                console.log(`✅ Successfully merged PR #${pr.number}`);
+                
+                // Post success comment
+                await github.rest.issues.createComment({
+                  issue_number: pr.number,
+                  owner,
+                  repo,
+                  body: "## 🎉 Successfully Merged!\n\n" +
+                        "This PR has been automatically merged via the merge queue.\n\n" +
+                        "**Merge Details:**\n" +
+                        "- Method: Squash merge\n" +
+                        "- Commit SHA: `" + mergeResult.data.sha + "`\n" +
+                        "- Merged at: " + new Date().toISOString() + "\n\n" +
+                        "Thank you for your contribution! 🚀"
+                });
+                
+              } catch (error) {
+                console.error(`❌ Failed to merge PR #${pr.number}: ${error.message}`);
+                throw error;
+              }
+            }
+            
+            async function reportMergeBlocker(pr, validation) {
+              let comment = "## 🚫 Merge Queue: Cannot Merge\n\n" +
+                           "**Reason:** " + validation.reason + "\n\n" +
+                           "### 🛠️ How to Fix:";
+              
+              if (validation.reason.includes('merge conflicts')) {
+                comment += "\n1. Sync your branch with the latest main:\n" +
+                          "   ```bash\n" +
+                          "   git checkout main\n" +
+                          "   git pull origin main\n" +
+                          "   git checkout " + pr.head.ref + "\n" +
+                          "   git merge main  # Resolve any conflicts\n" +
+                          "   git push origin " + pr.head.ref + "\n" +
+                          "   ```";
+              } else if (validation.reason.includes('approval')) {
+                comment += "\n1. Request review from a team member\n" +
+                          "2. Address any review feedback\n" +
+                          "3. Obtain an approval from a reviewer";
+              } else if (validation.failingChecks) {
+                comment += "\n1. Fix the failing checks:\n" +
+                          validation.failingChecks.map(check => "   - " + check).join('\n') + "\n" +
+                          "2. Push your fixes to trigger CI re-run";
+              } else {
+                comment += "\n1. Check the PR status and resolve any issues\n" +
+                          "2. Ensure all requirements are met";
+              }
+              
+              comment += "\n\nThe merge queue will automatically retry once the issues are resolved.\n\n" +
+                        "---\n" +
+                        "*Automated message from merge queue system*";
+              
+              await github.rest.issues.createComment({
+                issue_number: pr.number,
+                owner,
+                repo,
+                body: comment
+              });
+            }
+            
+            async function reportProcessingError(pr, error) {
+              console.error("Processing error for PR #" + pr.number + ":", error);
+              
+              await github.rest.issues.createComment({
+                issue_number: pr.number,
+                owner,
+                repo,
+                body: "## ⚠️ Merge Queue Processing Error\n\n" +
+                      "An error occurred while processing this PR for automatic merge:\n\n" +
+                      "**Error:** " + error.message + "\n\n" +
+                      "### 🔧 Next Steps:\n" +
+                      "1. This may be a temporary issue - the merge queue will retry in the next cycle\n" +
+                      "2. If the error persists, you can manually merge this PR\n" +
+                      "3. Contact the team if you believe this is a system issue\n\n" +
+                      "**Troubleshooting:**\n" +
+                      "- Ensure the PR is in a mergeable state\n" +
+                      "- Verify all required checks are passing\n" +
+                      "- Check that the branch is up to date\n\n" +
+                      "---\n" +
+                      "*Automated error report from merge queue system*"
+              });
             }

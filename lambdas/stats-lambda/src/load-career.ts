@@ -21,7 +21,7 @@ const getDb = memoizeOne(async () => {
 
 async function loadPlayer(
   dbClient: BaseDbConnection<typeof PublicSchema>,
-  brefId: string
+  brefId: string,
 ): Promise<void> {
   LOGGER.debug(`Importing ${brefId}`);
 
@@ -57,7 +57,7 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       } catch (parseError) {
         LOGGER.error(
           `Failed to parse message body for record ${record.messageId}:`,
-          parseError as Error
+          parseError as Error,
         );
         batchItemFailures.push({ itemIdentifier: record.messageId });
         continue;
@@ -72,12 +72,12 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       // Process the player
       await loadPlayer(dbClient, brefId);
       LOGGER.debug(
-        `Successfully processed record ${record.messageId} for player ${brefId}`
+        `Successfully processed record ${record.messageId} for player ${brefId}`,
       );
     } catch (error) {
       LOGGER.error(
         `Failed to process record ${record.messageId}:`,
-        error as Error
+        error as Error,
       );
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }
@@ -86,7 +86,7 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   await dbClient.close();
 
   LOGGER.debug(
-    `Processed ${event.Records.length} records, ${batchItemFailures.length} failures`
+    `Processed ${event.Records.length} records, ${batchItemFailures.length} failures`,
   );
 
   return {

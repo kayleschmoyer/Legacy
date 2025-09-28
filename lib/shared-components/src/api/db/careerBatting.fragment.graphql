@@ -1,0 +1,25 @@
+# Career Batting fragment defining the fields for career batting statistics
+fragment CareerBatting on CareerBatting {
+  playerId
+  games
+  plateAppearances
+  atBats
+  runs
+  hits
+  doubles
+  triples
+  homeRuns
+  rbi
+  stolenBases
+  caughtStealing
+  baseOnBalls
+  strikeouts
+  totalBases
+  groundedIntoDoublePlays
+  hitByPitch
+  sacrificeHits
+  intentionalBaseOnBalls
+  battingAverage
+  onBasePercentage
+  sluggingPercentage
+}

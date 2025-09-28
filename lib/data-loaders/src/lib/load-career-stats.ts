@@ -10,7 +10,7 @@ import {
 
 export async function loadCareerStats(
   db: PublicDb,
-  brefId: string
+  brefId: string,
 ): Promise<CareerStats> {
   const player = await getPlayerByBrefId(db, brefId);
 

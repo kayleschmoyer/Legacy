@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+/**
+ * Git Pre-Commit Hook - Secret Validation
+ * 
+ * This hook automatically runs before every git commit to ensure
+ * no secrets are accidentally committed to the repository.
+ * 
+ * Installation: Copy this file to .git/hooks/pre-commit and make executable
+ */
+
+const { execSync } = require('child_process');
+const path = require('path');
+
+try {
+  // Run the secret validation script
+  console.log('🔒 Running pre-commit secret validation...\n');
+  
+  const scriptPath = path.join(__dirname, '../../scripts/validate-secrets.js');
+  execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
+  
+  console.log('✅ Pre-commit validation passed!\n');
+  process.exit(0);
+} catch (error) {
+  console.error('\n❌ Pre-commit validation failed!');
+  console.error('Commit blocked to prevent secret exposure.\n');
+  process.exit(1);
+}

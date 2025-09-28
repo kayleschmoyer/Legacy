@@ -28,10 +28,7 @@
         "lib/shared-components/src/index.ts"
       ],
       "@legacy-sports/tamagui-config": ["lib/tamagui-config/src/index.ts"],
-      "@legacy-sports/utils": ["lib/utils/src/index.ts"],
-      "__PLATFORM_COMPONENTS__": [
-        "lib/shared-components/src/platform-components/__PLATFORM_COMPONENTS__.d.ts"
-      ]
+      "@legacy-sports/utils": ["lib/utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

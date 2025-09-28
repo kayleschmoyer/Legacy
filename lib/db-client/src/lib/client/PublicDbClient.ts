@@ -7,7 +7,7 @@ import {
   AggregateSeasonFieldingByPos,
   AggregateSeasonPitching,
   CareerBatting,
-  careerFielding,
+  CareerFielding,
   CareerPitching,
   CreateMatchupPlayer,
   CreatePlayerInput,
@@ -27,7 +27,7 @@ export type PublicDb = GenericDatabase<typeof Schema>;
 
 export async function getPlayerByBrefId(
   db: PublicDb,
-  brefId: string
+  brefId: string,
 ): Promise<Player | null> {
   return await db
     .select()
@@ -38,7 +38,7 @@ export async function getPlayerByBrefId(
 
 export async function getCareerBattingStatsForPlayer(
   db: PublicDb,
-  playerId: number
+  playerId: number,
 ): Promise<CareerBatting | null> {
   return await db
     .select()
@@ -49,8 +49,8 @@ export async function getCareerBattingStatsForPlayer(
 
 export async function getCareerFieldingStatsForPlayer(
   db: PublicDb,
-  playerId: number
-): Promise<careerFielding | null> {
+  playerId: number,
+): Promise<CareerFielding | null> {
   return await db
     .select()
     .from(Schema.careerFielding)
@@ -60,7 +60,7 @@ export async function getCareerFieldingStatsForPlayer(
 
 export async function getCareerPitchingStatsForPlayer(
   db: PublicDb,
-  playerId: number
+  playerId: number,
 ): Promise<CareerPitching | null> {
   return await db
     .select()
@@ -88,7 +88,7 @@ export async function getPlayersOnTeams(db: PublicDb): Promise<Player[]> {
 
 export async function bulkUpsertBattingSeason(
   db: PublicDb,
-  season: SeasonBatting[]
+  season: SeasonBatting[],
 ): Promise<SeasonBatting[]> {
   if (season.length === 0) {
     return [];
@@ -116,7 +116,7 @@ export async function bulkUpsertBattingSeason(
 
 export async function bulkUpsertFieldingSeason(
   db: PublicDb,
-  season: SeasonFielding[]
+  season: SeasonFielding[],
 ): Promise<SeasonFielding[]> {
   if (season.length === 0) {
     return [];
@@ -146,7 +146,7 @@ export async function bulkUpsertFieldingSeason(
 
 export async function bulkUpsertPitchingSeason(
   db: PublicDb,
-  season: SeasonPitching[]
+  season: SeasonPitching[],
 ): Promise<SeasonPitching[]> {
   if (season.length === 0) {
     return [];
@@ -174,7 +174,7 @@ export async function bulkUpsertPitchingSeason(
 
 export async function bulkCreatePlayers(
   db: PublicDb,
-  players: CreatePlayerInput[]
+  players: CreatePlayerInput[],
 ): Promise<Player[]> {
   if (players.length === 0) {
     return [];
@@ -192,7 +192,7 @@ export async function bulkCreatePlayers(
 
 export function getPositionsForPlayer(
   db: PublicDb,
-  playerId: number
+  playerId: number,
 ): Promise<PlayerEligiblePosition[]> {
   return db
     .select()
@@ -203,7 +203,7 @@ export function getPositionsForPlayer(
 export function getMatchupForLeague(
   db: PublicDb,
   leagueId: number,
-  weekId: number
+  weekId: number,
 ): Promise<Matchup | null> {
   return db
     .select()
@@ -211,15 +211,15 @@ export function getMatchupForLeague(
     .where(
       and(
         eq(Schema.matchups.leagueId, leagueId),
-        eq(Schema.matchups.weekNumber, weekId)
-      )
+        eq(Schema.matchups.weekNumber, weekId),
+      ),
     )
     .then(TakeUniqueOrNull);
 }
 
 export function getPlayersForLeague(
   db: PublicDb,
-  leagueId: number
+  leagueId: number,
 ): Promise<Player[]> {
   const subQuery = db
     .select()
@@ -235,7 +235,7 @@ export function getPlayersForLeague(
 
 export function getSeasonBattingStatsForPlayer(
   db: PublicDb,
-  playerId: number
+  playerId: number,
 ): Promise<SeasonBatting[]> {
   return db
     .select()
@@ -246,7 +246,7 @@ export function getSeasonBattingStatsForPlayer(
 export function getSeasonBattingStatsForPlayerSeason(
   db: PublicDb,
   playerId: number,
-  season: number
+  season: number,
 ): Promise<AggregateSeasonBatting | null> {
   return db
     .select()
@@ -254,8 +254,8 @@ export function getSeasonBattingStatsForPlayerSeason(
     .where(
       and(
         eq(Schema.aggregateSeasonBatting.playerId, playerId),
-        eq(Schema.aggregateSeasonBatting.season, season)
-      )
+        eq(Schema.aggregateSeasonBatting.season, season),
+      ),
     )
     .then(TakeUniqueOrNull);
 }
@@ -263,7 +263,7 @@ export function getSeasonBattingStatsForPlayerSeason(
 export function getSeasonPitchingStatsForPlayerSeason(
   db: PublicDb,
   playerId: number,
-  season: number
+  season: number,
 ): Promise<AggregateSeasonPitching | null> {
   return db
     .select()
@@ -271,8 +271,8 @@ export function getSeasonPitchingStatsForPlayerSeason(
     .where(
       and(
         eq(Schema.aggregateSeasonPitching.playerId, playerId),
-        eq(Schema.aggregateSeasonPitching.season, season)
-      )
+        eq(Schema.aggregateSeasonPitching.season, season),
+      ),
     )
     .then(TakeUniqueOrNull);
 }
@@ -280,7 +280,7 @@ export function getSeasonPitchingStatsForPlayerSeason(
 export function getSeasonFieldingStatsForPlayerSeason(
   db: PublicDb,
   playerId: number,
-  season: number
+  season: number,
 ): Promise<AggregateSeasonFieldingByPos[]> {
   return db
     .select()
@@ -288,14 +288,14 @@ export function getSeasonFieldingStatsForPlayerSeason(
     .where(
       and(
         eq(Schema.aggregateSeasonFieldingByPos.playerId, playerId),
-        eq(Schema.aggregateSeasonFieldingByPos.season, season)
-      )
+        eq(Schema.aggregateSeasonFieldingByPos.season, season),
+      ),
     );
 }
 
 export function getMissingMatchupRecords(
   db: PublicDb,
-  matchupId: number
+  matchupId: number,
 ): Promise<Player[]> {
   const populatedMatchups = db
     .select({
@@ -309,7 +309,7 @@ export function getMissingMatchupRecords(
     .from(Schema.teamMembers)
     .innerJoin(
       Schema.matchups,
-      eq(Schema.matchups.leagueId, Schema.teamMembers.leagueId)
+      eq(Schema.matchups.leagueId, Schema.teamMembers.leagueId),
     )
     .where(eq(Schema.matchups.id, matchupId));
 
@@ -319,14 +319,14 @@ export function getMissingMatchupRecords(
     .where(
       and(
         inArray(Schema.players.id, teamMembers),
-        not(inArray(Schema.players.id, populatedMatchups))
-      )
+        not(inArray(Schema.players.id, populatedMatchups)),
+      ),
     );
 }
 
 export async function createMatchupRecord(
   db: PublicDb,
-  record: CreateMatchupPlayer
+  record: CreateMatchupPlayer,
 ): Promise<MatchupPlayer> {
   const [result] = await db
     .insert(Schema.matchupPlayers)
@@ -338,7 +338,7 @@ export async function createMatchupRecord(
 export function getMatchup(
   db: PublicDb,
   leagueId: number,
-  week: number
+  week: number,
 ): Promise<Matchup | null> {
   return db
     .select()
@@ -346,8 +346,8 @@ export function getMatchup(
     .where(
       and(
         eq(Schema.matchups.leagueId, leagueId),
-        eq(Schema.matchups.weekNumber, week)
-      )
+        eq(Schema.matchups.weekNumber, week),
+      ),
     )
     .then(TakeUniqueOrNull);
 }

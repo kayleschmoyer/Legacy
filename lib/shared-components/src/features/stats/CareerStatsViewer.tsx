@@ -81,13 +81,14 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
 export interface CareerStatsViewerProps {
   /**
    * API endpoint for fetching career stats
-   * @default 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats'
+   * @default 'http://localhost:5000/career-stats'
    */
   apiEndpoint?: string;
 }
 
 function CareerStatsViewer({
-  apiEndpoint = 'https://e57xg24kgi.execute-api.us-east-1.amazonaws.com/default/career-stats',
+  apiEndpoint = process.env.VITE_STATS_API_URL ||
+    'http://localhost:5000/career-stats',
 }: CareerStatsViewerProps) {
   const [player, setPlayer] = useState('');
   const [loading, setLoading] = useState(false);

@@ -24,7 +24,9 @@ type ArgsType<T> = T extends Argv<infer P> ? P : never;
 async function insertIntoSqs(playerId: string): Promise<void> {
   const queueUrl = getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
 
-  const sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  const sqsClient = new SQSClient({
+    region: process.env.AWS_REGION || 'us-east-1',
+  });
 
   const command = new SendMessageCommand({
     QueueUrl: queueUrl,
@@ -41,7 +43,7 @@ type HandleLoadCareerStatsArgs = ArgsType<
 >;
 
 export async function handleLoadCareerStats(
-  args: HandleLoadCareerStatsArgs
+  args: HandleLoadCareerStatsArgs,
 ): Promise<void> {
   LOGGER.debug('Loading Player Stats');
 

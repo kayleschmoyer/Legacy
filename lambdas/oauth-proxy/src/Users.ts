@@ -23,7 +23,7 @@ interface GoogleJwtContents {
 
 export async function getUserFromGoogleJwt(
   dbClient: BaseDbConnection<typeof InternalSchema>,
-  googleToken: string
+  googleToken: string,
 ): Promise<InternalUser> {
   const googleJwt = jwtDecode<GoogleJwtContents>(googleToken);
   let user = await getUserByEmail(dbClient.db, googleJwt.email);
@@ -49,7 +49,7 @@ export async function hashPassword(plaintext: string): Promise<string> {
 
 export async function testPassword(
   plaintext: string,
-  hash: string
+  hash: string,
 ): Promise<boolean> {
   return await compare(plaintext, hash);
 }

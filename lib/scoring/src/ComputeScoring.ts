@@ -1,10 +1,10 @@
 export function computeAverageScoring<
   T extends Record<string, number | string | null | undefined> & {
     g?: number | null;
-  }
+  },
 >(
   statsRecord: T | null | undefined,
-  scoringSettings: Partial<Record<keyof T, number>>
+  scoringSettings: Partial<Record<keyof T, number>>,
 ): number {
   if (!statsRecord?.g) {
     return 0;
@@ -15,10 +15,10 @@ export function computeAverageScoring<
 }
 
 export function computeScoring<
-  T extends Record<string, number | string | null | undefined>
+  T extends Record<string, number | string | null | undefined>,
 >(
   statsRecord: T | null | undefined,
-  scoringSettings: Partial<Record<keyof T, number>>
+  scoringSettings: Partial<Record<keyof T, number>>,
 ): number {
   if (!statsRecord) {
     return 0;

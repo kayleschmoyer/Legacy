@@ -29,7 +29,7 @@ export function useGetUserByEmailQuery(
     (
       | { variables: Types.GetUserByEmailQueryVariables; skip?: boolean }
       | { skip: boolean }
-    )
+    ),
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -41,7 +41,7 @@ export function useGetUserByEmailLazyQuery(
   baseOptions?: Apollo.LazyQueryHookOptions<
     Types.GetUserByEmailQuery,
     Types.GetUserByEmailQueryVariables
-  >
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useLazyQuery<
@@ -53,7 +53,7 @@ export function useGetUserByEmailSuspenseQuery(
   baseOptions?: Apollo.SuspenseQueryHookOptions<
     Types.GetUserByEmailQuery,
     Types.GetUserByEmailQueryVariables
-  >
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<
@@ -99,7 +99,7 @@ export function useGetUserByIdQuery(
     (
       | { variables: Types.GetUserByIdQueryVariables; skip?: boolean }
       | { skip: boolean }
-    )
+    ),
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -111,7 +111,7 @@ export function useGetUserByIdLazyQuery(
   baseOptions?: Apollo.LazyQueryHookOptions<
     Types.GetUserByIdQuery,
     Types.GetUserByIdQueryVariables
-  >
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useLazyQuery<
@@ -123,7 +123,7 @@ export function useGetUserByIdSuspenseQuery(
   baseOptions?: Apollo.SuspenseQueryHookOptions<
     Types.GetUserByIdQuery,
     Types.GetUserByIdQueryVariables
-  >
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<
@@ -168,7 +168,7 @@ export function useCreateUserMutation(
   baseOptions?: Apollo.MutationHookOptions<
     Types.CreateUserMutation,
     Types.CreateUserMutationVariables
-  >
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useMutation<

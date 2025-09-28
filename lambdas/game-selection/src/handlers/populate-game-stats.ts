@@ -15,7 +15,7 @@ export type PopulateGameStatsEvent = EventBridgeEvent<
 >;
 
 export async function handler(
-  event: PopulateGameStatsEvent
+  event: PopulateGameStatsEvent,
 ): Promise<Record<string, never>> {
   LOGGER.debug('Processing populate game stats event', { event });
 
@@ -29,12 +29,12 @@ export async function handler(
         PublicSchema.matchupPlayers,
         eq(
           PublicSchema.matchupPlayers.id,
-          PublicSchema.matchupPlayerGames.matchupPlayerId
-        )
+          PublicSchema.matchupPlayerGames.matchupPlayerId,
+        ),
       )
       .innerJoin(
         PublicSchema.players,
-        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id)
+        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id),
       )
       .where(
         not(
@@ -46,20 +46,20 @@ export async function handler(
                 and(
                   eq(
                     PublicSchema.gameBatting.playerId,
-                    PublicSchema.matchupPlayers.playerId
+                    PublicSchema.matchupPlayers.playerId,
                   ),
                   eq(
                     PublicSchema.gameBatting.gameNum,
-                    PublicSchema.matchupPlayerGames.battingGameNum
+                    PublicSchema.matchupPlayerGames.battingGameNum,
                   ),
                   eq(
                     PublicSchema.gameBatting.season,
-                    PublicSchema.matchupPlayers.season
-                  )
-                )
-              )
-          )
-        )
+                    PublicSchema.matchupPlayers.season,
+                  ),
+                ),
+              ),
+          ),
+        ),
       );
 
     const pitchingGamesToLoad = await db.db
@@ -69,12 +69,12 @@ export async function handler(
         PublicSchema.matchupPlayers,
         eq(
           PublicSchema.matchupPlayers.id,
-          PublicSchema.matchupPlayerGames.matchupPlayerId
-        )
+          PublicSchema.matchupPlayerGames.matchupPlayerId,
+        ),
       )
       .innerJoin(
         PublicSchema.players,
-        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id)
+        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id),
       )
       .where(
         not(
@@ -86,20 +86,20 @@ export async function handler(
                 and(
                   eq(
                     PublicSchema.gamePitching.playerId,
-                    PublicSchema.matchupPlayers.playerId
+                    PublicSchema.matchupPlayers.playerId,
                   ),
                   eq(
                     PublicSchema.gamePitching.gameNum,
-                    PublicSchema.matchupPlayerGames.pitchingGameNum
+                    PublicSchema.matchupPlayerGames.pitchingGameNum,
                   ),
                   eq(
                     PublicSchema.gamePitching.season,
-                    PublicSchema.matchupPlayers.season
-                  )
-                )
-              )
-          )
-        )
+                    PublicSchema.matchupPlayers.season,
+                  ),
+                ),
+              ),
+          ),
+        ),
       );
 
     const fieldingGamesToLoad = await db.db
@@ -109,12 +109,12 @@ export async function handler(
         PublicSchema.matchupPlayers,
         eq(
           PublicSchema.matchupPlayers.id,
-          PublicSchema.matchupPlayerGames.matchupPlayerId
-        )
+          PublicSchema.matchupPlayerGames.matchupPlayerId,
+        ),
       )
       .innerJoin(
         PublicSchema.players,
-        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id)
+        eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id),
       )
       .where(
         not(
@@ -126,32 +126,32 @@ export async function handler(
                 and(
                   eq(
                     PublicSchema.gameFielding.playerId,
-                    PublicSchema.matchupPlayers.playerId
+                    PublicSchema.matchupPlayers.playerId,
                   ),
                   eq(
                     PublicSchema.gameFielding.gameNum,
-                    PublicSchema.matchupPlayerGames.fieldingGameNum
+                    PublicSchema.matchupPlayerGames.fieldingGameNum,
                   ),
                   eq(
                     PublicSchema.gameFielding.season,
-                    PublicSchema.matchupPlayers.season
-                  )
-                )
-              )
-          )
-        )
+                    PublicSchema.matchupPlayers.season,
+                  ),
+                ),
+              ),
+          ),
+        ),
       );
 
     for (const game of battingGamesToLoad) {
       if (game.matchup_player_games.battingGameNum !== null) {
         LOGGER.debug(
-          `Loading Batting game ${game.matchup_player_games.battingGameNum} from ${game.matchup_players.season} for ${game.players.brefId}`
+          `Loading Batting game ${game.matchup_player_games.battingGameNum} from ${game.matchup_players.season} for ${game.players.brefId}`,
         );
 
         const battingStats = await getGameBattingStats(
           game.players,
           game.matchup_players.season,
-          game.matchup_player_games.battingGameNum
+          game.matchup_player_games.battingGameNum,
         );
 
         if (battingStats !== null) {
@@ -166,14 +166,14 @@ export async function handler(
     for (const game of fieldingGamesToLoad) {
       if (game.matchup_player_games.fieldingGameNum !== null) {
         LOGGER.debug(
-          `Loading Fielding game ${game.matchup_player_games.fieldingGameNum} at ${game.matchup_player_games.fieldingGamePos} from ${game.matchup_players.season} for ${game.players.brefId}`
+          `Loading Fielding game ${game.matchup_player_games.fieldingGameNum} at ${game.matchup_player_games.fieldingGamePos} from ${game.matchup_players.season} for ${game.players.brefId}`,
         );
 
         const fieldingStats = await getGameFieldingStats(
           game.players,
           game.matchup_players.season,
           game.matchup_player_games.fieldingGameNum,
-          game.matchup_player_games.fieldingGamePos
+          game.matchup_player_games.fieldingGamePos,
         );
 
         if (fieldingStats !== null) {
@@ -188,13 +188,13 @@ export async function handler(
     for (const game of pitchingGamesToLoad) {
       if (game.matchup_player_games.pitchingGameNum !== null) {
         LOGGER.debug(
-          `Loading Pitching game ${game.matchup_player_games.pitchingGameNum} from ${game.matchup_players.season} for ${game.players.brefId}`
+          `Loading Pitching game ${game.matchup_player_games.pitchingGameNum} from ${game.matchup_players.season} for ${game.players.brefId}`,
         );
 
         const pitchingStats = await getGamePitchingStats(
           game.players,
           game.matchup_players.season,
-          game.matchup_player_games.pitchingGameNum
+          game.matchup_player_games.pitchingGameNum,
         );
 
         if (pitchingStats !== null) {

@@ -25,7 +25,7 @@ export interface FieldingStatsTableProps {
 }
 
 export function FieldingStatsTable(
-  props: FieldingStatsTableProps
+  props: FieldingStatsTableProps,
 ): React.JSX.Element {
   const { stats } = props;
 

@@ -105,14 +105,14 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_rds" {
 
 # Lambda function
 resource "aws_lambda_function" "graphql" {
-  s3_bucket         = aws_s3_bucket.lambda_deployments.bucket
-  s3_key           = "db/db-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
-  function_name    = "${local.name_prefix}-graphql"
-  role            = aws_iam_role.graphql_lambda.arn
-  handler         = "index.handler"
-  runtime         = "nodejs20.x"
-  timeout         = 30
-  memory_size     = 1024
+  s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
+  s3_key        = "db/db-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
+  function_name = "${local.name_prefix}-graphql"
+  role          = aws_iam_role.graphql_lambda.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = var.environment == "dev" ? 512 : 1024
 
   source_code_hash = data.aws_ssm_parameter.graphql_lambda_version.value
 
@@ -123,9 +123,19 @@ resource "aws_lambda_function" "graphql" {
 
   environment {
     variables = {
+      # Database configuration - use RDS proxy for connection pooling and security
+      DB_SECRET_NAME        = aws_secretsmanager_secret.database_credentials.name
+      DB_HOST               = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      USE_LOCAL_CREDENTIALS = "false"
+      DB_CERT_PATH          = "/opt/certs/us-east-1-bundle.pem"
+
+      # Legacy support - keep DB_CREDS_PATH as fallback
       DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
-      DB_HOST       = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      NODE_ENV      = var.environment
+
+      # Runtime configuration
+      NODE_ENV                            = var.environment
+      LOG_LEVEL                           = "debug"
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
     }
   }
 
@@ -142,7 +152,7 @@ resource "aws_lambda_function" "graphql" {
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "graphql_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.graphql.function_name}"
-  retention_in_days = 14
+  retention_in_days = var.environment == "dev" ? 7 : 14
 
   tags = local.common_tags
 }
@@ -155,3 +165,8 @@ resource "aws_lambda_permission" "graphql_api_gateway" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
+
+# Legacy GraphQL Lambda and IAM role (DECOMMISSIONED on September 26, 2025)
+# These resources were successfully destroyed as they were replaced by the new GraphQL Lambda:
+# - aws_lambda_function.legacy_graphql (legacy-sports-graphql-dev-graphql)
+# - aws_iam_role.legacy_graphql_lambda (legacy-sports-graphql-dev-us-east-1-lambdaRole)

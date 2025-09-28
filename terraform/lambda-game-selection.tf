@@ -23,10 +23,8 @@ resource "aws_iam_role_policy_attachment" "game_selection_lambda_basic" {
   role       = aws_iam_role.game_selection_lambda.name
 }
 
-resource "aws_iam_role_policy_attachment" "game_selection_lambda_vpc" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-  role       = aws_iam_role.game_selection_lambda.name
-}
+# VPC access policy removed - Game Selection Lambda now runs outside VPC for external API access
+# VPC execution role no longer needed for external Baseball Reference scraping
 
 # Custom policy for Game Selection Lambda
 resource "aws_iam_policy" "game_selection_lambda_secrets" {
@@ -88,65 +86,50 @@ resource "aws_iam_role_policy_attachment" "game_selection_lambda_rds" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "game_selection_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-game-selection"
-  retention_in_days = 14
+  retention_in_days = var.environment == "dev" ? 7 : 14
 
   tags = local.common_tags
 }
 
-# Build Game Selection Lambda
-resource "null_resource" "build_game_selection_lambda" {
-  triggers = {
-    source_hash = sha256(join("", [
-      for f in fileset("${path.module}/../lambdas/game-selection/src", "**/*.{ts,js,json}")
-      : filesha256("${path.module}/../lambdas/game-selection/src/${f}")
-    ]))
-    package_json = filesha256("${path.module}/../lambdas/game-selection/project.json")
-  }
-
-  provisioner "local-exec" {
-    command     = "npx nx run game-selection:build"
-    working_dir = "${path.module}/.."
-  }
-}
-
-# Archive Game Selection Lambda
-data "archive_file" "game_selection_lambda" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambdas/game-selection/dist"
-  output_path = "${path.module}/../lambdas/game-selection/game-selection-lambda.zip"
-  
-  depends_on = [null_resource.build_game_selection_lambda]
+# Data source to get the current Game Selection Lambda version from SSM
+data "aws_ssm_parameter" "game_selection_lambda_version" {
+  name = "/legacy-sports/${var.environment}/lambda/game-selection/version"
 }
 
 # Lambda Function
 resource "aws_lambda_function" "game_selection" {
-  filename         = data.archive_file.game_selection_lambda.output_path
-  function_name    = "${local.name_prefix}-game-selection"
-  role            = aws_iam_role.game_selection_lambda.arn
-  handler         = "index.handler"
-  runtime         = "nodejs20.x"
-  timeout         = 30
-  memory_size     = 256
+  s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
+  s3_key        = "game-selection/game-selection-${data.aws_ssm_parameter.game_selection_lambda_version.value}.zip"
+  function_name = "${local.name_prefix}-game-selection"
+  role          = aws_iam_role.game_selection_lambda.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 30
+  memory_size   = 256
 
-  source_code_hash = data.archive_file.game_selection_lambda.output_base64sha256
+  source_code_hash = data.aws_ssm_parameter.game_selection_lambda_version.value
 
-  vpc_config {
-    subnet_ids         = aws_subnet.private_lambda[*].id
-    security_group_ids = [aws_security_group.lambda.id]
-  }
+  # VPC config removed - Lambda now runs outside VPC for direct external API access
+  # This allows Baseball Reference scraping without NAT Gateway requirements
 
   environment {
     variables = {
-      DB_CREDS_PATH                       = aws_secretsmanager_secret.database_credentials.name
-      DB_HOST                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      NODE_ENV                           = var.environment
+      # New unified credential system environment variables
+      DB_SECRET_NAME        = aws_secretsmanager_secret.database_credentials.name
+      DB_HOST               = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      USE_LOCAL_CREDENTIALS = "false"
+
+      # Legacy support - keep DB_CREDS_PATH as fallback
+      DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
+
+      NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.game_selection_lambda_basic,
-    aws_iam_role_policy_attachment.game_selection_lambda_vpc,
+    # VPC dependency removed - Lambda now runs outside VPC
     aws_iam_role_policy_attachment.game_selection_lambda_secrets,
     aws_iam_role_policy_attachment.game_selection_lambda_rds,
     aws_cloudwatch_log_group.game_selection_lambda
@@ -205,7 +188,7 @@ resource "aws_api_gateway_method_response" "game_selection_options" {
 
 resource "aws_api_gateway_integration_response" "game_selection_options" {
   depends_on = [aws_api_gateway_integration.game_selection_options]
-  
+
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.game_selection_paths.id
   http_method = aws_api_gateway_method.game_selection_options.http_method

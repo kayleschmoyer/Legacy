@@ -18,7 +18,7 @@
     "assetBundlePatterns": ["**/*"],
     "extra": {
       "oauthProxyUrl": "http://localhost:5001",
-      "googleClientId": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com"
+      "googleClientId": "placeholder-google-client-id"
     },
     "ios": {
       "supportsTablet": true,

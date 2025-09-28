@@ -29,7 +29,7 @@ export function BattingStatsTableWithData(): React.JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats]
+    [stats],
   );
 
   if (loading) {
@@ -55,7 +55,7 @@ export function PitchingStatsTableWithData(): React.JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats]
+    [stats],
   );
 
   if (loading) {
@@ -81,7 +81,7 @@ export function FieldingStatsTableWithData(): React.JSX.Element {
 
   const filteredStats = useMemo(
     () => stats?.filter((s) => s !== undefined && s !== null),
-    [stats]
+    [stats],
   );
 
   if (loading) {

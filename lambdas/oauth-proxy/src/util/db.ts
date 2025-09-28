@@ -17,5 +17,5 @@ export const getDbClient = memoizeOne(
     await connection.initialize();
 
     return connection;
-  }
+  },
 );

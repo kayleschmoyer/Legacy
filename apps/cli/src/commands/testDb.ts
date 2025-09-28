@@ -12,7 +12,7 @@ import { CommandArgs, loadEnvFile } from '../utils/loadEnvFile';
 export const testDbCommandBuilder = (argv: Argv): Argv => argv.usage('test-db');
 
 export async function handleTestDb(
-  args: ArgumentsCamelCase<CommandArgs>
+  args: ArgumentsCamelCase<CommandArgs>,
 ): Promise<void> {
   loadEnvFile(args);
   LOGGER.info('Testing database connectivity...');
@@ -24,7 +24,7 @@ export async function handleTestDb(
   const dbCertPath = getEnvVarRequired(EnvironmentVariable.DB_CERT_PATH);
 
   LOGGER.debug(
-    `Connecting to database ${dbName || '-'} at ${dbHost} with user ${dbUser}`
+    `Connecting to database ${dbName || '-'} at ${dbHost} with user ${dbUser}`,
   );
 
   const options: PoolConfig = {

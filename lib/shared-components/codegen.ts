@@ -2,8 +2,15 @@ import type { CodegenConfig } from '@graphql-codegen/cli';
 
 const config: CodegenConfig = {
   overwrite: true,
-  schema: 'https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql',
-  documents: 'src/api/db/**/*.graphql',
+  // Use the local PostGraphile server with full database schema
+  schema:
+    process.env.GRAPHQL_HOST ||
+    process.env.VITE_GRAPHQL_HOST ||
+    'http://localhost:5000/graphql',
+  documents: [
+    'src/api/db/**/*.graphql',
+    'src/features/**/PlayerStatsQueries.ts',
+  ],
   generates: {
     'src/api/db/graphql.generated.ts': {
       config: {

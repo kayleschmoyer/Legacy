@@ -94,7 +94,7 @@ test.describe('Visual Snapshots', () => {
 
     // Try to enable dark mode if available
     const darkModeToggle = page.locator(
-      '[data-testid="dark-mode-toggle"], .dark-mode-toggle, [aria-label*="dark"], [aria-label*="theme"]'
+      '[data-testid="dark-mode-toggle"], .dark-mode-toggle, [aria-label*="dark"], [aria-label*="theme"]',
     );
     if (await darkModeToggle.isVisible()) {
       await darkModeToggle.click();
@@ -183,13 +183,13 @@ test.describe('Visual Snapshots', () => {
               {
                 animations: 'disabled',
                 threshold: 0.3, // Allow slight differences
-              }
+              },
             );
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : 'Unknown error';
             console.log(
-              `Skipped snapshot for ${selector}${suffix}: ${errorMessage}`
+              `Skipped snapshot for ${selector}${suffix}: ${errorMessage}`,
             );
           }
         }
@@ -235,7 +235,7 @@ test.describe('Visual Snapshots', () => {
 
     // Look for error messages or states
     const errorElements = page.locator(
-      '.error, .alert-error, [data-testid="error"], .text-red-500'
+      '.error, .alert-error, [data-testid="error"], .text-red-500',
     );
     if (await errorElements.first().isVisible()) {
       await expect(page).toHaveScreenshot('error-state.png', {

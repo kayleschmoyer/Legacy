@@ -19,7 +19,7 @@ query {
     }
   }
 }
-  `.trim()
+  `.trim(),
   );
 
   const [variables, setVariables] = useState('{}');
@@ -28,7 +28,7 @@ query {
   const [error, setError] = useState<string | null>(null);
 
   const GRAPHQL_HOST =
-    process.env['GRAPHQL_HOST'] || 'http://localhost:4000/graphql';
+    process.env['GRAPHQL_HOST'] || 'http://localhost:5000/graphql';
 
   const executeQuery = async () => {
     setLoading(true);

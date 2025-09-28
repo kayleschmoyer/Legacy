@@ -23,10 +23,8 @@ resource "aws_iam_role_policy_attachment" "stats_lambda_basic" {
   role       = aws_iam_role.stats_lambda.name
 }
 
-resource "aws_iam_role_policy_attachment" "stats_lambda_vpc" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-  role       = aws_iam_role.stats_lambda.name
-}
+# VPC access policy removed - Stats Lambda now runs outside VPC for external API access
+# VPC execution role no longer needed for external Baseball Reference scraping
 
 # Custom policy for Stats Lambda
 resource "aws_iam_policy" "stats_lambda_secrets" {
@@ -118,7 +116,7 @@ resource "aws_iam_role_policy_attachment" "stats_lambda_rds" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "stats_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-stats"
-  retention_in_days = 14
+  retention_in_days = var.environment == "dev" ? 7 : 14
 
   tags = local.common_tags
 }
@@ -130,35 +128,39 @@ data "aws_ssm_parameter" "stats_lambda_version" {
 
 # Lambda Function
 resource "aws_lambda_function" "stats" {
-  s3_bucket         = aws_s3_bucket.lambda_deployments.bucket
-  s3_key           = "stats/stats-${data.aws_ssm_parameter.stats_lambda_version.value}.zip"
-  function_name    = "${local.name_prefix}-stats"
-  role            = aws_iam_role.stats_lambda.arn
-  handler         = "index.handler"
-  runtime         = "nodejs20.x"
-  timeout         = 300  # 5 minutes for stats processing
-  memory_size     = 512  # Higher memory for data processing
+  s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
+  s3_key        = "stats/stats-${data.aws_ssm_parameter.stats_lambda_version.value}.zip"
+  function_name = "${local.name_prefix}-stats"
+  role          = aws_iam_role.stats_lambda.arn
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  timeout       = var.environment == "dev" ? 180 : var.lambda_stats_timeout
+  memory_size   = var.environment == "dev" ? 256 : 512 # Lower memory for dev
 
   source_code_hash = data.aws_ssm_parameter.stats_lambda_version.value
 
-  vpc_config {
-    subnet_ids         = aws_subnet.private_lambda[*].id
-    security_group_ids = [aws_security_group.lambda.id]
-  }
+  # VPC config removed - Lambda now runs outside VPC for direct external API access
+  # This allows Baseball Reference scraping without NAT Gateway requirements
 
   environment {
     variables = {
-      DB_CREDS_PATH                       = aws_secretsmanager_secret.database_credentials.name
-      DB_HOST                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      SQS_QUEUE_URL                      = aws_sqs_queue.load_season_stats.url
-      NODE_ENV                           = var.environment
+      # New unified credential system environment variables
+      DB_SECRET_NAME        = aws_secretsmanager_secret.database_credentials.name
+      DB_HOST               = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      USE_LOCAL_CREDENTIALS = "false"
+
+      # Legacy support - keep DB_CREDS_PATH as fallback
+      DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
+
+      SQS_QUEUE_URL                       = aws_sqs_queue.load_season_stats.url
+      NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.stats_lambda_basic,
-    aws_iam_role_policy_attachment.stats_lambda_vpc,
+    # VPC dependency removed - Lambda now runs outside VPC
     aws_iam_role_policy_attachment.stats_lambda_secrets,
     aws_iam_role_policy_attachment.stats_lambda_sqs,
     aws_iam_role_policy_attachment.stats_lambda_rds,
@@ -218,7 +220,7 @@ resource "aws_api_gateway_method_response" "stats_options" {
 
 resource "aws_api_gateway_integration_response" "stats_options" {
   depends_on = [aws_api_gateway_integration.stats_options]
-  
+
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.stats_paths.id
   http_method = aws_api_gateway_method.stats_options.http_method
@@ -261,14 +263,14 @@ resource "aws_lambda_permission" "stats_api_gateway" {
 resource "aws_lambda_event_source_mapping" "stats_sqs" {
   event_source_arn = aws_sqs_queue.load_season_stats.arn
   function_name    = aws_lambda_function.stats.arn
-  
+
   # Batch processing configuration
   batch_size = 10
   # Note: maximum_batching_window_in_seconds is not supported for FIFO queues
-  
+
   # Error handling
   function_response_types = ["ReportBatchItemFailures"]
-  
+
   depends_on = [
     aws_lambda_function.stats,
     aws_sqs_queue.load_season_stats

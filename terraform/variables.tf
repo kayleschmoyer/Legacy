@@ -5,9 +5,13 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  description = "Environment name"
+  description = "Environment name (dev/staging/prod) - affects resource sizing for cost optimization"
   type        = string
   default     = "dev"
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be one of: dev, staging, prod."
+  }
 }
 
 variable "project_name" {
@@ -25,7 +29,7 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "Availability zones"
   type        = list(string)
-  default     = ["us-east-1a"]  # Reduced from 3 AZs to 1 for dev environment
+  default     = ["us-east-1a", "us-east-1b"] # Minimum 2 AZs required for RDS
 }
 
 variable "database_name" {
@@ -41,9 +45,15 @@ variable "database_username" {
 }
 
 variable "lambda_timeout" {
-  description = "Lambda function timeout in seconds"
+  description = "Lambda function timeout in seconds (standard functions)"
   type        = number
   default     = 30
+}
+
+variable "lambda_stats_timeout" {
+  description = "Stats Lambda timeout in seconds (longer for data processing)"
+  type        = number
+  default     = 300
 }
 
 variable "google_oauth_client_id" {
@@ -73,5 +83,17 @@ variable "allowed_public_ips" {
 variable "enable_rds_proxy" {
   description = "Enable RDS Proxy (can be disabled for dev to save costs)"
   type        = bool
-  default     = false  # Disabled by default for dev cost savings
+  default     = false # Disabled by default for dev cost savings
+}
+
+variable "nat_gateway_count" {
+  description = "Number of NAT Gateways to create (1 for cost savings, same as AZ count for high availability)"
+  type        = number
+  default     = 0 # Disabled by default - use NAT instance instead for cost savings
+}
+
+variable "use_nat_instance" {
+  description = "Use lightweight NAT instance instead of expensive NAT Gateway for internet access"
+  type        = bool
+  default     = true
 }

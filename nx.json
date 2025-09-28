@@ -49,20 +49,7 @@
         "typecheckTargetName": "typecheck"
       }
     },
-    {
-      "plugin": "@nx/react-native/plugin",
-      "options": {
-        "startTargetName": "react-native:start",
-        "upgradeTargetName": "update",
-        "bundleTargetName": "react-native:bundle",
-        "podInstallTargetName": "pod-install",
-        "runIosTargetName": "react-native:run-ios",
-        "runAndroidTargetName": "react-native:run-android",
-        "buildIosTargetName": "react-native:build-ios",
-        "buildAndroidTargetName": "react-native:build-android",
-        "syncDepsTargetName": "react-native:sync-deps"
-      }
-    },
+
     {
       "plugin": "@nx/storybook/plugin",
       "options": {
@@ -183,6 +170,5 @@
         "unitTestRunner": "none"
       }
     }
-  },
-  "nxCloudId": "68ce3a86265b78d5c0375b68"
+  }
 }

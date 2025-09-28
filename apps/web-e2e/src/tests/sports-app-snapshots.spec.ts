@@ -15,7 +15,7 @@ test.describe('Sports App Snapshots', () => {
     // Responsive snapshots
     await SnapshotUtils.captureResponsiveSnapshots(
       page,
-      'sports-app-responsive'
+      'sports-app-responsive',
     );
   });
 
@@ -30,12 +30,12 @@ test.describe('Sports App Snapshots', () => {
       await SnapshotUtils.captureComponentStates(
         page,
         sportsListSelector,
-        'sports-list'
+        'sports-list',
       );
       await SnapshotUtils.takeHtmlSnapshot(
         page,
         sportsListSelector,
-        'sports-list.html'
+        'sports-list.html',
       );
     }
 
@@ -46,12 +46,12 @@ test.describe('Sports App Snapshots', () => {
       await SnapshotUtils.captureComponentStates(
         page,
         gameCardSelector,
-        'game-card'
+        'game-card',
       );
       await SnapshotUtils.takeHtmlSnapshot(
         page,
         gameCardSelector,
-        'game-card.html'
+        'game-card.html',
       );
     }
 
@@ -62,7 +62,7 @@ test.describe('Sports App Snapshots', () => {
       await SnapshotUtils.captureComponentStates(
         page,
         teamSelectorSelector,
-        'team-selector'
+        'team-selector',
       );
     }
 
@@ -73,7 +73,7 @@ test.describe('Sports App Snapshots', () => {
       await SnapshotUtils.takeComponentScreenshot(
         page,
         scoreDisplaySelector,
-        'score-display.png'
+        'score-display.png',
       );
     }
   });
@@ -97,12 +97,12 @@ test.describe('Sports App Snapshots', () => {
       await SnapshotUtils.takeComponentScreenshot(
         page,
         navSelector,
-        'navigation-default.png'
+        'navigation-default.png',
       );
 
       // Mobile navigation (if exists)
       const mobileMenuToggle = page.locator(
-        '[data-testid="mobile-menu"], .mobile-menu-toggle, .hamburger'
+        '[data-testid="mobile-menu"], .mobile-menu-toggle, .hamburger',
       );
       if (await mobileMenuToggle.isVisible()) {
         await mobileMenuToggle.click();
@@ -110,7 +110,7 @@ test.describe('Sports App Snapshots', () => {
         await SnapshotUtils.takeComponentScreenshot(
           page,
           navSelector,
-          'navigation-mobile-open.png'
+          'navigation-mobile-open.png',
         );
       }
     }
@@ -131,7 +131,7 @@ test.describe('Sports App Snapshots', () => {
         await SnapshotUtils.takeComponentScreenshot(
           page,
           `form:nth-child(${i + 1})`,
-          `form-${i + 1}-empty.png`
+          `form-${i + 1}-empty.png`,
         );
 
         // Fill form with sample data
@@ -167,12 +167,12 @@ test.describe('Sports App Snapshots', () => {
         await SnapshotUtils.takeComponentScreenshot(
           page,
           `form:nth-child(${i + 1})`,
-          `form-${i + 1}-filled.png`
+          `form-${i + 1}-filled.png`,
         );
         await SnapshotUtils.takeHtmlSnapshot(
           page,
           `form:nth-child(${i + 1})`,
-          `form-${i + 1}.html`
+          `form-${i + 1}.html`,
         );
       }
     }
@@ -203,19 +203,19 @@ test.describe('Sports App Snapshots', () => {
     // Light theme (default)
     await SnapshotUtils.takeFullPageScreenshot(
       page,
-      `theme-light-${browserName}.png`
+      `theme-light-${browserName}.png`,
     );
 
     // Try to find and activate dark mode
     const darkModeToggle = page.locator(
-      '[data-testid="dark-mode"], [data-testid="theme-toggle"], .dark-mode-toggle'
+      '[data-testid="dark-mode"], [data-testid="theme-toggle"], .dark-mode-toggle',
     );
     if (await darkModeToggle.isVisible()) {
       await darkModeToggle.click();
       await page.waitForTimeout(500); // Wait for theme transition
       await SnapshotUtils.takeFullPageScreenshot(
         page,
-        `theme-dark-${browserName}.png`
+        `theme-dark-${browserName}.png`,
       );
     } else {
       // Force dark mode with CSS
@@ -231,7 +231,7 @@ test.describe('Sports App Snapshots', () => {
       });
       await SnapshotUtils.takeFullPageScreenshot(
         page,
-        `theme-dark-forced-${browserName}.png`
+        `theme-dark-forced-${browserName}.png`,
       );
     }
   });

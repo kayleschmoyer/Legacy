@@ -21,7 +21,7 @@ const DEFAULT_DB_CREDENTIALS_ENVIRONMENT_VARIABLES =
   });
 
 export function getDbCredentials(
-  envVars: Partial<DbCredentialsEnvironmentVariables> = {}
+  envVars: Partial<DbCredentialsEnvironmentVariables> = {},
 ): DbCredentials {
   const { DB_HOST, DB_PASSWORD, DB_USERNAME } = {
     ...DEFAULT_DB_CREDENTIALS_ENVIRONMENT_VARIABLES,

@@ -4,6 +4,13 @@
 
 This document outlines the cost optimizations made to reduce AWS spending for the development environment while maintaining functionality.
 
+> **✅ UPDATE (September 26, 2025)**: Additional cost savings achieved through infrastructure cleanup
+>
+> - Removed 2 unused API Gateway instances
+> - Decommissioned legacy Lambda function
+> - Eliminated unused S3 bucket storage costs
+> - See [INFRASTRUCTURE_CHANGELOG.md](INFRASTRUCTURE_CHANGELOG.md) for details
+
 ## 🎯 Major Cost Reductions
 
 ### 1. NAT Gateway Optimization - **SAVE ~$90/month**

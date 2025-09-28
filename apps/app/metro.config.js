@@ -38,6 +38,11 @@ const customConfig = {
         __dirname,
         '../../node_modules/expo-linking',
       ),
+      // Platform-specific component resolution for React Native builds
+      '__PLATFORM_COMPONENTS__': path.resolve(
+        __dirname,
+        '../../lib/shared-components/src/platform-components/mobile/index.ts',
+      ),
     },
   },
 };

@@ -20,7 +20,7 @@ describe('GameLogsTable', () => {
 
   it('renders correctly with custom API endpoint', () => {
     const { getByPlaceholderText, getByText } = render(
-      <GameLogsTable apiEndpoint="https://custom-api.com/game-logs" />
+      <GameLogsTable apiEndpoint="https://custom-api.com/game-logs" />,
     );
 
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();

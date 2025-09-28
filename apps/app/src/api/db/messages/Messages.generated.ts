@@ -5,7 +5,6 @@ import * as Operations from '../graphql.generated';
 import * as Apollo from '@apollo/client';
 const defaultOptions = {} as const;
 
-
 /**
  * __useGetMessagesForLeagueQuery__
  *
@@ -23,23 +22,68 @@ const defaultOptions = {} as const;
  *   },
  * });
  */
-export function useGetMessagesForLeagueQuery(baseOptions: Apollo.QueryHookOptions<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables> & ({ variables: Types.GetMessagesForLeagueQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>(Operations.GetMessagesForLeague, options);
-      }
-export function useGetMessagesForLeagueLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>(Operations.GetMessagesForLeague, options);
-        }
-export function useGetMessagesForLeagueSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>(Operations.GetMessagesForLeague, options);
-        }
-export type GetMessagesForLeagueQueryHookResult = ReturnType<typeof useGetMessagesForLeagueQuery>;
-export type GetMessagesForLeagueLazyQueryHookResult = ReturnType<typeof useGetMessagesForLeagueLazyQuery>;
-export type GetMessagesForLeagueSuspenseQueryHookResult = ReturnType<typeof useGetMessagesForLeagueSuspenseQuery>;
-export type GetMessagesForLeagueQueryResult = Apollo.QueryResult<Types.GetMessagesForLeagueQuery, Types.GetMessagesForLeagueQueryVariables>;
-export type SendLeagueMessageMutationFn = Apollo.MutationFunction<Types.SendLeagueMessageMutation, Types.SendLeagueMessageMutationVariables>;
+export function useGetMessagesForLeagueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    Types.GetMessagesForLeagueQuery,
+    Types.GetMessagesForLeagueQueryVariables
+  > &
+    (
+      | { variables: Types.GetMessagesForLeagueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    Types.GetMessagesForLeagueQuery,
+    Types.GetMessagesForLeagueQueryVariables
+  >(Operations.GetMessagesForLeague, options);
+}
+export function useGetMessagesForLeagueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    Types.GetMessagesForLeagueQuery,
+    Types.GetMessagesForLeagueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    Types.GetMessagesForLeagueQuery,
+    Types.GetMessagesForLeagueQueryVariables
+  >(Operations.GetMessagesForLeague, options);
+}
+export function useGetMessagesForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        Types.GetMessagesForLeagueQuery,
+        Types.GetMessagesForLeagueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    Types.GetMessagesForLeagueQuery,
+    Types.GetMessagesForLeagueQueryVariables
+  >(Operations.GetMessagesForLeague, options);
+}
+export type GetMessagesForLeagueQueryHookResult = ReturnType<
+  typeof useGetMessagesForLeagueQuery
+>;
+export type GetMessagesForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetMessagesForLeagueLazyQuery
+>;
+export type GetMessagesForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetMessagesForLeagueSuspenseQuery
+>;
+export type GetMessagesForLeagueQueryResult = Apollo.QueryResult<
+  Types.GetMessagesForLeagueQuery,
+  Types.GetMessagesForLeagueQueryVariables
+>;
+export type SendLeagueMessageMutationFn = Apollo.MutationFunction<
+  Types.SendLeagueMessageMutation,
+  Types.SendLeagueMessageMutationVariables
+>;
 
 /**
  * __useSendLeagueMessageMutation__
@@ -58,10 +102,24 @@ export type SendLeagueMessageMutationFn = Apollo.MutationFunction<Types.SendLeag
  *   },
  * });
  */
-export function useSendLeagueMessageMutation(baseOptions?: Apollo.MutationHookOptions<Types.SendLeagueMessageMutation, Types.SendLeagueMessageMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<Types.SendLeagueMessageMutation, Types.SendLeagueMessageMutationVariables>(Operations.SendLeagueMessage, options);
-      }
-export type SendLeagueMessageMutationHookResult = ReturnType<typeof useSendLeagueMessageMutation>;
-export type SendLeagueMessageMutationResult = Apollo.MutationResult<Types.SendLeagueMessageMutation>;
-export type SendLeagueMessageMutationOptions = Apollo.BaseMutationOptions<Types.SendLeagueMessageMutation, Types.SendLeagueMessageMutationVariables>;
+export function useSendLeagueMessageMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    Types.SendLeagueMessageMutation,
+    Types.SendLeagueMessageMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    Types.SendLeagueMessageMutation,
+    Types.SendLeagueMessageMutationVariables
+  >(Operations.SendLeagueMessage, options);
+}
+export type SendLeagueMessageMutationHookResult = ReturnType<
+  typeof useSendLeagueMessageMutation
+>;
+export type SendLeagueMessageMutationResult =
+  Apollo.MutationResult<Types.SendLeagueMessageMutation>;
+export type SendLeagueMessageMutationOptions = Apollo.BaseMutationOptions<
+  Types.SendLeagueMessageMutation,
+  Types.SendLeagueMessageMutationVariables
+>;

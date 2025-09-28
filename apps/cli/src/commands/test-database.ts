@@ -27,7 +27,7 @@ async function main() {
       console.log(
         `  - ID: ${user.id}, Email: ${user.email || 'N/A'}, Username: ${
           user.username || 'N/A'
-        }`
+        }`,
       );
     });
 
@@ -55,7 +55,7 @@ async function main() {
     console.log(`Found ${players.length} players:`);
     players.forEach((player) => {
       console.log(
-        `  - ID: ${player.id}, Name: ${player.firstName} ${player.lastName}, BRef ID: ${player.brefId}`
+        `  - ID: ${player.id}, Name: ${player.firstName} ${player.lastName}, BRef ID: ${player.brefId}`,
       );
     });
 
@@ -69,7 +69,7 @@ async function main() {
       console.log(`\nPlayers with 'a' in name (first 3):`);
       searchResults.forEach((player) => {
         console.log(
-          `  - ${player.firstName} ${player.lastName} (${player.brefId})`
+          `  - ${player.firstName} ${player.lastName} (${player.brefId})`,
         );
       });
     }

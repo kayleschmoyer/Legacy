@@ -1,56 +1,101 @@
 import React from 'react';
-import { H2, Text, YStack } from 'tamagui';
+import { Button, H2, Text, XStack, YStack } from 'tamagui';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-interface PlayerDetailProps {
-  route: {
-    params: {
-      playerId: number;
-    };
+/**
+ * Mobile Player Detail Screen
+ *
+ * Shows detailed information for a specific player.
+ * This is updated to work with Expo Router and the new player stats system.
+ */
+function PlayerDetail() {
+  const router = useRouter();
+  const { playerId, playerName } = useLocalSearchParams<{
+    playerId: string;
+    playerName: string;
+  }>();
+
+  const handleBackToStats = () => {
+    router.back();
   };
-}
-
-const getPlayerDetails = (playerId: number) => {
-  const playersData = [
-    {
-      battingAvg: 0.342,
-      id: 1,
-      name: 'Babe Ruth',
-      position: 'OF',
-      team: 'New York Yankees',
-    },
-    {
-      battingAvg: 0.366,
-      id: 2,
-      name: 'Ty Cobb',
-      position: 'CF',
-      team: 'Detroit Tigers',
-    },
-  ];
-  return playersData.find((player) => player.id === playerId);
-};
-
-const PlayerDetail: React.FC<PlayerDetailProps> = ({ route }) => {
-  const { playerId } = route.params;
-  const player = getPlayerDetails(playerId);
-
-  if (!player) {
-    return (
-      <YStack padding="$4" backgroundColor="$background">
-        <Text>Player not found</Text>
-      </YStack>
-    );
-  }
 
   return (
-    <YStack padding="$4" backgroundColor="$background" space="$3">
-      <H2 fontSize="$8" fontWeight="bold" marginBottom="$3">
-        {player.name}
-      </H2>
-      <Text fontSize="$4">Position: {player.position}</Text>
-      <Text fontSize="$4">Team: {player.team}</Text>
-      <Text fontSize="$4">Batting Average: {player.battingAvg}</Text>
+    <YStack flex={1} padding="$4" space="$4" backgroundColor="$background">
+      {/* Back button */}
+      <XStack alignItems="center" space="$2">
+        <Button size="$3" onPress={handleBackToStats} chromeless>
+          ← Back to Statistics
+        </Button>
+      </XStack>
+
+      {/* Player header */}
+      <YStack space="$2" paddingVertical="$3">
+        <H2 fontSize="$8" color="$color12">
+          {playerName || `Player ${playerId}`}
+        </H2>
+        <Text fontSize="$4" color="$gray11">
+          Player ID: {playerId}
+        </Text>
+      </YStack>
+
+      {/* Placeholder content */}
+      <YStack flex={1} justifyContent="center" alignItems="center" space="$4">
+        <Text fontSize="$7" textAlign="center">
+          {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+          📊
+        </Text>
+        <Text fontSize="$6" fontWeight="600" textAlign="center">
+          Player Details
+        </Text>
+        <Text fontSize="$4" color="$gray11" textAlign="center" maxWidth={300}>
+          This screen would show comprehensive player information, including:
+        </Text>
+
+        <YStack space="$2" alignItems="flex-start" maxWidth={280}>
+          <Text fontSize="$4" color="$gray10">
+            • Career statistics and trends
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            • Season-by-season performance
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            • Advanced analytics and metrics
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            • Team history and positions
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            • Awards and achievements
+          </Text>
+          <Text fontSize="$4" color="$gray10">
+            • Comparable players
+          </Text>
+        </YStack>
+
+        {/* Action buttons */}
+        <YStack space="$3" marginTop="$4" alignItems="center">
+          <Button size="$4" theme="blue" onPress={handleBackToStats}>
+            View All Player Statistics
+          </Button>
+        </YStack>
+      </YStack>
     </YStack>
   );
-};
+}
 
 export default PlayerDetail;
+
+/**
+ * PlayerDetailScreen Header Component
+ */
+export function PlayerDetailScreenHeader() {
+  const { playerName } = useLocalSearchParams<{ playerName: string }>();
+
+  return (
+    <XStack flex={1} alignItems="center" justifyContent="center">
+      <Text fontSize="$5" fontWeight="600" color="$color12" numberOfLines={1}>
+        {playerName || 'Player Details'}
+      </Text>
+    </XStack>
+  );
+}

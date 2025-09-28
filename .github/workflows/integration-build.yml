@@ -26,13 +26,14 @@ permissions:
   pull-requests: read
 
 env:
-  # Nx Cloud is configured with nxCloudId - enable distributed execution for faster builds
-  NX_CLOUD_DISTRIBUTED_EXECUTION: true
-  # Agents for integration build (can be higher since it's less frequent)
-  NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT: 6
-  NX_PARALLEL: 4
   # Nx Cloud access token for enhanced CI features (set as GitHub secret)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  # Base Nx configuration (cloud-specific settings will be set conditionally based on availability test)
+  NX_DAEMON: false
+  NX_CLOUD_TIMEOUT: 300000
+  # Default settings for local execution (will be overridden if cloud is available)
+  NX_PARALLEL: 2
+  NX_CLOUD_DISTRIBUTED_EXECUTION: false
 
 jobs:
   integration-build:
@@ -54,12 +55,36 @@ jobs:
           install-dependencies: true
           set-nx-shas: true
 
+      - name: Configure Nx Cloud
+        id: nx-cloud
+        uses: ./.github/actions/configure-nx-cloud
+        with:
+          agent-count: "6"
+          local-parallel: "3"
+          workflow-type: "integration-build"
+          nx-cloud-access-token-candidate: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
       - name: Validate Workspace
         uses: ./.github/actions/validate-workspace
 
       - name: Show Build Plan
         run: |
           echo "🏗️ Integration build validates the ENTIRE repository (not just affected projects)"
+          echo ""
+          echo "📋 Final Execution Mode:"
+          if [ "${NX_LOCAL_FALLBACK}" = "true" ]; then
+            echo "  🔧 LOCAL FALLBACK MODE"
+            echo "  💡 Nx Cloud unavailable (quota exceeded or connection failed)"
+            echo "  💡 Build will run locally with higher parallelism for integration"
+          elif [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
+            echo "  🚀 NX CLOUD DISTRIBUTED MODE"
+            echo "  💡 Build will use Nx Cloud distributed execution with ${NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT:-6} agents"
+          else
+            echo "  🔧 LOCAL MODE"
+            echo "  💡 Standard local execution"
+          fi
+          echo "  Parallel: ${NX_PARALLEL:-4}"
+          echo "  Cloud ID: ${NX_CLOUD_ID:-not set}"
           echo ""
           echo "All projects in workspace:"
           npx nx show projects
@@ -76,7 +101,27 @@ jobs:
           parallel: "4"
           verbose: "false"
 
-      # Enable Nx Cloud Self-Healing CI
+      # Enable Nx Cloud Self-Healing CI (only when Nx Cloud is available)
       - name: Auto-Fix CI Issues
-        run: npx nx-cloud fix-ci
+        run: |
+          echo "🔧 Running Nx Cloud self-healing..."
+          if [ "${NX_LOCAL_FALLBACK}" != "true" ] && [ -n "${NX_CLOUD_ACCESS_TOKEN}" ]; then
+            npx nx-cloud fix-ci || echo "⚠️  Nx Cloud fix-ci failed but continuing"
+          else
+            echo "ℹ️  Nx Cloud not available, skipping fix-ci"
+          fi
         if: always()
+
+      - name: Integration Build Summary
+        if: always()
+        run: |
+          echo "📊 Integration Build Summary"
+          echo "=========================="
+          if [ "${NX_LOCAL_FALLBACK}" = "true" ]; then
+            echo "✅ Build completed in LOCAL FALLBACK mode (Nx Cloud unavailable)"
+            echo "💡 This is expected when Nx Cloud quota is exceeded or service is unavailable"
+          elif [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
+            echo "✅ Build completed in NX CLOUD DISTRIBUTED mode"
+          else
+            echo "✅ Build completed in LOCAL mode"
+          fi

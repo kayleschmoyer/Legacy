@@ -2,6 +2,9 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 
+// Create a single database service instance to reuse across all resolvers
+const dbService = createDatabaseService(getDbOptions());
+
 // User type
 const UserRef = builder.objectRef<{
   id: number;
@@ -30,8 +33,6 @@ builder.queryField('users', (t) =>
       orderDirection: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
-      const dbService = createDatabaseService(getDbOptions());
-
       const orderBy = args.orderBy as 'id' | 'email' | 'username' | undefined;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
 
@@ -49,7 +50,7 @@ builder.queryField('users', (t) =>
         accessLevel: user.accessLevel,
       }));
     },
-  })
+  }),
 );
 
 builder.queryField('user', (t) =>
@@ -60,7 +61,7 @@ builder.queryField('user', (t) =>
       id: t.arg.int({ required: true }),
     },
     resolve: async (parent, { id }) => {
-      const dbService = createDatabaseService(getDbOptions());
+      // Using shared dbService instance
 
       const user = await dbService.users.getUserById(id);
 
@@ -73,7 +74,7 @@ builder.queryField('user', (t) =>
         accessLevel: user.accessLevel,
       };
     },
-  })
+  }),
 );
 
 builder.queryField('userByEmail', (t) =>
@@ -84,7 +85,7 @@ builder.queryField('userByEmail', (t) =>
       email: t.arg.string({ required: true }),
     },
     resolve: async (parent, { email }) => {
-      const dbService = createDatabaseService(getDbOptions());
+      // Using shared dbService instance
 
       const user = await dbService.users.getUserByEmail(email);
 
@@ -97,7 +98,7 @@ builder.queryField('userByEmail', (t) =>
         accessLevel: user.accessLevel,
       };
     },
-  })
+  }),
 );
 
 builder.queryField('searchUsers', (t) =>
@@ -108,11 +109,11 @@ builder.queryField('searchUsers', (t) =>
       limit: t.arg.int({ required: false }),
     },
     resolve: async (parent, args) => {
-      const dbService = createDatabaseService(getDbOptions());
+      // Using shared dbService instance
 
       const users = await dbService.users.searchUsers(
         args.searchTerm,
-        args.limit || 10
+        args.limit || 10,
       );
 
       return users.map((user) => ({
@@ -122,5 +123,5 @@ builder.queryField('searchUsers', (t) =>
         accessLevel: user.accessLevel,
       }));
     },
-  })
+  }),
 );

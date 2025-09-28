@@ -33,10 +33,12 @@ interface PlayerRow {
   bref_id: string | null;
 }
 
-type SSLConfig = false | {
-  rejectUnauthorized: boolean;
-  ca: string;
-};
+type SSLConfig =
+  | false
+  | {
+      rejectUnauthorized: boolean;
+      ca: string;
+    };
 
 export const testRawConnectionCommandBuilder = () => ({});
 

@@ -23,6 +23,65 @@ import '@testing-library/jest-dom';
 // Mock global __DEV__ variable for React Native
 (global as any).__DEV__ = true;
 
+// Mock environment configuration module for tests
+jest.mock('./config/environment', () => ({
+  env: {
+    oauthProxyUrl: 'http://localhost:5001',
+    googleClientId: 'test-google-client-id',
+    isDev: true,
+  },
+  getEnvironmentConfig: jest.fn(() => ({
+    oauthProxyUrl: 'http://localhost:5001',
+    googleClientId: 'test-google-client-id',
+    isDev: true,
+  })),
+}));
+
+// Mock auth service from shared-components
+let mockAuthService: any = null;
+
+jest.mock('@legacy-sports/shared-components', () => {
+  const React = require('react');
+  const actualModule = jest.requireActual('@legacy-sports/shared-components');
+
+  // Mock auth service
+  const mockService = {
+    getState: jest.fn(() => ({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+      error: null,
+    })),
+    subscribe: jest.fn(),
+    login: jest.fn().mockResolvedValue({ success: true }),
+    logout: jest.fn().mockResolvedValue({ success: true }),
+    refreshToken: jest.fn().mockResolvedValue({ success: true }),
+    checkAuthStatus: jest.fn().mockResolvedValue({ success: true }),
+  };
+
+  return {
+    ...actualModule,
+    createAuthService: jest.fn((config) => {
+      mockAuthService = mockService;
+      return mockService;
+    }),
+    getAuthService: jest.fn(() => mockAuthService),
+    resetAuthService: jest.fn(() => {
+      mockAuthService = null;
+    }),
+    useAuth: jest.fn(() => ({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+      error: null,
+      login: jest.fn().mockResolvedValue({ success: true }),
+      logout: jest.fn().mockResolvedValue({ success: true }),
+      refreshToken: jest.fn().mockResolvedValue({ success: true }),
+      checkAuthStatus: jest.fn().mockResolvedValue({ success: true }),
+    })),
+  };
+});
+
 // Mock platform-components to resolve build-time magic string replacement
 jest.mock('__PLATFORM_COMPONENTS__', () => {
   const React = require('react');
@@ -36,9 +95,18 @@ jest.mock('__PLATFORM_COMPONENTS__', () => {
   };
 
   return {
-    // Platform providers
-    OAuthProvider: ({ children }: any) =>
-      React.createElement('div', {}, children),
+    // Platform providers with OAuth methods
+    OAuthProvider: Object.assign(
+      ({ children }: any) => React.createElement('div', {}, children),
+      {
+        configure: jest.fn().mockResolvedValue({ success: true }),
+      },
+    ),
+    OAuthErrorCode: {
+      CONFIGURATION_ERROR: 'CONFIGURATION_ERROR',
+      SIGNIN_ERROR: 'SIGNIN_ERROR',
+      NETWORK_ERROR: 'NETWORK_ERROR',
+    },
     SecureStorageProvider: ({ children }: any) =>
       React.createElement('div', {}, children),
     PlatformProviders: ({ children }: any) =>
@@ -84,8 +152,17 @@ jest.mock('__PLATFORM_COMPONENTS__', () => {
 
     // Default export for compatibility
     default: {
-      OAuthProvider: ({ children }: any) =>
-        React.createElement('div', {}, children),
+      OAuthProvider: Object.assign(
+        ({ children }: any) => React.createElement('div', {}, children),
+        {
+          configure: jest.fn().mockResolvedValue({ success: true }),
+        },
+      ),
+      OAuthErrorCode: {
+        CONFIGURATION_ERROR: 'CONFIGURATION_ERROR',
+        SIGNIN_ERROR: 'SIGNIN_ERROR',
+        NETWORK_ERROR: 'NETWORK_ERROR',
+      },
       SecureStorageProvider: ({ children }: any) =>
         React.createElement('div', {}, children),
       PlatformProviders: ({ children }: any) =>

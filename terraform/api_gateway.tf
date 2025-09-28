@@ -24,8 +24,12 @@ resource "aws_api_gateway_deployment" "main" {
       # OAuth Proxy resources
       aws_api_gateway_resource.oauth_proxy.id,
       aws_api_gateway_resource.oauth_proxy_paths.id,
+      aws_api_gateway_method.oauth_proxy_root_any.id,
+      aws_api_gateway_method.oauth_proxy_root_options.id,
       aws_api_gateway_method.oauth_proxy_any.id,
       aws_api_gateway_method.oauth_proxy_options.id,
+      aws_api_gateway_integration.oauth_proxy_root_any.id,
+      aws_api_gateway_integration.oauth_proxy_root_options.id,
       aws_api_gateway_integration.oauth_proxy_any.id,
       aws_api_gateway_integration.oauth_proxy_options.id,
       # Stats resources
@@ -173,5 +177,3 @@ resource "aws_api_gateway_integration_response" "graphql_options" {
 
   depends_on = [aws_api_gateway_integration.graphql_options]
 }
-
-

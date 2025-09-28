@@ -43,6 +43,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "lambda_deployments" {
     id     = "lambda_artifacts_cleanup"
     status = "Enabled"
 
+    # Apply to all objects in the bucket
+    filter {}
+
     # Keep current versions but clean up old ones
     noncurrent_version_expiration {
       noncurrent_days = 30
@@ -113,3 +116,12 @@ resource "aws_iam_policy" "lambda_deployment_policy" {
 # The SQS event source mapping and IAM roles are managed by Serverless Framework
 
 # CloudWatch Log Groups removed - Serverless Framework creates these automatically
+
+# Legacy S3 bucket and configurations (DECOMMISSIONED on September 26, 2025)
+# Successfully destroyed and replaced with the new deployment bucket:
+# - aws_s3_bucket.legacy_lambda_deployments (legacy-sports-dev-lambdas-f3d4b778)
+# - aws_s3_bucket_versioning.legacy_lambda_deployments
+# - aws_s3_bucket_server_side_encryption_configuration.legacy_lambda_deployments  
+# - aws_s3_bucket_public_access_block.legacy_lambda_deployments
+# 
+# The new deployment bucket is: aws_s3_bucket.lambda_deployments

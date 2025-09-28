@@ -31,7 +31,7 @@ export interface PitchingStatsTableProps {
 }
 
 export function PitchingStatsTable(
-  props: PitchingStatsTableProps
+  props: PitchingStatsTableProps,
 ): React.JSX.Element {
   const { stats } = props;
 

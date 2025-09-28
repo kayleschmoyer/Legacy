@@ -1,30 +1,30 @@
 # SQS Queue for loading season stats
 resource "aws_sqs_queue" "load_season_stats_dlq" {
   name = "${local.name_prefix}-load-season-stats-dlq.fifo"
-  
+
   fifo_queue                  = true
   content_based_deduplication = true
-  
+
   tags = local.common_tags
 }
 
 resource "aws_sqs_queue" "load_season_stats" {
   name = "${local.name_prefix}-load-season-stats.fifo"
-  
+
   fifo_queue                  = true
   content_based_deduplication = true
-  
+
   # Message settings
-  visibility_timeout_seconds = 360  # 6 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600  # 14 days
-  receive_wait_time_seconds  = 10  # Long polling
-  
+  visibility_timeout_seconds = 360     # 6 minutes (longer than lambda timeout)
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
   # Redrive policy for dead letter queue
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.load_season_stats_dlq.arn
     maxReceiveCount     = 3
   })
-  
+
   tags = local.common_tags
 }
 

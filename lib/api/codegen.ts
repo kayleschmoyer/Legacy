@@ -2,7 +2,7 @@ import type { CodegenConfig } from '@graphql-codegen/cli';
 
 const config: CodegenConfig = {
   overwrite: true,
-  schema: 'https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql',
+  schema: process.env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
   documents: [
     'src/shared/hello.query.graphql',
     'src/resources/players/*.graphql',
