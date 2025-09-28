@@ -23,18 +23,22 @@ Write-Host "🚀 Starting Lambda deployment for: $FunctionName" -ForegroundColor
 switch ($FunctionName) {
     { $_ -in @('graphql', 'db') } {
         $LambdaDir = 'lambdas/db'
+        $ProjectName = 'db'
         $SsmParam = "/legacy-sports/${Environment}/lambda/graphql/version"
     }
     'stats' {
         $LambdaDir = 'lambdas/stats-lambda'
+        $ProjectName = 'stats-lambda'
         $SsmParam = "/legacy-sports/${Environment}/lambda/stats/version"
     }
     'oauth-proxy' {
         $LambdaDir = 'lambdas/oauth-proxy'
+        $ProjectName = 'oauth-proxy'
         $SsmParam = "/legacy-sports/${Environment}/lambda/oauth-proxy/version"
     }
     'game-selection' {
         $LambdaDir = 'lambdas/game-selection'
+        $ProjectName = 'game-selection'
         $SsmParam = "/legacy-sports/${Environment}/lambda/game-selection/version"
     }
     default {
@@ -49,9 +53,9 @@ if ($FunctionName -in @('graphql', 'db')) {
     Write-Host 'Using pre-built lambda (already compiled via nx)' -ForegroundColor Green
 } else {
     # Build other lambdas using the correct project name
-    npx nx run "${FunctionName}:build"
+    npx nx run "${ProjectName}:build"
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Build failed for $FunctionName"
+        Write-Error "Build failed for $ProjectName"
     }
     Write-Host 'Build completed successfully' -ForegroundColor Green
 }

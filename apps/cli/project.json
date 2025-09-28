@@ -7,31 +7,23 @@
   "targets": {
     "build": {
       "executor": "@nx/esbuild:esbuild",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "platform": "node",
         "outputPath": "dist/apps/cli",
-        "format": [
-          "cjs"
-        ],
+        "format": ["cjs"],
         "bundle": true,
         "main": "apps/cli/src/main.ts",
         "tsConfig": "apps/cli/tsconfig.app.json",
-        "assets": [
-          "apps/cli/src/assets"
-        ],
+        "assets": ["apps/cli/src/assets"],
         "generatePackageJson": true,
         "esbuildOptions": {
           "sourcemap": true,
           "outExtension": {
             ".js": ".js"
           },
-          "external": [
-            "pg-native"
-          ]
+          "external": ["pg-native"]
         }
       },
       "configurations": {
@@ -42,9 +34,7 @@
             "outExtension": {
               ".js": ".js"
             },
-            "external": [
-              "pg-native"
-            ]
+            "external": ["pg-native"]
           }
         }
       }
@@ -52,9 +42,7 @@
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "buildTarget": "cli:build",
         "runBuildTargetDependencies": false
@@ -82,6 +70,13 @@
         "cwd": "apps/cli"
       }
     },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json",
+        "cwd": "apps/cli"
+      }
+    },
     "start": {
       "executor": "nx:run-commands",
       "options": {
@@ -92,9 +87,7 @@
     "run": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "buildTarget": "cli:build",
         "runBuildTargetDependencies": false,

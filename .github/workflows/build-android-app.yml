@@ -121,32 +121,55 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Generate React Native Bundle
+        timeout-minutes: 5
         run: |
           cd apps/app
-          npx react-native bundle \
+
+          # Ensure assets directory exists
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/res
+
+          # Generate bundle with timeout protection
+          timeout 180s npx react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res/
+            --assets-dest android/app/src/main/res/ \
+            --reset-cache || {
+            echo "Bundle generation timed out or failed, trying without reset-cache..."
+            npx react-native bundle \
+              --platform android \
+              --dev false \
+              --entry-file index.js \
+              --bundle-output android/app/src/main/assets/index.android.bundle \
+              --assets-dest android/app/src/main/res/
+          }
 
       - name: Build Android APK
         id: build
+        timeout-minutes: 15
         run: |
           cd apps/app/android
 
           # Set execute permissions for gradlew
           chmod +x gradlew
 
+          # Kill any existing Gradle daemons to prevent conflicts
+          ./gradlew --stop || true
+
+          # Use CI-optimized Gradle properties
+          cp gradle-ci.properties gradle.properties
+
           # Determine build type
           BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
 
           if [ "$BUILD_TYPE" == "release" ]; then
-            ./gradlew assembleRelease --no-daemon --stacktrace
+            ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --no-build-cache
             APK_PATH="app/build/outputs/apk/release/app-release.apk"
             APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}.apk"
           else
-            ./gradlew assembleDebug --no-daemon --stacktrace
+            ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --no-build-cache
             APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
             APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}-debug.apk"
           fi

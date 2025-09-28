@@ -13,5 +13,6 @@ export * from './types';
 export * from './config/database';
 export * from './config/credentials';
 
-// Migration system
-export * from './migrations/migration-runner';
+// Database scripts (for CLI usage)
+export { resetDatabase } from './scripts/reset-database';
+export { runMigrations } from './scripts/run-drizzle-migrations';

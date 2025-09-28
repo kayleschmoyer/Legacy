@@ -26,6 +26,6 @@ enable_rds_proxy = true # Enabled to resolve Lambda DNS resolution issues (~$15/
 # Google OAuth Configuration - REPLACE WITH YOUR ACTUAL CLIENT ID
 google_oauth_client_id = "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com"
 
-# Public IP addresses allowed to access database for migrations
-# Add your actual public IPs here - for security, limit to your actual IPs
-allowed_public_ips = ["0.0.0.0"] # CAUTION: This allows all IPs - restrict for production
+# Public IP addresses allowed to access database for migrations and development
+# Configured with current public IP for security
+allowed_public_ips = ["71.182.228.7"] # Your current public IP - update if it changes

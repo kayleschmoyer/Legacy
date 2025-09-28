@@ -22,3 +22,6 @@ google_oauth_client_id = "your-google-client-id.apps.googleusercontent.com"
 # Public IP addresses allowed to access database for migrations
 # Add your actual public IPs here
 allowed_public_ips = ["0.0.0.0"]
+
+# RDS Proxy Configuration
+enable_rds_proxy = true       # Production RDS Proxy (private)

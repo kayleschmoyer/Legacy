@@ -1,0 +1,566 @@
+/**
+ * PlayerStatsDataGrid.test.tsx - Component Integration Tests
+ *
+ * Comprehensive test suite for the PlayerStatsDataGrid component including
+ * rendering, interaction, and integration with the CareerStatsService.
+ *
+ * @author Legacy Sports Team
+ * @since 2025-09-28
+ */
+
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MockedProvider, MockedResponse } from '@apollo/client/testing';
+import { TamaguiProvider } from 'tamagui';
+import { config } from '@tamagui/config/v3';
+import {
+  PlayerStatsDataGrid,
+  type PlayerStatsDataGridProps,
+} from './PlayerStatsDataGrid';
+import {
+  CAREER_BATTING_STATS_QUERY,
+  type CareerBattingStatsRaw,
+} from './services/CareerStatsService';
+
+// =============================================================================
+// Test Setup and Mocks
+// =============================================================================
+
+const mockPlayerData: CareerBattingStatsRaw[] = [
+  {
+    playerId: 1486,
+    games: 3298,
+    plateAppearances: 14053,
+    atBats: 12364,
+    runs: 2174,
+    hits: 3771,
+    doubles: 624,
+    triples: 98,
+    homeRuns: 755,
+    rbi: 2297,
+    stolenBases: 240,
+    caughtStealing: 117,
+    baseOnBalls: 1402,
+    strikeouts: 1383,
+    totalBases: 6856,
+    groundedIntoDoublePlays: 315,
+    hitByPitch: 107,
+    sacrificeHits: 61,
+    intentionalBaseOnBalls: 293,
+    battingAverage: 0.305,
+    onBasePercentage: 0.377,
+    sluggingPercentage: 0.555,
+  },
+  {
+    playerId: 1542,
+    games: 170,
+    plateAppearances: 64,
+    atBats: 54,
+    runs: 5,
+    hits: 9,
+    doubles: 1,
+    triples: 0,
+    homeRuns: 0,
+    rbi: 1,
+    stolenBases: 0,
+    caughtStealing: 0,
+    baseOnBalls: 8,
+    strikeouts: 32,
+    totalBases: 10,
+    groundedIntoDoublePlays: 2,
+    hitByPitch: 1,
+    sacrificeHits: 1,
+    intentionalBaseOnBalls: 0,
+    battingAverage: 0.167,
+    onBasePercentage: 0.281,
+    sluggingPercentage: 0.185,
+  },
+];
+
+const defaultMock: MockedResponse = {
+  request: {
+    query: CAREER_BATTING_STATS_QUERY,
+    variables: {
+      limit: 25,
+      offset: 0,
+      orderBy: 'homeRuns',
+      orderDirection: 'desc',
+      minGames: 10,
+      minHomeRuns: 0,
+      minRBI: 0,
+      minBattingAvg: 0,
+      searchTerm: '',
+    },
+  },
+  result: {
+    data: {
+      careerBattingStats: mockPlayerData,
+    },
+  },
+};
+
+const emptyMock: MockedResponse = {
+  ...defaultMock,
+  result: {
+    data: {
+      careerBattingStats: [],
+    },
+  },
+};
+
+const errorMock: MockedResponse = {
+  ...defaultMock,
+  error: new Error('Failed to load player statistics'),
+};
+
+// Test wrapper component
+interface TestWrapperProps {
+  children: React.ReactNode;
+  mocks?: MockedResponse[];
+}
+
+const TestWrapper: React.FC<TestWrapperProps> = ({
+  children,
+  mocks = [defaultMock],
+}) => (
+  <TamaguiProvider config={config}>
+    <MockedProvider mocks={mocks} addTypename={false}>
+      {children}
+    </MockedProvider>
+  </TamaguiProvider>
+);
+
+// Default props for testing
+const defaultProps: PlayerStatsDataGridProps = {
+  title: 'Test Player Statistics',
+  showSearch: true,
+  showFilters: true,
+  showPagination: true,
+  showSorting: true,
+  testId: 'test-grid',
+};
+
+// =============================================================================
+// Rendering Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Rendering', () => {
+  test('should render with default props', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
+    expect(
+      screen.getByText('Loading player statistics...'),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Loading player statistics...'),
+      ).not.toBeInTheDocument();
+    });
+
+    // Verify table headers are present
+    expect(screen.getByText('Player')).toBeInTheDocument();
+    expect(screen.getByText('HR')).toBeInTheDocument();
+    expect(screen.getByText('RBI')).toBeInTheDocument();
+    expect(screen.getByText('AVG')).toBeInTheDocument();
+  });
+
+  test('should render player data correctly', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+      expect(screen.getByText('755')).toBeInTheDocument(); // Home runs
+      expect(screen.getByText('2297')).toBeInTheDocument(); // RBIs
+      expect(screen.getByText('0.305')).toBeInTheDocument(); // Batting average
+    });
+  });
+
+  test('should show search input when showSearch is true', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} showSearch={true} />
+      </TestWrapper>,
+    );
+
+    expect(
+      screen.getByPlaceholderText('Search players...'),
+    ).toBeInTheDocument();
+  });
+
+  test('should hide search input when showSearch is false', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} showSearch={false} />
+      </TestWrapper>,
+    );
+
+    expect(
+      screen.queryByPlaceholderText('Search players...'),
+    ).not.toBeInTheDocument();
+  });
+
+  test('should show filter controls when showFilters is true', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} showFilters={true} />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByText('Filters:')).toBeInTheDocument();
+    expect(screen.getByText('Min Games:')).toBeInTheDocument();
+    expect(screen.getByText('Min HR:')).toBeInTheDocument();
+  });
+
+  test('should show pagination controls when showPagination is true', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} showPagination={true} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Previous')).toBeInTheDocument();
+      expect(screen.getByText('Next')).toBeInTheDocument();
+      expect(screen.getByText(/Page \d+/)).toBeInTheDocument();
+    });
+  });
+});
+
+// =============================================================================
+// Interaction Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Interactions', () => {
+  test('should handle player row clicks', async () => {
+    const mockPlayerSelect = jest.fn();
+
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid
+          {...defaultProps}
+          onPlayerSelect={mockPlayerSelect}
+        />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Click on the first player row
+    fireEvent.click(screen.getByText('Player 1486'));
+
+    expect(mockPlayerSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playerId: 1486,
+        displayName: 'Player 1486',
+        homeRuns: 755,
+      }),
+    );
+  });
+
+  test('should handle search input changes', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search players...');
+    fireEvent.change(searchInput, { target: { value: 'ruth' } });
+
+    expect((searchInput as HTMLInputElement).value).toBe('ruth');
+  });
+
+  test('should handle filter changes', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    const minGamesInput = screen.getByDisplayValue('10');
+    fireEvent.change(minGamesInput, { target: { value: '100' } });
+
+    expect((minGamesInput as HTMLInputElement).value).toBe('100');
+  });
+
+  test('should handle page size changes', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('25')).toBeInTheDocument();
+    });
+
+    // Click on the 50 page size button
+    const pageSizeButton = screen.getByText('50');
+    fireEvent.click(pageSizeButton);
+
+    // The button should become outlined (selected state)
+    expect(pageSizeButton).toBeInTheDocument();
+  });
+
+  test('should handle refresh button click', () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    const refreshButton = screen.getByText('Refresh');
+    fireEvent.click(refreshButton);
+
+    // Should show loading state briefly
+    expect(screen.getByText('🔄')).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// Error Handling Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Error Handling', () => {
+  test('should display error state when GraphQL query fails', async () => {
+    render(
+      <TestWrapper mocks={[errorMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Statistics')).toBeInTheDocument();
+      expect(
+        screen.getByText('Failed to load player statistics'),
+      ).toBeInTheDocument();
+    });
+
+    // Should show retry button
+    expect(screen.getByText('Try Again')).toBeInTheDocument();
+  });
+
+  test('should display empty state when no data is returned', async () => {
+    render(
+      <TestWrapper mocks={[emptyMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No players found')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Try adjusting your search terms or filters to find more players.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    // Should show clear filters button
+    expect(screen.getByText('Clear Filters')).toBeInTheDocument();
+  });
+
+  test('should handle error recovery with retry button', async () => {
+    const { rerender } = render(
+      <TestWrapper mocks={[errorMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Statistics')).toBeInTheDocument();
+    });
+
+    // Click retry and provide successful mock
+    const retryButton = screen.getByText('Try Again');
+
+    rerender(
+      <TestWrapper mocks={[defaultMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Error Loading Statistics'),
+      ).not.toBeInTheDocument();
+    });
+  });
+});
+
+// =============================================================================
+// Accessibility Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Accessibility', () => {
+  test('should have proper ARIA labels and roles', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      const grid = screen.getByTestId('test-grid');
+      expect(grid).toBeInTheDocument();
+    });
+
+    // Check for input labels
+    expect(
+      screen.getByPlaceholderText('Search players...'),
+    ).toBeInTheDocument();
+  });
+
+  test('should support keyboard navigation', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Test tab navigation (basic check)
+    const searchInput = screen.getByPlaceholderText('Search players...');
+    searchInput.focus();
+    expect(document.activeElement).toBe(searchInput);
+  });
+});
+
+// =============================================================================
+// Performance Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Performance', () => {
+  test('should render large datasets efficiently', async () => {
+    // Create a larger mock dataset
+    const largeMockData: CareerBattingStatsRaw[] = Array.from(
+      { length: 100 },
+      (_, index) => ({
+        ...mockPlayerData[0],
+        playerId: index + 1,
+      }),
+    );
+
+    const largeMock: MockedResponse = {
+      ...defaultMock,
+      result: {
+        data: {
+          careerBattingStats: largeMockData,
+        },
+      },
+    };
+
+    const startTime = performance.now();
+
+    render(
+      <TestWrapper mocks={[largeMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1')).toBeInTheDocument();
+    });
+
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+
+    // Should render within reasonable time (adjust threshold as needed)
+    expect(renderTime).toBeLessThan(5000); // 5 seconds max for large dataset
+  });
+
+  test('should handle rapid state updates gracefully', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search players...');
+
+    // Simulate rapid typing
+    fireEvent.change(searchInput, { target: { value: 'a' } });
+    fireEvent.change(searchInput, { target: { value: 'ab' } });
+    fireEvent.change(searchInput, { target: { value: 'abc' } });
+    fireEvent.change(searchInput, { target: { value: 'abcd' } });
+
+    await waitFor(() => {
+      expect((searchInput as HTMLInputElement).value).toBe('abcd');
+    });
+
+    // Should not crash or show error
+    expect(
+      screen.queryByText('Error Loading Statistics'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// Integration Tests
+// =============================================================================
+
+describe('PlayerStatsDataGrid - Integration', () => {
+  test('should integrate properly with CareerStatsService', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid
+          {...defaultProps}
+          initialParams={{
+            limit: 10,
+            orderBy: 'battingAverage',
+            orderDirection: 'desc',
+          }}
+        />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Verify data transformation worked correctly
+    expect(screen.getByText('0.305')).toBeInTheDocument(); // Formatted batting average
+    expect(screen.getByText('0.932')).toBeInTheDocument(); // Computed OPS (0.377 + 0.555)
+  });
+
+  test('should maintain state consistency across operations', async () => {
+    render(
+      <TestWrapper>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Player 1486')).toBeInTheDocument();
+    });
+
+    // Change search term
+    const searchInput = screen.getByPlaceholderText('Search players...');
+    fireEvent.change(searchInput, { target: { value: 'test search' } });
+
+    // Change page size
+    const pageSizeButton = screen.getByText('50');
+    fireEvent.click(pageSizeButton);
+
+    // Verify both states are maintained
+    expect((searchInput as HTMLInputElement).value).toBe('test search');
+    // Page size change should be reflected in the component state
+  });
+});

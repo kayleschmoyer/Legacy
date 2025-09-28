@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'lambdas/db/**'
-      - '.github/workflows/publish-gql.yml'
+      - "lambdas/db/**"
+      - ".github/workflows/publish-gql.yml"
 
 # Cancel in-progress deployments for the same workflow
 concurrency:
@@ -73,31 +73,31 @@ jobs:
         run: |
           # Create cache
           npm run make-cache
-          
+
           # Build the Lambda
           npm run build
-          
+
           # Create version string
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
           VERSION="${TIMESTAMP}-${COMMIT_SHA}"
-          
+
           # Create deployment package
           zip -r "graphql-${VERSION}.zip" dist/
-          
+
           # Get S3 bucket name from Terraform output or SSM
           S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
-          
+
           # Upload to S3
           aws s3 cp "graphql-${VERSION}.zip" "s3://${S3_BUCKET}/graphql/" --region ${{ env.AWS_REGION }}
-          
+
           # Update SSM parameter
           aws ssm put-parameter \
             --name "/legacy-sports/${AWS_STAGE}/lambda/graphql/version" \
             --value "$VERSION" \
             --overwrite \
             --region ${{ env.AWS_REGION }}
-          
+
           echo "✅ Lambda package uploaded: graphql-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 

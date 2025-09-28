@@ -83,7 +83,9 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     }
   }
 
-  await dbClient.close();
+  // Note: Don't close the database connection in Lambda
+  // The connection is memoized and should be reused across invocations
+  // Lambda containers handle cleanup when the container is terminated
 
   LOGGER.debug(
     `Processed ${event.Records.length} records, ${batchItemFailures.length} failures`,

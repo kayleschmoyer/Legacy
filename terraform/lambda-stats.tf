@@ -23,8 +23,11 @@ resource "aws_iam_role_policy_attachment" "stats_lambda_basic" {
   role       = aws_iam_role.stats_lambda.name
 }
 
-# VPC access policy removed - Stats Lambda now runs outside VPC for external API access
-# VPC execution role no longer needed for external Baseball Reference scraping
+# IAM policy for VPC access
+resource "aws_iam_role_policy_attachment" "stats_lambda_vpc" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  role       = aws_iam_role.stats_lambda.name
+}
 
 # Custom policy for Stats Lambda
 resource "aws_iam_policy" "stats_lambda_secrets" {
@@ -139,8 +142,10 @@ resource "aws_lambda_function" "stats" {
 
   source_code_hash = data.aws_ssm_parameter.stats_lambda_version.value
 
-  # VPC config removed - Lambda now runs outside VPC for direct external API access
-  # This allows Baseball Reference scraping without NAT Gateway requirements
+  vpc_config {
+    subnet_ids         = aws_subnet.private_lambda[*].id
+    security_group_ids = [aws_security_group.lambda.id]
+  }
 
   environment {
     variables = {
@@ -160,7 +165,7 @@ resource "aws_lambda_function" "stats" {
 
   depends_on = [
     aws_iam_role_policy_attachment.stats_lambda_basic,
-    # VPC dependency removed - Lambda now runs outside VPC
+    aws_iam_role_policy_attachment.stats_lambda_vpc,
     aws_iam_role_policy_attachment.stats_lambda_secrets,
     aws_iam_role_policy_attachment.stats_lambda_sqs,
     aws_iam_role_policy_attachment.stats_lambda_rds,

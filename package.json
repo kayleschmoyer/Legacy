@@ -5,6 +5,7 @@
     "all": "nx affected -t build lint:fix lint format test make-cache bundle typecheck",
     "android": "nx run-android app",
     "build-android": "nx build-android app",
+    "build-android-debug": "nx build-android-debug app",
     "build-ios": "nx build-ios app",
     "check:services": "node scripts/check-services.js",
     "clean:node": "npkill -d",

@@ -1,21 +1,21 @@
 # ================================================================
 # LEGACY WORKFLOW TEMPORARILY DISABLED
 # ================================================================
-# 
+#
 # This workflow has been replaced by ci-pipeline-improved.yml
-# 
+#
 # Migration Status: DISABLED (2024-09-27)
 # Replacement: .github/workflows/ci-pipeline-improved.yml
-# 
+#
 # To rollback: Remove this comment block and restore the workflow
 # To permanently delete: Remove this file after successful migration
-# 
+#
 # ================================================================
 
 # Original workflow content (commented out):
 
 # name: PR Validation
-# 
+#
 # # This workflow provides comprehensive validation for pull requests using Nx DTE
 # # It replaces multiple parallel jobs with a single job that leverages Nx's distributed task execution
 # on:
@@ -24,7 +24,7 @@
 #   merge_group:
 
 # Cancel in-progress runs for the same workflow on the same PR or merge group
-# concurrency:
+concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
@@ -331,7 +331,7 @@ jobs:
   build-android:
     name: Android Build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -355,7 +355,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "17"
           cache: "gradle"
 
       - name: Setup
@@ -379,9 +379,16 @@ jobs:
 
       - name: Build Android
         if: steps.check-android.outputs.build_needed == 'true'
+        timeout-minutes: 12
         run: |
           echo "🔨 Building Android application..."
-          npx nx build-android app
+          cd apps/app/android
+          chmod +x gradlew
+          # Kill any existing Gradle daemons
+          ./gradlew --stop || true
+          # Use CI-optimized Gradle properties
+          cp gradle-ci.properties gradle.properties
+          ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --no-build-cache
 
       - name: Test Android
         if: steps.check-android.outputs.build_needed == 'true'

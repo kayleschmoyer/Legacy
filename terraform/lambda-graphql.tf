@@ -106,7 +106,7 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_rds" {
 # Lambda function
 resource "aws_lambda_function" "graphql" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
-  s3_key        = "db/db-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
+  s3_key        = "graphql/graphql-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
   function_name = "${local.name_prefix}-graphql"
   role          = aws_iam_role.graphql_lambda.arn
   handler       = "index.handler"

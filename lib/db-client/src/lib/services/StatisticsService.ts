@@ -6,7 +6,31 @@ import {
   CareerBatting,
   CareerFielding,
   CareerPitching,
+  SeasonBatting,
+  SeasonFielding,
+  SeasonPitching,
 } from '../../types/DatabaseTypes';
+
+// Type-safe column access helpers to avoid unsafe any usage
+// These functions safely access Drizzle table columns by name for sorting
+function getBattingColumn(columnName: string) {
+  const columns = PublicSchema.seasonBatting;
+  const column = (columns as unknown as Record<string, unknown>)[columnName];
+  // Cast to the expected Drizzle column type for sorting
+  return column as SQL | undefined;
+}
+
+function getPitchingColumn(columnName: string) {
+  const columns = PublicSchema.seasonPitching;
+  const column = (columns as unknown as Record<string, unknown>)[columnName];
+  return column as SQL | undefined;
+}
+
+function getFieldingColumn(columnName: string) {
+  const columns = PublicSchema.seasonFielding;
+  const column = (columns as unknown as Record<string, unknown>)[columnName];
+  return column as SQL | undefined;
+}
 
 export interface StatisticsFilters {
   playerId?: number;
@@ -17,8 +41,28 @@ export interface StatisticsFilters {
   minStrikeouts?: number;
 }
 
+export interface SeasonStatisticsFilters {
+  playerId?: number;
+  season?: number;
+  team?: string;
+  lgId?: string;
+  minGames?: number;
+  minHomeRuns?: number;
+  minRBI?: number;
+  minWins?: number;
+  minStrikeouts?: number;
+}
+
 export interface StatisticsQueryOptions {
   filters?: StatisticsFilters;
+  limit?: number;
+  offset?: number;
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+}
+
+export interface SeasonStatisticsQueryOptions {
+  filters?: SeasonStatisticsFilters;
   limit?: number;
   offset?: number;
   orderBy?: string;
@@ -253,13 +297,176 @@ export class StatisticsService {
     playerId: number,
   ): Promise<CareerFielding | null> {
     return runWithPublicClient(this.options, async (db) => {
-      const results = await db
+      return db
         .select()
         .from(PublicSchema.careerFielding)
         .where(eq(PublicSchema.careerFielding.playerId, playerId))
-        .limit(1);
+        .then((rows) => rows[0] || null);
+    });
+  }
 
-      return results[0] || null;
+  /**
+   * Get season batting statistics with optional filtering and pagination
+   */
+  async getSeasonBattingStats(
+    queryOptions: SeasonStatisticsQueryOptions = {},
+  ): Promise<SeasonBatting[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      const queryBuilder = db.select().from(PublicSchema.seasonBatting);
+
+      // Build WHERE clause
+      const conditions = queryOptions.filters
+        ? this.buildSeasonBattingFilters(queryOptions.filters)
+        : [];
+
+      // Build final query parts
+      const orderDirection = queryOptions.orderDirection || 'desc';
+
+      if (conditions.length > 0) {
+        queryBuilder.where(and(...conditions));
+      }
+
+      if (queryOptions.orderBy) {
+        const column = getBattingColumn(queryOptions.orderBy);
+        if (column) {
+          queryBuilder.orderBy(
+            orderDirection === 'asc' ? asc(column) : desc(column),
+          );
+        }
+      }
+
+      if (queryOptions.limit) {
+        queryBuilder.limit(queryOptions.limit);
+      }
+
+      if (queryOptions.offset) {
+        queryBuilder.offset(queryOptions.offset);
+      }
+
+      return queryBuilder;
+    });
+  }
+
+  /**
+   * Get season pitching statistics with optional filtering and pagination
+   */
+  async getSeasonPitchingStats(
+    queryOptions: SeasonStatisticsQueryOptions = {},
+  ): Promise<SeasonPitching[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      const queryBuilder = db.select().from(PublicSchema.seasonPitching);
+
+      // Build WHERE clause
+      const conditions = queryOptions.filters
+        ? this.buildSeasonPitchingFilters(queryOptions.filters)
+        : [];
+
+      // Build final query parts
+      const orderDirection = queryOptions.orderDirection || 'desc';
+
+      if (conditions.length > 0) {
+        queryBuilder.where(and(...conditions));
+      }
+
+      if (queryOptions.orderBy) {
+        const column = getPitchingColumn(queryOptions.orderBy);
+        if (column) {
+          queryBuilder.orderBy(
+            orderDirection === 'asc' ? asc(column) : desc(column),
+          );
+        }
+      }
+
+      if (queryOptions.limit) {
+        queryBuilder.limit(queryOptions.limit);
+      }
+
+      if (queryOptions.offset) {
+        queryBuilder.offset(queryOptions.offset);
+      }
+
+      return queryBuilder;
+    });
+  }
+
+  /**
+   * Get season fielding statistics with optional filtering and pagination
+   */
+  async getSeasonFieldingStats(
+    queryOptions: SeasonStatisticsQueryOptions = {},
+  ): Promise<SeasonFielding[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      const queryBuilder = db.select().from(PublicSchema.seasonFielding);
+
+      // Build WHERE clause
+      const conditions = queryOptions.filters
+        ? this.buildSeasonFieldingFilters(queryOptions.filters)
+        : [];
+
+      // Build final query parts
+      const orderDirection = queryOptions.orderDirection || 'desc';
+
+      if (conditions.length > 0) {
+        queryBuilder.where(and(...conditions));
+      }
+
+      if (queryOptions.orderBy) {
+        const column = getFieldingColumn(queryOptions.orderBy);
+        if (column) {
+          queryBuilder.orderBy(
+            orderDirection === 'asc' ? asc(column) : desc(column),
+          );
+        }
+      }
+
+      if (queryOptions.limit) {
+        queryBuilder.limit(queryOptions.limit);
+      }
+
+      if (queryOptions.offset) {
+        queryBuilder.offset(queryOptions.offset);
+      }
+
+      return queryBuilder;
+    });
+  }
+
+  /**
+   * Get season batting statistics for a specific player
+   */
+  async getPlayerSeasonBatting(playerId: number): Promise<SeasonBatting[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      return db
+        .select()
+        .from(PublicSchema.seasonBatting)
+        .where(eq(PublicSchema.seasonBatting.playerId, playerId))
+        .orderBy(desc(PublicSchema.seasonBatting.season));
+    });
+  }
+
+  /**
+   * Get season pitching statistics for a specific player
+   */
+  async getPlayerSeasonPitching(playerId: number): Promise<SeasonPitching[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      return db
+        .select()
+        .from(PublicSchema.seasonPitching)
+        .where(eq(PublicSchema.seasonPitching.playerId, playerId))
+        .orderBy(desc(PublicSchema.seasonPitching.season));
+    });
+  }
+
+  /**
+   * Get season fielding statistics for a specific player
+   */
+  async getPlayerSeasonFielding(playerId: number): Promise<SeasonFielding[]> {
+    return runWithPublicClient(this.options, async (db) => {
+      return db
+        .select()
+        .from(PublicSchema.seasonFielding)
+        .where(eq(PublicSchema.seasonFielding.playerId, playerId))
+        .orderBy(desc(PublicSchema.seasonFielding.season));
     });
   }
 
@@ -410,6 +617,129 @@ export class StatisticsService {
     if (filters.minGames !== undefined) {
       conditions.push(
         sql`${PublicSchema.careerFielding.g} >= ${filters.minGames}`,
+      );
+    }
+
+    return conditions;
+  }
+
+  /**
+   * Build WHERE conditions for season batting queries
+   */
+  private buildSeasonBattingFilters(filters: SeasonStatisticsFilters): SQL[] {
+    const conditions: SQL[] = [];
+
+    if (filters.playerId !== undefined) {
+      conditions.push(
+        eq(PublicSchema.seasonBatting.playerId, filters.playerId),
+      );
+    }
+
+    if (filters.season !== undefined) {
+      conditions.push(eq(PublicSchema.seasonBatting.season, filters.season));
+    }
+
+    if (filters.team !== undefined) {
+      conditions.push(eq(PublicSchema.seasonBatting.team, filters.team));
+    }
+
+    if (filters.lgId !== undefined) {
+      conditions.push(eq(PublicSchema.seasonBatting.lgId, filters.lgId));
+    }
+
+    if (filters.minGames !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonBatting.g} >= ${filters.minGames}`,
+      );
+    }
+
+    if (filters.minHomeRuns !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonBatting.hr} >= ${filters.minHomeRuns}`,
+      );
+    }
+
+    if (filters.minRBI !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonBatting.rbi} >= ${filters.minRBI}`,
+      );
+    }
+
+    return conditions;
+  }
+
+  /**
+   * Build WHERE conditions for season pitching queries
+   */
+  private buildSeasonPitchingFilters(filters: SeasonStatisticsFilters): SQL[] {
+    const conditions: SQL[] = [];
+
+    if (filters.playerId !== undefined) {
+      conditions.push(
+        eq(PublicSchema.seasonPitching.playerId, filters.playerId),
+      );
+    }
+
+    if (filters.season !== undefined) {
+      conditions.push(eq(PublicSchema.seasonPitching.season, filters.season));
+    }
+
+    if (filters.team !== undefined) {
+      conditions.push(eq(PublicSchema.seasonPitching.team, filters.team));
+    }
+
+    if (filters.lgId !== undefined) {
+      conditions.push(eq(PublicSchema.seasonPitching.lgId, filters.lgId));
+    }
+
+    if (filters.minGames !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonPitching.g} >= ${filters.minGames}`,
+      );
+    }
+
+    if (filters.minWins !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonPitching.w} >= ${filters.minWins}`,
+      );
+    }
+
+    if (filters.minStrikeouts !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonPitching.so} >= ${filters.minStrikeouts}`,
+      );
+    }
+
+    return conditions;
+  }
+
+  /**
+   * Build WHERE conditions for season fielding queries
+   */
+  private buildSeasonFieldingFilters(filters: SeasonStatisticsFilters): SQL[] {
+    const conditions: SQL[] = [];
+
+    if (filters.playerId !== undefined) {
+      conditions.push(
+        eq(PublicSchema.seasonFielding.playerId, filters.playerId),
+      );
+    }
+
+    if (filters.season !== undefined) {
+      conditions.push(eq(PublicSchema.seasonFielding.season, filters.season));
+    }
+
+    if (filters.team !== undefined) {
+      conditions.push(eq(PublicSchema.seasonFielding.team, filters.team));
+    }
+
+    if (filters.lgId !== undefined) {
+      conditions.push(eq(PublicSchema.seasonFielding.lgId, filters.lgId));
+    }
+
+    if (filters.minGames !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.seasonFielding.g} >= ${filters.minGames}`,
       );
     }
 

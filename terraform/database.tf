@@ -1,6 +1,6 @@
-# DB Subnet Group - Keep existing to avoid RDS recreation
-# Note: Moving existing RDS to private subnets requires recreation
-# Current security is achieved through removed public access rules
+# DB Subnet Group - RDS deployed in public subnets for direct access capability
+# Public subnets allow both RDS Proxy (Lambda) and direct access (CLI/migrations)
+# Security is controlled via security group rules, not network isolation
 resource "aws_db_subnet_group" "main" {
   name       = "${local.name_prefix}-db-subnet-group-v2" # Keep existing name
   subnet_ids = aws_subnet.public[*].id                   # Keep existing subnets to avoid RDS recreation
@@ -30,10 +30,10 @@ resource "aws_db_instance" "postgres" {
   username = var.database_username
   password = random_password.database_password.result
 
-  # Network & Security - Private database in private subnets
+  # Network & Security - Public subnets with controlled access
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = false # Secure: no public access, only via RDS proxy
+  publicly_accessible    = var.environment == "dev" ? true : false # Enable direct access for development
 
   # Backup & Maintenance - Optimized for dev
   backup_retention_period    = 1 # Reduced from 7 days for dev
@@ -172,3 +172,10 @@ resource "aws_iam_role_policy" "rds_proxy_secrets" {
     ]
   })
 }
+
+# =============================================================================
+# CLI DATABASE ACCESS
+# =============================================================================
+# CLI and development tools now connect directly to RDS for simplicity and performance.
+# Direct access is enabled via publicly_accessible=true and security group rules.
+# Lambda functions continue to use RDS Proxy above for production reliability.

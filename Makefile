@@ -240,9 +240,13 @@ db-studio: ## Open database studio
 	@$(call echo_blue,Opening database studio...)
 	npx nx studio:public db-client
 
-db-reset: ## Reset database
+db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
-	npx nx db:reset db-client
+ifeq ($(DETECTED_OS),Windows)
+	cd lib$(PATH_SEP)db-client && npm run db:reset
+else
+	cd lib$(PATH_SEP)db-client && npm run db:reset
+endif
 
 # Code Generation
 codegen: ## Run code generation

@@ -33,11 +33,15 @@ export function BattingStatsTableWithData(): React.JSX.Element {
   );
 
   if (loading) {
-    return <Spinner />;
+    return <Spinner color="$blue10" />;
   }
 
   if (!filteredStats) {
-    return <Text>Could not load batting stats</Text>;
+    return (
+      <Text color="$color10" fontSize="$4" textAlign="center" padding="$4">
+        Could not load batting stats
+      </Text>
+    );
   }
 
   return <BattingStatsTable stats={filteredStats} />;
@@ -59,11 +63,15 @@ export function PitchingStatsTableWithData(): React.JSX.Element {
   );
 
   if (loading) {
-    return <Spinner />;
+    return <Spinner color="$green10" />;
   }
 
   if (!filteredStats) {
-    return <Text>Could not load pitching stats</Text>;
+    return (
+      <Text color="$color10" fontSize="$4" textAlign="center" padding="$4">
+        Could not load pitching stats
+      </Text>
+    );
   }
 
   return <PitchingStatsTable stats={filteredStats} />;
@@ -85,11 +93,15 @@ export function FieldingStatsTableWithData(): React.JSX.Element {
   );
 
   if (loading) {
-    return <Spinner />;
+    return <Spinner color="$purple10" />;
   }
 
   if (!filteredStats) {
-    return <Text>Could not load fielding stats</Text>;
+    return (
+      <Text color="$color10" fontSize="$4" textAlign="center" padding="$4">
+        Could not load fielding stats
+      </Text>
+    );
   }
 
   return <FieldingStatsTable stats={filteredStats} />;

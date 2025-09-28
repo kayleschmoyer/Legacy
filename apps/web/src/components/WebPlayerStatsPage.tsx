@@ -164,7 +164,8 @@ export function WebPlayerStatsPage() {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#f8f9fa', // Light background for the page
+        backgroundColor: '#0f0f23', // Dark theme background
+        color: '#bababaa', // Dark theme text
         padding: 0, // Remove default padding as PlayerStatsPage handles its own
       }}
     >

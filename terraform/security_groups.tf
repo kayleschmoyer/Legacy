@@ -49,9 +49,25 @@ resource "aws_security_group_rule" "rds_from_proxy" {
   security_group_id        = aws_security_group.rds.id
 }
 
-# RDS now secured in private subnets - no public access
-# Database access only through RDS proxy from Lambda functions in private subnets
-# Migrations should use database tunneling or VPN for secure access
+# =============================================================================
+# RDS ACCESS STRATEGY:
+# - Lambda functions: Use RDS Proxy for connection pooling and reliability
+# - CLI/Migrations: Use direct RDS access for simplicity and performance  
+# - Security: Controlled via security group rules (source-based access control)
+# =============================================================================
+
+# CLI Development Access - Direct RDS connection for development tools
+resource "aws_security_group_rule" "rds_from_cli_dev" {
+  count = var.environment == "dev" && length(var.allowed_public_ips) > 0 ? 1 : 0
+  
+  type              = "ingress"
+  from_port         = 5432
+  to_port           = 5432
+  protocol          = "tcp"
+  cidr_blocks       = [for ip in var.allowed_public_ips : "${ip}/32"]
+  security_group_id = aws_security_group.rds.id
+  description       = "Direct PostgreSQL access from allowed development IPs (CLI tools)"
+}
 
 # RDS Proxy Security Group - Optional for dev cost savings
 resource "aws_security_group" "rds_proxy" {
@@ -91,3 +107,13 @@ resource "aws_security_group_rule" "rds_proxy_to_rds" {
 
 # API Gateway security group removed - not needed since API Gateways are managed by Serverless Framework
 # and don't require VPC endpoints for this application
+
+# =============================================================================
+# DEVELOPMENT RDS PROXY SECURITY GROUPS (PUBLIC ACCESS)
+# =============================================================================
+
+# =============================================================================
+# CLI DATABASE ACCESS  
+# =============================================================================
+# CLI and development tools now access RDS directly via the rds_from_cli_dev rule above.
+# This replaces the previous development RDS proxy approach for simplicity and cost savings.

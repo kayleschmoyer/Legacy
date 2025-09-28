@@ -8,10 +8,12 @@ export { PlayersScreen } from './PlayersScreen';
 export { PlayersTable } from './PlayersTable';
 
 // Advanced player statistics components
-// TODO: Add PlayersCareerStatsTable when component is implemented
-// TODO: Add PlayerStatsTable when component is implemented
+export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 export { PlayerStatsFilterDialog } from './PlayerStatsFilterDialog';
 export { PlayerStatsPage } from './PlayerStatsPage';
+
+// Career statistics services and types
+export * from './services/CareerStatsService';
 
 // Player statistics types and utilities
 export type {
@@ -23,7 +25,6 @@ export type {
 
 // API exports
 export * from './PlayersApi';
-export * from './CareerStatsApi';
 
 // Types
 export type { PlayerRowData, PlayerRowProps } from './PlayerRow';

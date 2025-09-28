@@ -11,19 +11,31 @@ import { Text, XStack, YStack } from 'tamagui';
  */
 export default function PlayerStatsScreen() {
   return (
-    <YStack flex={1} backgroundColor="$background" padding="$4">
-      <Text
-        fontSize="$6"
-        fontWeight="bold"
-        textAlign="center"
-        marginBottom="$4"
+    <YStack flex={1} backgroundColor="$background" padding="$4" space="$4">
+      <YStack
+        backgroundColor="$color2"
+        borderColor="$borderColor"
+        borderWidth={1}
+        borderRadius="$4"
+        padding="$4"
+        alignItems="center"
+        space="$3"
       >
-        Player Statistics
-      </Text>
-      <Text textAlign="center" color="$gray10">
-        Component implementation needed
-      </Text>
-      {/* TODO: Add actual player statistics functionality */}
+        <Text
+          fontSize="$6"
+          fontWeight="bold"
+          textAlign="center"
+          color="$color12"
+          accessibilityLabel="Chart icon Player Statistics"
+        >
+          {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+          📊 Player Statistics
+        </Text>
+        <Text textAlign="center" color="$color10" fontSize="$4">
+          Component implementation needed
+        </Text>
+        {/* TODO: Add actual player statistics functionality */}
+      </YStack>
     </YStack>
   );
 }
@@ -36,7 +48,15 @@ export default function PlayerStatsScreen() {
  */
 export function PlayerStatsScreenHeader() {
   return (
-    <XStack flex={1} alignItems="center" justifyContent="center">
+    <XStack
+      flex={1}
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor="$color2"
+      borderBottomWidth={1}
+      borderBottomColor="$borderColor"
+      paddingVertical="$2"
+    >
       <Text fontSize="$6" fontWeight="600" color="$color12">
         {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
         📊 Player Statistics

@@ -372,9 +372,25 @@ export class AuthService {
   }
 
   /**
-   * Verify if current token is still valid
+   * Verify if current token is still valid (local validation only for better performance)
    */
-  async verifyToken(token?: string): Promise<boolean> {
+  verifyToken(token?: string): boolean {
+    const jwt = token || this.getStoredToken();
+    if (!jwt) return false;
+
+    try {
+      // Local JWT validation - check if token is properly formatted and not expired
+      return this.isTokenValidLocally(jwt);
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verify if current token is still valid (remote verification - use for critical operations)
+   */
+  async verifyTokenRemote(token?: string): Promise<boolean> {
     const jwt = token || this.getStoredToken();
     if (!jwt) return false;
 
@@ -389,7 +405,48 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      console.error('Token verification failed:', error);
+      console.error('Remote token verification failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Local JWT validation - checks format and expiration without API call
+   */
+  private isTokenValidLocally(jwt: string): boolean {
+    try {
+      // Check JWT format
+      const parts = jwt.split('.');
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      // Decode payload to check expiration
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
+      ) as {
+        exp?: number;
+        iat?: number;
+        [key: string]: unknown;
+      };
+
+      // Check if token has expiration time
+      if (!payload.exp) {
+        // If no expiration time, consider token valid (some JWTs may not have exp)
+        return true;
+      }
+
+      // Check if token is expired (exp is in seconds, Date.now() is in milliseconds)
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (payload.exp <= currentTime) {
+        console.log('JWT token has expired');
+        return false;
+      }
+
+      // Token is valid and not expired
+      return true;
+    } catch (error) {
+      console.error('Failed to validate JWT locally:', error);
       return false;
     }
   }

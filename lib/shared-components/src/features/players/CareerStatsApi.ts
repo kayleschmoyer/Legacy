@@ -1,30 +1,93 @@
 // Career Statistics API for Players Table
 // Uses the career statistics queries from the GraphQL schema
 
-import {
-  type CareerBattingFragment,
-  CareerBattingFragmentDoc,
-  GetCareerBattingStats,
-  type GetCareerBattingStatsLazyQueryHookResult,
-  type GetCareerBattingStatsQuery,
-  type GetCareerBattingStatsQueryHookResult,
-  type GetCareerBattingStatsQueryVariables,
-  useGetCareerBattingStatsLazyQuery,
-  useGetCareerBattingStatsQuery,
-} from '../../api/db/graphql.generated';
+import { gql, useQuery } from '@apollo/client';
 
-// Re-export for convenience
-export {
-  type CareerBattingFragment,
-  type GetCareerBattingStatsQuery,
-  type GetCareerBattingStatsQueryVariables,
-  type GetCareerBattingStatsQueryHookResult,
-  type GetCareerBattingStatsLazyQueryHookResult,
-  CareerBattingFragmentDoc,
-  GetCareerBattingStats,
-  useGetCareerBattingStatsQuery,
-  useGetCareerBattingStatsLazyQuery,
-};
+// GraphQL query for career batting statistics
+const GET_CAREER_BATTING_STATS = gql`
+  query GetCareerBattingStats(
+    $limit: Int
+    $offset: Int
+    $orderBy: String
+    $orderDirection: String
+    $minGames: Int
+    $minHomeRuns: Int
+    $minRBI: Int
+  ) {
+    careerBattingStats(
+      limit: $limit
+      offset: $offset
+      orderBy: $orderBy
+      orderDirection: $orderDirection
+      minGames: $minGames
+      minHomeRuns: $minHomeRuns
+      minRBI: $minRBI
+    ) {
+      playerId
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      totalBases
+      groundedIntoDoublePlays
+      hitByPitch
+      sacrificeHits
+      intentionalBaseOnBalls
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+  }
+`;
+
+// TypeScript interface for the GraphQL response
+export interface CareerBattingStats {
+  playerId: number | null;
+  games: number | null;
+  plateAppearances: number | null;
+  atBats: number | null;
+  runs: number | null;
+  hits: number | null;
+  doubles: number | null;
+  triples: number | null;
+  homeRuns: number | null;
+  rbi: number | null;
+  stolenBases: number | null;
+  caughtStealing: number | null;
+  baseOnBalls: number | null;
+  strikeouts: number | null;
+  totalBases: number | null;
+  groundedIntoDoublePlays: number | null;
+  hitByPitch: number | null;
+  sacrificeHits: number | null;
+  intentionalBaseOnBalls: number | null;
+  battingAverage: number | null;
+  onBasePercentage: number | null;
+  sluggingPercentage: number | null;
+}
+
+export interface GetCareerBattingStatsResponse {
+  careerBattingStats: CareerBattingStats[];
+}
+
+export interface GetCareerBattingStatsVariables {
+  limit?: number;
+  offset?: number;
+  orderBy?: string;
+  orderDirection?: string;
+  minGames?: number;
+  minHomeRuns?: number;
+  minRBI?: number;
+}
 
 // Enhanced player interface that combines basic player info with career stats
 export interface PlayerWithCareerStats {
@@ -54,25 +117,21 @@ export interface PlayerWithCareerStats {
 }
 
 // Hook for getting career batting statistics
-export function useCareerBattingStatsQuery(variables?: {
-  limit?: number;
-  offset?: number;
-  orderBy?: string;
-  orderDirection?: string;
-  minGames?: number;
-  minHomeRuns?: number;
-  minRBI?: number;
-}) {
-  const { data, loading, error, refetch, fetchMore } =
-    useGetCareerBattingStatsQuery({
-      variables,
-      errorPolicy: 'all',
-      notifyOnNetworkStatusChange: true,
-    });
+export function useCareerBattingStatsQuery(
+  variables?: GetCareerBattingStatsVariables,
+) {
+  const { data, loading, error, refetch, fetchMore } = useQuery<
+    GetCareerBattingStatsResponse,
+    GetCareerBattingStatsVariables
+  >(GET_CAREER_BATTING_STATS, {
+    variables,
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: true,
+  });
 
   // Transform GraphQL data to enhanced player format with career stats
   const transformedData: PlayerWithCareerStats[] =
-    data?.careerBattingStats?.map((stats: CareerBattingFragment) => ({
+    data?.careerBattingStats?.map((stats: CareerBattingStats) => ({
       playerId: stats.playerId,
       displayName: `Player ${stats.playerId || 'Unknown'}`, // We'll need to join with player names later
 

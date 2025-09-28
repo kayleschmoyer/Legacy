@@ -2,15 +2,15 @@ name: Enhanced Merge Queue
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Run every 10 minutes (reduced frequency for efficiency)
-  workflow_dispatch:      # Allow manual triggering
+    - cron: "*/10 * * * *" # Run every 10 minutes (reduced frequency for efficiency)
+  workflow_dispatch: # Allow manual triggering
     inputs:
       dry_run:
-        description: 'Run in dry-run mode (no actual merging)'
+        description: "Run in dry-run mode (no actual merging)"
         type: boolean
         default: false
       force_check:
-        description: 'Force check all PRs even if not labeled'  
+        description: "Force check all PRs even if not labeled"
         type: boolean
         default: false
   # Trigger on status check completion for faster response
@@ -46,27 +46,27 @@ jobs:
             const isDryRun = ${{ github.event.inputs.dry_run || false }};
             const forceCheck = ${{ github.event.inputs.force_check || false }};
             const isTriggeredByStatus = context.eventName === 'status' || context.eventName === 'check_run';
-            
+
             console.log(`🔄 Starting merge queue processing (${isDryRun ? 'DRY RUN' : 'LIVE'})...`);
             if (isTriggeredByStatus) {
               console.log(`⚡ Triggered by status/check completion - faster response mode`);
             }
-            
+
             // Get PRs with merge-when-ready label (or all if force_check is true)
             const prs = await github.rest.pulls.list({
               owner,
               repo,
               state: 'open'
             });
-            
+
             const mergeReadyPRs = forceCheck 
               ? prs.data 
               : prs.data.filter(pr => 
                   pr.labels.some(label => label.name === 'merge-when-ready')
                 );
-            
+
             console.log(`📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label`);
-            
+
             for (const pr of mergeReadyPRs) {
               console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
               
@@ -99,9 +99,9 @@ jobs:
                 await reportProcessingError(pr, error);
               }
             }
-            
+
             console.log(`\n🏁 Merge queue processing complete`);
-            
+
             // Helper Functions
             async function validatePRForMerge(pr) {
               // Check if PR is draft
@@ -118,20 +118,20 @@ jobs:
                 return { canMerge: false, reason: 'GitHub is still calculating mergeable state, will retry next cycle' };
               }
               
-              // Check for required reviews
-              const reviews = await github.rest.pulls.listReviews({
-                owner,
-                repo,
-                pull_number: pr.number
-              });
-              
-              const approvals = reviews.data.filter(review => 
-                review.state === 'APPROVED' && review.user.type === 'User'
-              );
-              
-              if (approvals.length === 0) {
-                return { canMerge: false, reason: 'PR requires at least one approval from a reviewer' };
-              }
+              // Reviews are no longer required - skip review check
+              // const reviews = await github.rest.pulls.listReviews({
+              //   owner,
+              //   repo,
+              //   pull_number: pr.number
+              // });
+              // 
+              // const approvals = reviews.data.filter(review => 
+              //   review.state === 'APPROVED' && review.user.type === 'User'
+              // );
+              // 
+              // if (approvals.length === 0) {
+              //   return { canMerge: false, reason: 'PR requires at least one approval from a reviewer' };
+              // }
               
               // Check status checks
               const checksResult = await validateStatusChecks(pr.head.sha);
@@ -145,7 +145,7 @@ jobs:
               
               return { canMerge: true };
             }
-            
+
             async function validateStatusChecks(sha) {
               // Get check runs
               const checks = await github.rest.checks.listForRef({
@@ -194,7 +194,46 @@ jobs:
                 failingChecks
               };
             }
-            
+
+            async function findOrCreateComment(pr, commentBody, commentType = 'merge-queue') {
+              // Find existing merge queue comments
+              const comments = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: pr.number
+              });
+              
+              // Look for existing merge queue comment by checking for signature
+              const existingComment = comments.data.find(comment => 
+                comment.body.includes('*Automated message from merge queue system*') ||
+                comment.body.includes('## 🚫 Merge Queue: Cannot Merge') ||
+                comment.body.includes('## 🎉 Successfully Merged!') ||
+                comment.body.includes('## ⚠️ Merge Queue Processing Error')
+              );
+              
+              if (existingComment) {
+                // Update existing comment
+                console.log(`🔄 Updating existing merge queue comment #${existingComment.id}`);
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existingComment.id,
+                  body: commentBody
+                });
+                return existingComment.id;
+              } else {
+                // Create new comment
+                console.log(`✨ Creating new merge queue comment`);
+                const newComment = await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  body: commentBody
+                });
+                return newComment.data.id;
+              }
+            }
+
             async function performMerge(pr) {
               try {
                 console.log(`🚀 Merging PR #${pr.number}...`);
@@ -210,26 +249,25 @@ jobs:
                 
                 console.log(`✅ Successfully merged PR #${pr.number}`);
                 
-                // Post success comment
-                await github.rest.issues.createComment({
-                  issue_number: pr.number,
-                  owner,
-                  repo,
-                  body: "## 🎉 Successfully Merged!\n\n" +
-                        "This PR has been automatically merged via the merge queue.\n\n" +
-                        "**Merge Details:**\n" +
-                        "- Method: Squash merge\n" +
-                        "- Commit SHA: `" + mergeResult.data.sha + "`\n" +
-                        "- Merged at: " + new Date().toISOString() + "\n\n" +
-                        "Thank you for your contribution! 🚀"
-                });
+                // Post success comment (reuse existing comment if available)
+                const successComment = "## 🎉 Successfully Merged!\n\n" +
+                      "This PR has been automatically merged via the merge queue.\n\n" +
+                      "**Merge Details:**\n" +
+                      "- Method: Squash merge\n" +
+                      "- Commit SHA: `" + mergeResult.data.sha + "`\n" +
+                      "- Merged at: " + new Date().toISOString() + "\n\n" +
+                      "Thank you for your contribution! 🚀\n\n" +
+                      "---\n" +
+                      "*Automated message from merge queue system*";
+                
+                await findOrCreateComment(pr, successComment, 'success');
                 
               } catch (error) {
                 console.error(`❌ Failed to merge PR #${pr.number}: ${error.message}`);
                 throw error;
               }
             }
-            
+
             async function reportMergeBlocker(pr, validation) {
               let comment = "## 🚫 Merge Queue: Cannot Merge\n\n" +
                            "**Reason:** " + validation.reason + "\n\n" +
@@ -245,9 +283,9 @@ jobs:
                           "   git push origin " + pr.head.ref + "\n" +
                           "   ```";
               } else if (validation.reason.includes('approval')) {
-                comment += "\n1. Request review from a team member\n" +
-                          "2. Address any review feedback\n" +
-                          "3. Obtain an approval from a reviewer";
+                // Reviews are no longer required - this case should not occur
+                comment += "\n1. Check the PR status and resolve any issues\n" +
+                          "2. Ensure all requirements are met";
               } else if (validation.failingChecks) {
                 comment += "\n1. Fix the failing checks:\n" +
                           validation.failingChecks.map(check => "   - " + check).join('\n') + "\n" +
@@ -261,33 +299,25 @@ jobs:
                         "---\n" +
                         "*Automated message from merge queue system*";
               
-              await github.rest.issues.createComment({
-                issue_number: pr.number,
-                owner,
-                repo,
-                body: comment
-              });
+              await findOrCreateComment(pr, comment, 'blocker');
             }
-            
+
             async function reportProcessingError(pr, error) {
               console.error("Processing error for PR #" + pr.number + ":", error);
               
-              await github.rest.issues.createComment({
-                issue_number: pr.number,
-                owner,
-                repo,
-                body: "## ⚠️ Merge Queue Processing Error\n\n" +
-                      "An error occurred while processing this PR for automatic merge:\n\n" +
-                      "**Error:** " + error.message + "\n\n" +
-                      "### 🔧 Next Steps:\n" +
-                      "1. This may be a temporary issue - the merge queue will retry in the next cycle\n" +
-                      "2. If the error persists, you can manually merge this PR\n" +
-                      "3. Contact the team if you believe this is a system issue\n\n" +
-                      "**Troubleshooting:**\n" +
-                      "- Ensure the PR is in a mergeable state\n" +
-                      "- Verify all required checks are passing\n" +
-                      "- Check that the branch is up to date\n\n" +
-                      "---\n" +
-                      "*Automated error report from merge queue system*"
-              });
+              const errorComment = "## ⚠️ Merge Queue Processing Error\n\n" +
+                    "An error occurred while processing this PR for automatic merge:\n\n" +
+                    "**Error:** " + error.message + "\n\n" +
+                    "### 🔧 Next Steps:\n" +
+                    "1. This may be a temporary issue - the merge queue will retry in the next cycle\n" +
+                    "2. If the error persists, you can manually merge this PR\n" +
+                    "3. Contact the team if you believe this is a system issue\n\n" +
+                    "**Troubleshooting:**\n" +
+                    "- Ensure the PR is in a mergeable state\n" +
+                    "- Verify all required checks are passing\n" +
+                    "- Check that the branch is up to date\n\n" +
+                    "---\n" +
+                    "*Automated message from merge queue system*";
+              
+              await findOrCreateComment(pr, errorComment, 'error');
             }

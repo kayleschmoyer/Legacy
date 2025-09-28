@@ -46,14 +46,14 @@ permissions:
 env:
   # Nx Cloud configuration (with intelligent detection)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-  
+
   # Adaptive settings (will be overridden by intelligent detection)
   NX_DAEMON: false
-  NX_PARALLEL: 4  # Default, adjusted by DTE detection
+  NX_PARALLEL: 4 # Default, adjusted by DTE detection
   NX_CACHE_DIRECTORY: .nx-cache
   NX_SKIP_NX_CACHE: false
-  NODE_OPTIONS: "--max_old_space_size=4096"  # Increased to 6GB if DTE available
-  
+  NODE_OPTIONS: "--max_old_space_size=4096" # Increased to 6GB if DTE available
+
   # Debug mode
   NX_VERBOSE_LOGGING: ${{ github.event.inputs.debug_mode == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
 
@@ -97,14 +97,14 @@ jobs:
         id: dte-detect
         run: |
           echo "::group::🧠 Smart Nx Cloud Detection with Usage Limits"
-          
+
           # Initialize defaults
           CLOUD_AVAILABLE="false"
           DTE_AVAILABLE="false"  
           EXECUTION_MODE="local"
           OPTIMAL_AGENTS=4
           FALLBACK_REASON=""
-          
+
           if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
             echo "✅ Nx Cloud token found"
             
@@ -200,7 +200,7 @@ jobs:
             echo "📥 Installing dependencies for local execution..."
             npm ci --prefer-offline --no-audit --silent
           fi
-          
+
           # Set environment variables for subsequent steps
           if [ "$DTE_AVAILABLE" == "true" ]; then
             echo "NX_PARALLEL=$OPTIMAL_AGENTS" >> $GITHUB_ENV
@@ -211,32 +211,32 @@ jobs:
             echo "NODE_OPTIONS=--max_old_space_size=4096" >> $GITHUB_ENV
             echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false" >> $GITHUB_ENV
           fi
-          
+
           # Output results for other steps
           echo "cloud-available=$CLOUD_AVAILABLE" >> $GITHUB_OUTPUT
           echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
           echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
           echo "optimal-agents=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
           echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
-          
+
           # Create summary report
           echo "## ☁️ Execution Mode Detection" >> $GITHUB_STEP_SUMMARY
           echo "- **Cloud Available**: $CLOUD_AVAILABLE" >> $GITHUB_STEP_SUMMARY
           echo "- **DTE Available**: $DTE_AVAILABLE" >> $GITHUB_STEP_SUMMARY  
           echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
           echo "- **Agents/Parallel**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "$EXECUTION_MODE" == "local" ] && [ -n "$FALLBACK_REASON" ]; then
             echo "- **Fallback Reason**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           # Set appropriate notices
           if [ "$DTE_AVAILABLE" == "true" ]; then
             echo "::notice title=Nx Cloud DTE::Using distributed execution with $OPTIMAL_AGENTS agents"
           else
             echo "::notice title=Local Execution::$FALLBACK_REASON - using GitHub Actions (4 processes)"
           fi
-          
+
           echo "::endgroup::"
 
       - name: "📦 Setup Caching"
@@ -254,7 +254,7 @@ jobs:
         timeout-minutes: 2
         run: |
           echo "::group::Verifying Dependencies"
-          
+
           # Dependencies are already installed in DTE detection step
           # This step just verifies the installation was successful
           if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
@@ -391,13 +391,13 @@ jobs:
         timeout-minutes: 15
         run: |
           echo "::group::� Nx Cloud Distributed Task Execution"
-          
+
           AGENTS="${{ steps.dte-detect.outputs.optimal-agents }}"
           echo "🎯 Starting DTE with $AGENTS agents..."
-          
+
           # Start DTE session with optimal agent count
           npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=$AGENTS
-          
+
           echo "�🔧 Running lint and typecheck with DTE..."
           if npx nx affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS 2>&1 | tee dte-quality.log; then
             echo "✅ Code quality checks passed (DTE)"
@@ -410,7 +410,7 @@ jobs:
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
-          
+
           echo "🧪 Running tests with DTE..."  
           if npx nx affected -t test --parallel=$AGENTS --max-parallel=$AGENTS 2>&1 | tee dte-test.log; then
             echo "✅ Tests passed (DTE)"
@@ -421,7 +421,7 @@ jobs:
             echo "::error::Tests failed in DTE mode. Check dte-test.log for details."
             exit 1
           fi
-          
+
           echo "📦 Running builds with DTE..."
           if npx nx affected -t build --parallel=$AGENTS --max-parallel=$AGENTS 2>&1 | tee dte-build.log; then
             echo "✅ Builds completed (DTE)"
@@ -432,24 +432,24 @@ jobs:
             echo "::error::Builds failed in DTE mode. Check dte-build.log for details."
             exit 1
           fi
-          
+
           echo "🎉 Distributed execution completed successfully"
           echo "::endgroup::"
 
       - name: "🔄 Code Quality & Testing (Local Fallback)"
-        id: local-execution  
+        id: local-execution
         if: steps.dte-detect.outputs.dte-available != 'true'
         timeout-minutes: 25
         run: |
           echo "::group::🏠 Local Execution (GitHub Actions)"
-          
+
           REASON="${{ steps.dte-detect.outputs.fallback-reason }}"
           echo "📋 Using local execution: $REASON"
-          
+
           # Local ESLint validation
           echo "🔧 Running ESLint validation..."
           echo "::notice::To reproduce locally: npx nx affected -t lint --parallel=4"
-          
+
           ERROR_CONTEXT="eslint-$(date +%s)"
           if npx nx affected -t lint --base=origin/main --head=HEAD --parallel=4 2>&1 | tee "${ERROR_CONTEXT}.log"; then
             echo "✅ ESLint validation passed"
@@ -460,11 +460,11 @@ jobs:
             echo "::error::ESLint validation failed. Check ${ERROR_CONTEXT}.log for details."
             exit 1
           fi
-          
+
           # Local TypeScript check
           echo "📝 Running TypeScript type checking..."
           echo "::notice::To reproduce locally: npx nx affected -t typecheck --parallel=4"
-          
+
           TYPECHECK_CONTEXT="typecheck-$(date +%s)"
           if npx nx affected -t typecheck --base=origin/main --head=HEAD --parallel=4 2>&1 | tee "${TYPECHECK_CONTEXT}.log"; then
             echo "✅ TypeScript validation passed"
@@ -475,11 +475,11 @@ jobs:
             echo "::error::TypeScript validation failed. Check ${TYPECHECK_CONTEXT}.log for details."
             exit 1
           fi
-          
+
           # Local testing
           echo "🧪 Running unit tests..."
           echo "::notice::To reproduce locally: npx nx affected -t test --parallel=4"
-          
+
           TEST_CONTEXT="test-$(date +%s)"
           if npx nx affected -t test --base=origin/main --head=HEAD --parallel=4 2>&1 | tee "${TEST_CONTEXT}.log"; then
             echo "✅ Unit tests passed"
@@ -490,11 +490,11 @@ jobs:
             echo "::error::Unit tests failed. Check ${TEST_CONTEXT}.log for details."
             exit 1
           fi
-          
+
           # Local builds
           echo "📦 Running builds..."
           echo "::notice::To reproduce locally: npx nx affected -t build --parallel=4"
-          
+
           BUILD_CONTEXT="build-$(date +%s)"
           if npx nx affected -t build --base=origin/main --head=HEAD --parallel=4 2>&1 | tee "${BUILD_CONTEXT}.log"; then
             echo "✅ Builds completed"
@@ -505,12 +505,12 @@ jobs:
             echo "::error::Builds failed. Check ${BUILD_CONTEXT}.log for details."
             exit 1
           fi
-          
+
           echo "✅ Local execution completed successfully"
           echo "result=success" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
-      # ======================================================================  
+      # ======================================================================
       # USAGE ANALYTICS & MONITORING
       # ======================================================================
 
@@ -518,7 +518,7 @@ jobs:
         if: always()
         run: |
           echo "::group::📈 Performance & Usage Analytics"
-          
+
           if [ "${{ steps.dte-detect.outputs.dte-available }}" == "true" ]; then
             echo "Collecting DTE usage statistics..."
             
@@ -561,7 +561,7 @@ jobs:
             echo "- **Cache**: Local Nx cache only" >> $GITHUB_STEP_SUMMARY
             echo "- **Recommendation**: Add NX_CLOUD_ACCESS_TOKEN for 60-80% performance boost" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "::endgroup::"
 
       # ======================================================================
@@ -574,24 +574,24 @@ jobs:
         with:
           script: |
             const commentMarker = "<!-- CI-PIPELINE-COMMENT -->";
-            
+
             // Find existing CI comment to update
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            
+
             let existingComment = comments.data.find(comment => 
               comment.body.includes(commentMarker)
             );
-            
+
             // Determine specific failure context
             let failureReason = "Unknown CI failure";
             let reproCommand = "";
             let debugSection = "";
             let executionMode = "${{ steps.dte-detect.outputs.execution-mode || 'local' }}";
-            
+
             // Analyze which step failed for specific guidance
             const stepResults = {
               dteDetect: "${{ steps.dte-detect.result }}",
@@ -608,7 +608,7 @@ jobs:
               deploymentReadiness: "${{ steps.deployment-readiness.result }}",
               ciReport: "${{ steps.ci-report.result }}"
             };
-            
+
             // Find the first failed step and provide specific guidance
             if (stepResults.dteDetect === "failure") {
               failureReason = "Nx Cloud detection failed";
@@ -660,7 +660,7 @@ jobs:
               reproCommand = ".\\scripts\\test-ci.ps1";
               debugSection = "A CI step failed but couldn't be identified. Use our local CI simulation to reproduce the exact failure and check the GitHub Actions logs for more details.";
             }
-            
+
             // Add detailed step status for debugging
             let failedSteps = [];
             Object.entries(stepResults).forEach(([step, result]) => {
@@ -668,7 +668,7 @@ jobs:
                 failedSteps.push(step);
               }
             });
-            
+
             let stepStatusTable = "";
             if (failedSteps.length > 0) {
               stepStatusTable = "\n### 🔍 Step Status Details\n" +
@@ -683,7 +683,7 @@ jobs:
               });
               stepStatusTable += "\n";
             }
-            
+
             const comment = "## ❌ CI Pipeline Failed\n\n" +
                            "**Failure**: " + failureReason + "\n\n" +
                            "### 🔍 Quick Debug\n" +
@@ -735,7 +735,7 @@ jobs:
               console.log("Created new CI failure comment");
             }
 
-      - name: "✅ Report CI Success to PR"  
+      - name: "✅ Report CI Success to PR"
         if: success() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -743,17 +743,17 @@ jobs:
             const executionMode = "${{ steps.dte-detect.outputs.execution-mode || 'local' }}";
             const agents = "${{ steps.dte-detect.outputs.optimal-agents || '4' }}";
             const fallbackReason = "${{ steps.dte-detect.outputs.fallback-reason }}";
-            
+
             let performanceNote = "";
             if (executionMode === 'distributed') {
               performanceNote = "🚀 **Performance**: 60-80% faster with Distributed Task Execution";
             } else {
               performanceNote = "⚡ **Performance**: Standard GitHub Actions (add NX_CLOUD_ACCESS_TOKEN for 60-80% speedup)";
             }
-            
+
             // Define comment marker for success comments
             const COMMENT_MARKER = "<!-- CI_SUCCESS_COMMENT -->";
-            
+
             const comment = COMMENT_MARKER + "\n" +
                            "## ✅ CI Pipeline Passed\n\n" +
                            "All checks completed successfully! This PR is ready for review and merge.\n\n" +
@@ -778,11 +778,11 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo
             });
-            
+
             const existingComment = comments.find(comment => 
               comment.body && comment.body.includes(COMMENT_MARKER)
             );
-            
+
             if (existingComment) {
               // Update existing success comment
               await github.rest.issues.updateComment({
@@ -1241,12 +1241,12 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: "🤖 Android Build"
-        timeout-minutes: 25
+        timeout-minutes: 15
         run: |
           echo "::group::Android Build"
-          echo "::notice::To reproduce locally: npx nx build app --platform=android"
+          echo "::notice::To reproduce locally: npx nx build-android-debug app"
 
-          if npx nx build app --platform=android 2>&1 | tee android-build.log; then
+          if npx nx build-android-debug app 2>&1 | tee android-build.log; then
             echo "✅ Android build completed successfully"
           else
             echo "❌ Android build failed"

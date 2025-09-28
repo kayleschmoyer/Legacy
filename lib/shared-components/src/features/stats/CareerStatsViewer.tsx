@@ -25,18 +25,42 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
 }) => {
   if (Platform.OS === 'web') {
     return (
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ marginBottom: 16, color: '#333' }}>{title}</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div
+        style={{
+          marginBottom: 24,
+          backgroundColor: '#1a1a2e',
+          borderRadius: '8px',
+          padding: '16px',
+          border: '1px solid #3a3a5a',
+        }}
+      >
+        <h3
+          style={{
+            marginBottom: 16,
+            color: '#bababaa',
+            fontSize: '18px',
+            fontWeight: '600',
+          }}
+        >
+          {title}
+        </h3>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            backgroundColor: '#0f0f23',
+          }}
+        >
           <thead>
             <tr>
               {headers.map((header, index) => (
                 <th
                   key={index}
                   style={{
-                    padding: 8,
-                    border: '1px solid #ddd',
-                    backgroundColor: '#f5f5f5',
+                    padding: 12,
+                    border: '1px solid #3a3a5a',
+                    backgroundColor: '#1a1a2e',
+                    color: '#bababaa',
                     textAlign: 'left',
                     fontSize: 14,
                     fontWeight: 'bold',
@@ -54,9 +78,11 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
                   <td
                     key={cellIndex}
                     style={{
-                      padding: 8,
-                      border: '1px solid #ddd',
+                      padding: 10,
+                      border: '1px solid #3a3a5a',
                       fontSize: 13,
+                      color: '#9a9aaa',
+                      backgroundColor: '#0f0f23',
                     }}
                   >
                     {cell}
@@ -168,36 +194,46 @@ function CareerStatsViewer({
   };
 
   return (
-    <ScrollView flex={1} padding="$4">
+    <ScrollView flex={1} backgroundColor="$background" padding="$4">
       <Text
         fontSize="$5"
         fontWeight="bold"
         marginBottom="$4"
         textAlign="center"
+        color="$color12"
       >
         Player Career Stats
       </Text>
 
-      <YStack marginBottom="$4">
-        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+      <YStack
+        marginBottom="$4"
+        backgroundColor="$color2"
+        padding="$4"
+        borderRadius="$4"
+        borderWidth={1}
+        borderColor="$borderColor"
+      >
+        <Text fontSize="$4" fontWeight="600" marginBottom="$2" color="$color11">
           Player ID:
         </Text>
         <Input
           borderWidth={1}
-          borderColor="$gray8"
+          borderColor="$borderColor"
           borderRadius="$3"
           padding="$3"
           fontSize="$4"
-          backgroundColor="$white"
+          backgroundColor="$color1"
+          color="$color12"
           value={player}
           onChangeText={setPlayer}
           placeholder="Enter player ID"
+          placeholderTextColor="$color9"
           editable={!loading}
         />
       </YStack>
 
       <Button
-        backgroundColor={loading ? '$gray8' : '$blue10'}
+        backgroundColor={loading ? '$color6' : '$blue10'}
         paddingVertical="$3"
         paddingHorizontal="$6"
         borderRadius="$3"
@@ -248,9 +284,18 @@ function CareerStatsViewer({
         pitchingStats.length === 0 &&
         fieldingStats.length === 0 &&
         player && (
-          <Text fontSize="$4" textAlign="center" color="$gray10" marginTop="$4">
-            No career stats found for this player.
-          </Text>
+          <YStack
+            backgroundColor="$color2"
+            padding="$4"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$borderColor"
+            marginTop="$4"
+          >
+            <Text fontSize="$4" textAlign="center" color="$color10">
+              No career stats found for this player.
+            </Text>
+          </YStack>
         )}
     </ScrollView>
   );

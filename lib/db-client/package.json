@@ -13,10 +13,11 @@
     "db:psql:production": "tsx src/cli/db-cli.ts psql --production",
     "db:credentials": "tsx src/cli/db-cli.ts credentials",
     "db:credentials:production": "tsx src/cli/db-cli.ts credentials --production",
-    "db:migrate": "tsx src/scripts/run-migrations.ts",
-    "db:migrate:dry-run": "tsx src/scripts/run-migrations.ts --dry-run",
-    "db:migrate:production": "tsx src/scripts/run-migrations.ts --production",
-    "db:migrate:verbose": "tsx src/scripts/run-migrations.ts --verbose"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/scripts/run-drizzle-migrations.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:reset": "tsx src/scripts/reset-database.ts"
   },
   "dependencies": {
     "dotenv": "*"

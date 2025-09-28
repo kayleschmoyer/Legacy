@@ -107,6 +107,7 @@ const StatMapping: Record<
   IP: 'ip',
   L: 'l',
   LG_ID: 'lgId',
+  COMP_NAME_ABBR: 'lgId',
   ONBASE_PERC: 'onbasePerc',
   ONBASE_PLUS_SLUGGING: 'onbasePlusSlugging',
   ONBASE_PLUS_SLUGGING_PLUS: 'onbasePlusSluggingPlus',
@@ -200,6 +201,12 @@ function parseRow<T extends object>(
     rowId: !rowId ? yearCell?.text : rowId,
   } as T;
 
+  // Debug: Log all found data-stat attributes
+  const foundStats = allCells
+    .map((col) => col.getAttribute('data-stat'))
+    .filter((stat) => stat !== undefined);
+  LOGGER.debug(`Found data-stat attributes: ${foundStats.join(', ')}`);
+
   for (const col of allCells) {
     const stat = col.getAttribute('data-stat');
 
@@ -212,8 +219,10 @@ function parseRow<T extends object>(
     const statField = StatMapping[stat.toUpperCase()];
 
     if (!statField) {
-      LOGGER.debug(`Skipping field ${stat}`);
+      LOGGER.debug(`Skipping field ${stat} (text: '${text}')`);
       continue;
+    } else {
+      LOGGER.debug(`Mapping field ${stat} (text: '${text}') -> ${statField}`);
     }
 
     let value: string | number | null = text === '' ? null : text;

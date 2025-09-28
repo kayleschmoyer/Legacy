@@ -119,21 +119,31 @@ try {
     $directDbHost = $directDbEndpoint -replace ':.*$', ''
     $newEnvVars["DB_HOST_DIRECT"] = $directDbHost
     
-    # Set main DB_HOST based on user preference (proxy is preferred for production)
+    # Set main DB_HOST based on user preference and availability
     if ($DatabaseEndpoint -eq "direct") {
         $newEnvVars["DB_HOST"] = $directDbHost
-        Write-Host "Using direct database endpoint for DB_HOST (for migrations/admin)" -ForegroundColor Yellow
+        Write-Host "Using direct database endpoint for DB_HOST (CLI and migrations)" -ForegroundColor Green
     } else {
+        # For CLI/development, use direct RDS access (publicly accessible)
+        $newEnvVars["DB_HOST"] = $directDbHost
+        Write-Host "Using direct RDS access for DB_HOST (CLI development - publicly accessible)" -ForegroundColor Green
+        Write-Host "Note: Lambdas continue using RDS Proxy for production reliability" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Warning "Could not retrieve direct database endpoint."
+    
+    # Fallback to direct RDS access if available
+    if ($directDbHost) {
+        $newEnvVars["DB_HOST"] = $directDbHost
+        Write-Host "Using direct RDS access for DB_HOST (CLI development)" -ForegroundColor Green
+    } else {
+        # Final fallback to production proxy if direct access fails
         $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
         $proxyHost = $proxyEndpoint -replace ':.*$', ''
         $newEnvVars["DB_HOST"] = $proxyHost
-        Write-Host "Using RDS proxy endpoint for DB_HOST (recommended for production)" -ForegroundColor Yellow
+        Write-Host "Fallback: Using production RDS proxy endpoint for DB_HOST" -ForegroundColor Yellow
     }
-} catch {
-    Write-Warning "Could not retrieve direct database endpoint. Using proxy endpoint."
-    $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
-    $proxyHost = $proxyEndpoint -replace ':.*$', ''
-    $newEnvVars["DB_HOST"] = $proxyHost
+    
     Pop-Location
 }
 
@@ -241,6 +251,7 @@ Write-Host "  Database Secret: $($newEnvVars["DB_SECRET_NAME"])" -ForegroundColo
 Write-Host "  Database Host: $($newEnvVars["DB_HOST"])" -ForegroundColor Gray
 Write-Host "  RDS Proxy Endpoint: $($terraformOutput.rds_proxy_endpoint.value)" -ForegroundColor Gray
 Write-Host "  Direct RDS Endpoint: $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
+Write-Host "  CLI Database Access: Direct RDS (publicly accessible)" -ForegroundColor Green
 Write-Host "  AWS Region: $($terraformOutput.environment_variables_summary.value.aws_region)" -ForegroundColor Gray
 Write-Host "  SQS Queue URL: $($terraformOutput.environment_variables_summary.value.sqs_queue_url)" -ForegroundColor Gray
 Write-Host "  Google Client ID: $($terraformOutput.environment_variables_summary.value.google_oauth_client_id)" -ForegroundColor Gray

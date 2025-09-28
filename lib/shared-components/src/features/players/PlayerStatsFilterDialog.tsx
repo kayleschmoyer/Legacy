@@ -73,6 +73,8 @@ export function PlayerStatsFilterDialog({
           bordered
           elevate
           key="content"
+          backgroundColor="$color2"
+          borderColor="$borderColor"
           animateOnly={['transform', 'opacity']}
           animation={[
             'quicker',
@@ -92,11 +94,13 @@ export function PlayerStatsFilterDialog({
         >
           {/* Header */}
           <XStack ai="center" jc="space-between">
-            <H3 color="$color">Filter Player Statistics</H3>
+            <H3 color="$color12">Filter Player Statistics</H3>
             <Button
               size="$2"
               circular
               variant="outlined"
+              backgroundColor="$color1"
+              borderColor="$borderColor"
               icon={X}
               onPress={handleCancel}
             />

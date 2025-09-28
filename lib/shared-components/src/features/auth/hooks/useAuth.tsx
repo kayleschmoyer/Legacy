@@ -83,11 +83,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   // Initialize auth state on mount
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initializeAuth = () => {
       try {
         const token = authService.getStoredToken();
         if (token) {
-          const isValid = await authService.verifyToken(token);
+          const isValid = authService.verifyToken(token);
           if (isValid) {
             // Token is valid, extract user info from JWT payload
             try {
