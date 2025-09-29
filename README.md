@@ -16,7 +16,7 @@ A modern sports data management platform built with React Native CLI, Next.js we
 2. Enable "Install from Unknown Sources" in your Android settings
 3. Install the APK on your Android device
 
-> **Note:** iOS builds coming soon! Currently focusing on Android development to avoid the $99/year Apple Developer Program cost during early development.
+> **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
 ## �🚀 Quick Start
 
@@ -72,17 +72,16 @@ npm run format
 ### Mobile Development
 
 ```bash
-# Start Metro bundler
-npm run app:start
+# Start Metro bundler (from apps/app directory)
+npm run start
 
 # Run on Android (requires Android Studio)
-npm run app:android
+npm run android
 
-# Run on iOS (requires Xcode - macOS only)
-npm run app:ios
+# iOS builds are currently disabled
 
 # Build Android APK
-npm run app:build-android
+npm run build-android
 ```
 
 ### Web Development
@@ -189,10 +188,9 @@ The web app automatically deploys to GitHub Pages on pushes to `main`:
 
 ```bash
 # Android APK
-npm run app:build-android
+npm run build-android
 
-# iOS (macOS only)
-npm run app:build-ios
+# iOS builds are currently disabled
 ```
 
 ### Lambda Deployment

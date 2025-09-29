@@ -13,6 +13,7 @@ name: "CI Pipeline (Improved)"
 # - Single workflow with clear sequential steps
 # - Structured error reporting and logging
 # - Smart platform detection and conditional execution
+# - Configurable iOS builds via IOS_BUILDS_ENABLED flag
 # - Local execution optimization (no Nx Cloud complexity)
 # - Consistent error handling patterns
 # - Easy local reproduction of CI steps
@@ -44,6 +45,19 @@ permissions:
   issues: write
 
 env:
+  # Platform build configuration
+  # 
+  # iOS_BUILDS_ENABLED: Controls whether iOS builds run in CI
+  # - Set to 'true' to re-enable iOS builds (requires Apple Developer account)
+  # - Set to 'false' to disable iOS builds (current state - not actively using iOS)
+  #
+  # To re-enable iOS builds:
+  # 1. Change IOS_BUILDS_ENABLED to 'true' below
+  # 2. Restore iOS build scripts in package.json files 
+  # 3. Restore iOS build targets in apps/app/project.json
+  # 4. Update documentation to remove "disabled" notes
+  IOS_BUILDS_ENABLED: false
+
   # Nx Cloud configuration (with intelligent detection)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
@@ -66,7 +80,7 @@ jobs:
     outputs:
       web-affected: ${{ steps.detect-changes.outputs.web }}
       mobile-affected: ${{ steps.detect-changes.outputs.mobile }}
-      ios-affected: ${{ steps.detect-changes.outputs.mobile }}
+      ios-affected: ${{ env.IOS_BUILDS_ENABLED == 'true' && steps.detect-changes.outputs.mobile == 'true' }}
       android-affected: ${{ steps.detect-changes.outputs.mobile }}
       lambdas-affected: ${{ steps.detect-changes.outputs.lambdas }}
       terraform-affected: ${{ steps.detect-changes.outputs.terraform }}
@@ -1139,7 +1153,7 @@ jobs:
   # ======================================================================
 
   ios-build:
-    name: "iOS Build"
+    name: "iOS Build${{ env.IOS_BUILDS_ENABLED == 'true' && '' || ' (DISABLED)' }}"
     runs-on: macos-latest
     needs: [ci-pipeline]
     if: needs.ci-pipeline.outputs.ios-affected == 'true' && needs.ci-pipeline.result == 'success'

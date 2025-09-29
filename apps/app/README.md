@@ -1,6 +1,8 @@
 # Mobile App (React Native CLI)
 
-The Legacy Sports mobile application built with React Native CLI for iOS and Android platforms.
+The Legacy Sports mobile application built with React Native CLI for Android platform.
+
+> **Note**: iOS builds are currently disabled as we are not actively using the iOS platform.
 
 ## 🚀 Quick Start
 
@@ -27,10 +29,7 @@ npm run android
 # or
 npx react-native run-android
 
-# Run on iOS (macOS only)
-npm run ios
-# or
-npx react-native run-ios
+# iOS builds are currently disabled
 ```
 
 ## 📱 Platform Requirements

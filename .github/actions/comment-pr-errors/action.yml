@@ -145,17 +145,16 @@ runs:
                 
               case 'ios':
                 icon = '🍎';
-                description = 'iOS build failed. This could be due to Xcode configuration, dependencies, or code signing issues.';
-                suggestions = `### 🔧 How to Fix:
+                description = 'iOS builds are currently disabled as we are not actively using the iOS platform.';
+                suggestions = `### ℹ️ iOS Status:
 
-          1. **Check iOS configuration** in \`apps/app/ios/\`
-          2. **Verify Xcode scheme** and workspace settings
-          3. **Update iOS dependencies**:
-             \`\`\`bash
-             cd apps/app/ios && pod install
-             \`\`\`
-          4. **Test locally** if you have access to macOS/Xcode
-          5. **Check for React Native compatibility** issues`;
+          iOS builds have been disabled for this project since we are not actively using the iOS platform.
+          
+          If you need to re-enable iOS builds in the future:
+          1. **Update CI configuration** to re-enable iOS jobs
+          2. **Restore iOS build targets** in project.json and package.json
+          3. **Set up Apple Developer** account and code signing
+          4. **Install Xcode and dependencies** on build machines`;
                 break;
                 
               case 'android':
