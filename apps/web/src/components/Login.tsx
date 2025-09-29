@@ -1,6 +1,11 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { LoginPage, useAuth } from '@legacy-sports/shared-components';
+import {
+  LoginPage,
+  Paragraph,
+  useAuth,
+  YStack,
+} from '@legacy-sports/shared-components';
 import type { UseAuthResult } from '@legacy-sports/shared-components';
 
 interface LocationState {
@@ -8,13 +13,16 @@ interface LocationState {
 }
 
 export function Login() {
+  console.log('Login component - Starting to render');
+
   const { isAuthenticated, isLoading, loginWithOAuth, config }: UseAuthResult =
     useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Debug: Log the OAuth config being used
-  console.log('OAuth config:', config);
+  console.log('Login component - Auth state:', { isAuthenticated, isLoading });
+  console.log('Login component - Location:', location.pathname);
+  console.log('Login component - OAuth config:', config);
 
   // Get the path the user was trying to visit, or default to home
   const from = (location.state as LocationState)?.from?.pathname || '/';
@@ -36,28 +44,20 @@ export function Login() {
   // Don't show login form while checking auth status
   if (isLoading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#1E1E1E',
-          color: '#FFFFFF',
-        }}
+      <YStack
+        minHeight="100vh"
+        alignItems="center"
+        justifyContent="center"
+        backgroundColor="$background"
+        color="$color"
       >
-        <div>Checking authentication...</div>
-      </div>
+        <Paragraph>Checking authentication...</Paragraph>
+      </YStack>
     );
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
+    <YStack minHeight="100vh" backgroundColor="$background">
       <LoginPage
         config={config}
         loginWithOAuth={async (oauthResponse) => {
@@ -96,7 +96,7 @@ export function Login() {
         maxWidth={800}
         hideDecorations={false}
       />
-    </div>
+    </YStack>
   );
 }
 

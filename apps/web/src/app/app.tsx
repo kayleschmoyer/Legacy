@@ -1,272 +1,182 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import React, { useEffect, useState } from 'react';
-import {
-  Link,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
-import { HomeScreen, useAuth } from '@legacy-sports/shared-components';
-
+import React from 'react';
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Button, H1, XStack, YStack } from '@legacy-sports/shared-components';
+import { styled } from 'tamagui';
 import {
   BaseballScreen,
   FootballScreen,
   PlayersScreen,
-} from '../components/screens';
+} from '@legacy-sports/shared-components';
+import { WebHomeScreen } from '../components/WebHomeScreen';
+import { UserProfileDropdown } from '../components/UserProfileDropdown';
 
-import { LoadingPanel } from '../components/LoadingPanel';
-import Login from '../components/Login';
-import ProtectedRoute from '../components/ProtectedRoute';
 import {
   WebPlayerDetailPage,
   WebPlayerStatsPage,
 } from '../components/WebPlayerStatsPage';
 
-// Simple Navigation Component
-interface AuthContext {
-  isAuthenticated: boolean;
-  logout: () => Promise<void>;
-}
+// Styled Tamagui components for navigation
+const NavContainer = styled(YStack, {
+  backgroundColor: '$background',
+  borderBottomWidth: 1,
+  borderBottomColor: '$borderColor',
+  padding: '$4',
+  position: 'sticky',
+  top: 0,
+  zIndex: 50,
+  shadowColor: '$shadowColor',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 4,
+});
+
+const NavContent = styled(XStack, {
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  maxWidth: 1200,
+  width: '100%',
+  alignSelf: 'center',
+  gap: '$6',
+});
+
+const NavLinks = styled(XStack, {
+  alignItems: 'center',
+  gap: '$2',
+  flex: 1,
+  justifyContent: 'center',
+});
+
+const NavLink = styled(Link, {
+  textDecoration: 'none',
+});
 
 function Navigation() {
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuth() as AuthContext;
-
-  const navStyle = {
-    backgroundColor: '#1E1E1E',
-    padding: '1rem',
-    borderBottom: '1px solid #333',
-  };
-
-  const linkStyle = {
-    color: '#FFFFFF',
-    textDecoration: 'none',
-    padding: '0.5rem 1rem',
-    margin: '0 0.5rem',
-    borderRadius: '4px',
-    border: '1px solid #3366FF',
-    backgroundColor: 'transparent',
-    transition: 'all 0.2s',
-  };
-
-  const activeLinkStyle = {
-    ...linkStyle,
-    backgroundColor: '#3366FF',
-  };
 
   return (
-    <nav style={navStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-        <h1
-          style={{
-            color: '#FFFFFF',
-            margin: 0,
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-          }}
-        >
-          <span role="img" aria-label="football">
-            🏈
-          </span>{' '}
-          Fantasy Sports Hub
-        </h1>
-        {isAuthenticated && (
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <Link
-              to="/"
-              style={location.pathname === '/' ? activeLinkStyle : linkStyle}
+    <NavContainer>
+      <NavContent>
+        {/* Logo/Brand Section */}
+        <XStack alignItems="center" space="$4">
+          <H1 color="$color" size="$6">
+            <span role="img" aria-label="football">
+              🏈
+            </span>{' '}
+            Legacy Sports
+          </H1>
+        </XStack>
+
+        {/* Center Navigation Links */}
+        <NavLinks display="none" $gtMd={{ display: 'flex' }}>
+          <NavLink to="/">
+            <Button
+              variant={location.pathname === '/' ? 'primary' : 'secondary'}
+              size="$3"
             >
               <span role="img" aria-label="home">
                 🏠
               </span>{' '}
               Home
-            </Link>
-            <Link
-              to="/football"
-              style={
-                location.pathname === '/football' ? activeLinkStyle : linkStyle
+            </Button>
+          </NavLink>
+          <NavLink to="/football">
+            <Button
+              variant={
+                location.pathname === '/football' ? 'primary' : 'secondary'
               }
+              size="$3"
             >
               <span role="img" aria-label="football">
                 🏈
               </span>{' '}
               Football
-            </Link>
-            <Link
-              to="/baseball"
-              style={
-                location.pathname === '/baseball' ? activeLinkStyle : linkStyle
+            </Button>
+          </NavLink>
+          <NavLink to="/baseball">
+            <Button
+              variant={
+                location.pathname === '/baseball' ? 'primary' : 'secondary'
               }
+              size="$3"
             >
               <span role="img" aria-label="baseball">
                 ⚾
               </span>{' '}
               Baseball
-            </Link>
-            <Link
-              to="/players"
-              style={
-                location.pathname === '/players' ? activeLinkStyle : linkStyle
+            </Button>
+          </NavLink>
+          <NavLink to="/players">
+            <Button
+              variant={
+                location.pathname === '/players' ? 'primary' : 'secondary'
               }
+              size="$3"
             >
               <span role="img" aria-label="players">
                 👤
               </span>{' '}
               Players
-            </Link>
-            <Link
-              to="/players/stats"
-              style={
-                location.pathname === '/players/stats'
-                  ? activeLinkStyle
-                  : linkStyle
+            </Button>
+          </NavLink>
+          <NavLink to="/players/stats">
+            <Button
+              variant={
+                location.pathname === '/players/stats' ? 'primary' : 'secondary'
               }
+              size="$3"
             >
               <span role="img" aria-label="statistics">
                 📊
               </span>{' '}
               Player Stats
-            </Link>
-            <button
-              onClick={() => {
-                void logout();
-              }}
-              style={{
-                ...linkStyle,
-                backgroundColor: 'transparent',
-                border: '1px solid #FF6B6B',
-                color: '#FF6B6B',
-                cursor: 'pointer',
-              }}
-            >
-              <span role="img" aria-label="logout">
-                🚪
-              </span>{' '}
-              Logout
-            </button>
-          </div>
-        )}
-      </div>
-    </nav>
+            </Button>
+          </NavLink>
+        </NavLinks>
+
+        {/* User Profile Section */}
+        <XStack alignItems="center" space="$3">
+          <UserProfileDropdown />
+        </XStack>
+      </NavContent>
+    </NavContainer>
   );
 }
 
 // HomeScreen wrapper with navigation
 function NavigableHomeScreen() {
-  const navigate = useNavigate();
-
-  const handleSportPress = (sportKey: string) => {
-    // Map sport keys to routes
-    const routeMap: Record<string, string> = {
-      football: '/football',
-      baseball: '/baseball',
-      basketball: '/basketball',
-      hockey: '/hockey',
-    };
-
-    const route = routeMap[sportKey];
-    if (route) {
-      navigate(route);
-    }
-  };
-
-  return <HomeScreen onSportPress={handleSportPress} />;
+  return <WebHomeScreen />;
 }
 
-// Main App Layout
-function AppLayout({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  const isLoginPage = location.pathname === '/login';
+const MainLayout = styled(YStack, {
+  minHeight: '100vh',
+  backgroundColor: '$background',
+  color: '$color',
+});
+
+/**
+ * Main App Component - Now authentication-free!
+ * Authentication is handled by EnhancedAuthGuard at the root level.
+ * This component only renders authenticated content.
+ */
+function App() {
+  console.log('Rendering authenticated app content...');
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#1E1E1E',
-        color: '#FFFFFF',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
-      {!isLoginPage && <Navigation />}
-      <main style={{ padding: isLoginPage ? '0' : '2rem' }}>{children}</main>
-    </div>
-  );
-}
-
-export function App() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Simulate app initialization
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading) {
-    return <LoadingPanel />;
-  }
-
-  return (
-    <AppLayout>
-      <Routes>
-        {/* Public route - login page */}
-        <Route path="/login" element={<Login />} />
-
-        {/* Protected routes - require authentication */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <NavigableHomeScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/football"
-          element={
-            <ProtectedRoute>
-              <FootballScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/baseball"
-          element={
-            <ProtectedRoute>
-              <BaseballScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/players"
-          element={
-            <ProtectedRoute>
-              <PlayersScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/players/stats"
-          element={
-            <ProtectedRoute>
-              <WebPlayerStatsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/players/:id"
-          element={
-            <ProtectedRoute>
-              <WebPlayerDetailPage />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </AppLayout>
+    <MainLayout>
+      <Navigation />
+      <YStack flex={1} padding="$4">
+        <Routes>
+          {/* All routes are now authenticated by default */}
+          <Route path="/" element={<NavigableHomeScreen />} />
+          <Route path="/football" element={<FootballScreen />} />
+          <Route path="/baseball" element={<BaseballScreen />} />
+          <Route path="/players" element={<PlayersScreen />} />
+          <Route path="/players/stats" element={<WebPlayerStatsPage />} />
+          <Route path="/players/:id" element={<WebPlayerDetailPage />} />
+        </Routes>
+      </YStack>
+    </MainLayout>
   );
 }
 

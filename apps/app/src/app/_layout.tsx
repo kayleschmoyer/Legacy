@@ -3,24 +3,40 @@ import { useColorScheme } from 'react-native';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
-  AppNavigator,
   AppProvider,
   AuthProvider,
   BaseballScreen,
   EnhancedAuthGuard,
   FootballScreen,
   HomeScreen,
-  NavigationRoute,
+  TamaguiAppNavigator,
 } from '@legacy-sports/shared-components';
+import type { NavigationRoute } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
+
+// Create a wrapper for HomeScreen that provides required props
+function MobileHomeScreen() {
+  const handleSportPress = (sportKey: string) => {
+    console.log('Mobile app - Sport selected:', sportKey);
+    // In a real app, this would navigate to the sport-specific screen
+  };
+
+  return (
+    <HomeScreen
+      onSportPress={handleSportPress}
+      title="Fantasy Sports Hub"
+      subtitle="Choose your sport to get started"
+    />
+  );
+}
 
 // Define your app routes
 const routes: NavigationRoute[] = [
   {
     name: 'Home',
-    component: HomeScreen,
+    component: MobileHomeScreen,
     title: 'Fantasy Sports Hub',
   },
   {
@@ -56,31 +72,15 @@ function AuthenticatedContent(): React.JSX.Element {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       tamaguiConfig={tamaguiConfig}
     >
-      <AppNavigator routes={routes} initialRoute="Home" />
+      <TamaguiAppNavigator routes={routes} initialRoute="Home" />
     </AppProvider>
   );
 }
 
-function InnerLayout(): React.JSX.Element {
-  return (
-    <AuthProvider config={authConfig}>
-      <EnhancedAuthGuard
-        loginTitle="Welcome to Legacy Sports!"
-        loginSubtitle="Sign in to access your fantasy leagues and stats"
-        testMode={__DEV__} // Enable test mode in development
-        onLoginSuccess={() => {
-          console.log('Mobile login successful!');
-        }}
-        onLoginFailure={(error) => {
-          console.error('Mobile login failed:', error);
-        }}
-      >
-        <AuthenticatedContent />
-      </EnhancedAuthGuard>
-    </AuthProvider>
-  );
-}
-
+/**
+ * Main Mobile App Layout - Clean authentication flow
+ * Uses EnhancedAuthGuard at root level for consistent behavior
+ */
 export default function Layout() {
   const colorScheme = useColorScheme();
 
@@ -90,7 +90,21 @@ export default function Layout() {
       config={tamaguiConfig}
       defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
     >
-      <InnerLayout />
+      <AuthProvider config={authConfig}>
+        <EnhancedAuthGuard
+          loginTitle="Welcome to Legacy Sports!"
+          loginSubtitle="Sign in to access your fantasy leagues and stats"
+          testMode={__DEV__} // Enable test mode in development
+          onLoginSuccess={() => {
+            console.log('Mobile app login successful!');
+          }}
+          onLoginFailure={(error) => {
+            console.error('Mobile app login failed:', error);
+          }}
+        >
+          <AuthenticatedContent />
+        </EnhancedAuthGuard>
+      </AuthProvider>
     </TamaguiProvider>
   );
 }

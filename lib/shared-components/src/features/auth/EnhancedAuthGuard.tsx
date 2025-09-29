@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './LoginPage';
@@ -53,7 +53,25 @@ export function EnhancedAuthGuard({
   onLoginFailure,
   onLogoutSuccess,
 }: EnhancedAuthGuardProps) {
-  const { isAuthenticated, isLoading, config } = useAuth();
+  const { isAuthenticated, isLoading, config, loginWithOAuth, user } =
+    useAuth();
+
+  // Debug logging
+  console.log('EnhancedAuthGuard render:', {
+    isAuthenticated,
+    isLoading,
+    hasUser: !!user,
+    userId: user?.id,
+  });
+
+  // Track authentication state changes
+  useEffect(() => {
+    console.log('EnhancedAuthGuard - Auth state changed:', {
+      isAuthenticated,
+      isLoading,
+      hasUser: !!user,
+    });
+  }, [isAuthenticated, isLoading, user]);
 
   // Show loading state
   if (isLoading) {
@@ -79,9 +97,11 @@ export function EnhancedAuthGuard({
       loginComponent || (
         <LoginPage
           config={config}
+          loginWithOAuth={loginWithOAuth}
           onSuccess={(user: { id: number; email: string; name?: string }) => {
             try {
-              // User is already authenticated through ModernLoginPage
+              console.log('EnhancedAuthGuard - Login successful, user:', user);
+              // The authentication state should already be updated by loginWithOAuth
               // Call the optional callback if provided
               onLoginSuccess?.();
             } catch (error) {

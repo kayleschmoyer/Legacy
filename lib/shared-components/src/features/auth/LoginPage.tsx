@@ -136,7 +136,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   useEffect(() => {
     const handleOneTapSuccess = async (event: Event) => {
       const customEvent = event as CustomEvent<OneTapEventDetail>;
-      console.log('One Tap success event received');
       setIsLoading(true);
       setErrorMessage('');
 
@@ -146,8 +145,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         // Use AuthProvider's method if available, otherwise fallback to local auth service
         if (loginWithOAuth) {
           await loginWithOAuth(authResponse);
-          // Extract user info for callback - in this case, we don't have the user object
-          // The AuthProvider will handle state management, so we just call onSuccess with a placeholder
+          // AuthProvider handles state management, call onSuccess with placeholder
           onSuccess({ id: 0, email: 'authenticated@user.com' });
         } else {
           // Fallback to local auth service
@@ -169,9 +167,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     const handleOneTapError = (event: Event) => {
       const customEvent = event as CustomEvent<OneTapErrorEventDetail>;
-      console.log('One Tap error event received:', customEvent.detail);
       // Don't show error for One Tap failures - user can still use manual button
-      // Just log it for debugging
+      console.error('One Tap authentication error:', customEvent.detail);
     };
 
     // Create wrapper functions for event listeners to handle async properly
@@ -201,14 +198,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMessage('');
 
     try {
-      // Step 1: Get OAuth response from Google
+      // Get OAuth response from Google
       const oauthResponse = await OAuthProvider.signIn();
 
-      // Step 2: Use AuthProvider's method if available, otherwise fallback to local auth service
+      // Use AuthProvider's method if available, otherwise fallback to local auth service
       if (loginWithOAuth) {
         await loginWithOAuth(oauthResponse);
-        // Extract user info for callback - in this case, we don't have the user object
-        // The AuthProvider will handle state management, so we just call onSuccess with a placeholder
+        // AuthProvider handles state management, call onSuccess with placeholder
         onSuccess({ id: 0, email: 'authenticated@user.com' });
       } else {
         // Fallback to local auth service

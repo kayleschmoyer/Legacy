@@ -11,7 +11,7 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: GoogleIdConfiguration) => void;
+          initialize: (config: ExtendedGoogleIdConfiguration) => void;
           prompt: (
             momentListener?: (notification: PromptMomentNotification) => void,
           ) => void;
@@ -34,6 +34,11 @@ interface GoogleIdConfiguration {
   callback: (credentialResponse: CredentialResponse) => void;
   auto_select?: boolean;
   cancel_on_tap_outside?: boolean;
+}
+
+// Extended configuration that includes newer GSI features
+interface ExtendedGoogleIdConfiguration extends GoogleIdConfiguration {
+  use_fedcm_for_prompt?: boolean;
 }
 
 interface CredentialResponse {
@@ -184,6 +189,7 @@ export class WebOAuthProvider implements OAuthProvider {
 
   private shouldEnableOneTap(): boolean {
     // Enable One Tap by default, unless explicitly disabled
+    // We'll handle FedCM errors gracefully rather than completely disabling
     return this.config?.gsi?.oneTap !== false;
   }
 
@@ -196,18 +202,19 @@ export class WebOAuthProvider implements OAuthProvider {
       return;
     }
 
+    if (!this.shouldEnableOneTap()) {
+      return;
+    }
+
     try {
-      window.google.accounts.id.initialize({
+      // Create GSI configuration with FedCM handling
+      const gsiConfig: ExtendedGoogleIdConfiguration = {
         client_id: this.config.googleClientId,
         callback: (response: CredentialResponse) => {
-          console.log(
-            'One Tap sign-in successful - handling ID token directly',
-          );
           // One Tap provides ID token - send it directly to OAuth proxy
-          // The OAuth proxy supports both code (mobile) and credential (web) flows
           void this.handleOneTapResponse(response)
             .then((authResponse) => {
-              // Emit a custom event that the auth system can listen to
+              // Emit success event for auth system
               window.dispatchEvent(
                 new CustomEvent('gsi-one-tap-success', {
                   detail: { authResponse },
@@ -215,7 +222,7 @@ export class WebOAuthProvider implements OAuthProvider {
               );
             })
             .catch((error: unknown) => {
-              console.error('One Tap ID token authentication failed:', error);
+              console.error('One Tap authentication failed:', error);
               window.dispatchEvent(
                 new CustomEvent('gsi-one-tap-error', {
                   detail: { error },
@@ -225,18 +232,38 @@ export class WebOAuthProvider implements OAuthProvider {
         },
         auto_select: this.config.gsi?.autoSelect ?? true,
         cancel_on_tap_outside: this.config.gsi?.cancelOnTapOutside ?? true,
-      });
+      };
+
+      // Disable FedCM for localhost development to avoid token retrieval errors
+      if (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      ) {
+        gsiConfig.use_fedcm_for_prompt = false;
+      }
+
+      window.google.accounts.id.initialize(gsiConfig);
 
       // Show One Tap prompt
       window.google.accounts.id.prompt(
         (notification: PromptMomentNotification) => {
-          console.log('One Tap notification:', notification.getMomentType());
+          const momentType = notification.getMomentType();
+
+          // Log important failures but not routine user actions
+          if (
+            momentType === 'dismissed_moment_credential_selector_limit' ||
+            momentType === 'dismissed_moment_fedcm_continue_on' ||
+            momentType === 'dismissed_moment_fedcm_disabled'
+          ) {
+            console.warn('One Tap dismissed:', momentType);
+          }
         },
       );
 
       this.oneTapInitialized = true;
     } catch (error) {
-      console.warn('Failed to initialize One Tap:', error);
+      console.error('Failed to initialize One Tap:', error);
+      // Don't throw - fall back to authorization code flow
     }
   }
 

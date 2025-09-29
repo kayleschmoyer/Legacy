@@ -1,0 +1,10 @@
+Category,Subcategory,Rule_Type,Pattern_Concept,Description,Code_Example,File_Path
+platform_components,magic_string_system,CRITICAL,__PLATFORM_COMPONENTS__,Build-time magic string that resolves to platform-specific implementations,"import platformComponents from '__PLATFORM_COMPONENTS__';","platform-components/index.ts"
+platform_components,magic_string_system,DO,dual_implementation,Add new platform implementations to both web AND mobile,"export { WebNewComponent as NewComponent } from './ReactNativeEquivalents';","platform-components/web/index.ts"
+platform_components,magic_string_system,DO,magic_string_export,Export new components through the magic string abstraction,"export const { NewComponent } = validatePlatformExports(platformComponents);","platform-components/index.ts"
+platform_components,magic_string_system,DO,shared_types,Add shared types to types directory,"interface PlatformExports { NewComponent: React.ComponentType<Props>; }","platform-components/types/"
+platform_components,magic_string_system,DO,build_time_resolution,Use the build-time resolution system for platform differences,"resolve: { alias: { '__PLATFORM_COMPONENTS__': platform/index.ts } }","vite.config.mts"
+platform_components,magic_string_system,DONT,direct_import,Never import platform-specific files directly,"import from './web/ReactNativeEquivalents' // ❌",""
+platform_components,magic_string_system,DONT,runtime_detection,Never add runtime platform detection in the abstraction layer,"if (Platform.OS === 'web') // ❌",""
+platform_components,magic_string_system,DONT,direct_exports,Never replace magic string exports with direct imports,"export { Component } from './web' // ❌",""
+platform_components,magic_string_system,DONT,dynamic_imports,Never use dynamic imports/requires (defeats build-time optimization),"require('./platform') // ❌",""

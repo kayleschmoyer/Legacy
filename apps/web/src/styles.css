@@ -1,4 +1,4 @@
-/* Basic CSS Reset and Global Styles */
+/* Basic CSS Reset and Global Styles for Tamagui */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -10,11 +10,22 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  /* Use Tamagui theme colors for body background */
+  background-color: var(--color1, #0f0f23);
+  color: var(--color, #ffffff);
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
     sans-serif;
 }
 
 #root {
   height: 100%;
   width: 100%;
+  /* Ensure root inherits theme colors */
+  background-color: inherit;
+  color: inherit;
 }

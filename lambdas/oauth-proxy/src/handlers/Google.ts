@@ -1,5 +1,9 @@
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
-import { OAuth2Client, UserRefreshClient } from 'google-auth-library';
+import {
+  Credentials,
+  OAuth2Client,
+  UserRefreshClient,
+} from 'google-auth-library';
 import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
@@ -12,6 +16,12 @@ import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
 import { getDbClient } from '../util/db';
+
+// Extended API Gateway Event with cached OAuth data to prevent duplicate processing
+interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
+  _credential?: string; // Cached validated credential
+  _exchangedTokens?: Credentials; // Cached token exchange result
+}
 
 const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
 const GOOGLE_JWT_COOKIE = 'GOOGLE_JWT';
@@ -43,6 +53,7 @@ async function getGoogleAuthSettings(): Promise<GoogleAuthSettings> {
   };
 }
 
+// Main OAuth client - use 'postmessage' for GSI web flows
 const getOAuthClient = memoizeOne((clientId: string, clientSecret: string) => {
   return new OAuth2Client(clientId, clientSecret, 'postmessage');
 });
@@ -57,7 +68,7 @@ interface GoogleAuthRequest {
  * This implements the requirement that only pre-authorized users can authenticate
  */
 export const handleSecureGoogleAuth = async (
-  event: APIGatewayEvent,
+  event: ExtendedAPIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info(
     'Starting secure Google authentication flow (user-first validation)',
@@ -76,11 +87,16 @@ export const handleSecureGoogleAuth = async (
     let userEmail: string;
 
     if (body.credential) {
-      // For web flow, decode the JWT to get email (don't validate signature yet)
+      // For One Tap flow, decode the JWT to get email (don't validate signature yet)
       const { jwtDecode } = await import('jwt-decode');
       try {
         const payload = jwtDecode<{ email: string }>(body.credential);
         userEmail = payload.email;
+
+        // Store credential in the event so we can reuse it in the main flow
+        // This avoids re-validation and matches the authorization code pattern
+        event._credential = body.credential;
+
         LOGGER.debug(`Extracted email from ID token: ${userEmail}`);
       } catch (error) {
         LOGGER.error(
@@ -96,10 +112,10 @@ export const handleSecureGoogleAuth = async (
         };
       }
     } else if (body.code) {
-      // For mobile flow, we need to do a preliminary token exchange to get the email
-      // This is less efficient but necessary for the authorization code flow
+      // For authorization code flow, we need to exchange the code to get the email
+      // We'll store the tokens and reuse them later to avoid double-exchange
       LOGGER.debug(
-        'Mobile flow detected - need to exchange code to get user email',
+        'Authorization code flow detected - exchanging code to get user email',
       );
 
       const { clientId, clientSecret } = await getGoogleAuthSettings();
@@ -116,6 +132,11 @@ export const handleSecureGoogleAuth = async (
         const { jwtDecode } = await import('jwt-decode');
         const payload = jwtDecode<{ email: string }>(tokens.id_token);
         userEmail = payload.email;
+
+        // Store tokens in the event body so we can reuse them later
+        // This avoids the "invalid_grant" error from double-exchange
+        event._exchangedTokens = tokens;
+
         LOGGER.debug(
           `Extracted email from authorization code flow: ${userEmail}`,
         );
@@ -189,7 +210,7 @@ export const handleSecureGoogleAuth = async (
   }
 };
 
-export const handleGoogleAuth = async (event: APIGatewayEvent) => {
+export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   LOGGER.debug('Starting handleGoogleAuth function');
 
   const body = parseEventBody<GoogleAuthRequest>(event);
@@ -211,17 +232,32 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
   let idToken: string;
 
   if (body.code) {
-    // Authorization code flow (mobile)
+    // Authorization code flow (web/mobile)
     LOGGER.debug('Processing authorization code flow...');
-    LOGGER.info(
-      `Exchanging authorization code for tokens: ${body.code.substring(0, 20)}...`,
-    );
 
-    LOGGER.debug(
-      'About to call oauthClient.getToken() - this may take time...',
-    );
+    let tokens: Credentials;
 
-    const { tokens } = await oauthClient.getToken(body.code);
+    // Check if we already have tokens from the secure flow (to avoid double-exchange)
+    if (event._exchangedTokens) {
+      LOGGER.debug(
+        'Using previously exchanged tokens (avoiding duplicate exchange)',
+      );
+      tokens = event._exchangedTokens;
+    } else {
+      // First time exchange - this shouldn't happen in secure flow, but keeping for compatibility
+      LOGGER.info(
+        `Exchanging authorization code for tokens: ${body.code.substring(0, 20)}...`,
+      );
+
+      LOGGER.debug(
+        'About to call oauthClient.getToken() - this may take time...',
+      );
+
+      // Note: Using 'postmessage' as redirect_uri for GSI web flows
+      // This matches what Google Identity Services uses for popup/iframe flows
+      const tokenResponse = await oauthClient.getToken(body.code);
+      tokens = tokenResponse.tokens;
+    }
 
     LOGGER.debug('Successfully received tokens from Google OAuth');
 
@@ -234,10 +270,23 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
 
     idToken = tokens.id_token;
   } else if (body.credential) {
-    // ID token flow (web)
-    LOGGER.info(
-      `Processing Google ID token: ${body.credential.substring(0, 20)}...`,
-    );
+    // ID token flow (One Tap)
+
+    let credential: string;
+
+    // Check if we already have a validated credential from the secure flow
+    if (event._credential) {
+      LOGGER.debug(
+        'Using previously extracted credential from secure flow (avoiding re-validation)',
+      );
+      credential = event._credential;
+    } else {
+      // First time validation - this shouldn't happen in secure flow, but keeping for compatibility
+      LOGGER.info(
+        `Processing Google ID token: ${body.credential.substring(0, 20)}...`,
+      );
+      credential = body.credential;
+    }
 
     LOGGER.debug(
       'About to verify ID token with Google - this may take time...',
@@ -246,7 +295,7 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
     // Verify the ID token is valid
     try {
       const ticket = await oauthClient.verifyIdToken({
-        idToken: body.credential,
+        idToken: credential,
         audience: clientId,
       });
 
@@ -257,7 +306,7 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
         throw new Error('Invalid ID token payload');
       }
 
-      idToken = body.credential;
+      idToken = credential;
     } catch (error) {
       LOGGER.error(
         'ID token verification failed:',
@@ -286,7 +335,13 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
 
     LOGGER.debug('User retrieved from database, creating internal JWT...');
 
-    internalJwt = await createJwt(userInfo);
+    // Extract picture from Google JWT for inclusion in our internal JWT
+    const { jwtDecode } = await import('jwt-decode');
+    const googlePayload = jwtDecode<{ picture?: string }>(idToken);
+
+    internalJwt = await createJwt(userInfo, {
+      picture: googlePayload.picture,
+    });
 
     LOGGER.debug('Internal JWT created successfully');
   } catch (dbError) {
@@ -297,9 +352,12 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
 
     // Fallback: decode JWT and create temporary user
     const { jwtDecode } = await import('jwt-decode');
-    const payload = jwtDecode<{ sub: string; email: string; name?: string }>(
-      idToken,
-    );
+    const payload = jwtDecode<{
+      sub: string;
+      email: string;
+      name?: string;
+      picture?: string;
+    }>(idToken);
 
     // Create a temporary user object that matches InternalUser interface
     userInfo = {
@@ -319,6 +377,7 @@ export const handleGoogleAuth = async (event: APIGatewayEvent) => {
       email: userInfo.email,
       id: userInfo.id,
       username: userInfo.username,
+      ...(payload.picture && { picture: payload.picture }),
     };
 
     internalJwt = jwt.sign(jwtPayload, jwtSecret, { expiresIn: '24h' });
@@ -373,7 +432,14 @@ export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
   }
 
   const userInfo = await getUserFromGoogleJwt(dbClient, credentials.id_token);
-  const internalJwt = await createJwt(userInfo);
+
+  // Extract picture from Google JWT for inclusion in our internal JWT
+  const { jwtDecode } = await import('jwt-decode');
+  const googlePayload = jwtDecode<{ picture?: string }>(credentials.id_token);
+
+  const internalJwt = await createJwt(userInfo, {
+    picture: googlePayload.picture,
+  });
 
   const result: APIGatewayProxyResult = {
     body: JSON.stringify({

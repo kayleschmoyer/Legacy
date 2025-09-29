@@ -7,6 +7,7 @@ interface User {
   id: number;
   email: string;
   username: string;
+  picture?: string;
   accessLevel: 'none' | 'user' | 'admin';
 }
 
@@ -301,6 +302,7 @@ export class AuthService {
         email?: string;
         username?: string;
         name?: string;
+        picture?: string;
         accessLevel?: 'none' | 'user' | 'admin';
       };
 
@@ -308,6 +310,7 @@ export class AuthService {
         id: payload.id ?? 0,
         email: payload.email ?? '',
         username: payload.username ?? payload.name ?? 'Unknown',
+        picture: payload.picture,
         accessLevel: payload.accessLevel ?? 'user',
       };
     } catch (error) {
