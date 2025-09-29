@@ -1237,24 +1237,59 @@ jobs:
           distribution: "temurin"
           java-version: "21"
 
+      - name: "⚡ Setup Gradle Cache"
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: false
+          cache-read-only: false
+          gradle-home-cache-cleanup: true
+
       - name: "📥 Install Dependencies"
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --silent
 
       - name: "🤖 Android Build"
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           echo "::group::Android Build"
           echo "::notice::To reproduce locally: npx nx build-android-debug app"
 
+          # Record build start time
+          BUILD_START=$(date +%s)
+          echo "🕐 Build started at $(date)"
+
           if npx nx build-android-debug app 2>&1 | tee android-build.log; then
+            BUILD_END=$(date +%s)
+            BUILD_DURATION=$((BUILD_END - BUILD_START))
+            MINUTES=$((BUILD_DURATION / 60))
+            SECONDS=$((BUILD_DURATION % 60))
+            
             echo "✅ Android build completed successfully"
+            echo "⏱️  Build time: ${MINUTES}m ${SECONDS}s (${BUILD_DURATION}s total)"
+            echo "::notice::Android build completed in ${MINUTES}m ${SECONDS}s"
           else
-            echo "❌ Android build failed"
+            BUILD_END=$(date +%s)
+            BUILD_DURATION=$((BUILD_END - BUILD_START))
+            MINUTES=$((BUILD_DURATION / 60))
+            SECONDS=$((BUILD_DURATION % 60))
+            
+            echo "❌ Android build failed after ${MINUTES}m ${SECONDS}s"
             echo "::error::Android build failed. Check android-build.log for details."
             exit 1
           fi
 
           echo "::endgroup::"
+
+      - name: "🧹 Cleanup Build Processes"
+        if: always()
+        run: |
+          echo "🧹 Cleaning up any lingering build processes..."
+          # Kill any remaining Gradle processes
+          pkill -f gradle || true
+          pkill -f java || true
+          # Clean up any Android build artifacts that might lock files
+          cd apps/app/android || true
+          ./gradlew --stop || true
+          echo "✅ Cleanup completed"
 
       - name: "📋 Upload Android Build Logs"
         if: always()

@@ -15,14 +15,14 @@
     "build-android": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2",
+        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
         "cwd": "apps/app"
       }
     },
     "build-android-debug": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2",
+        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
         "cwd": "apps/app"
       }
     },

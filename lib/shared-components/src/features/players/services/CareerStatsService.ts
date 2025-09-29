@@ -83,9 +83,9 @@ export const PLAYERS_QUERY = gql`
 // =============================================================================
 
 /**
- * Player information from GraphQL API
+ * Player information from GraphQL API (for career stats)
  */
-export interface Player {
+export interface CareerStatsPlayer {
   id: number;
   firstName: string | null;
   lastName: string | null;
@@ -235,7 +235,7 @@ function safeNumber(value: number | null | undefined, fallback = 0): number {
  */
 export function transformCareerStats(
   rawStats: CareerBattingStatsRaw,
-  player?: Player,
+  player?: CareerStatsPlayer,
 ): PlayerCareerStats {
   const playerId = safeNumber(rawStats.playerId);
   const games = safeNumber(rawStats.games);
@@ -439,20 +439,20 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
     data: playersData,
     loading: playersLoading,
     error: playersError,
-  } = useQuery<{ players: Player[] }, { limit: number; offset: number }>(
-    PLAYERS_QUERY,
-    {
-      variables: { limit: 5000, offset: 0 }, // Fetch a large batch for client-side lookup
-      errorPolicy: 'all',
-      fetchPolicy: 'cache-first', // Cache player names aggressively
-    },
-  );
+  } = useQuery<
+    { players: CareerStatsPlayer[] },
+    { limit: number; offset: number }
+  >(PLAYERS_QUERY, {
+    variables: { limit: 5000, offset: 0 }, // Fetch a large batch for client-side lookup
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-first', // Cache player names aggressively
+  });
 
   // Create a player lookup map
   const playersMap = React.useMemo(() => {
-    if (!playersData?.players) return new Map<number, Player>();
+    if (!playersData?.players) return new Map<number, CareerStatsPlayer>();
 
-    const map = new Map<number, Player>();
+    const map = new Map<number, CareerStatsPlayer>();
     for (const player of playersData.players) {
       map.set(player.id, player);
     }

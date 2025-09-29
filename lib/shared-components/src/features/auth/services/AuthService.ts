@@ -20,13 +20,9 @@ interface SecureOAuthResponse {
   refreshToken?: string;
 }
 
-// Type for import.meta environment access
-interface ImportMetaEnv {
+// Type for Vite environment configuration
+interface ViteEnvironment {
   VITE_OAUTH_PROXY_URL?: string;
-}
-
-interface ImportMeta {
-  env?: ImportMetaEnv;
 }
 
 // Extended response interface that may include user data
@@ -86,14 +82,17 @@ export class AuthService {
       );
     }
 
-    // Browser environment - use direct import.meta.env access with fallback
-    try {
-      const env = (import.meta as ImportMeta)?.env;
-      if (env?.VITE_OAUTH_PROXY_URL) {
-        return env.VITE_OAUTH_PROXY_URL;
+    // Browser environment - check for Vite environment variables
+    if (typeof window !== 'undefined') {
+      // Check if we're in a Vite environment (browser build)
+      // Use type-safe access to window environment
+      const windowWithEnv = window as typeof window & {
+        __VITE_ENV__?: ViteEnvironment;
+      };
+      const viteEnv = windowWithEnv.__VITE_ENV__;
+      if (viteEnv?.VITE_OAUTH_PROXY_URL) {
+        return viteEnv.VITE_OAUTH_PROXY_URL;
       }
-    } catch {
-      // Fallback if import.meta is not available
     }
 
     return 'http://localhost:5001';
