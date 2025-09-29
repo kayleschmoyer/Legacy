@@ -276,7 +276,7 @@ jobs:
 
       - name: "🔍 Detect Changed Files"
         id: detect-changes
-        uses: dorny/paths-filter@v2
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             web:
