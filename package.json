@@ -174,7 +174,7 @@
     "@nx/js": "21.5.2",
     "@nx/node": "21.5.3",
     "@nx/playwright": "21.5.2",
-    "@nx/react": "21.5.2",
+    "@nx/react": "21.5.3",
     "@nx/react-native": "21.5.2",
     "@nx/storybook": "^21.5.2",
     "@nx/vite": "21.5.2",
