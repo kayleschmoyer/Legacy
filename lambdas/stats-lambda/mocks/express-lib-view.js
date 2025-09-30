@@ -183,7 +183,7 @@ function tryStat(path) {
 
   try {
     return fs.statSync(path);
-  } catch (e) {
+  } catch (e) { // eslint-disable-line @typescript-eslint/no-unused-vars
     return undefined;
   }
 }

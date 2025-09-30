@@ -58,6 +58,7 @@ import {
   testRawConnectionCommandBuilder,
 } from './commands/testRawConnection';
 import { main as testDatabase } from './commands/test-database';
+import { decodeJwtCommandBuilder, handleDecodeJwt } from './commands/decodeJwt';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -153,6 +154,12 @@ async function run(): Promise<void> {
       'Test internal schema state',
       testInternalCommandBuilder,
       testInternal,
+    )
+    .command(
+      'decode-jwt',
+      'Decode and analyze a JWT token',
+      decodeJwtCommandBuilder,
+      handleDecodeJwt,
     )
     .demandCommand()
     .help()

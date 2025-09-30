@@ -96,6 +96,12 @@ export const UserProfileDropdown: React.FC = () => {
   const userEmail = auth.user.email;
   const userImage = auth.user.picture || null;
 
+  // DEBUG: Log the auth object and picture field
+  console.log('[UserProfileDropdown] Full auth object:', auth);
+  console.log('[UserProfileDropdown] auth.user:', auth.user);
+  console.log('[UserProfileDropdown] auth.user.picture:', auth.user.picture);
+  console.log('[UserProfileDropdown] userImage value:', userImage);
+
   const handleLogout = async () => {
     try {
       setIsOpen(false);

@@ -306,13 +306,23 @@ export class AuthService {
         accessLevel?: 'none' | 'user' | 'admin';
       };
 
-      return {
+      // DEBUG: Log the payload and extracted picture field
+      console.log('[AuthService] JWT Payload:', payload);
+      console.log('[AuthService] Picture field from JWT:', payload.picture);
+
+      const user = {
         id: payload.id ?? 0,
         email: payload.email ?? '',
         username: payload.username ?? payload.name ?? 'Unknown',
         picture: payload.picture,
         accessLevel: payload.accessLevel ?? 'user',
       };
+
+      // DEBUG: Log the final user object
+      console.log('[AuthService] Final user object:', user);
+      console.log('[AuthService] Picture in final user object:', user.picture);
+
+      return user;
     } catch (error) {
       console.error('Failed to decode JWT:', error);
       throw new Error('Invalid authentication token');

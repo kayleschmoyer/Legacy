@@ -114,13 +114,35 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
 
-    case 'AUTH_SUCCESS':
-      return {
+    case 'AUTH_SUCCESS': {
+      // DEBUG: Log the user payload and picture field
+      console.log(
+        '[authReducer] AUTH_SUCCESS - Payload received:',
+        action.payload,
+      );
+      console.log(
+        '[authReducer] AUTH_SUCCESS - Picture in payload:',
+        action.payload.picture,
+      );
+
+      const newState = {
         ...state,
         isLoading: false,
         user: action.payload,
         error: null,
       };
+
+      console.log(
+        '[authReducer] AUTH_SUCCESS - New state user:',
+        newState.user,
+      );
+      console.log(
+        '[authReducer] AUTH_SUCCESS - Picture in new state:',
+        newState.user?.picture,
+      );
+
+      return newState;
+    }
 
     case 'AUTH_FAILURE':
       return {
@@ -241,6 +263,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 const payload = JSON.parse(
                   atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
                 ) as JwtPayload;
+                // DEBUG: Log payload and picture extraction
+                console.log('[useAuth] JWT Payload:', payload);
+                console.log('[useAuth] Picture from payload:', payload.picture);
+
                 const userInfo = {
                   id: payload.id || 0,
                   email: payload.email || '',
@@ -248,8 +274,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                   picture: payload.picture,
                   accessLevel: payload.accessLevel || ('user' as const),
                 };
+
+                // DEBUG: Log final user info and picture
+                console.log('[useAuth] Final userInfo object:', userInfo);
+                console.log('[useAuth] Picture in userInfo:', userInfo.picture);
                 console.log('AuthProvider - Setting user:', userInfo);
+
                 if (isMounted) {
+                  console.log(
+                    '[useAuth] About to dispatch AUTH_SUCCESS with user:',
+                    userInfo,
+                  );
                   dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
                 }
               }
