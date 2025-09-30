@@ -33,16 +33,18 @@ const customConfig = {
     // Ensure expo packages are resolved correctly
     resolverMainFields: ['react-native', 'browser', 'main'],
     platforms: ['ios', 'android', 'native', 'web'],
+    // Platform-specific file extensions (React Native will prefer .native.ts over .ts)
+    // This allows us to have platform-specific implementations
+    platformsMap: {
+      native: ['native', 'ios', 'android'],
+      android: ['android', 'native'],
+      ios: ['ios', 'native'],
+    },
     // Explicit alias for expo-linking to help with resolution
     alias: {
       'expo-linking': path.resolve(
         __dirname,
         '../../node_modules/expo-linking',
-      ),
-      // Platform-specific component resolution for React Native builds
-      '__PLATFORM_COMPONENTS__': path.resolve(
-        __dirname,
-        '../../lib/shared-components/src/platform-components/mobile/index.ts',
       ),
     },
   },
