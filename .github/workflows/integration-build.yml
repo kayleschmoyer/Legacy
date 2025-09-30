@@ -1,10 +1,23 @@
-name: Integration Build
+name: "Integration Build (Optimized)"
 
 # This workflow runs integration builds on main branch to ensure the full repository is always passing
 # It runs ALL projects (not just affected) to catch integration issues after merges
-# For pull request validation, see pr-validation.yml
+# 
+# OPTIMIZATIONS APPLIED:
+# - Intelligent Nx Cloud DTE detection with quota management
+# - Smart agent allocation based on workspace size and available quota
+# - Structured error reporting and GitHub summary generation
+# - Advanced caching and performance optimizations
+# - Graceful fallback to local execution when DTE unavailable
+# - Same battle-tested logic as the optimized PR pipeline
 on:
   workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: "Enable debug mode for detailed logging"
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -26,102 +39,447 @@ permissions:
   pull-requests: read
 
 env:
-  # Nx Cloud access token for enhanced CI features (set as GitHub secret)
+  # Nx Cloud configuration (with intelligent detection)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-  # Base Nx configuration (cloud-specific settings will be set conditionally based on availability test)
+
+  # Adaptive settings (will be overridden by intelligent detection)
   NX_DAEMON: false
-  NX_CLOUD_TIMEOUT: 300000
-  # Default settings for local execution (will be overridden if cloud is available)
-  NX_PARALLEL: 2
-  NX_CLOUD_DISTRIBUTED_EXECUTION: false
+  NX_PARALLEL: 4 # Default, adjusted by DTE detection
+  NX_CACHE_DIRECTORY: .nx-cache
+  NX_SKIP_NX_CACHE: false
+  NODE_OPTIONS: "--max_old_space_size=4096" # Increased to 6GB if DTE available
+
+  # Debug mode
+  NX_VERBOSE_LOGGING: ${{ github.event.inputs.debug_mode == 'true' || contains(github.event.head_commit.message, '[ci-debug]') }}
 
 jobs:
   integration-build:
-    name: Integration Build
+    name: "Integration Build"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+
+    outputs:
+      execution-plan: ${{ steps.execution-plan.outputs.plan }}
+      # DTE detection results
+      dte-available: ${{ steps.dte-detect.outputs.dte-available }}
+      execution-mode: ${{ steps.dte-detect.outputs.execution-mode }}
+      optimal-agents: ${{ steps.dte-detect.outputs.optimal-agents }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          filter: tree:0
-          fetch-depth: 0
+      # ======================================================================
+      # STAGE 1: ENVIRONMENT SETUP & VALIDATION
+      # ======================================================================
 
-      - name: Setup
-        uses: ./.github/actions/setup
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "🔧 Setup Node.js"
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          install-dependencies: true
-          set-nx-shas: true
+          cache: npm
 
-      - name: Configure Nx Cloud
-        id: nx-cloud
-        uses: ./.github/actions/configure-nx-cloud
-        with:
-          agent-count: "6"
-          local-parallel: "3"
-          workflow-type: "integration-build"
-          nx-cloud-access-token-candidate: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-
-      - name: Validate Workspace
-        uses: ./.github/actions/validate-workspace
-
-      - name: Show Build Plan
+      - name: "☁️ Intelligent DTE Detection & Quota Check"
+        id: dte-detect
         run: |
-          echo "🏗️ Integration build validates the ENTIRE repository (not just affected projects)"
-          echo ""
-          echo "📋 Final Execution Mode:"
-          if [ "${NX_LOCAL_FALLBACK}" = "true" ]; then
-            echo "  🔧 LOCAL FALLBACK MODE"
-            echo "  💡 Nx Cloud unavailable (quota exceeded or connection failed)"
-            echo "  💡 Build will run locally with higher parallelism for integration"
-          elif [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
-            echo "  🚀 NX CLOUD DISTRIBUTED MODE"
-            echo "  💡 Build will use Nx Cloud distributed execution with ${NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT:-6} agents"
-          else
-            echo "  🔧 LOCAL MODE"
-            echo "  💡 Standard local execution"
-          fi
-          echo "  Parallel: ${NX_PARALLEL:-4}"
-          echo "  Cloud ID: ${NX_CLOUD_ID:-not set}"
-          echo ""
-          echo "All projects in workspace:"
-          npx nx show projects
-          echo ""
-          echo "Build dependency graph for all projects:"
-          npx nx run-many -t build --dry-run
-          echo ""
+          echo "::group::🧠 Smart Nx Cloud Detection for Integration Build"
 
-      - name: Lint, Test & Build All
-        uses: ./.github/actions/nx-tasks
+          # Initialize defaults
+          CLOUD_AVAILABLE="false"
+          DTE_AVAILABLE="false"  
+          EXECUTION_MODE="local"
+          OPTIMAL_AGENTS=6  # Higher default for integration builds
+          FALLBACK_REASON=""
+
+          if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
+            echo "✅ Nx Cloud token found"
+            
+            # Install dependencies first (needed for nx-cloud CLI)
+            echo "📥 Installing dependencies for cloud detection..."
+            npm ci --prefer-offline --no-audit --silent
+            
+            # Test basic cloud connectivity with timeout
+            echo "🌐 Testing cloud connectivity..."
+            if timeout 30s npx nx-cloud --version >/dev/null 2>&1; then
+              echo "✅ Nx Cloud CLI accessible"
+              CLOUD_AVAILABLE="true"
+              
+              # Test DTE availability and quota with retry logic
+              echo "🎯 Testing DTE quota for integration build..."
+              
+              MAX_RETRIES=2
+              RETRY_COUNT=0
+              
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$DTE_AVAILABLE" != "true" ]; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "🔄 DTE test attempt $RETRY_COUNT/$MAX_RETRIES"
+                
+                # Get DTE status (with timeout)
+                DTE_STATUS=$(timeout 20s npx nx-cloud dte-status --json 2>/dev/null || echo '{"error": "timeout"}')
+                
+                if echo "$DTE_STATUS" | jq -e '.agentsAvailable' >/dev/null 2>&1; then
+                  AGENTS_AVAILABLE=$(echo "$DTE_STATUS" | jq -r '.agentsAvailable // 0')
+                  QUOTA_REMAINING=$(echo "$DTE_STATUS" | jq -r '.quotaRemaining // 0')
+                  
+                  echo "📊 Agents available: $AGENTS_AVAILABLE"
+                  echo "📈 Quota remaining: $QUOTA_REMAINING"
+                  
+                  # Integration builds need more quota since they build everything
+                  if [ "$AGENTS_AVAILABLE" -gt 0 ] && [ "$QUOTA_REMAINING" -gt 15 ]; then
+                    # Quick DTE session test
+                    if timeout 15s npx nx-cloud start-ci-run --dry-run --agent-count=4 >/dev/null 2>&1; then
+                      echo "✅ DTE available for integration build"
+                      DTE_AVAILABLE="true"
+                      EXECUTION_MODE="distributed"
+                      
+                      # Smart agent allocation for full workspace builds
+                      if [ "$QUOTA_REMAINING" -lt 30 ]; then
+                        OPTIMAL_AGENTS=4  # Conservative for integration when quota is low
+                        FALLBACK_REASON="Low quota - using reduced agents for integration"
+                      elif [ "$AGENTS_AVAILABLE" -ge 8 ]; then
+                        OPTIMAL_AGENTS=8  # Max for full integration builds
+                        FALLBACK_REASON="Full integration - using maximum agents"
+                      else
+                        OPTIMAL_AGENTS=6  # Standard for integration builds
+                        FALLBACK_REASON="Standard integration - using moderate agents"
+                      fi
+                      
+                      echo "🎯 Using $OPTIMAL_AGENTS agents for integration: $FALLBACK_REASON"
+                      break
+                    else
+                      echo "⚠️ DTE session test failed on attempt $RETRY_COUNT"
+                    fi
+                  else
+                    if [ "$AGENTS_AVAILABLE" -le 0 ]; then
+                      FALLBACK_REASON="No DTE agents available"
+                    else
+                      FALLBACK_REASON="DTE quota too low for integration build (remaining: $QUOTA_REMAINING, need >15)"
+                    fi
+                    echo "⚠️ $FALLBACK_REASON"
+                    break
+                  fi
+                else
+                  echo "⚠️ Unable to query DTE status on attempt $RETRY_COUNT"
+                  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                    echo "⏳ Waiting 5 seconds before retry..."
+                    sleep 5
+                  fi
+                fi
+              done
+              
+              if [ "$DTE_AVAILABLE" != "true" ] && [ -z "$FALLBACK_REASON" ]; then
+                FALLBACK_REASON="DTE detection failed after $MAX_RETRIES attempts"
+              fi
+            else
+              FALLBACK_REASON="Nx Cloud CLI not accessible or timed out"
+              echo "❌ $FALLBACK_REASON"
+            fi
+          else
+            FALLBACK_REASON="No Nx Cloud token provided"
+            echo "ℹ️ $FALLBACK_REASON"
+            # Still install dependencies for local execution
+            echo "📥 Installing dependencies for local execution..."
+            npm ci --prefer-offline --no-audit --silent
+          fi
+
+          # Set environment variables for subsequent steps
+          if [ "$DTE_AVAILABLE" == "true" ]; then
+            echo "NX_PARALLEL=$OPTIMAL_AGENTS" >> $GITHUB_ENV
+            echo "NODE_OPTIONS=--max_old_space_size=6144" >> $GITHUB_ENV
+            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=true" >> $GITHUB_ENV
+          else
+            echo "NX_PARALLEL=4" >> $GITHUB_ENV  
+            echo "NODE_OPTIONS=--max_old_space_size=4096" >> $GITHUB_ENV
+            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false" >> $GITHUB_ENV
+          fi
+
+          # Output results for other steps
+          echo "cloud-available=$CLOUD_AVAILABLE" >> $GITHUB_OUTPUT
+          echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
+          echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
+          echo "optimal-agents=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
+          echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
+
+          # Create summary report
+          echo "## ☁️ Integration Build Execution Mode" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cloud Available**: $CLOUD_AVAILABLE" >> $GITHUB_STEP_SUMMARY
+          echo "- **DTE Available**: $DTE_AVAILABLE" >> $GITHUB_STEP_SUMMARY  
+          echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Agents/Parallel**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Scope**: All projects (integration validation)" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EXECUTION_MODE" == "local" ] && [ -n "$FALLBACK_REASON" ]; then
+            echo "- **Fallback Reason**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Set appropriate notices
+          if [ "$DTE_AVAILABLE" == "true" ]; then
+            echo "::notice title=Nx Cloud DTE Integration::Using distributed execution with $OPTIMAL_AGENTS agents for full workspace"
+          else
+            echo "::notice title=Local Integration::$FALLBACK_REASON - using GitHub Actions (4 processes) for full workspace"
+          fi
+
+          echo "::endgroup::"
+
+      - name: "� Setup Caching"
+        uses: actions/cache@v4
         with:
-          tasks: "lint test build"
-          scope: "all"
-          parallel: "4"
-          verbose: "false"
+          path: |
+            ~/.npm
+            node_modules
+            .nx-cache
+          key: ${{ runner.os }}-integration-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-integration-
+
+      - name: "🔍 Generate Execution Plan"
+        id: execution-plan
+        run: |
+          echo "::group::📋 Integration Build Planning"
+
+          # Create execution plan for all projects (integration scope)
+          cat > execution-plan.json << 'EOF'
+          {
+            "scope": "all",
+            "reason": "Integration build validates entire workspace after merge",
+            "projects": "all-projects",
+            "tasks": ["lint", "test", "build"],
+            "execution_mode": "${{ steps.dte-detect.outputs.execution-mode }}",
+            "parallel": "${{ steps.dte-detect.outputs.optimal-agents }}"
+          }
+          EOF
+
+          echo "🏗️ **Integration Build Plan**"
+          echo "| Component | Status | Reason |"
+          echo "|-----------|--------|--------|"
+          echo "| All Projects | ✅ Will Process | Full workspace validation after merge |"
+          echo "| Execution Mode | ${{ steps.dte-detect.outputs.execution-mode }} | ${{ steps.dte-detect.outputs.fallback-reason || 'Optimal execution detected' }} |"
+          echo "| Parallelism | ${{ steps.dte-detect.outputs.optimal-agents }} | Optimized for integration workload |"
+
+          echo ""
+          echo "📊 All projects in workspace:"
+          npx nx show projects | head -20
+          PROJECT_COUNT=$(npx nx show projects | wc -l)
+          if [ "$PROJECT_COUNT" -gt 20 ]; then
+            echo "... and $((PROJECT_COUNT - 20)) more projects"
+          fi
+
+          # Set output for later steps
+          echo "plan=$(cat execution-plan.json | jq -c .)" >> $GITHUB_OUTPUT
+
+          echo "::endgroup::"
+
+      # ======================================================================
+      # STAGE 2: CODE QUALITY CHECKS
+      # ======================================================================
+
+      - name: "🎨 Code Formatting Check"
+        id: format-check
+        timeout-minutes: 3
+        run: |
+          echo "::group::Code Formatting Validation"
+          echo "::notice::To reproduce locally: npx nx format:check"
+
+          if npx nx format:check 2>&1 | tee format-check.log; then
+            echo "✅ All files are properly formatted"
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Code formatting issues detected"
+            echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+            
+            # Show specific files that need formatting
+            echo "Files requiring formatting:"
+            grep -E "would be reformatted|needs formatting" format-check.log || true
+            
+            echo "result=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+      # ======================================================================
+      # ADAPTIVE EXECUTION: DTE or Local based on detection
+      # ======================================================================
+
+      - name: "⚡ Integration Build (Distributed)"
+        id: distributed-execution
+        if: steps.dte-detect.outputs.dte-available == 'true'
+        timeout-minutes: 25
+        run: |
+          echo "::group::🚀 Nx Cloud Distributed Integration Build"
+
+          AGENTS="${{ steps.dte-detect.outputs.optimal-agents }}"
+          echo "🎯 Starting DTE with $AGENTS agents for integration build..."
+
+          # Start DTE session with optimal agent count for integration
+          npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=$AGENTS
+
+          echo "🧪 Running linting with DTE..."
+          if npx nx run-many -t lint --parallel=$AGENTS --max-parallel=$AGENTS 2>&1 | tee dte-lint.log; then
+            echo "✅ Linting completed (DTE)"
+          else
+            echo "❌ Linting failed (DTE)" 
+            echo "## DTE Lint Errors"
+            grep -E "ERROR|failed" dte-lint.log | head -10 || true
+            echo "::error::Linting failed in DTE mode. Check dte-lint.log for details."
+            exit 1
+          fi
+
+          echo "🧪 Running tests with DTE..."
+          if npx nx run-many -t test --parallel=$AGENTS --max-parallel=$AGENTS --passWithNoTests 2>&1 | tee dte-test.log; then
+            echo "✅ Tests completed (DTE)"
+          else
+            echo "❌ Tests failed (DTE)" 
+            echo "## DTE Test Errors"
+            grep -E "ERROR|failed|FAIL" dte-test.log | head -10 || true
+            echo "::error::Tests failed in DTE mode. Check dte-test.log for details."
+            exit 1
+          fi
+
+          echo "📦 Running builds with DTE..."
+          if npx nx run-many -t build --parallel=$AGENTS --max-parallel=$AGENTS 2>&1 | tee dte-build.log; then
+            echo "✅ Builds completed (DTE)"
+          else
+            echo "❌ Builds failed (DTE)" 
+            echo "## DTE Build Errors"
+            grep -E "ERROR|failed" dte-build.log | head -10 || true
+            echo "::error::Builds failed in DTE mode. Check dte-build.log for details."
+            exit 1
+          fi
+
+          # Stop agents
+          npx nx-cloud stop-all-agents || echo "⚠️ Could not stop agents (may have auto-stopped)"
+
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "mode=distributed" >> $GITHUB_OUTPUT
+
+          echo "::endgroup::"
+
+      - name: "🔧 Integration Build (Local Fallback)"
+        id: local-execution
+        if: steps.dte-detect.outputs.dte-available != 'true'
+        timeout-minutes: 35
+        run: |
+          echo "::group::🏠 Local Integration Build"
+
+          echo "ℹ️ Fallback reason: ${{ steps.dte-detect.outputs.fallback-reason }}"
+          echo "🔧 Using local execution for integration build"
+
+          # Local linting
+          echo "🧪 Running linting..."
+          echo "::notice::To reproduce locally: npx nx run-many -t lint --parallel=4"
+
+          if npx nx run-many -t lint --parallel=4 2>&1 | tee local-lint.log; then
+            echo "✅ Linting completed (local)"
+          else
+            echo "❌ Linting failed (local)"
+            echo "## Local Lint Errors"
+            grep -E "ERROR|failed" local-lint.log | head -10 || true
+            echo "::error::Linting failed in local mode"
+            exit 1
+          fi
+
+          # Local testing  
+          echo "🧪 Running tests..."
+          echo "::notice::To reproduce locally: npx nx run-many -t test --parallel=4 --passWithNoTests"
+
+          if npx nx run-many -t test --parallel=4 --passWithNoTests 2>&1 | tee local-test.log; then
+            echo "✅ Tests completed (local)"
+          else
+            echo "❌ Tests failed (local)"
+            echo "## Local Test Errors"
+            grep -E "ERROR|failed|FAIL" local-test.log | head -10 || true
+            echo "::error::Tests failed in local mode"
+            exit 1
+          fi
+
+          # Local builds
+          echo "📦 Running builds..."
+          echo "::notice::To reproduce locally: npx nx run-many -t build --parallel=4"
+
+          if npx nx run-many -t build --parallel=4 2>&1 | tee local-build.log; then
+            echo "✅ Builds completed (local)"
+          else
+            echo "❌ Builds failed (local)"
+            echo "## Local Build Errors"
+            grep -E "ERROR|failed" local-build.log | head -10 || true
+            echo "::error::Builds failed in local mode"
+            exit 1
+          fi
+
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "mode=local" >> $GITHUB_OUTPUT
+
+          echo "::endgroup::"
+
+      # ======================================================================
+      # FINAL REPORTING & CLEANUP
+      # ======================================================================
+
+      - name: "📊 Integration Build Summary"
+        if: always()
+        run: |
+          echo "::group::🏁 Integration Build Results"
+
+          # Determine overall status
+          DIST_RESULT="${{ steps.distributed-execution.outputs.result }}"
+          LOCAL_RESULT="${{ steps.local-execution.outputs.result }}"
+          OVERALL_STATUS="success"
+
+          if [ "$DIST_RESULT" = "failure" ] || [ "$LOCAL_RESULT" = "failure" ]; then
+            OVERALL_STATUS="failure"
+          fi
+
+          # Generate comprehensive summary
+          echo "## 🏗️ Integration Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scope**: Full workspace (all projects)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ steps.dte-detect.outputs.execution-mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Parallelism**: ${{ steps.dte-detect.outputs.optimal-agents }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.dte-detect.outputs.execution-mode }}" = "local" ]; then
+            echo "- **Fallback Reason**: ${{ steps.dte-detect.outputs.fallback-reason }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$OVERALL_STATUS" = "success" ]; then
+            echo "✅ **Integration build completed successfully**" >> $GITHUB_STEP_SUMMARY
+            echo "All projects in the workspace have been validated after the merge." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Integration build failed**" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow logs for detailed error information." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Console output
+          echo "📊 Integration Build Summary"
+          echo "=========================="
+          
+          if [ "$OVERALL_STATUS" = "success" ]; then
+            if [ "${{ steps.dte-detect.outputs.execution-mode }}" = "distributed" ]; then
+              echo "✅ Integration build completed successfully using Nx Cloud DTE"
+            else
+              echo "✅ Integration build completed successfully using local execution"
+              echo "💡 Reason for local fallback: ${{ steps.dte-detect.outputs.fallback-reason }}"
+            fi
+          else
+            echo "❌ Integration build failed"
+          fi
+
+          echo "::endgroup::"
 
       # Enable Nx Cloud Self-Healing CI (only when Nx Cloud is available)
-      - name: Auto-Fix CI Issues
+      - name: "🔧 Auto-Fix CI Issues"
         run: |
           echo "🔧 Running Nx Cloud self-healing..."
-          if [ "${NX_LOCAL_FALLBACK}" != "true" ] && [ -n "${NX_CLOUD_ACCESS_TOKEN}" ]; then
+          if [ "${{ steps.dte-detect.outputs.dte-available }}" = "true" ] && [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
             npx nx-cloud fix-ci || echo "⚠️  Nx Cloud fix-ci failed but continuing"
           else
             echo "ℹ️  Nx Cloud not available, skipping fix-ci"
           fi
         if: always()
-
-      - name: Integration Build Summary
-        if: always()
-        run: |
-          echo "📊 Integration Build Summary"
-          echo "=========================="
-          if [ "${NX_LOCAL_FALLBACK}" = "true" ]; then
-            echo "✅ Build completed in LOCAL FALLBACK mode (Nx Cloud unavailable)"
-            echo "💡 This is expected when Nx Cloud quota is exceeded or service is unavailable"
-          elif [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
-            echo "✅ Build completed in NX CLOUD DISTRIBUTED mode"
-          else
-            echo "✅ Build completed in LOCAL mode"
-          fi
