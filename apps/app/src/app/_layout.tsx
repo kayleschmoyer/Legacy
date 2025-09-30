@@ -56,6 +56,9 @@ const authConfig: OAuthConfig = {
   googleClientId:
     (Constants.expoConfig?.extra?.googleClientId as string) ||
     '1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com',
+  oauthProxyUrl:
+    (Constants.expoConfig?.extra?.oauthProxyUrl as string) ||
+    'http://localhost:5001', // OAuth proxy lambda URL
   additionalScopes: ['openid', 'profile', 'email'],
   offlineAccess: true,
 };

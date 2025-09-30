@@ -45,6 +45,16 @@ const customConfig = {
         '../../lib/shared-components/src/platform-components/mobile/index.ts',
       ),
     },
+    resolveRequest: (context, moduleName, platform) => {
+      if (moduleName === '@react-oauth/google') {
+        throw new Error(
+          `[Metro] Cannot resolve @react-oauth/google - this is a web-only library.\n` +
+          `Use platform-components instead: import { OAuthProvider } from '@legacy-sports/shared-components'`
+        );
+      }
+      // Use the default resolver for all other modules
+      return context.resolveRequest(context, moduleName, platform);
+    },
   },
 };
 

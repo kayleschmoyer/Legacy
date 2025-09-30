@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1025244625243",
+    "project_id": "legacy-sports-mobile",
+    "storage_bucket": "legacy-sports-mobile.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1025244625243:android:a1b2c3d4e5f6789012345678",
+        "android_client_info": {
+          "package_name": "com.anonymous.legacysportssource"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anonymous.legacysportssource",
+            "certificate_hash": "sha1_placeholder_for_development"
+          }
+        },
+        {
+          "client_id": "1025244625243-web-client-for-server-auth.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDevelopmentKeyPlaceholder-Replace_With_Real_Key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1025244625243-web-client-for-server-auth.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

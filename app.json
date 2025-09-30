@@ -1,6 +1,15 @@
 {
   "plugins": ["expo-asset", "expo-font", "expo-router"],
   "android": {
-    "package": "com.anonymous.legacysportssource"
+    "package": "com.anonymous.legacysportssource",
+    "googleServicesFile": "./apps/app/android/app/google-services.json"
+  },
+  "ios": {
+    "bundleIdentifier": "com.anonymous.legacysportssource",
+    "googleServicesFile": "./apps/app/ios/GoogleService-Info.plist"
+  },
+  "extra": {
+    "googleClientId": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com",
+    "oauthProxyUrl": "http://localhost:5001"
   }
 }
