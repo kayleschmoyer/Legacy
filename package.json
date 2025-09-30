@@ -223,7 +223,7 @@
     "@wdio/appium-service": "^9.19.2",
     "@wdio/cli": "^9.19.2",
     "@wdio/local-runner": "^9.19.2",
-    "@wdio/mocha-framework": "^9.19.2",
+    "@wdio/mocha-framework": "^9.20.0",
     "@wdio/spec-reporter": "^9.19.2",
     "ajv": "^8.0.0",
     "appium": "^3.0.2",
