@@ -183,8 +183,12 @@ yarn-error.log
 **/fastlane/screenshots
 **/fastlane/test_output
 
-# Bundle artifact
+# Bundle artifacts (React Native)
 *.jsbundle
+*.bundle
+index.android.bundle
+index.ios.bundle
+**/assets/*.bundle
 
 # Ruby / CocoaPods
 **/Pods/

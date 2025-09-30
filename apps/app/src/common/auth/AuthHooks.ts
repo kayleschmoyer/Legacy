@@ -1,17 +1,16 @@
 import { useCallback, useMemo } from 'react';
 import memoizeOne from 'memoize-one';
 import axios from 'axios';
-import {
-  googleLogout,
-  useGoogleLogin,
-  UseGoogleLoginOptionsAuthCodeFlow,
-} from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'expo-router';
 import {
   ISecureStorage,
+  OAuthError,
+  OAuthProvider,
+  OAuthResponse,
   SecureStorageProvider,
 } from '@legacy-sports/shared-components';
+import type { OAuthErrorCode } from '@legacy-sports/shared-components';
 import {
   getEnvVarOptional,
   getEnvVarRequired,
@@ -102,57 +101,97 @@ async function resetToken(): Promise<void> {
   }
 }
 
-function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
+function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
   const router = useRouter();
   const onSuccess = callbacks?.onSuccess;
   const onFailure = callbacks?.onFailure;
 
-  const successHandler = useCallback<
-    Required<UseGoogleLoginOptionsAuthCodeFlow>['onSuccess']
-  >(
-    async (response) => {
-      const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
-      const tokenResponse = await axios.post<OAuthProxyTokens>(
-        `${oauthProxy}/google/auth`,
-        {
-          code: response.code,
-        },
-      );
+  const successHandler = useCallback(
+    async (response: OAuthResponse) => {
+      try {
+        const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
+        
+        // Handle both web (code/credential) and mobile (serverAuthCode) responses
+        const authPayload: { code?: string; credential?: string } = {};
+        
+        if (response.code) {
+          // Authorization code flow (web and mobile)
+          authPayload.code = response.code;
+        } else if (response.serverAuthCode) {
+          // Mobile server auth code
+          authPayload.code = response.serverAuthCode;
+        } else if (response.credential) {
+          // Web ID token from One Tap
+          authPayload.credential = response.credential;
+        } else {
+          throw new Error('No valid authentication code or credential received');
+        }
 
-      await storeToken(tokenResponse.data);
+        const tokenResponse = await axios.post<OAuthProxyTokens>(
+          `${oauthProxy}/google/auth`,
+          authPayload,
+        );
 
-      if (onSuccess) {
-        onSuccess();
+        await storeToken(tokenResponse.data);
+
+        if (onSuccess) {
+          onSuccess();
+        }
+      } catch (error) {
+        console.error('Authentication success handler error:', error);
+        if (onFailure) {
+          onFailure(error instanceof Error ? error.message : 'Authentication failed');
+        }
       }
     },
-    [onSuccess],
+    [onSuccess, onFailure],
   );
 
-  const failureHandler = useCallback<
-    Required<UseGoogleLoginOptionsAuthCodeFlow>['onError']
-  >(
-    (err) => {
+  const failureHandler = useCallback(
+    (error: OAuthError) => {
+      console.error('OAuth authentication failed:', error);
       if (onFailure) {
-        onFailure(err.error_description);
+        onFailure(error.message || 'Authentication failed');
       }
     },
     [onFailure],
   );
 
   const logout = useCallback(async () => {
-    googleLogout();
+    try {
+      // Use platform-specific OAuth provider to sign out
+      await OAuthProvider.signOut();
+    } catch (error) {
+      console.warn('Error during OAuth sign-out:', error);
+      // Continue with local logout even if OAuth sign-out fails
+    }
+    
     // Clear all secrets
     await resetToken();
 
     router.replace('/');
   }, [router]);
 
-  const googleLogin = useGoogleLogin({
-    flow: 'auth-code',
-    onError: failureHandler,
-    onSuccess: successHandler,
-  });
+  const googleLogin = useCallback(async () => {
+    try {
+      const response = await OAuthProvider.signIn();
+      await successHandler(response);
+    } catch (error) {
+      // Check if it's already an OAuthError
+      if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+        failureHandler(error as OAuthError);
+      } else {
+        // Create a proper OAuthError
+        const oauthError: OAuthError = {
+          code: 'UNKNOWN_ERROR' as OAuthErrorCode,
+          message: error instanceof Error ? error.message : 'Unknown authentication error',
+          originalError: error,
+        };
+        failureHandler(oauthError);
+      }
+    }
+  }, [successHandler, failureHandler]);
 
   return useMemo(() => {
     return {
@@ -164,9 +203,8 @@ function useWebAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  // Only web auth is implemented in this app-specific version
-  // Mobile auth should use the shared-components version
-  return useWebAuthHandlers(callbacks);
+  // Uses platform abstraction layer - works on both web and mobile
+  return usePlatformAuthHandlers(callbacks);
 }
 
 const refreshJwt = memoizeOne(async (keychainLastUpdate: number) => {

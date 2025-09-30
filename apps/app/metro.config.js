@@ -45,11 +45,15 @@ const customConfig = {
         '../../lib/shared-components/src/platform-components/mobile/index.ts',
       ),
     },
+    // Custom resolver to block web-only dependencies
     resolveRequest: (context, moduleName, platform) => {
+      // Block web-only OAuth library from being imported in mobile builds
       if (moduleName === '@react-oauth/google') {
         throw new Error(
-          `[Metro] Cannot resolve @react-oauth/google - this is a web-only library.\n` +
-          `Use platform-components instead: import { OAuthProvider } from '@legacy-sports/shared-components'`
+          `❌ Cannot resolve @react-oauth/google - this is a web-only library.\n\n` +
+          `✅ Use platform-components instead:\n` +
+          `   import { OAuthProvider } from '@legacy-sports/shared-components'\n\n` +
+          `📝 The mobile app should use the MobileOAuthProvider through the platform abstraction layer.`
         );
       }
       // Use the default resolver for all other modules
