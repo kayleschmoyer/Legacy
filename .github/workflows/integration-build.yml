@@ -86,6 +86,11 @@ permissions:
   pull-requests: read
 
 env:
+  # Build environment
+  NODE_ENV: production
+  EXPO_NO_TELEMETRY: 1
+  REACT_NATIVE_PACKAGER_CACHE_DISABLED: true
+  
   # Nx Cloud configuration (with intelligent detection)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
