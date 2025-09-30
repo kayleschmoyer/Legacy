@@ -1,4 +1,4 @@
-const { withNxMetro } = require('@nx/react-native');
+// const { withNxMetro } = require('@nx/react-native');
 const { getDefaultConfig } = require('@expo/metro-config');
 const { mergeConfig } = require('@react-native/metro-config');
 const exclusionList = require('metro-config/src/defaults/exclusionList');
@@ -24,14 +24,14 @@ const customConfig = {
   },
   resolver: {
     assetExts: defaultConfig.resolver.assetExts.filter((ext) => ext !== 'svg'),
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'svg'],
+    sourceExts: [...defaultConfig.resolver.sourceExts, 'svg', 'native.ts', 'native.tsx'],
     blockList: exclusionList([/^.*\.test\.tsx?$/]),
     nodeModulesPaths: [
       path.resolve(__dirname, '../../node_modules'),
       path.resolve(__dirname, './node_modules'),
     ],
     // Ensure expo packages are resolved correctly
-    resolverMainFields: ['react-native', 'browser', 'main'],
+    resolverMainFields: ['react-native', 'main', 'browser'],
     platforms: ['ios', 'android', 'native', 'web'],
     // Platform-specific file extensions (React Native will prefer .native.ts over .ts)
     // This allows us to have platform-specific implementations
@@ -50,16 +50,26 @@ const customConfig = {
   },
 };
 
-module.exports = withNxMetro(mergeConfig(defaultConfig, customConfig), {
-  // Change this to true to see debugging info.
-  debug: false,
-  // all the file extensions used for imports other than 'ts', 'tsx', 'js', 'jsx', 'json'
-  extensions: [],
-  // Specify folders to watch, in addition to Nx defaults (workspace libraries and node_modules)
-  watchFolders: [],
-  // Add explicit node_modules paths for better resolution in CI
+// Standard Metro config for monorepo without Nx Metro integration
+// This avoids the path resolution issues in CI while maintaining monorepo support
+const finalConfig = mergeConfig(defaultConfig, customConfig);
+
+// Add workspace folders for monorepo support
+finalConfig.watchFolders = [
+  // Workspace root for package resolution
+  path.resolve(__dirname, '../..'),
+  // Specific library directories
+  path.resolve(__dirname, '../../lib'),
+  path.resolve(__dirname, '../../tools'),
+];
+
+// Ensure proper module resolution for workspace packages
+finalConfig.resolver = {
+  ...finalConfig.resolver,
   nodeModulesPaths: [
     path.resolve(__dirname, '../../node_modules'),
     path.resolve(__dirname, './node_modules'),
   ],
-});
+};
+
+module.exports = finalConfig;
