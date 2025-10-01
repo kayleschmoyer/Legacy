@@ -124,6 +124,11 @@ jobs:
           main-branch-name: "main"
           error-on-no-successful-workflow: false
 
+      - name: Setup Gradle Wrapper Permissions
+        run: |
+          cd apps/app/android
+          chmod +x gradlew
+
       - name: Cache Gradle Wrapper
         uses: actions/cache@v4
         with:
@@ -209,23 +214,32 @@ jobs:
             ${{ runner.os }}-gradle-build-${{ github.ref_name }}-
             ${{ runner.os }}-gradle-build-
 
-      - name: Pre-warm Gradle & Verify Caches
-        timeout-minutes: 3
+      - name: Verify Gradle Setup
+        timeout-minutes: 6
         run: |
           cd apps/app/android
-          chmod +x gradlew
-
-          # Check cache effectiveness
-          echo "📊 Checking cache status..."
-          ls -la ~/.gradle/caches/ 2>/dev/null | head -5 || echo "No Gradle cache found"
-          ls -la ~/.gradle/wrapper/ 2>/dev/null || echo "No Gradle wrapper cache found"
-
-          # Pre-download dependencies and warm up Gradle (faster with caching)
-          echo "🔄 Pre-warming Gradle dependencies..."
-          ./gradlew --no-daemon dependencies --quiet || true
           
-          # Verify build cache is working
-          echo "✅ Gradle pre-warming completed"
+          echo "📥 Ensuring Gradle wrapper is available..."
+          
+          # Download wrapper if needed and verify basic Gradle functionality
+          ./gradlew --version
+          
+          # Quick validation that build.gradle is parseable
+          ./gradlew help --quiet > /dev/null || {
+            echo "⚠️  Build configuration issue detected"
+            ./gradlew help  # Show error details
+          }
+          
+          echo "✅ Gradle setup verified"
+
+      - name: Check Cache Status
+        run: |
+          echo "📊 Current cache status:"
+          echo "  Gradle wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) files"
+          echo "  Gradle caches: $(ls ~/.gradle/caches/ 2>/dev/null | wc -l) entries"
+          echo "  Node modules: $(ls node_modules/ 2>/dev/null | wc -l) packages"
+          echo ""
+          echo "💡 Dependencies will be downloaded during build if not cached"
 
       - name: Generate React Native Bundle
         timeout-minutes: 10
@@ -283,9 +297,6 @@ jobs:
         timeout-minutes: 25
         run: |
           cd apps/app/android
-
-          # Set execute permissions for gradlew
-          chmod +x gradlew
 
           # Kill any existing Gradle daemons to prevent conflicts
           ./gradlew --stop || true
