@@ -6,12 +6,12 @@ import App from './app';
 
 // Mock all the components that might have complex dependencies
 jest.mock('@legacy-sports/shared-components', () => ({
-  Button: ({ children, ...props }: any) => (
-    <button {...props}>{children}</button>
+  Button: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
+    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>{children}</button>
   ),
-  H1: ({ children, ...props }: any) => <h1 {...props}>{children}</h1>,
-  XStack: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  YStack: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  H1: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>{children}</h1>,
+  XStack: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
+  YStack: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
   BaseballScreen: () => <div>Baseball Screen</div>,
   FootballScreen: () => <div>Football Screen</div>,
   PlayersScreen: () => <div>Players Screen</div>,
@@ -29,7 +29,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
 
 // Mock the styled function to avoid Tamagui issues
 jest.mock('tamagui', () => ({
-  styled: (component: any) => component,
+  styled: (component: React.ComponentType<unknown>) => component,
 }));
 
 // Mock the web components

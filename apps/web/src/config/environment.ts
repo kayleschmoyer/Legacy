@@ -10,6 +10,7 @@ export interface EnvironmentConfig {
   readonly oauthProxyUrl: string;
   readonly googleClientId: string;
   readonly isDev: boolean;
+  readonly authTestMode: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) ||
     'placeholder-google-client-id',
   isDev: import.meta.env.DEV === true,
+  authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
 });
 
 /**

@@ -57,7 +57,7 @@ export function Login() {
   }
 
   return (
-    <YStack minHeight="100vh" backgroundColor="$background">
+    <YStack minHeight="100vh" backgroundColor="$background" overflow="hidden" maxWidth="100vw">
       <LoginPage
         config={config}
         loginWithOAuth={async (oauthResponse) => {

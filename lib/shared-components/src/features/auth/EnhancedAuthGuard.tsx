@@ -108,6 +108,7 @@ export function EnhancedAuthGuard({
         <LoginPage
           config={config}
           loginWithOAuth={loginWithOAuth}
+          appName={loginTitle ? loginTitle.replace('Welcome to ', '') : 'Legacy Sports'}
           onSuccess={(user: { id: number; email: string; name?: string }) => {
             try {
               console.log('EnhancedAuthGuard - Login successful, user:', user);
@@ -129,7 +130,6 @@ export function EnhancedAuthGuard({
               error instanceof Error ? error.message : 'Authentication failed';
             onLoginFailure?.(errorMessage);
           }}
-          appName="Legacy Sports"
         />
       )
     );

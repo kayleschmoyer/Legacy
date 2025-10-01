@@ -11,20 +11,20 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MockedProvider, MockedResponse } from '@apollo/client/testing';
-
-// Mock TamaguiProvider to avoid font creation issues in tests
-const MockTamaguiProvider = ({ children }: { children: React.ReactNode }) => (
-  <div data-testid="tamagui-provider">{children}</div>
-);
 import {
   PlayerStatsDataGrid,
   type PlayerStatsDataGridProps,
 } from './PlayerStatsDataGrid';
 import {
   CAREER_BATTING_STATS_QUERY,
-  PLAYERS_QUERY,
   type CareerBattingStatsRaw,
+  PLAYERS_QUERY,
 } from './services/CareerStatsService';
+
+// Mock TamaguiProvider to avoid font creation issues in tests
+const MockTamaguiProvider = ({ children }: { children: React.ReactNode }) => (
+  <div data-testid="tamagui-provider">{children}</div>
+);
 
 // =============================================================================
 // Test Setup and Mocks

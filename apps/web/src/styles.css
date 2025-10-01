@@ -10,6 +10,7 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
   /* Use Tamagui theme colors for body background */
   background-color: var(--color1, #0f0f23);
   color: var(--color, #ffffff);
@@ -25,6 +26,7 @@ body {
 #root {
   height: 100%;
   width: 100%;
+  overflow-x: hidden;
   /* Ensure root inherits theme colors */
   background-color: inherit;
   color: inherit;

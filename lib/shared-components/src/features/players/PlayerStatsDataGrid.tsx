@@ -36,15 +36,27 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 // Icons - using simple text icons for cross-platform compatibility
-const ChevronDown = () => <Text>▼</Text>;
+const ChevronDown = () => (
+  <Text>
+    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+    ▼
+  </Text>
+);
 const Search = ({ size, color }: { size?: number; color?: string }) => (
-  <Text fontSize={size} color={color}>
+  <Text fontSize={size} color={color} accessibilityLabel="Search">
+    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
     🔍
   </Text>
 );
-const RefreshCw = () => <Text>🔄</Text>;
+const RefreshCw = () => (
+  <Text accessibilityLabel="Refresh">
+    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+    🔄
+  </Text>
+);
 const AlertCircle = ({ size, color }: { size?: number; color?: string }) => (
-  <Text fontSize={size} color={color}>
+  <Text fontSize={size} color={color} accessibilityLabel="Error">
+    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
     ⚠️
   </Text>
 );
@@ -684,7 +696,7 @@ export function PlayerStatsDataGrid({
               paddingHorizontal="$3"
               pressStyle={{ backgroundColor: '$color4' }}
               onPress={() => handleRowClick(player)}
-              // @ts-ignore - Add onClick for web compatibility in tests
+              // @ts-expect-error - Add onClick for web compatibility in tests
               onClick={() => handleRowClick(player)}
               cursor="pointer"
             >

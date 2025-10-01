@@ -68,7 +68,7 @@ try {
           <EnhancedAuthGuard
             loginTitle="Welcome to Legacy Sports!"
             loginSubtitle="Sign in to access your fantasy leagues and stats"
-            testMode={true} // Enable test mode to bypass OAuth issues
+            testMode={env.authTestMode}
             onLoginSuccess={() => {
               console.log('Web app login successful!');
             }}

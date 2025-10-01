@@ -1,7 +1,7 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios
+.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -312,6 +312,10 @@ workspace-lint: ## Run workspace-level validations
 	@$(call echo_blue,Running workspace validations...)
 	node scripts$(PATH_SEP)validate-workspace-deps.js
 	node scripts$(PATH_SEP)validate-package-json-standards.js
+
+pr: ## Create a GitHub pull request using twig
+	@$(call echo_blue,Creating GitHub pull request...)
+	twig github pr create
 
 # Composite Commands
 ci: clean-safe install lint typecheck test build ## Complete CI pipeline

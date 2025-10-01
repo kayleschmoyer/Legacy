@@ -3,8 +3,6 @@ import {
   Button,
   Card,
   Circle,
-  Input,
-  Separator,
   Spinner,
   Text,
   Theme,
@@ -81,9 +79,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // State management
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'social' | 'email'>('social');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   // Animation state for Tamagui
@@ -222,29 +217,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   }, [isConfigured, onSuccess, onError, authService, loginWithOAuth]);
 
-  // Handle email/password login
-  const handleEmailLogin = useCallback(async () => {
-    if (!email || !password) {
-      setErrorMessage('Please enter both email and password');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const user = await authService.authenticateWithEmail(email, password);
-      onSuccess(user);
-    } catch (error) {
-      console.error('Email login failed:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Login failed';
-      setErrorMessage(errorMsg);
-      onError?.(error instanceof Error ? error : new Error(errorMsg));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [email, password, onSuccess, onError, authService]);
-
   // Simple animation styles using Tamagui
   const containerAnimation = {
     opacity: isVisible ? 1 : 0,
@@ -265,9 +237,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         justifyContent="center"
         padding="$4"
         backgroundColor="$background"
+        overflow="hidden"
         style={[
           {
             minHeight: '100vh',
+            maxWidth: '100vw',
+            position: 'relative',
           },
           style,
         ]}
@@ -277,25 +252,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <>
             <Circle
               position="absolute"
-              top={-100}
-              right={-100}
-              size={300}
+              top={-50}
+              right={-50}
+              size={200}
               backgroundColor="$blue4"
               opacity={0.15}
             />
             <Circle
               position="absolute"
-              bottom={-150}
-              left={-150}
-              size={400}
+              bottom={-75}
+              left={-75}
+              size={250}
               backgroundColor="$purple4"
               opacity={0.1}
             />
             <Circle
               position="absolute"
               top="30%"
-              left={-50}
-              size={150}
+              left={-25}
+              size={100}
               backgroundColor="$green4"
               opacity={0.08}
             />
@@ -321,12 +296,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           shadowOffset={{ width: 0, height: 20 }}
           shadowOpacity={0.6}
           shadowRadius={30}
+          overflow="hidden"
+          alignSelf="center"
+          style={{
+            maxWidth: `min(${cardMaxWidth}px, calc(100vw - 32px))`,
+          }}
         >
           {shouldUseWideLayout ? (
             /* Wide layout for desktop - horizontal split */
-            <XStack space="$8" alignItems="center" width="100%">
+            <XStack space="$8" alignItems="center" width="100%" overflow="hidden">
               {/* Left side - Branding */}
-              <YStack space="$4" alignItems="center" flex={1} minWidth={250}>
+              <YStack space="$4" alignItems="center" flex={1} minWidth={200} maxWidth="50%">
                 {logo || (
                   <Circle
                     size={100}
@@ -341,8 +321,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </Circle>
                 )}
 
-                <YStack space="$2" alignItems="center">
-                  <Text fontSize="$8" fontWeight="bold" color="$color">
+                <YStack space="$2" alignItems="center" width="100%">
+                  <Text fontSize="$8" fontWeight="bold" color="$color" textAlign="center">
                     Welcome to {appName}
                   </Text>
                   <Text
@@ -358,7 +338,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </YStack>
 
               {/* Right side - Login form */}
-              <YStack space="$5" flex={1} minWidth={300}>
+              <YStack space="$5" flex={1} minWidth={250} maxWidth="50%">
                 {/* Error message */}
                 {errorMessage && (
                   <Card
@@ -374,147 +354,49 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </Card>
                 )}
 
-                {/* Social login section */}
-                {authMethod === 'social' && (
-                  <YStack space="$4" width="100%">
-                    <Button
-                      size="$5"
-                      backgroundColor="$blue6"
-                      color="$color"
-                      fontWeight="600"
-                      borderRadius="$4"
-                      borderColor="$blue7"
-                      borderWidth={1}
-                      disabled={!isConfigured || isLoading}
-                      opacity={!isConfigured || isLoading ? 0.6 : 1}
-                      onPress={() => {
-                        void handleGoogleLogin();
-                      }}
-                      icon={
-                        isLoading ? (
-                          <Spinner size="small" color="$color" />
-                        ) : undefined
-                      }
-                      width="100%"
-                      elevate
-                      pressStyle={{ scale: 0.98, backgroundColor: '$blue5' }}
-                      hoverStyle={{ backgroundColor: '$blue7' }}
-                      animation="bouncy"
-                    >
-                      <XStack space="$3" alignItems="center">
-                        {!isLoading && (
-                          <Text fontSize="$2">
-                            <span role="img" aria-label="star">
-                              🌟
-                            </span>
-                          </Text>
-                        )}
-                        <Text fontSize="$4" color="$color">
-                          {isLoading ? 'Signing in...' : 'Continue with Google'}
-                        </Text>
-                      </XStack>
-                    </Button>
-
-                    <XStack alignItems="center" space="$3">
-                      <Separator flex={1} borderColor="$borderColor" />
-                      <Text fontSize="$2" color="$color11">
-                        or
+                {/* Google login section */}
+                <YStack space="$4" width="100%">
+                  <Button
+                    size="$5"
+                    backgroundColor="white"
+                    color="#1f1f1f"
+                    fontWeight="500"
+                    borderRadius="$4"
+                    borderColor="#dadce0"
+                    borderWidth={1}
+                    disabled={!isConfigured || isLoading}
+                    opacity={!isConfigured || isLoading ? 0.6 : 1}
+                    onPress={() => {
+                      void handleGoogleLogin();
+                    }}
+                    icon={
+                      isLoading ? (
+                        <Spinner size="small" color="#1f1f1f" />
+                      ) : undefined
+                    }
+                    width="100%"
+                    elevate
+                    pressStyle={{ scale: 0.98, backgroundColor: '#f8f9fa' }}
+                    hoverStyle={{ backgroundColor: '#f8f9fa', borderColor: '#c1c7cd' }}
+                    animation="bouncy"
+                  >
+                    <XStack space="$3" alignItems="center" justifyContent="center" flex={1}>
+                      {!isLoading && (
+                        <svg width="18" height="18" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                      )}
+                      <Text fontSize="$4" color="#1f1f1f" textAlign="center">
+                        {isLoading ? 'Signing in...' : 'Sign in with Google'}
                       </Text>
-                      <Separator flex={1} borderColor="$borderColor" />
                     </XStack>
+                  </Button>
+                </YStack>
 
-                    <Button
-                      size="$4"
-                      variant="outlined"
-                      color="$color11"
-                      borderColor="$borderColor"
-                      backgroundColor="transparent"
-                      hoverStyle={{ borderColor: '$borderColorHover' }}
-                      pressStyle={{ scale: 0.98 }}
-                      onPress={() => setAuthMethod('email')}
-                      width="100%"
-                    >
-                      Sign in with Email
-                    </Button>
-                  </YStack>
-                )}
 
-                {/* Email login section */}
-                {authMethod === 'email' && (
-                  <YStack space="$4" width="100%">
-                    <YStack space="$3">
-                      <Input
-                        placeholder="Email address"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        size="$4"
-                        borderRadius="$3"
-                        backgroundColor="$color2"
-                        borderColor="$borderColor"
-                        color="$color"
-                        placeholderTextColor="$color11"
-                      />
-                      <Input
-                        placeholder="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        size="$4"
-                        borderRadius="$3"
-                        backgroundColor="$color2"
-                        borderColor="$borderColor"
-                        color="$color"
-                        placeholderTextColor="$color11"
-                      />
-                    </YStack>
-
-                    <Button
-                      size="$5"
-                      backgroundColor="$purple6"
-                      color="$color"
-                      fontWeight="600"
-                      borderColor="$purple7"
-                      borderWidth={1}
-                      disabled={isLoading || !email || !password}
-                      onPress={() => {
-                        void handleEmailLogin();
-                      }}
-                      width="100%"
-                      elevate
-                      hoverStyle={{ backgroundColor: '$purple7' }}
-                      pressStyle={{ scale: 0.98 }}
-                      icon={
-                        isLoading ? (
-                          <Spinner size="small" color="$color" />
-                        ) : undefined
-                      }
-                    >
-                      {isLoading ? 'Signing in...' : 'Sign In'}
-                    </Button>
-
-                    <Button
-                      size="$3"
-                      variant="outlined"
-                      color="$color11"
-                      borderColor="$borderColor"
-                      backgroundColor="transparent"
-                      hoverStyle={{ borderColor: '$borderColorHover' }}
-                      pressStyle={{ scale: 0.98 }}
-                      onPress={() => {
-                        setAuthMethod('social');
-                        setErrorMessage('');
-                      }}
-                      width="100%"
-                    >
-                      <span role="img" aria-label="arrow left">
-                        ←
-                      </span>{' '}
-                      Back to Social Login
-                    </Button>
-                  </YStack>
-                )}
 
                 {/* Configuration status */}
                 {!isConfigured && (
@@ -529,9 +411,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </XStack>
           ) : (
             /* Standard vertical layout for mobile */
-            <YStack space="$5" alignItems="center">
+            <YStack space="$5" alignItems="center" width="100%">
               {/* Header */}
-              <YStack space="$3" alignItems="center">
+              <YStack space="$3" alignItems="center" width="100%">
                 {logo || (
                   <Circle
                     size={80}
@@ -546,7 +428,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </Circle>
                 )}
 
-                <Text fontSize="$7" fontWeight="bold" color="$color">
+                <Text fontSize="$7" fontWeight="bold" color="$color" textAlign="center">
                   Welcome to {appName}
                 </Text>
 
@@ -570,125 +452,49 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </Card>
               )}
 
-              {/* Social login section */}
-              {authMethod === 'social' && (
-                <YStack space="$4" width="100%">
-                  <Button
-                    size="$5"
-                    backgroundColor="$blue10"
-                    color="white"
-                    fontWeight="600"
-                    borderRadius="$4"
-                    disabled={!isConfigured || isLoading}
-                    opacity={!isConfigured || isLoading ? 0.6 : 1}
-                    onPress={() => {
-                      void handleGoogleLogin();
-                    }}
-                    icon={
-                      isLoading ? (
-                        <Spinner size="small" color="white" />
-                      ) : undefined
-                    }
-                    width="100%"
-                    elevate
-                    pressStyle={{ scale: 0.98 }}
-                    animation="bouncy"
-                  >
-                    <XStack space="$3" alignItems="center">
-                      {!isLoading && (
-                        <Text fontSize="$2">
-                          <span role="img" aria-label="star">
-                            🌟
-                          </span>
-                        </Text>
-                      )}
-                      <Text fontSize="$4" color="white">
-                        {isLoading ? 'Signing in...' : 'Continue with Google'}
-                      </Text>
-                    </XStack>
-                  </Button>
-
-                  <XStack alignItems="center" space="$3">
-                    <Separator flex={1} />
-                    <Text fontSize="$2" color="$gray8">
-                      or
+              {/* Google login section */}
+              <YStack space="$4" width="100%">
+                <Button
+                  size="$5"
+                  backgroundColor="white"
+                  color="#1f1f1f"
+                  fontWeight="500"
+                  borderRadius="$4"
+                  borderColor="#dadce0"
+                  borderWidth={1}
+                  disabled={!isConfigured || isLoading}
+                  opacity={!isConfigured || isLoading ? 0.6 : 1}
+                  onPress={() => {
+                    void handleGoogleLogin();
+                  }}
+                  icon={
+                    isLoading ? (
+                      <Spinner size="small" color="#1f1f1f" />
+                    ) : undefined
+                  }
+                  width="100%"
+                  elevate
+                  pressStyle={{ scale: 0.98, backgroundColor: '#f8f9fa' }}
+                  hoverStyle={{ backgroundColor: '#f8f9fa', borderColor: '#c1c7cd' }}
+                  animation="bouncy"
+                >
+                  <XStack space="$3" alignItems="center" justifyContent="center" flex={1}>
+                    {!isLoading && (
+                      <svg width="18" height="18" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                    )}
+                    <Text fontSize="$4" color="#1f1f1f" textAlign="center">
+                      {isLoading ? 'Signing in...' : 'Sign in with Google'}
                     </Text>
-                    <Separator flex={1} />
                   </XStack>
+                </Button>
+              </YStack>
 
-                  <Button
-                    size="$4"
-                    variant="outlined"
-                    color="$gray11"
-                    borderColor="$gray6"
-                    onPress={() => setAuthMethod('email')}
-                    width="100%"
-                  >
-                    Sign in with Email
-                  </Button>
-                </YStack>
-              )}
 
-              {/* Email login section */}
-              {authMethod === 'email' && (
-                <YStack space="$4" width="100%">
-                  <YStack space="$3">
-                    <Input
-                      placeholder="Email address"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      size="$4"
-                      borderRadius="$3"
-                    />
-                    <Input
-                      placeholder="Password"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      size="$4"
-                      borderRadius="$3"
-                    />
-                  </YStack>
-
-                  <Button
-                    size="$5"
-                    backgroundColor="$purple10"
-                    color="white"
-                    fontWeight="600"
-                    disabled={isLoading || !email || !password}
-                    onPress={() => {
-                      void handleEmailLogin();
-                    }}
-                    width="100%"
-                    elevate
-                    icon={
-                      isLoading ? (
-                        <Spinner size="small" color="white" />
-                      ) : undefined
-                    }
-                  >
-                    {isLoading ? 'Signing in...' : 'Sign In'}
-                  </Button>
-
-                  <Button
-                    size="$3"
-                    variant="outlined"
-                    color="$gray11"
-                    onPress={() => {
-                      setAuthMethod('social');
-                      setErrorMessage('');
-                    }}
-                    width="100%"
-                  >
-                    <span role="img" aria-label="arrow left">
-                      ←
-                    </span>{' '}
-                    Back to Social Login
-                  </Button>
-                </YStack>
-              )}
 
               {/* Configuration status */}
               {!isConfigured && (

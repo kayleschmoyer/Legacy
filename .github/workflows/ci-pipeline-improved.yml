@@ -1363,3 +1363,8 @@ jobs:
           if [[ "${{ needs.ci-pipeline.result }}" != "success" ]]; then
             exit 1
           fi
+
+      - name: "🎯 Final Status"
+        if: always()
+        run: |
+          echo "::notice title=Pipeline Complete::All CI validation steps have been executed"

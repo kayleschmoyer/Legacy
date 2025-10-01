@@ -25,7 +25,7 @@ export function AppWithAuth() {
       <EnhancedAuthGuard
         loginTitle="Welcome to Fantasy Sports Hub!"
         loginSubtitle="Please sign in to access your fantasy leagues and stats"
-        testMode={env.isDev} // Enable test mode in development
+        testMode={env.authTestMode}
         onLoginSuccess={() => {
           console.log('Login successful!');
         }}
