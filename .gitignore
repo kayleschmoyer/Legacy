@@ -190,6 +190,26 @@ index.android.bundle
 index.ios.bundle
 **/assets/*.bundle
 
+# Metro bundle test artifacts
+test-bundle.js
+bundle.js
+**/bundle.js
+
+# Build and distribution artifacts
+**/dist/
+**/build/
+**/out/
+**/.next/
+**/.vite/
+**/.turbo/
+
+# Storybook build artifacts
+**/storybook-static/
+
+# Package build artifacts
+**/*.tsbuildinfo
+**/.tsbuildinfo
+
 # Ruby / CocoaPods
 **/Pods/
 **/vendor/bundle/

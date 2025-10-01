@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@legacy-sports/api": "*",
+    "@legacy-sports/logging": "*",
     "@legacy-sports/tamagui-config": "*"
   }
 }

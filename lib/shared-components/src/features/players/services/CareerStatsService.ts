@@ -27,6 +27,8 @@ export const CAREER_BATTING_STATS_QUERY = gql`
     $minGames: Int
     $minHomeRuns: Int
     $minRBI: Int
+    $minBattingAvg: Float
+    $searchTerm: String
   ) {
     careerBattingStats(
       limit: $limit
@@ -36,6 +38,8 @@ export const CAREER_BATTING_STATS_QUERY = gql`
       minGames: $minGames
       minHomeRuns: $minHomeRuns
       minRBI: $minRBI
+      minBattingAvg: $minBattingAvg
+      searchTerm: $searchTerm
     ) {
       playerId
       games
@@ -168,6 +172,8 @@ export interface CareerStatsQueryParams {
   readonly minGames?: number;
   readonly minHomeRuns?: number;
   readonly minRBI?: number;
+  readonly minBattingAvg?: number;
+  readonly searchTerm?: string;
 }
 
 /**
@@ -337,27 +343,17 @@ export function transformCareerStats(
 export function useCareerStatsService(
   params: CareerStatsQueryParams = {},
 ): CareerStatsServiceResponse {
-  const {
-    limit = 25,
-    offset = 0,
-    orderBy = 'homeRuns',
-    orderDirection = 'desc',
-    minGames = 10, // Default filter to exclude players with very few games
-    ...otherParams
-  } = params;
+  // Merge provided params with defaults to ensure consistent variable shape
+  const queryVariables = {
+    ...DEFAULT_CAREER_STATS_PARAMS,
+    ...params,
+  };
 
   const { data, loading, error, refetch } = useQuery<
     CareerStatsQueryResponse,
     CareerStatsQueryParams
   >(CAREER_BATTING_STATS_QUERY, {
-    variables: {
-      limit,
-      offset,
-      orderBy,
-      orderDirection,
-      minGames,
-      ...otherParams,
-    },
+    variables: queryVariables,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
     fetchPolicy: 'cache-and-network', // Balance performance with data freshness
@@ -370,11 +366,11 @@ export function useCareerStatsService(
     ) ?? [];
 
   // Calculate pagination metadata
-  const pageSize = limit;
-  const currentPage = Math.floor(offset / pageSize) + 1;
+  const pageSize = queryVariables.limit;
+  const currentPage = Math.floor(queryVariables.offset / pageSize) + 1;
   const totalCount = transformedData.length;
   const hasNextPage = transformedData.length === pageSize; // Heuristic: if we got a full page, there might be more
-  const hasPreviousPage = offset > 0;
+  const hasPreviousPage = queryVariables.offset > 0;
 
   return {
     data: transformedData,
@@ -563,4 +559,6 @@ export const DEFAULT_CAREER_STATS_PARAMS: Required<CareerStatsQueryParams> = {
   minGames: 10,
   minHomeRuns: 0,
   minRBI: 0,
+  minBattingAvg: 0,
+  searchTerm: '',
 } as const;

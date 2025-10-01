@@ -1,33 +1,11 @@
-// Logger setup with fallback
-let LOGGER: {
-  error: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
-  debug: (...args: unknown[]) => void;
-} = {
-  // Default fallback implementations
-  error: (...args: unknown[]) => {
-    // eslint-disable-next-line no-console
-    console.error(...args);
-  },
-  warn: (...args: unknown[]) => {
-    // eslint-disable-next-line no-console
-    console.warn(...args);
-  },
-  debug: (...args: unknown[]) => {
-    // eslint-disable-next-line no-console
-    console.debug(...args);
-  },
+// Simple logger fallback for SecureStorage
+const LOGGER = {
+  debug: (message: string, ...args: unknown[]) =>
+    console.debug(message, ...args),
+  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    console.error(message, ...args),
 };
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const logging = require('@legacy-sports/logging') as {
-    LOGGER: typeof LOGGER;
-  };
-  LOGGER = logging.LOGGER;
-} catch {
-  // Fallback for test environment
-}
 
 // Dynamic import for Expo SecureStore
 let secureStore: typeof import('expo-secure-store') | null = null;

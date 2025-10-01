@@ -1,29 +1,15 @@
 import React, { useCallback } from 'react';
 import { PlayersGrid } from './PlayersGrid';
 import { PlayerFragment } from './PlayersApi';
-
-// Logger setup with fallback
-let LOGGER: {
-  info: (...args: unknown[]) => void;
+// Simple logger fallback for PlayersScreen
+const LOGGER = {
+  debug: (message: string, ...args: unknown[]) =>
+    console.debug(message, ...args),
+  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
+  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    console.error(message, ...args),
 };
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const logging = require('@legacy-sports/logging') as {
-    LOGGER: {
-      info: (...args: unknown[]) => void;
-    };
-  };
-  LOGGER = logging.LOGGER;
-} catch {
-  // Fallback for test environment
-  LOGGER = {
-    info: (...args: unknown[]) => {
-      // eslint-disable-next-line no-console
-      console.info(...args);
-    },
-  };
-}
 
 export interface PlayersScreenProps {
   onPlayerSelect?: (player: PlayerFragment) => void;

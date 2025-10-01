@@ -4,29 +4,13 @@ import { TamaguiProvider } from 'tamagui';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
-
-// Logger setup with fallback
-let LOGGER: {
-  warn: (...args: unknown[]) => void;
+// Simple logger fallback for AppProvider
+const LOGGER = {
+  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    console.error(message, ...args),
+  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
 };
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const logging = require('@legacy-sports/logging') as {
-    LOGGER: {
-      warn: (...args: unknown[]) => void;
-    };
-  };
-  LOGGER = logging.LOGGER;
-} catch {
-  // Fallback for test environment
-  LOGGER = {
-    warn: (...args: unknown[]) => {
-      // eslint-disable-next-line no-console
-      console.warn(...args);
-    },
-  };
-}
 
 interface AppProviderProps {
   children: React.ReactNode;

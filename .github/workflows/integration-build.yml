@@ -2,55 +2,7 @@ name: "Integration Build (Optimized)"
 
 # This workflow runs integration builds on main branch to ensure the full repository is always passing
 # It runs ALL projects (not just affected) to catch integration issues after merges
-      - name: "📦 Setup Node.js & Nx Caching"
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules
-            .nx-cache
-          key: ${{ runner.os }}-integration-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-integration-
-
-      # ======================================================================
-      # GRADLE & ANDROID CACHING FOR MOBILE BUILDS
-      # ======================================================================
-
-      - name: "🏗️ Cache Gradle Dependencies"
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            apps/app/android/.gradle
-            apps/app/android/app/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/build.gradle', 'apps/app/android/app/build.gradle') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: "📱 Cache Android SDK & Build Tools"
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            ${{ github.workspace }}/apps/app/android/app/build
-            ${{ github.workspace }}/apps/app/android/.gradle/buildOutputCleanup
-          key: ${{ runner.os }}-android-${{ hashFiles('apps/app/android/**/build.gradle', 'apps/app/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-android-
-
-      - name: "⚡ Cache React Native Bundle"
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/app/android/app/src/main/assets/index.android.bundle
-            apps/app/android/app/src/main/res/drawable-*
-            apps/app/android/app/src/main/res/raw
-          key: ${{ runner.os }}-rn-bundle-${{ hashFiles('apps/app/**/*.{js,jsx,ts,tsx}', 'apps/app/package.json', 'lib/**/*.{js,jsx,ts,tsx}') }}
-          restore-keys: |
-            ${{ runner.os }}-rn-bundle-IZATIONS APPLIED:
+# OPTIMIZATIONS APPLIED:
 # - Intelligent Nx Cloud DTE detection with quota management
 # - Smart agent allocation based on workspace size and available quota
 # - Structured error reporting and GitHub summary generation
@@ -90,7 +42,7 @@ env:
   NODE_ENV: production
   EXPO_NO_TELEMETRY: 1
   REACT_NATIVE_PACKAGER_CACHE_DISABLED: true
-  
+
   # Nx Cloud configuration (with intelligent detection)
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
@@ -290,7 +242,7 @@ jobs:
       - name: "🏃 Pre-warm Build Environment"
         run: |
           echo "::group::Build Environment Optimization"
-          
+
           # Check Gradle cache status
           if [ -d "$HOME/.gradle/caches" ]; then
             echo "✅ Gradle cache restored - builds should be faster"
@@ -298,7 +250,7 @@ jobs:
           else
             echo "ℹ️ No Gradle cache - first Android build will be slower"
           fi
-          
+
           # Pre-create Android build directories
           if [ -d "apps/app/android" ]; then
             echo "📁 Preparing Android build directories..."
@@ -313,7 +265,7 @@ jobs:
               echo "ℹ️ No bundle cache - React Native bundle will be regenerated"
             fi
           fi
-          
+
           echo "🚀 Build environment optimized for speed"
           echo "::endgroup::"
 
@@ -541,7 +493,7 @@ jobs:
           # Console output
           echo "📊 Integration Build Summary"
           echo "=========================="
-          
+
           if [ "$OVERALL_STATUS" = "success" ]; then
             if [ "${{ steps.dte-detect.outputs.execution-mode }}" = "distributed" ]; then
               echo "✅ Integration build completed successfully using Nx Cloud DTE"

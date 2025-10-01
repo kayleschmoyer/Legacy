@@ -17,6 +17,11 @@ export {
   SecureStorageProvider,
   PlatformProviders,
   PlatformUtils,
+
+  // Platform-specific components (using magic string system)
+  Icon,
+  Table,
+
   // React Native equivalents (excluding components with Tamagui equivalents)
   FlatList,
   Alert,
@@ -63,6 +68,9 @@ export * from './utils/HookHelpers';
 export * from './utils/DateUtilities';
 export * from './utils/ErrorHandler';
 export * from './utils/PositionModels';
+
+// Platform-specific utilities (using Metro's .native.ts resolution)
+export * from './utils/SecureStorage';
 
 // Sports components
 export * from './features/sports/SportHome';

@@ -38,18 +38,14 @@ import {
 // Icons - using simple text icons for cross-platform compatibility
 const ChevronDown = () => <Text>▼</Text>;
 const Search = ({ size, color }: { size?: number; color?: string }) => (
-  <Text style={{ fontSize: size, color }}>
-    <span role="img" aria-label="Search">
-      🔍
-    </span>
+  <Text fontSize={size} color={color}>
+    🔍
   </Text>
 );
 const RefreshCw = () => <Text>🔄</Text>;
 const AlertCircle = ({ size, color }: { size?: number; color?: string }) => (
-  <Text style={{ fontSize: size, color }}>
-    <span role="img" aria-label="Alert">
-      ⚠️
-    </span>
+  <Text fontSize={size} color={color}>
+    ⚠️
   </Text>
 );
 
@@ -680,6 +676,7 @@ export function PlayerStatsDataGrid({
           data.map((player: PlayerCareerStats, index: number) => (
             <XStack
               key={player.id}
+              data-testid={`player-row-${player.playerId}`}
               backgroundColor={index % 2 === 0 ? '$color1' : '$color2'}
               borderBottomWidth={1}
               borderBottomColor="$borderColorFocus"
@@ -687,6 +684,8 @@ export function PlayerStatsDataGrid({
               paddingHorizontal="$3"
               pressStyle={{ backgroundColor: '$color4' }}
               onPress={() => handleRowClick(player)}
+              // @ts-ignore - Add onClick for web compatibility in tests
+              onClick={() => handleRowClick(player)}
               cursor="pointer"
             >
               {visibleColumns.map((column) => (

@@ -109,9 +109,9 @@ android {
 
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.legacySports'
+    namespace 'com.anonymous.legacysportssource'
     defaultConfig {
-        applicationId 'com.legacySports'
+        applicationId 'com.anonymous.legacysportssource'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

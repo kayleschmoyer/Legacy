@@ -1,0 +1,72 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+    - generic [ref=e8]:
+        - heading "football Legacy Sports" [level=1] [ref=e10]:
+            - img "football" [ref=e11]: 🏈
+            - text: Legacy Sports
+        - generic [ref=e12]:
+            - link "home Home" [ref=e13] [cursor=pointer]:
+                - /url: http://localhost:4200/#/
+                - button "home Home" [ref=e15] [cursor=pointer]:
+                    - img "home" [ref=e16] [cursor=pointer]: 🏠
+                    - generic [ref=e17] [cursor=pointer]: Home
+            - link "football Football" [ref=e18] [cursor=pointer]:
+                - /url: http://localhost:4200/#/football
+                - button "football Football" [ref=e20] [cursor=pointer]:
+                    - img "football" [ref=e21] [cursor=pointer]: 🏈
+                    - generic [ref=e22] [cursor=pointer]: Football
+            - link "baseball Baseball" [ref=e23] [cursor=pointer]:
+                - /url: http://localhost:4200/#/baseball
+                - button "baseball Baseball" [ref=e25] [cursor=pointer]:
+                    - img "baseball" [ref=e26] [cursor=pointer]: ⚾
+                    - generic [ref=e27] [cursor=pointer]: Baseball
+            - link "players Players" [ref=e28] [cursor=pointer]:
+                - /url: http://localhost:4200/#/players
+                - button "players Players" [ref=e30] [cursor=pointer]:
+                    - img "players" [ref=e31] [cursor=pointer]: 👤
+                    - generic [ref=e32] [cursor=pointer]: Players
+            - link "statistics Player Stats" [ref=e33] [cursor=pointer]:
+                - /url: http://localhost:4200/#/players/stats
+                - button "statistics Player Stats" [ref=e35] [cursor=pointer]:
+                    - img "statistics" [ref=e36] [cursor=pointer]: 📊
+                    - generic [ref=e37] [cursor=pointer]: Player Stats
+    - generic [ref=e40]:
+        - heading "MLB Player Statistics" [level=1] [ref=e41]
+        - generic [ref=e42]:
+            - generic [ref=e43]: 'View Mode: combined | Page Size: 25'
+            - generic [ref=e44]: 'Actions: Export, Share functionality available through parent component'
+        - generic [ref=e46]:
+            - heading "MLB Career Batting Leaders" [level=2] [ref=e47]
+            - generic [ref=e48]:
+                - generic [ref=e49]:
+                    - generic [ref=e50]:
+                        - generic [ref=e51]: 🔍
+                        - textbox "Search players..." [ref=e54]
+                    - generic [ref=e55]:
+                        - generic [ref=e56]: 'Sort by:'
+                        - combobox [ref=e57] [cursor=pointer]:
+                            - generic: Home Runs (Most)
+                            - generic [ref=e58] [cursor=pointer]: ▼
+                    - button "🔄 Refresh" [ref=e60] [cursor=pointer]:
+                        - generic [ref=e61] [cursor=pointer]: 🔄
+                        - generic [ref=e62] [cursor=pointer]: Refresh
+                - generic [ref=e63]:
+                    - generic [ref=e64]: 'Filters:'
+                    - generic [ref=e65]:
+                        - generic [ref=e66]: 'Min Games:'
+                        - textbox [ref=e69]: '100'
+                    - generic [ref=e70]:
+                        - generic [ref=e71]: 'Min HR:'
+                        - textbox [ref=e74]: '0'
+                    - generic [ref=e75]:
+                        - generic [ref=e76]: 'Min RBI:'
+                        - textbox [ref=e79]: '0'
+            - generic [ref=e80]:
+                - generic [ref=e81]: ⚠️
+                - heading "Error Loading Statistics" [level=3] [ref=e82]
+                - generic [ref=e83]: Failed to fetch
+                - button "Try Again" [ref=e85] [cursor=pointer]:
+                    - generic [ref=e86] [cursor=pointer]: Try Again
+```

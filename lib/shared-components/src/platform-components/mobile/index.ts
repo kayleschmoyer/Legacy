@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { mobileOAuthProvider } from './MobileOAuthProvider';
-import { mobileSecureStorage } from './MobileSecureStorage';
 import { MobileProviders } from './MobileProviders';
 import * as PlatformUtilsImport from './PlatformUtils';
 import IconsComponent from './Icons';
 import TableComponent from './Table';
+import { SecureStorage } from '../../utils/SecureStorage.native';
 import { validatePlatformExports } from '../types/platform-exports';
 
 // Export shared types (identical across all platforms)
@@ -25,7 +25,7 @@ export * from '../types';
 const MODULE_EXPORTS = validatePlatformExports({
   // ===== PLATFORM-SPECIFIC IMPLEMENTATIONS =====
   OAuthProvider: mobileOAuthProvider,
-  SecureStorageProvider: mobileSecureStorage,
+  SecureStorageProvider: new SecureStorage(),
 
   // ===== REACT NATIVE COMPONENTS (NO TAMAGUI EQUIVALENT) =====
   ActivityIndicator,
@@ -58,7 +58,6 @@ const MODULE_EXPORTS = validatePlatformExports({
   Table: TableComponent as unknown as React.ComponentType<
     Record<string, unknown>
   >,
-  SecureStorage: mobileSecureStorage,
 });
 
 // Export the entire validated module as a default export

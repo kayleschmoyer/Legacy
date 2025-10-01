@@ -1,3 +1,4 @@
-// Mobile-specific utils index - excludes server-side utilities
-// that use Node.js built-ins like 'path', 'fs', etc.
+// Mobile-specific utils index - includes mobile-safe utilities
 export * from './lib/ErrorHandling';
+export * from './lib/DbOptions.native';
+export * from './lib/AwsSecrets.native';

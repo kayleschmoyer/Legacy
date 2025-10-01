@@ -62,6 +62,7 @@ export function EnhancedAuthGuard({
     isLoading,
     hasUser: !!user,
     userId: user?.id,
+    testMode,
   });
 
   // Track authentication state changes
@@ -70,8 +71,17 @@ export function EnhancedAuthGuard({
       isAuthenticated,
       isLoading,
       hasUser: !!user,
+      testMode,
     });
-  }, [isAuthenticated, isLoading, user]);
+  }, [isAuthenticated, isLoading, user, testMode]);
+
+  // In test mode, bypass authentication and show content directly
+  if (testMode) {
+    console.log(
+      'EnhancedAuthGuard - Test mode enabled, showing authenticated content',
+    );
+    return children;
+  }
 
   // Show loading state
   if (isLoading) {

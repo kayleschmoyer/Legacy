@@ -11,7 +11,8 @@
       "__PLATFORM_COMPONENTS__": [
         "./src/platform-components/__PLATFORM_COMPONENTS__.d.ts"
       ],
-      "@legacy-sports/tamagui-config": ["../tamagui-config/dist/index.d.ts"]
+      "@legacy-sports/tamagui-config": ["../tamagui-config/dist/index.d.ts"],
+      "@legacy-sports/logging": ["../logging/src/index.ts"]
     }
   },
   "exclude": [

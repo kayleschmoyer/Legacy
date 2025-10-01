@@ -29,7 +29,6 @@ export default defineConfig({
     /* Threshold for visual comparisons */
     toHaveScreenshot: {
       threshold: 0.2,
-      mode: 'pixel',
       animations: 'disabled',
     },
     /* Maximum difference in pixels for visual comparisons */
@@ -42,27 +41,42 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+      },
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
+      },
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: { width: 1280, height: 720 },
+      },
     },
 
     /* Test against mobile viewports. */
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 375, height: 667 },
+      },
     },
     {
       name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
+      use: {
+        ...devices['iPhone 12'],
+        viewport: { width: 375, height: 667 },
+      },
     },
 
     /* Test against branded browsers. */

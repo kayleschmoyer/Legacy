@@ -254,7 +254,6 @@ export interface PlatformExports {
     dataSource?: unknown[];
     [key: string]: unknown;
   }>;
-  SecureStorage: ISecureStorage;
 }
 
 // Validation function to ensure platform exports conform to expected interface

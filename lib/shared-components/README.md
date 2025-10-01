@@ -11,16 +11,121 @@ This library provides:
 - **Business logic**: Shared screens and data handling
 - **Utilities**: Common functions and types
 
+## 🏗️ Hybrid Platform Architecture
+
+This library uses a **hybrid platform resolution system** for optimal cross-platform support:
+
+### 🎯 **Magic String System** (Complex UI Components)
+
+```typescript
+// Build-time resolved platform-specific implementations
+import { Icon, Table, OAuthProvider } from '@legacy-sports/shared-components';
+
+// Automatically uses web or mobile implementation
+<Icon name="search" size={24} />
+<Table headers={headers} data={data} />
+```
+
+**Location**: `src/platform-components/` - Icons, Tables, OAuth Providers  
+**Benefits**: Build-time optimization, strong type contracts, dead code elimination
+
+### 📱 **Metro Native Resolution** (Simple Utilities)
+
+```typescript
+// Metro automatically picks .native.ts for React Native, .ts for web
+import { SecureStorage, getDbOptions } from '@legacy-sports/shared-components';
+
+// Same API, different implementation per platform
+await SecureStorage.setItem('token', 'value');
+const dbOptions = getDbOptions();
+```
+
+**Location**: `src/utils/` - SecureStorage, DbOptions, AwsSecrets  
+**Benefits**: Native Metro support, simple developer experience, CI reliability
+
+**📚 Learn More**: [Hybrid Platform Resolution Guide](../../docs/HYBRID_PLATFORM_RESOLUTION_GUIDE.md)
+
+## 💡 Usage Examples
+
+### ✅ Complex UI Components (Magic String System)
+
+```typescript
+// These components use build-time platform resolution
+import {
+  Icon,
+  Table,
+  OAuthProvider,
+  PlatformProviders
+} from '@legacy-sports/shared-components';
+
+// Icons - Automatically uses Expo Vector Icons on mobile, CSS icons on web
+<Icon name="search" size={24} color="blue" />
+<Icon name="home" size={32} />
+
+// Tables - HTML table on web, React Native implementation on mobile
+<Table
+  headers={['Name', 'Position', 'Team']}
+  data={[
+    ['Mike Trout', 'CF', 'Angels'],
+    ['Mookie Betts', 'RF', 'Dodgers']
+  ]}
+/>
+
+// OAuth - Google OAuth web integration vs Expo AuthSession
+const handleLogin = () => OAuthProvider.signIn();
+```
+
+### ✅ Simple Utilities (Metro Native Resolution)
+
+```typescript
+// These utilities use .native.ts file resolution
+import {
+  SecureStorage,
+  getDbOptions,
+  readSecret,
+} from '@legacy-sports/shared-components';
+
+// SecureStorage - sessionStorage on web, Expo SecureStore on mobile
+await SecureStorage.setItem('auth_token', token);
+const storedToken = await SecureStorage.getItem('auth_token');
+
+// DbOptions - Node.js path resolution on web, env vars only on mobile
+const dbConfig = getDbOptions();
+
+// AwsSecrets - AWS SDK on web, environment fallbacks on mobile
+const secret = await readSecret({ secretName: 'db-credentials' });
+```
+
+### ✅ Screen Components (Universal)
+
+```typescript
+// Screen components work the same across platforms
+import {
+  PlayersScreen,
+  HomeScreen,
+  AppProvider
+} from '@legacy-sports/shared-components';
+
+function App() {
+  return (
+    <AppProvider apolloClient={client} colorScheme="dark">
+      <HomeScreen />
+      <PlayersScreen />
+    </AppProvider>
+  );
+}
+```
+
 ## 🧩 Package Structure
 
 ```
 lib/shared-components/
 ├── src/
 │   ├── components/        # Base UI components
-│   ├── screens/          # Complete screen components
 │   ├── features/         # Feature-specific components
+│   ├── platform-components/ # Magic string system (Icons, Tables, OAuth)
+│   ├── utils/            # Metro native resolution (SecureStorage, etc.)
 │   ├── providers/        # Context providers
-│   ├── utils/           # Utility functions
 │   └── index.ts         # Public API exports
 ├── tamagui.config.ts    # Tamagui configuration
 └── project.json         # NX build configuration

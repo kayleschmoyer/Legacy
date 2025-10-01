@@ -10,29 +10,15 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { Platform } from '../platform-components';
-
-// Logger setup with fallback
-let LOGGER: {
-  warn: (...args: unknown[]) => void;
+// Simple logger fallback for TamaguiAppNavigator
+const LOGGER = {
+  debug: (message: string, ...args: unknown[]) =>
+    console.debug(message, ...args),
+  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
+  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    console.error(message, ...args),
 };
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const logging = require('@legacy-sports/logging') as {
-    LOGGER: {
-      warn: (...args: unknown[]) => void;
-    };
-  };
-  LOGGER = logging.LOGGER;
-} catch {
-  // Fallback for test environment
-  LOGGER = {
-    warn: (...args: unknown[]) => {
-      // eslint-disable-next-line no-console
-      console.warn(...args);
-    },
-  };
-}
 
 export interface NavigationRoute {
   name: string;

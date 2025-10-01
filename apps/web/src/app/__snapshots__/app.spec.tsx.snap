@@ -1,568 +1,400 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`App FootballScreen should display correct football content 1`] = `
-<main
-  style="padding: 0px;"
->
-  <div
-    style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-  >
-    <div
-      style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-    >
-      <h1
-        style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-      >
-        Welcome to Fantasy Sports Hub!
-      </h1>
-      <p
-        style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-      >
-        Please sign in to access your fantasy leagues and stats
-      </p>
-      <div
-        alignitems="center"
-        space="$4"
-        style="display: flex; flex-direction: column;"
-      >
-        <button
-          backgroundcolor="$blue10"
-          borderradius="$4"
-          color="white"
-          disabled=""
-          opacity="0.6"
-          paddinghorizontal="$6"
-          paddingvertical="$3"
-          theme="blue"
-        >
-          <div
-            alignitems="center"
-            space="$2"
-            style="display: flex; flex-direction: row;"
-          >
-            <span
-              color="white"
-              font-size="$4"
-              font-weight="600"
-            >
-              Sign in with Google
-            </span>
-          </div>
-        </button>
-        <span
-          color="$red10"
-          font-size="$2"
-        >
-          Configuring OAuth...
-        </span>
-      </div>
-    </div>
-  </div>
-</main>
-`;
-
 exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
-<div
-  style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
->
-  <main
-    style="padding: 0px;"
-  >
-    <div
-      style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-    >
+<div>
+  <div>
+    <div>
       <div
-        style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
+        alignitems="center"
+        space="$4"
       >
         <h1
-          style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
+          color="$color"
         >
-          Welcome to Fantasy Sports Hub!
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           
+          Legacy Sports
         </h1>
-        <p
-          style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-        >
-          Please sign in to access your fantasy leagues and stats
-        </p>
-        <div
-          alignitems="center"
-          space="$4"
-          style="display: flex; flex-direction: column;"
+      </div>
+      <div
+        display="none"
+      >
+        <a
+          href="/"
+          style="text-decoration: none;"
         >
           <button
-            backgroundcolor="$blue10"
-            borderradius="$4"
-            color="white"
-            disabled=""
-            opacity="0.6"
-            paddinghorizontal="$6"
-            paddingvertical="$3"
-            theme="blue"
+            variant="secondary"
           >
-            <div
-              alignitems="center"
-              space="$2"
-              style="display: flex; flex-direction: row;"
+            <span
+              aria-label="home"
+              role="img"
             >
-              <span
-                color="white"
-                font-size="$4"
-                font-weight="600"
-              >
-                Sign in with Google
-              </span>
-            </div>
+              🏠
+            </span>
+             
+            Home
           </button>
-          <span
-            color="$red10"
-            font-size="$2"
+        </a>
+        <a
+          href="/football"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="primary"
           >
-            Configuring OAuth...
-          </span>
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Football
+          </button>
+        </a>
+        <a
+          href="/baseball"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="baseball"
+              role="img"
+            >
+              ⚾
+            </span>
+             
+            Baseball
+          </button>
+        </a>
+        <a
+          href="/players"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="players"
+              role="img"
+            >
+              👤
+            </span>
+             
+            Players
+          </button>
+        </a>
+        <a
+          href="/players/stats"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="statistics"
+              role="img"
+            >
+              📊
+            </span>
+             
+            Player Stats
+          </button>
+        </a>
+      </div>
+      <div
+        alignitems="center"
+        space="$3"
+      >
+        <div>
+          User Profile Dropdown
         </div>
       </div>
     </div>
-  </main>
+  </div>
+  <div
+    flex="1"
+    padding="$4"
+  >
+    <div>
+      Football Screen
+    </div>
+  </div>
 </div>
 `;
 
-exports[`App FootballScreen should match football screen snapshot 1`] = `
-<main
-  style="padding: 0px;"
->
-  <div
-    style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-  >
-    <div
-      style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-    >
-      <h1
-        style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-      >
-        Welcome to Fantasy Sports Hub!
-      </h1>
-      <p
-        style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-      >
-        Please sign in to access your fantasy leagues and stats
-      </p>
-      <div
-        alignitems="center"
-        space="$4"
-        style="display: flex; flex-direction: column;"
-      >
-        <button
-          backgroundcolor="$blue10"
-          borderradius="$4"
-          color="white"
-          disabled=""
-          opacity="0.6"
-          paddinghorizontal="$6"
-          paddingvertical="$3"
-          theme="blue"
-        >
-          <div
-            alignitems="center"
-            space="$2"
-            style="display: flex; flex-direction: row;"
-          >
-            <span
-              color="white"
-              font-size="$4"
-              font-weight="600"
-            >
-              Sign in with Google
-            </span>
-          </div>
-        </button>
-        <span
-          color="$red10"
-          font-size="$2"
-        >
-          Configuring OAuth...
-        </span>
-      </div>
-    </div>
-  </div>
-</main>
-`;
+exports[`App FootballScreen should match football screen snapshot 1`] = `null`;
 
-exports[`App FootballScreen should render football screen when navigating to /football 1`] = `
-<main
-  style="padding: 0px;"
->
-  <div
-    style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-  >
-    <div
-      style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-    >
-      <h1
-        style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-      >
-        Welcome to Fantasy Sports Hub!
-      </h1>
-      <p
-        style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-      >
-        Please sign in to access your fantasy leagues and stats
-      </p>
-      <div
-        alignitems="center"
-        space="$4"
-        style="display: flex; flex-direction: column;"
-      >
-        <button
-          backgroundcolor="$blue10"
-          borderradius="$4"
-          color="white"
-          disabled=""
-          opacity="0.6"
-          paddinghorizontal="$6"
-          paddingvertical="$3"
-          theme="blue"
-        >
-          <div
-            alignitems="center"
-            space="$2"
-            style="display: flex; flex-direction: row;"
-          >
-            <span
-              color="white"
-              font-size="$4"
-              font-weight="600"
-            >
-              Sign in with Google
-            </span>
-          </div>
-        </button>
-        <span
-          color="$red10"
-          font-size="$2"
-        >
-          Configuring OAuth...
-        </span>
-      </div>
-    </div>
-  </div>
-</main>
-`;
-
-exports[`App FootballScreen should render football screen with navigation and layout 1`] = `
-<div
-  style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
->
-  <main
-    style="padding: 0px;"
-  >
-    <div
-      style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-    >
-      <div
-        style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-      >
-        <h1
-          style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-        >
-          Welcome to Fantasy Sports Hub!
-        </h1>
-        <p
-          style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-        >
-          Please sign in to access your fantasy leagues and stats
-        </p>
-        <div
-          alignitems="center"
-          space="$4"
-          style="display: flex; flex-direction: column;"
-        >
-          <button
-            backgroundcolor="$blue10"
-            borderradius="$4"
-            color="white"
-            disabled=""
-            opacity="0.6"
-            paddinghorizontal="$6"
-            paddingvertical="$3"
-            theme="blue"
-          >
-            <div
-              alignitems="center"
-              space="$2"
-              style="display: flex; flex-direction: row;"
-            >
-              <span
-                color="white"
-                font-size="$4"
-                font-weight="600"
-              >
-                Sign in with Google
-              </span>
-            </div>
-          </button>
-          <span
-            color="$red10"
-            font-size="$2"
-          >
-            Configuring OAuth...
-          </span>
-        </div>
-      </div>
-    </div>
-  </main>
-</div>
-`;
-
-exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `
-<main
-  style="padding: 0px;"
->
-  <div
-    style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-  >
-    <div
-      style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-    >
-      <h1
-        style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-      >
-        Welcome to Fantasy Sports Hub!
-      </h1>
-      <p
-        style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-      >
-        Please sign in to access your fantasy leagues and stats
-      </p>
-      <div
-        alignitems="center"
-        space="$4"
-        style="display: flex; flex-direction: column;"
-      >
-        <button
-          backgroundcolor="$blue10"
-          borderradius="$4"
-          color="white"
-          disabled=""
-          opacity="0.6"
-          paddinghorizontal="$6"
-          paddingvertical="$3"
-          theme="blue"
-        >
-          <div
-            alignitems="center"
-            space="$2"
-            style="display: flex; flex-direction: row;"
-          >
-            <span
-              color="white"
-              font-size="$4"
-              font-weight="600"
-            >
-              Sign in with Google
-            </span>
-          </div>
-        </button>
-        <span
-          color="$red10"
-          font-size="$2"
-        >
-          Configuring OAuth...
-        </span>
-      </div>
-    </div>
-  </div>
-</main>
-`;
+exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `null`;
 
 exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
-<div
-  style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
->
-  <main
-    style="padding: 0px;"
-  >
-    <div
-      style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-    >
+<div>
+  <div>
+    <div>
       <div
-        style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
+        alignitems="center"
+        space="$4"
       >
         <h1
-          style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
+          color="$color"
         >
-          Welcome to Fantasy Sports Hub!
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           
+          Legacy Sports
         </h1>
-        <p
-          style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-        >
-          Please sign in to access your fantasy leagues and stats
-        </p>
-        <div
-          alignitems="center"
-          space="$4"
-          style="display: flex; flex-direction: column;"
+      </div>
+      <div
+        display="none"
+      >
+        <a
+          href="/"
+          style="text-decoration: none;"
         >
           <button
-            backgroundcolor="$blue10"
-            borderradius="$4"
-            color="white"
-            disabled=""
-            opacity="0.6"
-            paddinghorizontal="$6"
-            paddingvertical="$3"
-            theme="blue"
+            variant="primary"
           >
-            <div
-              alignitems="center"
-              space="$2"
-              style="display: flex; flex-direction: row;"
+            <span
+              aria-label="home"
+              role="img"
             >
-              <span
-                color="white"
-                font-size="$4"
-                font-weight="600"
-              >
-                Sign in with Google
-              </span>
-            </div>
+              🏠
+            </span>
+             
+            Home
           </button>
-          <span
-            color="$red10"
-            font-size="$2"
+        </a>
+        <a
+          href="/football"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
           >
-            Configuring OAuth...
-          </span>
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Football
+          </button>
+        </a>
+        <a
+          href="/baseball"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="baseball"
+              role="img"
+            >
+              ⚾
+            </span>
+             
+            Baseball
+          </button>
+        </a>
+        <a
+          href="/players"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="players"
+              role="img"
+            >
+              👤
+            </span>
+             
+            Players
+          </button>
+        </a>
+        <a
+          href="/players/stats"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="statistics"
+              role="img"
+            >
+              📊
+            </span>
+             
+            Player Stats
+          </button>
+        </a>
+      </div>
+      <div
+        alignitems="center"
+        space="$3"
+      >
+        <div>
+          User Profile Dropdown
         </div>
       </div>
     </div>
-  </main>
+  </div>
+  <div
+    flex="1"
+    padding="$4"
+  >
+    <div>
+      Web Home Screen
+    </div>
+  </div>
 </div>
 `;
 
 exports[`App Navigation should match navigation snapshot 1`] = `null`;
 
 exports[`App Navigation should render navigation with correct links 1`] = `
-<div
-  style="min-height: 100vh; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
->
-  <main
-    style="padding: 0px;"
-  >
-    <div
-      style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-    >
-      <div
-        style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-      >
-        <h1
-          style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-        >
-          Welcome to Fantasy Sports Hub!
-        </h1>
-        <p
-          style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-        >
-          Please sign in to access your fantasy leagues and stats
-        </p>
-        <div
-          alignitems="center"
-          space="$4"
-          style="display: flex; flex-direction: column;"
-        >
-          <button
-            backgroundcolor="$blue10"
-            borderradius="$4"
-            color="white"
-            disabled=""
-            opacity="0.6"
-            paddinghorizontal="$6"
-            paddingvertical="$3"
-            theme="blue"
-          >
-            <div
-              alignitems="center"
-              space="$2"
-              style="display: flex; flex-direction: row;"
-            >
-              <span
-                color="white"
-                font-size="$4"
-                font-weight="600"
-              >
-                Sign in with Google
-              </span>
-            </div>
-          </button>
-          <span
-            color="$red10"
-            font-size="$2"
-          >
-            Configuring OAuth...
-          </span>
-        </div>
-      </div>
-    </div>
-  </main>
-</div>
-`;
-
-exports[`App should render homepage after loading completes 1`] = `
-<main
-  style="padding: 0px;"
->
-  <div
-    style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: rgb(30, 30, 30); color: rgb(255, 255, 255); font-family: system-ui, -apple-system, sans-serif;"
-  >
-    <div
-      style="max-width: 400px; width: 100%; padding: 2rem; background-color: rgb(42, 42, 42); border-radius: 8px; border: 1px solid #333;"
-    >
-      <h1
-        style="text-align: center; margin-bottom: 1rem; color: rgb(255, 255, 255); font-size: 2rem;"
-      >
-        Welcome to Fantasy Sports Hub!
-      </h1>
-      <p
-        style="text-align: center; margin-bottom: 2rem; color: rgb(204, 204, 204);"
-      >
-        Please sign in to access your fantasy leagues and stats
-      </p>
+<div>
+  <div>
+    <div>
       <div
         alignitems="center"
         space="$4"
-        style="display: flex; flex-direction: column;"
       >
-        <button
-          backgroundcolor="$blue10"
-          borderradius="$4"
-          color="white"
-          disabled=""
-          opacity="0.6"
-          paddinghorizontal="$6"
-          paddingvertical="$3"
-          theme="blue"
+        <h1
+          color="$color"
         >
-          <div
-            alignitems="center"
-            space="$2"
-            style="display: flex; flex-direction: row;"
+          <span
+            aria-label="football"
+            role="img"
+          >
+            🏈
+          </span>
+           
+          Legacy Sports
+        </h1>
+      </div>
+      <div
+        display="none"
+      >
+        <a
+          href="/"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="primary"
           >
             <span
-              color="white"
-              font-size="$4"
-              font-weight="600"
+              aria-label="home"
+              role="img"
             >
-              Sign in with Google
+              🏠
             </span>
-          </div>
-        </button>
-        <span
-          color="$red10"
-          font-size="$2"
+             
+            Home
+          </button>
+        </a>
+        <a
+          href="/football"
+          style="text-decoration: none;"
         >
-          Configuring OAuth...
-        </span>
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Football
+          </button>
+        </a>
+        <a
+          href="/baseball"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="baseball"
+              role="img"
+            >
+              ⚾
+            </span>
+             
+            Baseball
+          </button>
+        </a>
+        <a
+          href="/players"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="players"
+              role="img"
+            >
+              👤
+            </span>
+             
+            Players
+          </button>
+        </a>
+        <a
+          href="/players/stats"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="statistics"
+              role="img"
+            >
+              📊
+            </span>
+             
+            Player Stats
+          </button>
+        </a>
+      </div>
+      <div
+        alignitems="center"
+        space="$3"
+      >
+        <div>
+          User Profile Dropdown
+        </div>
       </div>
     </div>
   </div>
-</main>
+  <div
+    flex="1"
+    padding="$4"
+  >
+    <div>
+      Web Home Screen
+    </div>
+  </div>
+</div>
 `;

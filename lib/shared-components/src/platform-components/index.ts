@@ -69,5 +69,4 @@ export const {
   // Platform-specific components
   Icon,
   Table,
-  SecureStorage,
 } = validatePlatformExports(platformComponents);

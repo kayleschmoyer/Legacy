@@ -1,4 +1,181 @@
 {
   "role": "WebArea",
-  "name": "Web"
+  "name": "Web",
+  "children": [
+    {
+      "role": "image",
+      "name": "football"
+    },
+    {
+      "role": "text",
+      "name": "LEGACY SPORTS"
+    },
+    {
+      "role": "link",
+      "name": "",
+      "children": [
+        {
+          "role": "button",
+          "name": "home Home"
+        }
+      ]
+    },
+    {
+      "role": "link",
+      "name": "",
+      "children": [
+        {
+          "role": "button",
+          "name": "football Football"
+        }
+      ]
+    },
+    {
+      "role": "link",
+      "name": "",
+      "children": [
+        {
+          "role": "button",
+          "name": "baseball Baseball"
+        }
+      ]
+    },
+    {
+      "role": "link",
+      "name": "",
+      "children": [
+        {
+          "role": "button",
+          "name": "players Players"
+        }
+      ]
+    },
+    {
+      "role": "link",
+      "name": "",
+      "children": [
+        {
+          "role": "button",
+          "name": "statistics Player Stats"
+        }
+      ]
+    },
+    {
+      "role": "image",
+      "name": "football"
+    },
+    {
+      "role": "text",
+      "name": "Legacy Sports Hub"
+    },
+    {
+      "role": "text",
+      "name": "Your complete fantasy sports management platform"
+    },
+    {
+      "role": "heading",
+      "name": "Quick Actions",
+      "level": 2
+    },
+    {
+      "role": "button",
+      "name": "lightning Quick Draft"
+    },
+    {
+      "role": "button",
+      "name": "people Manage Teams"
+    },
+    {
+      "role": "button",
+      "name": "chart Player Stats"
+    },
+    {
+      "role": "heading",
+      "name": "Choose Your Sport",
+      "level": 2
+    },
+    {
+      "role": "heading",
+      "name": "Football",
+      "level": 3
+    },
+    {
+      "role": "image",
+      "name": "football"
+    },
+    {
+      "role": "button",
+      "name": "Enter Football"
+    },
+    {
+      "role": "heading",
+      "name": "Baseball",
+      "level": 3
+    },
+    {
+      "role": "image",
+      "name": "baseball"
+    },
+    {
+      "role": "button",
+      "name": "Enter Baseball"
+    },
+    {
+      "role": "heading",
+      "name": "Basketball",
+      "level": 3
+    },
+    {
+      "role": "image",
+      "name": "basketball"
+    },
+    {
+      "role": "button",
+      "name": "Coming Soon"
+    },
+    {
+      "role": "heading",
+      "name": "Platform Features",
+      "level": 2
+    },
+    {
+      "role": "image",
+      "name": "trending up"
+    },
+    {
+      "role": "heading",
+      "name": "PLAYER STATS",
+      "level": 2
+    },
+    {
+      "role": "text",
+      "name": "Comprehensive player statistics and analytics"
+    },
+    {
+      "role": "image",
+      "name": "trophy"
+    },
+    {
+      "role": "heading",
+      "name": "DRAFT TOOLS",
+      "level": 2
+    },
+    {
+      "role": "text",
+      "name": "Advanced draft boards and team management"
+    },
+    {
+      "role": "image",
+      "name": "lightning bolt"
+    },
+    {
+      "role": "heading",
+      "name": "REAL-TIME DATA",
+      "level": 2
+    },
+    {
+      "role": "text",
+      "name": "Live updates and real-time statistics"
+    }
+  ]
 }

@@ -2,27 +2,15 @@ import React from 'react';
 import { Text } from 'react-native';
 import type { IconProps } from './LazyIcon';
 import { safeStyle } from '../../utils/styles';
-
-// Logger setup with fallback
-let LOGGER: {
-  info: (...args: unknown[]) => void;
-} = {
-  // Default fallback implementations
-  info: (...args: unknown[]) => {
-    // eslint-disable-next-line no-console
-    console.info(...args);
-  },
+// Simple logger fallback for Icons
+const LOGGER = {
+  debug: (message: string, ...args: unknown[]) =>
+    console.debug(message, ...args),
+  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
+  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    console.error(message, ...args),
 };
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const logging = require('@legacy-sports/logging') as {
-    LOGGER: typeof LOGGER;
-  };
-  LOGGER = logging.LOGGER;
-} catch {
-  // Fallback for test environment
-}
 
 // Native icon implementation with fallback
 const NativeIcons: React.FC<IconProps> = ({

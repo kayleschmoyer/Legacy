@@ -1,0 +1,95 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+    - generic [ref=e8]:
+        - heading "football Legacy Sports" [level=1] [ref=e10]:
+            - img "football" [ref=e11]: 🏈
+            - text: Legacy Sports
+        - generic [ref=e12]:
+            - link "home Home" [ref=e13] [cursor=pointer]:
+                - /url: http://localhost:4200/players/stats#/
+                - button "home Home" [ref=e15] [cursor=pointer]:
+                    - img "home" [ref=e16] [cursor=pointer]: 🏠
+                    - generic [ref=e17] [cursor=pointer]: Home
+            - link "football Football" [ref=e18] [cursor=pointer]:
+                - /url: http://localhost:4200/players/stats#/football
+                - button "football Football" [ref=e20] [cursor=pointer]:
+                    - img "football" [ref=e21] [cursor=pointer]: 🏈
+                    - generic [ref=e22] [cursor=pointer]: Football
+            - link "baseball Baseball" [ref=e23] [cursor=pointer]:
+                - /url: http://localhost:4200/players/stats#/baseball
+                - button "baseball Baseball" [ref=e25] [cursor=pointer]:
+                    - img "baseball" [ref=e26] [cursor=pointer]: ⚾
+                    - generic [ref=e27] [cursor=pointer]: Baseball
+            - link "players Players" [ref=e28] [cursor=pointer]:
+                - /url: http://localhost:4200/players/stats#/players
+                - button "players Players" [ref=e30] [cursor=pointer]:
+                    - img "players" [ref=e31] [cursor=pointer]: 👤
+                    - generic [ref=e32] [cursor=pointer]: Players
+            - link "statistics Player Stats" [ref=e33] [cursor=pointer]:
+                - /url: http://localhost:4200/players/stats#/players/stats
+                - button "statistics Player Stats" [ref=e35] [cursor=pointer]:
+                    - img "statistics" [ref=e36] [cursor=pointer]: 📊
+                    - generic [ref=e37] [cursor=pointer]: Player Stats
+    - generic [ref=e42]:
+        - generic [ref=e43]:
+            - heading "football Legacy Sports Hub" [level=1] [ref=e44]:
+                - img "football" [ref=e45]: 🏈
+                - text: Legacy Sports Hub
+            - paragraph [ref=e46]: Your complete fantasy sports management platform
+        - generic [ref=e47]:
+            - heading "Quick Actions" [level=2] [ref=e48]
+            - generic [ref=e49]:
+                - button "lightning Quick Draft" [ref=e51] [cursor=pointer]:
+                    - img "lightning" [ref=e52] [cursor=pointer]: ⚡
+                    - generic [ref=e53] [cursor=pointer]: Quick Draft
+                - button "people Manage Teams" [ref=e55] [cursor=pointer]:
+                    - img "people" [ref=e56] [cursor=pointer]: 👥
+                    - generic [ref=e57] [cursor=pointer]: Manage Teams
+                - button "chart Player Stats" [ref=e59] [cursor=pointer]:
+                    - img "chart" [ref=e60] [cursor=pointer]: 📊
+                    - generic [ref=e61] [cursor=pointer]: Player Stats
+        - generic [ref=e62]:
+            - heading "Choose Your Sport" [level=2] [ref=e63]
+            - generic [ref=e64]:
+                - generic [ref=e66]:
+                    - heading "Football" [level=3] [ref=e68]
+                    - generic [ref=e70]:
+                        - paragraph [ref=e71]:
+                            - img "football" [ref=e72]: 🏈
+                        - button "Enter Football" [ref=e74] [cursor=pointer]:
+                            - generic [ref=e75] [cursor=pointer]: Enter Football
+                - generic [ref=e77]:
+                    - heading "Baseball" [level=3] [ref=e79]
+                    - generic [ref=e81]:
+                        - paragraph [ref=e82]:
+                            - img "baseball" [ref=e83]: ⚾
+                        - button "Enter Baseball" [ref=e85] [cursor=pointer]:
+                            - generic [ref=e86] [cursor=pointer]: Enter Baseball
+                - generic [ref=e88]:
+                    - heading "Basketball" [level=3] [ref=e90]
+                    - generic [ref=e92]:
+                        - paragraph [ref=e93]:
+                            - img "basketball" [ref=e94]: 🏀
+                        - button "Coming Soon" [ref=e96] [cursor=pointer]:
+                            - generic [ref=e97] [cursor=pointer]: Coming Soon
+        - generic [ref=e98]:
+            - heading "Platform Features" [level=2] [ref=e99]
+            - generic [ref=e100]:
+                - generic [ref=e101]:
+                    - paragraph [ref=e102]:
+                        - img "trending up" [ref=e103]: 📈
+                    - heading "Player Stats" [level=2] [ref=e104]
+                    - paragraph [ref=e105]: Comprehensive player statistics and analytics
+                - generic [ref=e106]:
+                    - paragraph [ref=e107]:
+                        - img "trophy" [ref=e108]: 🏆
+                    - heading "Draft Tools" [level=2] [ref=e109]
+                    - paragraph [ref=e110]: Advanced draft boards and team management
+                - generic [ref=e111]:
+                    - paragraph [ref=e112]:
+                        - img "lightning bolt" [ref=e113]: ⚡
+                    - heading "Real-time Data" [level=2] [ref=e114]
+                    - paragraph [ref=e115]: Live updates and real-time statistics
+```

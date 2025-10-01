@@ -275,10 +275,28 @@ describe('CareerStatsService - React Hooks', () => {
     });
 
     test('should calculate pagination metadata correctly', async () => {
+      const paginationMock: MockedResponse = {
+        request: {
+          query: CAREER_BATTING_STATS_QUERY,
+          variables: {
+            ...DEFAULT_CAREER_STATS_PARAMS,
+            limit: 25,
+            offset: 50,
+          },
+        },
+        result: {
+          data: {
+            careerBattingStats: [mockRawPlayerStats],
+          },
+        },
+      };
+
       const { result } = renderHook(
         () => useCareerStatsService({ limit: 25, offset: 50 }),
         {
-          wrapper: ({ children }) => <TestWrapper>{children}</TestWrapper>,
+          wrapper: ({ children }) => (
+            <TestWrapper mocks={[paginationMock]}>{children}</TestWrapper>
+          ),
         },
       );
 

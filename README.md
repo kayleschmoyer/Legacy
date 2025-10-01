@@ -127,6 +127,40 @@ legacy-sports/
 - **Tools**: NX Monorepo, TypeScript, GraphQL
 - **CI/CD**: GitHub Actions, Terraform
 
+### Cross-Platform Architecture
+
+Legacy Sports uses a **hybrid platform resolution system** that combines the best of both worlds:
+
+#### 🎯 **Magic String System** (Complex UI Components)
+
+- **Used for**: Icons, Tables, OAuth Providers, Complex React Components
+- **Benefits**: Build-time optimization, strong type contracts, dead code elimination
+- **Files**: `lib/shared-components/src/platform-components/`
+
+```typescript
+// Resolved at build time to platform-specific implementations
+import { Icon, Table, OAuthProvider } from '@legacy-sports/shared-components';
+
+<Icon name="search" size={24} />
+<Table headers={headers} data={data} />
+```
+
+#### 📱 **Metro Native Resolution** (Simple Utilities)
+
+- **Used for**: DbOptions, AwsSecrets, SecureStorage, Configuration
+- **Benefits**: Native Metro support, simple developer experience, CI reliability
+- **Pattern**: `.native.ts` files automatically resolved by Metro bundler
+
+```typescript
+// Metro automatically picks .native.ts for React Native, .ts for web
+import { SecureStorage, getDbOptions } from '@legacy-sports/shared-components';
+
+await SecureStorage.setItem('key', 'value');
+const options = getDbOptions();
+```
+
+**📚 Learn More**: [Hybrid Platform Resolution Guide](./docs/HYBRID_PLATFORM_RESOLUTION_GUIDE.md)
+
 ## 🔧 Configuration
 
 ### Environment Variables

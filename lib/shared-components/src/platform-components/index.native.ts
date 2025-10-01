@@ -1,9 +1,9 @@
 /**
  * React Native specific platform components index
- * 
+ *
  * This file bypasses the __PLATFORM_COMPONENTS__ magic string resolution
  * which can cause issues in Metro bundler CI environments.
- * 
+ *
  * For React Native builds, we directly import mobile components.
  */
 
@@ -36,5 +36,4 @@ export const {
   // Platform-specific components
   Icon,
   Table,
-  SecureStorage,
 } = mobileComponents;

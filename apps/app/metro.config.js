@@ -24,7 +24,12 @@ const customConfig = {
   },
   resolver: {
     assetExts: defaultConfig.resolver.assetExts.filter((ext) => ext !== 'svg'),
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'svg', 'native.ts', 'native.tsx'],
+    sourceExts: [
+      ...defaultConfig.resolver.sourceExts,
+      'svg',
+      'native.ts',
+      'native.tsx',
+    ],
     blockList: exclusionList([/^.*\.test\.tsx?$/]),
     nodeModulesPaths: [
       path.resolve(__dirname, '../../node_modules'),

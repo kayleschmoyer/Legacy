@@ -1,6 +1,5 @@
 // Platform-specific web components
 import { webOAuthProvider } from './WebOAuthProvider';
-import { webSecureStorage } from './WebSecureStorage';
 import IconsComponent from './Icons';
 import {
   ActivityIndicator,
@@ -26,6 +25,7 @@ import {
   Vibration,
   View,
 } from './ReactNativeEquivalents';
+import { SecureStorage } from '../../utils/SecureStorage';
 import { validatePlatformExports } from '../types/platform-exports';
 
 // Export shared types (identical across all platforms)
@@ -35,7 +35,7 @@ export * from '../types';
 const MODULE_EXPORTS = validatePlatformExports({
   // ===== PLATFORM-SPECIFIC IMPLEMENTATIONS =====
   OAuthProvider: webOAuthProvider,
-  SecureStorageProvider: webSecureStorage,
+  SecureStorageProvider: new SecureStorage(),
 
   // ===== REACT NATIVE COMPONENTS (NO TAMAGUI EQUIVALENT) =====
   ActivityIndicator,
@@ -67,7 +67,6 @@ const MODULE_EXPORTS = validatePlatformExports({
   // ===== PLATFORM-SPECIFIC COMPONENTS =====
   Icon: IconsComponent,
   Table,
-  SecureStorage: webSecureStorage,
 });
 
 // Export the entire validated module as a default export

@@ -47,9 +47,7 @@ const NavLinks = styled(XStack, {
   justifyContent: 'center',
 });
 
-const NavLink = styled(Link, {
-  textDecoration: 'none',
-});
+// Note: Using regular Link instead of styled to avoid "Functions are not valid as a React child" error
 
 function Navigation() {
   const location = useLocation();
@@ -69,7 +67,7 @@ function Navigation() {
 
         {/* Center Navigation Links */}
         <NavLinks display="none" $gtMd={{ display: 'flex' }}>
-          <NavLink to="/">
+          <Link to="/" style={{ textDecoration: 'none' }}>
             <Button
               variant={location.pathname === '/' ? 'primary' : 'secondary'}
               size="$3"
@@ -79,8 +77,8 @@ function Navigation() {
               </span>{' '}
               Home
             </Button>
-          </NavLink>
-          <NavLink to="/football">
+          </Link>
+          <Link to="/football" style={{ textDecoration: 'none' }}>
             <Button
               variant={
                 location.pathname === '/football' ? 'primary' : 'secondary'
@@ -92,8 +90,8 @@ function Navigation() {
               </span>{' '}
               Football
             </Button>
-          </NavLink>
-          <NavLink to="/baseball">
+          </Link>
+          <Link to="/baseball" style={{ textDecoration: 'none' }}>
             <Button
               variant={
                 location.pathname === '/baseball' ? 'primary' : 'secondary'
@@ -105,8 +103,8 @@ function Navigation() {
               </span>{' '}
               Baseball
             </Button>
-          </NavLink>
-          <NavLink to="/players">
+          </Link>
+          <Link to="/players" style={{ textDecoration: 'none' }}>
             <Button
               variant={
                 location.pathname === '/players' ? 'primary' : 'secondary'
@@ -118,8 +116,8 @@ function Navigation() {
               </span>{' '}
               Players
             </Button>
-          </NavLink>
-          <NavLink to="/players/stats">
+          </Link>
+          <Link to="/players/stats" style={{ textDecoration: 'none' }}>
             <Button
               variant={
                 location.pathname === '/players/stats' ? 'primary' : 'secondary'
@@ -131,7 +129,7 @@ function Navigation() {
               </span>{' '}
               Player Stats
             </Button>
-          </NavLink>
+          </Link>
         </NavLinks>
 
         {/* User Profile Section */}
