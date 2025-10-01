@@ -36,6 +36,10 @@ concurrency:
 
 env:
   JAVA_VERSION: "17"
+  # Build optimization environment variables
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m"
+  GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+  NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
   setup:
@@ -99,6 +103,18 @@ jobs:
           distribution: "temurin"
           java-version: ${{ env.JAVA_VERSION }}
 
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            apps/app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json', 'apps/app/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+            ${{ runner.os }}-node-
+
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps
 
@@ -108,20 +124,111 @@ jobs:
           main-branch-name: "main"
           error-on-no-successful-workflow: false
 
-      - name: Cache Gradle
+      - name: Cache Gradle Wrapper
         uses: actions/cache@v4
         with:
           path: |
-            ~/.gradle/caches
             ~/.gradle/wrapper
-            apps/app/android/.gradle
-            apps/app/android/app/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
+            apps/app/android/gradle/wrapper
+          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-wrapper-
+
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/jars-9
+            ~/.gradle/caches/transforms-3
+            ~/.gradle/caches/kotlin-dsl
+            ~/.gradle/kotlin
+          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('apps/app/android/app/build.gradle', 'apps/app/android/build.gradle', 'apps/app/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-deps-${{ hashFiles('apps/app/android/app/build.gradle', 'apps/app/android/build.gradle') }}
+            ${{ runner.os }}-gradle-deps-
+
+      - name: Cache Kotlin Compilation
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+            ~/.gradle/caches/kotlin-*
+            apps/app/android/build/kotlin
+            apps/app/android/app/build/kotlin
+          key: ${{ runner.os }}-kotlin-${{ hashFiles('apps/app/android/**/*.kt', 'apps/app/android/**/*.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-kotlin-
+
+      - name: Cache Android SDK Components
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/sdk
+            /usr/local/lib/android/sdk
+          key: ${{ runner.os }}-android-sdk-${{ env.JAVA_VERSION }}-${{ hashFiles('apps/app/android/app/build.gradle') }}
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-${{ env.JAVA_VERSION }}-
+            ${{ runner.os }}-android-sdk-
+
+      - name: Cache React Native Metro
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.metro
+            apps/app/node_modules/.cache/metro
+            /tmp/metro-*
+            /tmp/haste-map-*
+          key: ${{ runner.os }}-metro-${{ hashFiles('apps/app/package.json', 'apps/app/metro.config.js') }}
+          restore-keys: |
+            ${{ runner.os }}-metro-
+
+      - name: Cache Hermes Compiler
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hermes
+            /tmp/hermes-*
+            apps/app/android/app/build/generated/assets/createBundle*/
+            apps/app/android/app/build/intermediates/merged_assets/
+          key: ${{ runner.os }}-hermes-${{ hashFiles('apps/app/**/*.js', 'apps/app/**/*.jsx', 'apps/app/**/*.ts', 'apps/app/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-hermes-
+
+      - name: Cache Gradle Build Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/build-cache-*
+            ~/.android/build-cache
+            apps/app/android/.gradle/buildOutputCleanup
+            apps/app/android/build
+            apps/app/android/app/build/intermediates
+          key: ${{ runner.os }}-gradle-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-build-${{ github.ref_name }}-
+            ${{ runner.os }}-gradle-build-
+
+      - name: Pre-warm Gradle & Verify Caches
+        timeout-minutes: 3
+        run: |
+          cd apps/app/android
+          chmod +x gradlew
+
+          # Check cache effectiveness
+          echo "📊 Checking cache status..."
+          ls -la ~/.gradle/caches/ 2>/dev/null | head -5 || echo "No Gradle cache found"
+          ls -la ~/.gradle/wrapper/ 2>/dev/null || echo "No Gradle wrapper cache found"
+
+          # Pre-download dependencies and warm up Gradle (faster with caching)
+          echo "🔄 Pre-warming Gradle dependencies..."
+          ./gradlew --no-daemon dependencies --quiet || true
+          
+          # Verify build cache is working
+          echo "✅ Gradle pre-warming completed"
 
       - name: Generate React Native Bundle
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           cd apps/app
 
@@ -129,26 +236,51 @@ jobs:
           mkdir -p android/app/src/main/assets
           mkdir -p android/app/src/main/res
 
-          # Generate bundle with timeout protection
-          timeout 180s npx react-native bundle \
+          # Check Metro cache status
+          echo "📊 Checking Metro cache status..."
+          ls -la ~/.metro/ 2>/dev/null || echo "No Metro cache found"
+          ls -la node_modules/.cache/metro/ 2>/dev/null || echo "No Metro node_modules cache found"
+
+          # Set environment optimizations for bundling with cache utilization
+          export REACT_NATIVE_PACKAGER_CACHE_DISABLED=false
+          export RCT_METRO_PORT=8082
+
+          # Generate bundle with optimizations for CI and cache utilization
+          echo "📦 Generating React Native bundle for Android (with caching)..."
+          npx react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res/ \
-            --reset-cache || {
-            echo "Bundle generation timed out or failed, trying without reset-cache..."
+            --minify true \
+            --verbose || {
+            echo "⚠️ Bundle generation failed, trying with reset-cache..."
             npx react-native bundle \
               --platform android \
               --dev false \
               --entry-file index.js \
               --bundle-output android/app/src/main/assets/index.android.bundle \
-              --assets-dest android/app/src/main/res/
+              --assets-dest android/app/src/main/res/ \
+              --minify true \
+              --reset-cache
           }
+
+          # Verify bundle was created and show cache effectiveness
+          if [ -f "android/app/src/main/assets/index.android.bundle" ]; then
+            BUNDLE_SIZE=$(du -h android/app/src/main/assets/index.android.bundle | cut -f1)
+            echo "✅ Bundle generated successfully: $BUNDLE_SIZE"
+            
+            # Check if Hermes cache is being used
+            ls -la android/app/build/generated/assets/ 2>/dev/null | head -3 || echo "No Hermes assets cache"
+          else
+            echo "❌ Bundle generation failed"
+            exit 1
+          fi
 
       - name: Build Android APK
         id: build
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           cd apps/app/android
 
@@ -161,18 +293,42 @@ jobs:
           # Use CI-optimized Gradle properties
           cp gradle-ci.properties gradle.properties
 
+          # Configure build optimizations with cache awareness
+          export _JAVA_OPTIONS="-Xmx4096m"
+
+          # Check cache effectiveness before build
+          echo "📊 Cache Status Summary:"
+          echo "  Gradle Wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) items"
+          echo "  Gradle Dependencies: $(ls ~/.gradle/caches/modules-2/ 2>/dev/null | wc -l) items"
+          echo "  Kotlin Cache: $(ls ~/.gradle/kotlin/ 2>/dev/null | wc -l) items"
+          echo "  Build Cache: $(ls ~/.gradle/caches/build-cache-* 2>/dev/null | wc -l) items"
+
           # Determine build type
           BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
 
+          # Common Gradle flags for CI optimization with aggressive caching
+          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache --configuration-cache-problems=warn --no-scan --info"
+
+          # Start build with timing
+          echo "🏗️  Starting Android $BUILD_TYPE build at $(date)"
+          BUILD_START_TIME=$(date +%s)
+
           if [ "$BUILD_TYPE" == "release" ]; then
-            ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --no-build-cache
+            echo "📦 Building Release APK..."
+            ./gradlew assembleRelease $GRADLE_FLAGS
             APK_PATH="app/build/outputs/apk/release/app-release.apk"
             APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}.apk"
           else
-            ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --no-build-cache
+            echo "🔧 Building Debug APK..."
+            ./gradlew assembleDebug $GRADLE_FLAGS
             APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
             APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}-debug.apk"
           fi
+
+          # Calculate build time
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+          echo "⏱️  Build completed in ${BUILD_DURATION} seconds"
 
           # Verify APK was created
           if [ ! -f "$APK_PATH" ]; then
@@ -187,6 +343,25 @@ jobs:
 
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Cache Cleanup & Optimization
+        if: always()
+        run: |
+          echo "🧹 Cleaning up cache for optimal performance..."
+          
+          # Remove large temporary files but keep useful caches
+          find ~/.gradle/caches -name "*.lock" -delete 2>/dev/null || true
+          find ~/.gradle/caches -name "gc.properties" -delete 2>/dev/null || true
+          
+          # Clean up old build outputs but preserve dependencies
+          rm -rf apps/app/android/build/intermediates/incremental 2>/dev/null || true
+          rm -rf apps/app/android/app/build/intermediates/incremental 2>/dev/null || true
+          
+          # Show final cache sizes
+          echo "📊 Final Cache Summary:"
+          du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Not found"
+          du -sh ~/.gradle/wrapper 2>/dev/null || echo "  Gradle wrapper: Not found"
+          du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Not found"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
