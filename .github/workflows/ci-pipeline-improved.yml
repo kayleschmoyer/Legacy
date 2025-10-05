@@ -1153,7 +1153,7 @@ jobs:
   # ======================================================================
 
   ios-build:
-    name: "iOS Build${{ env.IOS_BUILDS_ENABLED == 'true' && '' || ' (DISABLED)' }}"
+    name: "iOS Build"
     runs-on: macos-latest
     needs: [ci-pipeline]
     if: needs.ci-pipeline.outputs.ios-affected == 'true' && needs.ci-pipeline.result == 'success'
