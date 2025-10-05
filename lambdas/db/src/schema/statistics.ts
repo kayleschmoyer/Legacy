@@ -470,6 +470,8 @@ builder.queryField('careerBattingStats', (t) =>
       minGames: t.arg.int({ required: false }),
       minHomeRuns: t.arg.int({ required: false }),
       minRBI: t.arg.int({ required: false }),
+      minBattingAvg: t.arg.float({ required: false }),
+      searchTerm: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       return dbService.statistics.getCareerBattingStats({
@@ -481,6 +483,8 @@ builder.queryField('careerBattingStats', (t) =>
           minGames: args.minGames || undefined,
           minHomeRuns: args.minHomeRuns || undefined,
           minRBI: args.minRBI || undefined,
+          minBattingAvg: args.minBattingAvg || undefined,
+          searchTerm: args.searchTerm || undefined,
         },
       });
     },

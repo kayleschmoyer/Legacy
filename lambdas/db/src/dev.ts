@@ -56,9 +56,35 @@ async function startServer() {
   // Start the standalone server
   const { url } = await startStandaloneServer(server, {
     listen: { port: PORT },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    context: async () => {
-      return {};
+    context: async ({ req }) => {
+      // Extract JWT from Authorization header
+      const authorization = req.headers.authorization;
+      let user = null;
+
+      if (authorization && authorization.startsWith('Bearer ')) {
+        try {
+          const token = authorization.substring(7); // Remove 'Bearer ' prefix
+          
+          // Decode JWT payload (simple base64 decode - no signature verification for dev)
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(
+              Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+            );
+            
+            user = {
+              id: payload.id,
+              email: payload.email,
+              username: payload.username,
+              isAdmin: payload.isAdmin || false,
+            };
+          }
+        } catch (error) {
+          LOGGER.warn(`Failed to decode JWT: ${error}`);
+        }
+      }
+
+      return { user };
     },
   });
 

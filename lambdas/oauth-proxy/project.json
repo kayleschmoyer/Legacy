@@ -32,7 +32,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "../../scripts/deploy-lambda.ps1 oauth-proxy",
+        "command": "../../scripts/deploy-lambda.ps1 -FunctionName oauth-proxy",
         "cwd": "lambdas/oauth-proxy"
       }
     },

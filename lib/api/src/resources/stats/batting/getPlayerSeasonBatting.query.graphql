@@ -8,7 +8,8 @@ query GetPlayerSeasonBatting(
     ...SeasonBatting
     player {
       id
-      name
+      firstName
+      lastName
       brefId
     }
   }

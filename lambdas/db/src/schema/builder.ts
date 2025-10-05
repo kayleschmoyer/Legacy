@@ -5,8 +5,19 @@ import { getDbOptions } from '@legacy-sports/utils';
 // Initialize database service
 createDatabaseService(getDbOptions());
 
+// Define context type for GraphQL resolvers
+export interface Context {
+  user?: {
+    id: number;
+    email?: string | null;
+    username?: string | null;
+    isAdmin?: boolean;
+  } | null;
+}
+
 // Define the schema builder with comprehensive types
 export const builder = new SchemaBuilder<{
+  Context: Context;
   Objects: {
     User: {
       id: number;
@@ -95,6 +106,16 @@ builder.queryType({
   fields: (t) => ({
     hello: t.string({
       resolve: () => 'Hello from Pothos + Drizzle!',
+    }),
+  }),
+});
+
+// Create the basic Mutation type (mutations will be added by separate files)
+builder.mutationType({
+  fields: (t) => ({
+    // This is just a placeholder - actual mutations are added in separate files
+    _placeholder: t.boolean({
+      resolve: () => true,
     }),
   }),
 });

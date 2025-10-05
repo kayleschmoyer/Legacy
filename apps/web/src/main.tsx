@@ -21,7 +21,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';
-import App from './app/app';
+import { default as App } from './app/app';
 
 // Create secure OAuth configuration (single-lambda architecture)
 const authConfig: OAuthConfig = {

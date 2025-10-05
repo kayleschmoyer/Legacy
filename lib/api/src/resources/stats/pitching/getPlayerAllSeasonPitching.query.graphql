@@ -2,7 +2,8 @@
 query GetPlayerAllSeasonPitching($playerId: Int!) {
   player(id: $playerId) {
     id
-    name
+    firstName
+    lastName
     brefId
     seasonPitchings {
       nodes {

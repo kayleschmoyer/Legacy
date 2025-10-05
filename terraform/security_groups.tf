@@ -59,7 +59,7 @@ resource "aws_security_group_rule" "rds_from_proxy" {
 # CLI Development Access - Direct RDS connection for development tools
 resource "aws_security_group_rule" "rds_from_cli_dev" {
   count = var.environment == "dev" && length(var.allowed_public_ips) > 0 ? 1 : 0
-  
+
   type              = "ingress"
   from_port         = 5432
   to_port           = 5432

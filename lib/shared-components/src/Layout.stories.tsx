@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { XStack, YStack } from 'tamagui';
+import { XStack, YStack, Text } from 'tamagui';
 import { Card, Paragraph, Separator } from './Layout';
 import { Button } from './Button';
 
@@ -58,7 +58,7 @@ export const CardWithTitleAndSubtitle: CardStory = {
         <Paragraph>
           This card demonstrates both title and subtitle functionality.
         </Paragraph>
-        <Button onPress={fn()}>Action Button</Button>
+        <Button onPress={fn()}><Text>Action Button</Text></Button>
       </YStack>
     ),
   },

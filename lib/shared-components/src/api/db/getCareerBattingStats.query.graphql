@@ -9,6 +9,8 @@ query GetCareerBattingStats(
   $minGames: Int
   $minHomeRuns: Int
   $minRBI: Int
+  $minBattingAvg: Float
+  $searchTerm: String
 ) {
   careerBattingStats(
     limit: $limit
@@ -18,6 +20,8 @@ query GetCareerBattingStats(
     minGames: $minGames
     minHomeRuns: $minHomeRuns
     minRBI: $minRBI
+    minBattingAvg: $minBattingAvg
+    searchTerm: $searchTerm
   ) {
     ...CareerBatting
   }

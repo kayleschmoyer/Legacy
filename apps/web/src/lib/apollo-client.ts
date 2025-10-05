@@ -1,17 +1,34 @@
-import { ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
+import { ApolloClient, createHttpLink, InMemoryCache, from } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
+import { env } from '../config/environment';
 
-// GraphQL endpoint URL - can be overridden with environment variable
-const GRAPHQL_URL =
-  process.env.REACT_APP_GRAPHQL_HOST ||
-  process.env.VITE_GRAPHQL_HOST ||
-  'http://localhost:5000/graphql';
+// GraphQL endpoint URL from centralized environment config
+const GRAPHQL_URL = env.graphqlUrl;
+
+// Debug logging to check what URL is being used
+console.log('🔗 Apollo Client Configuration:');
+console.log('GraphQL URL from env config:', GRAPHQL_URL);
 
 const httpLink = createHttpLink({
   uri: (operation) => `${GRAPHQL_URL}?ref=${operation.operationName}`,
 });
 
+// Authentication link to add JWT token to requests
+const authLink = setContext((_, { headers }) => {
+  // Get the authentication token from local storage if it exists
+  const token = localStorage.getItem('auth_jwt');
+  
+  // Return the headers to the context so httpLink can read them
+  return {
+    headers: {
+      ...headers,
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    }
+  };
+});
+
 export const apolloClient = new ApolloClient({
-  link: httpLink,
+  link: from([authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {

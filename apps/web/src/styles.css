@@ -31,3 +31,127 @@ body {
   background-color: inherit;
   color: inherit;
 }
+
+/* Glassmorphism support and browser compatibility */
+.glassmorphism {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+/* Ensure backdrop-filter works properly */
+@supports (backdrop-filter: blur(1px)) {
+  .glassmorphism-card {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glassmorphism-card {
+    background: rgba(15, 15, 35, 0.85) !important;
+  }
+}
+
+/* Animation keyframes for league cards */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 165, 0, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 165, 0, 0.4);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes holographicShimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes holographicMove {
+  0%, 100% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translateX(5px) translateY(-3px) rotate(1deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateX(-3px) translateY(5px) rotate(-1deg);
+    opacity: 0.7;
+  }
+  75% {
+    transform: translateX(7px) translateY(2px) rotate(0.5deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes rotateSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes holographicText {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Fallback styles for league cards if CSS modules don't work */
+.league-card-fallback {
+  background: linear-gradient(135deg, 
+    rgba(15, 15, 35, 0.8) 0%, 
+    rgba(26, 26, 46, 0.7) 25%, 
+    rgba(22, 33, 62, 0.8) 50%, 
+    rgba(30, 30, 63, 0.7) 75%, 
+    rgba(42, 42, 74, 0.8) 100%
+  ) !important;
+  border: 1px solid rgba(255, 165, 0, 0.4) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  animation: slideInUp 0.6s ease-out forwards !important;
+  opacity: 0;
+  transform: translateY(20px);
+}

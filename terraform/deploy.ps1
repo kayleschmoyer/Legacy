@@ -507,47 +507,33 @@ if (-not $SkipBuild) {
     Write-Host "  Building oauth-proxy..." -ForegroundColor Cyan
     Set-Location "lambdas\oauth-proxy"
     npx nx build
-    npx serverless package
-    Copy-Item ".serverless\*.zip" "..\..\terraform\build\" -Force
+    # Create deployment package
+    Copy-Item "dist\index.js" "."
+    Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\oauth-proxy.zip" -Force
+    Remove-Item "index.js" -ErrorAction SilentlyContinue
     Set-Location "..\..\"
-
-    # Lambda packages are no longer copied since Serverless Framework manages Lambda deployment
-    # Each service (oauth-proxy, db/graphql, stats-lambda) deploys independently via serverless.yml
 
     # Build GraphQL function
     Write-Host "  Building graphql..." -ForegroundColor Cyan
     Set-Location "lambdas\db"
     npx nx build
-    npx serverless package
-    Copy-Item ".serverless\*.zip" "..\..\terraform\build\" -Force
+    # Create deployment package
+    Copy-Item "dist\index.js" "."
+    Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\graphql-lambda.zip" -Force
+    Remove-Item "index.js" -ErrorAction SilentlyContinue
     Set-Location "..\..\"
-
-
 
     # Build Stats lambda
     Write-Host "  Building stats-lambda..." -ForegroundColor Cyan
     Set-Location "lambdas\stats-lambda"
     npx nx build
-    npx serverless package
-    Copy-Item ".serverless\*.zip" "..\..\terraform\build\" -Force
+    # Create deployment package
+    Copy-Item "dist\index.js" "."
+    Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\stats-lambda.zip" -Force
+    Remove-Item "index.js" -ErrorAction SilentlyContinue
     Set-Location "..\..\"
 
-    # Copy stats lambda package with correct name (assuming it creates stats.zip or similar)
-    # We'll update this based on what's actually created
-    if (Test-Path "terraform\build\*.zip") {
-        $statsZip = Get-ChildItem "terraform\build\*.zip" | Where-Object { $_.Name -like "*stats*" -or $_.Name -like "*career*" } | Select-Object -First 1
-        if ($statsZip) {
-            Copy-Item $statsZip.FullName "terraform\stats-lambda.zip" -Force
-        } else {
-            # Fallback - use any zip file from stats-lambda build
-            $anyZip = Get-ChildItem "terraform\build\*.zip" | Select-Object -Last 1
-            if ($anyZip) {
-                Copy-Item $anyZip.FullName "terraform\stats-lambda.zip" -Force
-            }
-        }
-    }
 
-    # Node-pg layer creation removed - oauth-proxy serverless.yml manages its own layer
 
     Write-Host "Lambda packages built successfully" -ForegroundColor Green
 }
@@ -619,10 +605,7 @@ if ($confirmation -eq 'y' -or $confirmation -eq 'Y') {
     Write-Host ""
     Write-Host "2. Initialize the database schema using the provided SQL dump files" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "3. Deploy the Serverless services for API endpoints:" -ForegroundColor Gray
-    Write-Host "   cd lambdas/oauth-proxy && serverless deploy" -ForegroundColor Gray  
-    Write-Host "   cd lambdas/db && serverless deploy" -ForegroundColor Gray
-    Write-Host "   cd lambdas/stats-lambda && serverless deploy" -ForegroundColor Gray
+    Write-Host "3. Lambda functions are deployed automatically via Terraform" -ForegroundColor Gray
     
 } else {
     Write-Host "Deployment cancelled" -ForegroundColor Red

@@ -15,7 +15,7 @@ export const AISuggestions: React.FC<AISuggestionsProps> = ({ suggestions, onPic
         {suggestions.map(player => (
           <YStack key={player.id} padding="$2" borderBottomWidth={1} borderBottomColor="$borderColor">
             <Text>{player.name} - {player.position}</Text>
-            <Button size="$2" onPress={() => onPick(player.id)}>Pick</Button>
+            <Button size="$2" onPress={() => onPick(player.id)}><Text>Pick</Text></Button>
           </YStack>
         ))}
       </ScrollView>

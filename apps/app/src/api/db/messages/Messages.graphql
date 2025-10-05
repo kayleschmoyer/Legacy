@@ -1,28 +1,30 @@
-fragment LeagueMessage on LeagueMessage {
-  leagueId
-  messageText
-  timestamp
-  user {
-    id
-    username
-  }
-}
+# LeagueMessage type and related queries not available in current schema
+# fragment LeagueMessage on LeagueMessage {
+#   leagueId
+#   messageText
+#   timestamp
+#   user {
+#     id
+#     username
+#   }
+# }
 
-query GetMessagesForLeague(
-  $orderBy: [LeagueMessagesOrderBy!]
-  $condition: LeagueMessageCondition!
-) {
-  leagueMessages(orderBy: $orderBy, condition: $condition) {
-    nodes {
-      ...LeagueMessage
-    }
-  }
-}
+# query GetMessagesForLeague(
+#   $orderBy: [LeagueMessagesOrderBy!]
+#   $condition: LeagueMessageCondition!
+# ) {
+#   leagueMessages(orderBy: $orderBy, condition: $condition) {
+#     nodes {
+#       ...LeagueMessage
+#     }
+#   }
+# }
 
-mutation SendLeagueMessage($input: CreateLeagueMessageInput!) {
-  createLeagueMessage(input: $input) {
-    leagueMessage {
-      ...LeagueMessage
-    }
-  }
-}
+# SendLeagueMessage mutation not available in current schema
+# mutation SendLeagueMessage($input: CreateLeagueMessageInput!) {
+#   createLeagueMessage(input: $input) {
+#     leagueMessage {
+#       ...LeagueMessage
+#     }
+#   }
+# }

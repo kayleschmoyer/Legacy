@@ -3,32 +3,19 @@ import { gql } from '@apollo/client';
 import * as Apollo from '@apollo/client';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = {
-  [K in keyof T]: T[K];
-};
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & {
-  [SubKey in K]?: Maybe<T[SubKey]>;
-};
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & {
-  [SubKey in K]: Maybe<T[SubKey]>;
-};
-export type MakeEmpty<
-  T extends { [key: string]: unknown },
-  K extends keyof T,
-> = { [_ in K]?: never };
-export type Incremental<T> =
-  | T
-  | {
-      [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never;
-    };
+export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
+export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
+export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
+export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
+export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
 const defaultOptions = {} as const;
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
-  ID: { input: string; output: string };
-  String: { input: string; output: string };
-  Boolean: { input: boolean; output: boolean };
-  Int: { input: number; output: number };
-  Float: { input: number; output: number };
+  ID: { input: string; output: string; }
+  String: { input: string; output: string; }
+  Boolean: { input: boolean; output: boolean; }
+  Int: { input: number; output: number; }
+  Float: { input: number; output: number; }
 };
 
 export type CareerBatting = {
@@ -105,6 +92,72 @@ export type CareerPitching = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+export type CreateLeagueAndTeamsInput = {
+  draftType: Scalars['String']['input'];
+  isPublic?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueName: Scalars['String']['input'];
+  maxBatters?: InputMaybe<Scalars['Int']['input']>;
+  maxPitchers?: InputMaybe<Scalars['Int']['input']>;
+  numberOfTeams: Scalars['Int']['input'];
+  startDate?: InputMaybe<Scalars['String']['input']>;
+  tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type CreateLeagueAndTeamsPayload = {
+  __typename?: 'CreateLeagueAndTeamsPayload';
+  league?: Maybe<League>;
+  leagueMembers?: Maybe<Array<LeagueMember>>;
+  teams?: Maybe<Array<Team>>;
+};
+
+/** A fantasy sports league */
+export type League = {
+  __typename?: 'League';
+  currentMatchup?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  owner?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A member of a league */
+export type LeagueMember = {
+  __typename?: 'LeagueMember';
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  permissionLevel?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A position configuration in a league */
+export type LeaguePosition = {
+  __typename?: 'LeaguePosition';
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  positionType?: Maybe<Scalars['String']['output']>;
+};
+
+/** A matchup between teams in a league */
+export type Matchup = {
+  __typename?: 'Matchup';
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  numberOfGames?: Maybe<Scalars['Int']['output']>;
+  weekNumber?: Maybe<Scalars['Int']['output']>;
+};
+
+export type Mutation = {
+  __typename?: 'Mutation';
+  _placeholder?: Maybe<Scalars['Boolean']['output']>;
+  createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
+};
+
+
+export type MutationCreateLeagueAndTeamsArgs = {
+  input: CreateLeagueAndTeamsInput;
+};
+
 export type Player = {
   __typename?: 'Player';
   brefId?: Maybe<Scalars['String']['output']>;
@@ -119,28 +172,40 @@ export type Query = {
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   hello?: Maybe<Scalars['String']['output']>;
+  league?: Maybe<League>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
   playerCareerFielding?: Maybe<CareerFielding>;
   playerCareerPitching?: Maybe<CareerPitching>;
+  playerSeasonBatting?: Maybe<Array<SeasonBatting>>;
+  playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
+  playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
+  seasonBattingStats?: Maybe<Array<SeasonBatting>>;
+  seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
+  seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
+  userLeagues: Array<League>;
   users?: Maybe<Array<User>>;
 };
 
+
 export type QueryCareerBattingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
+  minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
+
 
 export type QueryCareerFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -149,6 +214,7 @@ export type QueryCareerFieldingStatsArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
+
 
 export type QueryCareerPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -160,25 +226,54 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
+
+export type QueryLeagueArgs = {
+  id: Scalars['Int']['input'];
+};
+
+
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
+
 
 export type QueryPlayerByBrefIdArgs = {
   brefId: Scalars['String']['input'];
 };
 
+
 export type QueryPlayerCareerBattingArgs = {
   playerId: Scalars['Int']['input'];
 };
+
 
 export type QueryPlayerCareerFieldingArgs = {
   playerId: Scalars['Int']['input'];
 };
 
+
 export type QueryPlayerCareerPitchingArgs = {
   playerId: Scalars['Int']['input'];
 };
+
+
+export type QueryPlayerSeasonBattingArgs = {
+  playerId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryPlayerSeasonFieldingArgs = {
+  playerId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryPlayerSeasonPitchingArgs = {
+  playerId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
 
 export type QueryPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -187,29 +282,186 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
+
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
+
 
 export type QuerySearchUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
 
+
+export type QuerySeasonBattingStatsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
+  minRBI?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QuerySeasonFieldingStatsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QuerySeasonPitchingStatsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  minWins?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  playerId?: InputMaybe<Scalars['Int']['input']>;
+  season?: InputMaybe<Scalars['Int']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryUserArgs = {
   id: Scalars['Int']['input'];
 };
 
+
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
 };
+
 
 export type QueryUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SeasonBatting = {
+  __typename?: 'SeasonBatting';
+  atBats?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  battingAverage?: Maybe<Scalars['Float']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  games?: Maybe<Scalars['Int']['output']>;
+  groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  league?: Maybe<Scalars['String']['output']>;
+  onBasePercentage?: Maybe<Scalars['Float']['output']>;
+  plateAppearances?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  sacrificeHits?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  sluggingPercentage?: Maybe<Scalars['Float']['output']>;
+  stolenBases?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  totalBases?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
+};
+
+export type SeasonFielding = {
+  __typename?: 'SeasonFielding';
+  assists?: Maybe<Scalars['Int']['output']>;
+  awardSummary?: Maybe<Scalars['String']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  caughtStealingPercentage?: Maybe<Scalars['Float']['output']>;
+  caughtStealingPercentageLeague?: Maybe<Scalars['Float']['output']>;
+  chances?: Maybe<Scalars['Float']['output']>;
+  completeGames?: Maybe<Scalars['Int']['output']>;
+  doublePlays?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Scalars['Int']['output']>;
+  fieldingPercentage?: Maybe<Scalars['Float']['output']>;
+  fieldingPercentageLeague?: Maybe<Scalars['Float']['output']>;
+  games?: Maybe<Scalars['Int']['output']>;
+  gamesOfParts?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  inningsDefended?: Maybe<Scalars['Float']['output']>;
+  league?: Maybe<Scalars['String']['output']>;
+  pickoffs?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  putouts?: Maybe<Scalars['Int']['output']>;
+  rangeFactorPerGame?: Maybe<Scalars['Float']['output']>;
+  rangeFactorPerGameLeague?: Maybe<Scalars['Float']['output']>;
+  rangeFactorPerNine?: Maybe<Scalars['Float']['output']>;
+  rangeFactorPerNineLeague?: Maybe<Scalars['Float']['output']>;
+  rowId?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  stolenBases?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  wildPitches?: Maybe<Scalars['Int']['output']>;
+};
+
+export type SeasonPitching = {
+  __typename?: 'SeasonPitching';
+  awardSummary?: Maybe<Scalars['String']['output']>;
+  balks?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
+  battersFaced?: Maybe<Scalars['Int']['output']>;
+  completeGames?: Maybe<Scalars['Int']['output']>;
+  earnedRunAverage?: Maybe<Scalars['String']['output']>;
+  earnedRunAveragePlus?: Maybe<Scalars['Float']['output']>;
+  earnedRuns?: Maybe<Scalars['Int']['output']>;
+  fip?: Maybe<Scalars['Float']['output']>;
+  games?: Maybe<Scalars['Int']['output']>;
+  gamesFinished?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  hitsPerNine?: Maybe<Scalars['Float']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  homeRunsPerNine?: Maybe<Scalars['Float']['output']>;
+  inningsPitched?: Maybe<Scalars['Float']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  league?: Maybe<Scalars['String']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  outsRecorded?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rowId?: Maybe<Scalars['String']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  saves?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  shutouts?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  strikeoutsPerBaseOnBalls?: Maybe<Scalars['Float']['output']>;
+  strikeoutsPerNine?: Maybe<Scalars['Float']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+  whip?: Maybe<Scalars['Float']['output']>;
+  wildPitches?: Maybe<Scalars['Int']['output']>;
+  winLossPercentage?: Maybe<Scalars['String']['output']>;
+  winPercentage?: Maybe<Scalars['Float']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A team in a league */
+export type Team = {
+  __typename?: 'Team';
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
 };
 
 export type User = {
@@ -220,31 +472,7 @@ export type User = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
-export type CareerBattingFragment = {
-  __typename?: 'CareerBatting';
-  playerId?: number | null;
-  games?: number | null;
-  plateAppearances?: number | null;
-  atBats?: number | null;
-  runs?: number | null;
-  hits?: number | null;
-  doubles?: number | null;
-  triples?: number | null;
-  homeRuns?: number | null;
-  rbi?: number | null;
-  stolenBases?: number | null;
-  caughtStealing?: number | null;
-  baseOnBalls?: number | null;
-  strikeouts?: number | null;
-  totalBases?: number | null;
-  groundedIntoDoublePlays?: number | null;
-  hitByPitch?: number | null;
-  sacrificeHits?: number | null;
-  intentionalBaseOnBalls?: number | null;
-  battingAverage?: number | null;
-  onBasePercentage?: number | null;
-  sluggingPercentage?: number | null;
-};
+export type CareerBattingFragment = { __typename?: 'CareerBatting', playerId?: number | null, games?: number | null, plateAppearances?: number | null, atBats?: number | null, runs?: number | null, hits?: number | null, doubles?: number | null, triples?: number | null, homeRuns?: number | null, rbi?: number | null, stolenBases?: number | null, caughtStealing?: number | null, baseOnBalls?: number | null, strikeouts?: number | null, totalBases?: number | null, groundedIntoDoublePlays?: number | null, hitByPitch?: number | null, sacrificeHits?: number | null, intentionalBaseOnBalls?: number | null, battingAverage?: number | null, onBasePercentage?: number | null, sluggingPercentage?: number | null };
 
 export type GetAllPlayersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -253,16 +481,8 @@ export type GetAllPlayersQueryVariables = Exact<{
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 }>;
 
-export type GetAllPlayersQuery = {
-  __typename?: 'Query';
-  players?: Array<{
-    __typename?: 'Player';
-    id?: number | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    brefId?: string | null;
-  }> | null;
-};
+
+export type GetAllPlayersQuery = { __typename?: 'Query', players?: Array<{ __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null }> | null };
 
 export type GetCareerBattingStatsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -272,131 +492,61 @@ export type GetCareerBattingStatsQueryVariables = Exact<{
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
   minRBI?: InputMaybe<Scalars['Int']['input']>;
+  minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
 }>;
 
-export type GetCareerBattingStatsQuery = {
-  __typename?: 'Query';
-  careerBattingStats?: Array<{
-    __typename?: 'CareerBatting';
-    playerId?: number | null;
-    games?: number | null;
-    plateAppearances?: number | null;
-    atBats?: number | null;
-    runs?: number | null;
-    hits?: number | null;
-    doubles?: number | null;
-    triples?: number | null;
-    homeRuns?: number | null;
-    rbi?: number | null;
-    stolenBases?: number | null;
-    caughtStealing?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    totalBases?: number | null;
-    groundedIntoDoublePlays?: number | null;
-    hitByPitch?: number | null;
-    sacrificeHits?: number | null;
-    intentionalBaseOnBalls?: number | null;
-    battingAverage?: number | null;
-    onBasePercentage?: number | null;
-    sluggingPercentage?: number | null;
-  }> | null;
-};
 
-export type PlayerFragment = {
-  __typename?: 'Player';
-  id?: number | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  brefId?: string | null;
-};
+export type GetCareerBattingStatsQuery = { __typename?: 'Query', careerBattingStats?: Array<{ __typename?: 'CareerBatting', playerId?: number | null, games?: number | null, plateAppearances?: number | null, atBats?: number | null, runs?: number | null, hits?: number | null, doubles?: number | null, triples?: number | null, homeRuns?: number | null, rbi?: number | null, stolenBases?: number | null, caughtStealing?: number | null, baseOnBalls?: number | null, strikeouts?: number | null, totalBases?: number | null, groundedIntoDoublePlays?: number | null, hitByPitch?: number | null, sacrificeHits?: number | null, intentionalBaseOnBalls?: number | null, battingAverage?: number | null, onBasePercentage?: number | null, sluggingPercentage?: number | null }> | null };
 
-export type PlayerBasicFragment = {
-  __typename?: 'Player';
-  id?: number | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  brefId?: string | null;
-};
-
-export type GetPlayersWithStatsTableQueryVariables = Exact<{
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  orderBy?: InputMaybe<Scalars['String']['input']>;
-  orderDirection?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-export type GetPlayersWithStatsTableQuery = {
-  __typename?: 'Query';
-  players?: Array<{
-    __typename?: 'Player';
-    id?: number | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    brefId?: string | null;
-  }> | null;
-};
+export type PlayerFragment = { __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null };
 
 export const CareerBattingFragmentDoc = gql`
-  fragment CareerBatting on CareerBatting {
-    playerId
-    games
-    plateAppearances
-    atBats
-    runs
-    hits
-    doubles
-    triples
-    homeRuns
-    rbi
-    stolenBases
-    caughtStealing
-    baseOnBalls
-    strikeouts
-    totalBases
-    groundedIntoDoublePlays
-    hitByPitch
-    sacrificeHits
-    intentionalBaseOnBalls
-    battingAverage
-    onBasePercentage
-    sluggingPercentage
-  }
-`;
+    fragment CareerBatting on CareerBatting {
+  playerId
+  games
+  plateAppearances
+  atBats
+  runs
+  hits
+  doubles
+  triples
+  homeRuns
+  rbi
+  stolenBases
+  caughtStealing
+  baseOnBalls
+  strikeouts
+  totalBases
+  groundedIntoDoublePlays
+  hitByPitch
+  sacrificeHits
+  intentionalBaseOnBalls
+  battingAverage
+  onBasePercentage
+  sluggingPercentage
+}
+    `;
 export const PlayerFragmentDoc = gql`
-  fragment Player on Player {
-    id
-    firstName
-    lastName
-    brefId
-  }
-`;
-export const PlayerBasicFragmentDoc = gql`
-  fragment PlayerBasic on Player {
-    id
-    firstName
-    lastName
-    brefId
-  }
-`;
+    fragment Player on Player {
+  id
+  firstName
+  lastName
+  brefId
+}
+    `;
 export const GetAllPlayers = gql`
-  query GetAllPlayers(
-    $limit: Int
-    $offset: Int
-    $orderBy: String
-    $orderDirection: String
+    query GetAllPlayers($limit: Int, $offset: Int, $orderBy: String, $orderDirection: String) {
+  players(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
   ) {
-    players(
-      limit: $limit
-      offset: $offset
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-    ) {
-      ...Player
-    }
+    ...Player
   }
-  ${PlayerFragmentDoc}
-`;
+}
+    ${PlayerFragmentDoc}`;
 
 /**
  * __useGetAllPlayersQuery__
@@ -417,84 +567,39 @@ export const GetAllPlayers = gql`
  *   },
  * });
  */
-export function useGetAllPlayersQuery(
-  baseOptions?: Apollo.QueryHookOptions<
-    GetAllPlayersQuery,
-    GetAllPlayersQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(
-    GetAllPlayers,
-    options,
-  );
-}
-export function useGetAllPlayersLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetAllPlayersQuery,
-    GetAllPlayersQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(
-    GetAllPlayers,
-    options,
-  );
-}
-export function useGetAllPlayersSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetAllPlayersQuery,
-        GetAllPlayersQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetAllPlayersQuery,
-    GetAllPlayersQueryVariables
-  >(GetAllPlayers, options);
-}
-export type GetAllPlayersQueryHookResult = ReturnType<
-  typeof useGetAllPlayersQuery
->;
-export type GetAllPlayersLazyQueryHookResult = ReturnType<
-  typeof useGetAllPlayersLazyQuery
->;
-export type GetAllPlayersSuspenseQueryHookResult = ReturnType<
-  typeof useGetAllPlayersSuspenseQuery
->;
-export type GetAllPlayersQueryResult = Apollo.QueryResult<
-  GetAllPlayersQuery,
-  GetAllPlayersQueryVariables
->;
+export function useGetAllPlayersQuery(baseOptions?: Apollo.QueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+      }
+export function useGetAllPlayersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+        }
+export function useGetAllPlayersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
+        }
+export type GetAllPlayersQueryHookResult = ReturnType<typeof useGetAllPlayersQuery>;
+export type GetAllPlayersLazyQueryHookResult = ReturnType<typeof useGetAllPlayersLazyQuery>;
+export type GetAllPlayersSuspenseQueryHookResult = ReturnType<typeof useGetAllPlayersSuspenseQuery>;
+export type GetAllPlayersQueryResult = Apollo.QueryResult<GetAllPlayersQuery, GetAllPlayersQueryVariables>;
 export const GetCareerBattingStats = gql`
-  query GetCareerBattingStats(
-    $limit: Int
-    $offset: Int
-    $orderBy: String
-    $orderDirection: String
-    $minGames: Int
-    $minHomeRuns: Int
-    $minRBI: Int
+    query GetCareerBattingStats($limit: Int, $offset: Int, $orderBy: String, $orderDirection: String, $minGames: Int, $minHomeRuns: Int, $minRBI: Int, $minBattingAvg: Float, $searchTerm: String) {
+  careerBattingStats(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    minGames: $minGames
+    minHomeRuns: $minHomeRuns
+    minRBI: $minRBI
+    minBattingAvg: $minBattingAvg
+    searchTerm: $searchTerm
   ) {
-    careerBattingStats(
-      limit: $limit
-      offset: $offset
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-      minGames: $minGames
-      minHomeRuns: $minHomeRuns
-      minRBI: $minRBI
-    ) {
-      ...CareerBatting
-    }
+    ...CareerBatting
   }
-  ${CareerBattingFragmentDoc}
-`;
+}
+    ${CareerBattingFragmentDoc}`;
 
 /**
  * __useGetCareerBattingStatsQuery__
@@ -515,152 +620,24 @@ export const GetCareerBattingStats = gql`
  *      minGames: // value for 'minGames'
  *      minHomeRuns: // value for 'minHomeRuns'
  *      minRBI: // value for 'minRBI'
+ *      minBattingAvg: // value for 'minBattingAvg'
+ *      searchTerm: // value for 'searchTerm'
  *   },
  * });
  */
-export function useGetCareerBattingStatsQuery(
-  baseOptions?: Apollo.QueryHookOptions<
-    GetCareerBattingStatsQuery,
-    GetCareerBattingStatsQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    GetCareerBattingStatsQuery,
-    GetCareerBattingStatsQueryVariables
-  >(GetCareerBattingStats, options);
-}
-export function useGetCareerBattingStatsLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetCareerBattingStatsQuery,
-    GetCareerBattingStatsQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    GetCareerBattingStatsQuery,
-    GetCareerBattingStatsQueryVariables
-  >(GetCareerBattingStats, options);
-}
-export function useGetCareerBattingStatsSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetCareerBattingStatsQuery,
-        GetCareerBattingStatsQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetCareerBattingStatsQuery,
-    GetCareerBattingStatsQueryVariables
-  >(GetCareerBattingStats, options);
-}
-export type GetCareerBattingStatsQueryHookResult = ReturnType<
-  typeof useGetCareerBattingStatsQuery
->;
-export type GetCareerBattingStatsLazyQueryHookResult = ReturnType<
-  typeof useGetCareerBattingStatsLazyQuery
->;
-export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<
-  typeof useGetCareerBattingStatsSuspenseQuery
->;
-export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<
-  GetCareerBattingStatsQuery,
-  GetCareerBattingStatsQueryVariables
->;
-export const GetPlayersWithStatsTable = gql`
-  query GetPlayersWithStatsTable(
-    $limit: Int
-    $offset: Int
-    $orderBy: String
-    $orderDirection: String
-  ) {
-    players(
-      limit: $limit
-      offset: $offset
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-    ) {
-      ...PlayerBasic
-    }
-  }
-  ${PlayerBasicFragmentDoc}
-`;
-
-/**
- * __useGetPlayersWithStatsTableQuery__
- *
- * To run a query within a React component, call `useGetPlayersWithStatsTableQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetPlayersWithStatsTableQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetPlayersWithStatsTableQuery({
- *   variables: {
- *      limit: // value for 'limit'
- *      offset: // value for 'offset'
- *      orderBy: // value for 'orderBy'
- *      orderDirection: // value for 'orderDirection'
- *   },
- * });
- */
-export function useGetPlayersWithStatsTableQuery(
-  baseOptions?: Apollo.QueryHookOptions<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >(GetPlayersWithStatsTable, options);
-}
-export function useGetPlayersWithStatsTableLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >(GetPlayersWithStatsTable, options);
-}
-export function useGetPlayersWithStatsTableSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetPlayersWithStatsTableQuery,
-        GetPlayersWithStatsTableQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >(GetPlayersWithStatsTable, options);
-}
-export type GetPlayersWithStatsTableQueryHookResult = ReturnType<
-  typeof useGetPlayersWithStatsTableQuery
->;
-export type GetPlayersWithStatsTableLazyQueryHookResult = ReturnType<
-  typeof useGetPlayersWithStatsTableLazyQuery
->;
-export type GetPlayersWithStatsTableSuspenseQueryHookResult = ReturnType<
-  typeof useGetPlayersWithStatsTableSuspenseQuery
->;
-export type GetPlayersWithStatsTableQueryResult = Apollo.QueryResult<
-  GetPlayersWithStatsTableQuery,
-  GetPlayersWithStatsTableQueryVariables
->;
+export function useGetCareerBattingStatsQuery(baseOptions?: Apollo.QueryHookOptions<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>(GetCareerBattingStats, options);
+      }
+export function useGetCareerBattingStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>(GetCareerBattingStats, options);
+        }
+export function useGetCareerBattingStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>(GetCareerBattingStats, options);
+        }
+export type GetCareerBattingStatsQueryHookResult = ReturnType<typeof useGetCareerBattingStatsQuery>;
+export type GetCareerBattingStatsLazyQueryHookResult = ReturnType<typeof useGetCareerBattingStatsLazyQuery>;
+export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<typeof useGetCareerBattingStatsSuspenseQuery>;
+export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<GetCareerBattingStatsQuery, GetCareerBattingStatsQueryVariables>;

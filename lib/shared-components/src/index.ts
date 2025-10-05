@@ -1,6 +1,7 @@
 import './types/tamagui.d.ts';
 
 export * from './Button';
+export * from './IconButton';
 export * from './Layout';
 export * from './screens/SportsScreens';
 export * from './screens/DraftBoardScreen';
@@ -8,6 +9,7 @@ export * from './screens/DraftBoardScreen';
 // New shared components
 export * from './ConditionalProviders';
 export * from './AppProvider';
+export * from './components/HolographicCard';
 // export * from './AppNavigator'; // Commented out due to parsing issues
 
 // Cross-platform components from new structure (star export except Button)
@@ -42,6 +44,14 @@ export type {
   OAuthErrorCode,
   ISecureStorage,
 } from './platform-components/types';
+
+// IconButton types
+export type {
+  IconButtonProps,
+  IconButtonSize,
+  IconButtonVariant,
+  IconButtonColorScheme,
+} from './types/IconButton.types';
 
 // Export all shared components and types
 export * from './config/sports';
@@ -88,6 +98,8 @@ export * from './features/players/PlayersScreen';
 
 // Common UI components
 export * from './features/common/SearchBar';
+export * from './components/DatePicker';
+export * from './components/DateTimePicker';
 
 // Team components
 export * from './features/teams/TeamPicker';

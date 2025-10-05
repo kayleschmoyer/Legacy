@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or, sql, SQL } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
@@ -39,6 +39,8 @@ export interface StatisticsFilters {
   minRBI?: number;
   minWins?: number;
   minStrikeouts?: number;
+  minBattingAvg?: number;
+  searchTerm?: string;
 }
 
 export interface SeasonStatisticsFilters {
@@ -82,12 +84,58 @@ export class StatisticsService {
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerBatting[]> {
     return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db.select().from(PublicSchema.careerBatting);
+      // Check if we need to join with players table for search term
+      const needsPlayerJoin = queryOptions.filters?.searchTerm;
+      
+      let queryBuilder;
+      if (needsPlayerJoin) {
+        // Join with players table for name search
+        queryBuilder = db
+          .select({
+            playerId: PublicSchema.careerBatting.playerId,
+            g: PublicSchema.careerBatting.g,
+            pa: PublicSchema.careerBatting.pa,
+            ab: PublicSchema.careerBatting.ab,
+            r: PublicSchema.careerBatting.r,
+            h: PublicSchema.careerBatting.h,
+            doubles: PublicSchema.careerBatting.doubles,
+            triples: PublicSchema.careerBatting.triples,
+            hr: PublicSchema.careerBatting.hr,
+            rbi: PublicSchema.careerBatting.rbi,
+            sb: PublicSchema.careerBatting.sb,
+            cs: PublicSchema.careerBatting.cs,
+            bb: PublicSchema.careerBatting.bb,
+            so: PublicSchema.careerBatting.so,
+            tb: PublicSchema.careerBatting.tb,
+            gidp: PublicSchema.careerBatting.gidp,
+            hbp: PublicSchema.careerBatting.hbp,
+            sh: PublicSchema.careerBatting.sh,
+            ibb: PublicSchema.careerBatting.ibb,
+          })
+          .from(PublicSchema.careerBatting)
+          .innerJoin(
+            PublicSchema.players,
+            eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id)
+          );
+      } else {
+        queryBuilder = db.select().from(PublicSchema.careerBatting);
+      }
 
       // Build WHERE clause
       const conditions = queryOptions.filters
         ? this.buildBattingFilters(queryOptions.filters)
         : [];
+
+      // Add search term condition if needed
+      if (needsPlayerJoin && queryOptions.filters?.searchTerm) {
+        const searchTerm = queryOptions.filters.searchTerm;
+        conditions.push(
+          or(
+            ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
+            ilike(PublicSchema.players.lastName, `%${searchTerm}%`)
+          )
+        );
+      }
 
       // Build final query parts
       const orderDirection = queryOptions.orderDirection || 'desc';
@@ -563,6 +611,14 @@ export class StatisticsService {
     if (filters.minRBI !== undefined) {
       conditions.push(
         sql`${PublicSchema.careerBatting.rbi} >= ${filters.minRBI}`,
+      );
+    }
+
+    if (filters.minBattingAvg !== undefined) {
+      // Filter by minimum batting average (hits/at-bats >= minBattingAvg)
+      // Only include players with at least 1 at-bat to avoid division by zero
+      conditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (CAST(${PublicSchema.careerBatting.h} AS DECIMAL) / CAST(${PublicSchema.careerBatting.ab} AS DECIMAL)) >= ${filters.minBattingAvg}`,
       );
     }
 

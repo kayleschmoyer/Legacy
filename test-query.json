@@ -1,0 +1,7 @@
+{
+  "query": "query TestCareerBattingStats($minBattingAvg: Float, $searchTerm: String) { careerBattingStats(limit: 1, minBattingAvg: $minBattingAvg, searchTerm: $searchTerm) { playerId games hits homeRuns battingAverage } }",
+  "variables": {
+    "minBattingAvg": 0.250,
+    "searchTerm": "Ruth"
+  }
+}

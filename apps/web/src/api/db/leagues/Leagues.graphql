@@ -1,0 +1,40 @@
+fragment League on League {
+  id
+  name
+  owner
+  maxRosterSize
+  currentMatchup
+}
+
+fragment LeagueMember on LeagueMember {
+  leagueId
+  userId
+  teamId
+  permissionLevel
+}
+
+fragment LeaguePosition on LeaguePosition {
+  id
+  leagueId
+  positionType
+}
+
+query GetLeagueById($id: Int!) {
+  league(id: $id) {
+    ...League
+  }
+}
+
+mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
+  createLeagueAndTeams(input: $input) {
+    league {
+      ...League
+    }
+  }
+}
+
+query GetUserLeagues {
+  userLeagues {
+    ...League
+  }
+}

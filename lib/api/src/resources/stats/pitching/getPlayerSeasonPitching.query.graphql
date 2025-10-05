@@ -8,7 +8,8 @@ query GetPlayerSeasonPitching(
     ...SeasonPitching
     player {
       id
-      name
+      firstName
+      lastName
       brefId
     }
   }

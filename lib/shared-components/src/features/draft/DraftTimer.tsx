@@ -14,9 +14,9 @@ export const DraftTimer: React.FC<DraftTimerProps> = ({ sport, currentPick, spee
       <Text fontSize="$6" fontWeight="bold">Draft Timer</Text>
       <Text fontSize="$4">Pick #{currentPick}</Text>
       <XStack space="$2" alignItems="center">
-        <Button size="$3" onPress={() => onSpeedChange?.(speed - 5)}>-</Button>
+        <Button size="$3" onPress={() => onSpeedChange?.(speed - 5)}><Text>-</Text></Button>
         <Text>{speed}s</Text>
-        <Button size="$3" onPress={() => onSpeedChange?.(speed + 5)}>+</Button>
+        <Button size="$3" onPress={() => onSpeedChange?.(speed + 5)}><Text>+</Text></Button>
       </XStack>
     </YStack>
   );

@@ -121,10 +121,42 @@ const server = new ApolloServer({
   introspection: process.env.NODE_ENV !== 'production',
 });
 
-// Create base handler
+// Create base handler with authentication context
 const baseHandler = startServerAndCreateLambdaHandler(
   server,
   handlers.createAPIGatewayProxyEventRequestHandler(),
+  {
+    context: async ({ event }) => {
+      // Extract JWT from Authorization header
+      const authorization = event.headers.authorization || event.headers.Authorization;
+      let user = null;
+
+      if (authorization && authorization.startsWith('Bearer ')) {
+        try {
+          const token = authorization.substring(7); // Remove 'Bearer ' prefix
+          
+          // Decode JWT payload (simple base64 decode - no signature verification for lambda)
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(
+              Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+            );
+            
+            user = {
+              id: payload.id,
+              email: payload.email,
+              username: payload.username,
+              isAdmin: payload.isAdmin || false,
+            };
+          }
+        } catch (error) {
+          console.warn(`Failed to decode JWT: ${error}`);
+        }
+      }
+
+      return { user };
+    },
+  }
 );
 
 // Lambda handler with proper CORS and error handling

@@ -1,16 +1,18 @@
 fragment Player on Player {
   brefId
   id
-  name
+  firstName
+  lastName
 }
 
-mutation BulkCreatePlayers($input: CreatePlayersInput!) {
-  createPlayers(input: $input) {
-    players {
-      ...Player
-    }
-  }
-}
+# BulkCreatePlayers mutation not available in current schema
+# mutation BulkCreatePlayers($input: CreatePlayersInput!) {
+#   createPlayers(input: $input) {
+#     players {
+#       ...Player
+#     }
+#   }
+# }
 
 query GetPlayerByBrefId($brefId: String!) {
   playerByBrefId(brefId: $brefId) {
@@ -18,14 +20,8 @@ query GetPlayerByBrefId($brefId: String!) {
   }
 }
 
-query GetAllPlayers($after: Cursor) {
-  players(after: $after) {
-    nodes {
-      ...Player
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
+query GetAllPlayers {
+  players {
+    ...Player
   }
 }

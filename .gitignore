@@ -112,9 +112,6 @@ yarn-error.log
 # testing
 /coverage
 
-# Serverless
-.serverless
-
 # Cert Files
 **/*.pem
 
@@ -228,7 +225,6 @@ node_modules/
 # Lambda deployment artifacts
 *.zip
 **/*.zip
-.serverless/
 
 # Terraform build artifacts
 terraform/build/

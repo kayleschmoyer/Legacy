@@ -1,0 +1,3 @@
+{
+  "query": "query TestCareerBattingStatsWithFilters { careerBattingStats(limit: 5, minBattingAvg: 0.300, minHomeRuns: 100) { playerId games hits homeRuns battingAverage } }"
+}

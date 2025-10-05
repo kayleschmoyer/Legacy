@@ -1,0 +1,11 @@
+fragment User on User {
+  id
+  email
+  username
+}
+
+query GetUserById($id: Int!) {
+  user(id: $id) {
+    ...User
+  }
+}

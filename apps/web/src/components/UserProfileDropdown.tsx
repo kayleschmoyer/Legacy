@@ -65,6 +65,7 @@ const MenuItem = styled(Button, {
 export const UserProfileDropdown: React.FC = () => {
   const auth = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Click outside handler
@@ -86,15 +87,20 @@ export const UserProfileDropdown: React.FC = () => {
     }
   }, [isOpen]);
 
+  // Extract user data from auth context (with fallback values)
+  const userName = auth?.user?.username || '';
+  const userEmail = auth?.user?.email || '';
+  const userImage = auth?.user?.picture || null;
+
+  // Reset image error state when user image changes
+  useEffect(() => {
+    setImageError(false);
+  }, [userImage]);
+
   // Don't render anything if user is not authenticated
   if (!auth?.isAuthenticated || !auth.user) {
     return null;
   }
-
-  // Extract user data from auth context
-  const userName = auth.user.username;
-  const userEmail = auth.user.email;
-  const userImage = auth.user.picture || null;
 
   // DEBUG: Log the auth object and picture field
   console.log('[UserProfileDropdown] Full auth object:', auth);
@@ -122,15 +128,26 @@ export const UserProfileDropdown: React.FC = () => {
       <UserMenuButton onPress={() => setIsOpen(!isOpen)}>
         <XStack alignItems="center" space="$2">
           <ProfileImage>
-            {userImage ? (
+            {userImage && !imageError ? (
               <img
                 src={userImage}
                 alt={userName}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
                 style={{
                   width: '100%',
                   height: '100%',
                   borderRadius: '50%',
                   objectFit: 'cover',
+                }}
+                onError={(e) => {
+                  console.error('[UserProfileDropdown] Image failed to load:', userImage, e);
+                  console.log('[UserProfileDropdown] Switching to initials fallback');
+                  setImageError(true);
+                }}
+                onLoad={() => {
+                  console.log('[UserProfileDropdown] Image loaded successfully:', userImage);
+                  setImageError(false);
                 }}
               />
             ) : (

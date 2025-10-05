@@ -11,7 +11,9 @@ import {
   gameBatting,
   gameFielding,
   gamePitching,
+  leagueMembers,
   leaguePosition,
+  leagues,
   matchupPlayers,
   matchups,
   playerEligiblePositions,
@@ -22,6 +24,7 @@ import {
   seasonFielding,
   seasonPitching,
   teamMembers,
+  teams,
   users,
 } from '../drizzle/public/schema';
 import { usersInAppInternal } from '../drizzle/internal/schema';
@@ -50,9 +53,15 @@ export type SeasonFielding = typeof seasonFielding.$inferSelect;
 export type SeasonPitching = typeof seasonPitching.$inferSelect;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type TeamPosition = typeof leaguePosition.$inferSelect;
+export type League = typeof leagues.$inferSelect;
+export type Team = typeof teams.$inferSelect;
+export type LeagueMember = typeof leagueMembers.$inferSelect;
 
 export type CreatePlayerInput = typeof players.$inferInsert;
 export type CreateMatchupPlayer = typeof matchupPlayers.$inferInsert;
+export type CreateLeagueInput = typeof leagues.$inferInsert;
+export type CreateTeamInput = typeof teams.$inferInsert;
+export type CreateLeagueMemberInput = typeof leagueMembers.$inferInsert;
 
 export type PlayerEligiblePosition = InferModelFromView<
   typeof playerEligiblePositions

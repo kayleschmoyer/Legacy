@@ -15,6 +15,7 @@ import PlayerStats from './PlayerStats';
 import ViewCareerStats from './view_career_stats';
 import ViewGameLogs from './view_game_logs';
 import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
+import LeagueCreatePage from './baseball/league/create';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
@@ -30,6 +31,7 @@ export type AppDrawerParamList = {
   view_game_logs: undefined;
   view_career_stats: undefined;
   'baseball/index': undefined;
+  'baseball/league/create': undefined;
   'football/index': undefined;
   DraftBoardPage: undefined;
   FreeAgents: undefined;
@@ -66,6 +68,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'baseball/index',
     title: 'Baseball',
+  },
+  {
+    route: 'baseball/league/create',
+    title: 'Create League',
   },
   {
     route: 'football/index',
@@ -170,14 +176,27 @@ export default function Layout() {
             component={BaseballHome}
           />
           <Screen
-            name="baseball/team/[teamId]"
-            options={{ headerTitle: TeamIdHeader }}
-            component={Team}
+            name="baseball/league/create"
+            options={{
+              drawerLabel: () => null,
+              headerShown: true,
+              headerTitle: 'Create League',
+            }}
+            component={LeagueCreatePage}
           />
           <Screen
             name="baseball/league/[leagueId]"
             options={{ headerTitle: LeagueIdHeader }}
             component={LeagueId}
+          />
+          <Screen
+            name="baseball/team/[teamId]"
+            options={{
+              drawerLabel: () => null,
+              headerShown: true,
+              headerTitle: () => <TeamIdHeader />,
+            }}
+            component={Team}
           />
           <Screen
             name="DraftBoardPage"

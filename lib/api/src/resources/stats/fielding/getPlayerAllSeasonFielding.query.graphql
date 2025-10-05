@@ -2,7 +2,8 @@
 query GetPlayerAllSeasonFielding($playerId: Int!) {
   player(id: $playerId) {
     id
-    name
+    firstName
+    lastName
     brefId
     seasonFieldings {
       nodes {

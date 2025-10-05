@@ -7,6 +7,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Text } from 'tamagui';
 
 export function AuthDebugger() {
   const auth: UseAuthResult = useAuth();
@@ -59,11 +60,11 @@ export function AuthDebugger() {
       </YStack>
 
       <Button onPress={() => navigate('/login')}>
-        Go to Login (React Router)
+        <Text>Go to Login (React Router)</Text>
       </Button>
 
       <Button onPress={() => (window.location.hash = '#/login')}>
-        Go to Login (Hash)
+        <Text>Go to Login (Hash)</Text>
       </Button>
     </YStack>
   );

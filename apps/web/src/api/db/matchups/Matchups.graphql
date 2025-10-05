@@ -1,0 +1,6 @@
+fragment Matchup on Matchup {
+  id
+  weekNumber
+  leagueId
+  numberOfGames
+}

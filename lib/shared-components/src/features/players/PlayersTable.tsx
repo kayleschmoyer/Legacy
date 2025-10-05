@@ -158,7 +158,7 @@ export function PlayersTable({
       <YStack p="$4" gap="$3" ai="center">
         <Text color="$red10">Error loading players: {error.message}</Text>
         <Button onPress={handleRefresh} icon={RefreshCw}>
-          Try Again
+          <Text>Try Again</Text>
         </Button>
       </YStack>
     );

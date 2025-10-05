@@ -1,215 +1,229 @@
-fragment MatchupBattingStats on MatchupBatting {
-  ab
-  bb
-  cs
-  doubles
-  gidp
-  h
-  hbp
-  hr
-  ibb
-  pa
-  r
-  rbi
-  sb
-  sh
-  so
-  triples
-}
+# MatchupBatting type not available in current schema
+# fragment MatchupBattingStats on MatchupBatting {
+#   ab
+#   bb
+#   cs
+#   doubles
+#   gidp
+#   h
+#   hbp
+#   hr
+#   ibb
+#   pa
+#   r
+#   rbi
+#   sb
+#   sh
+#   so
+#   triples
+# }
 
-fragment MatchupFieldingStats on MatchupFielding {
-  a
-  chances
-  dpDef
-  eDef
-  innDef
-  po
-}
+# MatchupFielding type not available in current schema
+# fragment MatchupFieldingStats on MatchupFielding {
+#   a
+#   chances
+#   dpDef
+#   eDef
+#   innDef
+#   po
+# }
 
-fragment MatchupPitchingStats on MatchupPitching {
-  battersFaced
-  bb
-  cg
-  er
-  gf
-  gs
-  h
-  hbp
-  hr
-  ibb
-  l
-  outsRecorded
-  r
-  sho
-  so
-  sv
-  w
-}
+# MatchupPitching type not available in current schema
+# fragment MatchupPitchingStats on MatchupPitching {
+#   battersFaced
+#   bb
+#   cg
+#   er
+#   gf
+#   gs
+#   h
+#   hbp
+#   hr
+#   ibb
+#   l
+#   outsRecorded
+#   r
+#   sho
+#   so
+#   sv
+#   w
+# }
 
-fragment AggregateSeasonBattingStats on AggregateSeasonBatting {
-  ab
-  bb
-  cs
-  doubles
-  g
-  gidp
-  h
-  hbp
-  hr
-  ibb
-  pa
-  r
-  rbi
-  sb
-  sh
-  so
-  tb
-  triples
-}
+# AggregateSeasonBatting type not available in current schema
+# fragment AggregateSeasonBattingStats on AggregateSeasonBatting {
+#   ab
+#   bb
+#   cs
+#   doubles
+#   g
+#   gidp
+#   h
+#   hbp
+#   hr
+#   ibb
+#   pa
+#   r
+#   rbi
+#   sb
+#   sh
+#   so
+#   tb
+#   triples
+# }
 
-fragment AggregateSeasonFieldingStats on AggregateSeasonFielding {
-  a
-  cg
-  chances
-  cs
-  dpDef
-  eDef
-  g
-  gs
-  innDef
-  pickoffs
-  po
-  sb
-  wp
-}
+# AggregateSeasonFielding type not available in current schema
+# fragment AggregateSeasonFieldingStats on AggregateSeasonFielding {
+#   a
+#   cg
+#   chances
+#   cs
+#   dpDef
+#   eDef
+#   g
+#   gs
+#   innDef
+#   pickoffs
+#   po
+#   sb
+#   wp
+# }
 
-fragment AggregateSeasonPitchingStats on AggregateSeasonPitching {
-  battersFaced
-  bb
-  bk
-  cg
-  er
-  g
-  gf
-  gs
-  h
-  hbp
-  hr
-  ibb
-  l
-  outsRecorded
-  r
-  sho
-  so
-  sv
-  w
-  wp
-}
+# AggregateSeasonPitching type not available in current schema
+# fragment AggregateSeasonPitchingStats on AggregateSeasonPitching {
+#   battersFaced
+#   bb
+#   bk
+#   cg
+#   er
+#   g
+#   gf
+#   gs
+#   h
+#   hbp
+#   hr
+#   ibb
+#   l
+#   outsRecorded
+#   r
+#   sho
+#   so
+#   sv
+#   w
+#   wp
+# }
 
 fragment CareerBattingStats on CareerBatting {
-  ab
-  bb
-  cs
+  atBats
+  baseOnBalls
+  caughtStealing
   doubles
-  g
-  gidp
-  h
-  hbp
-  hr
-  ibb
-  pa
-  r
+  games
+  groundedIntoDoublePlays
+  hits
+  hitByPitch
+  homeRuns
+  intentionalBaseOnBalls
+  plateAppearances
+  runs
   rbi
-  sb
-  sh
-  so
-  tb
+  stolenBases
+  sacrificeHits
+  strikeouts
+  totalBases
   triples
+  battingAverage
+  onBasePercentage
+  sluggingPercentage
+  playerId
 }
 
 fragment CareerFieldingStats on CareerFielding {
-  a
-  cg
+  assists
+  completeGames
   chances
-  cs
-  dpDef
-  eDef
-  g
-  gs
-  innDef
+  caughtStealing
+  doublePlays
+  errors
+  fieldingPercentage
+  games
+  gamesStarted
+  inningsDefended
   pickoffs
-  po
-  pos
-  sb
-  wp
+  putouts
+  positions
+  stolenBases
+  wildPitches
+  playerId
 }
 
 fragment CareerPitchingStats on CareerPitching {
   battersFaced
-  bb
-  bk
-  cg
-  er
+  baseOnBalls
+  balks
+  completeGames
+  earnedRuns
   era
-  g
-  gf
-  gs
-  h
-  hbp
-  hr
-  ibb
-  l
+  games
+  gamesFinished
+  gamesStarted
+  hits
+  hitByPitch
+  homeRuns
+  intentionalBaseOnBalls
+  losses
   outRate
   outsRecorded
-  r
-  sho
-  so
-  sv
-  w
-  wp
+  runs
+  shutouts
+  strikeouts
+  saves
+  wins
+  wildPitches
+  winPercentage
+  playerId
 }
 
-fragment CareerBattingStatsWithPlayer on CareerBatting {
-  ...CareerBattingStats
-  player {
-    ...Player
+# CareerBatting doesn't have player relationship, only playerId
+# fragment CareerBattingStatsWithPlayer on CareerBatting {
+#   ...CareerBattingStats
+#   player {
+#     ...Player
+#   }
+# }
+
+# CareerPitching doesn't have player relationship, only playerId
+# fragment CareerPitchingStatsWithPlayer on CareerPitching {
+#   ...CareerPitchingStats
+#   player {
+#     ...Player
+#   }
+# }
+
+# CareerFielding doesn't have player relationship, only playerId
+# fragment CareerFieldingStatsWithPlayer on CareerFielding {
+#   ...CareerFieldingStats
+#   player {
+#     ...Player
+#   }
+# }
+
+query GetCareerBattingStats {
+  careerBattingStats {
+    ...CareerBattingStats
+    # player relationship not available, only playerId
   }
 }
 
-fragment CareerPitchingStatsWithPlayer on CareerPitching {
-  ...CareerPitchingStats
-  player {
-    ...Player
+query GetCareerFieldingStats {
+  careerFieldingStats {
+    ...CareerFieldingStats
+    # player relationship not available, only playerId
   }
 }
 
-fragment CareerFieldingStatsWithPlayer on CareerFielding {
-  ...CareerFieldingStats
-  player {
-    ...Player
-  }
-}
-
-query GetCareerBattingStats($orderBy: [CareerBattingsOrderBy!], $first: Int) {
-  careerBattings(orderBy: $orderBy, first: $first) {
-    nodes {
-      ...CareerBattingStatsWithPlayer
-    }
-  }
-}
-
-query GetCareerFieldingStats($orderBy: [CareerFieldingsOrderBy!], $first: Int) {
-  careerFieldings(orderBy: $orderBy, first: $first) {
-    nodes {
-      ...CareerFieldingStatsWithPlayer
-    }
-  }
-}
-
-query GetCareerPitchingStats($orderBy: [CareerPitchingsOrderBy!], $first: Int) {
-  careerPitchings(orderBy: $orderBy, first: $first) {
-    nodes {
-      ...CareerPitchingStatsWithPlayer
-    }
+query GetCareerPitchingStats {
+  careerPitchingStats {
+    ...CareerPitchingStats
+    # player relationship not available, only playerId
   }
 }

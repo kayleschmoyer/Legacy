@@ -2,7 +2,8 @@
 query GetPlayer($id: Int!) {
   player(id: $id) {
     id
-    name
+    firstName
+    lastName
     brefId
   }
 }

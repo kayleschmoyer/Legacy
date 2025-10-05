@@ -517,36 +517,31 @@ if [ "$SKIP_BUILD" = false ]; then
 echo "  Building oauth-proxy..."
 cd lambdas/oauth-proxy
 npx nx build
-npx serverless package
-cp .serverless/*.zip ../../terraform/build/
+# Create deployment package
+cp dist/index.js .
+zip -r ../../terraform/oauth-proxy.zip index.js package.json
+rm -f index.js
 cd ../..
-
-# Rename oauth proxy packages
-cp terraform/build/legacy-sports-oauth-proxy.zip terraform/oauth-proxy-google.zip
-cp terraform/build/legacy-sports-oauth-proxy.zip terraform/oauth-proxy-local.zip
 
 # Build GraphQL function
 echo "  Building graphql..."
 cd lambdas/db
 npx nx build
-npx serverless package
-cp .serverless/*.zip ../../terraform/build/
+# Create deployment package
+cp dist/index.js .
+zip -r ../../terraform/graphql-lambda.zip index.js package.json
+rm -f index.js
 cd ../..
-
-# Rename graphql package
-cp terraform/build/legacy-sports-graphql.zip terraform/graphql.zip
 
 # Build Stats lambda
 echo "  Building stats-lambda..."
 cd lambdas/stats-lambda
 npx nx build
-npx serverless package
-cp .serverless/*.zip ../../terraform/build/
+# Create deployment package
+cp dist/index.js .
+zip -r ../../terraform/stats-lambda.zip index.js package.json
+rm -f index.js
 cd ../..
-
-# Rename stats lambda package
-cp terraform/build/legacy-sports-stats-lambda.zip terraform/stats-lambda.zip
-
 # Create node-pg layer
 echo "  Creating node-pg layer..."
 if [ -d "lambdas/layers/node-pg" ]; then

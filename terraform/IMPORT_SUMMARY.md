@@ -12,7 +12,7 @@ This document summarizes the AWS resources that were discovered and imported int
 
 **Resource**: `legacy-sports-graphql-dev-graphql`
 **Created**: September 8, 2025
-**Purpose**: GraphQL Lambda function deployed via Serverless Framework
+**Purpose**: Legacy GraphQL Lambda function
 **Status**: ✅ Imported as `aws_lambda_function.legacy_graphql`
 
 **Analysis**: This appears to be an older version of the GraphQL Lambda function that was deployed using the Serverless Framework. The current managed function `legacy-sports-dev-graphql` was deployed on September 26, 2025, indicating this legacy function is outdated.

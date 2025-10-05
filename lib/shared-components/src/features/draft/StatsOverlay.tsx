@@ -12,7 +12,7 @@ export const StatsOverlay: React.FC<StatsOverlayProps> = ({ onClose, player }) =
     <YStack flex={1} padding="$4" backgroundColor="$background" borderRadius="$4">
       <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
         <Text fontSize="$6" fontWeight="bold">{player?.name} Stats</Text>
-        <Button size="$2" onPress={onClose}>X</Button>
+        <Button size="$2" onPress={onClose}><Text>X</Text></Button>
       </XStack>
       <ScrollView>
         <Text>Stats data here...</Text>

@@ -17,13 +17,15 @@ query GetLeaguesForUser(
   $withTeams: Boolean = false
 ) {
   user(id: $id) {
-    leagueMembers {
-      nodes {
-        league {
-          ...League
-        }
-      }
-    }
+    # leagueMembers field not available on User
+    # leagueMembers {
+    #   nodes {
+    #     league {
+    #       ...League
+    #     }
+    #   }
+    # }
+    ...User
   }
 }
 
@@ -32,10 +34,11 @@ query GetUserById($id: Int!) {
     ...User
   }
 }
-mutation CreateUser($input: CreateUserInput!) {
-  createUser(input: $input) {
-    user {
-      ...User
-    }
-  }
-}
+# CreateUser mutation not available in current schema
+# mutation CreateUser($input: CreateUserInput!) {
+#   createUser(input: $input) {
+#     user {
+#       ...User
+#     }
+#   }
+# }

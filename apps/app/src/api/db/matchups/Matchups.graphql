@@ -5,34 +5,35 @@ fragment Matchup on Matchup {
   numberOfGames
 }
 
-query GetMatchupStats(
-  $matchupId: Int!
-  $withMatchupStats: Boolean = false
-  $withProjections: Boolean = false
-) {
-  matchupPlayers(condition: { matchupId: $matchupId }) {
-    nodes {
-      playerId
-      aggregateSeasonPitchingByPlayerIdAndSeason
-        @include(if: $withProjections) {
-        ...AggregateSeasonPitchingStats
-      }
-      aggregateSeasonFieldingByPlayerIdAndSeason
-        @include(if: $withProjections) {
-        ...AggregateSeasonFieldingStats
-      }
-      aggregateSeasonBattingByPlayerIdAndSeason @include(if: $withProjections) {
-        ...AggregateSeasonBattingStats
-      }
-      matchupBatting @include(if: $withMatchupStats) {
-        ...MatchupBattingStats
-      }
-      matchupFielding @include(if: $withMatchupStats) {
-        ...MatchupFieldingStats
-      }
-      matchupPitching @include(if: $withMatchupStats) {
-        ...MatchupPitchingStats
-      }
-    }
-  }
-}
+# GetMatchupStats query not available - matchupPlayers query doesn't exist in schema
+# query GetMatchupStats(
+#   $matchupId: Int!
+#   $withMatchupStats: Boolean = false
+#   $withProjections: Boolean = false
+# ) {
+#   matchupPlayers(condition: { matchupId: $matchupId }) {
+#     nodes {
+#       playerId
+#       aggregateSeasonPitchingByPlayerIdAndSeason
+#         @include(if: $withProjections) {
+#         ...AggregateSeasonPitchingStats
+#       }
+#       aggregateSeasonFieldingByPlayerIdAndSeason
+#         @include(if: $withProjections) {
+#         ...AggregateSeasonFieldingStats
+#       }
+#       aggregateSeasonBattingByPlayerIdAndSeason @include(if: $withProjections) {
+#         ...AggregateSeasonBattingStats
+#       }
+#       matchupBatting @include(if: $withMatchupStats) {
+#         ...MatchupBattingStats
+#       }
+#       matchupFielding @include(if: $withMatchupStats) {
+#         ...MatchupFieldingStats
+#       }
+#       matchupPitching @include(if: $withMatchupStats) {
+#         ...MatchupPitchingStats
+#       }
+#     }
+#   }
+# }

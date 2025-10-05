@@ -1,19 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { Button, H1, XStack, YStack } from '@legacy-sports/shared-components';
-import { styled } from 'tamagui';
+import { Popover, styled, Text } from 'tamagui';
+import { ChevronDown } from '@tamagui/lucide-icons';
 import {
-  BaseballScreen,
   FootballScreen,
   PlayersScreen,
 } from '@legacy-sports/shared-components';
 import { WebHomeScreen } from '../components/WebHomeScreen';
 import { UserProfileDropdown } from '../components/UserProfileDropdown';
+import { BaseballScreen } from '../components/baseball';
 
 import {
   WebPlayerDetailPage,
   WebPlayerStatsPage,
 } from '../components/WebPlayerStatsPage';
+import LeagueCreatePage from '../components/baseball/LeagueCreatePage';
+import LeagueDetailPage from '../components/baseball/LeagueDetailPage';
 
 // Styled Tamagui components for navigation
 const NavContainer = styled(YStack, {
@@ -49,6 +52,88 @@ const NavLinks = styled(XStack, {
 
 // Note: Using regular Link instead of styled to avoid "Functions are not valid as a React child" error
 
+function BaseballDropdownMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  
+  const isBaseballActive = location.pathname?.startsWith('/baseball') ?? false;
+
+  return (
+    <Popover size="$5" allowFlip placement="bottom" open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          variant={isBaseballActive ? 'primary' : 'secondary'}
+          size="$3"
+          onPress={() => setIsOpen(!isOpen)}
+        >
+          <span role="img" aria-label="baseball">
+            ⚾
+          </span>{' '}
+          Baseball{' '}
+          <ChevronDown
+            size="$0.75"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        </Button>
+      </Popover.Trigger>
+      
+      <Popover.Content
+        borderWidth={1}
+        borderColor="$borderColor"
+        enterStyle={{ y: -10, opacity: 0 }}
+        exitStyle={{ y: -10, opacity: 0 }}
+        elevate
+        animation={[
+          'quick',
+          {
+            opacity: {
+              overshootClamping: true,
+            },
+          },
+        ]}
+        padding="$2"
+        backgroundColor="$background"
+        minWidth={180}
+      >
+        <YStack space="$1">
+          <Link to="/baseball" style={{ textDecoration: 'none' }}>
+            <Button
+              variant="outlined"
+              size="$3"
+              justifyContent="flex-start"
+              width="100%"
+              onPress={() => setIsOpen(false)}
+            >
+              <span role="img" aria-label="baseball-home">
+                🏠
+              </span>{' '}
+              Baseball Home
+            </Button>
+          </Link>
+          
+          <Link to="/baseball/league/create" style={{ textDecoration: 'none' }}>
+            <Button
+              variant="outlined"
+              size="$3"
+              justifyContent="flex-start"
+              width="100%"
+              onPress={() => setIsOpen(false)}
+            >
+              <span role="img" aria-label="create-league">
+                ➕
+              </span>{' '}
+              Create League
+            </Button>
+          </Link>
+        </YStack>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
 function Navigation() {
   const location = useLocation();
 
@@ -57,12 +142,14 @@ function Navigation() {
       <NavContent>
         {/* Logo/Brand Section */}
         <XStack alignItems="center" space="$4">
-          <H1 color="$color" size="$6">
-            <span role="img" aria-label="football">
-              🏈
-            </span>{' '}
-            Legacy Sports
-          </H1>
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <H1 color="$color" size="$6" cursor="pointer" hoverStyle={{ opacity: 0.8 }}>
+              <span role="img" aria-label="football">
+                🏈
+              </span>{' '}
+              Legacy Sports
+            </H1>
+          </Link>
         </XStack>
 
         {/* Center Navigation Links */}
@@ -91,19 +178,8 @@ function Navigation() {
               Football
             </Button>
           </Link>
-          <Link to="/baseball" style={{ textDecoration: 'none' }}>
-            <Button
-              variant={
-                location.pathname === '/baseball' ? 'primary' : 'secondary'
-              }
-              size="$3"
-            >
-              <span role="img" aria-label="baseball">
-                ⚾
-              </span>{' '}
-              Baseball
-            </Button>
-          </Link>
+          {/* Baseball Dropdown Menu */}
+          <BaseballDropdownMenu />
           <Link to="/players" style={{ textDecoration: 'none' }}>
             <Button
               variant={
@@ -169,6 +245,8 @@ function App() {
           <Route path="/" element={<NavigableHomeScreen />} />
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
+          <Route path="/baseball/league/create" element={<LeagueCreatePage />} />
+          <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route path="/players" element={<PlayersScreen />} />
           <Route path="/players/stats" element={<WebPlayerStatsPage />} />
           <Route path="/players/:id" element={<WebPlayerDetailPage />} />
@@ -178,4 +256,6 @@ function App() {
   );
 }
 
-export default App;
+// Explicit default export
+const AppComponent = App;
+export default AppComponent;

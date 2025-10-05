@@ -15,10 +15,11 @@ query GetUserById($id: Int!) {
     ...User
   }
 }
-mutation CreateUser($input: CreateUserInput!) {
-  createUser(input: $input) {
-    user {
-      ...User
-    }
-  }
-}
+# CreateUser mutation not available in current schema
+# mutation CreateUser($input: CreateUserInput!) {
+#   createUser(input: $input) {
+#     user {
+#       ...User
+#     }
+#   }
+# }

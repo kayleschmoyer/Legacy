@@ -101,35 +101,36 @@ fragment SeasonPitching on SeasonPitching {
   wp
 }
 
-mutation UpsertSeasonBatting(
-  $input: UpsertSeasonBattingInput!
-  $where: UpsertSeasonBattingWhere!
-) {
-  upsertSeasonBatting(input: $input, where: $where) {
-    seasonBatting {
-      ...SeasonBatting
-    }
-  }
-}
+# Upsert mutations not available in current schema
+# mutation UpsertSeasonBatting(
+#   $input: UpsertSeasonBattingInput!
+#   $where: UpsertSeasonBattingWhere!
+# ) {
+#   upsertSeasonBatting(input: $input, where: $where) {
+#     seasonBatting {
+#       ...SeasonBatting
+#     }
+#   }
+# }
 
-mutation UpsertSeasonFielding(
-  $input: UpsertSeasonFieldingInput!
-  $where: UpsertSeasonFieldingWhere!
-) {
-  upsertSeasonFielding(input: $input, where: $where) {
-    seasonFielding {
-      ...SeasonFielding
-    }
-  }
-}
+# mutation UpsertSeasonFielding(
+#   $input: UpsertSeasonFieldingInput!
+#   $where: UpsertSeasonFieldingWhere!
+# ) {
+#   upsertSeasonFielding(input: $input, where: $where) {
+#     seasonFielding {
+#       ...SeasonFielding
+#     }
+#   }
+# }
 
-mutation UpsertSeasonPitching(
-  $input: UpsertSeasonPitchingInput!
-  $where: UpsertSeasonPitchingWhere!
-) {
-  upsertSeasonPitching(input: $input, where: $where) {
-    seasonPitching {
-      ...SeasonPitching
-    }
-  }
-}
+# mutation UpsertSeasonPitching(
+#   $input: UpsertSeasonPitchingInput!
+#   $where: UpsertSeasonPitchingWhere!
+# ) {
+#   upsertSeasonPitching(input: $input, where: $where) {
+#     seasonPitching {
+#       ...SeasonPitching
+#     }
+#   }
+# }

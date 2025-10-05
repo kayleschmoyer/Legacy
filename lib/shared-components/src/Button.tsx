@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Button as TamaguiButton,
   ButtonProps as TamaguiButtonProps,
+  Text,
 } from 'tamagui';
 
 export interface ButtonProps extends Omit<TamaguiButtonProps, 'variant'> {
@@ -22,9 +23,20 @@ function Button({
       ? { chromeless: true, ...props }
       : props;
 
+  // Auto-wrap string children in Text component for React Native compatibility
+  const processChildren = (child: React.ReactNode): React.ReactNode => {
+    if (typeof child === 'string') {
+      return <Text>{child}</Text>;
+    }
+    return child;
+  };
+
+  const content = children || title;
+  const wrappedContent = React.isValidElement(content) ? content : processChildren(content);
+
   return (
     <TamaguiButton size="$4" {...buttonProps}>
-      {children || title}
+      {wrappedContent}
     </TamaguiButton>
   );
 }

@@ -24,7 +24,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, leagueId }) => {
     <YStack flex={1} padding="$4" backgroundColor="$background" borderRadius="$4">
       <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
         <Text fontSize="$6" fontWeight="bold">League Chat</Text>
-        <Button size="$2" onPress={onClose}>X</Button>
+        <Button size="$2" onPress={onClose}><Text>X</Text></Button>
       </XStack>
       <ScrollView flex={1}>
         {messages.map((msg, index) => (
@@ -33,7 +33,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, leagueId }) => {
       </ScrollView>
       <XStack space="$2">
         <Input flex={1} value={message} onChangeText={setMessage} placeholder="Type message..." />
-        <Button onPress={sendMessage}>Send</Button>
+        <Button onPress={sendMessage}><Text>Send</Text></Button>
       </XStack>
     </YStack>
   );

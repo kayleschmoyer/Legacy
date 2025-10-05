@@ -12,7 +12,8 @@ query GetAllPlayers(
     orderDirection: $orderDirection
   ) {
     id
-    name
+    firstName
+    lastName
     brefId
   }
 }

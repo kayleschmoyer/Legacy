@@ -9,7 +9,8 @@ query GetPlayerSeasonFielding(
     ...SeasonFielding
     player {
       id
-      name
+      firstName
+      lastName
       brefId
     }
   }

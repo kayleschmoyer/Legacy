@@ -696,8 +696,6 @@ export function PlayerStatsDataGrid({
               paddingHorizontal="$3"
               pressStyle={{ backgroundColor: '$color4' }}
               onPress={() => handleRowClick(player)}
-              // @ts-expect-error - Add onClick for web compatibility in tests
-              onClick={() => handleRowClick(player)}
               cursor="pointer"
             >
               {visibleColumns.map((column) => (
@@ -825,7 +823,7 @@ export function PlayerStatsDataGrid({
               'An unexpected error occurred while loading player data.'}
           </Text>
           <Button theme="red" onPress={handleRefresh}>
-            Try Again
+            <Text>Try Again</Text>
           </Button>
         </YStack>
       )}

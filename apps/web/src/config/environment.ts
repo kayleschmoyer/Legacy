@@ -9,6 +9,7 @@
 export interface EnvironmentConfig {
   readonly oauthProxyUrl: string;
   readonly googleClientId: string;
+  readonly graphqlUrl: string;
   readonly isDev: boolean;
   readonly authTestMode: boolean;
 }
@@ -23,6 +24,8 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   googleClientId:
     (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) ||
     'placeholder-google-client-id',
+  graphqlUrl:
+    (import.meta.env.VITE_GRAPHQL_HOST as string) || 'http://localhost:5000/graphql',
   isDev: import.meta.env.DEV === true,
   authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
 });

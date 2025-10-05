@@ -1,5 +1,5 @@
 /* eslint-disable @nx/enforce-module-boundaries */
-import config from '@legacy-sports/codegen-base';
+import config from '../../lib/codegen/codegen.base';
 
-config.schema = process.env.GRAPHQL_HOST;
+config.schema = process.env.GRAPHQL_HOST || 'http://localhost:5000/graphql';
 export default config;

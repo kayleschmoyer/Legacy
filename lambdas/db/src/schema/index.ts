@@ -4,6 +4,8 @@ import { builder } from './builder';
 import './users';
 import './players';
 import './statistics';
+import './leagues';
+import './matchups';
 
 // Export the final schema
 export const schema = builder.toSchema();
