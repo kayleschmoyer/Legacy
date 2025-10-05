@@ -36,8 +36,8 @@ concurrency:
 
 env:
   JAVA_VERSION: "17"
-  # Build optimization environment variables
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m"
+  # Build optimization environment variables with improved network timeouts
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
   GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
   NODE_OPTIONS: "--max-old-space-size=4096"
 
@@ -128,6 +128,23 @@ jobs:
         run: |
           cd apps/app/android
           chmod +x gradlew
+          
+          # Pre-download Gradle distribution if not cached to avoid timeout during verify step
+          echo "🔍 Pre-checking Gradle distribution..."
+          if [ ! -d "$HOME/.gradle/wrapper/dists/gradle-8.10.2-all" ]; then
+            echo "📥 Pre-downloading Gradle distribution to avoid timeout..."
+            # Use curl to download with better timeout control
+            mkdir -p ~/.gradle/wrapper/dists/gradle-8.10.2-all
+            cd ~/.gradle/wrapper/dists/gradle-8.10.2-all
+            curl -L --fail --retry 3 --retry-delay 5 --connect-timeout 60 --max-time 600 \
+              -o gradle-8.10.2-all.zip \
+              "https://services.gradle.org/distributions/gradle-8.10.2-all.zip" || {
+              echo "⚠️ Direct download failed, will let Gradle wrapper handle it"
+              rm -f gradle-8.10.2-all.zip
+            }
+          else
+            echo "✅ Gradle distribution already cached"
+          fi
 
       - name: Cache Gradle Wrapper
         uses: actions/cache@v4
@@ -135,8 +152,9 @@ jobs:
           path: |
             ~/.gradle/wrapper
             apps/app/android/gradle/wrapper
-          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-wrapper-v2-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
+            ${{ runner.os }}-gradle-wrapper-v2-
             ${{ runner.os }}-gradle-wrapper-
 
       - name: Cache Gradle Dependencies
@@ -215,22 +233,31 @@ jobs:
             ${{ runner.os }}-gradle-build-
 
       - name: Verify Gradle Setup
-        timeout-minutes: 6
+        timeout-minutes: 10
         run: |
           cd apps/app/android
           
           echo "📥 Ensuring Gradle wrapper is available..."
+          echo "🕐 Gradle setup started at $(date)"
+          
+          # Set network timeout environment variables for better CI reliability
+          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
           
           # Download wrapper if needed and verify basic Gradle functionality
-          ./gradlew --version
-          
-          # Quick validation that build.gradle is parseable
-          ./gradlew help --quiet > /dev/null || {
-            echo "⚠️  Build configuration issue detected"
-            ./gradlew help  # Show error details
+          echo "🔍 Checking Gradle wrapper version..."
+          timeout 300s ./gradlew --version || {
+            echo "⚠️  Gradle version check timeout - retrying with verbose output"
+            timeout 300s ./gradlew --version --info
           }
           
-          echo "✅ Gradle setup verified"
+          # Quick validation that build.gradle is parseable (without dependency resolution)
+          echo "🔍 Validating build configuration..."
+          timeout 180s ./gradlew help --quiet --no-daemon > /dev/null || {
+            echo "⚠️  Build configuration issue detected - showing details:"
+            timeout 180s ./gradlew help --no-daemon  # Show error details
+          }
+          
+          echo "✅ Gradle setup verified at $(date)"
 
       - name: Check Cache Status
         run: |
