@@ -5,7 +5,7 @@
 ### Version Changes
 
 - **Expo SDK**: 52.0.47 → 53.0.22
-- **React Native**: 0.76.5 → 0.79.5
+- **React Native**: 0.76.5 → 0.79.6
 - **React**: 18.3.1 → 19.0.0
 - **React DOM**: 18.3.1 → 19.0.0
 
@@ -46,7 +46,7 @@ npm warn peer react-native@"^0.79.2" from tamagui@1.132.23
 ### After: All Dependencies Compatible
 
 - ✅ No peer dependency warnings
-- ✅ Tamagui 1.132.23 fully compatible with React Native 0.79.5
+- ✅ Tamagui 1.132.23 fully compatible with React Native 0.79.6
 - ✅ All builds working correctly
 
 ## 🔧 Configuration Updates
@@ -72,7 +72,7 @@ Reverted to default Tamagui v4 config (no custom animation driver needed)
 
 ## 🚀 Benefits Achieved
 
-1. **Resolved Peer Dependencies**: Tamagui 1.132.23 now works perfectly with React Native 0.79.5
+1. **Resolved Peer Dependencies**: Tamagui 1.132.23 now works perfectly with React Native 0.79.6
 2. **Latest Features**: Access to newest React Native and Expo features
 3. **Future-Proof**: Using officially supported version combinations
 4. **Performance**: React 19 improvements and React Native 0.79 optimizations

@@ -11,8 +11,35 @@ local.properties
 *.iml
 *.hprof
 .cxx/
+gradle-app.setting
 
-# Bundle artifacts
+# Bundle artifacts and React Native outputs
 *.jsbundle
 *.bundle
 **/assets/*.bundle
+main.jsbundle
+index.android.bundle
+
+# Android build outputs
+app/build/
+**/*.apk
+**/*.aab
+**/*.ap_
+releases/
+proguard/
+lint-results*
+*.log
+
+# Generated React Native files
+app/src/main/assets/index.android.bundle
+app/src/main/res/drawable-*
+app/src/main/res/raw/
+
+# Keystore files (keep debug keystore for development)
+*.keystore
+!debug.keystore
+
+# Android specific cache and temp files
+.externalNativeBuild/
+.cxx/
+captures/

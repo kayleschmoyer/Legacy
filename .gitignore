@@ -109,6 +109,52 @@ yarn-error.log
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
 
+# React Native Metro cache files
+~/.metro
+**/.metro/
+**/node_modules/.cache/metro/
+/tmp/metro-*
+/tmp/haste-map-*
+
+# React Native bundler cache and outputs
+**/main.jsbundle
+**/*.hbc
+
+# Hermes compiler cache and bytecode
+~/.hermes
+/tmp/hermes-*
+**/hermes/
+**/build/generated/assets/createBundle*/
+**/build/intermediates/merged_assets/
+
+# Android build outputs and cache (additional patterns)
+**/android/app/src/main/assets/index.android.bundle
+**/android/app/src/main/res/drawable-*
+**/android/app/src/main/res/raw/
+
+# iOS build outputs and cache (additional patterns)
+**/ios/.xcode.env.local
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcshareddata/
+
+# React Native packager and debugging
+**/.packager-info
+**/packager-info.json
+**/.flipper/
+**/flipper-rn-addons.json
+**/.react-native-cli/
+**/.watchmanconfig
+
+# APK and AAB files (Android distribution)
+**/*.apk
+**/*.aab
+**/*.ap_
+
+# IPA and dSYM files (iOS distribution)
+**/*.dSYM
+**/*.dSYM.zip
+
 # testing
 /coverage
 

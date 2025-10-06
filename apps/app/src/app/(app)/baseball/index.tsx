@@ -71,7 +71,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
       >
         {/* Hero section */}
         <ImageBackground
-          source="baseball-banner.jpg"
+          source="baseball_banner.jpg"
           style={{
             alignItems: 'center',
             borderRadius: 15,

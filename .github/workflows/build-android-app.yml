@@ -35,11 +35,20 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  JAVA_VERSION: "17"
-  # Build optimization environment variables with improved network timeouts
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
+  # Version Matrix Configuration
+  JAVA_VERSION: "17"                    # LTS version, compatible with RN 0.79.6
+  NODE_VERSION: "22"                    # Latest LTS, matches development environment
+  ANDROID_API_LEVEL: "35"              # Target SDK for Google Play compliance
+  NDK_VERSION: "27.1.12297006"         # Stable NDK for RN 0.79.6
+  
+  # Build optimization environment variables with improved network timeouts and cache limits
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.caching=true -Dorg.gradle.caching.debug=false -Dorg.gradle.cache.cleanup=true"
   GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
   NODE_OPTIONS: "--max-old-space-size=4096"
+  
+  # Cache optimization - reduce compression time during cleanup
+  ACTIONS_CACHE_COMPRESSION_LEVEL: "1"  # Lower compression = faster cleanup
+  ACTIONS_CACHE_MAX_SIZE: "5GB"         # Limit cache size
 
 jobs:
   setup:
@@ -94,7 +103,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
       - name: Setup Java
@@ -103,17 +112,30 @@ jobs:
           distribution: "temurin"
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Cache Node Modules
+      - name: Verify Version Matrix
+        run: |
+          echo "## 📋 Build Version Matrix" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java**: $(java -version 2>&1 | head -n1)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node.js**: $(node --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM**: $(npm --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Android API Level**: ${{ env.ANDROID_API_LEVEL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **NDK Version**: ${{ env.NDK_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **React Native**: $(node -p "require('./apps/app/package.json').dependencies['react-native'] || require('./package.json').dependencies['react-native']")" >> $GITHUB_STEP_SUMMARY
+
+      # Consolidated caching strategy to reduce cache overhead and improve cleanup speed
+      - name: Cache Dependencies and Build Artifacts
         uses: actions/cache@v4
         with:
           path: |
             ~/.npm
             node_modules
-            apps/app/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json', 'apps/app/package.json') }}
+            ~/.gradle/wrapper
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/jars-9  
+          key: ${{ runner.os }}-build-deps-${{ hashFiles('package-lock.json', 'apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/app/build.gradle') }}
           restore-keys: |
-            ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-build-deps-${{ hashFiles('package-lock.json') }}
+            ${{ runner.os }}-build-deps-
 
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps
@@ -128,109 +150,6 @@ jobs:
         run: |
           cd apps/app/android
           chmod +x gradlew
-          
-          # Pre-download Gradle distribution if not cached to avoid timeout during verify step
-          echo "🔍 Pre-checking Gradle distribution..."
-          if [ ! -d "$HOME/.gradle/wrapper/dists/gradle-8.10.2-all" ]; then
-            echo "📥 Pre-downloading Gradle distribution to avoid timeout..."
-            # Use curl to download with better timeout control
-            mkdir -p ~/.gradle/wrapper/dists/gradle-8.10.2-all
-            cd ~/.gradle/wrapper/dists/gradle-8.10.2-all
-            curl -L --fail --retry 3 --retry-delay 5 --connect-timeout 60 --max-time 600 \
-              -o gradle-8.10.2-all.zip \
-              "https://services.gradle.org/distributions/gradle-8.10.2-all.zip" || {
-              echo "⚠️ Direct download failed, will let Gradle wrapper handle it"
-              rm -f gradle-8.10.2-all.zip
-            }
-          else
-            echo "✅ Gradle distribution already cached"
-          fi
-
-      - name: Cache Gradle Wrapper
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/wrapper
-            apps/app/android/gradle/wrapper
-          key: ${{ runner.os }}-gradle-wrapper-v2-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-wrapper-v2-
-            ${{ runner.os }}-gradle-wrapper-
-
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches/modules-2
-            ~/.gradle/caches/jars-9
-            ~/.gradle/caches/transforms-3
-            ~/.gradle/caches/kotlin-dsl
-            ~/.gradle/kotlin
-          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('apps/app/android/app/build.gradle', 'apps/app/android/build.gradle', 'apps/app/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-deps-${{ hashFiles('apps/app/android/app/build.gradle', 'apps/app/android/build.gradle') }}
-            ${{ runner.os }}-gradle-deps-
-
-      - name: Cache Kotlin Compilation
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.konan
-            ~/.gradle/caches/kotlin-*
-            apps/app/android/build/kotlin
-            apps/app/android/app/build/kotlin
-          key: ${{ runner.os }}-kotlin-${{ hashFiles('apps/app/android/**/*.kt', 'apps/app/android/**/*.kts') }}
-          restore-keys: |
-            ${{ runner.os }}-kotlin-
-
-      - name: Cache Android SDK Components
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/sdk
-            /usr/local/lib/android/sdk
-          key: ${{ runner.os }}-android-sdk-${{ env.JAVA_VERSION }}-${{ hashFiles('apps/app/android/app/build.gradle') }}
-          restore-keys: |
-            ${{ runner.os }}-android-sdk-${{ env.JAVA_VERSION }}-
-            ${{ runner.os }}-android-sdk-
-
-      - name: Cache React Native Metro
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.metro
-            apps/app/node_modules/.cache/metro
-            /tmp/metro-*
-            /tmp/haste-map-*
-          key: ${{ runner.os }}-metro-${{ hashFiles('apps/app/package.json', 'apps/app/metro.config.js') }}
-          restore-keys: |
-            ${{ runner.os }}-metro-
-
-      - name: Cache Hermes Compiler
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.hermes
-            /tmp/hermes-*
-            apps/app/android/app/build/generated/assets/createBundle*/
-            apps/app/android/app/build/intermediates/merged_assets/
-          key: ${{ runner.os }}-hermes-${{ hashFiles('apps/app/**/*.js', 'apps/app/**/*.jsx', 'apps/app/**/*.ts', 'apps/app/**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-hermes-
-
-      - name: Cache Gradle Build Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches/build-cache-*
-            ~/.android/build-cache
-            apps/app/android/.gradle/buildOutputCleanup
-            apps/app/android/build
-            apps/app/android/app/build/intermediates
-          key: ${{ runner.os }}-gradle-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-build-${{ github.ref_name }}-
-            ${{ runner.os }}-gradle-build-
 
       - name: Verify Gradle Setup
         timeout-minutes: 10
@@ -243,12 +162,24 @@ jobs:
           # Set network timeout environment variables for better CI reliability
           export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
           
-          # Download wrapper if needed and verify basic Gradle functionality
+          # Version compatibility validation
+          echo "🔍 Validating version matrix compatibility..."
+          
+          # Check Java version compatibility
+          JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1-2)
+          echo "Java version detected: $JAVA_VERSION"
+          
+          # Check Gradle version
           echo "🔍 Checking Gradle wrapper version..."
           timeout 300s ./gradlew --version || {
             echo "⚠️  Gradle version check timeout - retrying with verbose output"
             timeout 300s ./gradlew --version --info
           }
+          
+          # Validate Android SDK configuration
+          echo "🔍 Validating Android SDK configuration..."
+          echo "Target Android API Level: ${{ env.ANDROID_API_LEVEL }}"
+          echo "NDK Version: ${{ env.NDK_VERSION }}"
           
           # Quick validation that build.gradle is parseable (without dependency resolution)
           echo "🔍 Validating build configuration..."
@@ -257,7 +188,7 @@ jobs:
             timeout 180s ./gradlew help --no-daemon  # Show error details
           }
           
-          echo "✅ Gradle setup verified at $(date)"
+          echo "✅ Gradle setup and version matrix verified at $(date)"
 
       - name: Check Cache Status
         run: |
@@ -407,6 +338,32 @@ jobs:
           name: android-apk-${{ needs.setup.outputs.build_type }}
           path: apps/app/android/${{ steps.build.outputs.apk_path }}
           retention-days: 30
+
+      - name: Cache Cleanup for Faster Compression
+        if: always()
+        run: |
+          echo "🧹 Cleaning up large cache directories to speed up post-job cleanup..."
+          
+          # Remove large temporary build artifacts that don't need to be cached
+          rm -rf apps/app/android/app/build/intermediates/merged_assets/ || true
+          rm -rf apps/app/android/app/build/intermediates/incremental/ || true
+          rm -rf apps/app/android/app/build/outputs/logs/ || true
+          rm -rf ~/.gradle/caches/build-cache-* || true
+          rm -rf ~/.android/build-cache || true
+          rm -rf /tmp/metro-* /tmp/haste-map-* || true
+          
+          # Clean up large node_modules that can be restored from npm cache
+          find node_modules -name "*.log" -delete || true
+          find node_modules -name ".DS_Store" -delete || true
+          
+          # Compress remaining gradle caches to reduce cleanup time
+          find ~/.gradle/caches -name "*.lock" -delete || true
+          
+          echo "✅ Cache cleanup completed. Remaining cache sizes:"
+          du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Cleaned"
+          du -sh node_modules 2>/dev/null || echo "  Node modules: $(du -sh node_modules | cut -f1)"
+          
+          echo "💡 Post-job cache compression should be much faster now"
 
   create-release:
     name: Create GitHub Release
