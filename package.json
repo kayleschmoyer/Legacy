@@ -255,7 +255,7 @@
     "ajv": "^8.0.0",
     "appium": "^3.0.2",
     "appium-uiautomator2-driver": "^5.0.3",
-    "appium-xcuitest-driver": "^10.1.2",
+    "appium-xcuitest-driver": "^10.1.6",
     "babel-jest": "^29.7.0",
     "babel-preset-expo": "~13.0.0",
     "concurrently": "^9.2.1",
