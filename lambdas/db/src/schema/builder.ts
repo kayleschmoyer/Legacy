@@ -1,4 +1,7 @@
 import SchemaBuilder from '@pothos/core';
+import RelayPlugin from '@pothos/plugin-relay';
+import DataloaderPlugin from '@pothos/plugin-dataloader';
+import ValidationPlugin from '@pothos/plugin-validation';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 
@@ -27,8 +30,10 @@ export const builder = new SchemaBuilder<{
     };
     Player: {
       id: number;
-      name: string;
+      firstName: string;
+      lastName: string;
       brefId: string;
+      statsLastFetchedAt: Date | null;
     };
     CareerBatting: {
       playerId: number | null;
@@ -95,6 +100,12 @@ export const builder = new SchemaBuilder<{
     };
   };
 }>({
+  plugins: [RelayPlugin, DataloaderPlugin, ValidationPlugin],
+  relayOptions: {
+    // Configure relay options for connections
+    clientMutationId: 'omit',
+    cursorType: 'String',
+  },
   // Add notStrict to make TypeScript happy
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore

@@ -7,8 +7,21 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { 
+  getSentryConfigFromEnv, 
+  initSentry, 
+  withSentry, 
+  captureError,
+  addBreadcrumb 
+} from '@legacy-sports/utils';
 import { and, eq, exists, not } from 'drizzle-orm';
 import { getDb } from '../utils/db';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 interface SelectGameEvent {
   matchupId: number;
@@ -102,7 +115,12 @@ async function selectGamesForMatchup(
   }
 }
 
-export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
+const baseSelectGameHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  addBreadcrumb(
+    `Processing ${event.Records.length} select game messages`,
+    { recordCount: event.Records.length }
+  );
+
   LOGGER.debug('Processing SQS event', { event });
 
   const db = await getDb();
@@ -113,11 +131,32 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
     for (const record of event.Records) {
       try {
         const matchup = JSON.parse(record.body) as SelectGameEvent;
+        
+        addBreadcrumb(
+          'Processing select game message',
+          { 
+            messageId: record.messageId,
+            matchupId: matchup.matchupId,
+            game: matchup.game
+          }
+        );
+
         await selectGamesForMatchup(db.db, matchup.matchupId, matchup.game);
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
         LOGGER.error('Error processing record', {
           error: err instanceof Error ? err.message : String(err),
+        });
+        
+        captureError(err instanceof Error ? err : new Error(String(err)), {
+          tags: {
+            lambda: 'game-selection-select-game',
+            operation: 'selectGamesForMatchup'
+          },
+          extra: {
+            messageId: record.messageId,
+            recordBody: record.body
+          }
         });
       }
     }
@@ -128,4 +167,6 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   return {
     batchItemFailures: failures,
   };
-}
+};
+
+export const handler = withSentry(baseSelectGameHandler);

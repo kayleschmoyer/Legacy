@@ -1,0 +1,10 @@
+query GetUserLeagues {
+  userLeagues {
+    id
+    name
+    owner
+    maxRosterSize
+    currentMatchup
+    draftStatus
+  }
+}

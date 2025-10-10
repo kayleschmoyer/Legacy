@@ -5,8 +5,8 @@
  * A simple wrapper around Drizzle's migration utilities that:
  * - Loads AWS credentials properly
  * - Uses environment configuration
- * - Runs internal schema migrations BEFORE public schema migrations
- * - Supports both schemas (public and app_internal)
+ * - Runs unified migrations for both schemas (public and app_internal)
+ * - Handles cross-schema dependencies in correct order
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -49,41 +49,19 @@ async function runMigrations() {
     // Create Drizzle instance
     const db = drizzle(pool);
 
-    LOGGER.info('🚀 Running migrations in order...');
+    LOGGER.info('🚀 Running unified migrations...');
 
-    // 1. Run internal schema migrations first (authentication, permissions)
-    const internalMigrationsPath = join(
-      process.cwd(),
-      'migrations',
-      'internal',
-    );
-    if (existsSync(internalMigrationsPath)) {
-      LOGGER.info('📋 Running internal schema migrations (app_internal)...');
-      await migrate(db, { migrationsFolder: internalMigrationsPath });
-      LOGGER.info('✅ Internal schema migrations completed');
+    // Run all migrations from the unified migrations folder
+    const migrationsPath = join(process.cwd(), 'migrations');
+    LOGGER.info(`� Migrations path: ${migrationsPath}`);
+    
+    if (existsSync(migrationsPath)) {
+      LOGGER.info('📋 Applying all migrations (both public and internal schemas)...');
+      await migrate(db, { migrationsFolder: migrationsPath });
+      LOGGER.info('✅ All migrations applied successfully');
     } else {
-      LOGGER.info('ℹ️ No internal schema migrations found');
-    }
-
-    // 2. Run public schema migrations second (depends on internal schema)
-    const publicMigrationsPath = join(process.cwd(), 'migrations', 'public');
-    if (existsSync(publicMigrationsPath)) {
-      LOGGER.info('📋 Running public schema migrations...');
-      await migrate(db, { migrationsFolder: publicMigrationsPath });
-      LOGGER.info('✅ Public schema migrations completed');
-    } else {
-      LOGGER.info('ℹ️ No public schema migrations found');
-    }
-
-    // 3. If no separate folders exist, run all migrations from main folder
-    const mainMigrationsPath = join(process.cwd(), 'migrations');
-    if (
-      !existsSync(internalMigrationsPath) &&
-      !existsSync(publicMigrationsPath) &&
-      existsSync(mainMigrationsPath)
-    ) {
-      LOGGER.info('📋 Running all migrations from main folder...');
-      await migrate(db, { migrationsFolder: mainMigrationsPath });
+      LOGGER.error(`❌ Migrations folder not found: ${migrationsPath}`);
+      throw new Error(`Migration folder does not exist: ${migrationsPath}`);
     }
 
     LOGGER.info('✅ All migrations completed successfully');

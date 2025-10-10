@@ -2,8 +2,8 @@
 #import "./careerBatting.fragment.graphql"
 
 query GetCareerBattingStats(
-  $limit: Int
-  $offset: Int
+  $first: Int
+  $after: String
   $orderBy: String
   $orderDirection: String
   $minGames: Int
@@ -13,8 +13,8 @@ query GetCareerBattingStats(
   $searchTerm: String
 ) {
   careerBattingStats(
-    limit: $limit
-    offset: $offset
+    first: $first
+    after: $after
     orderBy: $orderBy
     orderDirection: $orderDirection
     minGames: $minGames
@@ -23,6 +23,17 @@ query GetCareerBattingStats(
     minBattingAvg: $minBattingAvg
     searchTerm: $searchTerm
   ) {
-    ...CareerBatting
+    edges {
+      node {
+        ...CareerBatting
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    totalCount
   }
 }

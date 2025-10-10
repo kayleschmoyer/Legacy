@@ -8,6 +8,10 @@ export * from './lib/client/abstract/DbClient';
 // Service layer
 export * from './lib/services';
 
+// Draft utilities (database-dependent)
+export * from './lib/DraftUtils';
+export * from './lib/DraftService';
+
 // Types and configuration
 export * from './types';
 export * from './config/database';

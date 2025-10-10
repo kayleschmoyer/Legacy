@@ -1,0 +1,31 @@
+query HealthCheck {
+  # Test basic connectivity
+  __schema {
+    queryType {
+      name
+    }
+    mutationType {
+      name
+    }
+  }
+  
+  # Test user authentication and permissions
+  currentUser {
+    id
+    email
+    username
+    accessLevel
+  }
+  
+  # Test data access (if available)
+  users(limit: 1) {
+    id
+    email
+  }
+  
+  # Test if player data is accessible
+  players(limit: 1) {
+    id
+    name
+  }
+}

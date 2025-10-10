@@ -49,8 +49,13 @@ export async function handleComputeScoring(
     const pitchingStats = await getCareerPitchingStatsForPlayer(db, player.id);
 
     const battingScore = computeScoring(battingStats, DEFAULT_BATTING_SCORING);
+    
+    // Exclude positionsPlayed field from fielding stats as it's not used in scoring
+    const fieldingStatsForScoring = fieldingStats ? 
+      (({ positionsPlayed, ...rest }) => rest)(fieldingStats) : fieldingStats;
+    
     const fieldingScore = computeScoring(
-      fieldingStats,
+      fieldingStatsForScoring,
       DEFAULT_FIELDING_SCORING,
     );
     const pitchingScore = computeScoring(

@@ -3,3 +3,29 @@ fragment Team on Team {
   leagueId
   name
 }
+
+fragment TeamMember on TeamMember {
+  id
+  playerId
+  positionId
+  teamId
+  leagueId
+  player {
+    id
+    firstName
+    lastName
+    brefId
+  }
+}
+
+query GetTeamMembers($teamId: Int!) {
+  teamMembers(teamId: $teamId) {
+    ...TeamMember
+  }
+}
+
+mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+  updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
+    ...TeamMember
+  }
+}

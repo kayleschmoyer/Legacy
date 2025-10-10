@@ -88,7 +88,7 @@ export function PlayerStatsPage({
         <PlayerStatsDataGrid
           title="MLB Career Batting Leaders"
           initialParams={{
-            limit: initialPageSize,
+            first: initialPageSize,
             orderBy: 'homeRuns',
             orderDirection: 'desc',
             minGames: 100,

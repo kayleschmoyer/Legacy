@@ -41,8 +41,13 @@ switch ($FunctionName) {
         $ProjectName = 'game-selection'
         $SsmParam = "/legacy-sports/${Environment}/lambda/game-selection/version"
     }
+    'draft-processor' {
+        $LambdaDir = 'lambdas/draft-processor'
+        $ProjectName = 'draft-processor'
+        $SsmParam = "/legacy-sports/${Environment}/lambda/draft-processor/version"
+    }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, db, stats, oauth-proxy, game-selection"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, db, stats, oauth-proxy, game-selection, draft-processor"
     }
 }
 
@@ -95,6 +100,18 @@ Write-Host "Working in: $(Get-Location)"
 if (-not (Test-Path 'dist')) {
     Write-Error "Dist directory not found in $LambdaDir"
 }
+
+# Create version info file in dist directory for inclusion in package
+$DeployTimestamp = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ'
+$VersionInfo = @{
+    version = $Version
+    gitCommit = $CommitSha
+    deployedAt = $DeployTimestamp
+    environment = $Environment
+} | ConvertTo-Json -Depth 2
+
+$VersionInfo | Out-File -FilePath "dist/version-info.json" -Encoding UTF8
+Write-Host "Created version info: $Version (commit: $CommitSha)" -ForegroundColor Cyan
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory("$(Get-Location)\dist", "$(Get-Location)\$PackageName")

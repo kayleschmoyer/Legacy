@@ -14,7 +14,10 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: [
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['line'], // Console output for real-time feedback
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -92,8 +95,11 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npx nx serve web',
+    command: 'cross-env VITE_AUTH_TEST_MODE=true npx nx serve web',
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env.CI,
+    env: {
+      VITE_AUTH_TEST_MODE: 'true',
+    },
   },
 });

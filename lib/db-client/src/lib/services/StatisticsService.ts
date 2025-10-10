@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, ilike, or, sql, SQL } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
@@ -11,25 +12,27 @@ import {
   SeasonPitching,
 } from '../../types/DatabaseTypes';
 
-// Type-safe column access helpers to avoid unsafe any usage
+// Type-safe column access helpers with proper Drizzle types
 // These functions safely access Drizzle table columns by name for sorting
-function getBattingColumn(columnName: string) {
-  const columns = PublicSchema.seasonBatting;
-  const column = (columns as unknown as Record<string, unknown>)[columnName];
-  // Cast to the expected Drizzle column type for sorting
-  return column as SQL | undefined;
+
+type TableColumns<T> = T extends { [K: string]: AnyPgColumn } ? T : never;
+
+function getBattingColumn(columnName: string): AnyPgColumn | undefined {
+  const columns = PublicSchema.seasonBatting as TableColumns<typeof PublicSchema.seasonBatting>;
+  const column = columns[columnName as keyof typeof columns];
+  return column;
 }
 
-function getPitchingColumn(columnName: string) {
-  const columns = PublicSchema.seasonPitching;
-  const column = (columns as unknown as Record<string, unknown>)[columnName];
-  return column as SQL | undefined;
+function getPitchingColumn(columnName: string): AnyPgColumn | undefined {
+  const columns = PublicSchema.seasonPitching as TableColumns<typeof PublicSchema.seasonPitching>;
+  const column = columns[columnName as keyof typeof columns];
+  return column;
 }
 
-function getFieldingColumn(columnName: string) {
-  const columns = PublicSchema.seasonFielding;
-  const column = (columns as unknown as Record<string, unknown>)[columnName];
-  return column as SQL | undefined;
+function getFieldingColumn(columnName: string): AnyPgColumn | undefined {
+  const columns = PublicSchema.seasonFielding as TableColumns<typeof PublicSchema.seasonFielding>;
+  const column = columns[columnName as keyof typeof columns];
+  return column;
 }
 
 export interface StatisticsFilters {
@@ -83,7 +86,7 @@ export class StatisticsService {
   async getCareerBattingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerBatting[]> {
-    return runWithPublicClient(this.options, async (db) => {
+    return runWithPublicClient(this.options, async (db): Promise<CareerBatting[]> => {
       // Check if we need to join with players table for search term
       const needsPlayerJoin = queryOptions.filters?.searchTerm;
       
@@ -129,12 +132,15 @@ export class StatisticsService {
       // Add search term condition if needed
       if (needsPlayerJoin && queryOptions.filters?.searchTerm) {
         const searchTerm = queryOptions.filters.searchTerm;
-        conditions.push(
-          or(
-            ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
-            ilike(PublicSchema.players.lastName, `%${searchTerm}%`)
-          )
-        );
+        // Use properly typed column references
+        const firstNameCol = PublicSchema.players.firstName;
+        const lastNameCol = PublicSchema.players.lastName;
+        const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
+        const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
+        const searchCondition = or(firstNameMatch, lastNameMatch);
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
       }
 
       // Build final query parts
@@ -144,11 +150,20 @@ export class StatisticsService {
       let finalQuery = queryBuilder;
 
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          // TypeScript has issues with Drizzle's complex query builder types
+          // This is a safe cast since we know the query is valid
+          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        }
       }
 
       // Default ordering by home runs descending for interesting results
       if (queryOptions.orderBy === 'games') {
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
         finalQuery =
           orderDirection === 'desc'
             ? (finalQuery.orderBy(
@@ -158,6 +173,8 @@ export class StatisticsService {
                 asc(PublicSchema.careerBatting.g),
               ) as typeof finalQuery);
       } else if (queryOptions.orderBy === 'homeRuns') {
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
         finalQuery =
           orderDirection === 'desc'
             ? (finalQuery.orderBy(
@@ -168,22 +185,96 @@ export class StatisticsService {
               ) as typeof finalQuery);
       } else {
         // Default to home runs descending
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
         finalQuery = finalQuery.orderBy(
           desc(PublicSchema.careerBatting.hr),
         ) as typeof finalQuery;
       }
 
       if (queryOptions.limit) {
+        // TypeScript has issues with Drizzle's complex query builder types
+        // This is a safe cast since we know the query is valid
         finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
       }
 
       if (queryOptions.offset) {
+        // TypeScript has issues with Drizzle's complex query builder types  
+        // This is a safe cast since we know the query is valid
         finalQuery = finalQuery.offset(
           queryOptions.offset,
         ) as typeof finalQuery;
       }
 
-      return finalQuery.execute();
+      return await finalQuery.execute();
+    });
+  }
+
+  /**
+   * Get the total count of career batting statistics with optional filtering
+   * Uses the same filters as getCareerBattingStats but returns only the count
+   */
+  async getCareerBattingStatsCount(
+    queryOptions: StatisticsQueryOptions = {},
+  ): Promise<number> {
+    return runWithPublicClient(this.options, async (db): Promise<number> => {
+      // Check if we need to join with players table for search term
+      const needsPlayerJoin = queryOptions.filters?.searchTerm;
+      
+      let queryBuilder;
+      if (needsPlayerJoin) {
+        // Join with players table for name search - use count() for the count query
+        queryBuilder = db
+          .select({
+            count: count(),
+          })
+          .from(PublicSchema.careerBatting)
+          .innerJoin(
+            PublicSchema.players,
+            eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id)
+          );
+      } else {
+        queryBuilder = db
+          .select({
+            count: count(),
+          })
+          .from(PublicSchema.careerBatting);
+      }
+
+      // Build WHERE clause - same logic as getCareerBattingStats
+      const conditions = queryOptions.filters
+        ? this.buildBattingFilters(queryOptions.filters)
+        : [];
+
+      // Add search term condition if needed - same logic as getCareerBattingStats
+      if (needsPlayerJoin && queryOptions.filters?.searchTerm) {
+        const searchTerm = queryOptions.filters.searchTerm;
+        // Use properly typed column references
+        const firstNameCol = PublicSchema.players.firstName;
+        const lastNameCol = PublicSchema.players.lastName;
+        const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
+        const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
+        const searchCondition = or(firstNameMatch, lastNameMatch);
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+      }
+
+      // Apply WHERE conditions if any
+      let finalQuery = queryBuilder;
+
+      if (conditions.length > 0) {
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        }
+      }
+
+      // No need for ordering, limit, or offset in a count query
+      const result = await finalQuery.execute();
+      return result[0]?.count || 0;
     });
   }
 
@@ -193,7 +284,7 @@ export class StatisticsService {
   async getCareerPitchingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerPitching[]> {
-    return runWithPublicClient(this.options, async (db) => {
+    return runWithPublicClient(this.options, async (db): Promise<CareerPitching[]> => {
       const queryBuilder = db.select().from(PublicSchema.careerPitching);
 
       // Build WHERE clause
@@ -207,7 +298,12 @@ export class StatisticsService {
       let finalQuery = queryBuilder;
 
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        }
       }
 
       // Default ordering by wins descending for interesting results
@@ -290,7 +386,7 @@ export class StatisticsService {
   async getCareerFieldingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerFielding[]> {
-    return runWithPublicClient(this.options, async (db) => {
+    return runWithPublicClient(this.options, async (db): Promise<CareerFielding[]> => {
       const queryBuilder = db.select().from(PublicSchema.careerFielding);
 
       // Build WHERE clause
@@ -304,7 +400,12 @@ export class StatisticsService {
       let finalQuery = queryBuilder;
 
       if (conditions.length > 0) {
-        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        }
       }
 
       // Default ordering by games descending
@@ -371,7 +472,12 @@ export class StatisticsService {
       const orderDirection = queryOptions.orderDirection || 'desc';
 
       if (conditions.length > 0) {
-        queryBuilder.where(and(...conditions));
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder.where(whereClause);
+        }
       }
 
       if (queryOptions.orderBy) {
@@ -413,7 +519,12 @@ export class StatisticsService {
       const orderDirection = queryOptions.orderDirection || 'desc';
 
       if (conditions.length > 0) {
-        queryBuilder.where(and(...conditions));
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder.where(whereClause);
+        }
       }
 
       if (queryOptions.orderBy) {
@@ -455,7 +566,12 @@ export class StatisticsService {
       const orderDirection = queryOptions.orderDirection || 'desc';
 
       if (conditions.length > 0) {
-        queryBuilder.where(and(...conditions));
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder.where(whereClause);
+        }
       }
 
       if (queryOptions.orderBy) {
@@ -530,9 +646,12 @@ export class StatisticsService {
       const conditions = filters ? this.buildBattingFilters(filters) : [];
 
       if (conditions.length > 0) {
-        queryBuilder = queryBuilder.where(
-          and(...conditions),
-        ) as typeof queryBuilder;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
+        }
       }
 
       const result = await queryBuilder.execute();
@@ -552,9 +671,12 @@ export class StatisticsService {
       const conditions = filters ? this.buildPitchingFilters(filters) : [];
 
       if (conditions.length > 0) {
-        queryBuilder = queryBuilder.where(
-          and(...conditions),
-        ) as typeof queryBuilder;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
+        }
       }
 
       const result = await queryBuilder.execute();
@@ -574,9 +696,12 @@ export class StatisticsService {
       const conditions = filters ? this.buildFieldingFilters(filters) : [];
 
       if (conditions.length > 0) {
-        queryBuilder = queryBuilder.where(
-          and(...conditions),
-        ) as typeof queryBuilder;
+        // Filter out any undefined conditions before passing to and()
+        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        if (validConditions.length > 0) {
+          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
+        }
       }
 
       const result = await queryBuilder.execute();

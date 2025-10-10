@@ -60,6 +60,11 @@ async function resetDatabase() {
       DROP SCHEMA IF EXISTS app_internal CASCADE;
     `);
 
+    // Drop drizzle schema if it exists (contains migration tracking table)
+    await db.execute(sql`
+      DROP SCHEMA IF EXISTS drizzle CASCADE;
+    `);
+
     LOGGER.info('✅ Database reset completed successfully');
     LOGGER.info('📋 All tables and schemas have been dropped');
     LOGGER.info('🚀 Ready for fresh migrations');

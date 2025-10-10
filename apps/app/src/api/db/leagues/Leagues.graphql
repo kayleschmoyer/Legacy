@@ -3,6 +3,10 @@ fragment League on League {
   name
   owner
   currentMatchup
+  draftStatus
+  userMembership {
+    ...LeagueMember
+  }
   # leagueMembers field not available
   # leagueMembers @include(if: $withMembers) {
   #   nodes {
@@ -62,11 +66,18 @@ mutation CreateLeague(
   }
 }
 
-# leaguePositions query not available in current schema
-# query GetPositionsForLeague($leagueId: Int!) {
-#   leaguePositions(condition: { leagueId: $leagueId }) {
-#     nodes {
-#       ...LeaguePosition
-#     }
-#   }
-# }
+query GetPositionsForLeague($leagueId: Int!) {
+  leaguePositions(leagueId: $leagueId) {
+    ...LeaguePosition
+  }
+}
+
+mutation DeleteAllLeagues {
+  deleteAllLeagues
+}
+
+mutation StartDraft($leagueId: Int!, $draftType: String) {
+  startDraft(leagueId: $leagueId, draftType: $draftType) {
+    ...League
+  }
+}

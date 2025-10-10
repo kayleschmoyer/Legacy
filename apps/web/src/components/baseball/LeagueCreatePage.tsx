@@ -20,17 +20,22 @@ import { useCreateLeagueAndTeamsMutation, GetUserLeagues, GetUserLeaguesQuery } 
 interface CreateLeagueFormData {
   leagueName: string;
   numberOfTeams: number;
-  draftType: 'NORMAL' | 'BLIND';
+  draftType: 'NORMAL' | 'BLIND' | 'RANDOM-DRAFT';
+  maxRosterSize: number;
   draftDate?: Date;
 }
 
 // Team count options
 const TEAM_COUNT_OPTIONS = [6, 8, 10, 12, 14, 16];
 
+// Roster size options
+const ROSTER_SIZE_OPTIONS = [20, 22, 25, 30, 35, 40];
+
 // Draft type options
 const DRAFT_TYPES = [
   { label: 'Standard Draft', value: 'NORMAL' },
   { label: 'Blind Draft', value: 'BLIND' },
+  { label: 'Random Draft', value: 'RANDOM-DRAFT' },
 ] as const;
 
 export function LeagueCreatePage(): React.JSX.Element {
@@ -39,6 +44,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     leagueName: '',
     numberOfTeams: 10,
     draftType: 'NORMAL',
+    maxRosterSize: 25, // Default to 25 players
     draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 1 week from now
   });
 
@@ -111,6 +117,10 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'Number of teams must be between 6 and 16';
     }
 
+    if (formData.maxRosterSize < 15 || formData.maxRosterSize > 50) {
+      return 'Roster size must be between 15 and 50 players';
+    }
+
     if (!formData.draftDate) {
       return 'Please select a draft date';
     }
@@ -139,6 +149,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
             draftType: formData.draftType,
+            maxRosterSize: formData.maxRosterSize, // User-selected roster size
             startDate: formData.draftDate!.toISOString().split('T')[0], // Format as YYYY-MM-DD
             isPublic: false, // Default to private leagues
             tradingEnabled: true, // Default settings
@@ -250,6 +261,50 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </Text>
               </YStack>
 
+              {/* Roster Size */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Roster Size *
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {ROSTER_SIZE_OPTIONS.map((size) => (
+                    <Button
+                      key={size}
+                      size="$3"
+                      variant={formData.maxRosterSize === size ? 'primary' : 'outlined'}
+                      onPress={(e: any) => {
+                        e?.preventDefault?.();
+                        e?.stopPropagation?.();
+                        handleInputChange('maxRosterSize', size);
+                      }}
+                      disabled={loading}
+                      minWidth="$5"
+                      backgroundColor={formData.maxRosterSize === size ? '$blue8' : '$color2'}
+                      borderColor={formData.maxRosterSize === size ? '$blue8' : '$borderColor'}
+                      borderWidth={formData.maxRosterSize === size ? 2 : 1}
+                      hoverStyle={{ 
+                        backgroundColor: formData.maxRosterSize === size ? '$blue9' : '$color3',
+                        borderColor: formData.maxRosterSize === size ? '$blue9' : '$borderColorHover'
+                      }}
+                      pressStyle={{ 
+                        scale: 0.95,
+                        backgroundColor: formData.maxRosterSize === size ? '$blue7' : '$color4'
+                      }}
+                    >
+                      <Text 
+                        color={formData.maxRosterSize === size ? '$blue12' : '$color'}
+                        fontWeight={formData.maxRosterSize === size ? '600' : '400'}
+                      >
+                        {size}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Number of players each team can have (15-50 recommended)
+                </Text>
+              </YStack>
+
               {/* Draft Type */}
               <YStack space="$2">
                 <Text size="$4" fontWeight="600" color="$gray12">
@@ -292,7 +347,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                 <Text size="$2" color="$gray10">
                   {formData.draftType === 'NORMAL' 
                     ? 'Standard draft where you can see other picks'
-                    : 'Blind draft where picks are hidden until reveal'
+                    : formData.draftType === 'BLIND'
+                    ? 'Blind draft where picks are hidden until reveal' 
+                    : 'Random draft where players are automatically assigned to teams'
                   }
                 </Text>
               </YStack>

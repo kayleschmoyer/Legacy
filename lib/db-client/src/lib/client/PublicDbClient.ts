@@ -183,8 +183,7 @@ export async function bulkCreatePlayers(
   return await db
     .insert(Schema.players)
     .values(players)
-    .onConflictDoUpdate({
-      set: conflictUpdateAllExcept(Schema.players, ['brefId']),
+    .onConflictDoNothing({
       target: [Schema.players.brefId],
     })
     .returning();
@@ -351,3 +350,12 @@ export function getMatchup(
     )
     .then(TakeUniqueOrNull);
 }
+
+// Re-export player stats utilities
+export {
+  getPlayersWithoutStats,
+  getPlayersWithStaleStats,
+  getPlayersNeedingStatsRefresh,
+  getStatsRefreshSummary,
+  getPlayersOrderedByLastFetch,
+} from './PlayerStatsUtils';

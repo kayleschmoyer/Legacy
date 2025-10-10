@@ -6,6 +6,7 @@ import './players';
 import './statistics';
 import './leagues';
 import './matchups';
+import './version';
 
 // Export the final schema
 export const schema = builder.toSchema();

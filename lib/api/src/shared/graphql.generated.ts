@@ -59,6 +59,7 @@ export type CareerFielding = {
   pickoffs?: Maybe<Scalars['Int']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positions?: Maybe<Scalars['String']['output']>;
+  positionsPlayed?: Maybe<Scalars['String']['output']>;
   putouts?: Maybe<Scalars['Int']['output']>;
   stolenBases?: Maybe<Scalars['Int']['output']>;
   wildPitches?: Maybe<Scalars['Int']['output']>;
@@ -107,12 +108,15 @@ export type CreateLeagueAndTeamsInput = {
 export type CreateLeagueAndTeamsPayload = {
   __typename?: 'CreateLeagueAndTeamsPayload';
   league?: Maybe<League>;
+  leagueMembers?: Maybe<Array<LeagueMember>>;
+  teams?: Maybe<Array<Team>>;
 };
 
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
   currentMatchup?: Maybe<Scalars['Int']['output']>;
+  draftStatus?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
@@ -122,7 +126,6 @@ export type League = {
 /** A member of a league */
 export type LeagueMember = {
   __typename?: 'LeagueMember';
-  id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   permissionLevel?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
@@ -149,12 +152,33 @@ export type Matchup = {
 export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
+  addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
+  deleteAllLeagues?: Maybe<Scalars['String']['output']>;
+  startDraft?: Maybe<League>;
+  updateTeamMemberPosition?: Maybe<TeamMember>;
+};
+
+
+export type MutationAddDefaultPositionsToLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
+};
+
+
+export type MutationStartDraftArgs = {
+  draftType?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+};
+
+
+export type MutationUpdateTeamMemberPositionArgs = {
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+  teamMemberId: Scalars['Int']['input'];
 };
 
 export type Player = {
@@ -163,6 +187,7 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
 export type Query = {
@@ -172,6 +197,7 @@ export type Query = {
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
+  leaguePositions?: Maybe<Array<LeaguePosition>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -186,20 +212,26 @@ export type Query = {
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  teamMembers?: Maybe<Array<TeamMember>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
+  userLeagues: Array<League>;
   users?: Maybe<Array<User>>;
+  /** Get version and deployment information for the GraphQL API */
+  version?: Maybe<VersionInfo>;
 };
 
 
 export type QueryCareerBattingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
+  minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -225,6 +257,11 @@ export type QueryCareerPitchingStatsArgs = {
 
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
+};
+
+
+export type QueryLeaguePositionsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 
@@ -328,6 +365,11 @@ export type QuerySeasonPitchingStatsArgs = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryTeamMembersArgs = {
+  teamId: Scalars['Int']['input'];
 };
 
 
@@ -460,12 +502,36 @@ export type Team = {
   name?: Maybe<Scalars['String']['output']>;
 };
 
+/** A member of a team */
+export type TeamMember = {
+  __typename?: 'TeamMember';
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  positionId?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;
+};
+
+/** Version and deployment information for the GraphQL API */
+export type VersionInfo = {
+  __typename?: 'VersionInfo';
+  /** Deployment timestamp (ISO 8601) */
+  deployedAt?: Maybe<Scalars['String']['output']>;
+  /** Runtime environment (development, production, etc.) */
+  environment?: Maybe<Scalars['String']['output']>;
+  /** Git commit hash (short) */
+  gitCommit?: Maybe<Scalars['String']['output']>;
+  /** Package version from package.json */
+  version?: Maybe<Scalars['String']['output']>;
 };
 
 export type GetAllPlayersQueryVariables = Exact<{

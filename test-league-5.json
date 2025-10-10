@@ -1,0 +1,3 @@
+{
+  "query": "{ league(id: 5) { id name draftStatus } }"
+}

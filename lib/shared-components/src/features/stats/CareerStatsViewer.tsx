@@ -44,13 +44,22 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
         >
           {title}
         </h3>
-        <table
+        <div
           style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            backgroundColor: '#0f0f23',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            overflowX: 'auto',
+            border: '1px solid #3a3a5a',
+            borderRadius: '4px',
           }}
         >
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              backgroundColor: '#0f0f23',
+            }}
+          >
           <thead>
             <tr>
               {headers.map((header, index) => (
@@ -92,6 +101,7 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     );
   }

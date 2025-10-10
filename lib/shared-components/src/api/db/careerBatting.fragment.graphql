@@ -1,6 +1,8 @@
 # Career Batting fragment defining the fields for career batting statistics
 fragment CareerBatting on CareerBatting {
   playerId
+  primaryPosition
+  positionsPlayed
   games
   plateAppearances
   atBats
@@ -22,4 +24,10 @@ fragment CareerBatting on CareerBatting {
   battingAverage
   onBasePercentage
   sluggingPercentage
+  player {
+    id
+    firstName
+    lastName
+    brefId
+  }
 }

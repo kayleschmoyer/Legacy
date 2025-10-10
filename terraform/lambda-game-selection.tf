@@ -124,6 +124,11 @@ resource "aws_lambda_function" "game_selection" {
 
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+
+      # Sentry configuration
+      SENTRY_DSN               = var.sentry_dsn
+      SENTRY_TRACES_SAMPLE_RATE = "0.1"
+      SENTRY_DEBUG             = "false"
     }
   }
 

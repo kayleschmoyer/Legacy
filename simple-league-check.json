@@ -1,0 +1,3 @@
+{
+  "query": "{ league(id: 5) { id name draftStatus teams { nodes { id name teamMembers { nodes { id playerId player { firstName lastName } } } } } } }"
+}

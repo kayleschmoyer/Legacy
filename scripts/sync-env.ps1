@@ -107,7 +107,10 @@ $newEnvVars["COOKIE_SECRET"] = $cookieSecret
 # AWS Configuration
 $newEnvVars["AWS_REGION"] = $terraformOutput.environment_variables_summary.value.aws_region
 $newEnvVars["RDS_PROXY_ENDPOINT"] = $terraformOutput.rds_proxy_endpoint.value
-$newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_queue_url
+$newEnvVars["SQS_LOAD_SEASON_STATS_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url
+$newEnvVars["SQS_AUTOMATIC_DRAFTS_URL"] = $terraformOutput.environment_variables_summary.value.sqs_automatic_drafts_url
+# Legacy support
+$newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url
 
 # Get direct database endpoint for migrations (if available)
 try {
@@ -253,7 +256,8 @@ Write-Host "  RDS Proxy Endpoint: $($terraformOutput.rds_proxy_endpoint.value)" 
 Write-Host "  Direct RDS Endpoint: $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
 Write-Host "  CLI Database Access: Direct RDS (publicly accessible)" -ForegroundColor Green
 Write-Host "  AWS Region: $($terraformOutput.environment_variables_summary.value.aws_region)" -ForegroundColor Gray
-Write-Host "  SQS Queue URL: $($terraformOutput.environment_variables_summary.value.sqs_queue_url)" -ForegroundColor Gray
+Write-Host "  SQS Load Season Stats URL: $($terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url)" -ForegroundColor Gray
+Write-Host "  SQS Automatic Drafts URL: $($terraformOutput.environment_variables_summary.value.sqs_automatic_drafts_url)" -ForegroundColor Gray
 Write-Host "  Google Client ID: $($terraformOutput.environment_variables_summary.value.google_oauth_client_id)" -ForegroundColor Gray
 Write-Host "  Secrets configured: JWT, Google OAuth, Cookie" -ForegroundColor Gray
 Write-Host ""

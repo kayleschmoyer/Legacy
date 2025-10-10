@@ -1,8 +1,22 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
+// Determine the GraphQL schema endpoint from environment variables
+const getGraphQLSchemaEndpoint = (): string => {
+  // Try multiple environment variable patterns to support different deployment contexts
+  const endpoint = 
+    process.env.GRAPHQL_HOST ||
+    process.env.VITE_GRAPHQL_HOST || 
+    process.env.EXPO_PUBLIC_GRAPHQL_HOST ||
+    process.env.REACT_APP_GRAPHQL_HOST ||
+    'http://localhost:5000/graphql'; // fallback for local development
+
+  console.log(`🔗 API GraphQL CodeGen using schema endpoint: ${endpoint}`);
+  return endpoint;
+};
+
 const config: CodegenConfig = {
   overwrite: true,
-  schema: process.env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
+  schema: getGraphQLSchemaEndpoint(),
   documents: [
     'src/shared/hello.query.graphql',
     'src/resources/players/*.graphql',

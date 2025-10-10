@@ -30,6 +30,19 @@ interface MigrationSummary {
   [schema: string]: number;
 }
 
+// Type guard to safely check if a row matches the expected structure
+function isMigrationStateRow(row: unknown): row is MigrationStateRow {
+  return (
+    typeof row === 'object' &&
+    row !== null &&
+    'id' in row &&
+    'schema' in row &&
+    'name' in row &&
+    'applied_at' in row &&
+    'checksum' in row
+  );
+}
+
 async function main() {
   console.log('🔍 Checking migration_state table...\n');
 
@@ -57,21 +70,26 @@ async function main() {
       );
     } else {
       result.rows.forEach((row) => {
-        const migrationRow = row as unknown as MigrationStateRow;
-        const id = String(migrationRow.id).padStart(2, ' ');
-        const schema = String(migrationRow.schema).padEnd(8, ' ');
-        const name = String(migrationRow.name).padEnd(33, ' ');
-        const appliedAt = new Date(migrationRow.applied_at)
-          .toISOString()
-          .slice(0, 19);
-        console.log(`${id} | ${schema} | ${name} | ${appliedAt}`);
+        // Safely type the row with proper validation
+        if (isMigrationStateRow(row)) {
+          const id = String(row.id).padStart(2, ' ');
+          const schema = String(row.schema).padEnd(8, ' ');
+          const name = String(row.name).padEnd(33, ' ');
+          const appliedAt = new Date(row.applied_at)
+            .toISOString()
+            .slice(0, 19);
+          console.log(`${id} | ${schema} | ${name} | ${appliedAt}`);
+        } else {
+          console.log('   | Invalid row data format |                   |');
+        }
       });
     }
 
     console.log('\n📈 Summary:');
     const bySchema = result.rows.reduce((acc: MigrationSummary, row) => {
-      const migrationRow = row as unknown as MigrationStateRow;
-      acc[migrationRow.schema] = (acc[migrationRow.schema] || 0) + 1;
+      if (isMigrationStateRow(row)) {
+        acc[row.schema] = (acc[row.schema] || 0) + 1;
+      }
       return acc;
     }, {} as MigrationSummary);
 

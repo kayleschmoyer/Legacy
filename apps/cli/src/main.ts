@@ -59,6 +59,38 @@ import {
 } from './commands/testRawConnection';
 import { main as testDatabase } from './commands/test-database';
 import { decodeJwtCommandBuilder, handleDecodeJwt } from './commands/decodeJwt';
+import {
+  setUserTypeCommandBuilder,
+  handleSetUserType,
+} from './commands/setUserType';
+import {
+  listUsersCommandBuilder,
+  handleListUsers,
+} from './commands/listUsers';
+import {
+  authCommandBuilder,
+  handleAuth,
+} from './commands/auth';
+import {
+  authenticatedListUsersCommandBuilder,
+  handleAuthenticatedListUsers,
+} from './commands/authenticatedListUsers';
+import {
+  graphqlTestCommandBuilder,
+  handleGraphQLTest,
+} from './commands/graphqlTest';
+import {
+  generateJwtCommandBuilder,
+  handleGenerateJwt,
+} from './commands/generateJwt';
+import {
+  inspectSqsQueueCommandBuilder,
+  handleInspectSqsQueue,
+} from './commands/inspectSqsQueue';
+import {
+  startDraftCommandBuilder,
+  handleStartDraft,
+} from './commands/startDraft';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -160,6 +192,54 @@ async function run(): Promise<void> {
       'Decode and analyze a JWT token',
       decodeJwtCommandBuilder,
       handleDecodeJwt,
+    )
+    .command(
+      'set-user-type',
+      'Set the access level for a user by email address',
+      setUserTypeCommandBuilder,
+      handleSetUserType,
+    )
+    .command(
+      'list-users',
+      'List existing users with their IDs and email addresses',
+      listUsersCommandBuilder,
+      handleListUsers,
+    )
+    .command(
+      'auth <action>',
+      'Manage CLI authentication (login, logout, status, switch, list)',
+      authCommandBuilder,
+      handleAuth,
+    )
+    .command(
+      'list-users-auth',
+      'List users using authenticated GraphQL API (demo of auth system)',
+      authenticatedListUsersCommandBuilder,
+      handleAuthenticatedListUsers,
+    )
+    .command(
+      'graphql-test',
+      'Execute arbitrary GraphQL queries with authentication',
+      graphqlTestCommandBuilder,
+      handleGraphQLTest,
+    )
+    .command(
+      'generate-jwt',
+      'Generate a JWT token for a specific user (development/testing)',
+      generateJwtCommandBuilder,
+      handleGenerateJwt,
+    )
+    .command(
+      'inspect-sqs-queue',
+      'Inspect and manage the SQS draft queue',
+      inspectSqsQueueCommandBuilder,
+      handleInspectSqsQueue,
+    )
+    .command(
+      'start-draft',
+      'Start a draft for a specific league',
+      startDraftCommandBuilder,
+      handleStartDraft,
     )
     .demandCommand()
     .help()

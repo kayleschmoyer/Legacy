@@ -1,93 +1,17 @@
 // Career Statistics API for Players Table
 // Uses the career statistics queries from the GraphQL schema
 
-import { gql, useQuery } from '@apollo/client';
+import {
+  useGetCareerBattingStatsQuery,
+  GetCareerBattingStatsQuery,
+  GetCareerBattingStatsQueryVariables,
+  CareerBattingFragment,
+} from '../../api/db/graphql.generated';
 
-// GraphQL query for career batting statistics
-const GET_CAREER_BATTING_STATS = gql`
-  query GetCareerBattingStats(
-    $limit: Int
-    $offset: Int
-    $orderBy: String
-    $orderDirection: String
-    $minGames: Int
-    $minHomeRuns: Int
-    $minRBI: Int
-  ) {
-    careerBattingStats(
-      limit: $limit
-      offset: $offset
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-      minGames: $minGames
-      minHomeRuns: $minHomeRuns
-      minRBI: $minRBI
-    ) {
-      playerId
-      games
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      totalBases
-      groundedIntoDoublePlays
-      hitByPitch
-      sacrificeHits
-      intentionalBaseOnBalls
-      battingAverage
-      onBasePercentage
-      sluggingPercentage
-    }
-  }
-`;
-
-// TypeScript interface for the GraphQL response
-export interface CareerBattingStats {
-  playerId: number | null;
-  games: number | null;
-  plateAppearances: number | null;
-  atBats: number | null;
-  runs: number | null;
-  hits: number | null;
-  doubles: number | null;
-  triples: number | null;
-  homeRuns: number | null;
-  rbi: number | null;
-  stolenBases: number | null;
-  caughtStealing: number | null;
-  baseOnBalls: number | null;
-  strikeouts: number | null;
-  totalBases: number | null;
-  groundedIntoDoublePlays: number | null;
-  hitByPitch: number | null;
-  sacrificeHits: number | null;
-  intentionalBaseOnBalls: number | null;
-  battingAverage: number | null;
-  onBasePercentage: number | null;
-  sluggingPercentage: number | null;
-}
-
-export interface GetCareerBattingStatsResponse {
-  careerBattingStats: CareerBattingStats[];
-}
-
-export interface GetCareerBattingStatsVariables {
-  limit?: number;
-  offset?: number;
-  orderBy?: string;
-  orderDirection?: string;
-  minGames?: number;
-  minHomeRuns?: number;
-  minRBI?: number;
-}
+// Use generated types instead of manual interfaces
+export type CareerBattingStats = CareerBattingFragment;
+export type GetCareerBattingStatsResponse = GetCareerBattingStatsQuery;
+export type GetCareerBattingStatsVariables = GetCareerBattingStatsQueryVariables;
 
 // Enhanced player interface that combines basic player info with career stats
 export interface PlayerWithCareerStats {
@@ -120,41 +44,39 @@ export interface PlayerWithCareerStats {
 export function useCareerBattingStatsQuery(
   variables?: GetCareerBattingStatsVariables,
 ) {
-  const { data, loading, error, refetch, fetchMore } = useQuery<
-    GetCareerBattingStatsResponse,
-    GetCareerBattingStatsVariables
-  >(GET_CAREER_BATTING_STATS, {
+  const { data, loading, error, refetch, fetchMore } = useGetCareerBattingStatsQuery({
     variables,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
   });
 
   // Transform GraphQL data to enhanced player format with career stats
+  // Note: Using abbreviated field names from generated schema (g, pa, ab, etc.)
   const transformedData: PlayerWithCareerStats[] =
-    data?.careerBattingStats?.map((stats: CareerBattingStats) => ({
+    data?.careerBattings?.nodes?.filter(stats => stats !== null).map((stats) => ({
       playerId: stats.playerId,
       displayName: `Player ${stats.playerId || 'Unknown'}`, // We'll need to join with player names later
 
-      // Career Statistics
-      games: stats.games,
-      plateAppearances: stats.plateAppearances,
-      atBats: stats.atBats,
-      runs: stats.runs,
-      hits: stats.hits,
-      doubles: stats.doubles,
-      triples: stats.triples,
-      homeRuns: stats.homeRuns,
-      rbi: stats.rbi,
-      stolenBases: stats.stolenBases,
-      caughtStealing: stats.caughtStealing,
-      baseOnBalls: stats.baseOnBalls,
-      strikeouts: stats.strikeouts,
-      totalBases: stats.totalBases,
+      // Career Statistics (using abbreviated field names from schema)
+      games: parseInt(stats.g || '0', 10),
+      plateAppearances: parseInt(stats.pa || '0', 10),
+      atBats: parseInt(stats.ab || '0', 10),
+      runs: parseInt(stats.r || '0', 10),
+      hits: parseInt(stats.h || '0', 10),
+      doubles: parseInt(stats.doubles || '0', 10),
+      triples: parseInt(stats.triples || '0', 10),
+      homeRuns: parseInt(stats.hr || '0', 10),
+      rbi: parseInt(stats.rbi || '0', 10),
+      stolenBases: parseInt(stats.sb || '0', 10),
+      caughtStealing: parseInt(stats.cs || '0', 10),
+      baseOnBalls: parseInt(stats.bb || '0', 10),
+      strikeouts: parseInt(stats.so || '0', 10),
+      totalBases: parseInt(stats.tb || '0', 10),
 
-      // Computed Statistics
-      battingAverage: stats.battingAverage,
-      onBasePercentage: stats.onBasePercentage,
-      sluggingPercentage: stats.sluggingPercentage,
+      // Computed Statistics (not in schema - need to calculate)
+      battingAverage: null,
+      onBasePercentage: null,
+      sluggingPercentage: null,
     })) || [];
 
   return {

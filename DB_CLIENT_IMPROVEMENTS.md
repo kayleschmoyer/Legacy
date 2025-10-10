@@ -122,9 +122,10 @@ src/
 
 ### 🚀 **Migration Workflow**
 
-- Separate schema migration tracking
+- Unified migration approach for both schemas
 - Clear migration documentation
 - Safe migration practices
+- Cross-schema dependency handling
 
 ### 🔒 **Type Safety**
 

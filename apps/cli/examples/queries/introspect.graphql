@@ -1,0 +1,9 @@
+query IntrospectSchema {
+  __schema {
+    types {
+      name
+      kind
+      description
+    }
+  }
+}

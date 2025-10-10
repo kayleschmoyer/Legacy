@@ -5,7 +5,8 @@
  * statistics with server-side sorting, filtering, search, and pagination.
  *
  * Features:
- * - Server-side operations (sort, filter, search, paginate)
+ * - Server-side operations with GraphQL connections (sort, filter, search, paginate)
+ * - Cursor-based pagination using relay-style connections
  * - Responsive design (mobile-first)
  * - Accessibility compliant (ARIA labels, keyboard navigation)
  * - Cross-platform compatibility (Web/React Native)
@@ -175,6 +176,16 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     description: 'Player name and identifier',
   },
   {
+    key: 'formattedPositions',
+    label: 'Positions',
+    sortable: false,
+    width: '150px',
+    minWidth: 120,
+    align: 'left',
+    priority: 'medium',
+    description: 'Positions played with games count, sorted by most played',
+  },
+  {
     key: 'games',
     label: 'G',
     sortable: true,
@@ -292,7 +303,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
  * ```tsx
  * <PlayerStatsDataGrid
  *   title="Top Home Run Hitters"
- *   initialParams={{ orderBy: 'homeRuns', orderDirection: 'desc', limit: 50 }}
+ *   initialParams={{ orderBy: 'homeRuns', orderDirection: 'desc', first: 50 }}
  *   onPlayerSelect={(player) => navigateToPlayer(player.playerId)}
  *   showSearch={true}
  *   showFilters={true}
@@ -364,7 +375,7 @@ export function PlayerStatsDataGrid({
     (columnKey: string, orderDirection: 'asc' | 'desc') => {
       // Map UI column key to GraphQL sort field
       const sortField = COLUMN_TO_SORT_FIELD_MAP[columnKey] || columnKey;
-      updateQueryParams({ orderBy: sortField, orderDirection, offset: 0 }); // Reset to first page
+      updateQueryParams({ orderBy: sortField, orderDirection, after: undefined }); // Reset to first page
     },
     [updateQueryParams],
   );
@@ -385,7 +396,7 @@ export function PlayerStatsDataGrid({
     (filterKey: string, value: number) => {
       const newFilters = { ...localFilters, [filterKey]: value };
       setLocalFilters(newFilters);
-      updateQueryParams({ ...newFilters, offset: 0 });
+      updateQueryParams({ ...newFilters, after: undefined }); // Reset to first page
     },
     [localFilters, updateQueryParams],
   );
@@ -395,14 +406,21 @@ export function PlayerStatsDataGrid({
    */
   const handlePageChange = useCallback(
     (direction: 'next' | 'prev') => {
-      const offset = queryParams.offset ?? 0;
-      const limit = queryParams.limit ?? 25;
-      const newOffset =
-        direction === 'next' ? offset + limit : Math.max(0, offset - limit);
-
-      updateQueryParams({ offset: newOffset });
+      if (direction === 'next' && hasNextPage) {
+        // Use endCursor from current page as the 'after' cursor for next page
+        const endCursor = data?.length > 0 ? 
+          Buffer.from((((queryParams.after ? parseInt(Buffer.from(queryParams.after, 'base64').toString()) : 0) + (queryParams.first ?? 25)) - 1).toString()).toString('base64') : undefined;
+        updateQueryParams({ after: endCursor });
+      } else if (direction === 'prev' && hasPreviousPage) {
+        // For previous page, calculate the cursor based on current position
+        const currentOffset = queryParams.after ? parseInt(Buffer.from(queryParams.after, 'base64').toString()) : 0;
+        const pageSize = queryParams.first ?? 25;
+        const newOffset = Math.max(0, currentOffset - pageSize);
+        const prevCursor = newOffset > 0 ? Buffer.from(newOffset.toString()).toString('base64') : undefined;
+        updateQueryParams({ after: prevCursor });
+      }
     },
-    [queryParams.offset, queryParams.limit, updateQueryParams],
+    [queryParams.after, queryParams.first, hasNextPage, hasPreviousPage, data?.length, updateQueryParams],
   );
 
   /**
@@ -410,7 +428,7 @@ export function PlayerStatsDataGrid({
    */
   const handlePageSizeChange = useCallback(
     (newPageSize: number) => {
-      updateQueryParams({ limit: newPageSize, offset: 0 });
+      updateQueryParams({ first: newPageSize, after: undefined }); // Reset to first page when changing page size
     },
     [updateQueryParams],
   );
@@ -491,9 +509,9 @@ export function PlayerStatsDataGrid({
                 <Select.Viewport minWidth={200}>
                   {CAREER_STATS_SORT_OPTIONS.map((option) => (
                     <Select.Item
-                      key={`${option.value}-${option.direction}`}
+                      key={`${option.value}-desc`}
                       index={0}
-                      value={`${option.value}-${option.direction}`}
+                      value={`${option.value}-desc`}
                     >
                       <Select.ItemText>{option.label}</Select.ItemText>
                     </Select.Item>
@@ -676,7 +694,7 @@ export function PlayerStatsDataGrid({
                   minGames: 10,
                   minHomeRuns: 0,
                   minRBI: 0,
-                  offset: 0,
+                  after: undefined,
                 });
               }}
             >
@@ -800,6 +818,18 @@ export function PlayerStatsDataGrid({
       <H2 color="$color12" textAlign="center">
         {title}
       </H2>
+
+      {/* Total Count */}
+      {!loading && !error && (
+        <Text 
+          color="$color11" 
+          textAlign="center" 
+          fontSize="$4"
+          fontWeight="600"
+        >
+          Total Players: {totalCount.toLocaleString()}
+        </Text>
+      )}
 
       {/* Controls */}
       {(showSearch || showSorting || showFilters) && renderControls()}

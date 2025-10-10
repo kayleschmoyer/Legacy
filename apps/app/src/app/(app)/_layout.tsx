@@ -18,6 +18,7 @@ import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
 import LeagueCreatePage from './baseball/league/create';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
+import ManagementScreen from './management';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
 import {
@@ -39,6 +40,7 @@ export type AppDrawerParamList = {
   PlayerDetail: { playerId: string; playerName: string };
   'baseball/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
+  management: undefined;
 };
 
 const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
@@ -84,6 +86,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'FreeAgents',
     title: 'Free Agents',
+  },
+  {
+    route: 'management',
+    title: 'Management',
   },
 ]);
 
@@ -217,6 +223,11 @@ export default function Layout() {
             name="PlayerDetail"
             options={{ title: 'Player Details' }}
             component={PlayerDetail}
+          />
+          <Screen
+            name="management"
+            options={{ title: 'Management' }}
+            component={ManagementScreen}
           />
         </Navigator>
       </GestureHandlerRootView>

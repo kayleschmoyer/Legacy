@@ -1,0 +1,3 @@
+{
+  "query": "query CheckLeague4Status { leagues(where: { id: { _eq: 4 } }) { id name draftStatus maxRosterSize teams { id name teamMembers { id playerId position player { id name mlbTeam positions } } } } }"
+}

@@ -1,3 +1,0 @@
-{
-  "query": "query TestCareerBattingStats { careerBattingStats(limit: 3) { playerId games hits homeRuns battingAverage } }"
-}

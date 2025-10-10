@@ -1,0 +1,9 @@
+query GetAllUsers {
+  users {
+    id
+    email
+    username
+    accessLevel
+    createdAt
+  }
+}

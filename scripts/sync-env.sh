@@ -54,7 +54,10 @@ GOOGLE_CLIENT_ID=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summ
 DB_HOST=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.db_host')
 AWS_REGION=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.aws_region')
 RDS_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.rds_proxy_endpoint.value')
-SQS_QUEUE_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_queue_url')
+SQS_LOAD_SEASON_STATS_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_load_season_stats_url')
+SQS_AUTOMATIC_DRAFTS_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_automatic_drafts_url')
+# Legacy support
+SQS_QUEUE_URL=$SQS_LOAD_SEASON_STATS_URL
 OAUTH_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.oauth_proxy_endpoint.value')
 GRAPHQL_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.graphql_endpoint.value')
 
@@ -122,6 +125,11 @@ COOKIE_SECRET=$COOKIE_SECRET
 # AWS Configuration
 AWS_REGION=$AWS_REGION
 RDS_PROXY_ENDPOINT=$RDS_PROXY_ENDPOINT
+
+# SQS Queue URLs
+SQS_LOAD_SEASON_STATS_URL=$SQS_LOAD_SEASON_STATS_URL
+SQS_AUTOMATIC_DRAFTS_URL=$SQS_AUTOMATIC_DRAFTS_URL
+# Legacy support
 SQS_QUEUE_URL=$SQS_QUEUE_URL
 EOF
 
@@ -211,7 +219,8 @@ echo "  Database Host: $DB_HOST_MAIN"
 echo "  RDS Proxy Endpoint: $RDS_PROXY_ENDPOINT"
 echo "  Direct RDS Endpoint: $DB_HOST_DIRECT"
 echo "  AWS Region: $AWS_REGION"
-echo "  SQS Queue URL: $SQS_QUEUE_URL"
+echo "  SQS Load Season Stats URL: $SQS_LOAD_SEASON_STATS_URL"
+echo "  SQS Automatic Drafts URL: $SQS_AUTOMATIC_DRAFTS_URL"
 echo "  Google Client ID: $GOOGLE_CLIENT_ID"
 echo "  Secrets configured: JWT, Google OAuth, Cookie"
 echo ""

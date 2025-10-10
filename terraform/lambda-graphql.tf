@@ -103,6 +103,37 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_rds" {
   role       = aws_iam_role.graphql_lambda.name
 }
 
+# IAM policy for SQS access (sending messages to draft queue)
+resource "aws_iam_policy" "graphql_lambda_sqs" {
+  name        = "${local.name_prefix}-graphql-lambda-sqs"
+  description = "IAM policy for GraphQL Lambda to send messages to SQS queues"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = [
+          aws_sqs_queue.automatic_drafts.arn,
+          aws_sqs_queue.load_season_stats.arn
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "graphql_lambda_sqs" {
+  policy_arn = aws_iam_policy.graphql_lambda_sqs.arn
+  role       = aws_iam_role.graphql_lambda.name
+}
+
 # Lambda function
 resource "aws_lambda_function" "graphql" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
@@ -136,6 +167,15 @@ resource "aws_lambda_function" "graphql" {
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "debug"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+      
+      # SQS Queue URLs
+      SQS_LOAD_SEASON_STATS_URL           = aws_sqs_queue.load_season_stats.url
+      SQS_AUTOMATIC_DRAFTS_URL            = aws_sqs_queue.automatic_drafts.url
+
+      # Sentry Configuration
+      SENTRY_DSN                    = var.sentry_dsn
+      SENTRY_TRACES_SAMPLE_RATE     = var.environment == "dev" ? "1.0" : "0.1"
+      SENTRY_DEBUG                  = var.environment == "dev" ? "true" : "false"
     }
   }
 

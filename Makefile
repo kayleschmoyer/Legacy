@@ -1,7 +1,7 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr
+.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -257,7 +257,7 @@ codegen: ## Run code generation
 deploy-lambdas: ## Deploy all lambda functions
 	@$(call echo_blue,Deploying lambda functions...)
 ifeq ($(DETECTED_OS),Windows)
-	scripts$(PATH_SEP)deploy-lambda-all.ps1
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)deploy-lambda-all.ps1
 else
 	scripts$(PATH_SEP)deploy-lambda-all.sh
 endif
@@ -265,18 +265,28 @@ endif
 deploy-infrastructure: ## Deploy infrastructure with Terraform
 	@$(call echo_blue,Deploying infrastructure...)
 ifeq ($(DETECTED_OS),Windows)
-	cd terraform && deploy.ps1
+	cd terraform && powershell -ExecutionPolicy Bypass -File deploy.ps1
 else
 	cd terraform && ./deploy.sh
 endif
+
+terraform-init: ## Initialize Terraform working directory
+	@$(call echo_blue,Initializing Terraform...)
+	cd terraform && terraform init
 
 terraform-plan: ## Plan Terraform deployment
 	@$(call echo_blue,Planning Terraform deployment...)
 	cd terraform && terraform plan
 
-terraform-apply: ## Apply Terraform changes
+terraform-apply: ## Apply Terraform changes (with confirmation)
 	@$(call echo_blue,Applying Terraform changes...)
+	@$(call echo_yellow,This will apply changes to AWS infrastructure!)
 	cd terraform && terraform apply
+
+terraform-apply-auto: ## Apply Terraform changes (auto-approve, use with caution)
+	@$(call echo_blue,Auto-applying Terraform changes...)
+	@$(call echo_red,WARNING: Auto-approving Terraform changes!)
+	cd terraform && terraform apply -auto-approve
 
 terraform-destroy: ## Destroy Terraform infrastructure
 	@$(call echo_yellow,Destroying Terraform infrastructure...)

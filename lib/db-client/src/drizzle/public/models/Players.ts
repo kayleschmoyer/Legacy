@@ -8,6 +8,7 @@ import {
   primaryKey,
   foreignKey,
   pgView,
+  timestamp,
 } from 'drizzle-orm/pg-core';
 import { playerPosition } from './Enums';
 import { sql } from 'drizzle-orm';
@@ -19,6 +20,7 @@ export const players = pgTable(
     firstName: text('first_name').notNull(),
     lastName: text('last_name').notNull(),
     brefId: varchar('bref_id', { length: 10 }).notNull(),
+    statsLastFetchedAt: timestamp('stats_last_fetched_at'),
   },
   (table) => {
     return {

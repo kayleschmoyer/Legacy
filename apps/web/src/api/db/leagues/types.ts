@@ -2,7 +2,7 @@
 export interface CreateLeagueAndTeamsInput {
   leagueName: string;
   numberOfTeams: number;
-  draftType: 'NORMAL' | 'BLIND' | 'LEGACY';
+  draftType: 'NORMAL' | 'BLIND' | 'LEGACY' | 'RANDOM-DRAFT';
   isPublic?: boolean;
   maxBatters?: number;
   maxPitchers?: number;

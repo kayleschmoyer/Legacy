@@ -1,5 +1,6 @@
 /* eslint-disable @nx/enforce-module-boundaries */
 import config from '../../lib/codegen/codegen.base';
 
-config.schema = process.env.EXPO_PUBLIC_GRAPHQL_HOST || 'http://localhost:5000/graphql';
+// The base config now handles dynamic schema endpoint detection
+// No need to override it here since it already checks EXPO_PUBLIC_GRAPHQL_HOST
 export default config;

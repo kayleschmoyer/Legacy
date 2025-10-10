@@ -4,48 +4,28 @@ fragment Team on Team {
   name
 }
 
-# TeamMember type not available in current schema
-# fragment TeamMember on TeamMember {
-#   id
-#   playerId
-#   positionId
-#   teamId
-# }
+fragment TeamMember on TeamMember {
+  id
+  playerId
+  positionId
+  teamId
+  leagueId
+  player {
+    id
+    firstName
+    lastName
+    brefId
+  }
+}
 
-# fragment TeamMemberWithPositions on TeamMember {
-#   ...TeamMember
-#   player @include(if: $withPositions) {
-#     ...Player
-#     playerEligiblePositions @include(if: $withPositions) {
-#       nodes {
-#         ...PlayerEligiblePosition
-#       }
-#     }
-#   }
-# }
+query GetTeamMembers($teamId: Int!) {
+  teamMembers(teamId: $teamId) {
+    ...TeamMember
+  }
+}
 
-# team query not available in current schema
-# query GetTeamById($teamId: Int!, $withPositions: Boolean = false) {
-#   team(id: $teamId) {
-#     teamMembers {
-#       nodes {
-#         ...TeamMemberWithPositions
-#       }
-#     }
-#     ...Team
-#   }
-# }
-
-# UpdateTeamMemberPosition mutation not available in current schema
-# mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
-#   updateTeamMember(
-#     input: { patch: { positionId: $positionId }, id: $teamMemberId }
-#   ) {
-#     teamMember {
-#       id
-#       leagueId
-#       playerId
-#       positionId
-#     }
-#   }
-# }
+mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+  updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
+    ...TeamMember
+  }
+}

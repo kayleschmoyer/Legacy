@@ -16,6 +16,7 @@ import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
 import { getDbClient } from '../util/db';
+import { completeDeviceFlow } from './DeviceFlow';
 
 // Extended API Gateway Event with cached OAuth data to prevent duplicate processing
 interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
@@ -61,6 +62,141 @@ const getOAuthClient = memoizeOne((clientId: string, clientSecret: string) => {
 interface GoogleAuthRequest {
   code?: string; // Authorization code (mobile flow)
   credential?: string; // ID token JWT (web flow)
+}
+
+/**
+ * Initiate Google OAuth authorization flow
+ * Used for device flow to redirect user to Google OAuth consent screen
+ */
+export const handleGoogleAuthorize = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  LOGGER.info('Google OAuth authorization request');
+  
+  try {
+    const { clientId } = await getGoogleAuthSettings();
+    const state = event.queryStringParameters?.state || '';
+    
+    // Build Google OAuth URL
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: getRedirectUri(event),
+      response_type: 'code',
+      scope: 'openid profile email',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: state,
+    });
+    
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/auth?${params.toString()}`;
+    
+    LOGGER.debug(`Redirecting to Google OAuth: ${googleAuthUrl}`);
+    
+    return {
+      statusCode: 302,
+      headers: {
+        Location: googleAuthUrl,
+      },
+      body: '',
+    };
+    
+  } catch (error) {
+    LOGGER.error('Google authorize error:', error instanceof Error ? error.message : String(error));
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Authorization failed',
+        message: 'Could not initiate OAuth flow',
+      }),
+    };
+  }
+};
+
+/**
+ * Handle OAuth callback from Google
+ * This processes the authorization code and completes authentication
+ */
+export const handleGoogleCallback = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  LOGGER.info('Google OAuth callback received');
+  
+  try {
+    const code = event.queryStringParameters?.code;
+    const state = event.queryStringParameters?.state;
+    const error = event.queryStringParameters?.error;
+    
+    if (error) {
+      LOGGER.error(`OAuth error from Google: ${error}`);
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'text/html',
+        },
+        body: `
+<!DOCTYPE html>
+<html>
+<head><title>Authentication Failed</title></head>
+<body>
+    <h1>Authentication Failed</h1>
+    <p>OAuth error: ${error}</p>
+    <p>Please close this window and try again in your CLI.</p>
+</body>
+</html>
+        `,
+      };
+    }
+    
+    if (!code) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Missing authorization code',
+          message: 'No authorization code received from Google',
+        }),
+      };
+    }
+    
+    // Create a synthetic event for the existing Google auth handler
+    const syntheticEvent: APIGatewayEvent = {
+      ...event,
+      httpMethod: 'POST',
+      body: JSON.stringify({ code }),
+      queryStringParameters: { ...event.queryStringParameters, state },
+    };
+    
+    // Use existing secure Google auth handler
+    return await handleSecureGoogleAuth(syntheticEvent);
+    
+  } catch (error) {
+    LOGGER.error('Google callback error:', error instanceof Error ? error.message : String(error));
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'text/html',
+      },
+      body: `
+<!DOCTYPE html>
+<html>
+<head><title>Authentication Error</title></head>
+<body>
+    <h1>Authentication Error</h1>
+    <p>An error occurred during authentication.</p>
+    <p>Please close this window and try again in your CLI.</p>
+</body>
+</html>
+      `,
+    };
+  }
+};
+
+/**
+ * Get OAuth redirect URI for the current environment
+ */
+function getRedirectUri(event: APIGatewayEvent): string {
+  const stage = event.requestContext.stage;
+  const domainName = event.requestContext.domainName;
+  return `https://${domainName}/${stage}/oauth/google/callback`;
 }
 
 /**
@@ -391,6 +527,57 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
 
   LOGGER.debug('Encrypting cookies.');
   const cookieHeader = await encryptCookies(cookies);
+
+  // Check if this is part of a device flow (state parameter contains device code)
+  const state = event.queryStringParameters?.state;
+  if (state) {
+    LOGGER.debug(`Checking for device flow completion with state: ${state}`);
+    
+    // Try to complete device flow
+    try {
+      const deviceTokenResponse = {
+        jwt: internalJwt,
+        user: {
+          id: userInfo.id,
+          email: userInfo.email,
+          username: userInfo.username,
+          accessLevel: userInfo.accessLevel,
+        },
+      };
+      
+      completeDeviceFlow(state, deviceTokenResponse);
+      LOGGER.info(`Device flow completed for state: ${state}`);
+      
+      // For device flow, show success page instead of returning JWT directly
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'text/html',
+        },
+        body: `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Successful</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
+        .success { color: #16a34a; font-size: 24px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="success">✅ Authentication Successful!</div>
+    <p>You can now close this browser window and return to your CLI.</p>
+    <p>Authenticated as: <strong>${userInfo.email}</strong></p>
+</body>
+</html>
+        `,
+      };
+    } catch (error) {
+      LOGGER.warn('Failed to complete device flow:', error instanceof Error ? error.message : String(error));
+      // Continue with normal flow if device flow completion fails
+    }
+  }
 
   const result: APIGatewayProxyResult = {
     body: JSON.stringify({

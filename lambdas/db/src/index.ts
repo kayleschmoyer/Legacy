@@ -8,7 +8,21 @@ import {
   APIGatewayProxyResult,
   Context,
 } from 'aws-lambda';
+import { 
+  getSentryConfigFromEnv, 
+  initSentry, 
+  withSentry, 
+  captureError,
+  addBreadcrumb 
+} from '@legacy-sports/utils';
 import { schema } from './schema';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 /**
  * Example Career Statistics GraphQL Queries
@@ -110,7 +124,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'Content-Type, Authorization, X-Requested-With',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -119,6 +133,15 @@ const server = new ApolloServer({
   schema,
   // Enable introspection and playground in development
   introspection: process.env.NODE_ENV !== 'production',
+  plugins: [
+    // Enable GraphQL Playground/Studio in non-production environments
+    process.env.NODE_ENV !== 'production'
+      ? ApolloServerPluginLandingPageLocalDefault({ 
+          embed: true,
+          includeCookies: true
+        })
+      : ApolloServerPluginLandingPageLocalDefault({ footer: false })
+  ],
 });
 
 // Create base handler with authentication context
@@ -159,12 +182,13 @@ const baseHandler = startServerAndCreateLambdaHandler(
   }
 );
 
-// Lambda handler with proper CORS and error handling
-export const handler = async (
+// Base Lambda handler with proper CORS and error handling
+const baseGraphQLHandler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ): Promise<APIGatewayProxyResult> => {
   console.log('Lambda handler invoked with method:', event.httpMethod);
+  addBreadcrumb(`GraphQL request: ${event.httpMethod} ${event.path}`);
 
   // Ensure Lambda doesn't wait for empty event loop
   context.callbackWaitsForEmptyEventLoop = false;
@@ -172,6 +196,7 @@ export const handler = async (
   // Handle preflight OPTIONS requests
   if (event.httpMethod === 'OPTIONS') {
     console.log('Handling OPTIONS request');
+    addBreadcrumb('Handling OPTIONS preflight request');
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
@@ -255,6 +280,16 @@ export const handler = async (
     };
   } catch (error) {
     console.error('Lambda handler error:', error);
+    
+    // Capture error with request context
+    captureError(error as Error, {
+      httpMethod: event.httpMethod,
+      path: event.path,
+      query: event.queryStringParameters,
+      headers: event.headers,
+      operation: 'graphql_request'
+    });
+
     return {
       statusCode: 500,
       headers: {
@@ -268,3 +303,6 @@ export const handler = async (
     };
   }
 };
+
+// Export the Sentry-wrapped handler
+export const handler = withSentry(baseGraphQLHandler);

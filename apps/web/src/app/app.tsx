@@ -17,6 +17,7 @@ import {
 } from '../components/WebPlayerStatsPage';
 import LeagueCreatePage from '../components/baseball/LeagueCreatePage';
 import LeagueDetailPage from '../components/baseball/LeagueDetailPage';
+import ManagementPage from '../components/ManagementPage';
 
 // Styled Tamagui components for navigation
 const NavContainer = styled(YStack, {
@@ -206,6 +207,19 @@ function Navigation() {
               Player Stats
             </Button>
           </Link>
+          <Link to="/management" style={{ textDecoration: 'none' }}>
+            <Button
+              variant={
+                location.pathname === '/management' ? 'primary' : 'secondary'
+              }
+              size="$3"
+            >
+              <span role="img" aria-label="management">
+                ⚙️
+              </span>{' '}
+              Management
+            </Button>
+          </Link>
         </NavLinks>
 
         {/* User Profile Section */}
@@ -247,6 +261,7 @@ function App() {
           <Route path="/baseball" element={<BaseballScreen />} />
           <Route path="/baseball/league/create" element={<LeagueCreatePage />} />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
+          <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />
           <Route path="/players/stats" element={<WebPlayerStatsPage />} />
           <Route path="/players/:id" element={<WebPlayerDetailPage />} />

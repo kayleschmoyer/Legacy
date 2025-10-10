@@ -300,9 +300,23 @@ function getFieldingStats(
   playerId: number,
 ): SeasonFielding[] {
   const fieldingStats = getTable(root, 'players_standard_fielding');
-  return parseTable<SeasonFielding>(fieldingStats, (r) =>
+  const allStats = parseTable<SeasonFielding>(fieldingStats, (r) =>
     parseRow(r, playerId),
   );
+  
+  // Filter out records where pos is null, undefined, or empty (e.g., "Did not play" records)
+  return allStats.filter(stat => {
+    return stat.pos != null && 
+           stat.pos !== undefined && 
+           stat.pos !== '' && 
+           stat.pos.trim() !== '' &&
+           stat.team != null &&
+           stat.team !== undefined &&
+           stat.team.trim() !== '' &&
+           stat.rowId != null &&
+           stat.rowId !== undefined &&
+           stat.rowId.trim() !== '';
+  });
 }
 
 function getPitchingStats(

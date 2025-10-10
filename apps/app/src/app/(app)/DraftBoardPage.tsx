@@ -25,6 +25,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { Alert } from 'react-native';
+import {
+  LeagueFragmentDoc,
+  useStartDraftMutation,
+  StartDraftMutation,
+  StartDraftMutationVariables,
+} from '../../api/db/graphql.generated';
 
 // Sport configurations
 const SPORT_CONFIGS = {
@@ -339,6 +346,8 @@ const FilterDrawer: React.FC<{
   );
 };
 
+// Using generated StartDraft mutation from codegen
+
 /**
  * Main DraftBoard component
  */
@@ -347,7 +356,7 @@ const DraftBoardPage: React.FC = () => {
   const [draftId] = useState('default-draft');
   const [sport] = useState<'baseball' | 'football'>('baseball');
   const [searchText, setSearchText] = useState('');
-  const [filters, setFilters] = useState({ position: 'ALL', team: 'ALL' });
+  const [filters, setFilters] = useState<Filter>({ position: 'ALL' });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [activeView, setActiveView] = useState<'draft' | 'teams' | 'myteam'>(
@@ -358,6 +367,22 @@ const DraftBoardPage: React.FC = () => {
 
   // Hooks
   const timer = useTimer(90);
+  
+  // GraphQL mutation hook - now returns League object, eliminating need for manual refetch
+  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
+    onCompleted: (data: StartDraftMutation) => {
+      console.log('✅ Draft mutation completed successfully:', data);
+      console.log('🎯 Returned League object with updated status:', data.startDraft);
+      console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
+      console.log('🚀 Apollo Client cache automatically updated - no manual refetch needed!');
+      Alert.alert('Success', 'Draft has been started and queued for processing!');
+      timer.start();
+    },
+    onError: (error: any) => {
+      console.error('Error starting draft:', error);
+      Alert.alert('Error', error.message || 'Failed to start draft');
+    },
+  });
 
   // Empty data - will be populated from database
   const draft: DraftState = {
@@ -401,8 +426,18 @@ const DraftBoardPage: React.FC = () => {
 
   const handleStartDraft = useCallback(() => {
     console.log('Starting draft...', draftId);
-    timer.start();
-  }, [timer, draftId]);
+    
+    // For now, using a placeholder league ID - this should come from route params or props
+    // TODO: Get actual league ID from route parameters or component props
+    const leagueId = 1; // Placeholder - replace with actual league ID
+    
+    startDraft({
+      variables: {
+        leagueId: leagueId,
+        draftType: 'random-draft', // Could be configurable based on draft type
+      },
+    });
+  }, [startDraft, draftId]);
 
   const renderPlayerGrid = () => (
     <FlatList
@@ -515,8 +550,10 @@ const DraftBoardPage: React.FC = () => {
               size="$5"
               margin="$4"
               onPress={handleStartDraft}
+              disabled={startDraftLoading}
+              opacity={startDraftLoading ? 0.6 : 1}
             >
-              Start Draft
+              {startDraftLoading ? 'Starting Draft...' : 'Start Draft'}
             </Button>
           )}
 

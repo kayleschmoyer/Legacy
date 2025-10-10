@@ -8,120 +8,67 @@
  * @since 2025-09-28
  */
 
-import { gql, useLazyQuery, useQuery } from '@apollo/client';
+import { useLazyQuery, useQuery } from '@apollo/client';
 import * as React from 'react';
+import {
+  GetCareerBattingStats,
+  GetCareerBattingStatsQuery,
+  GetCareerBattingStatsQueryVariables,
+  useGetCareerBattingStatsQuery,
+  useGetCareerBattingStatsLazyQuery,
+  GetAllPlayers,
+  GetAllPlayersQuery,
+  GetAllPlayersQueryVariables,
+  useGetAllPlayersQuery,
+  CareerBattingFragment,
+  PlayerFragment,
+} from '../../../api/db/graphql.generated';
 
 // =============================================================================
-// GraphQL Operations
+// GraphQL Operations (Using Codegen Generated Queries)
 // =============================================================================
 
-/**
- * Primary GraphQL query for career batting statistics with server-side operations
- */
-export const CAREER_BATTING_STATS_QUERY = gql`
-  query CareerBattingStatsQuery(
-    $limit: Int
-    $offset: Int
-    $orderBy: String
-    $orderDirection: String
-    $minGames: Int
-    $minHomeRuns: Int
-    $minRBI: Int
-    $minBattingAvg: Float
-    $searchTerm: String
-  ) {
-    careerBattingStats(
-      limit: $limit
-      offset: $offset
-      orderBy: $orderBy
-      orderDirection: $orderDirection
-      minGames: $minGames
-      minHomeRuns: $minHomeRuns
-      minRBI: $minRBI
-      minBattingAvg: $minBattingAvg
-      searchTerm: $searchTerm
-    ) {
-      playerId
-      games
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      totalBases
-      groundedIntoDoublePlays
-      hitByPitch
-      sacrificeHits
-      intentionalBaseOnBalls
-      battingAverage
-      onBasePercentage
-      sluggingPercentage
-    }
-  }
-`;
+// All GraphQL operations are now imported from the generated file:
+// - GetCareerBattingStats: Primary query for career batting statistics  
+// - GetAllPlayers: Query to fetch players with positions
+// - Associated hooks: useGetCareerBattingStatsQuery, useGetCareerBattingStatsLazyQuery, etc.
 
-/**
- * GraphQL query to fetch all players (for name lookup)
- * Note: We fetch a large batch and cache client-side since the API doesn't support ID filtering
- */
-export const PLAYERS_QUERY = gql`
-  query PlayersQuery($limit: Int, $offset: Int) {
-    players(limit: $limit, offset: $offset) {
-      id
-      firstName
-      lastName
-      brefId
-    }
-  }
-`;
+
 
 // =============================================================================
 // Type Definitions
 // =============================================================================
 
 /**
- * Player information from GraphQL API (for career stats)
+ * Player information from GraphQL API (using generated types)
+ * Note: Now uses the PlayerFragment from generated code
  */
-export interface CareerStatsPlayer {
-  id: number;
-  firstName: string | null;
-  lastName: string | null;
-  brefId: string | null;
+export type CareerStatsPlayer = PlayerFragment;
+
+/**
+ * Raw career batting statistics from GraphQL (using generated CareerBattingFragment)
+ * Note: Fields use abbreviated names (g, pa, ab, etc.) and are string representations of BigInt
+ */
+export type CareerBattingStatsRaw = CareerBattingFragment;
+
+/**
+ * Raw career fielding statistics from GraphQL (matches database structure)
+ */
+export interface CareerFieldingStatsRaw {
+  playerId: number;
+  games: number;
+  gamesStarted: number;
+  fieldingPercentage: number | null;
+  positionsPlayed: string | null; // JSON string of position data
 }
 
 /**
- * Raw career batting statistics from GraphQL API
+ * Position data from the database positionsPlayed field
  */
-export interface CareerBattingStatsRaw {
-  playerId: number | null;
-  games: number | null;
-  plateAppearances: number | null;
-  atBats: number | null;
-  runs: number | null;
-  hits: number | null;
-  doubles: number | null;
-  triples: number | null;
-  homeRuns: number | null;
-  rbi: number | null;
-  stolenBases: number | null;
-  caughtStealing: number | null;
-  baseOnBalls: number | null;
-  strikeouts: number | null;
-  totalBases: number | null;
-  groundedIntoDoublePlays: number | null;
-  hitByPitch: number | null;
-  sacrificeHits: number | null;
-  intentionalBaseOnBalls: number | null;
-  battingAverage: number | null;
-  onBasePercentage: number | null;
-  sluggingPercentage: number | null;
+export interface PositionData {
+  readonly games: number;
+  readonly gamesStarted: number;
+  readonly position: string;
 }
 
 /**
@@ -133,6 +80,8 @@ export interface PlayerCareerStats {
   readonly displayName: string;
   readonly firstName: string;
   readonly lastName: string;
+  readonly primaryPosition?: string;
+  // Batting statistics
   readonly games: number;
   readonly plateAppearances: number;
   readonly atBats: number;
@@ -159,29 +108,22 @@ export interface PlayerCareerStats {
   readonly formattedOnBasePercentage: string;
   readonly formattedSluggingPercentage: string;
   readonly formattedOPS: string;
+  // Fielding statistics
+  readonly fieldingGames?: number;
+  readonly fieldingPercentage?: number;
+  readonly positionsPlayed?: Record<string, PositionData>;
+  readonly formattedPositions?: string;
 }
 
 /**
- * Server-side query parameters for career statistics
+ * Server-side query parameters for career statistics (using generated types)
  */
-export interface CareerStatsQueryParams {
-  readonly limit?: number;
-  readonly offset?: number;
-  readonly orderBy?: string;
-  readonly orderDirection?: 'asc' | 'desc';
-  readonly minGames?: number;
-  readonly minHomeRuns?: number;
-  readonly minRBI?: number;
-  readonly minBattingAvg?: number;
-  readonly searchTerm?: string;
-}
+export type CareerStatsQueryParams = GetCareerBattingStatsQueryVariables;
 
 /**
- * GraphQL query response structure
+ * GraphQL connection response structure (using generated types)
  */
-export interface CareerStatsQueryResponse {
-  readonly careerBattingStats: CareerBattingStatsRaw[];
-}
+export type CareerStatsQueryResponse = GetCareerBattingStatsQuery;
 
 /**
  * Service response with enhanced data and metadata
@@ -222,7 +164,7 @@ function formatStatistic(
 }
 
 /**
- * Safely converts nullable number to non-null with fallback
+ * Safely extracts a non-null number from potentially null/undefined values
  *
  * @param value - The nullable number value
  * @param fallback - Fallback value (default: 0)
@@ -230,6 +172,64 @@ function formatStatistic(
  */
 function safeNumber(value: number | null | undefined, fallback = 0): number {
   return value ?? fallback;
+}
+
+/**
+ * Safely converts a BigInt string to a number with fallback
+ * GraphQL BigInt fields are serialized as strings and need conversion
+ *
+ * @param value - The string representation of a BigInt or null
+ * @param fallback - Fallback value (default: 0)
+ * @returns Converted number
+ */
+function safeBigIntToNumber(value: string | null | undefined, fallback = 0): number {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+/**
+ * Parse positions played JSON string into a structured object
+ *
+ * @param positionsPlayedJson - JSON string of position data from database
+ * @returns Parsed positions object or undefined if parsing fails
+ */
+function parsePositionsPlayed(positionsPlayedJson: string | null | undefined): Record<string, PositionData> | undefined {
+  if (!positionsPlayedJson) return undefined;
+  
+  try {
+    const parsed = JSON.parse(positionsPlayedJson);
+    return typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+  } catch (error) {
+    console.warn('Failed to parse positions data:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Format positions played data into a readable string sorted by games played
+ *
+ * @param positionsPlayedJson - JSON string of position data from database
+ * @returns Formatted string like "1B (210g), OF (45g), DH (12g)"
+ */
+function formatPositionsPlayed(positionsPlayedJson: string | null | undefined): string {
+  if (!positionsPlayedJson) return '';
+  
+  try {
+    const positionsData: Record<string, PositionData> = JSON.parse(positionsPlayedJson);
+    
+    // Convert to array and sort by games played (descending)
+    const sortedPositions = Object.values(positionsData)
+      .sort((a, b) => b.games - a.games)
+      .map(pos => `${pos.position} (${pos.games}g)`);
+      
+    return sortedPositions.join(', ');
+  } catch (error) {
+    console.warn('Failed to parse positions played data:', error);
+    return '';
+  }
 }
 
 /**
@@ -244,6 +244,7 @@ export function transformCareerStats(
   player?: CareerStatsPlayer,
 ): PlayerCareerStats {
   const playerId = safeNumber(rawStats.playerId);
+  // Convert field names to numbers (using full field names from new schema)
   const games = safeNumber(rawStats.games);
   const plateAppearances = safeNumber(rawStats.plateAppearances);
   const atBats = safeNumber(rawStats.atBats);
@@ -263,21 +264,20 @@ export function transformCareerStats(
   const sacrificeHits = safeNumber(rawStats.sacrificeHits);
   const intentionalBaseOnBalls = safeNumber(rawStats.intentionalBaseOnBalls);
 
-  // Use server-computed values when available, with client-side fallbacks
-  const battingAverage =
-    rawStats.battingAverage ?? (atBats > 0 ? hits / atBats : 0);
-  const onBasePercentage = rawStats.onBasePercentage ?? 0;
-  const sluggingPercentage =
-    rawStats.sluggingPercentage ?? (atBats > 0 ? totalBases / atBats : 0);
+  // Use calculated statistics from schema when available, or calculate if needed
+  const battingAverage = rawStats.battingAverage ?? (atBats > 0 ? hits / atBats : 0);
+  const onBasePercentage = rawStats.onBasePercentage ?? (plateAppearances > 0 ? 
+    (hits + baseOnBalls + hitByPitch) / plateAppearances : 0);
+  const sluggingPercentage = rawStats.sluggingPercentage ?? (atBats > 0 ? totalBases / atBats : 0);
 
   // Compute OPS (On-base Plus Slugging)
   const ops = onBasePercentage + sluggingPercentage;
 
-  // Generate display information
-  const firstName = player?.firstName ?? '';
-  const lastName = player?.lastName ?? '';
-  const displayName =
-    firstName && lastName ? `${firstName} ${lastName}` : `Player ${playerId}`;
+  // Generate display information using player data from GraphQL response or fallback
+  const playerData = rawStats.player ?? player; // CareerBattingFragment now includes player relation
+  const firstName = playerData?.firstName ?? '';
+  const lastName = playerData?.lastName ?? '';
+  const displayName = `${firstName} ${lastName}`.trim() || `Player ${playerId}`;
 
   return {
     id: `player-${playerId}`,
@@ -285,6 +285,7 @@ export function transformCareerStats(
     displayName,
     firstName,
     lastName,
+    primaryPosition: rawStats.primaryPosition ?? undefined,
     games,
     plateAppearances,
     atBats,
@@ -311,7 +312,52 @@ export function transformCareerStats(
     formattedOnBasePercentage: formatStatistic(onBasePercentage),
     formattedSluggingPercentage: formatStatistic(sluggingPercentage),
     formattedOPS: formatStatistic(ops),
+    // Parse positions played from the new field
+    positionsPlayed: parsePositionsPlayed(rawStats.positionsPlayed),
+    formattedPositions: formatPositionsPlayed(rawStats.positionsPlayed),
   };
+}
+
+/**
+ * Transforms raw GraphQL career stats with fielding data to enhanced player stats
+ *
+ * @param battingStats - Raw batting statistics from GraphQL API
+ * @param fieldingStats - Raw fielding statistics from GraphQL API (optional)
+ * @param player - Player information (optional, for name display)
+ * @returns Enhanced player statistics with computed fields and fielding data
+ */
+export function transformCareerStatsWithFielding(
+  battingStats: CareerBattingStatsRaw,
+  fieldingStats?: CareerFieldingStatsRaw,
+  player?: CareerStatsPlayer,
+): PlayerCareerStats {
+  // Start with the existing batting transformation
+  const baseStats = transformCareerStats(battingStats, player);
+  
+  // Add fielding data if available
+  if (fieldingStats) {
+    const fieldingGames = safeNumber(fieldingStats.games);
+    const fieldingPercentage = fieldingStats.fieldingPercentage ?? undefined;
+    const positionsPlayedJson = fieldingStats.positionsPlayed;
+    
+    // Parse positions data
+    let positionsPlayed: Record<string, PositionData> | undefined;
+    try {
+      positionsPlayed = positionsPlayedJson ? JSON.parse(positionsPlayedJson) : undefined;
+    } catch (error) {
+      console.warn('Failed to parse positions data for player', battingStats.playerId, error);
+    }
+    
+    return {
+      ...baseStats,
+      fieldingGames,
+      fieldingPercentage,
+      positionsPlayed,
+      formattedPositions: formatPositionsPlayed(positionsPlayedJson),
+    };
+  }
+  
+  return baseStats;
 }
 
 // =============================================================================
@@ -343,34 +389,28 @@ export function transformCareerStats(
 export function useCareerStatsService(
   params: CareerStatsQueryParams = {},
 ): CareerStatsServiceResponse {
-  // Merge provided params with defaults to ensure consistent variable shape
-  const queryVariables = {
-    ...DEFAULT_CAREER_STATS_PARAMS,
-    ...params,
-  };
-
-  const { data, loading, error, refetch } = useQuery<
-    CareerStatsQueryResponse,
-    CareerStatsQueryParams
-  >(CAREER_BATTING_STATS_QUERY, {
-    variables: queryVariables,
+  // Use generated hook directly
+  const { data, loading, error, refetch } = useGetCareerBattingStatsQuery({
+    variables: params,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
     fetchPolicy: 'cache-and-network', // Balance performance with data freshness
   });
 
-  // Transform raw data to enhanced format (without player names for now)
+  // Transform raw data from connection format (using edges instead of nodes)
   const transformedData: PlayerCareerStats[] =
-    data?.careerBattingStats?.map((rawStats) =>
-      transformCareerStats(rawStats),
-    ) ?? [];
+    data?.careerBattingStats?.edges?.map((edge) =>
+      edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null
+    ).filter(Boolean) as PlayerCareerStats[] ?? [];
 
-  // Calculate pagination metadata
-  const pageSize = queryVariables.limit;
-  const currentPage = Math.floor(queryVariables.offset / pageSize) + 1;
-  const totalCount = transformedData.length;
-  const hasNextPage = transformedData.length === pageSize; // Heuristic: if we got a full page, there might be more
-  const hasPreviousPage = queryVariables.offset > 0;
+  // Extract pagination metadata from connection
+  const totalCount = data?.careerBattingStats?.totalCount ?? 0;
+  const pageSize = params.first ?? 25;
+  const hasNextPage = data?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
+  const hasPreviousPage = data?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+  
+  // Calculate current page from cursor (simplified approximation)
+  const currentPage = 1; // Since we're using cursor-based pagination, page concept is simplified
 
   return {
     data: transformedData,
@@ -395,87 +435,38 @@ export function useCareerStatsService(
  * @returns Career statistics with player names included
  */
 export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
-  const {
-    limit = 25,
-    offset = 0,
-    orderBy = 'homeRuns',
-    orderDirection = 'desc',
-    minGames = 10,
-    minHomeRuns,
-    minRBI,
-  } = params;
-
-  // Fetch career statistics
-
+  // Use generated hook directly
   const {
     data: statsData,
     loading: statsLoading,
     error: statsError,
     refetch: refetchStats,
-  } = useQuery<CareerStatsQueryResponse, CareerStatsQueryParams>(
-    CAREER_BATTING_STATS_QUERY,
-    {
-      variables: {
-        limit,
-        offset,
-        orderBy,
-        orderDirection,
-        minGames,
-        minHomeRuns,
-        minRBI,
-      },
-      errorPolicy: 'all',
-      notifyOnNetworkStatusChange: true,
-      fetchPolicy: 'cache-and-network', // Balance performance with data freshness
-    },
-  );
-
-  // Fetch players for name lookup (fetch a large batch to cover most cases)
-  const {
-    data: playersData,
-    loading: playersLoading,
-    error: playersError,
-  } = useQuery<
-    { players: CareerStatsPlayer[] },
-    { limit: number; offset: number }
-  >(PLAYERS_QUERY, {
-    variables: { limit: 5000, offset: 0 }, // Fetch a large batch for client-side lookup
+  } = useGetCareerBattingStatsQuery({
+    variables: params,
     errorPolicy: 'all',
-    fetchPolicy: 'cache-first', // Cache player names aggressively
+    notifyOnNetworkStatusChange: true,
+    fetchPolicy: 'cache-and-network', // Balance performance with data freshness
   });
 
-  // Create a player lookup map
-  const playersMap = React.useMemo(() => {
-    if (!playersData?.players) return new Map<number, CareerStatsPlayer>();
-
-    const map = new Map<number, CareerStatsPlayer>();
-    for (const player of playersData.players) {
-      map.set(player.id, player);
-    }
-    return map;
-  }, [playersData]);
-
-  // Transform data with player names
+  // Transform data (simplified - just batting stats for now)
   const transformedData: PlayerCareerStats[] = React.useMemo(() => {
-    if (!statsData?.careerBattingStats) return [];
+    if (!statsData?.careerBattingStats?.edges) return [];
 
-    return statsData.careerBattingStats.map((rawStats) => {
-      const playerId = rawStats.playerId;
-      const player = playerId ? playersMap.get(playerId) : undefined;
-      return transformCareerStats(rawStats, player);
-    });
-  }, [statsData, playersMap]);
+    return statsData.careerBattingStats.edges.map((edge) => {
+      return edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null;
+    }).filter(Boolean) as PlayerCareerStats[];
+  }, [statsData]);
 
-  // Calculate pagination metadata
-  const pageSize = limit;
-  const currentPage = Math.floor(offset / pageSize) + 1;
-  const totalCount = transformedData.length;
-  const hasNextPage = transformedData.length === pageSize;
-  const hasPreviousPage = offset > 0;
+  // Extract pagination metadata from connection
+  const totalCount = statsData?.careerBattingStats?.totalCount ?? 0;
+  const pageSize = params.first ?? 25;
+  const hasNextPage = statsData?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
+  const hasPreviousPage = statsData?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+  const currentPage = 1; // Simplified for cursor-based pagination
 
   // Combined loading and error states
-  const loading = statsLoading || playersLoading;
-  const error = statsError || playersError || null;
+  const loading = statsLoading;
+  const error = statsError || null;
 
   const refetch = React.useCallback(() => {
     return refetchStats();
@@ -513,13 +504,10 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
  * ```
  */
 export function useCareerStatsLazyQuery() {
-  return useLazyQuery<CareerStatsQueryResponse, CareerStatsQueryParams>(
-    CAREER_BATTING_STATS_QUERY,
-    {
-      errorPolicy: 'all',
-      notifyOnNetworkStatusChange: true,
-    },
-  );
+  return useGetCareerBattingStatsLazyQuery({
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: true,
+  });
 }
 
 // =============================================================================
@@ -527,38 +515,24 @@ export function useCareerStatsLazyQuery() {
 // =============================================================================
 
 /**
- * Available sorting options for career statistics
+ * Available sorting options for career statistics (using string values)
  */
 export const CAREER_STATS_SORT_OPTIONS = [
-  { label: 'Games (Most)', value: 'games', direction: 'desc' as const },
-  { label: 'Home Runs (Most)', value: 'homeRuns', direction: 'desc' as const },
-  { label: 'RBIs (Most)', value: 'rbi', direction: 'desc' as const },
-  {
-    label: 'Batting Average (Highest)',
-    value: 'battingAverage',
-    direction: 'desc' as const,
-  },
-  { label: 'Hits (Most)', value: 'hits', direction: 'desc' as const },
-  {
-    label: 'Stolen Bases (Most)',
-    value: 'stolenBases',
-    direction: 'desc' as const,
-  },
-  { label: 'OPS (Highest)', value: 'ops', direction: 'desc' as const },
-  { label: 'Player ID', value: 'playerId', direction: 'asc' as const },
+  { label: 'Games (Most)', value: 'games' },
+  { label: 'Home Runs (Most)', value: 'homeRuns' },
+  { label: 'RBIs (Most)', value: 'rbi' },
+  { label: 'Hits (Most)', value: 'hits' },
+  { label: 'Stolen Bases (Most)', value: 'stolenBases' },
+  { label: 'At Bats (Most)', value: 'atBats' },
+  { label: 'Runs (Most)', value: 'runs' },
+  { label: 'Player ID', value: 'playerId' },
 ] as const;
 
 /**
- * Default query parameters for career statistics
+ * Default query parameters for career statistics (using generated types)
  */
-export const DEFAULT_CAREER_STATS_PARAMS: Required<CareerStatsQueryParams> = {
-  limit: 25,
-  offset: 0,
-  orderBy: 'homeRuns',
+export const DEFAULT_CAREER_STATS_PARAMS: CareerStatsQueryParams = {
+  first: 25,
+  orderBy: 'homeRuns', // Home runs descending
   orderDirection: 'desc',
-  minGames: 10,
-  minHomeRuns: 0,
-  minRBI: 0,
-  minBattingAvg: 0,
-  searchTerm: '',
 } as const;

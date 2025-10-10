@@ -1,12 +1,32 @@
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
+import { 
+  getSentryConfigFromEnv, 
+  initSentry, 
+  withSentry, 
+  captureError,
+  addBreadcrumb 
+} from '@legacy-sports/utils';
 import {
   handleGoogleAuth,
   handleGoogleRefresh,
   handleSecureGoogleAuth,
+  handleGoogleAuthorize,
+  handleGoogleCallback,
 } from './handlers/Google';
 import { handleLogin, handleRegister } from './handlers/Local';
 import { handleVerify } from './handlers/Verify';
+import {
+  handleDeviceAuthorize,
+  handleDeviceToken,
+  handleDeviceVerify,
+} from './handlers/DeviceFlow';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 /**
  * Add CORS headers to API Gateway response
@@ -53,7 +73,7 @@ function handleOptions(): APIGatewayProxyResult {
  *
  * Previously controlled by VERBOSE_LOGGING=true, now use LOG_LEVEL=debug for same effect
  */
-export const handler = async (
+const baseOAuthHandler = async (
   event: APIGatewayEvent,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _context: Context,
@@ -62,6 +82,7 @@ export const handler = async (
   LOGGER.info(
     `OAuth Proxy Handler - Method: ${event.httpMethod}, Path: ${event.path}`,
   );
+  addBreadcrumb(`OAuth request: ${event.httpMethod} ${event.path}`);
 
   LOGGER.debug('Environment Variables Check:', {
     CLIENT_ID: process.env.CLIENT_ID ? '[SET]' : '[MISSING]',
@@ -104,9 +125,14 @@ export const handler = async (
               '/oauth/verify',
               '/oauth/google (NEW: secure flow with user pre-check)',
               '/oauth/google/legacy (original flow for backward compatibility)',
+              '/oauth/google/authorize (OAuth initiation)',
+              '/oauth/google/callback (OAuth callback)',
               '/oauth/google/refresh',
               '/oauth/login',
               '/oauth/register',
+              '/oauth/device/authorize (CLI device flow)',
+              '/oauth/device/token (CLI device flow)',
+              '/oauth/device/verify (CLI device flow)',
             ],
             security:
               'Only pre-authorized users can complete OAuth authentication',
@@ -140,6 +166,22 @@ export const handler = async (
         }
         break;
 
+      case '/oauth/google/authorize':
+      case '/dev/oauth/google/authorize':
+        if (event.httpMethod === 'GET') {
+          const result = await handleGoogleAuthorize(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
+      case '/oauth/google/callback':
+      case '/dev/oauth/google/callback':
+        if (event.httpMethod === 'GET') {
+          const result = await handleGoogleCallback(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
       case '/oauth/google/refresh':
       case '/dev/oauth/google/refresh':
         if (event.httpMethod === 'POST') {
@@ -164,6 +206,31 @@ export const handler = async (
         }
         break;
 
+      // Device flow endpoints for CLI authentication
+      case '/oauth/device/authorize':
+      case '/dev/oauth/device/authorize':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDeviceAuthorize(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
+      case '/oauth/device/token':
+      case '/dev/oauth/device/token':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDeviceToken(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
+      case '/oauth/device/verify':
+      case '/dev/oauth/device/verify':
+        if (event.httpMethod === 'GET') {
+          const result = await handleDeviceVerify(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
       default:
         LOGGER.warn(`Unknown path: ${event.path}`);
         return addCorsHeaders({
@@ -183,6 +250,15 @@ export const handler = async (
       error instanceof Error ? error.message : String(error),
     );
 
+    // Capture error with request context
+    captureError(error as Error, {
+      httpMethod: event.httpMethod,
+      path: event.path,
+      query: event.queryStringParameters,
+      headers: event.headers,
+      operation: 'oauth_request'
+    });
+
     return addCorsHeaders({
       statusCode: 500,
       body: JSON.stringify({
@@ -193,7 +269,11 @@ export const handler = async (
   }
 };
 
+// Export the Sentry-wrapped handler
+export const handler = withSentry(baseOAuthHandler);
+
 // Export individual handlers for backward compatibility and testing
 export * from './handlers/Google';
 export * from './handlers/Local';
 export * from './handlers/Verify';
+export * from './handlers/DeviceFlow';

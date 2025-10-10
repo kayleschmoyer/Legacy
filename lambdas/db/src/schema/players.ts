@@ -11,6 +11,7 @@ const PlayerRef = builder.objectRef<{
   firstName: string;
   lastName: string;
   brefId: string;
+  statsLastFetchedAt: Date | null;
 }>('Player');
 
 PlayerRef.implement({
@@ -19,6 +20,9 @@ PlayerRef.implement({
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
     brefId: t.exposeString('brefId'),
+    statsLastFetchedAt: t.string({ nullable: true, resolve: (parent) => 
+      parent.statsLastFetchedAt ? parent.statsLastFetchedAt.toISOString() : null 
+    }),
   }),
 });
 

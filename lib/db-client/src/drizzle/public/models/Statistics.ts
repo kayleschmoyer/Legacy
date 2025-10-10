@@ -16,6 +16,7 @@ import {
   char,
   pgEnum,
   pgView,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { players } from './Players';
@@ -25,8 +26,8 @@ export const seasonFielding = pgTable(
   {
     playerId: integer('player_id').notNull(),
     season: integer('season').notNull(),
-    pos: varchar('pos', { length: 10 }).notNull(),
-    lgId: varchar('lg_id', { length: 20 }),
+    pos: varchar('pos', { length: 20 }).notNull(),
+    lgId: varchar('lg_id', { length: 50 }),
     g: integer('g'),
     gs: integer('gs'),
     cg: integer('cg'),
@@ -50,8 +51,8 @@ export const seasonFielding = pgTable(
     pickoffs: integer('pickoffs'),
     awardSummary: text('award_summary'),
     wp: integer('wp'),
-    team: varchar('team', { length: 20 }).notNull(),
-    rowId: varchar('row_id', { length: 10 }).notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    rowId: varchar('row_id', { length: 50 }).notNull(),
   },
   (table) => {
     return {
@@ -108,13 +109,13 @@ export const seasonBatting = pgTable(
     gidp: integer('gidp'),
     hbp: integer('hbp'),
     sh: integer('sh'),
-    sf: varchar('sf', { length: 10 }),
+    sf: varchar('sf', { length: 20 }),
     ibb: integer('ibb'),
-    posSeason: varchar('pos_season', { length: 50 }),
+    posSeason: varchar('pos_season', { length: 100 }),
     awardSummary: text('award_summary'),
-    lgId: varchar('lg_id', { length: 20 }),
-    team: varchar('team', { length: 20 }).notNull(),
-    rowId: varchar('row_id', { length: 10 }).notNull(),
+    lgId: varchar('lg_id', { length: 50 }),
+    team: varchar('team', { length: 50 }).notNull(),
+    rowId: varchar('row_id', { length: 50 }).notNull(),
   },
   (table) => {
     return {
@@ -159,7 +160,7 @@ export const seasonPitching = pgTable(
     hbp: integer('hbp'),
     bk: integer('bk'),
     wp: integer('wp'),
-    rowId: varchar('row_id', { length: 10 }).notNull(),
+    rowId: varchar('row_id', { length: 50 }).notNull(),
     battersFaced: integer('batters_faced'),
     earnedRunAvgPlus: doublePrecision('earned_run_avg_plus'),
     fip: doublePrecision('fip'),
@@ -170,8 +171,8 @@ export const seasonPitching = pgTable(
     strikeoutsPerNine: doublePrecision('strikeouts_per_nine'),
     strikeoutsPerBaseOnBalls: doublePrecision('strikeouts_per_base_on_balls'),
     awardSummary: text('award_summary'),
-    team: varchar('team', { length: 20 }).notNull(),
-    lgId: varchar('lg_id', { length: 20 }),
+    team: varchar('team', { length: 50 }).notNull(),
+    lgId: varchar('lg_id', { length: 50 }),
     outsRecorded: integer('outs_recorded').generatedAlwaysAs(
       sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`,
     ),
@@ -441,27 +442,67 @@ export const careerFielding = pgView('career_fielding', {
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   wp: bigint('wp', { mode: 'number' }),
   pos: text('pos'),
-}).as(sql`SELECT player_id,
-       sum(g)        AS g,
-       sum(gs)       AS gs,
-       sum(cg)       AS cg,
-       sum(inn_def)  AS inn_def,
-       sum(chances)  AS chances,
-       sum(po)       AS po,
-       sum(a)        AS a,
-       sum(e_def)    AS e_def,
-       sum(dp_def)   AS dp_def,
-       sum(sb)       AS sb,
-       sum(cs)       AS cs,
-       sum(pickoffs) AS pickoffs,
-       sum(wp)       AS wp
-FROM season_fielding
-WHERE ((SELECT count(1) AS count
-        FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)
-        WHERE
-            season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) >
-      0
-GROUP BY player_id`);
+  positionsPlayed: jsonb('positions_played'),
+}).as(sql`SELECT 
+    cf.player_id,
+    cf.g,
+    cf.gs,
+    cf.cg,
+    cf.inn_def,
+    cf.chances,
+    cf.po,
+    cf.a,
+    cf.e_def,
+    cf.dp_def,
+    cf.sb,
+    cf.cs,
+    cf.pickoffs,
+    cf.wp,
+    NULL::text AS pos,
+    COALESCE(
+        jsonb_object_agg(
+            pos_agg.pos, 
+            jsonb_build_object(
+                'games', pos_agg.g, 
+                'gamesStarted', pos_agg.gs,
+                'position', pos_agg.pos
+            )
+        ) FILTER (WHERE pos_agg.pos IS NOT NULL),
+        '{}'::jsonb
+    ) AS positions_played
+FROM (
+    SELECT player_id,
+        sum(g) AS g,
+        sum(gs) AS gs,
+        sum(cg) AS cg,
+        sum(inn_def) AS inn_def,
+        sum(chances) AS chances,
+        sum(po) AS po,
+        sum(a) AS a,
+        sum(e_def) AS e_def,
+        sum(dp_def) AS dp_def,
+        sum(sb) AS sb,
+        sum(cs) AS cs,
+        sum(pickoffs) AS pickoffs,
+        sum(wp) AS wp
+    FROM season_fielding
+    WHERE ((SELECT count(1) AS count
+            FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)
+            WHERE season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0
+    GROUP BY player_id
+) cf
+LEFT JOIN (
+    SELECT player_id,
+        pos,
+        sum(g) AS g,
+        sum(gs) AS gs
+    FROM season_fielding
+    WHERE ((SELECT count(1) AS count
+            FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)
+            WHERE season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0
+    GROUP BY player_id, pos
+) pos_agg ON cf.player_id = pos_agg.player_id
+GROUP BY cf.player_id, cf.g, cf.gs, cf.cg, cf.inn_def, cf.chances, cf.po, cf.a, cf.e_def, cf.dp_def, cf.sb, cf.cs, cf.pickoffs, cf.wp`);
 
 export const gameBatting = pgTable(
   'game_batting',
@@ -469,7 +510,7 @@ export const gameBatting = pgTable(
     playerId: integer('player_id').notNull(),
     season: integer('season').notNull(),
     gameNum: integer('game_number').notNull(),
-    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    gameIdentifier: varchar('game_identifier', { length: 20 }).notNull(),
     pa: integer('pa'),
     ab: integer('ab'),
     r: integer('r'),
@@ -499,7 +540,7 @@ export const gamePitching = pgTable(
     playerId: integer('player_id').notNull(),
     season: integer('season').notNull(),
     gameNum: integer('game_num').notNull(),
-    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    gameIdentifier: varchar('game_identifier', { length: 20 }).notNull(),
     w: integer('w'),
     l: integer('l'),
     gs: integer('gs'),
@@ -532,7 +573,7 @@ export const gameFielding = pgTable(
     playerId: integer('player_id').notNull(),
     season: integer('season').notNull(),
     gameNum: integer('game_num').notNull(),
-    gameIdentifier: char('game_identifier', { length: 12 }).notNull(),
+    gameIdentifier: varchar('game_identifier', { length: 20 }).notNull(),
     innDef: doublePrecision('inn_def'),
     chances: doublePrecision('chances'),
     po: integer('po'),

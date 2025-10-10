@@ -1,8 +1,11 @@
 import { useLazyQuery, useQuery } from '@apollo/client';
 import {
-  GetPlayersWithStatsTable,
-  type GetPlayersWithStatsTableQuery,
-  type GetPlayersWithStatsTableQueryVariables,
+  GetAllPlayers,
+  type GetAllPlayersQuery,
+  type GetAllPlayersQueryVariables,
+  GetCareerBattingStats,
+  type GetCareerBattingStatsQuery,
+  type GetCareerBattingStatsQueryVariables,
 } from '../../api/db/graphql.generated';
 
 // Local interface definition (TODO: Import from PlayerStatsTypes when import issue is resolved)
@@ -25,20 +28,24 @@ export {
   useGetAllPlayersLazyQuery,
 } from './PlayersApi';
 
-// Re-export generated types from the current schema
+// Re-export additional GraphQL types for career batting stats
 export {
-  type GetPlayersWithStatsTableQuery,
-  type GetPlayersWithStatsTableQueryVariables,
-  useGetPlayersWithStatsTableQuery,
-  useGetPlayersWithStatsTableLazyQuery,
+  type GetCareerBattingStatsQuery,
+  type GetCareerBattingStatsQueryVariables,
+  useGetCareerBattingStatsQuery,
+  useGetCareerBattingStatsLazyQuery,
 } from '../../api/db/graphql.generated';
+
+// Extract Player type from GraphQL query result
+type PlayerFromQuery = NonNullable<GetAllPlayersQuery['players']>[number];
 
 // Basic Player type matching current Pothos schema
 export interface BasicPlayer {
   id: number;
   firstName: string;
   lastName: string;
-  brefId?: string;
+  brefId: string;
+  displayName?: string;
 }
 
 // Hook for getting players with the stats table query (currently just basic data)
@@ -49,9 +56,9 @@ export function usePlayerStatsQuery(variables?: {
   orderDirection?: string;
 }) {
   const { data, loading, error, refetch, fetchMore } = useQuery<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >(GetPlayersWithStatsTable, {
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >(GetAllPlayers, {
     variables,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
@@ -59,7 +66,7 @@ export function usePlayerStatsQuery(variables?: {
 
   // Transform to consistent format with display name
   const transformedData =
-    data?.players?.map((player) => ({
+    data?.players?.map((player: PlayerFromQuery) => ({
       id: player?.id ?? 0,
       firstName: player?.firstName ?? '',
       lastName: player?.lastName ?? '',
@@ -82,9 +89,9 @@ export function usePlayerStatsQuery(variables?: {
 // Lazy query version for on-demand loading
 export function usePlayerStatsLazyQuery() {
   const [executeQuery, { data, loading, error }] = useLazyQuery<
-    GetPlayersWithStatsTableQuery,
-    GetPlayersWithStatsTableQueryVariables
-  >(GetPlayersWithStatsTable, {
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >(GetAllPlayers, {
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
   });
@@ -100,7 +107,7 @@ export function usePlayerStatsLazyQuery() {
 
   // Transform data to consistent format
   const transformedData =
-    data?.players?.map((player) => ({
+    data?.players?.map((player: PlayerFromQuery) => ({
       id: player?.id ?? 0,
       firstName: player?.firstName ?? '',
       lastName: player?.lastName ?? '',

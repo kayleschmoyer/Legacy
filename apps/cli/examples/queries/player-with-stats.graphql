@@ -1,0 +1,25 @@
+query GetPlayer($id: Int!) {
+  player(id: $id) {
+    id
+    name
+    position
+    team
+    careerBatting {
+      gamesPlayed
+      atBats
+      hits
+      homeRuns
+      rbis
+      battingAverage
+    }
+    seasonBatting {
+      season
+      gamesPlayed
+      atBats
+      hits
+      homeRuns
+      rbis
+      battingAverage
+    }
+  }
+}

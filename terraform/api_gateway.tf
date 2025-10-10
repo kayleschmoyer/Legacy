@@ -17,8 +17,10 @@ resource "aws_api_gateway_deployment" "main" {
   triggers = {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.graphql.id,
+      aws_api_gateway_method.graphql_get.id,
       aws_api_gateway_method.graphql_post.id,
       aws_api_gateway_method.graphql_options.id,
+      aws_api_gateway_integration.graphql_get.id,
       aws_api_gateway_integration.graphql_post.id,
       aws_api_gateway_integration.graphql_options.id,
       # OAuth Proxy resources
@@ -54,8 +56,10 @@ resource "aws_api_gateway_deployment" "main" {
   }
 
   depends_on = [
+    aws_api_gateway_method.graphql_get,
     aws_api_gateway_method.graphql_post,
     aws_api_gateway_method.graphql_options,
+    aws_api_gateway_integration.graphql_get,
     aws_api_gateway_integration.graphql_post,
     aws_api_gateway_integration.graphql_options,
   ]
@@ -85,6 +89,14 @@ resource "aws_api_gateway_method" "graphql_post" {
   authorization = "NONE"
 }
 
+# GraphQL GET method for Explorer/Playground
+resource "aws_api_gateway_method" "graphql_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.graphql.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
 # GraphQL OPTIONS method for CORS
 resource "aws_api_gateway_method" "graphql_options" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
@@ -98,6 +110,17 @@ resource "aws_api_gateway_integration" "graphql_post" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.graphql.id
   http_method = aws_api_gateway_method.graphql_post.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.graphql.invoke_arn
+}
+
+# GraphQL GET integration for Explorer/Playground
+resource "aws_api_gateway_integration" "graphql_get" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.graphql.id
+  http_method = aws_api_gateway_method.graphql_get.http_method
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
@@ -132,6 +155,20 @@ resource "aws_api_gateway_method_response" "graphql_post" {
   }
 }
 
+# GraphQL GET method response for Explorer/Playground
+resource "aws_api_gateway_method_response" "graphql_get" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.graphql.id
+  http_method = aws_api_gateway_method.graphql_get.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+  }
+}
+
 # GraphQL OPTIONS method response for CORS
 resource "aws_api_gateway_method_response" "graphql_options" {
   rest_api_id = aws_api_gateway_rest_api.main.id
@@ -156,10 +193,26 @@ resource "aws_api_gateway_integration_response" "graphql_post" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
   }
 
   depends_on = [aws_api_gateway_integration.graphql_post]
+}
+
+# GraphQL GET integration response for Explorer/Playground
+resource "aws_api_gateway_integration_response" "graphql_get" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.graphql.id
+  http_method = aws_api_gateway_method.graphql_get.http_method
+  status_code = aws_api_gateway_method_response.graphql_get.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+  }
+
+  depends_on = [aws_api_gateway_integration.graphql_get]
 }
 
 # GraphQL OPTIONS integration response for CORS
@@ -172,7 +225,7 @@ resource "aws_api_gateway_integration_response" "graphql_options" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
   }
 
   depends_on = [aws_api_gateway_integration.graphql_options]

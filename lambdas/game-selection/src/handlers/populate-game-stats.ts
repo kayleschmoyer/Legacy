@@ -6,17 +6,35 @@ import {
   getGamePitchingStats,
 } from '@legacy-sports/bref-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { 
+  getSentryConfigFromEnv, 
+  initSentry, 
+  withSentry, 
+  captureError,
+  addBreadcrumb 
+} from '@legacy-sports/utils';
 import { and, eq, exists, not } from 'drizzle-orm';
 import { getDb } from '../utils/db';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 export type PopulateGameStatsEvent = EventBridgeEvent<
   'populate-game-stats',
   Record<string, never>
 >;
 
-export async function handler(
+const basePopulateGameStatsHandler = async (
   event: PopulateGameStatsEvent,
-): Promise<Record<string, never>> {
+): Promise<Record<string, never>> => {
+  addBreadcrumb('Processing populate game stats event', { 
+    eventSource: event.source,
+    detailType: event['detail-type']
+  });
+
   LOGGER.debug('Processing populate game stats event', { event });
 
   const db = await getDb();
@@ -205,9 +223,22 @@ export async function handler(
         }
       }
     }
+  } catch (error) {
+    captureError(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        lambda: 'game-selection-populate-stats',
+        operation: 'populateGameStats'
+      },
+      extra: {
+        event: event
+      }
+    });
+    throw error;
   } finally {
     await db.close();
   }
 
   return {};
-}
+};
+
+export const handler = withSentry(basePopulateGameStatsHandler);

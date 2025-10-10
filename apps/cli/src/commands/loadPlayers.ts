@@ -26,38 +26,45 @@ export async function handleLoadPlayers(): Promise<void> {
         'Database connection established, starting player loading...',
       );
 
-      // Start with just letter 'A' for testing
-      const letter = 'a' as Letter;
+      // Load all players from A-Z
+      const letters: Letter[] = [
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+      ];
 
-      try {
-        LOGGER.info(`Loading players for letter: ${letter.toUpperCase()}`);
-        const letterPlayers = await getPlayers(letter);
+      for (let i = 0; i < letters.length; i++) {
+        const letter = letters[i];
+        
+        try {
+          LOGGER.info(`[${i + 1}/${letters.length}] Loading players for letter: ${letter.toUpperCase()}`);
+          const letterPlayers = await getPlayers(letter);
 
-        if (letterPlayers.length === 0) {
-          LOGGER.info(`No players found for letter ${letter.toUpperCase()}`);
-          return;
+          if (letterPlayers.length === 0) {
+            LOGGER.info(`No players found for letter ${letter.toUpperCase()}`);
+            continue;
+          }
+
+          LOGGER.info(
+            `Found ${
+              letterPlayers.length
+            } players for letter ${letter.toUpperCase()}`,
+          );
+          const createdPlayers = await bulkCreatePlayers(db, letterPlayers);
+          totalPlayersCreated += createdPlayers.length;
+
+          LOGGER.info(
+            `Letter ${letter.toUpperCase()}: Created/updated ${
+              createdPlayers.length
+            } players (Total so far: ${totalPlayersCreated})`,
+          );
+        } catch (error) {
+          LOGGER.error(
+            `Error loading players for letter ${letter.toUpperCase()}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          throw error; // Re-throw to stop the process on error
         }
-
-        LOGGER.info(
-          `Found ${
-            letterPlayers.length
-          } players for letter ${letter.toUpperCase()}`,
-        );
-        const createdPlayers = await bulkCreatePlayers(db, letterPlayers);
-        totalPlayersCreated += createdPlayers.length;
-
-        LOGGER.info(
-          `Letter ${letter.toUpperCase()}: Created/updated ${
-            createdPlayers.length
-          } players`,
-        );
-      } catch (error) {
-        LOGGER.error(
-          `Error loading players for letter ${letter.toUpperCase()}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        throw error; // Re-throw to stop the process on error
       }
     });
 

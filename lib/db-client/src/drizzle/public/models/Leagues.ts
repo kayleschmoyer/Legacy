@@ -14,6 +14,7 @@ import {
 import {
   draftOrder,
   draftType,
+  draftStatus,
   leaguePermissionLevel,
   positionSlot,
 } from './Enums';
@@ -28,6 +29,7 @@ export const leagues = pgTable(
     owner: integer('owner').notNull(),
     maxRosterSize: integer('max_roster_size').notNull().default(25),
     currentMatchup: integer('current_matchup'),
+    draftStatus: draftStatus('draft_status').notNull().default('not-started'),
   },
   (table) => {
     return {};
@@ -161,13 +163,13 @@ export const leaguePosition = pgTable(
   'league_positions',
   {
     id: serial('id').primaryKey().notNull(),
-    teamId: integer('league_id').notNull(),
+    leagueId: integer('league_id').notNull(),
     positionType: positionSlot('position_type').notNull(),
   },
   (table) => {
     return {
       leaguePositionLeagueFk: foreignKey({
-        columns: [table.teamId],
+        columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_position_league_fk',
       }),
@@ -207,6 +209,11 @@ export const teamMembers = pgTable(
         foreignColumns: [leaguePosition.id],
         name: 'team_members_position_fk',
       }),
+      // Ensure only one player per position per team
+      teamMembersUkTeamPosition: unique('team_members_uk_team_position').on(
+        table.teamId,
+        table.positionId,
+      ),
     };
   },
 );

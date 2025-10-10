@@ -15,6 +15,48 @@
       "when": 1759078997543,
       "tag": "0001_add-career-statistics-views",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759773113140,
+      "tag": "0002_deep_wild_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759938600000,
+      "tag": "0003_add_positions_played_to_career_fielding",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1759867906734,
+      "tag": "0004_early_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1759872826490,
+      "tag": "0005_familiar_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759880906778,
+      "tag": "0006_oval_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1760024758403,
+      "tag": "0007_add_stats_last_fetched_at_to_players",
+      "breakpoints": true
     }
   ]
 }

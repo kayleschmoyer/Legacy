@@ -4,6 +4,10 @@ fragment League on League {
   owner
   maxRosterSize
   currentMatchup
+  draftStatus
+  userMembership {
+    ...LeagueMember
+  }
 }
 
 fragment LeagueMember on LeagueMember {
@@ -35,6 +39,22 @@ mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
 
 query GetUserLeagues {
   userLeagues {
+    ...League
+  }
+}
+
+query GetPositionsForLeague($leagueId: Int!) {
+  leaguePositions(leagueId: $leagueId) {
+    ...LeaguePosition
+  }
+}
+
+mutation DeleteAllLeagues {
+  deleteAllLeagues
+}
+
+mutation StartDraft($leagueId: Int!, $draftType: String) {
+  startDraft(leagueId: $leagueId, draftType: $draftType) {
     ...League
   }
 }

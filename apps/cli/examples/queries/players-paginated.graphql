@@ -1,0 +1,8 @@
+query GetAllPlayers($limit: Int, $offset: Int) {
+  players(limit: $limit, offset: $offset) {
+    id
+    name
+    position
+    team
+  }
+}

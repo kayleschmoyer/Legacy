@@ -1,6 +1,39 @@
 import React from 'react';
 import { Button, H3, Paragraph, XStack, YStack, HolographicCard } from '@legacy-sports/shared-components';
 
+// Helper functions for draft status display
+function formatDraftStatus(status?: string | null): string {
+  if (!status) return 'Unknown';
+  
+  switch (status) {
+    case 'not-started':
+      return 'Not Started';
+    case 'queued':
+      return 'Queued';
+    case 'in-progress':
+      return 'In Progress';
+    case 'completed':
+      return 'Completed';
+    default:
+      return status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+}
+
+function getDraftStatusColor(status?: string | null): string {
+  switch (status) {
+    case 'not-started':
+      return '$gray11';
+    case 'queued':
+      return '$orange11';
+    case 'in-progress':
+      return '$blue11';
+    case 'completed':
+      return '$green11';
+    default:
+      return '$gray11';
+  }
+}
+
 // Types for league data - based on actual GraphQL schema
 export interface League {
   id?: number | null;
@@ -8,6 +41,7 @@ export interface League {
   owner?: number | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
+  draftStatus?: string | null;
 }
 
 interface LeagueCardProps {
@@ -143,15 +177,16 @@ export function LeagueCard({ league, onViewLeague, animationDelay = 0 }: LeagueC
               letterSpacing={0.8}
               opacity={0.8}
             >
-              Format
+              Draft
             </Paragraph>
             <Paragraph 
-              fontSize="$6"
-              color="$color"
+              fontSize="$5"
+              color={getDraftStatusColor(league.draftStatus)}
               fontWeight="700"
               marginTop="$2"
+              textAlign="center"
             >
-              H2H
+              {formatDraftStatus(league.draftStatus)}
             </Paragraph>
           </YStack>
         </XStack>
