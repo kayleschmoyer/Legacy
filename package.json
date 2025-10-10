@@ -205,7 +205,7 @@
     "@nx/storybook": "^21.5.2",
     "@nx/vite": "21.5.2",
     "@nx/web": "21.5.2",
-    "@nx/workspace": "21.5.2",
+    "@nx/workspace": "21.6.3",
     "@nxlv/python": "^19.0.2",
     "@playwright/test": "^1.55.0",
     "@react-native/metro-config": "^0.81.1",
