@@ -96,7 +96,7 @@ jobs:
       # ======================================================================
 
       - name: "🚀 Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           filter: tree:0
@@ -1163,7 +1163,7 @@ jobs:
 
     steps:
       - name: "🚀 Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -1235,7 +1235,7 @@ jobs:
 
     steps:
       - name: "🚀 Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
