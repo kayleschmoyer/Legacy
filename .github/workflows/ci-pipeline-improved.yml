@@ -894,16 +894,16 @@ jobs:
         timeout-minutes: 10
         run: |
           echo "::group::Lambda Functions Build"
-          echo "::notice::To reproduce locally: npx nx affected -t build --projects=lambdas-*"
+          echo "::notice::To reproduce locally: npx nx affected -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
 
           ERROR_CONTEXT="build-lambdas-$(date +%s)"
 
           # Build affected lambda functions
-          if npx nx affected -t build --base=origin/main --head=HEAD --projects="lambdas-*" 2>&1 | tee "${ERROR_CONTEXT}.log"; then
+          if npx nx affected -t build --base=origin/main --head=HEAD --projects="draft-processor,game-selection,oauth-proxy,stats-lambda" 2>&1 | tee "${ERROR_CONTEXT}.log"; then
             echo "✅ Lambda functions built successfully"
             
             # Package lambdas for deployment validation
-            if npx nx affected -t package --base=origin/main --head=HEAD --projects="lambdas-*" 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
+            if npx nx affected -t package --base=origin/main --head=HEAD --projects="draft-processor,game-selection,oauth-proxy,stats-lambda" 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
               echo "✅ Lambda functions packaged successfully"
             else
               echo "⚠️ Lambda packaging failed (may be expected if no package target)"
