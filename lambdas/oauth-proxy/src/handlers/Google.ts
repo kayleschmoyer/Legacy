@@ -7,7 +7,7 @@ import {
 import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { readSecret } from '@legacy-sports/utils';
+import { readSecret } from '@legacy-sports/aws-utils';
 import { InternalUser } from '@legacy-sports/db-client';
 import { checkUserExists } from './UserManager';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';

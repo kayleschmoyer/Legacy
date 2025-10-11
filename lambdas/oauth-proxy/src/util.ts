@@ -1,4 +1,4 @@
-import { SecretConfiguration } from '@legacy-sports/utils';
+import { SecretConfiguration } from '@legacy-sports/aws-utils';
 
 export enum EnvironmentVariable {
   CLIENT_ID = 'CLIENT_ID',

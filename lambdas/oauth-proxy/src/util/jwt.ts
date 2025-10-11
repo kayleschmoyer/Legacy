@@ -1,5 +1,5 @@
 import { sign } from 'jsonwebtoken';
-import { readSecret } from '@legacy-sports/utils';
+import { readSecret } from '@legacy-sports/aws-utils';
 import { InternalUser } from '@legacy-sports/db-client';
 import { Secret, SECRET_CONFIG } from '../util';
 

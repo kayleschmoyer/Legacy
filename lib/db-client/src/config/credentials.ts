@@ -13,7 +13,7 @@ import {
   getEnvVarOptional,
   getEnvVarRequired,
 } from '@legacy-sports/env-utilities';
-import { retrieveSecretParameterValue } from '@legacy-sports/utils';
+import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 
 /**
  * Database connection credentials

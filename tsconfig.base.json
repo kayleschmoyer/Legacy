@@ -17,6 +17,7 @@
     "baseUrl": ".",
     "paths": {
       "@legacy-sports/api": ["lib/api/src/index.ts"],
+      "@legacy-sports/aws-utils": ["lib/aws-utils/src/index.ts"],
       "@legacy-sports/bref-client": ["lib/bref-client/src/index.ts"],
       "@legacy-sports/codegen-base": ["lib/codegen/codegen.base.ts"],
       "@legacy-sports/data-loaders": ["lib/data-loaders/src/index.ts"],

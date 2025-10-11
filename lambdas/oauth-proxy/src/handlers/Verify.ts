@@ -2,7 +2,7 @@ import { OAuth2Client } from 'google-auth-library';
 import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { readSecret } from '@legacy-sports/utils';
+import { readSecret } from '@legacy-sports/aws-utils';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { parseEventBody } from '../util/lambda';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';

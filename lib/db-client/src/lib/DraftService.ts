@@ -1,4 +1,5 @@
-import { getDbOptions, DraftSqsService, StartDraftMessage } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils';
+import { DraftSqsService, StartDraftMessage } from '@legacy-sports/aws-utils';
 import { 
   validateDraftType, 
   validateUserAccess, 

@@ -1,4 +1,4 @@
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 
 // Draft processing message types for SQS queue
@@ -27,7 +27,7 @@ export class DraftSqsService {
   private sqsClient: SQSClient;
   private queueUrl: string;
 
-  constructor(queueUrl: string, region: string = 'us-east-1') {
+  constructor(queueUrl: string, region = 'us-east-1') {
     this.sqsClient = new SQSClient({ region });
     this.queueUrl = queueUrl;
   }

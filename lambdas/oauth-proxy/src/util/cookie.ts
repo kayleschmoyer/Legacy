@@ -1,4 +1,4 @@
-import { readSecret } from '@legacy-sports/utils';
+import { readSecret } from '@legacy-sports/aws-utils';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { Secret, SECRET_CONFIG } from '../util';
 

@@ -51,6 +51,7 @@ const customConfig = {
         __dirname,
         '../../node_modules/expo-linking',
       ),
+      // Note: No special aliases needed since packages are now properly separated
     },
   },
 };
