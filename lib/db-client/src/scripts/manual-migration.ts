@@ -10,6 +10,10 @@ import { config } from 'dotenv';
 import { Pool } from 'pg';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { 
+  extractSingleTypedResult,
+  isDatabaseIntrospectionResult
+} from '../types/RawSqlTypes';
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -51,7 +55,8 @@ async function runMigration0006() {
         WHERE typname = 'draft_status'
       ) as enum_exists;
     `);
-    console.log(`Enum exists: ${(enumCheck.rows[0] as any).enum_exists}`);
+    const enumExists = extractSingleTypedResult(enumCheck, isDatabaseIntrospectionResult);
+    console.log(`Enum exists: ${enumExists ? enumExists.enum_exists : false}`);
     
     console.log('🔍 Verifying column was added...');
     const columnCheck = await pool.query(`
@@ -62,7 +67,8 @@ async function runMigration0006() {
         AND column_name = 'draft_status'
       ) as column_exists;
     `);
-    console.log(`Column exists: ${(columnCheck.rows[0] as any).column_exists}`);
+    const columnExists = extractSingleTypedResult(columnCheck, isDatabaseIntrospectionResult);
+    console.log(`Column exists: ${columnExists ? columnExists.column_exists : false}`);
     
   } catch (error) {
     console.error('❌ Error running migration:', error);

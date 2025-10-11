@@ -9,6 +9,26 @@
 import { config } from 'dotenv';
 import { Pool } from 'pg';
 import { resolve } from 'path';
+import { 
+  DraftStatusUpdateResult,
+  extractSingleTypedResult,
+  extractTypedResults,
+  isLeagueStatusResult
+} from '../types/RawSqlTypes';
+
+// Type guard for DraftStatusUpdateResult
+function isDraftStatusUpdateResult(obj: unknown): obj is DraftStatusUpdateResult {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'name' in obj &&
+    'draft_status' in obj &&
+    typeof (obj as DraftStatusUpdateResult).id === 'number' &&
+    typeof (obj as DraftStatusUpdateResult).name === 'string' &&
+    typeof (obj as DraftStatusUpdateResult).draft_status === 'string'
+  );
+}
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -33,18 +53,20 @@ async function testDraftStatusUpdate() {
       ORDER BY id;
     `);
     
+    const leaguesTyped = extractTypedResults(leagues, isLeagueStatusResult);
+    
     console.log('\n📋 Current leagues:');
-    leagues.rows.forEach((league: any) => {
+    leaguesTyped.forEach((league) => {
       console.log(`- League ${league.id}: "${league.name}" - Draft Status: ${league.draft_status} (Owner: ${league.owner})`);
     });
     
-    if (leagues.rows.length === 0) {
+    if (leaguesTyped.length === 0) {
       console.log('\n❌ No leagues found in database. Create a league first to test draft status updates.');
       return;
     }
     
     // Pick the first league to test with
-    const testLeague = leagues.rows[0] as any;
+    const testLeague = leaguesTyped[0];
     console.log(`\n🎯 Testing with League ${testLeague.id}: "${testLeague.name}"`);
     console.log(`Current draft status: ${testLeague.draft_status}`);
     
@@ -63,14 +85,15 @@ async function testDraftStatusUpdate() {
       WHERE id = $1;
     `, [testLeague.id]);
     
-    if (updatedLeague.rows.length > 0) {
-      const league = updatedLeague.rows[0] as any;
-      console.log(`✅ Update successful! New draft status: ${league.draft_status}`);
+    const updatedLeagueResult = extractSingleTypedResult(updatedLeague, isDraftStatusUpdateResult);
+    
+    if (updatedLeagueResult) {
+      console.log(`✅ Update successful! New draft status: ${updatedLeagueResult.draft_status}`);
       
-      if (league.draft_status === 'queued') {
+      if (updatedLeagueResult.draft_status === 'queued') {
         console.log('🎉 Draft status correctly updated to "queued"');
       } else {
-        console.log(`❌ Expected "queued" but got "${league.draft_status}"`);
+        console.log(`❌ Expected "queued" but got "${updatedLeagueResult.draft_status}"`);
       }
     }
     
@@ -89,9 +112,10 @@ async function testDraftStatusUpdate() {
       WHERE id = $1;
     `, [testLeague.id]);
     
-    if (resetLeague.rows.length > 0) {
-      const league = resetLeague.rows[0] as any;
-      console.log(`✅ Reset successful! Draft status: ${league.draft_status}`);
+    const resetLeagueResult = extractSingleTypedResult(resetLeague, isDraftStatusUpdateResult);
+    
+    if (resetLeagueResult) {
+      console.log(`✅ Reset successful! Draft status: ${resetLeagueResult.draft_status}`);
     }
     
     console.log('\n✨ Draft status update test completed successfully!');

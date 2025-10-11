@@ -2,6 +2,7 @@ import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
+import { GraphQLResponse, User } from '../types/cli-types';
 
 interface AuthenticatedListUsersArgs extends CommandArgs {
   limit?: number;
@@ -54,15 +55,15 @@ export async function handleAuthenticatedListUsers(
         }
       `;
       
-      const data = await authMiddleware.makeGraphQLRequest(query, { limit, offset });
+      const data = await authMiddleware.makeGraphQLRequest(query, { limit, offset }) as GraphQLResponse<{ users: User[] }>;
       
-      if (data.users && data.users.length > 0) {
-        LOGGER.info(`\n✅ Found ${data.users.length} users:`);
+      if (data.data?.users && data.data.users.length > 0) {
+        LOGGER.info(`\n✅ Found ${data.data.users.length} users:`);
         LOGGER.info('─'.repeat(80));
         LOGGER.info('ID'.padEnd(8) + 'Email'.padEnd(30) + 'Username'.padEnd(25) + 'Access Level');
         LOGGER.info('─'.repeat(80));
         
-        data.users.forEach((user: any) => {
+        data.data.users.forEach((user: User) => {
           LOGGER.info(
             user.id.toString().padEnd(8) +
             user.email.padEnd(30) +

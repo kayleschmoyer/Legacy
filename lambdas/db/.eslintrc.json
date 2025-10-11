@@ -6,7 +6,10 @@
     "web-build",
     "cache",
     "dist",
-    "src/.startup.ts"
+    "src/.startup.ts",
+    "node_modules/**/*",
+    "**/node_modules/**",
+    "index.js"
   ],
   "overrides": [
     {

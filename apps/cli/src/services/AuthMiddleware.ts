@@ -1,5 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { CLIAuthService } from './AuthService';
+import { GraphQLResponse } from '../types/cli-types';
 
 /**
  * Authentication middleware for CLI commands
@@ -143,9 +144,9 @@ export class AuthMiddleware {
    */
   async makeGraphQLRequest(
     query: string,
-    variables: Record<string, any> = {},
+    variables: Record<string, unknown> = {},
     userEmail?: string
-  ): Promise<any> {
+  ): Promise<GraphQLResponse> {
     // Get GraphQL endpoint from environment
     const graphqlUrl = this.getGraphQLUrl();
 
@@ -160,13 +161,13 @@ export class AuthMiddleware {
       throw new Error(`GraphQL request failed: ${response.status} ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as GraphQLResponse;
     
     if (result.errors && result.errors.length > 0) {
       throw new Error(`GraphQL error: ${result.errors[0].message}`);
     }
 
-    return result.data;
+    return result;
   }
 
   /**

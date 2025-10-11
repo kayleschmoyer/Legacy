@@ -52,7 +52,7 @@ export async function handleComputeScoring(
     
     // Exclude positionsPlayed field from fielding stats as it's not used in scoring
     const fieldingStatsForScoring = fieldingStats ? 
-      (({ positionsPlayed: _positionsPlayed, ...rest }) => rest)(fieldingStats) : fieldingStats;
+      (({ positionsPlayed: _, ...rest }) => rest)(fieldingStats) : fieldingStats;
     
     const fieldingScore = computeScoring(
       fieldingStatsForScoring,

@@ -3,6 +3,13 @@ import { LOGGER } from '@legacy-sports/logging';
 import crypto from 'crypto';
 import { parseEventBody } from '../util/lambda';
 
+interface User {
+  id: number;
+  email: string;
+  username: string;
+  accessLevel: string;
+}
+
 // In-memory storage for device authorization flows
 // In production, this should use Redis or DynamoDB for persistence across Lambda instances
 interface DeviceAuthFlow {
@@ -14,7 +21,7 @@ interface DeviceAuthFlow {
   completed: boolean;
   tokenResponse?: {
     jwt: string;
-    user: any;
+    user: User;
     refreshToken?: string;
   };
 }
@@ -67,9 +74,9 @@ function generateDeviceCode(): string {
 /**
  * Handle device authorization request (step 1 of device flow)
  */
-export const handleDeviceAuthorize = async (
+export const handleDeviceAuthorize = (
   event: APIGatewayEvent,
-): Promise<APIGatewayProxyResult> => {
+): APIGatewayProxyResult => {
   LOGGER.info('Device authorization request received');
 
   try {
@@ -139,9 +146,9 @@ export const handleDeviceAuthorize = async (
 /**
  * Handle device token request (polling endpoint)
  */
-export const handleDeviceToken = async (
+export const handleDeviceToken = (
   event: APIGatewayEvent,
-): Promise<APIGatewayProxyResult> => {
+): APIGatewayProxyResult => {
   LOGGER.debug('Device token request received');
 
   try {
@@ -212,9 +219,9 @@ export const handleDeviceToken = async (
 /**
  * Handle device verification page (web interface for user to complete flow)
  */
-export const handleDeviceVerify = async (
+export const handleDeviceVerify = (
   event: APIGatewayEvent,
-): Promise<APIGatewayProxyResult> => {
+): APIGatewayProxyResult => {
   LOGGER.info('Device verification page requested');
 
   const userCode = event.queryStringParameters?.user_code;
@@ -271,12 +278,18 @@ export const handleDeviceVerify = async (
  * Complete device flow after OAuth success
  * This should be called from the main OAuth handler when it detects a device flow state
  */
-export const completeDeviceFlow = (deviceCode: string, tokenResponse: any): void => {
+interface TokenResponse {
+  jwt: string;
+  user: User;
+  refreshToken?: string;
+}
+
+export const completeDeviceFlow = (deviceCode: string, tokenResponse: TokenResponse): void => {
   const flow = deviceFlows.get(deviceCode);
   if (flow && !flow.completed && Date.now() <= flow.expiresAt) {
     flow.completed = true;
     flow.tokenResponse = tokenResponse;
-    LOGGER.info(`Device flow completed for: ${tokenResponse.user?.email}`);
+    LOGGER.info(`Device flow completed for: ${tokenResponse.user.email}`);
   }
 };
 

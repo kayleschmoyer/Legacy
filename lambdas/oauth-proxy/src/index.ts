@@ -210,7 +210,7 @@ const baseOAuthHandler = async (
       case '/oauth/device/authorize':
       case '/dev/oauth/device/authorize':
         if (event.httpMethod === 'POST') {
-          const result = await handleDeviceAuthorize(event);
+          const result = handleDeviceAuthorize(event);
           return addCorsHeaders(result);
         }
         break;
@@ -218,7 +218,7 @@ const baseOAuthHandler = async (
       case '/oauth/device/token':
       case '/dev/oauth/device/token':
         if (event.httpMethod === 'POST') {
-          const result = await handleDeviceToken(event);
+          const result = handleDeviceToken(event);
           return addCorsHeaders(result);
         }
         break;
@@ -226,7 +226,7 @@ const baseOAuthHandler = async (
       case '/oauth/device/verify':
       case '/dev/oauth/device/verify':
         if (event.httpMethod === 'GET') {
-          const result = await handleDeviceVerify(event);
+          const result = handleDeviceVerify(event);
           return addCorsHeaders(result);
         }
         break;

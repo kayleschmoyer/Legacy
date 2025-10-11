@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
+import { GraphQLResponse } from '../types/cli-types';
 
 interface GraphQLTestArgs extends CommandArgs {
   query?: string;
@@ -90,10 +91,10 @@ export async function handleGraphQLTest(
     }
 
     // Parse variables if provided
-    let parsedVariables: Record<string, any> = {};
+    let parsedVariables: Record<string, unknown> = {};
     if (variables) {
       try {
-        parsedVariables = JSON.parse(variables);
+        parsedVariables = JSON.parse(variables) as Record<string, unknown>;
         LOGGER.info(`📝 Using variables: ${JSON.stringify(parsedVariables, null, 2)}`);
       } catch (error) {
         throw new Error(`Invalid JSON in variables: ${error instanceof Error ? error.message : String(error)}`);
@@ -160,7 +161,7 @@ export async function handleGraphQLTest(
         LOGGER.info('─'.repeat(40));
       }
 
-      const responseData = await response.json();
+      const responseData = await response.json() as GraphQLResponse;
       
       LOGGER.info(`\n✅ Query completed in ${executionTime}ms`);
       LOGGER.info(`📊 Status: ${response.status} ${response.statusText}`);
@@ -241,14 +242,14 @@ function formatQuery(query: string): string {
 /**
  * Display GraphQL response with formatting
  */
-function displayGraphQLResponse(responseData: any, pretty: boolean): void {
+function displayGraphQLResponse(responseData: GraphQLResponse, pretty: boolean): void {
   LOGGER.info('\n📋 Response:');
   LOGGER.info('═'.repeat(60));
   
   // Check for GraphQL errors
   if (responseData.errors && responseData.errors.length > 0) {
     LOGGER.info('❌ GraphQL Errors:');
-    responseData.errors.forEach((error: any, index: number) => {
+    responseData.errors.forEach((error, index: number) => {
       LOGGER.info(`\n  Error ${index + 1}:`);
       LOGGER.info(`    Message: ${error.message}`);
       if (error.locations) {

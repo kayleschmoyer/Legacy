@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, sql, SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
@@ -11,6 +11,11 @@ import {
   SeasonFielding,
   SeasonPitching,
 } from '../../types/DatabaseTypes';
+import { 
+  CareerBattingQueryBuilder,
+  QueryOptions,
+  StatisticsQueryFilters
+} from '../query-builders/TypeSafeQueryBuilder';
 
 // Type-safe column access helpers with proper Drizzle types
 // These functions safely access Drizzle table columns by name for sorting
@@ -81,186 +86,81 @@ export class StatisticsService {
   constructor(private options: DbOptions) {}
 
   /**
+   * Convert legacy StatisticsQueryOptions to new TypeSafe interfaces
+   */
+  private convertToTypeSafeOptions(queryOptions: StatisticsQueryOptions = {}): {
+    filters: StatisticsQueryFilters;
+    options: QueryOptions;
+  } {
+    const filters: StatisticsQueryFilters = {
+      playerId: queryOptions.filters?.playerId,
+      minGames: queryOptions.filters?.minGames,
+      minHomeRuns: queryOptions.filters?.minHomeRuns,
+      minRBI: queryOptions.filters?.minRBI,
+      minWins: queryOptions.filters?.minWins,
+      minStrikeouts: queryOptions.filters?.minStrikeouts,
+      searchTerm: queryOptions.filters?.searchTerm,
+    };
+
+    const options: QueryOptions = {
+      orderBy: queryOptions.orderBy as 'games' | 'homeRuns' | 'wins' | 'strikeouts',
+      orderDirection: queryOptions.orderDirection || 'desc',
+      limit: queryOptions.limit,
+      offset: queryOptions.offset,
+    };
+
+    return { filters, options };
+  }
+
+  /**
    * Get career batting statistics with optional filtering and pagination
+   * Updated to use TypeSafe query builders
    */
   async getCareerBattingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerBatting[]> {
     return runWithPublicClient(this.options, async (db): Promise<CareerBatting[]> => {
-      // Check if we need to join with players table for search term
-      const needsPlayerJoin = queryOptions.filters?.searchTerm;
+      // Convert legacy options to TypeSafe format
+      const { filters, options } = this.convertToTypeSafeOptions(queryOptions);
       
-      // Build base query - using let without explicit any type so TypeScript can infer
-      let queryBuilder;
-      if (needsPlayerJoin) {
-        // Join with players table for name search
-        queryBuilder = db
-          .select({
-            playerId: PublicSchema.careerBatting.playerId,
-            g: PublicSchema.careerBatting.g,
-            pa: PublicSchema.careerBatting.pa,
-            ab: PublicSchema.careerBatting.ab,
-            r: PublicSchema.careerBatting.r,
-            h: PublicSchema.careerBatting.h,
-            doubles: PublicSchema.careerBatting.doubles,
-            triples: PublicSchema.careerBatting.triples,
-            hr: PublicSchema.careerBatting.hr,
-            rbi: PublicSchema.careerBatting.rbi,
-            sb: PublicSchema.careerBatting.sb,
-            cs: PublicSchema.careerBatting.cs,
-            bb: PublicSchema.careerBatting.bb,
-            so: PublicSchema.careerBatting.so,
-            tb: PublicSchema.careerBatting.tb,
-            gidp: PublicSchema.careerBatting.gidp,
-            hbp: PublicSchema.careerBatting.hbp,
-            sh: PublicSchema.careerBatting.sh,
-            ibb: PublicSchema.careerBatting.ibb,
-          })
-          .from(PublicSchema.careerBatting)
-          .innerJoin(
-            PublicSchema.players,
-            eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id)
-          );
-      } else {
-        queryBuilder = db.select().from(PublicSchema.careerBatting);
-      }
-
-      // Build WHERE clause
-      const conditions = queryOptions.filters
-        ? this.buildBattingFilters(queryOptions.filters)
-        : [];
-
-      // Add search term condition if needed
-      if (needsPlayerJoin && queryOptions.filters?.searchTerm) {
-        const searchTerm = queryOptions.filters.searchTerm;
-        // Use properly typed column references
-        const firstNameCol = PublicSchema.players.firstName;
-        const lastNameCol = PublicSchema.players.lastName;
-        const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
-        const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
-        const searchCondition = or(firstNameMatch, lastNameMatch);
-        if (searchCondition) {
-          conditions.push(searchCondition);
+      // Use the TypeSafe query builder - eliminates all 'any' type assertions
+      const queryBuilder = new CareerBattingQueryBuilder(db);
+      const results = await queryBuilder.executeQuery(filters, options);
+      
+      // Transform joined results to match expected CareerBatting format
+      // Drizzle returns results from joins as { tableName: data } structure
+      return results.map(result => {
+        // Check if this is a joined result (has career_batting property)
+        if (result && typeof result === 'object' && 'career_batting' in result) {
+          // Extract the career_batting data from the joined result
+          return (result as { career_batting: CareerBatting }).career_batting;
         }
-      }
-
-      // Build final query parts
-      const orderDirection = queryOptions.orderDirection || 'desc';
-
-      // Execute query with all conditions - using let without explicit any type
-      let finalQuery = queryBuilder;
-
-      if (conditions.length > 0) {
-        // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-        if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-          // Drizzle's complex conditional types require type assertion here
-          finalQuery = (finalQuery as any).where(whereClause);
-        }
-      }
-
-      // Default ordering by home runs descending for interesting results
-      if (queryOptions.orderBy === 'games') {
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery as any).orderBy(desc(PublicSchema.careerBatting.g))
-            : (finalQuery as any).orderBy(asc(PublicSchema.careerBatting.g));
-      } else if (queryOptions.orderBy === 'homeRuns') {
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery as any).orderBy(desc(PublicSchema.careerBatting.hr))
-            : (finalQuery as any).orderBy(asc(PublicSchema.careerBatting.hr));
-      } else {
-        // Default to home runs descending
-        finalQuery = (finalQuery as any).orderBy(
-          desc(PublicSchema.careerBatting.hr),
-        );
-      }
-
-      if (queryOptions.limit) {
-        finalQuery = (finalQuery as any).limit(queryOptions.limit);
-      }
-
-      if (queryOptions.offset) {
-        finalQuery = (finalQuery as any).offset(queryOptions.offset);
-      }
-
-      return await (finalQuery as any).execute();
+        // For non-joined queries, the result is already in the correct format
+        return result as CareerBatting;
+      });
     });
   }
 
-  /**
-   * Get the total count of career batting statistics with optional filtering
+    /**
+   * Get the total count of career batting statistics records matching the given filters.
    * Uses the same filters as getCareerBattingStats but returns only the count
    */
   async getCareerBattingStatsCount(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<number> {
     return runWithPublicClient(this.options, async (db): Promise<number> => {
+      const queryBuilder = new CareerBattingQueryBuilder(db);
+      
+      // Use the same type-safe filters as getCareerBattingStats
+      const typeSafeOptions = this.convertToTypeSafeOptions(queryOptions);
+      
       // Check if we need to join with players table for search term
-      const needsPlayerJoin = queryOptions.filters?.searchTerm;
-
-      // Build WHERE clause - same logic as getCareerBattingStats
-      const conditions = queryOptions.filters
-        ? this.buildBattingFilters(queryOptions.filters)
-        : [];
-
-      if (needsPlayerJoin) {
-        // Build query with join for name search
-        let queryBuilder = db
-          .select({
-            count: count(),
-          })
-          .from(PublicSchema.careerBatting)
-          .innerJoin(
-            PublicSchema.players,
-            eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id)
-          );
-
-        // Add search term condition
-        if (queryOptions.filters?.searchTerm) {
-          const searchTerm = queryOptions.filters.searchTerm;
-          const firstNameCol = PublicSchema.players.firstName;
-          const lastNameCol = PublicSchema.players.lastName;
-          const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
-          const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
-          const searchCondition = or(firstNameMatch, lastNameMatch);
-          if (searchCondition) {
-            conditions.push(searchCondition);
-          }
-        }
-
-        // Apply WHERE conditions if any
-        if (conditions.length > 0) {
-          const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-          if (validConditions.length > 0) {
-            const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-            queryBuilder = (queryBuilder as any).where(whereClause);
-          }
-        }
-
-        const result = await queryBuilder.execute();
-        return result[0]?.count || 0;
+      if (typeSafeOptions.filters?.searchTerm) {
+        const result = await queryBuilder.countWithPlayerJoin(typeSafeOptions);
+        return result[0]?.count ?? 0;
       } else {
-        // Build query without join for simple counts
-        let queryBuilder = db
-          .select({
-            count: count(),
-          })
-          .from(PublicSchema.careerBatting);
-
-        // Apply WHERE conditions if any
-        if (conditions.length > 0) {
-          const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-          if (validConditions.length > 0) {
-            const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-            queryBuilder = (queryBuilder as any).where(whereClause);
-          }
-        }
-
-        const result = await queryBuilder.execute();
-        return result[0]?.count || 0;
+        const result = await queryBuilder.countWithoutJoin(typeSafeOptions);
+        return result[0]?.count ?? 0;
       }
     });
   }

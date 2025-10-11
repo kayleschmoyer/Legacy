@@ -7,3 +7,6 @@ export * from './DatabaseTypes';
 
 // Re-export environment configuration
 export * from './EnvironmentVariable';
+
+// Re-export raw SQL result types and utilities
+export * from './RawSqlTypes';

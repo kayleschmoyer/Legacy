@@ -12,6 +12,11 @@ export * from './lib/services';
 export * from './lib/DraftUtils';
 export * from './lib/DraftService';
 
+// Type-safe query utilities
+export * from './lib/query-builders/TypeSafeQueryBuilder';
+export * from './lib/prepared-statements/PreparedStatements';
+export * from './lib/validation/ValidationUtils';
+
 // Types and configuration
 export * from './types';
 export * from './config/database';

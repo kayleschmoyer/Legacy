@@ -3,6 +3,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { DraftService } from '@legacy-sports/db-client';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
+import { User } from '../types/cli-types';
 
 export interface StartDraftArgs extends CommandArgs {
   leagueId: number;
@@ -71,7 +72,7 @@ export async function handleStartDraft(
 
     // Get authenticated user
     const authMiddleware = new AuthMiddleware();
-    let currentUser;
+    let currentUser: User;
     
     try {
       // Try to get the current user 

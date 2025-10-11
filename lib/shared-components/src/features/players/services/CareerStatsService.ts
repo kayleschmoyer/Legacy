@@ -179,8 +179,8 @@ function parsePositionsPlayed(positionsPlayedJson: string | null | undefined): R
   if (!positionsPlayedJson) return undefined;
   
   try {
-    const parsed = JSON.parse(positionsPlayedJson);
-    return typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+    const parsed = JSON.parse(positionsPlayedJson) as unknown;
+    return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, PositionData> : undefined;
   } catch (error) {
     console.warn('Failed to parse positions data:', error);
     return undefined;
@@ -197,7 +197,7 @@ function formatPositionsPlayed(positionsPlayedJson: string | null | undefined): 
   if (!positionsPlayedJson) return '';
   
   try {
-    const positionsData: Record<string, PositionData> = JSON.parse(positionsPlayedJson);
+    const positionsData: Record<string, PositionData> = JSON.parse(positionsPlayedJson) as Record<string, PositionData>;
     
     // Convert to array and sort by games played (descending)
     const sortedPositions = Object.values(positionsData)
@@ -322,7 +322,7 @@ export function transformCareerStatsWithFielding(
     // Parse positions data
     let positionsPlayed: Record<string, PositionData> | undefined;
     try {
-      positionsPlayed = positionsPlayedJson ? JSON.parse(positionsPlayedJson) : undefined;
+      positionsPlayed = positionsPlayedJson ? JSON.parse(positionsPlayedJson) as Record<string, PositionData> : undefined;
     } catch (error) {
       console.warn('Failed to parse positions data for player', battingStats.playerId, error);
     }

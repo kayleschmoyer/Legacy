@@ -3,6 +3,7 @@ import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { JWTPayload, User } from '../types/cli-types';
 
 interface AuthToken {
   jwt: string;
@@ -21,12 +22,7 @@ interface DeviceAuthRequest {
 
 interface TokenResponse {
   jwt: string;
-  user: {
-    id: number;
-    email: string;
-    username: string;
-    accessLevel: string;
-  };
+  user: User;
   refreshToken?: string;
 }
 
@@ -118,7 +114,7 @@ export class CLIAuthService {
       throw new Error(`Device authorization failed: ${error}`);
     }
 
-    return response.json();
+    return response.json() as Promise<DeviceAuthRequest>;
   }
 
   /**
@@ -142,10 +138,10 @@ export class CLIAuthService {
         });
 
         if (response.ok) {
-          return response.json();
+          return response.json() as Promise<TokenResponse>;
         }
 
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as { error?: string };
         
         if (response.status === 428) {
           // Authorization pending - continue polling
@@ -229,7 +225,7 @@ export class CLIAuthService {
 
     try {
       // Decode JWT to get user info (without verification since we trust our stored tokens)
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as JWTPayload;
       return {
         email: payload.email,
         accessLevel: payload.accessLevel,
@@ -314,7 +310,7 @@ export class CLIAuthService {
     // Calculate expiration (JWT standard is typically 1 hour, but we'll decode to be sure)
     let expiresAt = Date.now() + (60 * 60 * 1000); // Default 1 hour
     try {
-      const payload = JSON.parse(Buffer.from(tokenResponse.jwt.split('.')[1], 'base64').toString());
+      const payload = JSON.parse(Buffer.from(tokenResponse.jwt.split('.')[1], 'base64').toString()) as JWTPayload;
       if (payload.exp) {
         expiresAt = payload.exp * 1000; // Convert from seconds to milliseconds
       }
@@ -363,7 +359,7 @@ export class CLIAuthService {
   private async loadAuthData(): Promise<AuthStorageFile> {
     try {
       const data = await fs.readFile(this.tokenFile, 'utf8');
-      return JSON.parse(data);
+      return JSON.parse(data) as AuthStorageFile;
     } catch {
       // File doesn't exist or is invalid - return empty structure
       return { tokens: {} };

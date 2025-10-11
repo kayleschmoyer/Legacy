@@ -9,6 +9,124 @@
 import { config } from 'dotenv';
 import { Pool } from 'pg';
 import { resolve } from 'path';
+import { 
+  extractSingleTypedResult,
+  extractTypedResults,
+  isCountResult,
+  isPlayerWithPositionStatsResult
+} from '../types/RawSqlTypes';
+
+// Simple interfaces for the specific stat queries in this debug script
+interface SimpleFieldingStats {
+  pos: string;
+  g: number;
+}
+
+interface SimplePitchingStats {
+  g: number;
+  gs: number;
+}
+
+interface SimpleBattingStats {
+  g: number;
+  ab: number;
+  h: number;
+}
+
+interface PlayerGamesDistribution {
+  id: number;
+  first_name: string;
+  last_name: string;
+  max_fielding_games: number;
+  pitching_games: number;
+  pitching_starts: number;
+  batting_games: number;
+}
+
+interface LowGameCountPlayer {
+  id: number;
+  first_name: string;
+  last_name: string;
+  max_fielding_games: number;
+  pitching_games: number;
+  pitching_starts: number;
+}
+
+// Type guards for the simple stat interfaces
+function isSimpleFieldingStats(obj: unknown): obj is SimpleFieldingStats {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'pos' in obj &&
+    'g' in obj &&
+    typeof (obj as SimpleFieldingStats).pos === 'string' &&
+    typeof (obj as SimpleFieldingStats).g === 'number'
+  );
+}
+
+function isSimplePitchingStats(obj: unknown): obj is SimplePitchingStats {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'g' in obj &&
+    'gs' in obj &&
+    typeof (obj as SimplePitchingStats).g === 'number' &&
+    typeof (obj as SimplePitchingStats).gs === 'number'
+  );
+}
+
+function isSimpleBattingStats(obj: unknown): obj is SimpleBattingStats {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'g' in obj &&
+    'ab' in obj &&
+    'h' in obj &&
+    typeof (obj as SimpleBattingStats).g === 'number' &&
+    typeof (obj as SimpleBattingStats).ab === 'number' &&
+    typeof (obj as SimpleBattingStats).h === 'number'
+  );
+}
+
+function isPlayerGamesDistribution(obj: unknown): obj is PlayerGamesDistribution {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'first_name' in obj &&
+    'last_name' in obj &&
+    'max_fielding_games' in obj &&
+    'pitching_games' in obj &&
+    'pitching_starts' in obj &&
+    'batting_games' in obj &&
+    typeof (obj as PlayerGamesDistribution).id === 'number' &&
+    typeof (obj as PlayerGamesDistribution).first_name === 'string' &&
+    typeof (obj as PlayerGamesDistribution).last_name === 'string' &&
+    typeof (obj as PlayerGamesDistribution).max_fielding_games === 'number' &&
+    typeof (obj as PlayerGamesDistribution).pitching_games === 'number' &&
+    typeof (obj as PlayerGamesDistribution).pitching_starts === 'number' &&
+    typeof (obj as PlayerGamesDistribution).batting_games === 'number'
+  );
+}
+
+function isLowGameCountPlayer(obj: unknown): obj is LowGameCountPlayer {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'first_name' in obj &&
+    'last_name' in obj &&
+    'max_fielding_games' in obj &&
+    'pitching_games' in obj &&
+    'pitching_starts' in obj &&
+    typeof (obj as LowGameCountPlayer).id === 'number' &&
+    typeof (obj as LowGameCountPlayer).first_name === 'string' &&
+    typeof (obj as LowGameCountPlayer).last_name === 'string' &&
+    typeof (obj as LowGameCountPlayer).max_fielding_games === 'number' &&
+    typeof (obj as LowGameCountPlayer).pitching_games === 'number' &&
+    typeof (obj as LowGameCountPlayer).pitching_starts === 'number'
+  );
+}
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -27,13 +145,15 @@ async function debugPlayersWithoutPositions() {
   try {
     // 1. Get total number of players
     const totalPlayersResult = await pool.query('SELECT COUNT(*) as count FROM players');
-    const totalPlayers = parseInt((totalPlayersResult.rows[0] as any).count);
+    const totalPlayersCount = extractSingleTypedResult(totalPlayersResult, isCountResult);
+    const totalPlayers = totalPlayersCount ? totalPlayersCount.count : 0;
     
     console.log(`📊 Total players in database: ${totalPlayers}`);
     
     // 2. Get players with positions
     const playersWithPositionsResult = await pool.query('SELECT COUNT(DISTINCT player_id) as count FROM player_eligible_positions');
-    const playersWithPositions = parseInt((playersWithPositionsResult.rows[0] as any).count);
+    const playersWithPositionsCount = extractSingleTypedResult(playersWithPositionsResult, isCountResult);
+    const playersWithPositions = playersWithPositionsCount ? playersWithPositionsCount.count : 0;
     
     console.log(`✅ Players with eligible positions: ${playersWithPositions}`);
     console.log(`❌ Players WITHOUT positions: ${totalPlayers - playersWithPositions}\n`);
@@ -48,18 +168,19 @@ async function debugPlayersWithoutPositions() {
     `;
     
     const playersWithoutPositionsResult = await pool.query(playersWithoutPositionsQuery);
+    const playersWithoutPositions = extractTypedResults(playersWithoutPositionsResult, isPlayerWithPositionStatsResult);
     
     console.log('🚫 Sample of players WITHOUT positions:');
     console.log('ID\tName\t\t\tBRef ID');
     console.log('----------------------------------------');
-    playersWithoutPositionsResult.rows.forEach((player: any) => {
+    playersWithoutPositions.forEach((player) => {
       const fullName = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       console.log(`${player.id}\t${fullName}\t${player.bref_id}`);
     });
     
-    if (playersWithoutPositionsResult.rows.length > 0) {
+    if (playersWithoutPositions.length > 0) {
       // 4. Check stats for a sample player to understand why they don't have positions
-      const samplePlayer = playersWithoutPositionsResult.rows[0] as any;
+      const samplePlayer = playersWithoutPositions[0];
       console.log(`\n🔬 Analyzing sample player: ${samplePlayer.first_name} ${samplePlayer.last_name} (ID: ${samplePlayer.id})`);
       
       // Check career fielding stats
@@ -70,11 +191,13 @@ async function debugPlayersWithoutPositions() {
       `;
       const fieldingStatsResult = await pool.query(fieldingStatsQuery, [samplePlayer.id]);
       
+      const fieldingStats = extractTypedResults(fieldingStatsResult, isSimpleFieldingStats);
+      
       console.log('📈 Career fielding stats:');
-      if (fieldingStatsResult.rows.length === 0) {
+      if (fieldingStats.length === 0) {
         console.log('  - No fielding stats found');
       } else {
-        fieldingStatsResult.rows.forEach((stat: any) => {
+        fieldingStats.forEach((stat) => {
           console.log(`  - Position: ${stat.pos}, Games: ${stat.g}`);
         });
       }
@@ -87,11 +210,13 @@ async function debugPlayersWithoutPositions() {
       `;
       const pitchingStatsResult = await pool.query(pitchingStatsQuery, [samplePlayer.id]);
       
+      const pitchingStats = extractTypedResults(pitchingStatsResult, isSimplePitchingStats);
+      
       console.log('⚾ Career pitching stats:');
-      if (pitchingStatsResult.rows.length === 0) {
+      if (pitchingStats.length === 0) {
         console.log('  - No pitching stats found');
       } else {
-        pitchingStatsResult.rows.forEach((stat: any) => {
+        pitchingStats.forEach((stat) => {
           const reliefApps = stat.g - stat.gs;
           console.log(`  - Games: ${stat.g}, Games Started: ${stat.gs}, Relief Apps: ${reliefApps}`);
         });
@@ -105,11 +230,13 @@ async function debugPlayersWithoutPositions() {
       `;
       const battingStatsResult = await pool.query(battingStatsQuery, [samplePlayer.id]);
       
+      const battingStats = extractTypedResults(battingStatsResult, isSimpleBattingStats);
+      
       console.log('🏏 Career batting stats:');
-      if (battingStatsResult.rows.length === 0) {
+      if (battingStats.length === 0) {
         console.log('  - No batting stats found');
       } else {
-        battingStatsResult.rows.forEach((stat: any) => {
+        battingStats.forEach((stat) => {
           console.log(`  - Games: ${stat.g}, At Bats: ${stat.ab}, Hits: ${stat.h}`);
         });
       }
@@ -125,8 +252,9 @@ async function debugPlayersWithoutPositions() {
       WHERE g > 50 AND pos != 'P'
     `;
     const fieldingEligibleResult = await pool.query(fieldingEligibleQuery);
+    const fieldingEligibleCount = extractSingleTypedResult(fieldingEligibleResult, isCountResult);
     
-    console.log(`⚾ Fielding positions (50+ games, not P): ${(fieldingEligibleResult.rows[0] as any).count} players`);
+    console.log(`⚾ Fielding positions (50+ games, not P): ${fieldingEligibleCount ? fieldingEligibleCount.count : 0} players`);
     
     // Players eligible for SP (50+ games started)
     const spEligibleQuery = `
@@ -135,8 +263,9 @@ async function debugPlayersWithoutPositions() {
       WHERE gs > 50
     `;
     const spEligibleResult = await pool.query(spEligibleQuery);
+    const spEligibleCount = extractSingleTypedResult(spEligibleResult, isCountResult);
     
-    console.log(`🏈 Starting Pitcher (50+ GS): ${(spEligibleResult.rows[0] as any).count} players`);
+    console.log(`🏈 Starting Pitcher (50+ GS): ${spEligibleCount ? spEligibleCount.count : 0} players`);
     
     // Players eligible for RP (50+ relief appearances)
     const rpEligibleQuery = `
@@ -145,8 +274,9 @@ async function debugPlayersWithoutPositions() {
       WHERE g - gs > 50
     `;
     const rpEligibleResult = await pool.query(rpEligibleQuery);
+    const rpEligibleCount = extractSingleTypedResult(rpEligibleResult, isCountResult);
     
-    console.log(`🏈 Relief Pitcher (50+ relief apps): ${(rpEligibleResult.rows[0] as any).count} players`);
+    console.log(`🏈 Relief Pitcher (50+ relief apps): ${rpEligibleCount ? rpEligibleCount.count : 0} players`);
     
     // 6. Show distribution of games played for players without positions
     console.log('\n📊 Games played distribution for players without positions:');
@@ -172,10 +302,11 @@ async function debugPlayersWithoutPositions() {
     `;
     
     const gamesDistributionResult = await pool.query(gamesDistributionQuery);
+    const gamesDistribution = extractTypedResults(gamesDistributionResult, isPlayerGamesDistribution);
     
     console.log('Player\t\t\tMax Field Games\tPitch Games\tPitch Starts\tBat Games');
     console.log('---------------------------------------------------------------------------------');
-    gamesDistributionResult.rows.forEach((player: any) => {
+    gamesDistribution.forEach((player) => {
       const name = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       console.log(`${name}\t${player.max_fielding_games}\t\t${player.pitching_games}\t\t${player.pitching_starts}\t\t${player.batting_games}`);
     });
@@ -213,10 +344,11 @@ async function debugPlayersWithoutPositions() {
     `;
     
     const lowGameCountResult = await pool.query(lowGameCountQuery);
+    const lowGameCountPlayers = extractTypedResults(lowGameCountResult, isLowGameCountPlayer);
     
     console.log('Player\t\t\tMax Field Games\tPitch Games\tPitch Starts\tRelief Apps');
     console.log('---------------------------------------------------------------------------------');
-    lowGameCountResult.rows.forEach((player: any) => {
+    lowGameCountPlayers.forEach((player) => {
       const name = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       const reliefApps = player.pitching_games - player.pitching_starts;
       console.log(`${name}\t${player.max_fielding_games}\t\t${player.pitching_games}\t\t${player.pitching_starts}\t\t${reliefApps}`);

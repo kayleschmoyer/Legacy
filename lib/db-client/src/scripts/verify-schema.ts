@@ -9,6 +9,49 @@
 import { config } from 'dotenv';
 import { Pool } from 'pg';
 import { resolve } from 'path';
+import { 
+  extractSingleTypedResult,
+  extractTypedResults,
+  isDatabaseIntrospectionResult,
+  isEnumValueResult,
+  MigrationHistoryResult
+} from '../types/RawSqlTypes';
+
+// Interface for column details
+interface ColumnDetailsResult {
+  column_name: string;
+  data_type: string;
+  column_default: string | null;
+  is_nullable: string;
+}
+
+// Type guard for ColumnDetailsResult
+function isColumnDetailsResult(obj: unknown): obj is ColumnDetailsResult {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'column_name' in obj &&
+    'data_type' in obj &&
+    'column_default' in obj &&
+    'is_nullable' in obj &&
+    typeof (obj as ColumnDetailsResult).column_name === 'string' &&
+    typeof (obj as ColumnDetailsResult).data_type === 'string' &&
+    (typeof (obj as ColumnDetailsResult).column_default === 'string' || (obj as ColumnDetailsResult).column_default === null) &&
+    typeof (obj as ColumnDetailsResult).is_nullable === 'string'
+  );
+}
+
+// Type guard for MigrationHistoryResult
+function isMigrationHistoryResult(obj: unknown): obj is MigrationHistoryResult {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'hash' in obj &&
+    'created_at' in obj &&
+    typeof (obj as MigrationHistoryResult).hash === 'string' &&
+    (obj as MigrationHistoryResult).created_at instanceof Date
+  );
+}
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -35,9 +78,11 @@ async function verifyDraftStatusColumn() {
       ) as enum_exists;
     `);
     
-    console.log(`Draft status enum exists: ${(enumResult.rows[0] as any).enum_exists}`);
+    const enumExists = extractSingleTypedResult(enumResult, isDatabaseIntrospectionResult);
     
-    if ((enumResult.rows[0] as any).enum_exists) {
+    console.log(`Draft status enum exists: ${enumExists ? enumExists.enum_exists : false}`);
+    
+    if (enumExists && enumExists.enum_exists) {
       // Get enum values
       const enumValues = await pool.query(`
         SELECT enumlabel 
@@ -47,7 +92,8 @@ async function verifyDraftStatusColumn() {
         ORDER BY enumsortorder;
       `);
       
-      console.log('Enum values:', enumValues.rows.map((r: any) => r.enumlabel));
+      const enumValuesTyped = extractTypedResults(enumValues, isEnumValueResult);
+      console.log('Enum values:', enumValuesTyped.map((r) => r.enumlabel));
     }
     
     console.log('🔍 Checking for draft_status column in leagues table...');
@@ -62,9 +108,11 @@ async function verifyDraftStatusColumn() {
       ) as column_exists;
     `);
     
-    console.log(`Draft status column exists: ${(columnResult.rows[0] as any).column_exists}`);
+    const columnExists = extractSingleTypedResult(columnResult, isDatabaseIntrospectionResult);
     
-    if ((columnResult.rows[0] as any).column_exists) {
+    console.log(`Draft status column exists: ${columnExists ? columnExists.column_exists : false}`);
+    
+    if (columnExists && columnExists.column_exists) {
       // Get column details
       const columnDetails = await pool.query(`
         SELECT column_name, data_type, column_default, is_nullable
@@ -73,7 +121,8 @@ async function verifyDraftStatusColumn() {
         AND column_name = 'draft_status';
       `);
       
-      console.log('Column details:', columnDetails.rows[0]);
+      const columnDetail = extractSingleTypedResult(columnDetails, isColumnDetailsResult);
+      console.log('Column details:', columnDetail);
     }
     
     // Check migration history
@@ -83,9 +132,11 @@ async function verifyDraftStatusColumn() {
       ORDER BY created_at;
     `);
     
+    const migrations = extractTypedResults(migrationResult, isMigrationHistoryResult);
+    
     console.log('Applied migrations:');
-    migrationResult.rows.forEach((row: any) => {
-      console.log(`- ${row.hash} (${new Date(row.created_at).toISOString()})`);
+    migrations.forEach((row) => {
+      console.log(`- ${row.hash} (${row.created_at.toISOString()})`);
     });
     
   } catch (error) {

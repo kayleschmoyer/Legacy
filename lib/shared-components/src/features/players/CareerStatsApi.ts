@@ -52,32 +52,41 @@ export function useCareerBattingStatsQuery(
 
   // Transform GraphQL data to enhanced player format with career stats
   // Note: Using abbreviated field names from generated schema (g, pa, ab, etc.)
+  const rawStats = data?.careerBattingStats?.edges?.map(edge => edge?.node);
+  if (!Array.isArray(rawStats)) {
+    return { data: [], loading, error, refetch };
+  }
+
   const transformedData: PlayerWithCareerStats[] =
-    data?.careerBattings?.nodes?.filter(stats => stats !== null).map((stats) => ({
-      playerId: stats.playerId,
-      displayName: `Player ${stats.playerId || 'Unknown'}`, // We'll need to join with player names later
+    rawStats.filter(stats => stats !== null && stats !== undefined).map((stats) => {
+      if (!stats) return null;
+      
+      return {
+        playerId: stats.playerId,
+        displayName: `Player ${stats.playerId || 'Unknown'}`, // We'll need to join with player names later
 
-      // Career Statistics (using abbreviated field names from schema)
-      games: parseInt(stats.g || '0', 10),
-      plateAppearances: parseInt(stats.pa || '0', 10),
-      atBats: parseInt(stats.ab || '0', 10),
-      runs: parseInt(stats.r || '0', 10),
-      hits: parseInt(stats.h || '0', 10),
-      doubles: parseInt(stats.doubles || '0', 10),
-      triples: parseInt(stats.triples || '0', 10),
-      homeRuns: parseInt(stats.hr || '0', 10),
-      rbi: parseInt(stats.rbi || '0', 10),
-      stolenBases: parseInt(stats.sb || '0', 10),
-      caughtStealing: parseInt(stats.cs || '0', 10),
-      baseOnBalls: parseInt(stats.bb || '0', 10),
-      strikeouts: parseInt(stats.so || '0', 10),
-      totalBases: parseInt(stats.tb || '0', 10),
+        // Career Statistics (using full field names from schema)
+        games: stats.games || 0,
+        plateAppearances: stats.plateAppearances || 0,
+        atBats: stats.atBats || 0,
+        runs: stats.runs || 0,
+        hits: stats.hits || 0,
+        doubles: stats.doubles || 0,
+        triples: stats.triples || 0,
+        homeRuns: stats.homeRuns || 0,
+        rbi: stats.rbi || 0,
+        stolenBases: stats.stolenBases || 0,
+        caughtStealing: stats.caughtStealing || 0,
+        baseOnBalls: stats.baseOnBalls || 0,
+        strikeouts: stats.strikeouts || 0,
+        totalBases: stats.totalBases || 0,
 
-      // Computed Statistics (not in schema - need to calculate)
-      battingAverage: null,
-      onBasePercentage: null,
-      sluggingPercentage: null,
-    })) || [];
+        // Computed Statistics (not in schema - need to calculate)
+        battingAverage: null,
+        onBasePercentage: null,
+        sluggingPercentage: null,
+      };
+    }).filter(Boolean) as PlayerWithCareerStats[];
 
   return {
     data: transformedData,

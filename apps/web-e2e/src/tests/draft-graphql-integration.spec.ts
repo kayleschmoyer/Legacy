@@ -1,5 +1,24 @@
 import { expect, test } from '@playwright/test';
 
+interface GraphQLRequest {
+  query: string;
+  operationName?: string;
+  variables?: Record<string, unknown>;
+}
+
+interface GraphQLResponse {
+  data?: Record<string, unknown>;
+  errors?: Array<{ message: string }>;
+}
+
+interface GraphQLCapture {
+  request: GraphQLRequest;
+  response: GraphQLResponse;
+  operation: string;
+  type: string;
+  timestamp: number;
+}
+
 /**
  * GraphQL Integration E2E Tests for Draft Functionality
  * 
@@ -22,8 +41,8 @@ test.describe('Draft GraphQL Integration Tests', () => {
 
   test('should make correct GraphQL queries and handle responses', async ({ page }) => {
     // Track GraphQL requests
-    const graphqlRequests: any[] = [];
-    const graphqlResponses: any[] = [];
+    const graphqlRequests: GraphQLRequest[] = [];
+    const graphqlResponses: GraphQLResponse[] = [];
 
     // Intercept GraphQL requests
     await page.route('**/graphql', (route) => {
@@ -32,7 +51,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
       
       if (requestBody) {
         try {
-          const body = JSON.parse(requestBody)
+          const body = JSON.parse(requestBody) as GraphQLRequest
           graphqlRequests.push(body)
           
           // Mock response for any GraphQL query

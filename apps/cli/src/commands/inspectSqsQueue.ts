@@ -139,7 +139,7 @@ class SqsQueueInspector {
             console.log(`   📄 Message Type: ${parsedBody.messageType}`);
             console.log(`   📝 Raw Body: ${message.Body?.substring(0, 200)}...`);
           }
-        } catch (parseError) {
+        } catch {
           console.log(`   ⚠️  Could not parse message body as JSON`);
           console.log(`   📝 Raw Body: ${message.Body?.substring(0, 200)}...`);
         }

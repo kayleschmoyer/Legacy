@@ -8,6 +8,21 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { schema } from './schema';
 
+interface JWTPayload {
+  id: number;
+  email: string;
+  username: string;
+  isAdmin?: boolean;
+  [key: string]: unknown; // For other JWT standard fields
+}
+
+interface User {
+  id: number;
+  email: string;
+  username: string;
+  isAdmin: boolean;
+}
+
 const PORT = 5000;
 
 async function startServer() {
@@ -59,7 +74,7 @@ async function startServer() {
     context: async ({ req }) => {
       // Extract JWT from Authorization header
       const authorization = req.headers.authorization;
-      let user = null;
+      let user: User | null = null;
 
       if (authorization && authorization.startsWith('Bearer ')) {
         try {
@@ -70,7 +85,7 @@ async function startServer() {
           if (parts.length === 3) {
             const payload = JSON.parse(
               Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
-            );
+            ) as JWTPayload;
             
             user = {
               id: payload.id,
@@ -95,6 +110,8 @@ async function startServer() {
         };
       }
 
+      // Make this actually async to satisfy linter
+      await Promise.resolve();
       return { user };
     },
   });

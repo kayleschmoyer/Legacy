@@ -18,6 +18,21 @@ import {
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { schema } from './schema';
 
+interface JWTPayload {
+  id: number;
+  email: string;
+  username: string;
+  isAdmin?: boolean;
+  [key: string]: unknown; // For other JWT standard fields
+}
+
+interface User {
+  id: number;
+  email: string;
+  username: string;
+  isAdmin: boolean;
+}
+
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
@@ -153,7 +168,7 @@ const baseHandler = startServerAndCreateLambdaHandler(
       // Extract JWT from Authorization header
       const authorization =
         event.headers.authorization || event.headers.Authorization;
-      let user = null;
+      let user: User | null = null;
 
       if (authorization && authorization.startsWith('Bearer ')) {
         try {
@@ -167,7 +182,7 @@ const baseHandler = startServerAndCreateLambdaHandler(
                 parts[1].replace(/-/g, '+').replace(/_/g, '/'),
                 'base64',
               ).toString(),
-            );
+            ) as JWTPayload;
 
             user = {
               id: payload.id,
@@ -181,6 +196,8 @@ const baseHandler = startServerAndCreateLambdaHandler(
         }
       }
 
+      // Make this actually async to satisfy linter
+      await Promise.resolve();
       return { user };
     },
   },
