@@ -4,7 +4,7 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "react-native": "./src/index.native.ts",
+  "react-native": "./src/mobile.ts",
   "scripts": {
     "db:test": "tsx src/cli/db-cli.ts test",
     "db:test:production": "tsx src/cli/db-cli.ts test --production",
