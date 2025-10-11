@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runWithPublicClient, PublicSchema } from '@legacy-sports/db-client';
+import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 
@@ -86,5 +86,5 @@ async function main() {
 }
 
 if (require.main === module) {
-  main();
+  void main();
 }

@@ -1,6 +1,6 @@
-import { builder } from './builder';
 import * as fs from 'fs';
 import * as path from 'path';
+import { builder } from './builder';
 
 // Get version information from deployment info file or environment
 const getVersionInfo = () => {

@@ -7,5 +7,8 @@
   "scripts": {
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "npm run codegen:db"
+  },
+  "dependencies": {
+    "@legacy-sports/sentry": "*"
   }
 }

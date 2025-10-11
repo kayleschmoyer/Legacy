@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { Button, H1, XStack, YStack } from '@legacy-sports/shared-components';
-import { Popover, styled, Text } from 'tamagui';
+import { Popover, styled } from 'tamagui';
 import { ChevronDown } from '@tamagui/lucide-icons';
 import {
   FootballScreen,

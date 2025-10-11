@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
 import { 
-  YStack, 
-  XStack, 
-  Text, 
   Button, 
   Card, 
-  Separator,
+  H3, 
+  H4, 
+  Separator, 
   Spinner,
-  H3,
-  H4
+  Text,
+  XStack,
+  YStack
 } from 'tamagui';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 

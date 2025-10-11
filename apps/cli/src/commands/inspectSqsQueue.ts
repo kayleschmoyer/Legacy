@@ -1,8 +1,6 @@
-import { SQSClient, ReceiveMessageCommand, GetQueueAttributesCommand, PurgeQueueCommand } from '@aws-sdk/client-sqs';
-import yargs from 'yargs';
+import { GetQueueAttributesCommand, PurgeQueueCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { EnvironmentVariable } from '../EnvironmentVariable';
-import { LOGGER } from '@legacy-sports/logging';
 
 /**
  * CLI command to inspect and manage the SQS draft queue
@@ -36,7 +34,7 @@ class SqsQueueInspector {
   private sqsClient: SQSClient;
   private queueUrl: string;
 
-  constructor(queueUrl: string, region: string = 'us-east-1') {
+  constructor(queueUrl: string, region = 'us-east-1') {
     this.sqsClient = new SQSClient({ region });
     this.queueUrl = queueUrl;
   }
@@ -98,7 +96,7 @@ class SqsQueueInspector {
   /**
    * Peek at messages without consuming them (short visibility timeout)
    */
-  async peekMessages(maxMessages: number = 10): Promise<void> {
+  async peekMessages(maxMessages = 10): Promise<void> {
     try {
       console.log(`👀 Peeking at up to ${maxMessages} messages (won't consume them)...`);
       
@@ -158,7 +156,7 @@ class SqsQueueInspector {
   /**
    * List messages and consume them (for detailed inspection)
    */
-  async listMessages(maxMessages: number = 10): Promise<QueueMessage[]> {
+  async listMessages(maxMessages = 10): Promise<QueueMessage[]> {
     try {
       console.log(`📋 Listing up to ${maxMessages} messages (will consume them)...`);
       console.log('⚠️  WARNING: This will remove messages from the queue!\n');

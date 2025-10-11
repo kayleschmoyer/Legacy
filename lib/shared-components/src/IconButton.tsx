@@ -1,16 +1,13 @@
 import React from 'react';
 import {
-  Button as TamaguiButton,
   styled,
-  YStack,
+  Button as TamaguiButton,
   Text,
+  YStack,
 } from 'tamagui';
 import { Icon } from './platform-components';
 import type {
   IconButtonProps,
-  IconButtonSize,
-  IconButtonVariant,
-  IconButtonColorScheme,
 } from './types/IconButton.types';
 
 // Styled button with gradient shadow effects

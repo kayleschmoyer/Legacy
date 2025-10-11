@@ -6,13 +6,12 @@ import {
   bulkUpsertPitchingSeason,
   getPlayerByBrefId,
   PublicDb,
-  PublicSchema,
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
 } from '@legacy-sports/db-client';
-import { captureError, addBreadcrumb } from '@legacy-sports/utils';
-import { eq, sql } from 'drizzle-orm';
+import { addBreadcrumb, captureError } from '@legacy-sports/sentry';
+import { sql } from 'drizzle-orm';
 
 /**
  * Deduplicate season batting records by their composite primary key:
@@ -20,7 +19,7 @@ import { eq, sql } from 'drizzle-orm';
  */
 function deduplicateSeasonBatting(records: SeasonBatting[]): SeasonBatting[] {
   const seen = new Set<string>();
-  return records.filter(record => {
+  return records.filter((record) => {
     const key = `${record.playerId}-${record.season}-${record.team}-${record.rowId}`;
     if (seen.has(key)) {
       LOGGER.debug(`Skipping duplicate batting record: ${key}`);
@@ -35,9 +34,11 @@ function deduplicateSeasonBatting(records: SeasonBatting[]): SeasonBatting[] {
  * Deduplicate season fielding records by their composite primary key:
  * playerId + season + team + pos + rowId
  */
-function deduplicateSeasonFielding(records: SeasonFielding[]): SeasonFielding[] {
+function deduplicateSeasonFielding(
+  records: SeasonFielding[],
+): SeasonFielding[] {
   const seen = new Set<string>();
-  return records.filter(record => {
+  return records.filter((record) => {
     const key = `${record.playerId}-${record.season}-${record.team}-${record.pos}-${record.rowId}`;
     if (seen.has(key)) {
       LOGGER.debug(`Skipping duplicate fielding record: ${key}`);
@@ -52,9 +53,11 @@ function deduplicateSeasonFielding(records: SeasonFielding[]): SeasonFielding[] 
  * Deduplicate season pitching records by their composite primary key:
  * playerId + season + team + rowId
  */
-function deduplicateSeasonPitching(records: SeasonPitching[]): SeasonPitching[] {
+function deduplicateSeasonPitching(
+  records: SeasonPitching[],
+): SeasonPitching[] {
   const seen = new Set<string>();
-  return records.filter(record => {
+  return records.filter((record) => {
     const key = `${record.playerId}-${record.season}-${record.team}-${record.rowId}`;
     if (seen.has(key)) {
       LOGGER.debug(`Skipping duplicate pitching record: ${key}`);
@@ -75,27 +78,31 @@ export async function loadCareerStats(
     const error = new Error(`Player not found: ${brefId}`);
     captureError(error, {
       tags: { operation: 'load_career_stats', phase: 'player_lookup' },
-      extra: { brefId }
+      extra: { brefId },
     });
     throw error;
   }
 
   const playerName = `${player.firstName} ${player.lastName}`;
-  addBreadcrumb(`Loading stats for player ${playerName} (ID: ${player.id}, brefId: ${brefId})`);
+  addBreadcrumb(
+    `Loading stats for player ${playerName} (ID: ${player.id}, brefId: ${brefId})`,
+  );
   LOGGER.debug(`Importing ${brefId}`);
-  
+
   let stats: CareerStats;
   try {
     stats = await getCareerStats(player);
-    addBreadcrumb(`Retrieved ${stats.batting.length} batting, ${stats.fielding.length} fielding, ${stats.pitching.length} records`);
+    addBreadcrumb(
+      `Retrieved ${stats.batting.length} batting, ${stats.fielding.length} fielding, ${stats.pitching.length} records`,
+    );
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: { operation: 'load_career_stats', phase: 'bref_fetch' },
-      extra: { 
-        brefId, 
-        playerId: player.id, 
-        playerName: playerName 
-      }
+      extra: {
+        brefId,
+        playerId: player.id,
+        playerName: playerName,
+      },
     });
     throw error;
   }
@@ -104,79 +111,105 @@ export async function loadCareerStats(
   try {
     const uniqueBattingStats = deduplicateSeasonBatting(stats.batting);
     if (stats.batting.length !== uniqueBattingStats.length) {
-      LOGGER.warn(`Removed ${stats.batting.length - uniqueBattingStats.length} duplicate batting records for player ${player.id}`);
+      LOGGER.warn(
+        `Removed ${stats.batting.length - uniqueBattingStats.length} duplicate batting records for player ${player.id}`,
+      );
     }
 
     LOGGER.debug(`Inserting ${uniqueBattingStats.length} batting records.`);
-    addBreadcrumb(`Upserting ${uniqueBattingStats.length} batting records (deduplicated from ${stats.batting.length})`);
-    
+    addBreadcrumb(
+      `Upserting ${uniqueBattingStats.length} batting records (deduplicated from ${stats.batting.length})`,
+    );
+
     await bulkUpsertBattingSeason(db, uniqueBattingStats);
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: { operation: 'load_career_stats', phase: 'batting_upsert' },
-      extra: { 
-        brefId, 
-        playerId: player.id, 
+      extra: {
+        brefId,
+        playerId: player.id,
         playerName: playerName,
         battingRecordCount: stats.batting.length,
-        deduplicatedCount: deduplicateSeasonBatting(stats.batting).length
-      }
+        deduplicatedCount: deduplicateSeasonBatting(stats.batting).length,
+      },
     });
     throw error;
   }
   // Process fielding stats with error handling
   try {
-    const validFieldingStats = stats.fielding.filter(record => {
+    const validFieldingStats = stats.fielding.filter((record) => {
       // Filter out records with null/empty positions (military service, etc.)
-      if (!record.pos || record.pos.trim() === '' || record.pos === null || record.pos === undefined) {
-        LOGGER.debug(`Skipping fielding record for player ${player.id}, season ${record.season} - no position (likely military service or non-playing season)`);
+      if (
+        !record.pos ||
+        record.pos.trim() === '' ||
+        record.pos === null ||
+        record.pos === undefined
+      ) {
+        LOGGER.debug(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - no position (likely military service or non-playing season)`,
+        );
         return false;
       }
-      
+
       // Filter out records with excessively long data that would cause varchar violations
       if (record.pos.length > 20) {
-        LOGGER.warn(`Skipping fielding record for player ${player.id}, season ${record.season} - position too long: ${record.pos}`);
+        LOGGER.warn(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - position too long: ${record.pos}`,
+        );
         return false;
       }
-      
+
       if (record.team && record.team.length > 50) {
-        LOGGER.warn(`Skipping fielding record for player ${player.id}, season ${record.season} - team name too long: ${record.team}`);
+        LOGGER.warn(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - team name too long: ${record.team}`,
+        );
         return false;
       }
-      
+
       if (record.rowId && record.rowId.length > 50) {
-        LOGGER.warn(`Skipping fielding record for player ${player.id}, season ${record.season} - row_id too long: ${record.rowId}`);
+        LOGGER.warn(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - row_id too long: ${record.rowId}`,
+        );
         return false;
       }
-      
+
       // Ensure all required fields are present and not empty
       if (!record.team || record.team.trim() === '') {
-        LOGGER.debug(`Skipping fielding record for player ${player.id}, season ${record.season} - no team specified`);
+        LOGGER.debug(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - no team specified`,
+        );
         return false;
       }
-      
+
       if (!record.rowId || record.rowId.trim() === '') {
-        LOGGER.debug(`Skipping fielding record for player ${player.id}, season ${record.season} - no row_id specified`);
+        LOGGER.debug(
+          `Skipping fielding record for player ${player.id}, season ${record.season} - no row_id specified`,
+        );
         return false;
       }
-      
+
       return true;
     });
 
-    const deduplicatedFieldingStats = deduplicateSeasonFielding(validFieldingStats);
-    LOGGER.debug(`Inserting ${deduplicatedFieldingStats.length} fielding records (filtered from ${stats.fielding.length}).`);
-    addBreadcrumb(`Upserting ${deduplicatedFieldingStats.length} fielding records (filtered from ${stats.fielding.length})`);
-    
+    const deduplicatedFieldingStats =
+      deduplicateSeasonFielding(validFieldingStats);
+    LOGGER.debug(
+      `Inserting ${deduplicatedFieldingStats.length} fielding records (filtered from ${stats.fielding.length}).`,
+    );
+    addBreadcrumb(
+      `Upserting ${deduplicatedFieldingStats.length} fielding records (filtered from ${stats.fielding.length})`,
+    );
+
     await bulkUpsertFieldingSeason(db, deduplicatedFieldingStats);
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: { operation: 'load_career_stats', phase: 'fielding_upsert' },
-      extra: { 
-        brefId, 
-        playerId: player.id, 
+      extra: {
+        brefId,
+        playerId: player.id,
         playerName: playerName,
-        fieldingRecordCount: stats.fielding.length
-      }
+        fieldingRecordCount: stats.fielding.length,
+      },
     });
     throw error;
   }
@@ -184,27 +217,33 @@ export async function loadCareerStats(
   // Process pitching stats with error handling
   try {
     const deduplicatedPitchingStats = deduplicateSeasonPitching(stats.pitching);
-    LOGGER.debug(`Inserting ${deduplicatedPitchingStats.length} pitching records.`);
-    addBreadcrumb(`Upserting ${deduplicatedPitchingStats.length} pitching records (deduplicated from ${stats.pitching.length})`);
-    
+    LOGGER.debug(
+      `Inserting ${deduplicatedPitchingStats.length} pitching records.`,
+    );
+    addBreadcrumb(
+      `Upserting ${deduplicatedPitchingStats.length} pitching records (deduplicated from ${stats.pitching.length})`,
+    );
+
     await bulkUpsertPitchingSeason(db, deduplicatedPitchingStats);
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: { operation: 'load_career_stats', phase: 'pitching_upsert' },
-      extra: { 
-        brefId, 
-        playerId: player.id, 
+      extra: {
+        brefId,
+        playerId: player.id,
         playerName: playerName,
         pitchingRecordCount: stats.pitching.length,
-        deduplicatedCount: deduplicateSeasonPitching(stats.pitching).length
-      }
+        deduplicatedCount: deduplicateSeasonPitching(stats.pitching).length,
+      },
     });
     throw error;
   }
 
   // Update player timestamp with error handling
   try {
-    LOGGER.debug(`Updating stats_last_fetched_at timestamp for player ${player.id}`);
+    LOGGER.debug(
+      `Updating stats_last_fetched_at timestamp for player ${player.id}`,
+    );
     await db.execute(sql`
       UPDATE players 
       SET stats_last_fetched_at = NOW() 
@@ -214,11 +253,11 @@ export async function loadCareerStats(
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: { operation: 'load_career_stats', phase: 'timestamp_update' },
-      extra: { 
-        brefId, 
-        playerId: player.id, 
-        playerName: playerName 
-      }
+      extra: {
+        brefId,
+        playerId: player.id,
+        playerName: playerName,
+      },
     });
     throw error;
   }

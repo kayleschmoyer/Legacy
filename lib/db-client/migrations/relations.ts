@@ -1,3 +1,1 @@
-import { relations } from "drizzle-orm/relations";
-import {  } from "./schema";
-
+// Empty relations file - will be populated by drizzle migrations

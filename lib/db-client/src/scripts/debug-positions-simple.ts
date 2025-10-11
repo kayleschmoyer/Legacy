@@ -7,8 +7,8 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
 import { Pool } from 'pg';
+import { resolve } from 'path';
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -27,13 +27,13 @@ async function debugPlayersWithoutPositions() {
   try {
     // 1. Get total number of players
     const totalPlayersResult = await pool.query('SELECT COUNT(*) as count FROM players');
-    const totalPlayers = parseInt(totalPlayersResult.rows[0].count);
+    const totalPlayers = parseInt((totalPlayersResult.rows[0] as any).count);
     
     console.log(`📊 Total players in database: ${totalPlayers}`);
     
     // 2. Get players with positions
     const playersWithPositionsResult = await pool.query('SELECT COUNT(DISTINCT player_id) as count FROM player_eligible_positions');
-    const playersWithPositions = parseInt(playersWithPositionsResult.rows[0].count);
+    const playersWithPositions = parseInt((playersWithPositionsResult.rows[0] as any).count);
     
     console.log(`✅ Players with eligible positions: ${playersWithPositions}`);
     console.log(`❌ Players WITHOUT positions: ${totalPlayers - playersWithPositions}\n`);
@@ -52,14 +52,14 @@ async function debugPlayersWithoutPositions() {
     console.log('🚫 Sample of players WITHOUT positions:');
     console.log('ID\tName\t\t\tBRef ID');
     console.log('----------------------------------------');
-    playersWithoutPositionsResult.rows.forEach(player => {
+    playersWithoutPositionsResult.rows.forEach((player: any) => {
       const fullName = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       console.log(`${player.id}\t${fullName}\t${player.bref_id}`);
     });
     
     if (playersWithoutPositionsResult.rows.length > 0) {
       // 4. Check stats for a sample player to understand why they don't have positions
-      const samplePlayer = playersWithoutPositionsResult.rows[0];
+      const samplePlayer = playersWithoutPositionsResult.rows[0] as any;
       console.log(`\n🔬 Analyzing sample player: ${samplePlayer.first_name} ${samplePlayer.last_name} (ID: ${samplePlayer.id})`);
       
       // Check career fielding stats
@@ -74,7 +74,7 @@ async function debugPlayersWithoutPositions() {
       if (fieldingStatsResult.rows.length === 0) {
         console.log('  - No fielding stats found');
       } else {
-        fieldingStatsResult.rows.forEach(stat => {
+        fieldingStatsResult.rows.forEach((stat: any) => {
           console.log(`  - Position: ${stat.pos}, Games: ${stat.g}`);
         });
       }
@@ -91,7 +91,7 @@ async function debugPlayersWithoutPositions() {
       if (pitchingStatsResult.rows.length === 0) {
         console.log('  - No pitching stats found');
       } else {
-        pitchingStatsResult.rows.forEach(stat => {
+        pitchingStatsResult.rows.forEach((stat: any) => {
           const reliefApps = stat.g - stat.gs;
           console.log(`  - Games: ${stat.g}, Games Started: ${stat.gs}, Relief Apps: ${reliefApps}`);
         });
@@ -109,7 +109,7 @@ async function debugPlayersWithoutPositions() {
       if (battingStatsResult.rows.length === 0) {
         console.log('  - No batting stats found');
       } else {
-        battingStatsResult.rows.forEach(stat => {
+        battingStatsResult.rows.forEach((stat: any) => {
           console.log(`  - Games: ${stat.g}, At Bats: ${stat.ab}, Hits: ${stat.h}`);
         });
       }
@@ -126,7 +126,7 @@ async function debugPlayersWithoutPositions() {
     `;
     const fieldingEligibleResult = await pool.query(fieldingEligibleQuery);
     
-    console.log(`⚾ Fielding positions (50+ games, not P): ${fieldingEligibleResult.rows[0].count} players`);
+    console.log(`⚾ Fielding positions (50+ games, not P): ${(fieldingEligibleResult.rows[0] as any).count} players`);
     
     // Players eligible for SP (50+ games started)
     const spEligibleQuery = `
@@ -136,7 +136,7 @@ async function debugPlayersWithoutPositions() {
     `;
     const spEligibleResult = await pool.query(spEligibleQuery);
     
-    console.log(`🏈 Starting Pitcher (50+ GS): ${spEligibleResult.rows[0].count} players`);
+    console.log(`🏈 Starting Pitcher (50+ GS): ${(spEligibleResult.rows[0] as any).count} players`);
     
     // Players eligible for RP (50+ relief appearances)
     const rpEligibleQuery = `
@@ -146,7 +146,7 @@ async function debugPlayersWithoutPositions() {
     `;
     const rpEligibleResult = await pool.query(rpEligibleQuery);
     
-    console.log(`🏈 Relief Pitcher (50+ relief apps): ${rpEligibleResult.rows[0].count} players`);
+    console.log(`🏈 Relief Pitcher (50+ relief apps): ${(rpEligibleResult.rows[0] as any).count} players`);
     
     // 6. Show distribution of games played for players without positions
     console.log('\n📊 Games played distribution for players without positions:');
@@ -175,7 +175,7 @@ async function debugPlayersWithoutPositions() {
     
     console.log('Player\t\t\tMax Field Games\tPitch Games\tPitch Starts\tBat Games');
     console.log('---------------------------------------------------------------------------------');
-    gamesDistributionResult.rows.forEach(player => {
+    gamesDistributionResult.rows.forEach((player: any) => {
       const name = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       console.log(`${name}\t${player.max_fielding_games}\t\t${player.pitching_games}\t\t${player.pitching_starts}\t\t${player.batting_games}`);
     });
@@ -216,7 +216,7 @@ async function debugPlayersWithoutPositions() {
     
     console.log('Player\t\t\tMax Field Games\tPitch Games\tPitch Starts\tRelief Apps');
     console.log('---------------------------------------------------------------------------------');
-    lowGameCountResult.rows.forEach(player => {
+    lowGameCountResult.rows.forEach((player: any) => {
       const name = `${player.first_name} ${player.last_name}`.padEnd(20, ' ');
       const reliefApps = player.pitching_games - player.pitching_starts;
       console.log(`${name}\t${player.max_fielding_games}\t\t${player.pitching_games}\t\t${player.pitching_starts}\t\t${reliefApps}`);

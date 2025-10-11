@@ -1,8 +1,8 @@
-import { createDatabaseService, runWithPublicClient, PublicSchema, CreateLeagueInput, CreateTeamInput, CreateLeagueMemberInput, League as DbLeague, Team as DbTeam, LeagueMember as DbLeagueMember } from '@legacy-sports/db-client';
+import { createDatabaseService, CreateLeagueInput, CreateLeagueMemberInput, CreateTeamInput, League as DbLeague, LeagueMember as DbLeagueMember, Team as DbTeam, PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { DraftService } from '@legacy-sports/db-client';
+import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
-import { eq, and } from 'drizzle-orm';
 
 // Create a single database service instance to reuse across all resolvers
 // Updated for player field support - 2025-10-06
@@ -114,7 +114,7 @@ LeagueMember.implement({
                 leagueId: PublicSchema.teams.leagueId,
               })
               .from(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.id, parent.teamId!))
+              .where(eq(PublicSchema.teams.id, parent.teamId))
               .limit(1);
 
             return results.length > 0 ? results[0] : null;

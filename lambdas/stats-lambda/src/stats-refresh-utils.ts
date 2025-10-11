@@ -2,11 +2,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
   getDbConnection,
-  PublicSchema,
+  getPlayersNeedingStatsRefresh,
   getPlayersWithoutStats,
   getPlayersWithStaleStats,
-  getPlayersNeedingStatsRefresh,
   getStatsRefreshSummary,
+  PublicSchema,
 } from '@legacy-sports/db-client';
 
 /**
@@ -16,7 +16,7 @@ import {
  */
 
 export async function getPlayersForRefresh(
-  maxAgeHours: number = 24,
+  maxAgeHours = 24,
   limit?: number,
 ): Promise<{
   id: number;

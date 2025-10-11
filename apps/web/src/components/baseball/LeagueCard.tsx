@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, H3, Paragraph, XStack, YStack, HolographicCard } from '@legacy-sports/shared-components';
+import { Button, H3, HolographicCard, Paragraph, XStack, YStack } from '@legacy-sports/shared-components';
 
 // Helper functions for draft status display
 function formatDraftStatus(status?: string | null): string {

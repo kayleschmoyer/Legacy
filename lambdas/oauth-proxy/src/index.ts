@@ -1,18 +1,18 @@
 import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { 
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import {
+  addBreadcrumb,
   captureError,
-  addBreadcrumb 
-} from '@legacy-sports/utils';
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import {
   handleGoogleAuth,
-  handleGoogleRefresh,
-  handleSecureGoogleAuth,
   handleGoogleAuthorize,
   handleGoogleCallback,
+  handleGoogleRefresh,
+  handleSecureGoogleAuth,
 } from './handlers/Google';
 import { handleLogin, handleRegister } from './handlers/Local';
 import { handleVerify } from './handlers/Verify';
@@ -256,7 +256,7 @@ const baseOAuthHandler = async (
       path: event.path,
       query: event.queryStringParameters,
       headers: event.headers,
-      operation: 'oauth_request'
+      operation: 'oauth_request',
     });
 
     return addCorsHeaders({

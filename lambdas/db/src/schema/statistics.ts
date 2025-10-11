@@ -122,12 +122,12 @@ CareerBattingRef.implement({
             
             // Find position with most games played
             const primaryPos = positionEntries.reduce((max, current) => {
-              const currentGames = (current[1] as any)?.games || 0;
-              const maxGames = (max[1] as any)?.games || 0;
+              const currentGames = (current[1])?.games || 0;
+              const maxGames = (max[1])?.games || 0;
               return currentGames > maxGames ? current : max;
             });
             
-            return (primaryPos[1] as any)?.position || primaryPos[0];
+            return (primaryPos[1])?.position || primaryPos[0];
           }
           
           // Fallback: try parsing as string if it somehow comes as a string

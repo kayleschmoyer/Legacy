@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { expect, test } from '../fixtures/auth';
 
 test.describe('Debug Page Loading', () => {
   test('should load league page and find h1 element with auth bypass', async ({ page }) => {

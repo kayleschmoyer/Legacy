@@ -12,7 +12,7 @@ import {
   YStack,
 } from 'tamagui';
 import { DateTimePicker } from '@legacy-sports/shared-components';
-import { useCreateLeagueAndTeamsMutation, GetUserLeagues, GetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import { GetUserLeagues, GetUserLeaguesQuery, useCreateLeagueAndTeamsMutation } from '../../api/db/graphql.generated';
 
 // Now using codegen-generated hooks and types
 
@@ -93,7 +93,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     },
   });
 
-  const handleInputChange = (field: keyof CreateLeagueFormData, value: any) => {
+  const handleInputChange = (field: keyof CreateLeagueFormData, value: string | number | boolean | Date) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
@@ -150,7 +150,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             numberOfTeams: formData.numberOfTeams,
             draftType: formData.draftType,
             maxRosterSize: formData.maxRosterSize, // User-selected roster size
-            startDate: formData.draftDate!.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            startDate: formData.draftDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
             isPublic: false, // Default to private leagues
             tradingEnabled: true, // Default settings
             waiverEnabled: true,
@@ -163,13 +163,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
   };
 
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0];
-  };
 
-  const parseDate = (dateString: string): Date => {
-    return new Date(dateString);
-  };
 
   return (
     <ScrollView flex={1} backgroundColor="$background">
@@ -199,7 +193,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             </H2>
           </Card.Header>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => { void handleSubmit(e); }}>
             <YStack padding="$4" space="$5">
               {/* League Name */}
               <YStack space="$2">
@@ -228,9 +222,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       key={count}
                       size="$3"
                       variant={formData.numberOfTeams === count ? 'primary' : 'outlined'}
-                      onPress={(e: any) => {
-                        e?.preventDefault?.();
-                        e?.stopPropagation?.();
+                      onPress={() => {
                         handleInputChange('numberOfTeams', count);
                       }}
                       disabled={loading}
@@ -272,9 +264,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       key={size}
                       size="$3"
                       variant={formData.maxRosterSize === size ? 'primary' : 'outlined'}
-                      onPress={(e: any) => {
-                        e?.preventDefault?.();
-                        e?.stopPropagation?.();
+                      onPress={() => {
                         handleInputChange('maxRosterSize', size);
                       }}
                       disabled={loading}
@@ -316,9 +306,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       key={type.value}
                       size="$3"
                       variant={formData.draftType === type.value ? 'primary' : 'outlined'}
-                      onPress={(e: any) => {
-                        e?.preventDefault?.();
-                        e?.stopPropagation?.();
+                      onPress={() => {
                         handleInputChange('draftType', type.value);
                       }}
                       disabled={loading}

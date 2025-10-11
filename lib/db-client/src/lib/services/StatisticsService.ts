@@ -90,6 +90,7 @@ export class StatisticsService {
       // Check if we need to join with players table for search term
       const needsPlayerJoin = queryOptions.filters?.searchTerm;
       
+      // Build base query - using let without explicit any type so TypeScript can infer
       let queryBuilder;
       if (needsPlayerJoin) {
         // Join with players table for name search
@@ -146,7 +147,7 @@ export class StatisticsService {
       // Build final query parts
       const orderDirection = queryOptions.orderDirection || 'desc';
 
-      // Execute query with all conditions
+      // Execute query with all conditions - using let without explicit any type
       let finalQuery = queryBuilder;
 
       if (conditions.length > 0) {
@@ -154,59 +155,38 @@ export class StatisticsService {
         const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
         if (validConditions.length > 0) {
           const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-          // TypeScript has issues with Drizzle's complex query builder types
-          // This is a safe cast since we know the query is valid
-          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+          // Drizzle's complex conditional types require type assertion here
+          finalQuery = (finalQuery as any).where(whereClause);
         }
       }
 
       // Default ordering by home runs descending for interesting results
       if (queryOptions.orderBy === 'games') {
-        // TypeScript has issues with Drizzle's complex query builder types
-        // This is a safe cast since we know the query is valid
         finalQuery =
           orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                desc(PublicSchema.careerBatting.g),
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                asc(PublicSchema.careerBatting.g),
-              ) as typeof finalQuery);
+            ? (finalQuery as any).orderBy(desc(PublicSchema.careerBatting.g))
+            : (finalQuery as any).orderBy(asc(PublicSchema.careerBatting.g));
       } else if (queryOptions.orderBy === 'homeRuns') {
-        // TypeScript has issues with Drizzle's complex query builder types
-        // This is a safe cast since we know the query is valid
         finalQuery =
           orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                desc(PublicSchema.careerBatting.hr),
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                asc(PublicSchema.careerBatting.hr),
-              ) as typeof finalQuery);
+            ? (finalQuery as any).orderBy(desc(PublicSchema.careerBatting.hr))
+            : (finalQuery as any).orderBy(asc(PublicSchema.careerBatting.hr));
       } else {
         // Default to home runs descending
-        // TypeScript has issues with Drizzle's complex query builder types
-        // This is a safe cast since we know the query is valid
-        finalQuery = finalQuery.orderBy(
+        finalQuery = (finalQuery as any).orderBy(
           desc(PublicSchema.careerBatting.hr),
-        ) as typeof finalQuery;
+        );
       }
 
       if (queryOptions.limit) {
-        // TypeScript has issues with Drizzle's complex query builder types
-        // This is a safe cast since we know the query is valid
-        finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
+        finalQuery = (finalQuery as any).limit(queryOptions.limit);
       }
 
       if (queryOptions.offset) {
-        // TypeScript has issues with Drizzle's complex query builder types  
-        // This is a safe cast since we know the query is valid
-        finalQuery = finalQuery.offset(
-          queryOptions.offset,
-        ) as typeof finalQuery;
+        finalQuery = (finalQuery as any).offset(queryOptions.offset);
       }
 
-      return await finalQuery.execute();
+      return await (finalQuery as any).execute();
     });
   }
 
@@ -220,11 +200,15 @@ export class StatisticsService {
     return runWithPublicClient(this.options, async (db): Promise<number> => {
       // Check if we need to join with players table for search term
       const needsPlayerJoin = queryOptions.filters?.searchTerm;
-      
-      let queryBuilder;
+
+      // Build WHERE clause - same logic as getCareerBattingStats
+      const conditions = queryOptions.filters
+        ? this.buildBattingFilters(queryOptions.filters)
+        : [];
+
       if (needsPlayerJoin) {
-        // Join with players table for name search - use count() for the count query
-        queryBuilder = db
+        // Build query with join for name search
+        let queryBuilder = db
           .select({
             count: count(),
           })
@@ -233,48 +217,51 @@ export class StatisticsService {
             PublicSchema.players,
             eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id)
           );
+
+        // Add search term condition
+        if (queryOptions.filters?.searchTerm) {
+          const searchTerm = queryOptions.filters.searchTerm;
+          const firstNameCol = PublicSchema.players.firstName;
+          const lastNameCol = PublicSchema.players.lastName;
+          const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
+          const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
+          const searchCondition = or(firstNameMatch, lastNameMatch);
+          if (searchCondition) {
+            conditions.push(searchCondition);
+          }
+        }
+
+        // Apply WHERE conditions if any
+        if (conditions.length > 0) {
+          const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+          if (validConditions.length > 0) {
+            const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+            queryBuilder = (queryBuilder as any).where(whereClause);
+          }
+        }
+
+        const result = await queryBuilder.execute();
+        return result[0]?.count || 0;
       } else {
-        queryBuilder = db
+        // Build query without join for simple counts
+        let queryBuilder = db
           .select({
             count: count(),
           })
           .from(PublicSchema.careerBatting);
-      }
 
-      // Build WHERE clause - same logic as getCareerBattingStats
-      const conditions = queryOptions.filters
-        ? this.buildBattingFilters(queryOptions.filters)
-        : [];
-
-      // Add search term condition if needed - same logic as getCareerBattingStats
-      if (needsPlayerJoin && queryOptions.filters?.searchTerm) {
-        const searchTerm = queryOptions.filters.searchTerm;
-        // Use properly typed column references
-        const firstNameCol = PublicSchema.players.firstName;
-        const lastNameCol = PublicSchema.players.lastName;
-        const firstNameMatch = ilike(firstNameCol, `%${searchTerm}%`);
-        const lastNameMatch = ilike(lastNameCol, `%${searchTerm}%`);
-        const searchCondition = or(firstNameMatch, lastNameMatch);
-        if (searchCondition) {
-          conditions.push(searchCondition);
+        // Apply WHERE conditions if any
+        if (conditions.length > 0) {
+          const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+          if (validConditions.length > 0) {
+            const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+            queryBuilder = (queryBuilder as any).where(whereClause);
+          }
         }
+
+        const result = await queryBuilder.execute();
+        return result[0]?.count || 0;
       }
-
-      // Apply WHERE conditions if any
-      let finalQuery = queryBuilder;
-
-      if (conditions.length > 0) {
-        // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-        if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
-        }
-      }
-
-      // No need for ordering, limit, or offset in a count query
-      const result = await finalQuery.execute();
-      return result[0]?.count || 0;
     });
   }
 

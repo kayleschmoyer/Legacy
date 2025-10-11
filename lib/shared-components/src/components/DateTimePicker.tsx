@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Input, Popover, Text, XStack, YStack } from 'tamagui';
+import { Button, Popover, Text, XStack, YStack } from 'tamagui';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from '@tamagui/lucide-icons';
 import { Platform } from '../platform-components';
 
@@ -188,12 +188,7 @@ export function DateTimePicker({
           justifyContent="space-between"
           disabled={disabled}
           pressStyle={{ opacity: 0.8 }}
-          onPress={(e: any) => {
-            // Prevent form submission on web
-            if (Platform.OS === 'web') {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
-            }
+          onPress={() => {
             console.log('DateTimePicker trigger pressed, opening picker');
             setIsOpen(!isOpen);
           }}
@@ -238,9 +233,7 @@ export function DateTimePicker({
               <Button
                 size="$2"
                 chromeless
-                onPress={(e: any) => {
-                  e?.preventDefault?.();
-                  e?.stopPropagation?.();
+                onPress={() => {
                   navigateMonth('prev');
                 }}
                 pressStyle={{ opacity: 0.7 }}
@@ -255,9 +248,7 @@ export function DateTimePicker({
               <Button
                 size="$2"
                 chromeless
-                onPress={(e: any) => {
-                  e?.preventDefault?.();
-                  e?.stopPropagation?.();
+                onPress={() => {
                   navigateMonth('next');
                 }}
                 pressStyle={{ opacity: 0.7 }}
@@ -300,9 +291,7 @@ export function DateTimePicker({
                           }
                           opacity={currentMonthDay ? 1 : 0.3}
                           disabled={disabled}
-                          onPress={(e: any) => {
-                            e?.preventDefault?.();
-                            e?.stopPropagation?.();
+                          onPress={() => {
                             selectDate(date);
                           }}
                           pressStyle={{ opacity: 0.7 }}

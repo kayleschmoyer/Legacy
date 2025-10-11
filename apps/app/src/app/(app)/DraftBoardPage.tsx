@@ -28,9 +28,9 @@ import {
 import { Alert } from 'react-native';
 import {
   LeagueFragmentDoc,
-  useStartDraftMutation,
   StartDraftMutation,
   StartDraftMutationVariables,
+  useStartDraftMutation,
 } from '../../api/db/graphql.generated';
 
 // Sport configurations

@@ -3,7 +3,6 @@ import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import crypto from 'crypto';
 
 interface AuthToken {
   jwt: string;
@@ -248,7 +247,7 @@ export class CLIAuthService {
     try {
       const authData = await this.loadAuthData();
       return Object.keys(authData.tokens || {});
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -319,7 +318,7 @@ export class CLIAuthService {
       if (payload.exp) {
         expiresAt = payload.exp * 1000; // Convert from seconds to milliseconds
       }
-    } catch (error) {
+    } catch {
       LOGGER.debug('Could not decode JWT expiration, using default');
     }
 
@@ -365,7 +364,7 @@ export class CLIAuthService {
     try {
       const data = await fs.readFile(this.tokenFile, 'utf8');
       return JSON.parse(data);
-    } catch (error) {
+    } catch {
       // File doesn't exist or is invalid - return empty structure
       return { tokens: {} };
     }
@@ -378,7 +377,7 @@ export class CLIAuthService {
     // Ensure config directory exists
     try {
       await fs.mkdir(this.configDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Directory might already exist
     }
 

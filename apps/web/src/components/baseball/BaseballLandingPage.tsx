@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
   H1,
   H2,
   Paragraph,
+  useAuth,
   XStack,
   YStack,
-  useAuth,
 } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
-import { LeagueCard, League } from './LeagueCard';
+import { League, LeagueCard } from './LeagueCard';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 
 const PageContainer = styled(YStack, {
@@ -95,14 +95,7 @@ const LeaguesGrid = styled(XStack, {
   justifyContent: 'flex-start',
 });
 
-const LeaguesRow = styled(XStack, {
-  gap: '$4',
-  flexWrap: 'wrap',
-  justifyContent: 'flex-start',
-  '$sm': {
-    justifyContent: 'center',
-  },
-});
+
 
 const EmptyState = styled(YStack, {
   alignItems: 'center',

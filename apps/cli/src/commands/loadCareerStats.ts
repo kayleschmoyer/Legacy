@@ -4,11 +4,11 @@ import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import {
-  runWithPublicClient,
-  PublicSchema,
-  getPlayersWithoutStats,
   getPlayersOrderedByLastFetch,
+  getPlayersWithoutStats,
   getStatsRefreshSummary,
+  PublicSchema,
+  runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { EnvironmentVariable } from '../EnvironmentVariable';
@@ -73,7 +73,7 @@ async function getAllPlayers(db: any) {
     .from(PublicSchema.players);
 }
 
-async function getPlayersPrioritized(db: any, limit?: number, prioritizeNew: boolean = true) {
+async function getPlayersPrioritized(db: any, limit?: number, prioritizeNew = true) {
   if (!prioritizeNew) {
     // Use the original logic if not prioritizing new players
     return limit ? await getPlayersLimited(db, limit) : await getAllPlayers(db);

@@ -1,24 +1,23 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { 
-  getDbOptions, 
-  SqsDraftMessage, 
-  DraftProcessingResult,
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import { getDbOptions } from '@legacy-sports/utils';
+import { SqsDraftMessage, DraftProcessingResult } from '@legacy-sports/aws-utils';
+import {
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
   captureError,
-  addBreadcrumb
-} from '@legacy-sports/utils';
+  addBreadcrumb,
+} from '@legacy-sports/sentry';
 import {
   runWithPublicClient,
   PublicSchema,
+  PublicDb,
   validateUserAccess,
   updateLeagueDraftStatus,
   validateDraftType,
-  VALID_DRAFT_TYPES
 } from '@legacy-sports/db-client';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -30,12 +29,6 @@ if (sentryConfig) {
  * Draft Processing Lambda
  * Processes draft messages from SQS queue and executes the draft logic
  */
-
-// Default roster positions for new leagues
-const DEFAULT_ROSTER_POSITIONS = [
-  'C', '1B', '2B', '3B', 'SS', 'OF', 'OF', 'OF', 'DH',
-  'SP', 'SP', 'SP', 'SP', 'RP', 'RP', 'RP', 'RP', 'IF', 'XDH'
-] as const;
 
 /**
  * Shuffle an array using Fisher-Yates algorithm
@@ -59,105 +52,124 @@ interface PlayerWithPositions {
   brefId: string;
   eligiblePositions: string[];
   isPitcher: boolean;
-  positionDetails?: Record<string, { games: number; gamesStarted: number; position: string }>;
+  positionDetails?: Record<
+    string,
+    { games: number; gamesStarted: number; position: string }
+  >;
   positionScore?: number; // Dynamic scoring for position assignments
 }
 
 /**
  * OPTIMIZED: Batch load player positions using career_fielding positionsPlayed JSONB data
- * 
- * ARCHITECTURE: Uses the same positionsPlayed data structure as the GraphQL API but 
+ *
+ * ARCHITECTURE: Uses the same positionsPlayed data structure as the GraphQL API but
  * accesses it directly from the database for maximum performance:
- * 
+ *
  * ✅ Uses career_fielding.positions_played JSONB field (same as GraphQL positionsPlayed resolver)
- * ✅ Same ALLOWED_POSITIONS mapping (verified by test-position-consistency.ts)  
+ * ✅ Same ALLOWED_POSITIONS mapping (verified by test-position-consistency.ts)
  * ✅ Enhanced position eligibility logic with games/gamesStarted thresholds
  * ✅ Single database query instead of multiple views for better Lambda performance
- * 
+ *
  * Performance improvements:
  * - Single query vs 3 separate queries (3x faster database access)
  * - JSONB position data includes games played for smarter eligibility decisions
  * - Direct database access eliminates GraphQL resolution overhead
  */
-async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promise<Map<number, PlayerWithPositions>> {
+async function loadAllPlayersWithPositions(
+  db: PublicDb,
+  playerIds: number[],
+): Promise<Map<number, PlayerWithPositions>> {
   const startTime = Date.now();
-  addBreadcrumb('Loading optimized player positions and stats', { playerCount: playerIds.length });
-  
+  addBreadcrumb('Loading optimized player positions and stats', {
+    playerCount: playerIds.length,
+  });
+
   // Single optimized query: Get career fielding data with positions_played JSONB
   // and career pitching data in one go using LEFT JOINs
-  const playerData = await db.select({
-    playerId: PublicSchema.careerFielding.playerId,
-    positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
-    fieldingGames: PublicSchema.careerFielding.g,
-    pitchingGames: PublicSchema.careerPitching.g,
-    pitchingGamesStarted: PublicSchema.careerPitching.gs,
-  }).from(PublicSchema.careerFielding)
+  const playerData = await db
+    .select({
+      playerId: PublicSchema.careerFielding.playerId,
+      positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
+      fieldingGames: PublicSchema.careerFielding.g,
+      pitchingGames: PublicSchema.careerPitching.g,
+      pitchingGamesStarted: PublicSchema.careerPitching.gs,
+    })
+    .from(PublicSchema.careerFielding)
     .leftJoin(
       PublicSchema.careerPitching,
-      eq(PublicSchema.careerFielding.playerId, PublicSchema.careerPitching.playerId)
+      eq(
+        PublicSchema.careerFielding.playerId,
+        PublicSchema.careerPitching.playerId,
+      ),
     )
     .where(inArray(PublicSchema.careerFielding.playerId, playerIds));
 
   const queryTime = Date.now() - startTime;
-  addBreadcrumb('Database query completed', { 
+  addBreadcrumb('Database query completed', {
     queryTimeMs: queryTime,
-    recordsFound: playerData.length
+    recordsFound: playerData.length,
   });
 
   // Create enhanced player map with detailed position data
   const playerMap = new Map<number, PlayerWithPositions>();
   let playersWithPositionData = 0;
   let playersWithFallbackData = 0;
-  
+
   for (const record of playerData) {
     const playerId = record.playerId;
     let eligiblePositions: string[] = [];
-    let positionDetails: Record<string, { games: number; gamesStarted: number; position: string }> = {};
-    
+    let positionDetails: Record<
+      string,
+      { games: number; gamesStarted: number; position: string }
+    > = {};
+
     // Parse positions_played JSONB data (same format as GraphQL API)
     if (record.positionsPlayed && typeof record.positionsPlayed === 'object') {
       try {
-        const positions = record.positionsPlayed as Record<string, any>;
+        const positions = record.positionsPlayed as Record<string, { games: number; gamesStarted: number; position: string }>;
         positionDetails = positions;
-        
+
         // Extract eligible positions based on game thresholds
         // Use same logic as GraphQL API but with performance optimizations
         for (const [pos, data] of Object.entries(positions)) {
-          if (data && typeof data === 'object' && typeof data.games === 'number') {
+          if (
+            data &&
+            typeof data === 'object' &&
+            typeof data.games === 'number'
+          ) {
             // Apply smart thresholds based on position type
             let threshold = 25; // Default threshold for field positions
-            
+
             // Higher thresholds for specialized positions (same as player_eligible_positions view)
-            if (['C'].includes(pos)) threshold = 50;  // Catcher needs more experience
-            if (['SP', 'RP'].includes(pos)) threshold = 10;  // Pitchers have lower threshold
-            
+            if (['C'].includes(pos)) threshold = 50; // Catcher needs more experience
+            if (['SP', 'RP'].includes(pos)) threshold = 10; // Pitchers have lower threshold
+
             if (data.games >= threshold) {
               eligiblePositions.push(pos);
             }
           }
         }
-        
+
         playersWithPositionData++;
         addBreadcrumb('Parsed position data from JSONB', {
           playerId,
           positionCount: Object.keys(positions).length,
           eligibleCount: eligiblePositions.length,
-          totalFieldingGames: record.fieldingGames || 0
+          totalFieldingGames: record.fieldingGames || 0,
         });
-        
       } catch (error) {
         addBreadcrumb('Failed to parse positions_played JSONB', {
           playerId,
           error: error instanceof Error ? error.message : 'Unknown error',
-          rawData: record.positionsPlayed
+          rawData: record.positionsPlayed,
         });
       }
     }
-    
+
     // Apply enhanced fallback logic if no positions found from JSONB
     if (eligiblePositions.length === 0) {
       playersWithFallbackData++;
-      
+
       // Check pitching stats first (most reliable indicator)
       if (record.pitchingGames && record.pitchingGames > 10) {
         if (record.pitchingGamesStarted && record.pitchingGamesStarted > 10) {
@@ -169,19 +181,29 @@ async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promis
           playerId,
           pitchingGames: record.pitchingGames,
           pitchingGamesStarted: record.pitchingGamesStarted || 0,
-          assignedPositions: eligiblePositions
+          assignedPositions: eligiblePositions,
         });
-      } 
+      }
       // Check fielding games as secondary indicator
       else if (record.fieldingGames && record.fieldingGames > 25) {
         // Assign broad field positions for players with fielding experience
-        eligiblePositions = ['1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'C', 'DH'];
+        eligiblePositions = [
+          '1B',
+          '2B',
+          '3B',
+          'SS',
+          'LF',
+          'CF',
+          'RF',
+          'C',
+          'DH',
+        ];
         addBreadcrumb('Applied fielding fallback positions', {
           playerId,
           fieldingGames: record.fieldingGames,
-          assignedPositions: eligiblePositions
+          assignedPositions: eligiblePositions,
         });
-      } 
+      }
       // Final fallback: make player eligible for flexible positions
       else {
         eligiblePositions = ['DH']; // DH is the most flexible position slot
@@ -189,13 +211,15 @@ async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promis
           playerId,
           fieldingGames: record.fieldingGames || 0,
           pitchingGames: record.pitchingGames || 0,
-          assignedPositions: eligiblePositions
+          assignedPositions: eligiblePositions,
         });
       }
     }
 
-    const isPitcher = eligiblePositions.some(pos => PITCHING_POSITIONS.has(pos));
-    
+    const isPitcher = eligiblePositions.some((pos) =>
+      PITCHING_POSITIONS.has(pos),
+    );
+
     playerMap.set(playerId, {
       id: playerId,
       firstName: '', // Will be filled from main player query
@@ -203,7 +227,7 @@ async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promis
       brefId: '',
       eligiblePositions,
       isPitcher,
-      positionDetails
+      positionDetails,
     });
   }
 
@@ -211,7 +235,7 @@ async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promis
   for (const playerId of playerIds) {
     if (!playerMap.has(playerId)) {
       playersWithFallbackData++;
-      
+
       // Assign default flexible positions for players with no stats
       playerMap.set(playerId, {
         id: playerId,
@@ -220,26 +244,32 @@ async function loadAllPlayersWithPositions(db: any, playerIds: number[]): Promis
         brefId: '',
         eligiblePositions: ['DH'], // Most flexible position
         isPitcher: false,
-        positionDetails: {}
+        positionDetails: {},
       });
-      
-      addBreadcrumb('Player not found in career stats, assigned default position', {
-        playerId,
-        assignedPositions: ['DH']
-      });
+
+      addBreadcrumb(
+        'Player not found in career stats, assigned default position',
+        {
+          playerId,
+          assignedPositions: ['DH'],
+        },
+      );
     }
   }
 
   const processingTime = Date.now() - startTime;
-  
+
   // Enhanced performance tracking
   addBreadcrumb('Optimized position assignment completed', {
     totalPlayers: playerMap.size,
     playersWithPositionData,
     playersWithFallbackData,
-    fallbackPercentage: Math.round((playersWithFallbackData / playerMap.size) * 100),
+    fallbackPercentage: Math.round(
+      (playersWithFallbackData / playerMap.size) * 100,
+    ),
     totalProcessingTimeMs: processingTime,
-    avgProcessingTimePerPlayer: Math.round(processingTime / playerMap.size * 100) / 100
+    avgProcessingTimePerPlayer:
+      Math.round((processingTime / playerMap.size) * 100) / 100,
   });
 
   return playerMap;
@@ -268,19 +298,19 @@ interface PositionPlayerGroup {
  */
 const ALLOWED_POSITIONS = Object.freeze({
   '1B': ['1B'],
-  '2B': ['2B'], 
+  '2B': ['2B'],
   '3B': ['3B'],
-  'C': ['C'],
-  'CF': ['CF'],
-  'DH': ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'], // DH can be any position player
-  'IF': ['1B', '2B', '3B', 'SS'],
-  'LF': ['LF'],
-  'OF': ['LF', 'RF', 'CF'],
-  'RF': ['RF'],
-  'RP': ['RP', 'P'], // Relief pitchers include generic P
-  'SP': ['SP', 'P'], // Starting pitchers include generic P  
-  'SS': ['SS'],
-  'XDH': ['DH'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'], // DH can be any position player
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP', 'P'], // Relief pitchers include generic P
+  SP: ['SP', 'P'], // Starting pitchers include generic P
+  SS: ['SS'],
+  XDH: ['DH'],
 } as const);
 
 const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP', 'P']));
@@ -291,13 +321,18 @@ const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP', 'P']));
  * based on actual games played at each position for better draft decisions
  */
 function canPlayerPlayPosition(
-  playerEligiblePositions: string[], 
+  playerEligiblePositions: string[],
   requiredPosition: string,
-  positionDetails?: Record<string, { games: number; gamesStarted: number; position: string }>
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _positionDetails?: Record<
+    string,
+    { games: number; gamesStarted: number; position: string }
+  >,
 ): boolean {
   // Use same core logic as GraphQL API: lib/shared-components/src/utils/PositionModels.ts
-  const allowedPositions = ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
-  
+  const allowedPositions =
+    ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
+
   if (!allowedPositions) {
     return false;
   }
@@ -308,7 +343,7 @@ function canPlayerPlayPosition(
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -319,19 +354,29 @@ function canPlayerPlayPosition(
 function getPositionScore(
   playerEligiblePositions: string[],
   requiredPosition: string,
-  positionDetails?: Record<string, { games: number; gamesStarted: number; position: string }>
+  positionDetails?: Record<
+    string,
+    { games: number; gamesStarted: number; position: string }
+  >,
 ): number {
-  if (!canPlayerPlayPosition(playerEligiblePositions, requiredPosition, positionDetails)) {
+  if (
+    !canPlayerPlayPosition(
+      playerEligiblePositions,
+      requiredPosition,
+      positionDetails,
+    )
+  ) {
     return 0;
   }
 
-  const allowedPositions = ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
+  const allowedPositions =
+    ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
   if (!allowedPositions || !positionDetails) {
     return 1; // Basic eligibility score
   }
 
   let maxScore = 0;
-  
+
   // Calculate score based on actual games played at relevant positions
   for (const pos of allowedPositions) {
     const posData = positionDetails[pos];
@@ -341,29 +386,29 @@ function getPositionScore(
       if (posData.gamesStarted > 0) {
         score += Math.min(posData.gamesStarted / posData.games, 0.5); // Bonus for starting games
       }
-      
+
       // Exact position match gets highest priority
       if (pos === requiredPosition) {
         score *= 1.5;
       }
-      
+
       maxScore = Math.max(maxScore, score);
     }
   }
-  
+
   return maxScore || 1; // Fallback to basic eligibility
 }
 
 /**
  * HEAVILY OPTIMIZED: Smart player assignment using positionsPlayed JSONB data
- * 
+ *
  * Performance Improvements:
- * - Single database query vs 3 separate queries (3x faster DB access) 
+ * - Single database query vs 3 separate queries (3x faster DB access)
  * - Uses career_fielding.positions_played JSONB field (same as GraphQL API)
  * - Smart position scoring based on actual games played at each position
  * - Enhanced fallback logic for players without complete stats
  * - Batched database operations and transaction management
- * 
+ *
  * Quality Improvements:
  * - Players assigned to positions where they have most experience
  * - Controlled randomness maintains draft fairness while optimizing fit
@@ -373,287 +418,367 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
   await runWithPublicClient(getDbOptions(), async (db) => {
     // Use transaction for atomic draft operations
     return await db.transaction(async (tx) => {
-    addBreadcrumb('Starting optimized draft process', { leagueId });
-    
-    // Step 1: Batch fetch all required data in parallel
-    const [teams, leaguePositions] = await Promise.all([
-      tx.select({
-        id: PublicSchema.teams.id,
-        name: PublicSchema.teams.name,
-      }).from(PublicSchema.teams)
-        .where(eq(PublicSchema.teams.leagueId, leagueId)),
-      
-      tx.select({
-        id: PublicSchema.leaguePosition.id,
-        positionType: PublicSchema.leaguePosition.positionType,
-      }).from(PublicSchema.leaguePosition)
-        .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
-        .orderBy(PublicSchema.leaguePosition.id)
-    ]);
+      addBreadcrumb('Starting optimized draft process', { leagueId });
 
-    // Calculate players needed and fetch with appropriate buffer
-    const estimatedPlayersNeeded = teams.length * leaguePositions.length * 2; // 2x buffer
-    const players = await tx.select({
-      id: PublicSchema.players.id,
-      firstName: PublicSchema.players.firstName,
-      lastName: PublicSchema.players.lastName,
-      brefId: PublicSchema.players.brefId,
-    }).from(PublicSchema.players)
-      .limit(Math.max(estimatedPlayersNeeded, 1500)); // Minimum 1500 players
+      // Step 1: Batch fetch all required data in parallel
+      const [teams, leaguePositions] = await Promise.all([
+        tx
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.leagueId, leagueId)),
 
-    if (teams.length === 0) {
-      throw new Error(`No teams found for league ${leagueId}`);
-    }
-    if (leaguePositions.length === 0) {
-      throw new Error(`No positions found for league ${leagueId}. Make sure league positions are set up.`);
-    }
-    if (players.length === 0) {
-      throw new Error('No players available for draft');
-    }
+        tx
+          .select({
+            id: PublicSchema.leaguePosition.id,
+            positionType: PublicSchema.leaguePosition.positionType,
+          })
+          .from(PublicSchema.leaguePosition)
+          .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
+          .orderBy(PublicSchema.leaguePosition.id),
+      ]);
 
-    LOGGER.info(`Draft data loaded: ${teams.length} teams, ${leaguePositions.length} positions, ${players.length} players`);
-    addBreadcrumb('Basic draft data loaded', { 
-      teamCount: teams.length, 
-      positionCount: leaguePositions.length, 
-      playerCount: players.length 
-    });
-
-    // Step 2: Batch load all player positions and stats (eliminates N+1 queries)
-    const playerIds = players.map(p => p.id);
-    const playersWithPositions = await loadAllPlayersWithPositions(tx, playerIds);
-    
-    // Merge player data with position data
-    const enhancedPlayers: PlayerWithPositions[] = players.map(player => {
-      const positionData = playersWithPositions.get(player.id);
-      const eligiblePositions = positionData?.eligiblePositions || ['1B', '2B', '3B', 'OF', 'DH'];
-      
-      // DEBUG: Log some sample player eligibility
-      if (players.indexOf(player) < 5) {
-        LOGGER.info(`Sample player ${player.firstName} ${player.lastName}: eligible for ${eligiblePositions.join(',')}`);
-      }
-      
-      return {
-        ...player,
-        eligiblePositions,
-        isPitcher: positionData?.isPitcher || false
-      };
-    });
-    
-    LOGGER.info(`Total enhanced players: ${enhancedPlayers.length}`);
-
-    // Step 3: Create OPTIMIZED position-based player groups with smart scoring
-    const playersByPosition: PositionPlayerGroup = {};
-    for (const position of leaguePositions) {
-      // DEBUG: Log position requirements and player eligibility
-      LOGGER.info(`Processing position ${position.positionType} (id: ${position.id})`);
-      
-      // Filter eligible players and add position scoring for smarter assignments
-      const eligiblePlayers = enhancedPlayers
-        .filter(player => {
-          const canPlay = canPlayerPlayPosition(player.eligiblePositions, position.positionType, player.positionDetails);
-          if (!canPlay) {
-            LOGGER.debug(`Player ${player.firstName} ${player.lastName} (${player.eligiblePositions.join(',')}) cannot play ${position.positionType}`);
-          }
-          return canPlay;
+      // Calculate players needed and fetch with appropriate buffer
+      const estimatedPlayersNeeded = teams.length * leaguePositions.length * 2; // 2x buffer
+      const players = await tx
+        .select({
+          id: PublicSchema.players.id,
+          firstName: PublicSchema.players.firstName,
+          lastName: PublicSchema.players.lastName,
+          brefId: PublicSchema.players.brefId,
         })
-        .map(player => ({
-          ...player,
-          positionScore: getPositionScore(player.eligiblePositions, position.positionType, player.positionDetails)
-        }))
-        // Sort by position score (best fits first) then shuffle within similar score ranges
-        .sort((a, b) => b.positionScore - a.positionScore);
-      
-      LOGGER.info(`Position ${position.positionType}: ${eligiblePlayers.length} eligible players found`);
-      
-      // Add controlled randomness: shuffle players with similar scores to maintain draft fairness
-      const groupedByScore: PlayerWithPositions[][] = [];
-      let currentGroup: PlayerWithPositions[] = [];
-      let currentScore = -1;
-      
-      for (const player of eligiblePlayers) {
-        const scoreGroup = Math.floor(player.positionScore * 10); // Group by 0.1 increments
-        
-        if (scoreGroup !== currentScore) {
-          if (currentGroup.length > 0) {
-            groupedByScore.push(shuffleArray(currentGroup));
-          }
-          currentGroup = [player];
-          currentScore = scoreGroup;
-        } else {
-          currentGroup.push(player);
-        }
+        .from(PublicSchema.players)
+        .limit(Math.max(estimatedPlayersNeeded, 1500)); // Minimum 1500 players
+
+      if (teams.length === 0) {
+        throw new Error(`No teams found for league ${leagueId}`);
       }
-      
-      if (currentGroup.length > 0) {
-        groupedByScore.push(shuffleArray(currentGroup));
+      if (leaguePositions.length === 0) {
+        throw new Error(
+          `No positions found for league ${leagueId}. Make sure league positions are set up.`,
+        );
       }
-      
-      // Flatten back into single array maintaining score-based ordering with randomness
-      playersByPosition[position.positionType] = groupedByScore.flat();
-      
-      LOGGER.debug(`Position ${position.positionType}: ${playersByPosition[position.positionType].length} eligible players (smart-sorted)`);
-    }
+      if (players.length === 0) {
+        throw new Error('No players available for draft');
+      }
 
-    // Enhanced performance monitoring with position quality metrics
-    const positionQualityMetrics = Object.entries(playersByPosition).map(([pos, players]) => {
-      const avgScore = players.reduce((sum, p) => sum + (p.positionScore || 1), 0) / players.length;
-      const highQualityPlayers = players.filter(p => (p.positionScore || 1) > 1.2).length;
-      
-      return {
-        position: pos,
-        totalPlayers: players.length,
-        avgQualityScore: Math.round(avgScore * 100) / 100,
-        highQualityCount: highQualityPlayers,
-        highQualityPercentage: Math.round((highQualityPlayers / players.length) * 100)
-      };
-    });
-
-    addBreadcrumb('OPTIMIZED position groups created with quality scoring', { 
-      positionGroups: Object.keys(playersByPosition).length,
-      totalEligibleAssignments: Object.values(playersByPosition).reduce((sum, players) => sum + players.length, 0),
-      qualityMetrics: positionQualityMetrics,
-      improvementNote: 'Using positionsPlayed JSONB data for smarter assignments'
-    });
-
-    // Step 4: Optimized assignment algorithm with batch operations
-    const assignments: TeamAssignment[] = [];
-    const usedPlayerIds = new Set<number>();
-    const teamPositionAssignments: Map<number, Set<number>> = new Map();
-    
-    // Initialize team tracking
-    teams.forEach(team => teamPositionAssignments.set(team.id, new Set()));
-
-    // Assign players in round-robin fashion by position
-    for (const position of leaguePositions) {
-      const availablePlayers = playersByPosition[position.positionType].filter(
-        player => !usedPlayerIds.has(player.id)
+      LOGGER.info(
+        `Draft data loaded: ${teams.length} teams, ${leaguePositions.length} positions, ${players.length} players`,
       );
-      
-      let playerIndex = 0;
-      for (const team of teams) {
-        const teamAssignedPositions = teamPositionAssignments.get(team.id)!;
-        
-        // Skip if team already has this position filled
-        if (teamAssignedPositions.has(position.id)) {
-          continue;
-        }
-        
-        // Find next available player for this position
-        if (playerIndex < availablePlayers.length) {
-          const assignedPlayer = availablePlayers[playerIndex];
-          
-          // Create assignment record for batch insert
-          assignments.push({
-            teamId: team.id,
-            leagueId: leagueId,
-            playerId: assignedPlayer.id,
-            positionId: position.id,
-          });
-          
-          // Track assignment
-          teamAssignedPositions.add(position.id);
-          usedPlayerIds.add(assignedPlayer.id);
-          
-          LOGGER.debug(`Queued: ${assignedPlayer.firstName} ${assignedPlayer.lastName} → ${team.name} (${position.positionType})`);
-          playerIndex++;
-        } else {
-          LOGGER.warn(`No available players for ${team.name} at position ${position.positionType}`);
-        }
-      }
-    }
+      addBreadcrumb('Basic draft data loaded', {
+        teamCount: teams.length,
+        positionCount: leaguePositions.length,
+        playerCount: players.length,
+      });
 
-    // Step 4b: Fill remaining roster spots with bench players (no explicit positions)
-    // Get league's maxRosterSize to determine total roster spots
-    const leagueInfo = await tx.select({ maxRosterSize: PublicSchema.leagues.maxRosterSize })
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, leagueId))
-      .limit(1);
-    
-    if (leagueInfo.length === 0) {
-      throw new Error(`League ${leagueId} not found`);
-    }
-    
-    const maxRosterSize = leagueInfo[0].maxRosterSize;
-    const explicitPositions = leaguePositions.length; // 20 explicit positions
-    const benchSlots = maxRosterSize - explicitPositions; // remaining slots are bench
-    
-    if (benchSlots > 0) {
-      LOGGER.info(`Filling ${benchSlots} bench slots per team (maxRosterSize: ${maxRosterSize}, explicit positions: ${explicitPositions})`);
-      
-      // Get all remaining players (not used in explicit positions)
-      const remainingPlayers = enhancedPlayers.filter(player => !usedPlayerIds.has(player.id));
-      
-      // Assign remaining players to bench slots (positionId = null)
-      let playerIndex = 0;
-      for (let benchSlot = 0; benchSlot < benchSlots; benchSlot++) {
+      // Step 2: Batch load all player positions and stats (eliminates N+1 queries)
+      const playerIds = players.map((p) => p.id);
+      const playersWithPositions = await loadAllPlayersWithPositions(
+        tx,
+        playerIds,
+      );
+
+      // Merge player data with position data
+      const enhancedPlayers: PlayerWithPositions[] = players.map((player) => {
+        const positionData = playersWithPositions.get(player.id);
+        const eligiblePositions = positionData?.eligiblePositions || [
+          '1B',
+          '2B',
+          '3B',
+          'OF',
+          'DH',
+        ];
+
+        // DEBUG: Log some sample player eligibility
+        if (players.indexOf(player) < 5) {
+          LOGGER.info(
+            `Sample player ${player.firstName} ${player.lastName}: eligible for ${eligiblePositions.join(',')}`,
+          );
+        }
+
+        return {
+          ...player,
+          eligiblePositions,
+          isPitcher: positionData?.isPitcher || false,
+        };
+      });
+
+      LOGGER.info(`Total enhanced players: ${enhancedPlayers.length}`);
+
+      // Step 3: Create OPTIMIZED position-based player groups with smart scoring
+      const playersByPosition: PositionPlayerGroup = {};
+      for (const position of leaguePositions) {
+        // DEBUG: Log position requirements and player eligibility
+        LOGGER.info(
+          `Processing position ${position.positionType} (id: ${position.id})`,
+        );
+
+        // Filter eligible players and add position scoring for smarter assignments
+        const eligiblePlayers = enhancedPlayers
+          .filter((player) => {
+            const canPlay = canPlayerPlayPosition(
+              player.eligiblePositions,
+              position.positionType,
+              player.positionDetails,
+            );
+            if (!canPlay) {
+              LOGGER.debug(
+                `Player ${player.firstName} ${player.lastName} (${player.eligiblePositions.join(',')}) cannot play ${position.positionType}`,
+              );
+            }
+            return canPlay;
+          })
+          .map((player) => ({
+            ...player,
+            positionScore: getPositionScore(
+              player.eligiblePositions,
+              position.positionType,
+              player.positionDetails,
+            ),
+          }))
+          // Sort by position score (best fits first) then shuffle within similar score ranges
+          .sort((a, b) => b.positionScore - a.positionScore);
+
+        LOGGER.info(
+          `Position ${position.positionType}: ${eligiblePlayers.length} eligible players found`,
+        );
+
+        // Add controlled randomness: shuffle players with similar scores to maintain draft fairness
+        const groupedByScore: PlayerWithPositions[][] = [];
+        let currentGroup: PlayerWithPositions[] = [];
+        let currentScore = -1;
+
+        for (const player of eligiblePlayers) {
+          const scoreGroup = Math.floor(player.positionScore * 10); // Group by 0.1 increments
+
+          if (scoreGroup !== currentScore) {
+            if (currentGroup.length > 0) {
+              groupedByScore.push(shuffleArray(currentGroup));
+            }
+            currentGroup = [player];
+            currentScore = scoreGroup;
+          } else {
+            currentGroup.push(player);
+          }
+        }
+
+        if (currentGroup.length > 0) {
+          groupedByScore.push(shuffleArray(currentGroup));
+        }
+
+        // Flatten back into single array maintaining score-based ordering with randomness
+        playersByPosition[position.positionType] = groupedByScore.flat();
+
+        LOGGER.debug(
+          `Position ${position.positionType}: ${playersByPosition[position.positionType].length} eligible players (smart-sorted)`,
+        );
+      }
+
+      // Enhanced performance monitoring with position quality metrics
+      const positionQualityMetrics = Object.entries(playersByPosition).map(
+        ([pos, players]) => {
+          const avgScore =
+            players.reduce((sum, p) => sum + (p.positionScore || 1), 0) /
+            players.length;
+          const highQualityPlayers = players.filter(
+            (p) => (p.positionScore || 1) > 1.2,
+          ).length;
+
+          return {
+            position: pos,
+            totalPlayers: players.length,
+            avgQualityScore: Math.round(avgScore * 100) / 100,
+            highQualityCount: highQualityPlayers,
+            highQualityPercentage: Math.round(
+              (highQualityPlayers / players.length) * 100,
+            ),
+          };
+        },
+      );
+
+      addBreadcrumb('OPTIMIZED position groups created with quality scoring', {
+        positionGroups: Object.keys(playersByPosition).length,
+        totalEligibleAssignments: Object.values(playersByPosition).reduce(
+          (sum, players) => sum + players.length,
+          0,
+        ),
+        qualityMetrics: positionQualityMetrics,
+        improvementNote:
+          'Using positionsPlayed JSONB data for smarter assignments',
+      });
+
+      // Step 4: Optimized assignment algorithm with batch operations
+      const assignments: TeamAssignment[] = [];
+      const usedPlayerIds = new Set<number>();
+      const teamPositionAssignments: Map<number, Set<number>> = new Map();
+
+      // Initialize team tracking
+      teams.forEach((team) => teamPositionAssignments.set(team.id, new Set()));
+
+      // Assign players in round-robin fashion by position
+      for (const position of leaguePositions) {
+        const availablePlayers = playersByPosition[
+          position.positionType
+        ].filter((player) => !usedPlayerIds.has(player.id));
+
+        let playerIndex = 0;
         for (const team of teams) {
-          if (playerIndex < remainingPlayers.length) {
-            const assignedPlayer = remainingPlayers[playerIndex];
-            
-            // Create bench assignment (positionId = null for bench)
+          const teamAssignedPositions = teamPositionAssignments.get(team.id);
+          if (!teamAssignedPositions) continue;
+
+          // Skip if team already has this position filled
+          if (teamAssignedPositions.has(position.id)) {
+            continue;
+          }
+
+          // Find next available player for this position
+          if (playerIndex < availablePlayers.length) {
+            const assignedPlayer = availablePlayers[playerIndex];
+
+            // Create assignment record for batch insert
             assignments.push({
               teamId: team.id,
               leagueId: leagueId,
               playerId: assignedPlayer.id,
-              positionId: null, // null indicates bench spot
+              positionId: position.id,
             });
-            
+
+            // Track assignment
+            teamAssignedPositions.add(position.id);
             usedPlayerIds.add(assignedPlayer.id);
-            LOGGER.debug(`Queued bench: ${assignedPlayer.firstName} ${assignedPlayer.lastName} → ${team.name} (bench)`);
+
+            LOGGER.debug(
+              `Queued: ${assignedPlayer.firstName} ${assignedPlayer.lastName} → ${team.name} (${position.positionType})`,
+            );
             playerIndex++;
           } else {
-            LOGGER.warn(`No more available players for bench slot in ${team.name}`);
+            LOGGER.warn(
+              `No available players for ${team.name} at position ${position.positionType}`,
+            );
           }
         }
       }
-    }
 
-    addBreadcrumb('Assignment planning completed', { 
-      plannedAssignments: assignments.length,
-      expectedAssignments: teams.length * maxRosterSize,
-      explicitPositions: teams.length * explicitPositions,
-      benchAssignments: teams.length * benchSlots
-    });
+      // Step 4b: Fill remaining roster spots with bench players (no explicit positions)
+      // Get league's maxRosterSize to determine total roster spots
+      const leagueInfo = await tx
+        .select({ maxRosterSize: PublicSchema.leagues.maxRosterSize })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
 
-    // Step 5: Execute batch insert (single database operation instead of N individual inserts)
-    if (assignments.length > 0) {
-      LOGGER.info(`Executing batch insert of ${assignments.length} team member assignments`);
-      
-      await tx.insert(PublicSchema.teamMembers).values(
-        assignments.map(assignment => ({
-          teamId: assignment.teamId as any, // Type assertion for schema mismatch
-          leagueId: assignment.leagueId as any,
-          playerId: assignment.playerId as any,
-          positionId: assignment.positionId as any, // null for bench slots
-        }))
+      if (leagueInfo.length === 0) {
+        throw new Error(`League ${leagueId} not found`);
+      }
+
+      const maxRosterSize = leagueInfo[0].maxRosterSize;
+      const explicitPositions = leaguePositions.length; // 20 explicit positions
+      const benchSlots = maxRosterSize - explicitPositions; // remaining slots are bench
+
+      if (benchSlots > 0) {
+        LOGGER.info(
+          `Filling ${benchSlots} bench slots per team (maxRosterSize: ${maxRosterSize}, explicit positions: ${explicitPositions})`,
+        );
+
+        // Get all remaining players (not used in explicit positions)
+        const remainingPlayers = enhancedPlayers.filter(
+          (player) => !usedPlayerIds.has(player.id),
+        );
+
+        // Assign remaining players to bench slots (positionId = null)
+        let playerIndex = 0;
+        for (let benchSlot = 0; benchSlot < benchSlots; benchSlot++) {
+          for (const team of teams) {
+            if (playerIndex < remainingPlayers.length) {
+              const assignedPlayer = remainingPlayers[playerIndex];
+
+              // Create bench assignment (positionId = null for bench)
+              assignments.push({
+                teamId: team.id,
+                leagueId: leagueId,
+                playerId: assignedPlayer.id,
+                positionId: null, // null indicates bench spot
+              });
+
+              usedPlayerIds.add(assignedPlayer.id);
+              LOGGER.debug(
+                `Queued bench: ${assignedPlayer.firstName} ${assignedPlayer.lastName} → ${team.name} (bench)`,
+              );
+              playerIndex++;
+            } else {
+              LOGGER.warn(
+                `No more available players for bench slot in ${team.name}`,
+              );
+            }
+          }
+        }
+      }
+
+      addBreadcrumb('Assignment planning completed', {
+        plannedAssignments: assignments.length,
+        expectedAssignments: teams.length * maxRosterSize,
+        explicitPositions: teams.length * explicitPositions,
+        benchAssignments: teams.length * benchSlots,
+      });
+
+      // Step 5: Execute batch insert (single database operation instead of N individual inserts)
+      if (assignments.length > 0) {
+        LOGGER.info(
+          `Executing batch insert of ${assignments.length} team member assignments`,
+        );
+
+        await tx.insert(PublicSchema.teamMembers).values(
+          assignments.map((assignment) => ({
+            teamId: assignment.teamId as number,
+            leagueId: assignment.leagueId as number,
+            playerId: assignment.playerId as number,
+            positionId: assignment.positionId as number | null, // null for bench slots
+          })),
+        );
+
+        addBreadcrumb('Batch insert completed', {
+          assignmentCount: assignments.length,
+        });
+      }
+
+      // Step 6: Verify assignments
+      const finalAssignments = await tx
+        .select()
+        .from(PublicSchema.teamMembers)
+        .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+
+      const assignmentCount = finalAssignments.length;
+      const expectedAssignments = teams.length * maxRosterSize; // Total roster spots (positions + bench)
+
+      LOGGER.info(
+        `OPTIMIZED Draft completed: ${assignmentCount}/${expectedAssignments} roster spots filled for league ${leagueId}`,
       );
-      
-      addBreadcrumb('Batch insert completed', { assignmentCount: assignments.length });
-    }
+      LOGGER.info(
+        `  - Explicit positions: ${teams.length * explicitPositions} spots`,
+      );
+      LOGGER.info(`  - Bench slots: ${teams.length * benchSlots} spots`);
 
-    // Step 6: Verify assignments
-    const finalAssignments = await tx.select()
-      .from(PublicSchema.teamMembers)
-      .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+      if (assignmentCount < expectedAssignments) {
+        LOGGER.warn(
+          `Performance note: ${expectedAssignments - assignmentCount} roster spots remain unfilled due to player availability constraints`,
+        );
+      }
 
-    const assignmentCount = finalAssignments.length;
-    const expectedAssignments = teams.length * maxRosterSize; // Total roster spots (positions + bench)
-    
-    LOGGER.info(`OPTIMIZED Draft completed: ${assignmentCount}/${expectedAssignments} roster spots filled for league ${leagueId}`);
-    LOGGER.info(`  - Explicit positions: ${teams.length * explicitPositions} spots`);
-    LOGGER.info(`  - Bench slots: ${teams.length * benchSlots} spots`);
-    
-    if (assignmentCount < expectedAssignments) {
-      LOGGER.warn(`Performance note: ${expectedAssignments - assignmentCount} roster spots remain unfilled due to player availability constraints`);
-    }
-
-    addBreadcrumb('Draft process completed', { 
-      finalAssignmentCount: assignmentCount,
-      expectedTotal: expectedAssignments,
-      explicitPositionsFilled: Math.min(assignmentCount, teams.length * explicitPositions),
-      benchSlotsFilled: Math.max(0, assignmentCount - teams.length * explicitPositions),
-      fillRate: `${Math.round((assignmentCount / expectedAssignments) * 100)}%`
-    });
+      addBreadcrumb('Draft process completed', {
+        finalAssignmentCount: assignmentCount,
+        expectedTotal: expectedAssignments,
+        explicitPositionsFilled: Math.min(
+          assignmentCount,
+          teams.length * explicitPositions,
+        ),
+        benchSlotsFilled: Math.max(
+          0,
+          assignmentCount - teams.length * explicitPositions,
+        ),
+        fillRate: `${Math.round((assignmentCount / expectedAssignments) * 100)}%`,
+      });
     }); // End transaction
   }); // End runWithPublicClient
 }
@@ -662,37 +787,44 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
  * Update draft status with comprehensive error handling and Sentry tracking
  * Now uses shared updateLeagueDraftStatus utility with additional Sentry integration
  */
-async function updateDraftStatus(leagueId: number, status: 'in-progress' | 'completed' | 'not-started', context: string): Promise<void> {
+async function updateDraftStatus(
+  leagueId: number,
+  status: 'in-progress' | 'completed' | 'not-started',
+  context: string,
+): Promise<void> {
   try {
-    addBreadcrumb(
-      `Updating draft status to ${status}`,
-      { 
-        leagueId, 
-        status, 
-        context,
-        operation: 'updateDraftStatus'
-      }
-    );
+    addBreadcrumb(`Updating draft status to ${status}`, {
+      leagueId,
+      status,
+      context,
+      operation: 'updateDraftStatus',
+    });
 
     // Use shared utility for consistent status updates
-    await updateLeagueDraftStatus(leagueId, status, `${context} (draft-processor)`);
-    
+    await updateLeagueDraftStatus(
+      leagueId,
+      status,
+      `${context} (draft-processor)`,
+    );
   } catch (error) {
-    LOGGER.error(`Failed to update draft status to '${status}' for league ${leagueId}:`, error);
-    
+    LOGGER.error(
+      `Failed to update draft status to '${status}' for league ${leagueId}:`,
+      error,
+    );
+
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: {
         lambda: 'draft-processor',
-        operation: 'updateDraftStatus'
+        operation: 'updateDraftStatus',
       },
       extra: {
         leagueId,
         targetStatus: status,
         context,
-        originalError: error
-      }
+        originalError: error,
+      },
     });
-    
+
     throw error;
   }
 }
@@ -700,32 +832,37 @@ async function updateDraftStatus(leagueId: number, status: 'in-progress' | 'comp
 /**
  * Process a single draft message with comprehensive error handling
  */
-async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProcessingResult> {
+async function processDraftMessage(
+  message: SqsDraftMessage,
+): Promise<DraftProcessingResult> {
   const { leagueId, draftType, requestedBy, timestamp } = message.payload;
-  
-  addBreadcrumb(
-    'Starting draft processing',
-    { 
-      leagueId,
-      draftType,
-      requestedBy,
-      timestamp,
-      operation: 'processDraftMessage'
-    }
+
+  addBreadcrumb('Starting draft processing', {
+    leagueId,
+    draftType,
+    requestedBy,
+    timestamp,
+    operation: 'processDraftMessage',
+  });
+
+  LOGGER.info(
+    `Processing draft for league ${leagueId}, type: ${draftType}, requested by user ${requestedBy}`,
   );
-  
-  LOGGER.info(`Processing draft for league ${leagueId}, type: ${draftType}, requested by user ${requestedBy}`);
 
   try {
     // Step 1: Update draft status to 'in-progress'
-    await updateDraftStatus(leagueId, 'in-progress', 'draft processing started');
+    await updateDraftStatus(
+      leagueId,
+      'in-progress',
+      'draft processing started',
+    );
 
     // Step 2: Verify league exists and user has access
     addBreadcrumb('Verifying user access', { leagueId, requestedBy });
-    
+
     // Use shared validation utility for consistent access checking
     await validateUserAccess(leagueId, requestedBy);
-    
+
     addBreadcrumb('User access verified', { leagueId, requestedBy });
 
     // Step 2.5: Validate draft type using shared utility
@@ -734,7 +871,7 @@ async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProce
 
     // Step 3: Process based on draft type
     addBreadcrumb('Processing draft by type', { draftType });
-    
+
     switch (draftType) {
       case 'random-draft':
         await randomlyAssignPlayers(leagueId);
@@ -749,10 +886,17 @@ async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProce
         throw new Error(`Unknown draft type: ${draftType}`);
     }
 
-    addBreadcrumb('Draft processing completed successfully', { draftType, leagueId });
+    addBreadcrumb('Draft processing completed successfully', {
+      draftType,
+      leagueId,
+    });
 
     // Step 4: Update draft status to 'completed'
-    await updateDraftStatus(leagueId, 'completed', 'draft processing completed successfully');
+    await updateDraftStatus(
+      leagueId,
+      'completed',
+      'draft processing completed successfully',
+    );
 
     LOGGER.info(`Successfully completed ${draftType} for league ${leagueId}`);
 
@@ -761,20 +905,23 @@ async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProce
       leagueId,
       message: `${draftType} completed successfully for league ${leagueId}`,
     };
-    
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
-    LOGGER.error(`Error processing draft message for league ${leagueId}:`, error);
-    
+
+    LOGGER.error(
+      `Error processing draft message for league ${leagueId}:`,
+      error,
+    );
+
     // Capture detailed error context with Sentry
     captureError(error instanceof Error ? error : new Error(String(error)), {
       tags: {
         lambda: 'draft-processor',
         operation: 'processDraftMessage',
         draftType,
-        failureType: 'processing_error'
+        failureType: 'processing_error',
       },
       extra: {
         leagueId,
@@ -783,52 +930,64 @@ async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProce
         timestamp,
         errorMessage,
         errorStack,
-        processingPhase: 'draft_processing'
-      }
+        processingPhase: 'draft_processing',
+      },
     });
 
     // Critical: Reset draft status to 'not-started' for retry capability
     try {
-      await updateDraftStatus(leagueId, 'not-started', `error recovery - ${errorMessage}`);
-      
-      addBreadcrumb(
-        'Draft status reset to not-started due to error', 
-        { leagueId, errorMessage, recovery: 'success' }
+      await updateDraftStatus(
+        leagueId,
+        'not-started',
+        `error recovery - ${errorMessage}`,
       );
-      
-    } catch (statusError) {
-      const statusErrorMessage = statusError instanceof Error ? statusError.message : 'Unknown status update error';
-      
-      LOGGER.error(`CRITICAL: Failed to reset draft status for league ${leagueId} after processing error:`, statusError);
-      
-      // This is a critical error - we failed to reset the status AND the original processing failed
-      captureError(statusError instanceof Error ? statusError : new Error(String(statusError)), {
-        tags: {
-          lambda: 'draft-processor',
-          operation: 'statusRecovery',
-          severity: 'critical',
-          failureType: 'status_reset_failure'
-        },
-        extra: {
-          leagueId,
-          originalError: errorMessage,
-          statusUpdateError: statusErrorMessage,
-          processingPhase: 'error_recovery',
-          impact: 'league_may_be_stuck_in_progress'
-        }
-      });
 
-      addBreadcrumb(
-        'CRITICAL: Status recovery failed', 
-        { 
-          leagueId, 
-          originalError: errorMessage, 
-          statusError: statusErrorMessage,
-          recovery: 'failed'
-        }
+      addBreadcrumb('Draft status reset to not-started due to error', {
+        leagueId,
+        errorMessage,
+        recovery: 'success',
+      });
+    } catch (statusError) {
+      const statusErrorMessage =
+        statusError instanceof Error
+          ? statusError.message
+          : 'Unknown status update error';
+
+      LOGGER.error(
+        `CRITICAL: Failed to reset draft status for league ${leagueId} after processing error:`,
+        statusError,
       );
+
+      // This is a critical error - we failed to reset the status AND the original processing failed
+      captureError(
+        statusError instanceof Error
+          ? statusError
+          : new Error(String(statusError)),
+        {
+          tags: {
+            lambda: 'draft-processor',
+            operation: 'statusRecovery',
+            severity: 'critical',
+            failureType: 'status_reset_failure',
+          },
+          extra: {
+            leagueId,
+            originalError: errorMessage,
+            statusUpdateError: statusErrorMessage,
+            processingPhase: 'error_recovery',
+            impact: 'league_may_be_stuck_in_progress',
+          },
+        },
+      );
+
+      addBreadcrumb('CRITICAL: Status recovery failed', {
+        leagueId,
+        originalError: errorMessage,
+        statusError: statusErrorMessage,
+        recovery: 'failed',
+      });
     }
-    
+
     return {
       success: false,
       leagueId,
@@ -841,12 +1000,13 @@ async function processDraftMessage(message: SqsDraftMessage): Promise<DraftProce
 /**
  * Base SQS handler function
  */
-const baseDraftProcessorHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  addBreadcrumb(
-    `Processing ${event.Records.length} draft messages`,
-    { recordCount: event.Records.length }
-  );
-  
+const baseDraftProcessorHandler = async (
+  event: SQSEvent,
+): Promise<SQSBatchResponse> => {
+  addBreadcrumb(`Processing ${event.Records.length} draft messages`, {
+    recordCount: event.Records.length,
+  });
+
   LOGGER.info(`Processing ${event.Records.length} draft messages`);
 
   const batchItemFailures = [];
@@ -854,56 +1014,55 @@ const baseDraftProcessorHandler = async (event: SQSEvent): Promise<SQSBatchRespo
   for (const record of event.Records) {
     try {
       const message: SqsDraftMessage = JSON.parse(record.body);
-      
-      addBreadcrumb(
-        'Processing draft message',
-        { 
-          messageId: record.messageId,
-          messageType: message.messageType,
-          leagueId: message.payload?.leagueId 
-        }
-      );
-      
+
+      addBreadcrumb('Processing draft message', {
+        messageId: record.messageId,
+        messageType: message.messageType,
+        leagueId: message.payload?.leagueId,
+      });
+
       // Validate message format
       if (message.messageType !== 'START_DRAFT') {
         throw new Error(`Invalid message type: ${message.messageType}`);
       }
 
       const result = await processDraftMessage(message);
-      
+
       if (!result.success) {
-        LOGGER.error(`Draft processing failed for league ${result.leagueId}: ${result.error}`);
-        
+        LOGGER.error(
+          `Draft processing failed for league ${result.leagueId}: ${result.error}`,
+        );
+
         captureError(new Error(`Draft processing failed: ${result.error}`), {
           tags: {
             lambda: 'draft-processor',
-            operation: 'processDraftMessage'
+            operation: 'processDraftMessage',
           },
           extra: {
             leagueId: result.leagueId,
             messageId: record.messageId,
-            error: result.error
-          }
+            error: result.error,
+          },
         });
-        
+
         batchItemFailures.push({ itemIdentifier: record.messageId });
       } else {
         LOGGER.info(`Draft processing succeeded for league ${result.leagueId}`);
       }
     } catch (error) {
       LOGGER.error('Error processing SQS record:', error);
-      
+
       captureError(error instanceof Error ? error : new Error(String(error)), {
         tags: {
           lambda: 'draft-processor',
-          operation: 'sqsRecordProcessing'
+          operation: 'sqsRecordProcessing',
         },
         extra: {
           messageId: record.messageId,
-          recordBody: record.body
-        }
+          recordBody: record.body,
+        },
       });
-      
+
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }
   }

@@ -1,15 +1,10 @@
-import { getDbOptions } from '@legacy-sports/utils';
 import { DraftSqsService, StartDraftMessage } from '@legacy-sports/aws-utils';
-import { 
-  validateDraftType, 
-  validateUserAccess, 
-  updateLeagueDraftStatus, 
-  fetchLeagueDetails,
-  validateDraftRequest,
-  VALID_DRAFT_TYPES,
-  DraftType
-} from './DraftUtils';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  fetchLeagueDetails,
+  updateLeagueDraftStatus,
+  validateDraftRequest,
+} from './DraftUtils';
 
 export interface DraftTriggerResult {
   success: boolean;
@@ -67,7 +62,12 @@ export class DraftService {
    * This is the main entry point for triggering drafts
    */
   async startDraft(options: DraftServiceOptions): Promise<DraftTriggerResult> {
-    const { leagueId, draftType, requestedBy, validateUserAccess = true } = options;
+    const {
+      leagueId,
+      draftType,
+      requestedBy,
+      validateUserAccess = true,
+    } = options;
 
     try {
       // Validate draft request using shared utilities
@@ -75,7 +75,7 @@ export class DraftService {
         leagueId,
         draftType,
         userId: requestedBy,
-        skipUserValidation: !validateUserAccess
+        skipUserValidation: !validateUserAccess,
       });
 
       // Ensure SQS service is available
@@ -86,31 +86,44 @@ export class DraftService {
       // Update league draft status to 'queued' AND send SQS message in sequence
       // If SQS fails, we need to rollback the database change
       let dbUpdateSuccessful = false;
-      
+
       try {
         // Update league draft status to 'queued'
-        await updateLeagueDraftStatus(leagueId, 'queued', 'draft queued by coordinator');
+        await updateLeagueDraftStatus(
+          leagueId,
+          'queued',
+          'draft queued by coordinator',
+        );
         dbUpdateSuccessful = true;
 
         // Create and send draft message to SQS
         const message: StartDraftMessage = {
           leagueId,
-          draftType: draftType as DraftType,
+          draftType: draftType,
           requestedBy,
           timestamp: new Date().toISOString(),
         };
 
         await this.sendDraftMessage(message);
-
       } catch (sqsError) {
         // If SQS fails after DB update succeeded, rollback the DB change
         if (dbUpdateSuccessful) {
           LOGGER.error('❌ SQS message failed, rolling back database update');
           try {
-            await updateLeagueDraftStatus(leagueId, 'not-started', 'rollback after SQS failure');
+            await updateLeagueDraftStatus(
+              leagueId,
+              'not-started',
+              'rollback after SQS failure',
+            );
             LOGGER.info('✅ Database rollback completed');
-          } catch (rollbackError) {
-            LOGGER.error('❌ Failed to rollback database update:', rollbackError);
+          } catch (rollbackError: unknown) {
+            const errorMessage = rollbackError instanceof Error 
+              ? rollbackError.message 
+              : 'Unknown rollback error';
+            LOGGER.error(
+              '❌ Failed to rollback database update:',
+              errorMessage,
+            );
           }
         }
         throw sqsError;
@@ -119,20 +132,23 @@ export class DraftService {
       // Fetch and return the updated league object
       const updatedLeague = await fetchLeagueDetails(leagueId);
 
-      LOGGER.info('✅ Draft queued successfully, returning updated league:', updatedLeague);
-      
+      LOGGER.info(
+        '✅ Draft queued successfully, returning updated league:',
+        updatedLeague,
+      );
+
       return {
         success: true,
         league: updatedLeague,
-        message: 'Draft queued successfully and processing started'
+        message: 'Draft queued successfully and processing started',
       };
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       LOGGER.error('❌ Failed to start draft:', errorMessage);
-      
+
       // Try to get league details even in error case (if league exists)
-      let league;
+      let league: DraftTriggerResult['league'];
       try {
         league = await fetchLeagueDetails(leagueId);
       } catch {
@@ -143,7 +159,7 @@ export class DraftService {
           owner: requestedBy,
           maxRosterSize: 0,
           currentMatchup: null,
-          draftStatus: 'not-started'
+          draftStatus: 'not-started',
         };
       }
 
@@ -151,7 +167,7 @@ export class DraftService {
         success: false,
         league,
         message: 'Failed to start draft',
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }
@@ -159,12 +175,14 @@ export class DraftService {
   /**
    * Get the current draft status of a league
    */
-  async getDraftStatus(leagueId: number): Promise<{ leagueId: number; draftStatus: string }> {
+  async getDraftStatus(
+    leagueId: number,
+  ): Promise<{ leagueId: number; draftStatus: string }> {
     const league = await fetchLeagueDetails(leagueId);
-    
+
     return {
       leagueId: league.id,
-      draftStatus: league.draftStatus || 'not-started'
+      draftStatus: league.draftStatus || 'not-started',
     };
   }
 
@@ -178,10 +196,13 @@ export class DraftService {
   /**
    * Get configuration info for debugging
    */
-  getConfiguration(): { queueUrl: string | undefined; sqsServiceAvailable: boolean } {
+  getConfiguration(): {
+    queueUrl: string | undefined;
+    sqsServiceAvailable: boolean;
+  } {
     return {
       queueUrl: this.queueUrl,
-      sqsServiceAvailable: !!this.sqsService
+      sqsServiceAvailable: !!this.sqsService,
     };
   }
 }

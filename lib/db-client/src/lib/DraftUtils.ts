@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm';
-import { runWithPublicClient, PublicSchema } from '../index';
+import { and, eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
+import { PublicSchema, runWithPublicClient } from '../index';
 
 /**
  * Shared utilities for draft operations
@@ -61,9 +61,9 @@ export async function updateLeagueDraftStatus(
       LOGGER.info(`🔄 Updating draft status for league ${leagueId} to '${status}'${context ? ` (${context})` : ''}`);
       
       const updateResult = await db.update(PublicSchema.leagues)
-        .set({ 
+        .set({
           draftStatus: status
-        } as any)  // Type assertion needed due to Drizzle type inference limitations
+        } as Partial<typeof PublicSchema.leagues.$inferInsert>)
         .where(eq(PublicSchema.leagues.id, leagueId))
         .returning();
       
@@ -79,8 +79,9 @@ export async function updateLeagueDraftStatus(
       
       LOGGER.info('🔍 Verification query result:', verificationResult);
     });
-  } catch (error) {
-    LOGGER.error(`❌ Failed to update draft status to '${status}' for league ${leagueId}:`, error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    LOGGER.error(`❌ Failed to update draft status to '${status}' for league ${leagueId}:`, errorMessage);
     throw error;
   }
 }

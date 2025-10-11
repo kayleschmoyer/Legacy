@@ -1,7 +1,7 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { parseEventBody } from '../util/lambda';
 import crypto from 'crypto';
+import { parseEventBody } from '../util/lambda';
 
 // In-memory storage for device authorization flows
 // In production, this should use Redis or DynamoDB for persistence across Lambda instances

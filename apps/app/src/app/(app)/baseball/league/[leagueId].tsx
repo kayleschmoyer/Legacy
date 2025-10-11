@@ -1,18 +1,19 @@
 import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
-import { H3, Spinner, Text, YStack, Button, Card, XStack } from 'tamagui';
+import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert } from 'react-native';
+import { gql, useLazyQuery } from '@apollo/client';
 import {
   LeagueFragment,
   LeagueFragmentDoc,
-  TeamFragment,
   LeaguePositionFragment,
-  TeamMemberFragment,
-  useStartDraftMutation,
   StartDraftMutation,
   StartDraftMutationVariables,
+  TeamFragment,
+  TeamMemberFragment,
+  useStartDraftMutation,
 } from '../../../../api/db/graphql.generated';
 import { useGetLeagueByIdQuery } from '../../../../api/db/leagues/Leagues.generated';
 import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
@@ -20,7 +21,6 @@ import {
   useGetTeamMembersQuery, 
   useUpdateTeamMemberPositionMutation 
 } from '../../../../api/db/graphql.generated';
-import { useLazyQuery, gql } from '@apollo/client';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
@@ -160,8 +160,8 @@ export default function LeagueId(): React.JSX.Element {
     try {
       await updateTeamMemberPosition({
         variables: {
-          teamMemberId: player.id!,
-          positionId: position.id!,
+          teamMemberId: player.id,
+          positionId: position.id,
         },
       });
     } catch (error) {

@@ -1,9 +1,9 @@
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { CommandArgs } from '../utils/loadEnvFile';
-import { AuthMiddleware } from '../services/AuthMiddleware';
 import fs from 'fs/promises';
 import path from 'path';
+import { CommandArgs } from '../utils/loadEnvFile';
+import { AuthMiddleware } from '../services/AuthMiddleware';
 
 interface GraphQLTestArgs extends CommandArgs {
   query?: string;

@@ -10,13 +10,13 @@ import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { InternalUser } from '@legacy-sports/db-client';
 import { checkUserExists } from './UserManager';
+import { completeDeviceFlow } from './DeviceFlow';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
 import { getUserFromGoogleJwt } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
 import { getDbClient } from '../util/db';
-import { completeDeviceFlow } from './DeviceFlow';
 
 // Extended API Gateway Event with cached OAuth data to prevent duplicate processing
 interface ExtendedAPIGatewayEvent extends APIGatewayEvent {

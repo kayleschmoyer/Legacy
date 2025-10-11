@@ -1,9 +1,9 @@
-import { Argv, ArgumentsCamelCase } from 'yargs';
+import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { CommandArgs } from '../utils/loadEnvFile';
-import { runWithInternalClient, getUserByEmail } from '@legacy-sports/db-client';
+import { getUserByEmail, runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-import { sign, SignOptions } from 'jsonwebtoken';
+import { sign } from 'jsonwebtoken';
+import { CommandArgs } from '../utils/loadEnvFile';
 
 export interface GenerateJwtArgs extends CommandArgs {
   email: string;
@@ -90,7 +90,7 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
     }
     
     // Get JWT secret
-    const jwtSecret = await getJwtSecret();
+    const jwtSecret = getJwtSecret();
     
     // Create JWT payload (same format as OAuth proxy)
     const payload = {
@@ -187,7 +187,7 @@ function outputTokenFormat(
 /**
  * Get JWT secret using same method as OAuth proxy
  */
-async function getJwtSecret(): Promise<string> {
+function getJwtSecret(): string {
   try {
     // For development, use a simple secret
     // In production, this would read from AWS Secrets Manager
@@ -198,7 +198,7 @@ async function getJwtSecret(): Promise<string> {
     }
     
     return secret;
-  } catch (error) {
+  } catch {
     LOGGER.warn('⚠️  Could not load JWT secret from environment, using development secret');
     return 'dev-jwt-secret-key-not-for-production-use-only';
   }

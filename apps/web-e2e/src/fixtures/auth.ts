@@ -14,7 +14,7 @@ export const test = base.extend({
     // Only intercept very specific authentication and API endpoints
     // Let all static assets and module scripts load normally
     await page.route('**/oauth/login', route => {
-      route.fulfill({
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -43,7 +43,7 @@ export const test = base.extend({
       const postData = request.postData();
       
       if (postData?.includes('getLeagueById')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -70,7 +70,7 @@ export const test = base.extend({
           }),
         });
       } else if (postData?.includes('startDraft')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -97,7 +97,7 @@ export const test = base.extend({
           }),
         });
       } else if (postData?.includes('getPositionsForLeague')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -111,7 +111,7 @@ export const test = base.extend({
           }),
         });
       } else if (postData?.includes('getTeamMembers')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -122,7 +122,7 @@ export const test = base.extend({
         });
       } else {
         // Let other GraphQL requests pass through
-        route.continue();
+        void route.continue();
       }
     });
 

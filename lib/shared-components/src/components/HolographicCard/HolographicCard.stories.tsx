@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { Button, H3, Paragraph, XStack, YStack } from 'tamagui';
 import { HolographicCard } from './HolographicCard';
-import { H3, Paragraph, XStack, YStack, Button } from 'tamagui';
 
 const meta: Meta<typeof HolographicCard> = {
   title: 'Components/HolographicCard',
@@ -75,7 +75,7 @@ const CardContent = ({ title, subtitle, showButton = false }: {
         fontWeight="600"
         marginTop="$3"
       >
-        ✨ Interact
+        <span role="img" aria-label="Sparkles">✨</span> Interact
       </Button>
     )}
   </YStack>
@@ -198,7 +198,7 @@ export const Interactive: Story = {
       <YStack padding="$6" gap="$4" minHeight={200} justifyContent="space-between">
         <YStack gap="$2">
           <H3 color="$color" fontSize="$8" fontWeight="800">
-            🎮 Interactive Card
+            <span role="img" aria-label="Game controller">🎮</span> Interactive Card
           </H3>
           <Paragraph color="$color11" fontSize="$4" opacity={0.9}>
             Click me to see the interaction! Hover for mouse tracking effects.
@@ -243,7 +243,7 @@ export const Playground: Story = {
       <YStack padding="$6" gap="$4" flex={1} justifyContent="space-between">
         <YStack gap="$3">
           <H3 color="$color" fontSize="$8" fontWeight="800">
-            🌈 Playground
+            <span role="img" aria-label="Rainbow">🌈</span> Playground
           </H3>
           <Paragraph color="$color11" fontSize="$4" opacity={0.9}>
             Adjust the controls above to customize the holographic effects. 

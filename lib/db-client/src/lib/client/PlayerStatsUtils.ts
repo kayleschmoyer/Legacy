@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, lt, gte, isNotNull, count } from 'drizzle-orm';
+import { and, count, gte, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { PublicDb } from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
 import { Player } from '../../types/DatabaseTypes';
@@ -65,7 +65,7 @@ export async function getPlayersWithStaleStats(
  */
 export async function getPlayersNeedingStatsRefresh(
   db: PublicDb,
-  maxAgeHours: number = 24,
+  maxAgeHours = 24,
   limit?: number,
 ): Promise<Player[]> {
   const cutoffDate = new Date();

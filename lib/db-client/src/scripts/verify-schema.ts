@@ -7,8 +7,8 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
 import { Pool } from 'pg';
+import { resolve } from 'path';
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -35,9 +35,9 @@ async function verifyDraftStatusColumn() {
       ) as enum_exists;
     `);
     
-    console.log(`Draft status enum exists: ${enumResult.rows[0].enum_exists}`);
+    console.log(`Draft status enum exists: ${(enumResult.rows[0] as any).enum_exists}`);
     
-    if (enumResult.rows[0].enum_exists) {
+    if ((enumResult.rows[0] as any).enum_exists) {
       // Get enum values
       const enumValues = await pool.query(`
         SELECT enumlabel 
@@ -47,7 +47,7 @@ async function verifyDraftStatusColumn() {
         ORDER BY enumsortorder;
       `);
       
-      console.log('Enum values:', enumValues.rows.map(r => r.enumlabel));
+      console.log('Enum values:', enumValues.rows.map((r: any) => r.enumlabel));
     }
     
     console.log('🔍 Checking for draft_status column in leagues table...');
@@ -62,9 +62,9 @@ async function verifyDraftStatusColumn() {
       ) as column_exists;
     `);
     
-    console.log(`Draft status column exists: ${columnResult.rows[0].column_exists}`);
+    console.log(`Draft status column exists: ${(columnResult.rows[0] as any).column_exists}`);
     
-    if (columnResult.rows[0].column_exists) {
+    if ((columnResult.rows[0] as any).column_exists) {
       // Get column details
       const columnDetails = await pool.query(`
         SELECT column_name, data_type, column_default, is_nullable
@@ -84,7 +84,7 @@ async function verifyDraftStatusColumn() {
     `);
     
     console.log('Applied migrations:');
-    migrationResult.rows.forEach(row => {
+    migrationResult.rows.forEach((row: any) => {
       console.log(`- ${row.hash} (${new Date(row.created_at).toISOString()})`);
     });
     
@@ -95,4 +95,4 @@ async function verifyDraftStatusColumn() {
   }
 }
 
-verifyDraftStatusColumn();
+void verifyDraftStatusColumn();

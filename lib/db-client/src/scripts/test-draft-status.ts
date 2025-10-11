@@ -7,8 +7,8 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
 import { Pool } from 'pg';
+import { resolve } from 'path';
 
 // Load .env from the project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -34,7 +34,7 @@ async function testDraftStatusUpdate() {
     `);
     
     console.log('\n📋 Current leagues:');
-    leagues.rows.forEach(league => {
+    leagues.rows.forEach((league: any) => {
       console.log(`- League ${league.id}: "${league.name}" - Draft Status: ${league.draft_status} (Owner: ${league.owner})`);
     });
     
@@ -44,7 +44,7 @@ async function testDraftStatusUpdate() {
     }
     
     // Pick the first league to test with
-    const testLeague = leagues.rows[0];
+    const testLeague = leagues.rows[0] as any;
     console.log(`\n🎯 Testing with League ${testLeague.id}: "${testLeague.name}"`);
     console.log(`Current draft status: ${testLeague.draft_status}`);
     
@@ -64,7 +64,7 @@ async function testDraftStatusUpdate() {
     `, [testLeague.id]);
     
     if (updatedLeague.rows.length > 0) {
-      const league = updatedLeague.rows[0];
+      const league = updatedLeague.rows[0] as any;
       console.log(`✅ Update successful! New draft status: ${league.draft_status}`);
       
       if (league.draft_status === 'queued') {
@@ -90,7 +90,7 @@ async function testDraftStatusUpdate() {
     `, [testLeague.id]);
     
     if (resetLeague.rows.length > 0) {
-      const league = resetLeague.rows[0];
+      const league = resetLeague.rows[0] as any;
       console.log(`✅ Reset successful! Draft status: ${league.draft_status}`);
     }
     
@@ -103,4 +103,4 @@ async function testDraftStatusUpdate() {
   }
 }
 
-testDraftStatusUpdate();
+void testDraftStatusUpdate();

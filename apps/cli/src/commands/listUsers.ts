@@ -1,6 +1,6 @@
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { runWithInternalClient, InternalSchema } from '@legacy-sports/db-client';
+import { InternalSchema, runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { CommandArgs } from '../utils/loadEnvFile';
 

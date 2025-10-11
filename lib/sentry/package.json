@@ -1,0 +1,15 @@
+{
+  "name": "@legacy-sports/sentry",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "dependencies": {
+    "tslib": "^2.3.0",
+    "@legacy-sports/logging": "*",
+    "@sentry/node": "^7.118.0",
+    "@sentry/react-native": "^7.118.0",
+    "@sentry/browser": "^7.118.0"
+  }
+}

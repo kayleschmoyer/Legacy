@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { XStack, YStack, Text } from 'tamagui';
+import { Text, XStack, YStack } from 'tamagui';
 import { Card, Paragraph, Separator } from './Layout';
 import { Button } from './Button';
 

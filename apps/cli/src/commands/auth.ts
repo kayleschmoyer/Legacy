@@ -81,7 +81,7 @@ async function handleLogin(authService: CLIAuthService): Promise<void> {
   // Check if already authenticated
   if (await authService.isAuthenticated()) {
     const currentUser = await authService.getCurrentUser();
-    const proceed = await promptYesNo(`Already authenticated as ${currentUser?.email}. Login as different user?`);
+    const proceed = promptYesNo(`Already authenticated as ${currentUser?.email}. Login as different user?`);
     
     if (!proceed) {
       LOGGER.info('Authentication cancelled');
@@ -103,7 +103,7 @@ async function handleLogout(authService: CLIAuthService, args: AuthCommandArgs):
       return;
     }
 
-    const proceed = await promptYesNo(`Logout all ${users.length} authenticated user(s)?`);
+    const proceed = promptYesNo(`Logout all ${users.length} authenticated user(s)?`);
     if (!proceed) {
       LOGGER.info('Logout cancelled');
       return;
@@ -129,7 +129,7 @@ async function handleLogout(authService: CLIAuthService, args: AuthCommandArgs):
       return;
     }
 
-    const proceed = await promptYesNo(`Logout user ${currentUser.email}?`);
+    const proceed = promptYesNo(`Logout user ${currentUser.email}?`);
     if (!proceed) {
       LOGGER.info('Logout cancelled');
       return;
@@ -220,7 +220,7 @@ async function handleList(authService: CLIAuthService): Promise<void> {
 /**
  * Simple yes/no prompt (would normally use a proper CLI prompt library)
  */
-async function promptYesNo(message: string): Promise<boolean> {
+function promptYesNo(message: string): boolean {
   // For now, just return true. In a full implementation, you'd use
   // a library like 'inquirer' or 'prompts' for interactive CLI prompts
   LOGGER.info(`${message} (assuming yes for CLI operation)`);

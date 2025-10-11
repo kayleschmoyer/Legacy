@@ -2,14 +2,14 @@ import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import memoizeOne from 'memoize-one';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
 import { LOGGER } from '@legacy-sports/logging';
-import { 
-  getDbOptions, 
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import { getDbOptions } from '@legacy-sports/utils';
+import {
+  addBreadcrumb,
   captureError,
-  addBreadcrumb 
-} from '@legacy-sports/utils';
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import {
   getDbConnection,
   getPlayerByBrefId,
@@ -73,23 +73,27 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       try {
         brefId = JSON.parse(record.body) as string;
       } catch (parseError) {
-        const error = new Error(`Failed to parse message body for record ${record.messageId}`);
+        const error = new Error(
+          `Failed to parse message body for record ${record.messageId}`,
+        );
         LOGGER.error(error.message, parseError as Error);
-        captureError(error, { 
-          messageId: record.messageId, 
+        captureError(error, {
+          messageId: record.messageId,
           messageBody: record.body,
-          originalError: parseError 
+          originalError: parseError instanceof Error ? parseError : new Error(String(parseError)),
         });
         batchItemFailures.push({ itemIdentifier: record.messageId });
         continue;
       }
 
       if (!brefId || typeof brefId !== 'string') {
-        const error = new Error(`Invalid brefId in record ${record.messageId}: ${brefId}`);
+        const error = new Error(
+          `Invalid brefId in record ${record.messageId}: ${brefId}`,
+        );
         LOGGER.error(error.message);
-        captureError(error, { 
-          messageId: record.messageId, 
-          brefId: brefId 
+        captureError(error, {
+          messageId: record.messageId,
+          brefId: brefId,
         });
         batchItemFailures.push({ itemIdentifier: record.messageId });
         continue;
@@ -105,7 +109,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     } catch (error) {
       const errorMessage = `Failed to process record ${record.messageId}`;
       LOGGER.error(errorMessage, error as Error);
-      
+
       // Try to extract brefId from parsed body for error context
       let errorBrefId: string | undefined;
       try {
@@ -113,21 +117,21 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       } catch {
         // Ignore parsing errors in error handler
       }
-      
+
       // Capture error with full context for debugging
       captureError(error as Error, {
         tags: {
           lambda: 'stats-lambda',
-          operation: 'load_career_stats'
+          operation: 'load_career_stats',
         },
         extra: {
           messageId: record.messageId,
           messageBody: record.body,
           brefId: errorBrefId, // Include brefId if we could parse it
-          sqsMessageAttributes: record.messageAttributes
-        }
+          sqsMessageAttributes: record.messageAttributes,
+        },
       });
-      
+
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }
   }
@@ -139,7 +143,9 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   LOGGER.debug(
     `Processed ${event.Records.length} records, ${batchItemFailures.length} failures`,
   );
-  addBreadcrumb(`Completed processing with ${batchItemFailures.length} failures`);
+  addBreadcrumb(
+    `Completed processing with ${batchItemFailures.length} failures`,
+  );
 
   return {
     batchItemFailures,

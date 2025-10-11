@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { 
-  YStack, 
-  XStack, 
-  Text, 
   Button, 
   Card, 
+  Dialog, 
+  H3, 
+  H4, 
   Separator,
   Spinner,
-  H3,
-  H4,
-  Dialog
+  Text,
+  XStack,
+  YStack
 } from 'tamagui';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 
@@ -42,7 +42,7 @@ export const LeagueManagement: React.FC = () => {
 
   const handleFinalConfirm = () => {
     setIsDeleting(true);
-    deleteAllLeagues();
+    void deleteAllLeagues();
   };
 
   return (

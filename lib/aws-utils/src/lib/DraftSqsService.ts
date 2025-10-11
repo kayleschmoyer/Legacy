@@ -50,11 +50,18 @@ export class DraftSqsService {
       });
 
       await this.sqsClient.send(command);
-      
-      LOGGER.info(`Successfully queued draft request for league ${message.leagueId}`);
+
+      LOGGER.info(
+        `Successfully queued draft request for league ${message.leagueId}`,
+      );
     } catch (error) {
-      LOGGER.error('Failed to send draft message to SQS:', error instanceof Error ? error.message : String(error));
-      throw new Error(`Failed to queue draft request: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      LOGGER.error(
+        'Failed to send draft message to SQS:',
+        error instanceof Error ? error.message : String(error),
+      );
+      throw new Error(
+        `Failed to queue draft request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }

@@ -15365,7 +15365,7 @@ function mergeResolvers$1(resolversDefinitions, options) {
   if (resolversDefinitions.length === 1) {
     return resolversDefinitions[0] || {};
   }
-  const resolvers = new Array();
+  const resolvers = [];
   for (let resolversDefinition of resolversDefinitions) {
     if (Array.isArray(resolversDefinition)) {
       resolversDefinition = mergeResolvers$1(resolversDefinition);
@@ -32045,7 +32045,7 @@ function requireMergeResolvers() {
     if (resolversDefinitions.length === 1) {
       return resolversDefinitions[0] || {};
     }
-    const resolvers = new Array();
+    const resolvers = [];
     for (let resolversDefinition of resolversDefinitions) {
       if (Array.isArray(resolversDefinition)) {
         resolversDefinition = mergeResolvers$12(resolversDefinition);
@@ -63969,7 +63969,7 @@ class NormalizedSchema {
           return true;
         }
       } else if (typeof traits === "object") {
-        if (!!traits.idempotencyToken) {
+        if (traits.idempotencyToken) {
           return true;
         }
       }

@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/auth';
+import { expect, test } from '../fixtures/auth';
 
 /**
  * E2E Tests for Draft Status Functionality in Web App
@@ -277,7 +277,7 @@ test.describe('Draft Status Web UI Tests', () => {
 
     // Test keyboard navigation
     await page.keyboard.press('Tab');
-    const focusedElement = await page.locator(':focus').first();
+    const focusedElement = page.locator(':focus').first();
     
     if (await focusedElement.isVisible()) {
       console.log('✅ Keyboard navigation working');

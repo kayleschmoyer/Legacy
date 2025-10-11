@@ -60,12 +60,12 @@ import {
 import { main as testDatabase } from './commands/test-database';
 import { decodeJwtCommandBuilder, handleDecodeJwt } from './commands/decodeJwt';
 import {
-  setUserTypeCommandBuilder,
   handleSetUserType,
+  setUserTypeCommandBuilder,
 } from './commands/setUserType';
 import {
-  listUsersCommandBuilder,
   handleListUsers,
+  listUsersCommandBuilder,
 } from './commands/listUsers';
 import {
   authCommandBuilder,
@@ -84,12 +84,12 @@ import {
   handleGenerateJwt,
 } from './commands/generateJwt';
 import {
-  inspectSqsQueueCommandBuilder,
   handleInspectSqsQueue,
+  inspectSqsQueueCommandBuilder,
 } from './commands/inspectSqsQueue';
 import {
-  startDraftCommandBuilder,
   handleStartDraft,
+  startDraftCommandBuilder,
 } from './commands/startDraft';
 
 async function run(): Promise<void> {

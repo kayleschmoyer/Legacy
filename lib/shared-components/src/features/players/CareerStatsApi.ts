@@ -2,10 +2,10 @@
 // Uses the career statistics queries from the GraphQL schema
 
 import {
-  useGetCareerBattingStatsQuery,
+  CareerBattingFragment,
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables,
-  CareerBattingFragment,
+  useGetCareerBattingStatsQuery,
 } from '../../api/db/graphql.generated';
 
 // Use generated types instead of manual interfaces

@@ -7,13 +7,13 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { 
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import {
+  addBreadcrumb,
   captureError,
-  addBreadcrumb 
-} from '@legacy-sports/utils';
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import { and, eq, exists, not } from 'drizzle-orm';
 import { getDb } from '../utils/db';
 
@@ -115,11 +115,12 @@ async function selectGamesForMatchup(
   }
 }
 
-const baseSelectGameHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  addBreadcrumb(
-    `Processing ${event.Records.length} select game messages`,
-    { recordCount: event.Records.length }
-  );
+const baseSelectGameHandler = async (
+  event: SQSEvent,
+): Promise<SQSBatchResponse> => {
+  addBreadcrumb(`Processing ${event.Records.length} select game messages`, {
+    recordCount: event.Records.length,
+  });
 
   LOGGER.debug('Processing SQS event', { event });
 
@@ -131,15 +132,12 @@ const baseSelectGameHandler = async (event: SQSEvent): Promise<SQSBatchResponse>
     for (const record of event.Records) {
       try {
         const matchup = JSON.parse(record.body) as SelectGameEvent;
-        
-        addBreadcrumb(
-          'Processing select game message',
-          { 
-            messageId: record.messageId,
-            matchupId: matchup.matchupId,
-            game: matchup.game
-          }
-        );
+
+        addBreadcrumb('Processing select game message', {
+          messageId: record.messageId,
+          matchupId: matchup.matchupId,
+          game: matchup.game,
+        });
 
         await selectGamesForMatchup(db.db, matchup.matchupId, matchup.game);
       } catch (err) {
@@ -147,16 +145,16 @@ const baseSelectGameHandler = async (event: SQSEvent): Promise<SQSBatchResponse>
         LOGGER.error('Error processing record', {
           error: err instanceof Error ? err.message : String(err),
         });
-        
+
         captureError(err instanceof Error ? err : new Error(String(err)), {
           tags: {
             lambda: 'game-selection-select-game',
-            operation: 'selectGamesForMatchup'
+            operation: 'selectGamesForMatchup',
           },
           extra: {
             messageId: record.messageId,
-            recordBody: record.body
-          }
+            recordBody: record.body,
+          },
         });
       }
     }

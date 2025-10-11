@@ -1,26 +1,23 @@
-import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
+  Button, 
   Card, 
-  YStack, 
-  XStack, 
-  Button,
-  useAuth
+  useAuth, 
+  XStack,
+  YStack
 } from '@legacy-sports/shared-components';
-import { H1, H2, Text, Spinner } from 'tamagui';
+import { H1, H2, Spinner, Text } from 'tamagui';
+import { gql, useLazyQuery } from '@apollo/client';
 import { 
+  LeaguePositionFragment,
+  TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
-  useUpdateTeamMemberPositionMutation,
   useStartDraftMutation,
-  LeaguePositionFragment,
-  TeamMemberFragment,
-  LeagueFragment,
-  LeagueFragmentDoc,
-  GetLeagueById,
+  useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
-import { useLazyQuery, gql } from '@apollo/client';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
 
 // Manual GraphQL query for getting user's team ID in a league
@@ -97,7 +94,7 @@ function getDraftButtonColor(status?: string | null): string {
   }
 }
 
-function getDraftButtonText(status?: string | null, loading: boolean = false): string {
+function getDraftButtonText(status?: string | null, loading = false): string {
   if (loading) {
     return 'Starting...';
   }
@@ -122,7 +119,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'info' | 'roster' | 'commissioner'>('info');
   const { user } = useAuth();
 
-  const { data, loading, error, refetch } = useGetLeagueByIdQuery({
+  const { data, loading, error } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId),
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
@@ -156,7 +153,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(leagueId) && user?.id) {
-      getUserTeamId({
+      void getUserTeamId({
         variables: { leagueId },
         onCompleted: (data) => {
           console.log('🏀 User team ID query completed:', data);
@@ -215,11 +212,11 @@ export function LeagueDetailPage(): React.JSX.Element {
       return;
     }
 
-    if (confirm('Are you sure you want to start the draft? This will randomly assign players to all teams.')) {
+    if (window.confirm('Are you sure you want to start the draft? This will randomly assign players to all teams.')) {
       console.log('✅ User confirmed, calling startDraft mutation');
       console.log('🎯 Variables:', { leagueId, draftType: 'random-draft' });
       
-      startDraft({
+      void startDraft({
         variables: {
           leagueId: leagueId,
           draftType: 'random-draft'
@@ -231,11 +228,16 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [startDraft, leagueId, isCommissioner, user, data?.league]);
 
   const handlePlayerAssign = useCallback(async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+    if (!player.id) {
+      console.error('Player ID is required');
+      return;
+    }
+    
     try {
       await updateTeamMemberPosition({
         variables: {
-          teamMemberId: player.id!,
-          positionId: position.id!,
+          teamMemberId: player.id,
+          positionId: position.id,
         },
       });
     } catch (error) {
@@ -396,8 +398,8 @@ export function LeagueDetailPage(): React.JSX.Element {
     <LeagueRosterManagement
       positions={positions}
       teamPlayers={teamMembers}
-      onPlayerAssign={handlePlayerAssign}
-      onPlayerRemove={handlePlayerRemove}
+      onPlayerAssign={(player, position) => void handlePlayerAssign(player, position)}
+      onPlayerRemove={(player) => void handlePlayerRemove(player)}
       loading={positionsLoading || teamMembersLoading || userTeamLoading}
     />
   );
@@ -437,7 +439,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
         <YStack space="$3">
           <H2 size="$5" color="$yellow11">
-            ⚠️ Commissioner Features
+            <span role="img" aria-label="Warning">⚠️</span> Commissioner Features
           </H2>
           <Text color="$yellow11" fontSize="$4">
             Additional commissioner features like member management, league settings, 

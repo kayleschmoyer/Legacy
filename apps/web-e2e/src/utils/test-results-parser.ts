@@ -33,7 +33,7 @@ interface TestSuite {
   };
 }
 
-function parseTestResults(jsonPath: string = './test-results/results.json'): TestSuite[] {
+function parseTestResults(jsonPath = './test-results/results.json'): TestSuite[] {
   try {
     const resultsJson = readFileSync(jsonPath, 'utf8');
     const results = JSON.parse(resultsJson);
@@ -44,7 +44,7 @@ function parseTestResults(jsonPath: string = './test-results/results.json'): Tes
     const suiteMap = new Map<string, TestResult[]>();
     
     // Recursive function to process nested suites and specs
-    function processSuite(suite: any, parentName: string = ''): void {
+    function processSuite(suite: any, parentName = ''): void {
       const suiteName = suite.title || 'Unnamed Suite';
       const fullSuiteName = parentName ? `${parentName} › ${suiteName}` : suiteName;
       
@@ -71,7 +71,7 @@ function parseTestResults(jsonPath: string = './test-results/results.json'): Tes
             };
           }
           
-          suiteMap.get(fullSuiteName)!.push(testResult);
+          suiteMap.get(fullSuiteName).push(testResult);
         }
       }
       

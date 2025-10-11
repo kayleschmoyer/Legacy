@@ -1,6 +1,1 @@
-import { pgTable } from "drizzle-orm/pg-core"
-  import { sql } from "drizzle-orm"
-
-
-
-
+// Empty schema file - will be populated by drizzle migrations

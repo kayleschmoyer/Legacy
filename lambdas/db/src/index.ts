@@ -8,15 +8,15 @@ import {
   APIGatewayProxyResult,
   Context,
 } from 'aws-lambda';
-import { 
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import {
+  addBreadcrumb,
   captureError,
-  addBreadcrumb 
-} from '@legacy-sports/utils';
-import { schema } from './schema';
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { schema } from './schema';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -136,11 +136,11 @@ const server = new ApolloServer({
   plugins: [
     // Enable GraphQL Playground/Studio in non-production environments
     process.env.NODE_ENV !== 'production'
-      ? ApolloServerPluginLandingPageLocalDefault({ 
+      ? ApolloServerPluginLandingPageLocalDefault({
           embed: true,
-          includeCookies: true
+          includeCookies: true,
         })
-      : ApolloServerPluginLandingPageLocalDefault({ footer: false })
+      : ApolloServerPluginLandingPageLocalDefault({ footer: false }),
   ],
 });
 
@@ -151,20 +151,24 @@ const baseHandler = startServerAndCreateLambdaHandler(
   {
     context: async ({ event }) => {
       // Extract JWT from Authorization header
-      const authorization = event.headers.authorization || event.headers.Authorization;
+      const authorization =
+        event.headers.authorization || event.headers.Authorization;
       let user = null;
 
       if (authorization && authorization.startsWith('Bearer ')) {
         try {
           const token = authorization.substring(7); // Remove 'Bearer ' prefix
-          
+
           // Decode JWT payload (simple base64 decode - no signature verification for lambda)
           const parts = token.split('.');
           if (parts.length === 3) {
             const payload = JSON.parse(
-              Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+              Buffer.from(
+                parts[1].replace(/-/g, '+').replace(/_/g, '/'),
+                'base64',
+              ).toString(),
             );
-            
+
             user = {
               id: payload.id,
               email: payload.email,
@@ -179,7 +183,7 @@ const baseHandler = startServerAndCreateLambdaHandler(
 
       return { user };
     },
-  }
+  },
 );
 
 // Base Lambda handler with proper CORS and error handling
@@ -280,14 +284,14 @@ const baseGraphQLHandler = async (
     };
   } catch (error) {
     console.error('Lambda handler error:', error);
-    
+
     // Capture error with request context
     captureError(error as Error, {
       httpMethod: event.httpMethod,
       path: event.path,
       query: event.queryStringParameters,
       headers: event.headers,
-      operation: 'graphql_request'
+      operation: 'graphql_request',
     });
 
     return {

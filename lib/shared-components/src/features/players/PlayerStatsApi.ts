@@ -3,9 +3,6 @@ import {
   GetAllPlayers,
   type GetAllPlayersQuery,
   type GetAllPlayersQueryVariables,
-  GetCareerBattingStats,
-  type GetCareerBattingStatsQuery,
-  type GetCareerBattingStatsQueryVariables,
 } from '../../api/db/graphql.generated';
 
 // Local interface definition (TODO: Import from PlayerStatsTypes when import issue is resolved)

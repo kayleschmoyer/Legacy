@@ -49,7 +49,6 @@
         "typecheckTargetName": "typecheck"
       }
     },
-
     {
       "plugin": "@nx/storybook/plugin",
       "options": {

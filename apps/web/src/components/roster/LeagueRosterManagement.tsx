@@ -48,11 +48,7 @@ function RosterSlot({
   onPlayerSelect,
   isSelected = false,
 }: RosterSlotProps): React.JSX.Element {
-  const eligiblePlayers = useMemo(() => {
-    return availablePlayers.filter(player => 
-      player && player.id && canPlayerPlayPosition(player, position)
-    );
-  }, [availablePlayers, position]);
+
 
   const handleSlotPress = useCallback(() => {
     if (assignedPlayer) {

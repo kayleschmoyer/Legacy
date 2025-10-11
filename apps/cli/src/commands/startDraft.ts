@@ -1,8 +1,8 @@
-import { Argv, ArgumentsCamelCase } from 'yargs';
+import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
+import { DraftService } from '@legacy-sports/db-client';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
-import { DraftService } from '@legacy-sports/db-client';
 
 export interface StartDraftArgs extends CommandArgs {
   leagueId: number;

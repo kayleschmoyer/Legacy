@@ -6,9 +6,9 @@ import { proxySqsToExpress } from '@legacy-sports/utils';
 import { handler } from './load-career';
 import {
   getPlayersForRefresh,
-  getRefreshSummary,
-  getPlayersWithoutAnyStats,
   getPlayersWithOldStats,
+  getPlayersWithoutAnyStats,
+  getRefreshSummary,
 } from './stats-refresh-utils';
 
 const PORT = 5002;

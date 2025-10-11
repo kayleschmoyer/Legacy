@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Adapt, Button, Dialog, Input, Popover, Sheet, Text, XStack, YStack } from 'tamagui';
+import { Button, Popover, Text, XStack, YStack } from 'tamagui';
 import { Calendar, ChevronLeft, ChevronRight } from '@tamagui/lucide-icons';
 import { Platform } from '../platform-components';
 
@@ -164,12 +164,8 @@ export function DatePicker({
           justifyContent="space-between"
           disabled={disabled}
           pressStyle={{ opacity: 0.8 }}
-          onPress={(e: any) => {
-            // Prevent form submission on web
-            if (Platform.OS === 'web') {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
-            }
+          onPress={() => {
+            // Prevent form submission on web - simplified without event handling
             console.log('DatePicker trigger pressed, opening calendar');
             setIsOpen(!isOpen);
           }}
@@ -205,9 +201,7 @@ export function DatePicker({
             <Button
               size="$2"
               chromeless
-              onPress={(e: any) => {
-                e?.preventDefault?.();
-                e?.stopPropagation?.();
+              onPress={() => {
                 navigateMonth('prev');
               }}
               pressStyle={{ opacity: 0.7 }}
@@ -222,9 +216,7 @@ export function DatePicker({
             <Button
               size="$2"
               chromeless
-              onPress={(e: any) => {
-                e?.preventDefault?.();
-                e?.stopPropagation?.();
+              onPress={() => {
                 navigateMonth('next');
               }}
               pressStyle={{ opacity: 0.7 }}
@@ -267,9 +259,7 @@ export function DatePicker({
                         }
                         opacity={currentMonthDay ? 1 : 0.3}
                         disabled={disabled}
-                        onPress={(e: any) => {
-                          e?.preventDefault?.();
-                          e?.stopPropagation?.();
+                        onPress={() => {
                           selectDate(date);
                         }}
                         pressStyle={{ opacity: 0.7 }}
@@ -296,9 +286,7 @@ export function DatePicker({
           <Button
             size="$2"
             chromeless
-            onPress={(e: any) => {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
+            onPress={() => {
               const today = new Date();
               if (!isDateDisabled(today)) {
                 selectDate(today);

@@ -19,8 +19,8 @@
     "@legacy-sports/db-client": "*",
     "@legacy-sports/env-utilities": "*",
     "@legacy-sports/logging": "*",
-    "@legacy-sports/utils": "*",
-    "@sentry/node": "^7.118.0"
+    "@legacy-sports/sentry": "*",
+    "@legacy-sports/utils": "*"
   },
   "devDependencies": {
     "tsx": "*"

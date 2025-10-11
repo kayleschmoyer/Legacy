@@ -14,9 +14,9 @@ import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { DateTimePicker } from '@legacy-sports/shared-components';
 import {
-  useCreateLeagueMutation,
   CreateLeagueMutation,
   CreateLeagueMutationVariables,
+  useCreateLeagueMutation,
 } from '../../../../api/db/graphql.generated';
 
 // Types
@@ -119,7 +119,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             numberOfTeams: formData.numberOfTeams,
             draftType: formData.draftType,
             maxRosterSize: formData.maxRosterSize, // User-selected roster size
-            startDate: formData.draftDate!.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            startDate: formData.draftDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
             // Optional fields can be added as needed:
             // isPublic: false,
             // tradingEnabled: true,

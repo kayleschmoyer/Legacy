@@ -16,8 +16,7 @@ export interface HolographicCardProps {
   className?: string;
   /** Click handler */
   onPress?: () => void;
-  /** Additional props */
-  [key: string]: any;
+
 }
 
 const StyledCard = styled(Card, {

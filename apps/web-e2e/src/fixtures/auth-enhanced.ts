@@ -35,7 +35,7 @@ export const test = base.extend({
 
     // Keep existing route interceptors for OAuth endpoints
     await page.route('**/oauth/login', route => {
-      route.fulfill({
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -64,7 +64,7 @@ export const test = base.extend({
       const postData = request.postData();
       
       if (postData?.includes('getLeagueById')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -84,7 +84,7 @@ export const test = base.extend({
       }
 
       if (postData?.includes('currentUser')) {
-        route.fulfill({
+        void route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -103,7 +103,7 @@ export const test = base.extend({
       }
 
       // Default GraphQL response
-      route.fulfill({
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -146,7 +146,7 @@ export const adminTest = base.extend({
 
     // Same route setup as regular test
     await page.route('**/oauth/login', route => {
-      route.fulfill({
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({

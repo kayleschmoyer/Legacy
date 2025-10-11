@@ -8,14 +8,14 @@ import {
   PublicDb,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { 
-  getDbOptions,
-  getSentryConfigFromEnv, 
-  initSentry, 
-  withSentry, 
+import { getDbOptions } from '@legacy-sports/utils';
+import {
+  addBreadcrumb,
   captureError,
-  addBreadcrumb 
-} from '@legacy-sports/utils';
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent } from 'aws-lambda';
 
 // Initialize Sentry
@@ -61,11 +61,12 @@ async function createMatchup(
   }
 }
 
-const baseCreateMatchupHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  addBreadcrumb(
-    `Processing ${event.Records.length} create matchup messages`,
-    { recordCount: event.Records.length }
-  );
+const baseCreateMatchupHandler = async (
+  event: SQSEvent,
+): Promise<SQSBatchResponse> => {
+  addBreadcrumb(`Processing ${event.Records.length} create matchup messages`, {
+    recordCount: event.Records.length,
+  });
 
   const options = getDbOptions();
   const db = getPublicDbConnection(options);
@@ -78,30 +79,27 @@ const baseCreateMatchupHandler = async (event: SQSEvent): Promise<SQSBatchRespon
     for (const record of event.Records) {
       try {
         const matchup = JSON.parse(record.body) as CreateMatchupEvent;
-        
-        addBreadcrumb(
-          'Processing create matchup message',
-          { 
-            messageId: record.messageId,
-            league: matchup.league,
-            week: matchup.week
-          }
-        );
+
+        addBreadcrumb('Processing create matchup message', {
+          messageId: record.messageId,
+          league: matchup.league,
+          week: matchup.week,
+        });
 
         await createMatchup(db.db, matchup);
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
         LOGGER.error(err instanceof Error ? err.message : String(err));
-        
+
         captureError(err instanceof Error ? err : new Error(String(err)), {
           tags: {
             lambda: 'game-selection-create-matchup',
-            operation: 'createMatchup'
+            operation: 'createMatchup',
           },
           extra: {
             messageId: record.messageId,
-            recordBody: record.body
-          }
+            recordBody: record.body,
+          },
         });
       }
     }

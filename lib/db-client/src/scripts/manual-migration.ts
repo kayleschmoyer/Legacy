@@ -7,8 +7,8 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
 import { Pool } from 'pg';
+import { resolve } from 'path';
 import { readFileSync } from 'fs';
 
 // Load .env from the project root
@@ -51,7 +51,7 @@ async function runMigration0006() {
         WHERE typname = 'draft_status'
       ) as enum_exists;
     `);
-    console.log(`Enum exists: ${enumCheck.rows[0].enum_exists}`);
+    console.log(`Enum exists: ${(enumCheck.rows[0] as any).enum_exists}`);
     
     console.log('🔍 Verifying column was added...');
     const columnCheck = await pool.query(`
@@ -62,7 +62,7 @@ async function runMigration0006() {
         AND column_name = 'draft_status'
       ) as column_exists;
     `);
-    console.log(`Column exists: ${columnCheck.rows[0].column_exists}`);
+    console.log(`Column exists: ${(columnCheck.rows[0] as any).column_exists}`);
     
   } catch (error) {
     console.error('❌ Error running migration:', error);
@@ -71,4 +71,4 @@ async function runMigration0006() {
   }
 }
 
-runMigration0006();
+void runMigration0006();

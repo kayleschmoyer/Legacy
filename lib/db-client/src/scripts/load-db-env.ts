@@ -68,4 +68,4 @@ async function loadDbCredentialsToEnv() {
   }
 }
 
-loadDbCredentialsToEnv();
+void loadDbCredentialsToEnv();

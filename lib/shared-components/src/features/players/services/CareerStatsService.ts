@@ -8,20 +8,14 @@
  * @since 2025-09-28
  */
 
-import { useLazyQuery, useQuery } from '@apollo/client';
 import * as React from 'react';
 import {
-  GetCareerBattingStats,
+  CareerBattingFragment,
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables,
-  useGetCareerBattingStatsQuery,
-  useGetCareerBattingStatsLazyQuery,
-  GetAllPlayers,
-  GetAllPlayersQuery,
-  GetAllPlayersQueryVariables,
-  useGetAllPlayersQuery,
-  CareerBattingFragment,
   PlayerFragment,
+  useGetCareerBattingStatsLazyQuery,
+  useGetCareerBattingStatsQuery,
 } from '../../../api/db/graphql.generated';
 
 // =============================================================================
@@ -174,21 +168,6 @@ function safeNumber(value: number | null | undefined, fallback = 0): number {
   return value ?? fallback;
 }
 
-/**
- * Safely converts a BigInt string to a number with fallback
- * GraphQL BigInt fields are serialized as strings and need conversion
- *
- * @param value - The string representation of a BigInt or null
- * @param fallback - Fallback value (default: 0)
- * @returns Converted number
- */
-function safeBigIntToNumber(value: string | null | undefined, fallback = 0): number {
-  if (value === null || value === undefined || value === '') {
-    return fallback;
-  }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? fallback : parsed;
-}
 
 /**
  * Parse positions played JSON string into a structured object
@@ -401,7 +380,7 @@ export function useCareerStatsService(
   const transformedData: PlayerCareerStats[] =
     data?.careerBattingStats?.edges?.map((edge) =>
       edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null
-    ).filter(Boolean) as PlayerCareerStats[] ?? [];
+    ).filter((item): item is PlayerCareerStats => item !== null) ?? [];
 
   // Extract pagination metadata from connection
   const totalCount = data?.careerBattingStats?.totalCount ?? 0;
@@ -454,7 +433,7 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
 
     return statsData.careerBattingStats.edges.map((edge) => {
       return edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null;
-    }).filter(Boolean) as PlayerCareerStats[];
+    }).filter((item): item is PlayerCareerStats => item !== null);
   }, [statsData]);
 
   // Extract pagination metadata from connection

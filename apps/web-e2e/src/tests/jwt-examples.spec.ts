@@ -1,4 +1,4 @@
-import { test, expect, adminTest, createCustomAuthTest } from '../fixtures/auth-enhanced';
+import { adminTest, createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
 import { E2EAuth, E2EJwtUtil } from '../utils/jwt';
 
 /**
@@ -108,7 +108,7 @@ test.describe('Dynamic JWT Tests', () => {
 
 // JWT validation tests
 test.describe('JWT Validation', () => {
-  test('should validate JWT format', async ({ page }) => {
+  test('should validate JWT format', ({ page }) => {
     const jwt = E2EAuth.generateUserJwt();
     
     // Test the utility functions
@@ -119,7 +119,7 @@ test.describe('JWT Validation', () => {
     expect(payload.accessLevel).toBe('none');
   });
 
-  test('should handle multiple test users', async ({ page }) => {
+  test('should handle multiple test users', ({ page }) => {
     const jwts = E2EJwtUtil.generateTestJwts('30m');
     
     // Verify we got JWTs for all user types
@@ -137,7 +137,7 @@ test.describe('JWT Validation', () => {
 
 // Performance test with JWT generation
 test.describe('JWT Performance', () => {
-  test('should generate JWTs efficiently', async ({ page }) => {
+  test('should generate JWTs efficiently', ({ page }) => {
     const startTime = Date.now();
     
     // Generate multiple JWTs

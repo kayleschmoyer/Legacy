@@ -1,6 +1,6 @@
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { runWithInternalClient, InternalSchema } from '@legacy-sports/db-client';
+import { InternalSchema, runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { eq, sql } from 'drizzle-orm';
 import { CommandArgs } from '../utils/loadEnvFile';
@@ -52,7 +52,7 @@ export async function handleSetUserType(
       LOGGER.info(`🔐 Current access level: ${user.accessLevel}`);
 
       // Update the user's access level using raw SQL
-      const updateResult = await db.execute(
+      await db.execute(
         sql`UPDATE "app_internal"."users" 
             SET "access_level" = ${type}::app_internal.access_level 
             WHERE "email" = ${email} 
