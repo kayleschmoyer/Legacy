@@ -431,7 +431,9 @@ export function PlayerStatsDataGrid({
    * Handles manual refresh
    */
   const handleRefresh = useCallback(() => {
-    void refetch();
+    if (refetch) {
+      void refetch();
+    }
   }, [refetch]);
 
   // =============================================================================
@@ -835,10 +837,10 @@ export function PlayerStatsDataGrid({
           <AlertCircle size={32} color="$red10" />
           <H3 color="$red11">Error Loading Statistics</H3>
           <Text color="$red10" textAlign="center">
-            {error.message ||
-              'An unexpected error occurred while loading player data.'}
+            {error?.message ||
+              'Failed to load player statistics'}
           </Text>
-          <Button theme="red" onPress={handleRefresh}>
+          <Button onPress={handleRefresh}>
             <Text>Try Again</Text>
           </Button>
         </YStack>
