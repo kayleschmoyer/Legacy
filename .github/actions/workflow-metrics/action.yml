@@ -187,16 +187,7 @@ runs:
             BENCHMARK_STATUS="slower-than-expected"
           fi
           
-          BENCHMARK_COMPARISON=$(cat << EOF
-          {
-            "expected_duration": $EXPECTED_DURATION,
-            "actual_duration": $WORKFLOW_DURATION,
-            "performance_ratio": $PERFORMANCE_RATIO,
-            "status": "$BENCHMARK_STATUS",
-            "variance_seconds": $((WORKFLOW_DURATION - EXPECTED_DURATION))
-          }
-          EOF
-          )
+          BENCHMARK_COMPARISON=$(printf '%s' "{\"expected_duration\":$EXPECTED_DURATION,\"actual_duration\":$WORKFLOW_DURATION,\"performance_ratio\":$PERFORMANCE_RATIO,\"status\":\"$BENCHMARK_STATUS\",\"variance_seconds\":$((WORKFLOW_DURATION - EXPECTED_DURATION))}")
         fi
         
         # Count affected components if provided
@@ -206,24 +197,7 @@ runs:
         fi
         
         # Create comprehensive metrics summary
-        METRICS_SUMMARY=$(cat << EOF
-        {
-          "duration": {
-            "total_seconds": $WORKFLOW_DURATION,
-            "category": "$PERFORMANCE_CATEGORY",
-            "efficiency_score": $EFFICIENCY_SCORE
-          },
-          "execution": {
-            "mode": "$EXECUTION_MODE",
-            "strategy": "$EXECUTION_STRATEGY",
-            "agents": "$OPTIMAL_AGENTS",
-            "affected_components": $COMPONENT_COUNT
-          },
-          "benchmarks": $BENCHMARK_COMPARISON,
-          "recommendations": [$(printf '"%s",' "${RECOMMENDATIONS[@]}" | sed 's/,$//')]
-        }
-        EOF
-        )
+        METRICS_SUMMARY=$(printf '%s' "{\"duration\":{\"total_seconds\":$WORKFLOW_DURATION,\"category\":\"$PERFORMANCE_CATEGORY\",\"efficiency_score\":$EFFICIENCY_SCORE},\"execution\":{\"mode\":\"$EXECUTION_MODE\",\"strategy\":\"$EXECUTION_STRATEGY\",\"agents\":\"$OPTIMAL_AGENTS\",\"affected_components\":$COMPONENT_COUNT},\"benchmarks\":$BENCHMARK_COMPARISON,\"recommendations\":[$(printf '\"%s\",' \"\${RECOMMENDATIONS[@]}\" | sed 's/,\$//')]}")
         
         # Set outputs
         echo "workflow-duration=$WORKFLOW_DURATION" >> $GITHUB_OUTPUT
@@ -233,9 +207,8 @@ runs:
         echo "benchmark-comparison=$(echo "$BENCHMARK_COMPARISON" | jq -c .)" >> $GITHUB_OUTPUT
         
         # Set recommendations output
-        echo "recommendations<<EOF" >> $GITHUB_OUTPUT
-        printf '%s\n' "${RECOMMENDATIONS[@]}" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        RECOMMENDATIONS_STR=$(printf '%s\n' "${RECOMMENDATIONS[@]}")
+        echo "recommendations=$RECOMMENDATIONS_STR" >> $GITHUB_OUTPUT
         
         # Create detailed step summary
         echo "## ⏱️ Workflow Performance Metrics" >> $GITHUB_STEP_SUMMARY

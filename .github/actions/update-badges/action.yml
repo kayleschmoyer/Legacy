@@ -59,18 +59,7 @@ runs:
           local color="$4"
           local run_url="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
           
-          cat > "${step_name}.json" << EOF
-        {
-          "schemaVersion": 1,
-          "label": "${step_name}",
-          "message": "${message}",
-          "color": "${color}",
-          "namedLogo": "github",
-          "logoColor": "white",
-          "style": "flat",
-          "cacheSeconds": 300
-        }
-        EOF
+          printf '%s\n' "{\"schemaVersion\":1,\"label\":\"${step_name}\",\"message\":\"${message}\",\"color\":\"${color}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${step_name}.json"
         }
         
         # Function to determine status color

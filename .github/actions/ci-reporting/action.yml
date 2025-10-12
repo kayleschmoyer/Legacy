@@ -74,32 +74,16 @@ runs:
         # Create comprehensive report JSON
         TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
-        cat > ci-report.json << EOF
-        {
-          "pipeline": {
-            "status": "$STATUS",
-            "timestamp": "$TIMESTAMP",
-            "duration_seconds": "$WORKFLOW_DURATION",
-            "trigger": "$EVENT_NAME",
-            "execution_mode": "$EXECUTION_MODE",
-            "agents_used": "$OPTIMAL_AGENTS",
-            "fallback_reason": "$FALLBACK_REASON"
-          },
-          "performance": {
-            "mode_used": "$EXECUTION_MODE",
-            "agent_count": "$OPTIMAL_AGENTS",
-            "duration_category": "$(
-              if [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -gt 1200 ]; then
-                echo "slow"
-              elif [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -lt 600 ]; then
-                echo "fast"
-              else
-                echo "normal"
-              fi
-            )"
-          }
-        }
-        EOF
+        # Determine duration category first
+        if [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -gt 1200 ]; then
+          DURATION_CATEGORY="slow"
+        elif [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -lt 600 ]; then
+          DURATION_CATEGORY="fast"
+        else
+          DURATION_CATEGORY="normal"
+        fi
+        
+        printf '%s\n' "{\"pipeline\":{\"status\":\"$STATUS\",\"timestamp\":\"$TIMESTAMP\",\"duration_seconds\":\"$WORKFLOW_DURATION\",\"trigger\":\"$EVENT_NAME\",\"execution_mode\":\"$EXECUTION_MODE\",\"agents_used\":\"$OPTIMAL_AGENTS\",\"fallback_reason\":\"$FALLBACK_REASON\"},\"performance\":{\"mode_used\":\"$EXECUTION_MODE\",\"agent_count\":\"$OPTIMAL_AGENTS\",\"duration_category\":\"$DURATION_CATEGORY\"}}" > ci-report.json
         
         echo "report-generated=true" >> $GITHUB_OUTPUT
         

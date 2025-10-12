@@ -105,38 +105,21 @@ runs:
             PERFORMANCE_RATING="needs optimization"
           fi
           
-          PERFORMANCE_SUMMARY=$(cat << 'EOF'
-{
-  "duration_seconds": WORKFLOW_DURATION_VAL,
-  "duration_category": "PERFORMANCE_CATEGORY_VAL",
-  "rating": "PERFORMANCE_RATING_VAL",
-  "benchmark": {
-    "fast_threshold": 300,
-    "slow_threshold": 1200,
-    "current_duration": WORKFLOW_DURATION_VAL
-  }
-}
-EOF
-          )
-          
-          # Replace template values
-          PERFORMANCE_SUMMARY=$(echo "$PERFORMANCE_SUMMARY" | \
-            sed "s/WORKFLOW_DURATION_VAL/$WORKFLOW_DURATION/g" | \
-            sed "s/PERFORMANCE_CATEGORY_VAL/$PERFORMANCE_CATEGORY/g" | \
-            sed "s/PERFORMANCE_RATING_VAL/$PERFORMANCE_RATING/g")
+          # Create performance summary JSON
+          PERFORMANCE_SUMMARY=$(printf '{
+            "duration_seconds": %s,
+            "duration_category": "%s", 
+            "rating": "%s",
+            "benchmark": {
+              "fast_threshold": 300,
+              "slow_threshold": 1200,
+              "current_duration": %s
+            }
+          }' "$WORKFLOW_DURATION" "$PERFORMANCE_CATEGORY" "$PERFORMANCE_RATING" "$WORKFLOW_DURATION")
         fi
         
         # Create enhanced step results with metadata
-        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$WORKFLOW_DURATION" --arg status "$OVERALL_STATUS" '
-          . + {
-            "metadata": {
-              "overall_status": $status,
-              "workflow_duration": $duration,
-              "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
-              "total_steps": (. | length)
-            }
-          }
-        ')
+        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$WORKFLOW_DURATION" --arg status "$OVERALL_STATUS" '. + {"metadata": {"overall_status": $status, "workflow_duration": $duration, "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")), "total_steps": (. | length)}}')
         
         # Set outputs
         echo "step-results=$(echo "$ENHANCED_RESULTS" | jq -c .)" >> $GITHUB_OUTPUT

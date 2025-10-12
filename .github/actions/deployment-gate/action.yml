@@ -166,25 +166,27 @@ runs:
         fi
         
         # Create comprehensive readiness summary
-        READINESS_SUMMARY=$(cat << EOF
-        {
-          "ready": "$DEPLOYMENT_READY",
-          "environment": "$ENVIRONMENT",
-          "strategy": "$DEPLOYMENT_STRATEGY",
+        READINESS_SUMMARY=$(printf '{
+          "ready": "%s",
+          "environment": "%s", 
+          "strategy": "%s",
           "prerequisites": {
-            "quality_passed": $QUALITY_PASSED,
-            "artifacts_ready": "$ARTIFACTS_READY"
+            "quality_passed": %s,
+            "artifacts_ready": "%s"
           },
           "components": {
-            "required": [$(printf '"%s",' "${REQUIRED_COMP_ARRAY[@]}" | sed 's/,$//')],
-            "affected": [$(printf '"%s",' "${AFFECTED_COMPONENTS[@]}" | sed 's/,$//')],
-            "missing": [$(printf '"%s",' "${MISSING_COMPONENTS[@]}" | sed 's/,$//')]
+            "required": [%s],
+            "affected": [%s],
+            "missing": [%s]
           },
-          "artifacts": [$(printf '"%s",' "${REQUIRED_ARTIFACTS[@]}" | sed 's/,$//')],
-          "issues": [$(printf '"%s",' "${READINESS_ISSUES[@]}" | sed 's/,$//')]
-        }
-        EOF
-        )
+          "artifacts": [%s],
+          "issues": [%s]
+        }' "$DEPLOYMENT_READY" "$ENVIRONMENT" "$DEPLOYMENT_STRATEGY" "$QUALITY_PASSED" "$ARTIFACTS_READY" \
+        "$(printf '"%s",' "${REQUIRED_COMP_ARRAY[@]}" | sed 's/,$//')" \
+        "$(printf '"%s",' "${AFFECTED_COMPONENTS[@]}" | sed 's/,$//')" \
+        "$(printf '"%s",' "${MISSING_COMPONENTS[@]}" | sed 's/,$//')" \
+        "$(printf '"%s",' "${REQUIRED_ARTIFACTS[@]}" | sed 's/,$//')" \
+        "$(printf '"%s",' "${READINESS_ISSUES[@]}" | sed 's/,$//')")
         
         # Set outputs
         echo "deployment-ready=$DEPLOYMENT_READY" >> $GITHUB_OUTPUT

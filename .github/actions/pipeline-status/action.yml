@@ -145,35 +145,14 @@ runs:
         fi
         
         # Create comprehensive completion summary
-        COMPLETION_SUMMARY=$(cat << EOF
-        {
-          "status": "$OVERALL_STATUS",
-          "event": "$EVENT_NAME",
-          "performance": {
-            "duration_seconds": "$WORKFLOW_DURATION",
-            "execution_mode": "$EXECUTION_MODE",
-            "strategy": "$EXECUTION_STRATEGY",
-            "context": "$PERFORMANCE_CONTEXT"
-          },
-          "deployment": {
-            "ready": "$DEPLOYMENT_READY",
-            "strategy": "$DEPLOYMENT_STRATEGY"
-          },
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        }
-        EOF
-        )
+        COMPLETION_SUMMARY=$(printf '%s' "{\"status\":\"$OVERALL_STATUS\",\"event\":\"$EVENT_NAME\",\"performance\":{\"duration_seconds\":\"$WORKFLOW_DURATION\",\"execution_mode\":\"$EXECUTION_MODE\",\"strategy\":\"$EXECUTION_STRATEGY\",\"context\":\"$PERFORMANCE_CONTEXT\"},\"deployment\":{\"ready\":\"$DEPLOYMENT_READY\",\"strategy\":\"$DEPLOYMENT_STRATEGY\"},\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}")
         
         # Set outputs
-        echo "status-message<<EOF" >> $GITHUB_OUTPUT
-        echo -e "$STATUS_MESSAGE" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        echo "status-message=$STATUS_MESSAGE" >> $GITHUB_OUTPUT
         
         echo "completion-summary=$(echo "$COMPLETION_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
         
-        echo "next-steps<<EOF" >> $GITHUB_OUTPUT
-        echo -e "$NEXT_STEPS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        echo "next-steps=$NEXT_STEPS" >> $GITHUB_OUTPUT
         
         # Create step summary
         echo "## 🎯 Pipeline Completion Summary" >> $GITHUB_STEP_SUMMARY

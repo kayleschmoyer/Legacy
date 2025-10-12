@@ -100,9 +100,7 @@ runs:
           echo "$task_output"
           
           # Capture error output for PR commenting
-          echo "error_output<<EOF" >> $GITHUB_OUTPUT
-          echo "$task_output" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "error_output=$task_output" >> $GITHUB_OUTPUT
           
           # If we were using Nx Cloud and it failed, try local fallback as last resort
           if [ "${NX_LOCAL_FALLBACK}" != "true" ] && [ "${NX_CLOUD_DISTRIBUTED_EXECUTION}" = "true" ]; then
@@ -127,10 +125,8 @@ runs:
               echo "$local_output"
               
               # Update error output with local fallback result
-              echo "error_output<<EOF" >> $GITHUB_OUTPUT
-              echo "Nx Cloud execution failed, local fallback also failed:" >> $GITHUB_OUTPUT
-              echo "$local_output" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
+              ERROR_MSG="Nx Cloud execution failed, local fallback also failed: $local_output"
+              echo "error_output=$ERROR_MSG" >> $GITHUB_OUTPUT
               
               exit 1
             fi
