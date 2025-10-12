@@ -48,6 +48,19 @@ updates:
       - dependency-name: "expo"
         update-types: ["version-update:semver-major"]
 
+      # Metro ecosystem - pinned for Expo SDK 53 / React Native 0.79.6 compatibility
+      # These versions are specifically pinned to prevent TerminalReporter export conflicts
+      - dependency-name: "metro"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "metro-config"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@expo/metro-config"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@expo/cli"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@react-native/metro-config"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
       # Storybook - major updates often require migration
       - dependency-name: "@storybook/react"
         update-types: ["version-update:semver-major"]
@@ -76,6 +89,7 @@ updates:
           - "patch"
 
       # React Native ecosystem - very sensitive to version mismatches
+      # Metro dependencies are specifically ignored above to maintain compatibility
       react-native-ecosystem:
         patterns:
           - "react-native"
@@ -84,7 +98,7 @@ updates:
           - "react-native-*"
           - "expo*"
           - "@expo/*"
-          - "metro*"
+          # Note: metro* patterns are kept for other metro packages not specifically pinned
         update-types:
           - "patch"
 
