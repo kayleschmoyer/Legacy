@@ -18,17 +18,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Button,
-  H2,
-  H3,
-  Input,
-  Select,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   CAREER_STATS_SORT_OPTIONS,
   type CareerStatsQueryParams,
@@ -37,12 +27,6 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 // Icons - using simple text icons for cross-platform compatibility
-const ChevronDown = () => (
-  <Text>
-    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-    ▼
-  </Text>
-);
 const Search = ({ size, color }: { size?: number; color?: string }) => (
   <Text fontSize={size} color={color} accessibilityLabel="Search">
     {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
@@ -490,36 +474,35 @@ export function PlayerStatsDataGrid({
             <Text fontSize="$3" color="$color11">
               Sort by:
             </Text>
-            <Select
-              value={`${queryParams.orderBy}-${queryParams.orderDirection}`}
-              onValueChange={(value) => {
-                const [orderBy, orderDirection] = value.split('-') as [
-                  string,
-                  'asc' | 'desc',
-                ];
-                handleSort(orderBy, orderDirection);
-              }}
-            >
-              <Select.Trigger width={150}>
-                <Select.Value />
-                <ChevronDown />
-              </Select.Trigger>
-              <Select.Content zIndex={200000}>
-                <Select.ScrollUpButton />
-                <Select.Viewport minWidth={200}>
-                  {CAREER_STATS_SORT_OPTIONS.map((option) => (
-                    <Select.Item
-                      key={`${option.value}-desc`}
-                      index={0}
-                      value={`${option.value}-desc`}
-                    >
-                      <Select.ItemText>{option.label}</Select.ItemText>
-                    </Select.Item>
-                  ))}
-                </Select.Viewport>
-                <Select.ScrollDownButton />
-              </Select.Content>
-            </Select>
+            <XStack>
+              <select
+                value={`${queryParams.orderBy}-${queryParams.orderDirection}`}
+                onChange={(e) => {
+                  const [orderBy, orderDirection] = e.target.value.split('-') as [
+                    string,
+                    'asc' | 'desc',
+                  ];
+                  handleSort(orderBy, orderDirection);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #ccc',
+                  fontSize: '14px',
+                  backgroundColor: 'white',
+                  minWidth: '150px',
+                }}
+              >
+                {CAREER_STATS_SORT_OPTIONS.map((option) => (
+                  <option
+                    key={`${option.value}-desc`}
+                    value={`${option.value}-desc`}
+                  >
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </XStack>
           </XStack>
         )}
 
@@ -714,6 +697,8 @@ export function PlayerStatsDataGrid({
               paddingHorizontal="$3"
               pressStyle={{ backgroundColor: '$color4' }}
               onPress={() => handleRowClick(player)}
+              // @ts-ignore - onClick is added for web test compatibility
+              onClick={() => handleRowClick(player)}
               cursor="pointer"
             >
               {visibleColumns.map((column) => (

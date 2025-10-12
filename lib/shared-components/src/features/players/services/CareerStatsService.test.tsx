@@ -29,6 +29,8 @@ import {
 
 const mockRawPlayerStats: CareerBattingStatsRaw = {
   playerId: 1486,
+  primaryPosition: 'RF',
+  positionsPlayed: '["RF","LF","CF"]',
   games: 3298,
   plateAppearances: 14053,
   atBats: 12364,
@@ -50,6 +52,14 @@ const mockRawPlayerStats: CareerBattingStatsRaw = {
   battingAverage: 0.305,
   onBasePercentage: 0.377,
   sluggingPercentage: 0.555,
+  player: {
+    id: 1486,
+    firstName: 'Babe',
+    lastName: 'Ruth',
+    brefId: 'ruthba01',
+    __typename: 'Player',
+  },
+  __typename: 'CareerBatting',
 };
 
 const mockEmptyPlayerStats: CareerBattingStatsRaw = {
@@ -82,14 +92,23 @@ const mockEmptyPlayerStats: CareerBattingStatsRaw = {
 const mockGraphQLResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
-    variables: {
-      ...DEFAULT_CAREER_STATS_PARAMS,
-    },
+    variables: {},
   },
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   result: {
     data: {
-      careerBattingStats: [mockRawPlayerStats],
+      careerBattingStats: {
+        edges: [{ node: mockRawPlayerStats, __typename: 'CareerBattingEdge' }],
+        pageInfo: {
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: null,
+          endCursor: null,
+          __typename: 'PageInfo',
+        },
+        totalCount: 1,
+        __typename: 'CareerBattingConnection',
+      },
     },
   },
 };
@@ -98,7 +117,7 @@ const mockGraphQLResponse: MockedResponse = {
 const mockErrorResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
-    variables: DEFAULT_CAREER_STATS_PARAMS,
+    variables: {},
   },
   error: new Error('GraphQL Network Error'),
 };
@@ -134,7 +153,9 @@ describe('CareerStatsService - Data Transformation', () => {
       expect(result).toMatchObject({
         id: 'player-1486',
         playerId: 1486,
-        displayName: 'Player 1486',
+        displayName: 'Babe Ruth',
+        firstName: 'Babe',
+        lastName: 'Ruth',
         games: 3298,
         homeRuns: 755,
         rbi: 2297,
@@ -227,8 +248,8 @@ describe('CareerStatsService - React Hooks', () => {
 
     test('should handle custom query parameters', async () => {
       const customParams: CareerStatsQueryParams = {
-        limit: 10,
-        offset: 20,
+        first: 10,
+        after: 'cursor-20',
         orderBy: 'battingAverage',
         orderDirection: 'asc',
         minHomeRuns: 100,
@@ -238,15 +259,21 @@ describe('CareerStatsService - React Hooks', () => {
       const customMock: MockedResponse = {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
-          variables: {
-            ...DEFAULT_CAREER_STATS_PARAMS,
-            ...customParams,
-          },
+          variables: customParams,
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         result: {
           data: {
-            careerBattingStats: [mockRawPlayerStats],
+            careerBattingStats: {
+              edges: [{ node: mockRawPlayerStats }],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false,
+                startCursor: null,
+                endCursor: null,
+              },
+              totalCount: 1,
+            },
           },
         },
       };
@@ -262,7 +289,7 @@ describe('CareerStatsService - React Hooks', () => {
       });
 
       expect(result.current.pageSize).toBe(10);
-      expect(result.current.currentPage).toBe(3); // offset 20 / limit 10 + 1
+      expect(result.current.currentPage).toBe(1); // Cursor-based pagination always starts at 1
     });
 
     test('should handle GraphQL errors', async () => {
@@ -287,21 +314,29 @@ describe('CareerStatsService - React Hooks', () => {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
           variables: {
-            ...DEFAULT_CAREER_STATS_PARAMS,
-            limit: 25,
-            offset: 50,
+            first: 25,
+            after: 'cursor-50',
           },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         result: {
           data: {
-            careerBattingStats: [mockRawPlayerStats],
+            careerBattingStats: {
+              edges: [{ node: mockRawPlayerStats }],
+              pageInfo: {
+                hasNextPage: true,
+                hasPreviousPage: true,
+                startCursor: 'cursor-50',
+                endCursor: 'cursor-75',
+              },
+              totalCount: 100,
+            },
           },
         },
       };
 
       const { result } = renderHook(
-        () => useCareerStatsService({ limit: 25, offset: 50 }),
+        () => useCareerStatsService({ first: 25, after: 'cursor-50' }),
         {
           wrapper: ({ children }) => (
             <TestWrapper mocks={[paginationMock]}>{children}</TestWrapper>
@@ -314,9 +349,9 @@ describe('CareerStatsService - React Hooks', () => {
       });
 
       expect(result.current.pageSize).toBe(25);
-      expect(result.current.currentPage).toBe(3); // (50 / 25) + 1
+      expect(result.current.currentPage).toBe(1); // Cursor-based pagination always returns page 1
       expect(result.current.hasPreviousPage).toBe(true);
-      expect(result.current.hasNextPage).toBe(false); // Only 1 record returned, less than page size
+      expect(result.current.hasNextPage).toBe(true); // Matches pageInfo.hasNextPage from mock
     });
   });
 });

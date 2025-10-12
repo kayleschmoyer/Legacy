@@ -10,7 +10,7 @@ export interface BaseUIProps {
 }
 
 // Spacing and sizing types
-export type SpacingValue = number | 'auto' | string;
+export type SpacingValue = number | string;
 export type SizeValue = number | string;
 
 // Common layout props
@@ -180,7 +180,7 @@ export interface UIThemeContextValue {
 }
 
 // Component ref types
-export type ViewRef = React.ElementRef<'div'> | React.ElementRef<any>;
-export type TextRef = React.ElementRef<'span'> | React.ElementRef<any>;
-export type ButtonRef = React.ElementRef<'button'> | React.ElementRef<any>;
-export type InputRef = React.ElementRef<'input'> | React.ElementRef<any>;
+export type ViewRef = React.ElementRef<'div'>;
+export type TextRef = React.ElementRef<'span'>;
+export type ButtonRef = React.ElementRef<'button'>;
+export type InputRef = React.ElementRef<'input'>;

@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
+import { ScrollView as TamaguiScrollView } from 'tamagui';
 import type { ScrollViewProps, ViewRef } from '../types/ui';
 
 // Import Tamagui ScrollView
-import { ScrollView as TamaguiScrollView } from 'tamagui';
 
 // ScrollView component with stable types
 export const ScrollView = forwardRef<ViewRef, ScrollViewProps>(

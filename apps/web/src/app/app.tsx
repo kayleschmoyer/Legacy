@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { Button, H1, XStack, YStack } from '@legacy-sports/shared-components';
-import { Popover, styled } from 'tamagui';
-import { ChevronDown } from '@tamagui/lucide-icons';
+import { styled } from 'tamagui';
 import {
   FootballScreen,
   PlayersScreen,
@@ -54,84 +53,22 @@ const NavLinks = styled(XStack, {
 // Note: Using regular Link instead of styled to avoid "Functions are not valid as a React child" error
 
 function BaseballDropdownMenu() {
-  const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  
   const isBaseballActive = location.pathname?.startsWith('/baseball') ?? false;
 
+  // Temporary fix: Use direct link instead of Popover dropdown to avoid Popover.Trigger issue
   return (
-    <Popover size="$5" allowFlip placement="bottom" open={isOpen} onOpenChange={setIsOpen}>
-      <Popover.Trigger asChild>
-        <Button
-          variant={isBaseballActive ? 'primary' : 'secondary'}
-          size="$3"
-          onPress={() => setIsOpen(!isOpen)}
-        >
-          <span role="img" aria-label="baseball">
-            ⚾
-          </span>{' '}
-          Baseball{' '}
-          <ChevronDown
-            size="$0.75"
-            style={{
-              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
-            }}
-          />
-        </Button>
-      </Popover.Trigger>
-      
-      <Popover.Content
-        borderWidth={1}
-        borderColor="$borderColor"
-        enterStyle={{ y: -10, opacity: 0 }}
-        exitStyle={{ y: -10, opacity: 0 }}
-        elevate
-        animation={[
-          'quick',
-          {
-            opacity: {
-              overshootClamping: true,
-            },
-          },
-        ]}
-        padding="$2"
-        backgroundColor="$background"
-        minWidth={180}
+    <Link to="/baseball" style={{ textDecoration: 'none' }}>
+      <Button
+        variant={isBaseballActive ? 'primary' : 'secondary'}
+        size="$3"
       >
-        <YStack space="$1">
-          <Link to="/baseball" style={{ textDecoration: 'none' }}>
-            <Button
-              variant="outlined"
-              size="$3"
-              justifyContent="flex-start"
-              width="100%"
-              onPress={() => setIsOpen(false)}
-            >
-              <span role="img" aria-label="baseball-home">
-                🏠
-              </span>{' '}
-              Baseball Home
-            </Button>
-          </Link>
-          
-          <Link to="/baseball/league/create" style={{ textDecoration: 'none' }}>
-            <Button
-              variant="outlined"
-              size="$3"
-              justifyContent="flex-start"
-              width="100%"
-              onPress={() => setIsOpen(false)}
-            >
-              <span role="img" aria-label="create-league">
-                ➕
-              </span>{' '}
-              Create League
-            </Button>
-          </Link>
-        </YStack>
-      </Popover.Content>
-    </Popover>
+        <span role="img" aria-label="baseball">
+          ⚾
+        </span>{' '}
+        Baseball
+      </Button>
+    </Link>
   );
 }
 

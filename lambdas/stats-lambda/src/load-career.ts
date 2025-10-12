@@ -152,5 +152,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   };
 };
 
-// Export the Sentry-wrapped handler
-export const handler = withSentry(baseHandler);
+// Export the Sentry-wrapped handler with explicit Promise wrapper
+export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  return await withSentry(baseHandler)(event);
+};

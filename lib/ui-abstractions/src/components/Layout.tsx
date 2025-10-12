@@ -1,15 +1,15 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
-import type { ViewProps, ViewRef } from '../types/ui';
-
-// Import Tamagui View and Stack components
 import {
+  Card as TamaguiCard,
   View as TamaguiView,
   XStack as TamaguiXStack,
   YStack as TamaguiYStack,
   ZStack as TamaguiZStack,
-  Card as TamaguiCard,
 } from 'tamagui';
+import type { ViewProps, ViewRef } from '../types/ui';
+
+// Import Tamagui View and Stack components
 
 // Base View component with stable types
 export const View = forwardRef<ViewRef, ViewProps>(({ children, onPress, onLayout, ...props }, ref) => {

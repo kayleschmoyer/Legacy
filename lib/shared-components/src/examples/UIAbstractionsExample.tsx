@@ -1,19 +1,19 @@
 import React from 'react';
 import {
-  View,
-  Text,
   Button,
-  YStack,
-  XStack,
+  Card,
+  Container,
   H1,
   H2,
   H3,
+  LoadingPanel,
   Paragraph,
   Separator,
-  Card,
-  Container,
   Spinner,
-  LoadingPanel,
+  Text,
+  View,
+  XStack,
+  YStack,
 } from '@legacy-sports/ui-abstractions';
 
 // Example component showing how to use UI Abstractions instead of direct Tamagui
@@ -35,7 +35,7 @@ export function ExampleAbstractedComponent() {
         {/* Button examples */}
         <YStack space="$2">
           <H3>Button Variants</H3>
-          <XStack space="$2" flexWrap="wrap">
+          <XStack space="$2">
             <Button variant="primary">Primary</Button>
             <Button variant="secondary">Secondary</Button>
             <Button variant="outline">Outline</Button>
@@ -90,7 +90,7 @@ export function BeforeAfterExample() {
         {/* BEFORE: Direct Tamagui (complex types, potential issues) */}
         <Card padding="$4">
           <Text fontWeight="bold" color="$red10">
-            ❌ Before (Direct Tamagui):
+            <span role="img" aria-label="cross mark">❌</span> Before (Direct Tamagui):
           </Text>
           <Text variant="caption">
             {`import { Button, Text, XStack } from 'tamagui';`}
@@ -103,7 +103,7 @@ export function BeforeAfterExample() {
         {/* AFTER: UI Abstractions (stable types, consistent API) */}
         <Card padding="$4">
           <Text fontWeight="bold" color="$green10">
-            ✅ After (UI Abstractions):
+            <span role="img" aria-label="check mark">✅</span> After (UI Abstractions):
           </Text>
           <Text variant="caption">
             {`import { Button, Text, XStack } from '@legacy-sports/ui-abstractions';`}

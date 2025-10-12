@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
+import { Input as TamaguiInput, TextArea as TamaguiTextArea } from 'tamagui';
 import type { InputProps, InputRef } from '../types/ui';
 
 // Import Tamagui Input and TextArea components
-import { Input as TamaguiInput, TextArea as TamaguiTextArea } from 'tamagui';
 
 // Input component with stable types
 export const Input = forwardRef<InputRef, InputProps>(

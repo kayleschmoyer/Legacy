@@ -57,13 +57,6 @@ export function LeagueCard({ league, onViewLeague, animationDelay = 0 }: LeagueC
     }
   };
 
-  const handleKeyPress = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleViewLeague();
-    }
-  };
-
   return (
     <YStack
       minWidth={350}

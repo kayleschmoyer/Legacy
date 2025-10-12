@@ -112,4 +112,7 @@ const baseCreateMatchupHandler = async (
   };
 };
 
-export const handler = withSentry(baseCreateMatchupHandler);
+// Export the Sentry-wrapped handler with explicit Promise wrapper
+export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  return await withSentry(baseCreateMatchupHandler)(event);
+};

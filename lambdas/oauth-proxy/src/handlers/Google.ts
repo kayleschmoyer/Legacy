@@ -540,8 +540,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         user: {
           id: userInfo.id,
           email: userInfo.email,
-          username: userInfo.username,
-          accessLevel: userInfo.accessLevel,
+          username: userInfo.username || userInfo.email,
+          accessLevel: userInfo.accessLevel || 'none',
         },
       };
       

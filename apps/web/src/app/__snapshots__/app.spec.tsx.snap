@@ -8,18 +8,25 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         alignitems="center"
         space="$4"
       >
-        <h1
-          color="$color"
+        <a
+          href="/"
+          style="text-decoration: none;"
         >
-          <span
-            aria-label="football"
-            role="img"
+          <h1
+            color="$color"
+            cursor="pointer"
+            hoverstyle="[object Object]"
           >
-            🏈
-          </span>
-           
-          Legacy Sports
-        </h1>
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Legacy Sports
+          </h1>
+        </a>
       </div>
       <div
         display="none"
@@ -107,6 +114,23 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             </span>
              
             Player Stats
+          </button>
+        </a>
+        <a
+          href="/management"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="management"
+              role="img"
+            >
+              ⚙️
+            </span>
+             
+            Management
           </button>
         </a>
       </div>
@@ -143,18 +167,25 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         alignitems="center"
         space="$4"
       >
-        <h1
-          color="$color"
+        <a
+          href="/"
+          style="text-decoration: none;"
         >
-          <span
-            aria-label="football"
-            role="img"
+          <h1
+            color="$color"
+            cursor="pointer"
+            hoverstyle="[object Object]"
           >
-            🏈
-          </span>
-           
-          Legacy Sports
-        </h1>
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Legacy Sports
+          </h1>
+        </a>
       </div>
       <div
         display="none"
@@ -242,6 +273,23 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             </span>
              
             Player Stats
+          </button>
+        </a>
+        <a
+          href="/management"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="management"
+              role="img"
+            >
+              ⚙️
+            </span>
+             
+            Management
           </button>
         </a>
       </div>
@@ -276,18 +324,25 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         alignitems="center"
         space="$4"
       >
-        <h1
-          color="$color"
+        <a
+          href="/"
+          style="text-decoration: none;"
         >
-          <span
-            aria-label="football"
-            role="img"
+          <h1
+            color="$color"
+            cursor="pointer"
+            hoverstyle="[object Object]"
           >
-            🏈
-          </span>
-           
-          Legacy Sports
-        </h1>
+            <span
+              aria-label="football"
+              role="img"
+            >
+              🏈
+            </span>
+             
+            Legacy Sports
+          </h1>
+        </a>
       </div>
       <div
         display="none"
@@ -375,6 +430,23 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             </span>
              
             Player Stats
+          </button>
+        </a>
+        <a
+          href="/management"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="management"
+              role="img"
+            >
+              ⚙️
+            </span>
+             
+            Management
           </button>
         </a>
       </div>

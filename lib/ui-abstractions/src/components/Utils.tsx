@@ -2,7 +2,7 @@ import * as React from 'react';
 import { forwardRef } from 'react';
 
 // Import Tamagui utility components
-import { Spinner as TamaguiSpinner, Separator as TamaguiSeparator } from 'tamagui';
+import { Separator as TamaguiSeparator, Spinner as TamaguiSpinner } from 'tamagui';
 import type { BaseUIProps, ViewProps } from '../types/ui';
 
 // Loading spinner component
@@ -18,7 +18,7 @@ export const Spinner = forwardRef<any, SpinnerProps>(
     return (
       <TamaguiSpinner
         ref={ref}
-        size={tamaguiSize as 'small' | 'large'}
+        size={tamaguiSize}
         color={color}
       />
     );

@@ -1,10 +1,6 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
-import type { TextProps, TextRef } from '../types/ui';
-
-// Import Tamagui Text and related components
 import {
-  Text as TamaguiText,
   H1 as TamaguiH1,
   H2 as TamaguiH2,
   H3 as TamaguiH3,
@@ -12,7 +8,11 @@ import {
   H5 as TamaguiH5,
   H6 as TamaguiH6,
   Paragraph as TamaguiParagraph,
+  Text as TamaguiText,
 } from 'tamagui';
+import type { TextProps, TextRef } from '../types/ui';
+
+// Import Tamagui Text and related components
 
 // Base Text component with stable types
 export const Text = forwardRef<TextRef, TextProps & { variant?: 'body' | 'caption' | 'label' }>(

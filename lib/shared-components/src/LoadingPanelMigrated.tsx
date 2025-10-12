@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoadingPanel as UILoadingPanel, Spinner } from '@legacy-sports/ui-abstractions';
+import { Spinner, LoadingPanel as UILoadingPanel } from '@legacy-sports/ui-abstractions';
 import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
 
 export interface Props {

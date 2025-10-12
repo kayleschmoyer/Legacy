@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { forwardRef } from 'react';
+import { Button as TamaguiButton } from 'tamagui';
 import type { ButtonProps, ButtonRef } from '../types/ui';
 
 // Import Tamagui Button component
-import { Button as TamaguiButton } from 'tamagui';
 
 // Button component with stable types and consistent API
 export const Button = forwardRef<ButtonRef, ButtonProps>(
@@ -12,7 +12,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     const tamaguiVariant = React.useMemo(() => {
       // For now, Tamagui Button only supports 'outlined', so we use that consistently
       return 'outlined' as const;
-    }, [variant]);
+    }, []);
 
     // Map our size to Tamagui size
     const tamaguiSize = React.useMemo(() => {

@@ -167,4 +167,7 @@ const baseSelectGameHandler = async (
   };
 };
 
-export const handler = withSentry(baseSelectGameHandler);
+// Export the Sentry-wrapped handler with explicit Promise wrapper
+export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  return await withSentry(baseSelectGameHandler)(event);
+};
