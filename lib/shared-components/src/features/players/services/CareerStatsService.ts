@@ -11,6 +11,8 @@
 import * as React from 'react';
 import {
   CareerBattingFragment,
+  GetAllPlayers,
+  GetCareerBattingStats,
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables,
   PlayerFragment,
@@ -497,14 +499,14 @@ export function useCareerStatsLazyQuery() {
  * Available sorting options for career statistics (using string values)
  */
 export const CAREER_STATS_SORT_OPTIONS = [
-  { label: 'Games (Most)', value: 'games' },
-  { label: 'Home Runs (Most)', value: 'homeRuns' },
-  { label: 'RBIs (Most)', value: 'rbi' },
-  { label: 'Hits (Most)', value: 'hits' },
-  { label: 'Stolen Bases (Most)', value: 'stolenBases' },
-  { label: 'At Bats (Most)', value: 'atBats' },
-  { label: 'Runs (Most)', value: 'runs' },
-  { label: 'Player ID', value: 'playerId' },
+  { label: 'Games (Most)', value: 'games', direction: 'desc' },
+  { label: 'Home Runs (Most)', value: 'homeRuns', direction: 'desc' },
+  { label: 'RBIs (Most)', value: 'rbi', direction: 'desc' },
+  { label: 'Hits (Most)', value: 'hits', direction: 'desc' },
+  { label: 'Stolen Bases (Most)', value: 'stolenBases', direction: 'desc' },
+  { label: 'At Bats (Most)', value: 'atBats', direction: 'desc' },
+  { label: 'Runs (Most)', value: 'runs', direction: 'desc' },
+  { label: 'Batting Average (Highest)', value: 'battingAverage', direction: 'desc' },
 ] as const;
 
 /**
@@ -512,6 +514,25 @@ export const CAREER_STATS_SORT_OPTIONS = [
  */
 export const DEFAULT_CAREER_STATS_PARAMS: CareerStatsQueryParams = {
   first: 25,
-  orderBy: 'homeRuns', // Home runs descending
+  orderBy: 'homeRuns',
   orderDirection: 'desc',
+  minGames: 10,
+  minHomeRuns: 0,
+  minRBI: 0,
+  minBattingAvg: 0.0,
+  searchTerm: '',
 } as const;
+
+// =============================================================================
+// GraphQL Document Exports (for testing and direct usage)
+// =============================================================================
+
+/**
+ * Career batting statistics GraphQL query document
+ */
+export const CAREER_BATTING_STATS_QUERY = GetCareerBattingStats;
+
+/**
+ * Players query document  
+ */
+export const PLAYERS_QUERY = GetAllPlayers;

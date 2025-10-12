@@ -7,9 +7,11 @@ import {
   getPlayersOrderedByLastFetch,
   getPlayersWithoutStats,
   getStatsRefreshSummary,
+  PublicDb,
   PublicSchema,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
+import type { Player } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
@@ -60,20 +62,20 @@ type HandleLoadCareerStatsArgs = ArgsType<
   ReturnType<typeof loadCareerStatsCommandBuilder>
 >;
 
-async function getPlayersLimited(db: any, limit: number) {
+async function getPlayersLimited(db: PublicDb, limit: number): Promise<Player[]> {
   return await db
     .select()
     .from(PublicSchema.players)
     .limit(limit);
 }
 
-async function getAllPlayers(db: any) {
+async function getAllPlayers(db: PublicDb): Promise<Player[]> {
   return await db
     .select()
     .from(PublicSchema.players);
 }
 
-async function getPlayersPrioritized(db: any, limit?: number, prioritizeNew = true) {
+async function getPlayersPrioritized(db: PublicDb, limit?: number, prioritizeNew = true): Promise<Player[]> {
   if (!prioritizeNew) {
     // Use the original logic if not prioritizing new players
     return limit ? await getPlayersLimited(db, limit) : await getAllPlayers(db);
@@ -105,7 +107,7 @@ export async function handleLoadCareerStats(
 
   const opts = getDbOptions();
 
-  await runWithPublicClient(opts, async (db) => {
+  await runWithPublicClient(opts, async (db: PublicDb) => {
     // Show summary if requested
     if (args['show-summary']) {
       const summary = await getStatsRefreshSummary(db);
@@ -123,8 +125,8 @@ export async function handleLoadCareerStats(
     const errors: unknown[] = [];
 
     if (args['prioritize-new']) {
-      const playersWithoutStats = players.filter((p: any) => p.statsLastFetchedAt === null);
-      const playersWithStats = players.filter((p: any) => p.statsLastFetchedAt !== null);
+      const playersWithoutStats = players.filter((p: Player) => p.statsLastFetchedAt === null);
+      const playersWithStats = players.filter((p: Player) => p.statsLastFetchedAt !== null);
       
       LOGGER.info(`Processing ${players.length} players for stats loading`);
       LOGGER.info(`  ${playersWithoutStats.length} players without any stats (highest priority)`);

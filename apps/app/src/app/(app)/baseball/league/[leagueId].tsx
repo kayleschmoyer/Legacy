@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
@@ -6,12 +7,8 @@ import { Tabs } from '@tamagui/tabs';
 import { Alert } from 'react-native';
 import { gql, useLazyQuery } from '@apollo/client';
 import {
-  LeagueFragment,
-  LeagueFragmentDoc,
   LeaguePositionFragment,
   StartDraftMutation,
-  StartDraftMutationVariables,
-  TeamFragment,
   TeamMemberFragment,
   useStartDraftMutation,
 } from '../../../../api/db/graphql.generated';

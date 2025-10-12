@@ -22,6 +22,12 @@ import { builder } from './builder';
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
 
+// Type definitions for statistics
+interface PositionGames {
+  games: number;
+  position?: string;
+}
+
 // Career Batting type
 const CareerBattingRef = builder.objectRef<{
   playerId: number | null;
@@ -122,29 +128,31 @@ CareerBattingRef.implement({
             
             // Find position with most games played
             const primaryPos = positionEntries.reduce((max, current) => {
-              const currentGames = (current[1])?.games || 0;
-              const maxGames = (max[1])?.games || 0;
+              const currentGames = (current[1] as PositionGames)?.games || 0;
+              const maxGames = (max[1] as PositionGames)?.games || 0;
               return currentGames > maxGames ? current : max;
             });
             
-            return (primaryPos[1])?.position || primaryPos[0];
+            return (primaryPos[1] as PositionGames)?.position || primaryPos[0];
           }
           
           // Fallback: try parsing as string if it somehow comes as a string
           if (typeof positions === 'string') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const parsedPositions = JSON.parse(positions);
             if (typeof parsedPositions === 'object' && parsedPositions !== null) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               const positionEntries = Object.entries(parsedPositions);
               if (positionEntries.length === 0) return null;
               
               // Find position with most games played
               const primaryPos = positionEntries.reduce((max, current) => {
-                const currentGames = (current[1] as any)?.games || 0;
-                const maxGames = (max[1] as any)?.games || 0;
+                const currentGames = (current[1] as PositionGames)?.games || 0;
+                const maxGames = (max[1] as PositionGames)?.games || 0;
                 return currentGames > maxGames ? current : max;
               });
               
-              return (primaryPos[1] as any)?.position || primaryPos[0];
+              return (primaryPos[1] as PositionGames)?.position || primaryPos[0];
             }
           }
           
@@ -194,6 +202,7 @@ const CareerBattingConnection = builder.connectionObject({
   fields: (t) => ({
     totalCount: t.int({
       description: 'Total number of career batting records matching the filters',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
       resolve: (connection: any) => connection.totalCount || 0,
     }),
   }),
@@ -281,7 +290,7 @@ const CareerFieldingRef = builder.objectRef<{
   pickoffs: number | null;
   wp: number | null;
   pos: string | null;
-  positionsPlayed: any; // JSON data for positions and games played
+  positionsPlayed: unknown; // JSON data for positions and games played
 }>('CareerFielding');
 
 CareerFieldingRef.implement({

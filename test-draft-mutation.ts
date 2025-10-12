@@ -1,20 +1,6 @@
 #!/usr/bin/env node
 
-// Test script to verify startDraft mutation behavior  } catch (error) {
-    console.log('❌ Error during test:', error);
-    if (error instanceof Error) {
-      console.log('Error message:', error.message);
-    }
-    // Print GraphQL errors if available
-    if (error && typeof error === 'object' && 'graphQLErrors' in error) {
-      console.log('GraphQL Errors:', JSON.stringify(error.graphQLErrors, null, 2));
-    }
-    if (error && typeof error === 'object' && 'networkError' in error && error.networkError) {
-      console.log('Network Error Result:', JSON.stringify(error.networkError.result, null, 2));
-    }
-  }
-}
-
+// Test script to verify startDraft mutation behavior
 import { ApolloClient, InMemoryCache, gql, createHttpLink } from '@apollo/client/core/index.js';
 
 const httpLink = createHttpLink({

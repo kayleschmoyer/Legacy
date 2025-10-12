@@ -1,0 +1,41 @@
+{
+  "name": "ui-abstractions",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/ui-abstractions/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/lib/ui-abstractions",
+        "main": "lib/ui-abstractions/src/index.ts",
+        "tsConfig": "lib/ui-abstractions/tsconfig.lib.json",
+        "assets": [
+          "lib/ui-abstractions/*.md"
+        ]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "jestConfig": "lib/ui-abstractions/jest.config.ts"
+      }
+    }
+  },
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "scope:shared",
+    "type:ui",
+    "type:util"
+  ]
+}

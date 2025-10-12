@@ -4,8 +4,11 @@ import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 
+// Position types that match the database schema
+type PositionType = "C" | "1B" | "2B" | "3B" | "SS" | "OF" | "DH" | "SP" | "RP" | "IF" | "XDH" | "RF" | "LF" | "CF";
+
 // Default roster positions for leagues
-const DEFAULT_ROSTER_POSITIONS = [
+const DEFAULT_ROSTER_POSITIONS: PositionType[] = [
   // Batting positions
   'C',    // Catcher
   '1B',   // First Base  
@@ -59,7 +62,7 @@ async function main() {
           // Create position data
           const positionData = DEFAULT_ROSTER_POSITIONS.map(positionType => ({
             leagueId: league.id,
-            positionType: positionType as any,
+            positionType: positionType,
           }));
           
           // Insert positions

@@ -11,12 +11,16 @@ import {
   YStack,
 } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons';
-import { DraftType } from '../../api/db/graphql.generated';
 import { addDays } from '../../common/utilities/DateUtilities';
 import { useCreateLeagueMutation } from '../../api/db/leagues/Leagues.generated';
-import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
 import { handleError } from '../../common/utilities/ErrorHandler';
+
+// DraftType enum constants since it's not exported from generated types
+const DraftType = {
+  Normal: 'NORMAL' as const,
+  Blind: 'BLIND' as const,
+} as const;
 
 const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
   { text: '6', value: '6' },
@@ -35,20 +39,19 @@ export default function CreateLeagueModal(
 ): React.JSX.Element {
   const { onOpenChange, open } = props;
   const [leagueName, setLeagueName] = useState('');
-  const [draftType, setDraftType] = useState(DraftType.Normal);
+  const [draftType, setDraftType] = useState<'NORMAL' | 'BLIND'>('NORMAL');
   const [numberOfTeams, setNumberOfTeams] = useState(10);
-  const currentUserInfo = useAuthorizedUserInfo();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const [createLeague, { data, loading, error }] = useCreateLeagueMutation({
     variables: {
       input: {
-        draftDate: addDays(new Date(), 5),
         draftType: draftType,
         leagueName: leagueName,
         numberOfTeams: numberOfTeams,
-        userId: currentUserInfo.id,
+        startDate: addDays(new Date(), 5).toISOString(),
       },
     },
   });

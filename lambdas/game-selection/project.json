@@ -3,11 +3,18 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/game-selection/src",
   "projectType": "application",
-  "tags": ["lambda"],
+  "tags": [
+    "lambda",
+    "platform:node",
+    "scope:lambda",
+    "type:api"
+  ],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist"],
+      "outputs": [
+        "{projectRoot}/dist"
+      ],
       "options": {
         "command": "vite build",
         "cwd": "lambdas/game-selection"
@@ -23,7 +30,9 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "echo 'Legacy serverless package command. Use nx deploy game-selection instead.'",
         "cwd": "lambdas/game-selection"
@@ -31,7 +40,9 @@
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": ["package"],
+      "dependsOn": [
+        "package"
+      ],
       "options": {
         "commands": [
           "cd terraform",
@@ -44,7 +55,9 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": ["package"],
+      "dependsOn": [
+        "package"
+      ],
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for game-selection lambda...'",

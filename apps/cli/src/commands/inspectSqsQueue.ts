@@ -1,5 +1,6 @@
 import { GetQueueAttributesCommand, PurgeQueueCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
+import { Argv } from 'yargs';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 /**
@@ -17,7 +18,13 @@ interface QueueMessage {
   receiptHandle: string;
   body: string;
   attributes?: Record<string, string>;
-  messageAttributes?: Record<string, any>;
+  messageAttributes?: Record<string, unknown>;
+}
+
+interface CommandArgs {
+  action: string;
+  queueType: string;
+  maxMessages: number;
 }
 
 interface ParsedDraftMessage {
@@ -241,7 +248,7 @@ class SqsQueueInspector {
 }
 
 // CLI command builder function
-export const inspectSqsQueueCommandBuilder = (yargs: any) => {
+export const inspectSqsQueueCommandBuilder = (yargs: Argv) => {
   return yargs
     .option('action', {
       type: 'string',
@@ -270,7 +277,7 @@ export const inspectSqsQueueCommandBuilder = (yargs: any) => {
 };
 
 // CLI command handler function
-export const handleInspectSqsQueue = async (argv: any) => {
+export const handleInspectSqsQueue = async (argv: CommandArgs) => {
   try {
     console.log('🔍 SQS Queue Inspector');
     console.log('=====================\n');
@@ -292,7 +299,7 @@ export const handleInspectSqsQueue = async (argv: any) => {
         await inspector.peekMessages(argv.maxMessages);
         break;
         
-      case 'list':
+      case 'list': {
         await inspector.getQueueAttributes();
         const messages = await inspector.listMessages(argv.maxMessages);
         
@@ -301,6 +308,7 @@ export const handleInspectSqsQueue = async (argv: any) => {
           console.log('   They will be deleted automatically unless you process them.');
         }
         break;
+      }
         
       case 'purge':
         await inspector.getQueueAttributes();

@@ -11,6 +11,7 @@ import type {
 } from './types/IconButton.types';
 
 // Styled button with gradient shadow effects
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const StyledIconButton = styled(TamaguiButton, {
   name: 'IconButton',
   borderRadius: 16,
@@ -117,6 +118,7 @@ const StyledIconButton = styled(TamaguiButton, {
 });
 
 // Gradient overlay component for enhanced visual effects
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const GradientOverlay = styled(YStack, {
   name: 'GradientOverlay',
   position: 'absolute',

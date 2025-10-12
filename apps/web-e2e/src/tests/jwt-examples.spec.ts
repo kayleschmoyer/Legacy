@@ -114,8 +114,11 @@ test.describe('JWT Validation', () => {
     // Test the utility functions
     expect(E2EJwtUtil.isValidJwtFormat(jwt)).toBe(true);
     
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const payload = E2EJwtUtil.decodeJwtPayload(jwt);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(payload.email).toBe('user@test.com');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(payload.accessLevel).toBe('none');
   });
 

@@ -28,6 +28,9 @@ tmp
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
+
+# AI Agent Commands (temporary files)
+NEXT_AGENT_COMMAND.md
 testem.log
 /typings
 

@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
- * PlayerStatsDataGrid.test.tsx - Component Integration Tests
+ * PlayerStatsDataGrid.test.tsx - Component Integration Tests  
  *
- * Comprehensive test suite for the PlayerStatsDataGrid component including
+ * Comprehensive test suite for the PlayerStatsDataGrid component
  * rendering, interaction, and integration with the CareerStatsService.
  *
  * @author Legacy Sports Team
@@ -32,7 +33,15 @@ const MockTamaguiProvider = ({ children }: { children: React.ReactNode }) => (
 
 const mockPlayerData: CareerBattingStatsRaw[] = [
   {
+    __typename: 'CareerBatting',
     playerId: 1486,
+    player: {
+      __typename: 'Player',
+      id: 1486,
+      firstName: 'Player',
+      lastName: '1486',
+      brefId: 'player1486',
+    },
     games: 3298,
     plateAppearances: 14053,
     atBats: 12364,
@@ -43,6 +52,8 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
     homeRuns: 755,
     rbi: 2297,
     stolenBases: 240,
+    primaryPosition: '1B',
+    positionsPlayed: '{"1B": {"games": 3298}}',
     caughtStealing: 117,
     baseOnBalls: 1402,
     strikeouts: 1383,
@@ -56,7 +67,15 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
     sluggingPercentage: 0.555,
   },
   {
+    __typename: 'CareerBatting',
     playerId: 1542,
+    player: {
+      __typename: 'Player',
+      id: 1542,
+      firstName: 'Player',
+      lastName: '1542',
+      brefId: 'player1542',
+    },
     games: 170,
     plateAppearances: 64,
     atBats: 54,
@@ -67,6 +86,8 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
     homeRuns: 0,
     rbi: 1,
     stolenBases: 0,
+    primaryPosition: 'OF',
+    positionsPlayed: '{"OF": {"games": 170}}',
     caughtStealing: 0,
     baseOnBalls: 8,
     strikeouts: 32,
@@ -81,88 +102,146 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
   },
 ];
 
-// Default mock with correct variable structure based on actual useCareerStatsWithNames usage
+// Default mock with correct variable structure and Connection pattern response
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const defaultMock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
     variables: {
-      limit: 25,
-      offset: 0,
+      first: 25,
+      after: undefined,
       orderBy: 'homeRuns',
       orderDirection: 'desc',
       minGames: 10,
       minHomeRuns: 0,
       minRBI: 0,
+      minBattingAvg: 0,
+      searchTerm: '',
     },
   },
   result: {
     data: {
-      careerBattingStats: mockPlayerData,
+      careerBattingStats: {
+        __typename: 'CareerBattingConnection',
+        edges: mockPlayerData.map((player, index) => ({
+          __typename: 'CareerBattingEdge',
+          node: player,
+          cursor: `cursor-${index}`,
+        })),
+        pageInfo: {
+          __typename: 'PageInfo',
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
+          endCursor: mockPlayerData.length > 0 ? `cursor-${mockPlayerData.length - 1}` : null,
+        },
+        totalCount: mockPlayerData.length,
+      },
     },
   },
 };
 
-// Mock for batting average sort (used in integration test)
-const battingAverageMock: MockedResponse = {
+// Mock for the base component render (page size 10, batting average order)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const baseMock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
     variables: {
-      limit: 10,
-      offset: 0,
+      first: 10,
+      after: undefined,
       orderBy: 'battingAverage',
       orderDirection: 'desc',
       minGames: 10,
       minHomeRuns: 0,
       minRBI: 0,
+      minBattingAvg: 0,
+      searchTerm: '',
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   result: {
     data: {
-      careerBattingStats: mockPlayerData,
+      careerBattingStats: {
+        __typename: 'CareerBattingConnection',
+        edges: mockPlayerData.slice(0, 10).map((player, index) => ({
+          __typename: 'CareerBattingEdge',
+          node: player,
+          cursor: `cursor-${index}`,
+        })),
+        pageInfo: {
+          __typename: 'PageInfo',
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
+          endCursor: mockPlayerData.length > 0 ? `cursor-${Math.min(9, mockPlayerData.length - 1)}` : null,
+        },
+        totalCount: mockPlayerData.length,
+      },
     },
   },
 };
 
 // Mock for page size 50 (used in page size test)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment  
 const pageSize50Mock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
     variables: {
-      limit: 50,
-      offset: 0,
+      first: 50,
+      after: undefined,
       orderBy: 'homeRuns',
       orderDirection: 'desc',
       minGames: 10,
       minHomeRuns: 0,
       minRBI: 0,
+      minBattingAvg: 0,
+      searchTerm: '',
     },
   },
   result: {
     data: {
-      careerBattingStats: mockPlayerData,
+      careerBattingStats: {
+        __typename: 'CareerBattingConnection',
+        edges: mockPlayerData.map((player, index) => ({
+          __typename: 'CareerBattingEdge',
+          node: player,
+          cursor: `cursor-${index}`,
+        })),
+        pageInfo: {
+          __typename: 'PageInfo',
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
+          endCursor: mockPlayerData.length > 0 ? `cursor-${mockPlayerData.length - 1}` : null,
+        },
+        totalCount: mockPlayerData.length,
+      },
     },
   },
 };
 
 // Mock for the PLAYERS_QUERY used by useCareerStatsWithNames
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const playersQueryMock: MockedResponse = {
   request: {
     query: PLAYERS_QUERY,
     variables: {
-      limit: 5000,
-      offset: 0,
+      first: 5000,
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   result: {
     data: {
       players: [
         {
+          __typename: 'Player',
           id: 1486,
           firstName: 'Player',
           lastName: '1486',
           brefId: 'player1486',
         },
         {
+          __typename: 'Player',
           id: 1542,
           firstName: 'Player',
           lastName: '1542',
@@ -173,15 +252,29 @@ const playersQueryMock: MockedResponse = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const emptyMock: MockedResponse = {
   ...defaultMock,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   result: {
     data: {
-      careerBattingStats: [],
+      careerBattingStats: {
+        __typename: 'CareerBattingConnection',
+        edges: [],
+        pageInfo: {
+          __typename: 'PageInfo',
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: null,
+          endCursor: null,
+        },
+        totalCount: 0,
+      },
     },
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const errorMock: MockedResponse = {
   ...defaultMock,
   error: new Error('Failed to load player statistics'),
@@ -198,7 +291,7 @@ const TestWrapper: React.FC<TestWrapperProps> = ({
   mocks = [defaultMock, playersQueryMock],
 }) => (
   <MockTamaguiProvider>
-    <MockedProvider mocks={mocks} addTypename={false}>
+    <MockedProvider mocks={mocks}>
       {children}
     </MockedProvider>
   </MockTamaguiProvider>
@@ -333,6 +426,9 @@ describe('PlayerStatsDataGrid - Interactions', () => {
 
     // Click on the first player row using the test ID
     const playerRow = screen.getByTestId('player-row-1486');
+    // Try multiple event types to trigger the onPress handler
+    fireEvent.mouseDown(playerRow);
+    fireEvent.mouseUp(playerRow);
     fireEvent.click(playerRow);
 
     expect(mockPlayerSelect).toHaveBeenCalledWith(
@@ -530,18 +626,26 @@ describe('PlayerStatsDataGrid - Performance', () => {
       (_, index) => ({
         ...mockPlayerData[0],
         playerId: index + 1,
+        player: {
+          __typename: 'Player',
+          id: index + 1,
+          firstName: 'Player',
+          lastName: `${index + 1}`,
+          brefId: `player${index + 1}`,
+        },
       }),
     );
 
     // Create matching players data for the performance test
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const performancePlayersQueryMock: MockedResponse = {
       request: {
         query: PLAYERS_QUERY,
         variables: {
-          limit: 5000,
-          offset: 0,
+          first: 5000,
         },
       },
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       result: {
         data: {
           players: Array.from({ length: 100 }, (_, index) => ({
@@ -554,11 +658,28 @@ describe('PlayerStatsDataGrid - Performance', () => {
       },
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment  
     const largeMock: MockedResponse = {
       ...defaultMock,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       result: {
         data: {
-          careerBattingStats: largeMockData,
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            edges: largeMockData.map((player, index) => ({
+              __typename: 'CareerBattingEdge',
+              node: player,
+              cursor: `cursor-${index}`,
+            })),
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: false,
+              hasPreviousPage: false,
+              startCursor: largeMockData.length > 0 ? 'cursor-0' : null,
+              endCursor: largeMockData.length > 0 ? `cursor-${largeMockData.length - 1}` : null,
+            },
+            totalCount: largeMockData.length,
+          },
         },
       },
     };
@@ -615,11 +736,11 @@ describe('PlayerStatsDataGrid - Performance', () => {
 describe('PlayerStatsDataGrid - Integration', () => {
   test('should integrate properly with CareerStatsService', async () => {
     render(
-      <TestWrapper mocks={[battingAverageMock, playersQueryMock]}>
+      <TestWrapper mocks={[baseMock, playersQueryMock]}>
         <PlayerStatsDataGrid
           {...defaultProps}
           initialParams={{
-            limit: 10,
+            first: 10,
             orderBy: 'battingAverage',
             orderDirection: 'desc',
           }}

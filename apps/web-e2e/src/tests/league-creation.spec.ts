@@ -87,9 +87,11 @@ test.describe('League Creation', () => {
     // Mock GraphQL error response
     await page.route('/graphql', async (route) => {
       const request = route.request();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const body = await request.postDataJSON();
       
       // Intercept createLeagueAndTeams mutation
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       if (body.operationName === 'CreateLeagueAndTeams' || body.query?.includes('createLeagueAndTeams')) {
         await route.fulfill({
           status: 200,
@@ -241,8 +243,10 @@ test.describe('League Creation', () => {
     // Mock slow GraphQL response to test loading state
     await page.route('/graphql', async (route) => {
       const request = route.request();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const body = await request.postDataJSON();
       
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       if (body.operationName === 'CreateLeagueAndTeams' || body.query?.includes('createLeagueAndTeams')) {
         // Add delay to simulate slow response
         await new Promise(resolve => setTimeout(resolve, 1000));

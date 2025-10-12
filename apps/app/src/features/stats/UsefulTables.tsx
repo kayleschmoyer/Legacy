@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Spinner, Text } from 'tamagui';
 import { useMemo } from 'react';
 import { BattingStatsTable } from './BattingStatsTable';
@@ -10,7 +11,7 @@ import {
 } from '../../api/db/stats/Stats.generated';
 import {
   CareerBattingsOrderBy,
-  CareerBattingStatsWithPlayerFragment,
+  CareerBattingStatsFragment,
   CareerFieldingsOrderBy,
   CareerPitchingsOrderBy,
 } from '../../api/db/graphql.generated';

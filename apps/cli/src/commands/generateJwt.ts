@@ -103,12 +103,14 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
     };
     
     // Sign JWT with expiration
-    const signOptions: SignOptions = { expiresIn: expiration || '7d' };
+    const expirationValue = expiration || '7d';
+    const expMs = parseExpiration(expirationValue);
+    const expSeconds = Math.floor(expMs / 1000);
+    const signOptions: SignOptions = { expiresIn: expSeconds };
     const jwtToken = sign(payload, jwtSecret, signOptions);
     
     // Calculate expiration date for display
     const expirationDate = new Date();
-    const expMs = parseExpiration(expiration || '7d');
     expirationDate.setTime(expirationDate.getTime() + expMs);
     
     // Output based on format

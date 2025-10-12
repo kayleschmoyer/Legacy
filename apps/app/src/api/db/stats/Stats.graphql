@@ -209,21 +209,22 @@ fragment CareerPitchingStats on CareerPitching {
 
 query GetCareerBattingStats {
   careerBattingStats {
-    ...CareerBattingStats
-    # player relationship not available, only playerId
+    edges {
+      node {
+        ...CareerBattingStats
+      }
+    }
   }
 }
 
 query GetCareerFieldingStats {
   careerFieldingStats {
     ...CareerFieldingStats
-    # player relationship not available, only playerId
   }
 }
 
 query GetCareerPitchingStats {
   careerPitchingStats {
     ...CareerPitchingStats
-    # player relationship not available, only playerId
   }
 }

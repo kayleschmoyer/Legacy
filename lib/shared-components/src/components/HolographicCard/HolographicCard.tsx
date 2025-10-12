@@ -16,9 +16,11 @@ export interface HolographicCardProps {
   className?: string;
   /** Click handler */
   onPress?: () => void;
-
+  /** Custom style object */
+  style?: React.CSSProperties;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const StyledCard = styled(Card, {
   position: 'relative',
   cursor: 'pointer',
@@ -77,6 +79,7 @@ export const HolographicCard: React.FC<HolographicCardProps> = ({
   animationDelay = 0,
   className = '',
   onPress,
+  style,
   ...props
 }) => {
   const [mousePosition, setMousePosition] = React.useState({ x: 0, y: 0 });
@@ -97,11 +100,12 @@ export const HolographicCard: React.FC<HolographicCardProps> = ({
   }, []);
 
   // Generate CSS custom properties for mouse tracking
-  const mouseTrackingStyle = React.useMemo(() => ({
+  const combinedStyle = React.useMemo(() => ({
+    ...style,
     '--mouse-x': `${mousePosition.x}%`,
     '--mouse-y': `${mousePosition.y}%`,
     '--animation-delay': `${animationDelay}ms`,
-  } as React.CSSProperties), [mousePosition, animationDelay]);
+  } as React.CSSProperties), [mousePosition, animationDelay, style]);
 
   const cardClasses = [
     'holographic-card',
@@ -114,7 +118,7 @@ export const HolographicCard: React.FC<HolographicCardProps> = ({
   return (
     <div 
       className={cardClasses}
-      style={mouseTrackingStyle}
+      style={combinedStyle}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >

@@ -3,11 +3,17 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/logging/src",
   "projectType": "library",
-  "tags": [],
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "type:util"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "dist/lib/logging",
         "main": "lib/logging/src/index.ts",

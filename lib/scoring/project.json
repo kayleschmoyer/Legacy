@@ -3,7 +3,11 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/scoring/src",
   "projectType": "library",
-  "tags": [],
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "type:business"
+  ],
   "// targets": "to see all targets run: nx show project scoring --web",
   "targets": {}
 }

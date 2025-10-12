@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * CareerStatsService.test.ts - Comprehensive Test Suite
  *
@@ -76,6 +77,8 @@ const mockEmptyPlayerStats: CareerBattingStatsRaw = {
   sluggingPercentage: null,
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const mockGraphQLResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -83,6 +86,7 @@ const mockGraphQLResponse: MockedResponse = {
       ...DEFAULT_CAREER_STATS_PARAMS,
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   result: {
     data: {
       careerBattingStats: [mockRawPlayerStats],
@@ -90,6 +94,7 @@ const mockGraphQLResponse: MockedResponse = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const mockErrorResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -229,6 +234,7 @@ describe('CareerStatsService - React Hooks', () => {
         minHomeRuns: 100,
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const customMock: MockedResponse = {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
@@ -237,6 +243,7 @@ describe('CareerStatsService - React Hooks', () => {
             ...customParams,
           },
         },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         result: {
           data: {
             careerBattingStats: [mockRawPlayerStats],
@@ -275,6 +282,7 @@ describe('CareerStatsService - React Hooks', () => {
     });
 
     test('should calculate pagination metadata correctly', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const paginationMock: MockedResponse = {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
@@ -284,6 +292,7 @@ describe('CareerStatsService - React Hooks', () => {
             offset: 50,
           },
         },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         result: {
           data: {
             careerBattingStats: [mockRawPlayerStats],
@@ -350,14 +359,13 @@ describe('CareerStatsService - Configuration', () => {
   describe('DEFAULT_CAREER_STATS_PARAMS', () => {
     test('should contain sensible defaults', () => {
       expect(DEFAULT_CAREER_STATS_PARAMS).toMatchObject({
-        limit: 25,
-        offset: 0,
+        first: 25,
         orderBy: 'homeRuns',
         orderDirection: 'desc',
         minGames: 10,
         minHomeRuns: 0,
         minRBI: 0,
-        minBattingAvg: 0,
+        minBattingAvg: 0.0,
         searchTerm: '',
       });
     });

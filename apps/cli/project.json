@@ -3,27 +3,39 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/cli/src",
   "projectType": "application",
-  "tags": [],
+  "tags": [
+    "platform:node",
+    "scope:app",
+    "type:cli"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "defaultConfiguration": "production",
       "options": {
         "platform": "node",
         "outputPath": "dist/apps/cli",
-        "format": ["cjs"],
+        "format": [
+          "cjs"
+        ],
         "bundle": true,
         "main": "apps/cli/src/main.ts",
         "tsConfig": "apps/cli/tsconfig.app.json",
-        "assets": ["apps/cli/src/assets"],
+        "assets": [
+          "apps/cli/src/assets"
+        ],
         "generatePackageJson": true,
         "esbuildOptions": {
           "sourcemap": true,
           "outExtension": {
             ".js": ".js"
           },
-          "external": ["pg-native"]
+          "external": [
+            "pg-native"
+          ]
         }
       },
       "configurations": {
@@ -34,7 +46,9 @@
             "outExtension": {
               ".js": ".js"
             },
-            "external": ["pg-native"]
+            "external": [
+              "pg-native"
+            ]
           }
         }
       }
@@ -42,7 +56,9 @@
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "buildTarget": "cli:build",
         "runBuildTargetDependencies": false
@@ -87,7 +103,9 @@
     "run": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "buildTarget": "cli:build",
         "runBuildTargetDependencies": false,

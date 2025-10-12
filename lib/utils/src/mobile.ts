@@ -4,6 +4,5 @@ export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
 export * from './lib/LambdaHelpers';
-export * from './lib/sentry';
 
 // Note: AWS-specific utilities (SQS, Secrets Manager) are now in @legacy-sports/aws-utils

@@ -72,6 +72,12 @@ query GetPositionsForLeague($leagueId: Int!) {
   }
 }
 
+query GetUserLeagues {
+  userLeagues {
+    ...League
+  }
+}
+
 mutation DeleteAllLeagues {
   deleteAllLeagues
 }

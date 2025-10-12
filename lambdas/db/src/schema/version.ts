@@ -2,6 +2,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { builder } from './builder';
 
+// Type definitions for version info
+interface VersionData {
+  version?: string;
+  gitCommit?: string;
+  deployedAt?: string;
+  environment?: string;
+}
+
+interface VersionInfo {
+  version: string;
+  gitCommit: string;
+  deployedAt: string;
+  environment: string;
+}
+
 // Get version information from deployment info file or environment
 const getVersionInfo = () => {
   try {
@@ -18,7 +33,7 @@ const getVersionInfo = () => {
       for (const versionInfoPath of possiblePaths) {
         if (fs.existsSync(versionInfoPath)) {
           console.log(`Found version info at: ${versionInfoPath}`);
-          const versionData = JSON.parse(fs.readFileSync(versionInfoPath, 'utf8'));
+          const versionData = JSON.parse(fs.readFileSync(versionInfoPath, 'utf8')) as VersionData;
           return {
             version: versionData.version || 'unknown',
             gitCommit: versionData.gitCommit || 'unknown',
@@ -38,7 +53,7 @@ const getVersionInfo = () => {
     
     let packageVersion = 'unknown';
     try {
-      const pkg = require('../../../package.json');
+      const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf8')) as { version?: string };
       packageVersion = pkg.version || 'unknown';
     } catch {
       packageVersion = 'dev';

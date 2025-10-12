@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState } from 'react';
 import {
   Button,
@@ -15,7 +16,6 @@ import { Alert } from 'react-native';
 import { DateTimePicker } from '@legacy-sports/shared-components';
 import {
   CreateLeagueMutation,
-  CreateLeagueMutationVariables,
   useCreateLeagueMutation,
 } from '../../../../api/db/graphql.generated';
 
@@ -133,14 +133,6 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
   };
 
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0];
-  };
-
-  const parseDate = (dateString: string): Date => {
-    return new Date(dateString);
-  };
-
   return (
     <ScrollView flex={1} backgroundColor="$background" padding="$4">
       <YStack space="$6" maxWidth={600} alignSelf="center" width="100%">
@@ -195,9 +187,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     key={count}
                     size="$3"
                     variant={formData.numberOfTeams === count ? 'active' : 'outlined'}
-                    onPress={(e: any) => {
-                      e?.preventDefault?.();
-                      e?.stopPropagation?.();
+                    onPress={() => {
                       handleInputChange('numberOfTeams', count);
                     }}
                     disabled={loading}

@@ -6,7 +6,6 @@ import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
-  TeamMemberWithPositionsFragment,
 } from '../../api/db/graphql.generated';
 
 export interface LineupEditorProps {
@@ -20,7 +19,7 @@ export interface LineupEditorProps {
     playerTwo: TeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
-  team: readonly TeamMemberWithPositionsFragment[];
+  team: readonly TeamMemberFragment[];
   projections: Record<number, number>;
   actual: Record<number, number>;
 }

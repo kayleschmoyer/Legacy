@@ -1,7 +1,9 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - react-native-table-component lacks TypeScript definitions
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
 import { useTheme } from 'tamagui';
-import { CareerBattingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
+import { CareerBattingStatsFragment } from '../../api/db/graphql.generated';
 
 const TABLE_HEADER = [
   'Player',
@@ -26,7 +28,7 @@ const TABLE_HEADER = [
 ];
 
 export interface BattingStatsTableProps {
-  stats: readonly CareerBattingStatsWithPlayerFragment[];
+  stats: readonly CareerBattingStatsFragment[];
 }
 
 export function BattingStatsTable(
@@ -38,25 +40,25 @@ export function BattingStatsTable(
 
   const data = useMemo(() => {
     return stats.map((record) => [
-      record.player?.name,
-      record.g,
-      record.pa,
-      record.ab,
-      record.r,
-      record.h,
+      record.playerId, // Using playerId since there's no player object
+      record.games,
+      record.plateAppearances,
+      record.atBats,
+      record.runs,
+      record.hits,
       record.doubles,
       record.triples,
-      record.hr,
+      record.homeRuns,
       record.rbi,
-      record.sb,
-      record.cs,
-      record.bb,
-      record.so,
-      record.tb,
-      record.gidp,
-      record.hbp,
-      record.sh,
-      record.ibb,
+      record.stolenBases,
+      record.caughtStealing,
+      record.baseOnBalls,
+      record.strikeouts,
+      record.totalBases,
+      record.groundedIntoDoublePlays,
+      record.hitByPitch,
+      record.sacrificeHits,
+      record.intentionalBaseOnBalls,
     ]);
   }, [stats]);
 

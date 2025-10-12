@@ -58,7 +58,7 @@ export const LeagueManagement: React.FC = () => {
                   style: 'destructive',
                   onPress: () => {
                     setIsDeleting(true);
-                    deleteAllLeagues();
+                    void deleteAllLeagues();
                   },
                 },
               ]

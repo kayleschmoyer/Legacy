@@ -79,6 +79,7 @@ export class E2EJwtUtil {
    * Create a Playwright page setup function with JWT authentication
    */
   static createAuthSetup(userType: keyof typeof E2EJwtUtil.TEST_USERS | { email: string; accessLevel: 'none' | 'admin' }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return async (page: any) => {
       let jwt: string;
       
@@ -89,6 +90,7 @@ export class E2EJwtUtil {
         jwt = E2EJwtUtil.generateJwt(userType);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await page.addInitScript((token: string) => {
         window.localStorage.setItem('auth_jwt', token);
         console.log('[E2E Auth] Set JWT in localStorage:', token.substring(0, 20) + '...');
@@ -109,6 +111,7 @@ export class E2EJwtUtil {
   /**
    * Decode JWT payload for testing (without verification)
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static decodeJwtPayload(jwt: string): any {
     try {
       const [, payload] = jwt.split('.');

@@ -1,4 +1,5 @@
-import { createDatabaseService, CreateLeagueInput, CreateLeagueMemberInput, CreateTeamInput, League as DbLeague, LeagueMember as DbLeagueMember, Team as DbTeam, PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
+import { createDatabaseService, PublicDb, PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
+import type { Team as DbTeam } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { DraftService } from '@legacy-sports/db-client';
 import { and, eq } from 'drizzle-orm';
@@ -215,7 +216,8 @@ CreateLeagueAndTeamsPayload.implement({
   fields: (t) => ({
     league: t.field({
       type: League,
-      resolve: (parent) => parent.league as any,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      resolve: (parent) => parent.league as any, // GraphQL schema type mismatch - parent.league missing draftStatus field
     }),
     teams: t.field({
       type: [Team],
@@ -437,7 +439,8 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 // Helper function to randomly distribute players across teams
-async function randomlyAssignPlayers(db: any, leagueId: number, teams: any[], maxPlayersPerTeam: number) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function randomlyAssignPlayers(db: PublicDb, leagueId: number, teams: DbTeam[], maxPlayersPerTeam: number) {
   // Get a pool of players (limit to ensure we don't overwhelm the system)
   const availablePlayers: { id: number }[] = await db.select({
     id: PublicSchema.players.id,
@@ -453,7 +456,14 @@ async function randomlyAssignPlayers(db: any, leagueId: number, teams: any[], ma
   // Shuffle the players for random distribution
   const shuffledPlayers = shuffleArray(availablePlayers);
   
-  const teamMembers: any[] = [];
+  interface TeamMemberInsert {
+    teamId: number;
+    leagueId: number;
+    playerId: number;
+    positionId: number | null;
+  }
+  
+  const teamMembers: TeamMemberInsert[] = [];
   let playerIndex = 0;
 
   // Distribute players evenly across teams
@@ -506,8 +516,10 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         leagueName, 
         numberOfTeams, 
         draftType, 
-        maxBatters = 12, 
-        maxPitchers = 8,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        maxBatters: _maxBatters = 12, 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        maxPitchers: _maxPitchers = 8,
         maxRosterSize
       } = args.input;
       const userId = context.user.id;
@@ -541,8 +553,19 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
           const league = insertedLeagues[0];
 
-          let teams: any[] = [];
-          let leagueMembers: any[] = [];
+          interface InsertedTeam {
+            id: number;
+            name: string;
+            leagueId: number;
+          }
+          let teams: InsertedTeam[] = [];
+          interface LeagueMemberInsert {
+            leagueId: number;
+            userId: number;
+            teamId: number;
+            permissionLevel: 'owner' | 'commissioner';
+          }
+          let leagueMembers: LeagueMemberInsert[] = [];
 
           if (draftType === 'RANDOM-DRAFT') {
             // For random draft leagues, create multiple teams automatically
@@ -567,7 +590,11 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
             // Create teams up to numberOfTeams
             const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-            const teamData = [];
+            interface TeamInsertData {
+              name: string;
+              leagueId: number;
+            }
+            const teamData: TeamInsertData[] = [];
             
             for (let i = 0; i < teamsToCreate; i++) {
               teamData.push({
@@ -888,7 +915,8 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
             throw new Error('League not found');
           }
 
-          const maxRosterSize = league[0].maxRosterSize;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const _maxRosterSize = league[0].maxRosterSize;
 
           // Create roster positions for the league
           // Only create the defined starter positions, bench spots are inferred
@@ -1031,7 +1059,8 @@ builder.mutationField('deleteAllLeagues', (t) =>
         return result;
       } catch (error) {
         console.error('Error deleting leagues:', error);
-        throw new Error('Failed to delete leagues: ' + error.message);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error('Failed to delete leagues: ' + errorMessage);
       }
     },
   })

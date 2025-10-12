@@ -3,11 +3,19 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/draft-processor",
   "projectType": "application",
-  "tags": ["lambda", "draft"],
+  "tags": [
+    "draft",
+    "lambda",
+    "platform:node",
+    "scope:lambda",
+    "type:worker"
+  ],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist"],
+      "outputs": [
+        "{projectRoot}/dist"
+      ],
       "options": {
         "commands": [
           "vite build",
@@ -27,7 +35,9 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "jestConfig": "lambdas/draft-processor/jest.config.ts",
         "passWithNoTests": true
@@ -56,7 +66,9 @@
         "command": "node dist/index.js",
         "cwd": "lambdas/draft-processor"
       },
-      "dependsOn": ["build"]
+      "dependsOn": [
+        "build"
+      ]
     },
     "zip": {
       "executor": "nx:run-commands",
@@ -64,18 +76,24 @@
         "command": "cd dist && zip -r ../draft-processor-{args.version}.zip . && cd ..",
         "cwd": "lambdas/draft-processor"
       },
-      "dependsOn": ["build"]
+      "dependsOn": [
+        "build"
+      ]
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "powershell -ExecutionPolicy Bypass -File scripts/deploy-lambda.ps1 -FunctionName draft-processor"
       }
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for Draft Processor lambda...'",

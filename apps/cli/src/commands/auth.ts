@@ -64,10 +64,10 @@ export const handleAuth = async (args: ArgumentsCamelCase<AuthCommandArgs>): Pro
         break;
 
       default:
-        throw new Error(`Unknown action: ${args.action}`);
+        throw new Error(`Unknown action: ${String(args.action)}`);
     }
   } catch (error) {
-    LOGGER.error(`Auth ${args.action} failed:`, error instanceof Error ? error.message : String(error));
+    LOGGER.error(`Auth ${String(args.action)} failed:`, error instanceof Error ? error.message : String(error));
     throw error;
   }
 };

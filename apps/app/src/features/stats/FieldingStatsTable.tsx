@@ -1,7 +1,9 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - react-native-table-component lacks TypeScript definitions
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
 import { useTheme } from 'tamagui';
-import { CareerFieldingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
+import { CareerFieldingStatsFragment } from '../../api/db/graphql.generated';
 
 const TABLE_HEADER = [
   'Player',
@@ -22,7 +24,7 @@ const TABLE_HEADER = [
 ];
 
 export interface FieldingStatsTableProps {
-  stats: readonly CareerFieldingStatsWithPlayerFragment[];
+  stats: readonly CareerFieldingStatsFragment[];
 }
 
 export function FieldingStatsTable(
@@ -34,21 +36,21 @@ export function FieldingStatsTable(
 
   const data = useMemo(() => {
     return stats.map((record) => [
-      record.player?.name,
-      record.a,
-      record.cg,
+      record.playerId, // Using playerId since there's no player object
+      record.assists,
+      record.completeGames,
       record.chances,
-      record.cs,
-      record.dpDef,
-      record.eDef,
-      record.g,
-      record.gs,
-      record.innDef,
+      record.caughtStealing,
+      record.doublePlays,
+      record.errors,
+      record.games,
+      record.gamesStarted,
+      record.inningsDefended,
       record.pickoffs,
-      record.po,
-      record.pos,
-      record.sb,
-      record.wp,
+      record.putouts,
+      record.positions,
+      record.stolenBases,
+      record.wildPitches,
     ]);
   }, [stats]);
 

@@ -52,6 +52,7 @@ export async function handleComputeScoring(
     
     // Exclude positionsPlayed field from fielding stats as it's not used in scoring
     const fieldingStatsForScoring = fieldingStats ? 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       (({ positionsPlayed: _, ...rest }) => rest)(fieldingStats) : fieldingStats;
     
     const fieldingScore = computeScoring(

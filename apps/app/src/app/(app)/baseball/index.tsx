@@ -16,7 +16,7 @@ import {
 } from 'tamagui';
 import CreateLeagueModal from '../../../features/leagues/CreateLeagueModal';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
-import { useGetLeaguesForUserQuery } from '../../../api/db/users/Users.generated';
+import { useGetUserLeaguesQuery } from '../../../api/db/graphql.generated';
 
 type RootStackParamList = {
   LeagueHome: { leagueName: string };
@@ -33,10 +33,9 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
   const [isLoading, setIsLoading] = useState(false);
   const userInfo = useAuthorizedUserInfo();
 
-  const { data, loading: loadingLeagues } = useGetLeaguesForUserQuery({
-    variables: {
-      id: userInfo.id,
-    },
+  const { data, loading: loadingLeagues } = useGetUserLeaguesQuery({
+    // Only run the query if user is authenticated
+    skip: !userInfo?.id,
   });
 
   const openDraftModal = () => setModalVisible(true);
@@ -59,7 +58,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
     }, 2000);
   };
 
-  const leagues = data?.user?.leagueMembers.nodes;
+  const leagues = data?.userLeagues || [];
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -161,12 +160,12 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
               <Link
                 href={{
                   params: {
-                    leagueId: l?.league?.id,
+                    leagueId: l?.id,
                   },
                   pathname: './league/[leagueId]',
                 }}
                 asChild={true}
-                key={l?.league?.id}
+                key={l?.id}
               >
                 <Text
                   color="$orange9"
@@ -174,7 +173,7 @@ export default function BaseballHome({ navigation }: BaseballHomeProps) {
                   fontWeight="600"
                   marginBottom="$2"
                 >
-                  {l?.league?.name}
+                  {l?.name}
                 </Text>
               </Link>
             ))

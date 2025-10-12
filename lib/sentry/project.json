@@ -3,17 +3,25 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/sentry/src",
   "projectType": "library",
-  "tags": [],
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "type:util"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "dist/lib/sentry",
         "tsConfig": "lib/sentry/tsconfig.lib.json",
         "packageJson": "lib/sentry/package.json",
         "main": "lib/sentry/src/index.ts",
-        "assets": ["lib/sentry/*.md"]
+        "assets": [
+          "lib/sentry/*.md"
+        ]
       }
     }
   }

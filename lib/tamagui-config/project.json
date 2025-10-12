@@ -3,11 +3,18 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/tamagui-config/src",
   "projectType": "library",
-  "tags": ["type:config", "scope:ui"],
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "scope:ui",
+    "type:config"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "dist/lib/tamagui-config",
         "main": "lib/tamagui-config/src/index.ts",

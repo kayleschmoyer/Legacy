@@ -733,6 +733,7 @@ export function PlayerStatsDataGrid({
                   <Text fontSize="$3" color="$color11" numberOfLines={1}>
                     {column.formatter
                       ? column.formatter(player[column.key])
+                      // eslint-disable-next-line @typescript-eslint/no-base-to-string
                       : String(player[column.key] ?? '--')}
                   </Text>
                 </XStack>

@@ -76,14 +76,40 @@ export const Sheet = ({ children, ...props }) =>
   React.createElement('div', props, children);
 export const Dialog = ({ children, ...props }) =>
   React.createElement('div', props, children);
-export const Popover = ({ children, ...props }) =>
+// Create compound Popover component
+const PopoverBase = ({ children, ...props }) =>
   React.createElement('div', props, children);
+PopoverBase.Trigger = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+PopoverBase.Content = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+PopoverBase.Close = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+PopoverBase.Arrow = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+export const Popover = PopoverBase;
+
 export const Tooltip = ({ children, ...props }) =>
   React.createElement('div', props, children);
 export const AlertDialog = ({ children, ...props }) =>
   React.createElement('div', props, children);
-export const Select = ({ children, ...props }) =>
+
+// Create compound Select component
+const SelectBase = ({ children, ...props }) =>
   React.createElement('select', props, children);
+SelectBase.Trigger = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+SelectBase.Value = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+SelectBase.Content = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+SelectBase.Viewport = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+SelectBase.Item = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+SelectBase.ItemText = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+export const Select = SelectBase;
 export const Tabs = ({ children, ...props }) =>
   React.createElement('div', props, children);
 export const ListItem = ({ children, ...props }) =>

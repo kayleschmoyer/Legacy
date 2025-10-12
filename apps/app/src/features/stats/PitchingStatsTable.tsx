@@ -1,7 +1,9 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - react-native-table-component lacks TypeScript definitions
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
 import { useTheme } from 'tamagui';
-import { CareerPitchingStatsWithPlayerFragment } from '../../api/db/graphql.generated';
+import { CareerPitchingStatsFragment } from '../../api/db/graphql.generated';
 
 const TABLE_HEADER = [
   'Player',
@@ -28,7 +30,7 @@ const TABLE_HEADER = [
 ];
 
 export interface PitchingStatsTableProps {
-  stats: readonly CareerPitchingStatsWithPlayerFragment[];
+  stats: readonly CareerPitchingStatsFragment[];
 }
 
 export function PitchingStatsTable(
@@ -40,27 +42,27 @@ export function PitchingStatsTable(
 
   const data = useMemo(() => {
     return stats.map((record) => [
-      record.player?.name,
-      record.bb,
-      record.bk,
+      record.playerId, // Using playerId since there's no player object
+      record.baseOnBalls,
+      record.balks,
       record.battersFaced,
-      record.cg,
-      record.er,
-      record.g,
-      record.gf,
-      record.gs,
-      record.h,
-      record.hbp,
-      record.hr,
-      record.ibb,
-      record.l,
+      record.completeGames,
+      record.earnedRuns,
+      record.games,
+      record.gamesFinished,
+      record.gamesStarted,
+      record.hits,
+      record.hitByPitch,
+      record.homeRuns,
+      record.intentionalBaseOnBalls,
+      record.losses,
       record.outsRecorded,
-      record.r,
-      record.sho,
-      record.so,
-      record.sv,
-      record.w,
-      record.wp,
+      record.runs,
+      record.shutouts,
+      record.strikeouts,
+      record.saves,
+      record.wins,
+      record.wildPitches,
     ]);
   }, [stats]);
 

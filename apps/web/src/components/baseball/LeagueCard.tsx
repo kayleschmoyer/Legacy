@@ -77,22 +77,8 @@ export function LeagueCard({ league, onViewLeague, animationDelay = 0 }: LeagueC
         intensity="normal"
         enableHover={true}
         className="league-card"
-        padding="$7"
-        borderRadius="$8"
-        width="100%"
-        height="100%"
-        cursor="pointer"
         onPress={handleViewLeague}
-        role="button"
-        tabIndex={0}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={`View ${league.name || 'Unnamed League'} details`}
-        accessibilityHint="Double-tap to view league details and statistics"
-        onKeyDown={handleKeyPress}
-        style={{
-          animationDelay: `${animationDelay}ms`,
-        }}
+        animationDelay={animationDelay}
       >
       <YStack space="$5">
         {/* League Header */}
