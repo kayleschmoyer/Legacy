@@ -29,3 +29,6 @@ troubleshooting,gradle_ci,DO,gradle_offline_fallback,Use offline mode as fallbac
 troubleshooting,npm_ci_failures,CRITICAL,npm_install_timeout,Setup action npm ci hangs without completion - add timeout protection,"timeout-minutes: 10 and timeout 480s npm ci with retry logic",".github/actions/setup/action.yml"
 troubleshooting,npm_ci_failures,DO,npm_cache_reset_fallback,Use cache reset as fallback when npm ci fails,"npm cache clean --force before retry",".github/actions/setup/action.yml"
 troubleshooting,npm_ci_failures,DO,npm_lockfile_validation,Validate package-lock.json exists before npm ci,"Check file exists and provide clear error message",".github/actions/setup/action.yml"
+troubleshooting,sharp_dependencies,CRITICAL,sharp_lockfile_sync,Sharp platform binaries missing from lock file causes npm ci sync errors,"npm install --package-lock-only to regenerate lock file","package-lock.json"
+troubleshooting,sharp_dependencies,DO,lockfile_sync_detection,Detect lock file sync issues and use npm install fallback,"Check for 'package.json and package-lock.json.*are in sync' error",".github/actions/setup/action.yml"
+troubleshooting,sharp_dependencies,DO,sharp_platform_binaries,Sharp requires platform-specific binaries that may be missing after updates,"Regenerate lock file when Sharp dependencies are updated","apps/*/package.json"

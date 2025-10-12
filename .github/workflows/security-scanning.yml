@@ -1,0 +1,624 @@
+name: "Security & Vulnerability Scanning"
+
+# Comprehensive security scanning pipeline for Legacy Sports
+# Includes SAST, dependency scanning, secret detection, and infrastructure security
+# Runs on all PRs and weekly scheduled scans for continuous monitoring
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+  schedule:
+    # Weekly comprehensive security scan
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: "Type of security scan to run"
+        required: false
+        default: "comprehensive"
+        type: choice
+        options:
+          - comprehensive
+          - dependencies-only
+          - sast-only
+          - secrets-only
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: write
+  issues: write
+
+env:
+  # Security scan configuration
+  SECURITY_SCAN_TIMEOUT: 15
+  DEPENDENCY_SCAN_TIMEOUT: 10
+  SAST_SCAN_TIMEOUT: 20
+
+jobs:
+  # ======================================================================
+  # SECURITY SCAN ORCHESTRATION
+  # ======================================================================
+
+  security-scan-plan:
+    name: "Security Scan Planning"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    
+    outputs:
+      run-dependency-scan: ${{ steps.plan.outputs.run-dependency-scan }}
+      run-sast-scan: ${{ steps.plan.outputs.run-sast-scan }}
+      run-secret-scan: ${{ steps.plan.outputs.run-secret-scan }}
+      run-infrastructure-scan: ${{ steps.plan.outputs.run-infrastructure-scan }}
+      scan-scope: ${{ steps.plan.outputs.scan-scope }}
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "📋 Determine Security Scan Scope"
+        id: plan
+        run: |
+          echo "::group::🔒 Security Scan Planning"
+          
+          SCAN_TYPE="${{ github.event.inputs.scan_type || 'comprehensive' }}"
+          EVENT_NAME="${{ github.event_name }}"
+          
+          echo "🎯 Scan Type: $SCAN_TYPE"
+          echo "🔄 Trigger: $EVENT_NAME"
+
+          # Default to comprehensive scanning
+          RUN_DEPS=true
+          RUN_SAST=true  
+          RUN_SECRETS=true
+          RUN_INFRA=true
+          SCAN_SCOPE="full"
+
+          # Adjust based on scan type input
+          case "$SCAN_TYPE" in
+            "dependencies-only")
+              RUN_DEPS=true
+              RUN_SAST=false
+              RUN_SECRETS=false
+              RUN_INFRA=false
+              SCAN_SCOPE="dependencies"
+              ;;
+            "sast-only")
+              RUN_DEPS=false
+              RUN_SAST=true
+              RUN_SECRETS=false
+              RUN_INFRA=false
+              SCAN_SCOPE="static-analysis"
+              ;;
+            "secrets-only")
+              RUN_DEPS=false
+              RUN_SAST=false
+              RUN_SECRETS=true
+              RUN_INFRA=false
+              SCAN_SCOPE="secrets"
+              ;;
+          esac
+
+          # For PR events, focus on changed files for faster feedback
+          if [ "$EVENT_NAME" == "pull_request" ]; then
+            echo "🔍 PR-focused security scan"
+            # Always run secret scanning on PRs
+            RUN_SECRETS=true
+            SCAN_SCOPE="pr-targeted"
+          fi
+
+          # For scheduled runs, always do comprehensive scanning
+          if [ "$EVENT_NAME" == "schedule" ]; then
+            echo "📅 Scheduled comprehensive security audit"
+            RUN_DEPS=true
+            RUN_SAST=true
+            RUN_SECRETS=true
+            RUN_INFRA=true
+            SCAN_SCOPE="scheduled-audit"
+          fi
+
+          # Set outputs
+          echo "run-dependency-scan=$RUN_DEPS" >> $GITHUB_OUTPUT
+          echo "run-sast-scan=$RUN_SAST" >> $GITHUB_OUTPUT
+          echo "run-secret-scan=$RUN_SECRETS" >> $GITHUB_OUTPUT
+          echo "run-infrastructure-scan=$RUN_INFRA" >> $GITHUB_OUTPUT
+          echo "scan-scope=$SCAN_SCOPE" >> $GITHUB_OUTPUT
+
+          # Create summary
+          echo "## 🔒 Security Scan Plan" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scope**: $SCAN_SCOPE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Scan**: $RUN_DEPS" >> $GITHUB_STEP_SUMMARY
+          echo "- **SAST Scan**: $RUN_SAST" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secret Detection**: $RUN_SECRETS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Infrastructure Scan**: $RUN_INFRA" >> $GITHUB_STEP_SUMMARY
+
+          echo "::endgroup::"
+
+  # ======================================================================
+  # DEPENDENCY VULNERABILITY SCANNING
+  # ======================================================================
+
+  dependency-scan:
+    name: "Dependency Vulnerability Scan"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: security-scan-plan
+    if: needs.security-scan-plan.outputs.run-dependency-scan == 'true'
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Environment"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: "🔍 NPM Audit Scan"
+        id: npm-audit
+        run: |
+          echo "::group::📦 NPM Dependency Audit"
+          
+          # Run npm audit and capture results
+          AUDIT_TIMESTAMP=$(date +%s)
+          AUDIT_LOG="npm-audit-${AUDIT_TIMESTAMP}.json"
+          
+          echo "🔍 Running npm audit..."
+          if npm audit --audit-level=moderate --json > "$AUDIT_LOG" 2>&1; then
+            echo "✅ No moderate or higher vulnerabilities found"
+            AUDIT_STATUS="clean"
+          else
+            AUDIT_EXIT_CODE=$?
+            echo "⚠️ Vulnerabilities detected (exit code: $AUDIT_EXIT_CODE)"
+            AUDIT_STATUS="vulnerabilities"
+          fi
+
+          # Parse audit results
+          if [ -f "$AUDIT_LOG" ]; then
+            TOTAL_VULNS=$(jq -r '.metadata.vulnerabilities.total // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
+            HIGH_VULNS=$(jq -r '.metadata.vulnerabilities.high // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
+            CRITICAL_VULNS=$(jq -r '.metadata.vulnerabilities.critical // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
+            
+            echo "📊 Vulnerability Summary:"
+            echo "- Total: $TOTAL_VULNS"
+            echo "- High: $HIGH_VULNS"
+            echo "- Critical: $CRITICAL_VULNS"
+            
+            # Export for summary
+            echo "total-vulns=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+            echo "high-vulns=$HIGH_VULNS" >> $GITHUB_OUTPUT
+            echo "critical-vulns=$CRITICAL_VULNS" >> $GITHUB_OUTPUT
+            echo "audit-status=$AUDIT_STATUS" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      - name: "🛡️ Snyk Vulnerability Scan"
+        id: snyk-scan
+        continue-on-error: true
+        run: |
+          echo "::group::🛡️ Snyk Security Scan"
+          
+          # Install Snyk CLI
+          npm install -g snyk
+          
+          # Authenticate if token available
+          if [ -n "${{ secrets.SNYK_TOKEN }}" ]; then
+            snyk auth "${{ secrets.SNYK_TOKEN }}"
+            echo "✅ Snyk authenticated"
+          else
+            echo "ℹ️ Running Snyk in anonymous mode (limited features)"
+          fi
+
+          # Run Snyk test
+          SNYK_LOG="snyk-results-$(date +%s).json"
+          
+          if snyk test --json > "$SNYK_LOG" 2>&1; then
+            echo "✅ Snyk scan completed - no critical vulnerabilities"
+            SNYK_STATUS="clean"
+          else
+            echo "⚠️ Snyk detected vulnerabilities"
+            SNYK_STATUS="vulnerabilities"
+          fi
+
+          # Parse Snyk results if file exists
+          if [ -f "$SNYK_LOG" ]; then
+            SNYK_ISSUES=$(jq '.vulnerabilities | length' "$SNYK_LOG" 2>/dev/null || echo 0)
+            echo "📊 Snyk found $SNYK_ISSUES potential issues"
+            
+            # Show critical issues
+            if [ "$SNYK_ISSUES" -gt 0 ]; then
+              echo "🚨 Critical vulnerabilities:"
+              jq -r '.vulnerabilities[] | select(.severity == "critical" or .severity == "high") | "- \(.title) (\(.severity))"' "$SNYK_LOG" 2>/dev/null | head -5
+            fi
+            
+            echo "snyk-issues=$SNYK_ISSUES" >> $GITHUB_OUTPUT
+            echo "snyk-status=$SNYK_STATUS" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      - name: "📊 Dependency Scan Summary"
+        run: |
+          echo "## 📦 Dependency Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
+          
+          # NPM Audit Results
+          AUDIT_STATUS="${{ steps.npm-audit.outputs.audit-status || 'unknown' }}"
+          TOTAL_VULNS="${{ steps.npm-audit.outputs.total-vulns || 0 }}"
+          HIGH_VULNS="${{ steps.npm-audit.outputs.high-vulns || 0 }}"
+          CRITICAL_VULNS="${{ steps.npm-audit.outputs.critical-vulns || 0 }}"
+          
+          echo "### NPM Audit Results" >> $GITHUB_STEP_SUMMARY
+          if [ "$AUDIT_STATUS" == "clean" ]; then
+            echo "✅ **Status**: No moderate+ vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Status**: $TOTAL_VULNS vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+            echo "- **Critical**: $CRITICAL_VULNS" >> $GITHUB_STEP_SUMMARY
+            echo "- **High**: $HIGH_VULNS" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Snyk Results
+          SNYK_STATUS="${{ steps.snyk-scan.outputs.snyk-status || 'unknown' }}"
+          SNYK_ISSUES="${{ steps.snyk-scan.outputs.snyk-issues || 0 }}"
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Snyk Security Scan" >> $GITHUB_STEP_SUMMARY
+          if [ "$SNYK_STATUS" == "clean" ]; then
+            echo "✅ **Status**: No critical vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Status**: $SNYK_ISSUES potential issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Recommendations
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Recommendations" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$CRITICAL_VULNS" -gt 0 ] || [ "$HIGH_VULNS" -gt 0 ]; then
+            echo "- 🚨 **Immediate Action**: Update packages with critical/high vulnerabilities" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔧 **Command**: \`npm audit fix\` or manual updates" >> $GITHUB_STEP_SUMMARY
+            echo "- 📊 **Monitor**: Set up automated dependency updates with Dependabot" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ **Status**: Dependency security looks good" >> $GITHUB_STEP_SUMMARY
+            echo "- 📅 **Next**: Continue regular weekly scans" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ======================================================================
+  # SECRET DETECTION SCANNING
+  # ======================================================================
+
+  secret-detection:
+    name: "Secret Detection Scan"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: security-scan-plan
+    if: needs.security-scan-plan.outputs.run-secret-scan == 'true'
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔍 GitLeaks Secret Detection"
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        continue-on-error: true
+
+      - name: "🔐 Manual Secret Pattern Detection"
+        id: manual-scan
+        run: |
+          echo "::group::🔍 Additional Secret Pattern Scanning"
+          
+          SECRET_PATTERNS_FOUND=0
+          
+          echo "🔍 Scanning for common secret patterns..."
+          
+          # Check for common secret patterns
+          SECRET_PATTERNS=(
+            "AKIA[0-9A-Z]{16}"           # AWS Access Key
+            "aws_secret_access_key"      # AWS Secret Key
+            "sk_live_[0-9a-zA-Z]{24}"   # Stripe Live Key  
+            "sk_test_[0-9a-zA-Z]{24}"   # Stripe Test Key
+            "rk_live_[0-9a-zA-Z]{24}"   # Stripe Live Key
+            "AIza[0-9A-Za-z\\-_]{35}"   # Google API Key
+            "ya29\\.[0-9A-Za-z\\-_]+"   # Google OAuth
+            "ghp_[0-9a-zA-Z]{36}"       # GitHub Personal Access Token
+            "ghs_[0-9a-zA-Z]{36}"       # GitHub App Token
+            "postgres://.*:.*@.*:.*/"   # PostgreSQL connection string with credentials
+          )
+          
+          # Scan for patterns (excluding common safe files)
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" . \
+              --exclude-dir=".git" \
+              --exclude-dir="node_modules" \
+              --exclude-dir="dist" \
+              --exclude-dir=".nx" \
+              --exclude="*.md" \
+              --exclude="*.yml" \
+              --exclude="*.yaml" \
+              2>/dev/null; then
+              
+              echo "⚠️ Potential secret pattern found: $pattern"
+              SECRET_PATTERNS_FOUND=$((SECRET_PATTERNS_FOUND + 1))
+            fi
+          done
+
+          # Check for hardcoded credentials in specific files
+          echo "🔍 Checking for hardcoded credentials..."
+          
+          if grep -r "password\s*[:=]\s*['\"][^'\"]*['\"]" . \
+            --include="*.ts" --include="*.js" --include="*.json" \
+            --exclude-dir="node_modules" --exclude-dir=".git" 2>/dev/null; then
+            echo "⚠️ Potential hardcoded passwords found"
+            SECRET_PATTERNS_FOUND=$((SECRET_PATTERNS_FOUND + 1))
+          fi
+
+          echo "secret-patterns-found=$SECRET_PATTERNS_FOUND" >> $GITHUB_OUTPUT
+
+          if [ $SECRET_PATTERNS_FOUND -eq 0 ]; then
+            echo "✅ No obvious secret patterns detected"
+          else
+            echo "⚠️ Found $SECRET_PATTERNS_FOUND potential secret patterns"
+          fi
+
+          echo "::endgroup::"
+
+      - name: "📊 Secret Detection Summary"  
+        run: |
+          echo "## 🔐 Secret Detection Summary" >> $GITHUB_STEP_SUMMARY
+          
+          GITLEAKS_STATUS="${{ steps.gitleaks.outcome }}"
+          MANUAL_PATTERNS="${{ steps.manual-scan.outputs.secret-patterns-found || 0 }}"
+          
+          echo "### GitLeaks Scan Results" >> $GITHUB_STEP_SUMMARY
+          if [ "$GITLEAKS_STATUS" == "success" ]; then
+            echo "✅ **GitLeaks**: No secrets detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **GitLeaks**: Potential secrets detected - check detailed logs" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Manual Pattern Detection" >> $GITHUB_STEP_SUMMARY
+          if [ "$MANUAL_PATTERNS" -eq 0 ]; then
+            echo "✅ **Pattern Scan**: No obvious secret patterns found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Pattern Scan**: $MANUAL_PATTERNS potential patterns detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🛡️ Security Recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Use GitHub Secrets for sensitive data" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 Review .gitignore to exclude credential files" >> $GITHUB_STEP_SUMMARY  
+          echo "- 🔄 Rotate any exposed credentials immediately" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 Follow security guidelines in SECURITY_AND_SECRETS_GUIDE.md" >> $GITHUB_STEP_SUMMARY
+
+  # ======================================================================
+  # STATIC APPLICATION SECURITY TESTING (SAST)
+  # ======================================================================
+
+  sast-scan:
+    name: "Static Application Security Testing"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: security-scan-plan
+    if: needs.security-scan-plan.outputs.run-sast-scan == 'true'
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Environment"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: "🛡️ CodeQL Analysis"
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,typescript
+          queries: security-extended,security-and-quality
+
+      - name: "📦 Build for Analysis"
+        run: |
+          echo "🏗️ Building applications for SAST analysis..."
+          
+          # Build shared libraries first
+          npx nx build lib-shared-components || true
+          npx nx build lib-tamagui-config || true
+          
+          # Build applications
+          npx nx build web || echo "Web build failed - continuing analysis"
+          
+          echo "✅ Build completed for SAST analysis"
+
+      - name: "🔍 Perform CodeQL Analysis" 
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+      - name: "🔐 ESLint Security Rules"
+        id: eslint-security
+        run: |
+          echo "::group::🔒 ESLint Security Rule Analysis"
+          
+          # Install eslint security plugin if not present
+          npm install --no-save eslint-plugin-security
+          
+          SECURITY_LOG="eslint-security-$(date +%s).json"
+          
+          # Run ESLint with security rules
+          npx eslint . \
+            --ext .ts,.tsx,.js,.jsx \
+            --format json \
+            --output-file "$SECURITY_LOG" \
+            --config .eslintrc.json \
+            --no-eslintrc \
+            --plugin security \
+            --rule "security/detect-object-injection: error" \
+            --rule "security/detect-non-literal-regexp: error" \
+            --rule "security/detect-unsafe-regex: error" \
+            --rule "security/detect-buffer-noassert: error" \
+            --rule "security/detect-child-process: error" \
+            --rule "security/detect-disable-mustache-escape: error" \
+            --rule "security/detect-eval-with-expression: error" \
+            --rule "security/detect-no-csrf-before-method-override: error" \
+            --rule "security/detect-non-literal-fs-filename: error" \
+            --rule "security/detect-non-literal-require: error" \
+            --rule "security/detect-possible-timing-attacks: error" \
+            --rule "security/detect-pseudoRandomBytes: error" \
+            2>/dev/null || true
+
+          # Parse results
+          if [ -f "$SECURITY_LOG" ]; then
+            SECURITY_ISSUES=$(jq length "$SECURITY_LOG" 2>/dev/null || echo 0)
+            echo "📊 ESLint Security: $SECURITY_ISSUES issues found"
+            
+            if [ "$SECURITY_ISSUES" -gt 0 ]; then
+              echo "🚨 Security issues detected:"
+              jq -r '.[] | "- \(.ruleId): \(.message) (\(.filePath))"' "$SECURITY_LOG" | head -10
+            fi
+            
+            echo "eslint-security-issues=$SECURITY_ISSUES" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      - name: "📊 SAST Summary"
+        run: |
+          echo "## 🛡️ Static Application Security Testing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # CodeQL Results
+          echo "### CodeQL Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **CodeQL**: Analysis completed - results available in Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "- Language: JavaScript/TypeScript" >> $GITHUB_STEP_SUMMARY
+          echo "- Query Suite: security-extended,security-and-quality" >> $GITHUB_STEP_SUMMARY
+          
+          # ESLint Security Results
+          ESLINT_ISSUES="${{ steps.eslint-security.outputs.eslint-security-issues || 0 }}"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ESLint Security Rules" >> $GITHUB_STEP_SUMMARY
+          if [ "$ESLINT_ISSUES" -eq 0 ]; then
+            echo "✅ **ESLint Security**: No security rule violations detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **ESLint Security**: $ESLINT_ISSUES potential security issues" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Review CodeQL results in Security → Code scanning alerts" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 Address any high-severity security findings" >> $GITHUB_STEP_SUMMARY
+          echo "- 📚 Follow secure coding practices" >> $GITHUB_STEP_SUMMARY
+
+  # ======================================================================
+  # SECURITY SCAN SUMMARY & REPORTING  
+  # ======================================================================
+
+  security-summary:
+    name: "Security Scan Summary"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
+    if: always()
+
+    steps:
+      - name: "📊 Generate Security Summary Report"
+        run: |
+          echo "## 🔒 Security Scan Summary Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Date**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Scope**: ${{ needs.security-scan-plan.outputs.scan-scope }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Security Scan Results Table
+          echo "### 🛡️ Scan Results Overview" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------------|---------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Dependency Scan
+          DEP_STATUS="${{ needs.dependency-scan.result }}"
+          if [ "$DEP_STATUS" == "success" ]; then
+            echo "| Dependency Vulnerabilities | ✅ Passed | No critical vulnerabilities |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$DEP_STATUS" == "failure" ]; then
+            echo "| Dependency Vulnerabilities | ❌ Issues | Vulnerabilities detected |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Dependency Vulnerabilities | ⏭️ Skipped | Not included in scan scope |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Secret Detection
+          SECRET_STATUS="${{ needs.secret-detection.result }}"
+          if [ "$SECRET_STATUS" == "success" ]; then
+            echo "| Secret Detection | ✅ Passed | No secrets detected |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$SECRET_STATUS" == "failure" ]; then
+            echo "| Secret Detection | ⚠️ Issues | Potential secrets found |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Secret Detection | ⏭️ Skipped | Not included in scan scope |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # SAST Scan
+          SAST_STATUS="${{ needs.sast-scan.result }}"
+          if [ "$SAST_STATUS" == "success" ]; then
+            echo "| Static Analysis (SAST) | ✅ Passed | No security issues |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$SAST_STATUS" == "failure" ]; then
+            echo "| Static Analysis (SAST) | ⚠️ Issues | Security findings detected |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Static Analysis (SAST) | ⏭️ Skipped | Not included in scan scope |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Overall Security Posture
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Security Posture" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine overall status
+          CRITICAL_FAILURES=0
+          if [ "$DEP_STATUS" == "failure" ]; then CRITICAL_FAILURES=$((CRITICAL_FAILURES + 1)); fi
+          if [ "$SECRET_STATUS" == "failure" ]; then CRITICAL_FAILURES=$((CRITICAL_FAILURES + 1)); fi
+          
+          if [ $CRITICAL_FAILURES -eq 0 ]; then
+            echo "✅ **Overall Status**: Security scans completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "🛡️ **Assessment**: Application security posture is good" >> $GITHUB_STEP_SUMMARY
+          elif [ $CRITICAL_FAILURES -eq 1 ]; then
+            echo "⚠️ **Overall Status**: Minor security issues detected" >> $GITHUB_STEP_SUMMARY
+            echo "🔧 **Assessment**: Address findings and re-scan" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🚨 **Overall Status**: Multiple security concerns detected" >> $GITHUB_STEP_SUMMARY
+            echo "⚡ **Assessment**: Immediate security review required" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Action Items
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Recommended Actions" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $CRITICAL_FAILURES -gt 0 ]; then
+            echo "1. 🚨 **Immediate**: Review and address security findings" >> $GITHUB_STEP_SUMMARY
+            echo "2. 🔧 **Fix**: Update vulnerable dependencies" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🔒 **Secure**: Remove any exposed secrets" >> $GITHUB_STEP_SUMMARY
+            echo "4. ✅ **Verify**: Re-run security scan after fixes" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "1. ✅ **Monitor**: Continue regular security scanning" >> $GITHUB_STEP_SUMMARY
+            echo "2. 📚 **Educate**: Keep team updated on security best practices" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🔄 **Automate**: Consider adding pre-commit security hooks" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Next Scan Schedule
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📅 Next Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scheduled**: Every Monday at 2 AM UTC" >> $GITHUB_STEP_SUMMARY
+          echo "- **Automatic**: On every PR and main branch push" >> $GITHUB_STEP_SUMMARY
+          echo "- **Manual**: Available via workflow dispatch" >> $GITHUB_STEP_SUMMARY

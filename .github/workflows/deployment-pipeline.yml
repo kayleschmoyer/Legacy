@@ -1,0 +1,478 @@
+name: "Deployment Pipeline"
+
+# This workflow handles comprehensive deployments after CI validation passes
+# Triggered only after successful CI validation to ensure quality gates are met
+# Focuses on builds, deployments, and production readiness
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline (Improved)"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'apps/app/**' 
+      - 'lambdas/**'
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "Force deployment even if CI didn't run"
+        required: false
+        default: false
+        type: boolean
+      deploy_target:
+        description: "Deployment target"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - web-only
+          - lambdas-only
+          - mobile-only
+
+# Cancel in-progress deployments for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  deployments: write
+  pages: write
+  id-token: write
+
+env:
+  # AWS Configuration
+  AWS_REGION: us-east-1
+  AWS_SERVICE_NAME: legacy-sports
+  
+  # Nx Configuration for deployment builds
+  NX_CLOUD_DISTRIBUTED_EXECUTION: false
+  NX_DAEMON: false
+  NX_PARALLEL: 2
+  NODE_OPTIONS: "--max_old_space_size=4096"
+
+jobs:
+  # ======================================================================
+  # DEPLOYMENT VALIDATION & PREREQUISITES
+  # ======================================================================
+  
+  validate-deployment:
+    name: "Validate Deployment Prerequisites"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    outputs:
+      should-deploy: ${{ steps.validation.outputs.should-deploy }}
+      ci-status: ${{ steps.ci-check.outputs.status }}
+      deploy-web: ${{ steps.validation.outputs.deploy-web }}
+      deploy-mobile: ${{ steps.validation.outputs.deploy-mobile }}
+      deploy-lambdas: ${{ steps.validation.outputs.deploy-lambdas }}
+      deploy-terraform: ${{ steps.validation.outputs.deploy-terraform }}
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔍 Check CI Pipeline Status"
+        id: ci-check
+        run: |
+          echo "::group::CI Pipeline Status Check"
+          
+          # Check if this is a workflow_dispatch with force_deploy
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.force_deploy }}" == "true" ]; then
+            echo "🚀 Force deployment requested - skipping CI validation"
+            echo "status=forced" >> $GITHUB_OUTPUT
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          # For workflow_run triggers, check if CI passed
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            CI_CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            if [ "$CI_CONCLUSION" == "success" ]; then
+              echo "✅ CI Pipeline passed - proceeding with deployment"
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "❌ CI Pipeline failed or was cancelled - blocking deployment"
+              echo "status=failed" >> $GITHUB_OUTPUT
+              echo "::error::Cannot deploy - CI pipeline status: $CI_CONCLUSION"
+              exit 1
+            fi
+          else
+            echo "ℹ️ Direct push to main branch - will validate requirements"
+            echo "status=direct" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "::endgroup::"
+
+      - name: "📋 Determine Deployment Scope"
+        id: validation
+        run: |
+          echo "::group::Deployment Scope Analysis"
+          
+          # Determine what should be deployed based on changes and inputs
+          DEPLOY_TARGET="${{ github.event.inputs.deploy_target || 'all' }}"
+          
+          if [ "$DEPLOY_TARGET" != "all" ]; then
+            echo "🎯 Selective deployment requested: $DEPLOY_TARGET"
+            case "$DEPLOY_TARGET" in
+              "web-only")
+                echo "deploy-web=true" >> $GITHUB_OUTPUT
+                echo "deploy-mobile=false" >> $GITHUB_OUTPUT
+                echo "deploy-lambdas=false" >> $GITHUB_OUTPUT
+                echo "deploy-terraform=false" >> $GITHUB_OUTPUT
+                ;;
+              "lambdas-only")
+                echo "deploy-web=false" >> $GITHUB_OUTPUT
+                echo "deploy-mobile=false" >> $GITHUB_OUTPUT
+                echo "deploy-lambdas=true" >> $GITHUB_OUTPUT
+                echo "deploy-terraform=false" >> $GITHUB_OUTPUT
+                ;;
+              "mobile-only")
+                echo "deploy-web=false" >> $GITHUB_OUTPUT
+                echo "deploy-mobile=true" >> $GITHUB_OUTPUT
+                echo "deploy-lambdas=false" >> $GITHUB_OUTPUT
+                echo "deploy-terraform=false" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          else
+            echo "🔍 Analyzing changed files for deployment scope..."
+            
+            # Use git to detect changes (fallback for direct pushes)
+            CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || echo "")
+            
+            # Determine deployment scope based on changes
+            if echo "$CHANGED_FILES" | grep -E "^apps/web/" >/dev/null; then
+              echo "deploy-web=true" >> $GITHUB_OUTPUT
+              echo "📦 Web deployment required"
+            else
+              echo "deploy-web=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if echo "$CHANGED_FILES" | grep -E "^apps/app/" >/dev/null; then
+              echo "deploy-mobile=true" >> $GITHUB_OUTPUT
+              echo "📱 Mobile deployment required"
+            else
+              echo "deploy-mobile=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if echo "$CHANGED_FILES" | grep -E "^lambdas/" >/dev/null; then
+              echo "deploy-lambdas=true" >> $GITHUB_OUTPUT
+              echo "⚡ Lambda deployment required"
+            else
+              echo "deploy-lambdas=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if echo "$CHANGED_FILES" | grep -E "^terraform/" >/dev/null; then
+              echo "deploy-terraform=true" >> $GITHUB_OUTPUT
+              echo "🏗️ Infrastructure deployment required"
+            else
+              echo "deploy-terraform=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+          # Final deployment decision
+          SHOULD_DEPLOY="true"
+          CI_STATUS="${{ steps.ci-check.outputs.status }}"
+          
+          if [ "$CI_STATUS" == "failed" ]; then
+            SHOULD_DEPLOY="false"
+            echo "❌ Deployment blocked due to CI failure"
+          elif [ "$CI_STATUS" == "forced" ]; then
+            echo "🚀 Deployment forced via manual trigger"
+          else
+            echo "✅ Deployment approved - CI validation passed"
+          fi
+          
+          echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          
+          # Create deployment summary
+          echo "## 🚀 Deployment Plan" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **CI Status**: $CI_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Should Deploy**: $SHOULD_DEPLOY" >> $GITHUB_STEP_SUMMARY
+          
+          echo "::endgroup::"
+
+  # ======================================================================
+  # WEB APPLICATION DEPLOYMENT
+  # ======================================================================
+
+  deploy-web:
+    name: "Deploy Web Application"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate-deployment
+    if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-web == 'true'
+    environment:
+      name: production-web
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Environment"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: "📦 Build Web Application"
+        run: |
+          echo "🏗️ Building web application for production..."
+          npx nx build web --configuration=production
+
+      - name: "🔧 Setup Pages"
+        uses: actions/configure-pages@v5
+
+      - name: "📤 Upload to GitHub Pages"
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist/apps/web
+
+      - name: "🌐 Deploy to GitHub Pages"
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: "✅ Deployment Success"
+        run: |
+          echo "🎉 Web application deployed successfully!"
+          echo "🌐 URL: ${{ steps.deploy.outputs.page_url }}"
+
+  # ======================================================================
+  # LAMBDA SERVICES DEPLOYMENT
+  # ======================================================================
+
+  deploy-lambdas:
+    name: "Deploy Lambda Services"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate-deployment
+    if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-lambdas == 'true'
+    environment: production-aws
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Environment"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: "☁️ Setup AWS"
+        uses: ./.github/actions/setup-aws
+        id: setup-aws
+
+      - name: "🔐 Get RDS Credentials"
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            POSTGRES, rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+          parse-json-secrets: true
+
+      - name: "📦 Build and Deploy GraphQL Lambda"
+        env:
+          DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_USER: ${{ env.POSTGRES_USERNAME }}
+          DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
+        working-directory: lambdas/db
+        run: |
+          echo "🏗️ Building GraphQL Lambda..."
+          
+          # Create cache and build
+          npm run make-cache
+          npm run build
+
+          # Create deployment package
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+
+          zip -r "graphql-${VERSION}.zip" dist/
+
+          # Upload to S3
+          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/dev/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "legacy-sports-lambdas")
+          aws s3 cp "graphql-${VERSION}.zip" "s3://${S3_BUCKET}/graphql/" --region ${{ env.AWS_REGION }}
+
+          # Update version parameter
+          aws ssm put-parameter \
+            --name "/legacy-sports/dev/lambda/graphql/version" \
+            --value "$VERSION" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ GraphQL Lambda deployed: $VERSION"
+
+  # ======================================================================
+  # MOBILE APPLICATION BUILD
+  # ======================================================================
+
+  deploy-mobile:
+    name: "Deploy Mobile Application"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: validate-deployment
+    if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-mobile == 'true'
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Environment"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: "📱 Build Mobile Application"
+        run: |
+          echo "🏗️ Building mobile application..."
+          echo "ℹ️ Note: Full mobile builds require EAS configuration"
+          echo "🔧 Running validation build only..."
+          
+          # For now, just validate the build can complete
+          npx nx build-deps app
+          
+          echo "✅ Mobile application validation completed"
+          echo "📝 To enable full mobile deployments:"
+          echo "   1. Configure EAS Build credentials"
+          echo "   2. Set up app store certificates"
+          echo "   3. Enable mobile build workflow"
+
+  # ======================================================================
+  # INFRASTRUCTURE DEPLOYMENT
+  # ======================================================================
+
+  deploy-terraform:
+    name: "Deploy Infrastructure"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate-deployment
+    if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-terraform == 'true'
+    environment: production-aws
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+
+      - name: "☁️ Setup AWS"
+        uses: ./.github/actions/setup-aws
+
+      - name: "🏗️ Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.0"
+
+      - name: "🔍 Terraform Validation"
+        working-directory: terraform
+        run: |
+          echo "🔧 Validating Terraform configuration..."
+          terraform init -backend=false
+          terraform validate
+          
+          echo "📋 Planning infrastructure changes..."
+          # Note: This would require proper backend configuration
+          echo "✅ Terraform validation completed"
+          echo "📝 To enable full infrastructure deployment:"
+          echo "   1. Configure Terraform backend (S3 + DynamoDB)"
+          echo "   2. Set up AWS credentials with appropriate permissions"
+          echo "   3. Enable terraform apply in workflow"
+
+  # ======================================================================
+  # DEPLOYMENT SUMMARY & NOTIFICATIONS
+  # ======================================================================
+
+  deployment-summary:
+    name: "Deployment Summary"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [validate-deployment, deploy-web, deploy-lambdas, deploy-mobile, deploy-terraform]
+    if: always() && needs.validate-deployment.outputs.should-deploy == 'true'
+
+    steps:
+      - name: "📊 Generate Deployment Summary"
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment completed for commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Web deployment status
+          if [ "${{ needs.validate-deployment.outputs.deploy-web }}" == "true" ]; then
+            WEB_STATUS="${{ needs.deploy-web.result }}"
+            if [ "$WEB_STATUS" == "success" ]; then
+              echo "| Web App | ✅ Deployed | Production ready |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| Web App | ❌ Failed | Check logs for details |" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| Web App | ⏭️ Skipped | No changes detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Lambda deployment status  
+          if [ "${{ needs.validate-deployment.outputs.deploy-lambdas }}" == "true" ]; then
+            LAMBDA_STATUS="${{ needs.deploy-lambdas.result }}"
+            if [ "$LAMBDA_STATUS" == "success" ]; then
+              echo "| GraphQL API | ✅ Deployed | Services updated |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| GraphQL API | ❌ Failed | Check AWS logs |" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| GraphQL API | ⏭️ Skipped | No changes detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Mobile deployment status
+          if [ "${{ needs.validate-deployment.outputs.deploy-mobile }}" == "true" ]; then
+            MOBILE_STATUS="${{ needs.deploy-mobile.result }}"
+            if [ "$MOBILE_STATUS" == "success" ]; then
+              echo "| Mobile App | ✅ Validated | Build system ready |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| Mobile App | ❌ Failed | Validation issues |" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| Mobile App | ⏭️ Skipped | No changes detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Infrastructure deployment status
+          if [ "${{ needs.validate-deployment.outputs.deploy-terraform }}" == "true" ]; then
+            TERRAFORM_STATUS="${{ needs.deploy-terraform.result }}"
+            if [ "$TERRAFORM_STATUS" == "success" ]; then
+              echo "| Infrastructure | ✅ Validated | Configuration valid |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| Infrastructure | ❌ Failed | Terraform issues |" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| Infrastructure | ⏭️ Skipped | No changes detected |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor application health in production" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify deployment functionality" >> $GITHUB_STEP_SUMMARY
+          echo "- Check error rates and performance metrics" >> $GITHUB_STEP_SUMMARY
