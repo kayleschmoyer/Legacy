@@ -74,20 +74,42 @@ runs:
 
     - name: Install Dependencies (Fast)
       if: inputs.install-dependencies == 'true' && steps.cached-dependencies.outputs.cache-hit != 'true'
+      timeout-minutes: 10
       shell: bash
       run: |
         echo "Installing NPM dependencies..."
         echo "Node version: $(node --version)"
         echo "NPM version: $(npm --version)"
 
+        # Check package-lock.json integrity first
+        if [ ! -f "package-lock.json" ]; then
+          echo "❌ package-lock.json not found"
+          exit 1
+        fi
+
         # Use npm ci with standardized flags across all workflows
         # --prefer-offline: Use cache when possible
         # --no-audit: Skip vulnerability audit for speed
         # --no-fund: Skip funding messages
-        # --silent: Reduce log noise
-        npm ci --prefer-offline --no-audit --no-fund --silent
-
-        echo "✅ Dependencies installed successfully!"
+        # Add timeout protection with retry logic
+        echo "🔧 Installing dependencies with timeout protection..."
+        
+        if timeout 480s npm ci --prefer-offline --no-audit --no-fund; then
+          echo "✅ Dependencies installed successfully!"
+        else
+          echo "⚠️  Primary installation failed, retrying with cache reset..."
+          npm cache clean --force
+          if timeout 300s npm ci --no-audit --no-fund; then
+            echo "✅ Dependencies installed on retry!"
+          else
+            echo "❌ NPM installation failed completely"
+            echo "Debug info:"
+            echo "  - npm version: $(npm --version)"
+            echo "  - node version: $(node --version)"
+            echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
+            exit 1
+          fi
+        fi
 
     - name: Verify Dependencies
       if: inputs.install-dependencies == 'true'
