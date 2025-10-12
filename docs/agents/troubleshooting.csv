@@ -23,3 +23,6 @@ troubleshooting,platform_specific,EXPO,eas_build_clear,Clear EAS build cache for
 troubleshooting,database_connection,CRITICAL,credentials_sync,Database connection fails without proper credentials,"npm run sync-env && check .env.local","scripts/sync-env.ps1"
 troubleshooting,database_connection,DO,test_connection_first,Test database connection before running queries,"npm run cli:test-connection","package.json"
 troubleshooting,database_connection,DO,check_rds_status,Verify RDS instance is running in AWS,"AWS Console → RDS → legacy-sports-db","terraform/main.tf"
+troubleshooting,gradle_ci,CRITICAL,gradle_timeout_124,Exit code 124 in gradle setup indicates timeout - increase step timeout and gradle network timeouts,"timeout-minutes: 15 and GRADLE_OPTS timeout values > 120000ms",".github/workflows/build-android-app.yml"
+troubleshooting,gradle_ci,DO,gradle_network_timeouts,Set higher network timeouts for gradle in CI environment,"connectionTimeout=120000 socketTimeout=120000 retry.max.count=3",".github/workflows/build-android-app.yml"
+troubleshooting,gradle_ci,DO,gradle_offline_fallback,Use offline mode as fallback when gradle network operations fail,"./gradlew --version --offline --no-daemon as fallback",".github/workflows/build-android-app.yml"

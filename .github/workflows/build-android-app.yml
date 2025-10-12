@@ -42,7 +42,7 @@ env:
   NDK_VERSION: "27.1.12297006"         # Stable NDK for RN 0.79.6
   
   # Build optimization environment variables with improved network timeouts and cache limits
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.caching=true -Dorg.gradle.caching.debug=false -Dorg.gradle.cache.cleanup=true"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.caching=true -Dorg.gradle.caching.debug=false -Dorg.gradle.cache.cleanup=true -Dorg.gradle.internal.network.retry.max.count=3"
   GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
   NODE_OPTIONS: "--max-old-space-size=4096"
   
@@ -142,7 +142,7 @@ jobs:
           chmod +x gradlew
 
       - name: Verify Gradle Setup
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           cd apps/app/android
           
@@ -150,7 +150,7 @@ jobs:
           echo "🕐 Gradle setup started at $(date)"
           
           # Set network timeout environment variables for better CI reliability
-          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
+          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
           
           # Version compatibility validation
           echo "🔍 Validating version matrix compatibility..."
@@ -159,11 +159,14 @@ jobs:
           JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1-2)
           echo "Java version detected: $JAVA_VERSION"
           
-          # Check Gradle version
+          # Check Gradle version with increased timeout for network-dependent operations
           echo "🔍 Checking Gradle wrapper version..."
-          timeout 300s ./gradlew --version || {
-            echo "⚠️  Gradle version check timeout - retrying with verbose output"
-            timeout 300s ./gradlew --version --info
+          timeout 420s ./gradlew --version --no-daemon || {
+            echo "⚠️  Gradle version check failed - checking connectivity and retrying with offline mode"
+            timeout 120s ./gradlew --version --offline --no-daemon || {
+              echo "❌ Gradle setup failed completely - check network connectivity and gradle wrapper"
+              exit 1
+            }
           }
           
           # Validate Android SDK configuration
@@ -173,9 +176,9 @@ jobs:
           
           # Quick validation that build.gradle is parseable (without dependency resolution)
           echo "🔍 Validating build configuration..."
-          timeout 180s ./gradlew help --quiet --no-daemon > /dev/null || {
+          timeout 240s ./gradlew help --quiet --no-daemon > /dev/null || {
             echo "⚠️  Build configuration issue detected - showing details:"
-            timeout 180s ./gradlew help --no-daemon  # Show error details
+            timeout 180s ./gradlew help --no-daemon --info  # Show error details with more info
           }
           
           echo "✅ Gradle setup and version matrix verified at $(date)"
