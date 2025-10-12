@@ -80,11 +80,12 @@ jobs:
           fetch-depth: 0
           filter: tree:0
 
-      - name: "🔧 Setup Node.js"
-        uses: actions/setup-node@v5
+      - name: "🔧 Setup Workspace"
+        uses: ./.github/actions/setup
         with:
           node-version: 22
-          cache: npm
+          install-dependencies: true
+          set-nx-shas: true
 
       - name: "☁️ Intelligent DTE Detection & Quota Check"
         id: dte-detect
@@ -101,9 +102,8 @@ jobs:
           if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
             echo "✅ Nx Cloud token found"
             
-            # Install dependencies first (needed for nx-cloud CLI)
-            echo "📥 Installing dependencies for cloud detection..."
-            npm ci --prefer-offline --no-audit --silent
+            # Dependencies already installed by setup action
+            echo "📥 Dependencies ready from setup action..."
             
             # Test basic cloud connectivity with timeout
             echo "🌐 Testing cloud connectivity..."
@@ -184,9 +184,8 @@ jobs:
           else
             FALLBACK_REASON="No Nx Cloud token provided"
             echo "ℹ️ $FALLBACK_REASON"
-            # Still install dependencies for local execution
-            echo "📥 Installing dependencies for local execution..."
-            npm ci --prefer-offline --no-audit --silent
+            # Dependencies already installed by setup action
+            echo "📥 Dependencies ready for local execution..."
           fi
 
           # Set environment variables for subsequent steps

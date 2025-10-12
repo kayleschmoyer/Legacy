@@ -1,5 +1,5 @@
 name: "Setup Workspace"
-description: "Common setup steps for Node.js, dependencies, and Nx"
+description: "Common setup steps for Node.js, dependencies, and Nx - standardized across all workflows"
 inputs:
   node-version:
     description: "Node.js version to use"
@@ -13,6 +13,14 @@ inputs:
     description: "Whether to set NX SHAs for affected detection"
     required: false
     default: "true"
+  cache-key-suffix:
+    description: "Additional suffix for cache key (useful for matrix builds)"
+    required: false
+    default: ""
+  skip-system-deps:
+    description: "Skip installing system dependencies (for mobile/specialized builds)"
+    required: false
+    default: "false"
 
 outputs:
   cache-hit:
@@ -23,13 +31,14 @@ runs:
   using: "composite"
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ inputs.node-version }}
         cache: "npm"
         cache-dependency-path: "package-lock.json"
 
     - name: Install System Dependencies
+      if: inputs.skip-system-deps == 'false'
       shell: bash
       run: |
         echo "Installing system dependencies for cross-platform builds..."
@@ -37,9 +46,14 @@ runs:
         # Install zip utility for lambda packaging (if not already present)
         if ! command -v zip &> /dev/null; then
           echo "Installing zip utility..."
-          sudo apt-get update -qq
-          sudo apt-get install -y zip
-          echo "✅ zip utility installed"
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y zip
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # zip is pre-installed on macOS
+            echo "zip already available on macOS"
+          fi
+          echo "✅ zip utility ready"
         else
           echo "✅ zip utility already available"
         fi
@@ -53,8 +67,9 @@ runs:
           ~/.npm
           node_modules
           */*/node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        key: ${{ runner.os }}-node${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
+          ${{ runner.os }}-node${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}-
           ${{ runner.os }}-node-
 
     - name: Install Dependencies (Fast)
@@ -65,7 +80,11 @@ runs:
         echo "Node version: $(node --version)"
         echo "NPM version: $(npm --version)"
 
-        # Use npm ci with aggressive optimizations for speed
+        # Use npm ci with standardized flags across all workflows
+        # --prefer-offline: Use cache when possible
+        # --no-audit: Skip vulnerability audit for speed
+        # --no-fund: Skip funding messages
+        # --silent: Reduce log noise
         npm ci --prefer-offline --no-audit --no-fund --silent
 
         echo "✅ Dependencies installed successfully!"
@@ -105,12 +124,14 @@ runs:
 
         echo "✅ Basic Nx environment configured"
 
-    - name: Nx Setup Complete
+    - name: Workspace Setup Complete
       shell: bash
       run: |
-        echo "✅ Basic Nx setup complete"
+        echo "✅ Workspace setup complete"
         echo "   Node.js: $(node --version)"
         echo "   NPM: $(npm --version)" 
         echo "   Dependencies: ${{ steps.cached-dependencies.outputs.cache-hit == 'true' && 'Restored from cache' || 'Installed fresh' }}"
+        echo "   Cache Key Suffix: ${{ inputs.cache-key-suffix != '' && inputs.cache-key-suffix || 'none' }}"
+        echo "   System Dependencies: ${{ inputs.skip-system-deps == 'true' && 'Skipped' || 'Installed' }}"
         echo ""
-        echo "ℹ️  Nx Cloud configuration will be handled by individual workflows"
+        echo "ℹ️  Ready for build and test operations"

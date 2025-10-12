@@ -101,11 +101,12 @@ jobs:
           fetch-depth: 0
           filter: tree:0
 
-      - name: "🔧 Setup Node.js"
-        uses: actions/setup-node@v5
+      - name: "🔧 Setup Workspace"
+        uses: ./.github/actions/setup
         with:
           node-version: 22
-          cache: npm
+          install-dependencies: true
+          set-nx-shas: true
 
       - name: "☁️ Intelligent DTE Detection & Quota Check"
         id: dte-detect
@@ -122,9 +123,8 @@ jobs:
           if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
             echo "✅ Nx Cloud token found"
             
-            # Install dependencies first (needed for nx-cloud CLI)
-            echo "📥 Installing dependencies for cloud detection..."
-            npm ci --prefer-offline --no-audit --silent
+            # Dependencies already installed by setup action
+            echo "📥 Dependencies ready from setup action..."
             
             # Test basic cloud connectivity with timeout
             echo "🌐 Testing cloud connectivity..."
@@ -210,9 +210,8 @@ jobs:
           else
             FALLBACK_REASON="No Nx Cloud token provided"
             echo "ℹ️ $FALLBACK_REASON"
-            # Still install dependencies for local execution
-            echo "📥 Installing dependencies for local execution..."
-            npm ci --prefer-offline --no-audit --silent
+            # Dependencies already installed by setup action
+            echo "📥 Dependencies ready for local execution..."
           fi
 
           # Set environment variables for subsequent steps
@@ -269,21 +268,15 @@ jobs:
         run: |
           echo "::group::Verifying Dependencies"
 
-          # Dependencies are already installed in DTE detection step
+          # Dependencies are already installed by setup action
           # This step just verifies the installation was successful
           if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
-            echo "✅ Dependencies already installed and verified"
+            echo "✅ Dependencies already installed by setup action"
             echo "$(npm list --depth=0 2>/dev/null | wc -l) packages available"
           else
-            echo "⚠️ Dependencies missing, installing now..."
-            if npm ci --prefer-offline --no-audit 2>&1 | tee install.log; then
-              echo "✅ Dependencies installed successfully"
-              echo "$(npm list --depth=0 | wc -l) packages installed"
-            else
-              echo "❌ Dependency installation failed"
-              echo "::error::npm install failed. Check install.log for details."
-              exit 1
-            fi
+            echo "❌ Dependencies missing - setup action may have failed"
+            echo "::error::Dependencies not found. Setup action should have installed them."
+            exit 1
           fi
 
           echo "::endgroup::"
@@ -1167,14 +1160,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "🔧 Setup Node.js"
-        uses: actions/setup-node@v5
+      - name: "🔧 Setup Workspace"
+        uses: ./.github/actions/setup
         with:
           node-version: 22
-          cache: npm
-
-      - name: "📥 Install Dependencies"
-        run: npm ci --prefer-offline --no-audit
+          install-dependencies: true
+          set-nx-shas: false
 
       - name: "🍎 iOS Build"
         id: ios-build-step
@@ -1239,11 +1230,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "🔧 Setup Node.js"
-        uses: actions/setup-node@v5
+      - name: "🔧 Setup Workspace"
+        uses: ./.github/actions/setup
         with:
           node-version: 22
-          cache: npm
+          install-dependencies: true
+          set-nx-shas: false
 
       - name: "☕ Setup Java"
         uses: actions/setup-java@v5
@@ -1257,9 +1249,6 @@ jobs:
           cache-disabled: false
           cache-read-only: false
           gradle-home-cache-cleanup: true
-
-      - name: "📥 Install Dependencies"
-        run: npm ci --prefer-offline --no-audit --silent
 
       - name: "🤖 Android Build"
         timeout-minutes: 25

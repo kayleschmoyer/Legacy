@@ -56,25 +56,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
         with:
           node-version: 22
-          cache: "npm"
+          install-dependencies: true
+          set-nx-shas: true
+          skip-system-deps: true
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
-
-      - name: Install Dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Setup Nx SHAs
-        uses: nrwl/nx-set-shas@v4
-        with:
-          main-branch-name: "main"
-          error-on-no-successful-workflow: false
 
       - name: Install CocoaPods
         run: |
