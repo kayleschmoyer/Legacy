@@ -74,7 +74,6 @@ runs:
 
     - name: Install Dependencies (Fast)
       if: inputs.install-dependencies == 'true' && steps.cached-dependencies.outputs.cache-hit != 'true'
-      timeout-minutes: 10
       shell: bash
       run: |
         echo "Installing NPM dependencies..."
@@ -91,15 +90,35 @@ runs:
         # --prefer-offline: Use cache when possible
         # --no-audit: Skip vulnerability audit for speed
         # --no-fund: Skip funding messages
-        # Add timeout protection with retry logic
+        # Add timeout protection with retry logic (total max 10 minutes)
         echo "🔧 Installing dependencies with timeout protection..."
         
-        if timeout 480s npm ci --prefer-offline --no-audit --no-fund; then
+        # Use timeout command available on both Linux and macOS
+        if command -v timeout >/dev/null 2>&1; then
+          TIMEOUT_CMD="timeout 480s"
+        elif command -v gtimeout >/dev/null 2>&1; then
+          TIMEOUT_CMD="gtimeout 480s"
+        else
+          echo "⚠️  No timeout command available, proceeding without timeout..."
+          TIMEOUT_CMD=""
+        fi
+        
+        if $TIMEOUT_CMD npm ci --prefer-offline --no-audit --no-fund; then
           echo "✅ Dependencies installed successfully!"
         else
           echo "⚠️  Primary installation failed, retrying with cache reset..."
           npm cache clean --force
-          if timeout 300s npm ci --no-audit --no-fund; then
+          
+          # Shorter timeout for retry
+          if command -v timeout >/dev/null 2>&1; then
+            RETRY_TIMEOUT_CMD="timeout 300s"
+          elif command -v gtimeout >/dev/null 2>&1; then
+            RETRY_TIMEOUT_CMD="gtimeout 300s"
+          else
+            RETRY_TIMEOUT_CMD=""
+          fi
+          
+          if $RETRY_TIMEOUT_CMD npm ci --no-audit --no-fund; then
             echo "✅ Dependencies installed on retry!"
           else
             echo "❌ NPM installation failed completely"
@@ -107,6 +126,7 @@ runs:
             echo "  - npm version: $(npm --version)"
             echo "  - node version: $(node --version)"
             echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
+            echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
             exit 1
           fi
         fi
