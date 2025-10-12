@@ -1,0 +1,241 @@
+name: "Generate CI Execution Plan"
+description: "Creates optimized execution plan based on change detection and available resources with intelligent resource allocation"
+
+inputs:
+  affected-components:
+    description: "JSON array of affected components from change detection"
+    required: true
+  execution-mode:
+    description: "Execution mode (distributed/local)"
+    required: true
+  dte-available:
+    description: "Whether DTE is available"
+    required: true
+  optimal-agents:
+    description: "Number of optimal agents/parallel processes"
+    required: true
+  requires-full-build:
+    description: "Whether changes require full mono-repo build"
+    required: true
+  ios-enabled:
+    description: "Whether iOS builds are enabled"
+    required: false
+    default: "false"
+  event-name:
+    description: "GitHub event name triggering the workflow"
+    required: false
+    default: "unknown"
+
+outputs:
+  execution-plan:
+    description: "Complete execution plan as JSON"
+    value: ${{ steps.generate-plan.outputs.execution-plan }}
+  should-run-tests:
+    description: "Whether tests should be executed"
+    value: ${{ steps.generate-plan.outputs.should-run-tests }}
+  should-run-e2e:
+    description: "Whether E2E tests should be executed"
+    value: ${{ steps.generate-plan.outputs.should-run-e2e }}
+  should-build-web:
+    description: "Whether web build should be executed"
+    value: ${{ steps.generate-plan.outputs.should-build-web }}
+  should-build-mobile:
+    description: "Whether mobile build should be executed"
+    value: ${{ steps.generate-plan.outputs.should-build-mobile }}
+  should-build-lambdas:
+    description: "Whether lambda build should be executed"
+    value: ${{ steps.generate-plan.outputs.should-build-lambdas }}
+  should-validate-terraform:
+    description: "Whether Terraform validation should be executed"
+    value: ${{ steps.generate-plan.outputs.should-validate-terraform }}
+  estimated-duration:
+    description: "Estimated CI duration in minutes"
+    value: ${{ steps.generate-plan.outputs.estimated-duration }}
+  strategy:
+    description: "Execution strategy (full/selective/minimal)"
+    value: ${{ steps.generate-plan.outputs.strategy }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "📊 Generate Execution Plan"
+      id: generate-plan
+      shell: bash
+      run: |
+        echo "::group::📊 CI Execution Plan Generation"
+
+        # Parse inputs
+        AFFECTED_COMPONENTS='${{ inputs.affected-components }}'
+        EXECUTION_MODE="${{ inputs.execution-mode }}"
+        DTE_AVAILABLE="${{ inputs.dte-available }}"
+        OPTIMAL_AGENTS="${{ inputs.optimal-agents }}"
+        REQUIRES_FULL_BUILD="${{ inputs.requires-full-build }}"
+        IOS_ENABLED="${{ inputs.ios-enabled }}"
+        EVENT_NAME="${{ inputs.event-name }}"
+
+        echo "📋 Planning inputs:"
+        echo "  - Affected Components: $(echo "$AFFECTED_COMPONENTS" | jq -r 'join(", ")')"
+        echo "  - Execution Mode: $EXECUTION_MODE"
+        echo "  - DTE Available: $DTE_AVAILABLE" 
+        echo "  - Optimal Agents: $OPTIMAL_AGENTS"
+        echo "  - Full Build Required: $REQUIRES_FULL_BUILD"
+        echo "  - Event: $EVENT_NAME"
+
+        # Determine execution strategy
+        COMPONENT_COUNT=$(echo "$AFFECTED_COMPONENTS" | jq 'length')
+        
+        if [ "$REQUIRES_FULL_BUILD" == "true" ]; then
+          STRATEGY="full"
+          ESTIMATED_DURATION=25
+        elif [ "$COMPONENT_COUNT" -eq 0 ]; then
+          STRATEGY="minimal"
+          ESTIMATED_DURATION=5
+        else
+          STRATEGY="selective"
+          ESTIMATED_DURATION=15
+        fi
+
+        # Adjust duration based on execution mode
+        if [ "$DTE_AVAILABLE" == "true" ]; then
+          ESTIMATED_DURATION=$((ESTIMATED_DURATION * 70 / 100)) # 30% faster with DTE
+        fi
+
+        # Determine what should run based on affected components
+        SHOULD_RUN_TESTS="false"
+        SHOULD_RUN_E2E="false"
+        SHOULD_BUILD_WEB="false"
+        SHOULD_BUILD_MOBILE="false"
+        SHOULD_BUILD_LAMBDAS="false"
+        SHOULD_VALIDATE_TERRAFORM="false"
+
+        # Check each component
+        if echo "$AFFECTED_COMPONENTS" | jq -e '.[] | select(. == "web")' >/dev/null; then
+          SHOULD_BUILD_WEB="true"
+          SHOULD_RUN_TESTS="true"
+          SHOULD_RUN_E2E="true"
+          echo "📦 Web app affected - enabling web build, tests, and E2E"
+        fi
+
+        if echo "$AFFECTED_COMPONENTS" | jq -e '.[] | select(. == "mobile")' >/dev/null; then
+          SHOULD_BUILD_MOBILE="true"
+          SHOULD_RUN_TESTS="true"
+          echo "📱 Mobile app affected - enabling mobile build and tests"
+        fi
+
+        if echo "$AFFECTED_COMPONENTS" | jq -e '.[] | select(. == "lambdas")' >/dev/null; then
+          SHOULD_BUILD_LAMBDAS="true"
+          SHOULD_RUN_TESTS="true"
+          echo "⚡ Lambda functions affected - enabling lambda build and tests"
+        fi
+
+        if echo "$AFFECTED_COMPONENTS" | jq -e '.[] | select(. == "terraform")' >/dev/null; then
+          SHOULD_VALIDATE_TERRAFORM="true"
+          echo "🏗️ Infrastructure affected - enabling Terraform validation"
+        fi
+
+        if echo "$AFFECTED_COMPONENTS" | jq -e '.[] | select(. == "core" or . == "dependencies")' >/dev/null; then
+          SHOULD_BUILD_WEB="true"
+          SHOULD_BUILD_MOBILE="true"
+          SHOULD_BUILD_LAMBDAS="true"
+          SHOULD_RUN_TESTS="true"
+          SHOULD_RUN_E2E="true"
+          echo "🔄 Core/dependency changes - enabling all builds and tests"
+        fi
+
+        # Override for full strategy
+        if [ "$STRATEGY" == "full" ]; then
+          SHOULD_BUILD_WEB="true"
+          SHOULD_BUILD_MOBILE="true"
+          SHOULD_BUILD_LAMBDAS="true"
+          SHOULD_RUN_TESTS="true"
+          SHOULD_RUN_E2E="true"
+        fi
+
+        # Special handling for minimal strategy
+        if [ "$STRATEGY" == "minimal" ]; then
+          # Still run basic quality checks even with no changes
+          SHOULD_RUN_TESTS="true"
+        fi
+
+        # Create comprehensive execution plan JSON
+        EXECUTION_PLAN=$(cat << EOF
+        {
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "trigger": "$EVENT_NAME",
+          "strategy": "$STRATEGY",
+          "execution_mode": "$EXECUTION_MODE",
+          "resources": {
+            "dte_available": $DTE_AVAILABLE,
+            "optimal_agents": $OPTIMAL_AGENTS,
+            "estimated_duration_minutes": $ESTIMATED_DURATION
+          },
+          "affected_components": $AFFECTED_COMPONENTS,
+          "execution_plan": {
+            "quality_gates": true,
+            "tests": $SHOULD_RUN_TESTS,
+            "builds": {
+              "web": $SHOULD_BUILD_WEB,
+              "mobile": $SHOULD_BUILD_MOBILE,
+              "ios": $([ "$SHOULD_BUILD_MOBILE" == "true" ] && [ "$IOS_ENABLED" == "true" ] && echo "true" || echo "false"),
+              "android": $SHOULD_BUILD_MOBILE,
+              "lambdas": $SHOULD_BUILD_LAMBDAS
+            },
+            "validation": {
+              "terraform": $SHOULD_VALIDATE_TERRAFORM,
+              "e2e": $SHOULD_RUN_E2E
+            }
+          },
+          "optimization": {
+            "cache_enabled": true,
+            "parallel_execution": true,
+            "selective_execution": $([ "$STRATEGY" != "full" ] && echo "true" || echo "false")
+          }
+        }
+        EOF
+        )
+
+        # Set all outputs
+        echo "execution-plan=$(echo "$EXECUTION_PLAN" | jq -c .)" >> $GITHUB_OUTPUT
+        echo "should-run-tests=$SHOULD_RUN_TESTS" >> $GITHUB_OUTPUT
+        echo "should-run-e2e=$SHOULD_RUN_E2E" >> $GITHUB_OUTPUT
+        echo "should-build-web=$SHOULD_BUILD_WEB" >> $GITHUB_OUTPUT
+        echo "should-build-mobile=$SHOULD_BUILD_MOBILE" >> $GITHUB_OUTPUT
+        echo "should-build-lambdas=$SHOULD_BUILD_LAMBDAS" >> $GITHUB_OUTPUT
+        echo "should-validate-terraform=$SHOULD_VALIDATE_TERRAFORM" >> $GITHUB_OUTPUT
+        echo "estimated-duration=$ESTIMATED_DURATION" >> $GITHUB_OUTPUT
+        echo "strategy=$STRATEGY" >> $GITHUB_OUTPUT
+
+        # Create detailed summary
+        echo "## 📋 CI Execution Plan" >> $GITHUB_STEP_SUMMARY
+        echo "- **Strategy**: $STRATEGY" >> $GITHUB_STEP_SUMMARY
+        echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Estimated Duration**: ~$ESTIMATED_DURATION minutes" >> $GITHUB_STEP_SUMMARY
+        echo "- **Affected Components**: $(echo "$AFFECTED_COMPONENTS" | jq -r 'length') component(s)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### Execution Matrix" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Action | Reason |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Quality Gates | ✅ **Will Run** | Always executed for code standards |" >> $GITHUB_STEP_SUMMARY
+        echo "| Tests | $( [ "$SHOULD_RUN_TESTS" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_RUN_TESTS" == "true" ] && echo "Code changes detected" || echo "No testable changes" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Web Build | $( [ "$SHOULD_BUILD_WEB" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_WEB" == "true" ] && echo "Web app or dependencies changed" || echo "No web changes" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile Build | $( [ "$SHOULD_BUILD_MOBILE" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_MOBILE" == "true" ] && echo "Mobile app or dependencies changed" || echo "No mobile changes" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambda Build | $( [ "$SHOULD_BUILD_LAMBDAS" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_LAMBDAS" == "true" ] && echo "Lambda functions or APIs changed" || echo "No lambda changes" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| E2E Tests | $( [ "$SHOULD_RUN_E2E" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_RUN_E2E" == "true" ] && echo "Web changes require user flow validation" || echo "No web UI changes" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Terraform Validation | $( [ "$SHOULD_VALIDATE_TERRAFORM" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_VALIDATE_TERRAFORM" == "true" ] && echo "Infrastructure changes detected" || echo "No infrastructure changes" ) |" >> $GITHUB_STEP_SUMMARY
+
+        # Add strategy-specific notices
+        case "$STRATEGY" in
+          "full")
+            echo "::notice title=Full CI Strategy::Core changes detected - complete validation of all components"
+            ;;
+          "selective")
+            echo "::notice title=Selective CI Strategy::Targeted validation of $(echo "$AFFECTED_COMPONENTS" | jq -r 'length') affected component(s) - optimized execution"
+            ;;
+          "minimal")
+            echo "::notice title=Minimal CI Strategy::No significant changes - fast-track quality validation only"
+            ;;
+        esac
+
+        echo "🎯 Execution plan generated: $STRATEGY strategy, ~$ESTIMATED_DURATION minutes"
+        echo "::endgroup::"

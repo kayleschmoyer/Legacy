@@ -1,0 +1,216 @@
+name: "Detect Project Changes"
+description: "Intelligent change detection for mono-repo projects with configurable file patterns and affected component analysis"
+
+inputs:
+  base-ref:
+    description: "Base reference for change detection"
+    required: false
+    default: "origin/main"
+  head-ref:
+    description: "Head reference for change detection"
+    required: false
+    default: "HEAD"
+  web-patterns:
+    description: "File patterns for web project changes (newline-separated)"
+    required: false
+    default: |
+      apps/web/**
+      lib/shared-components/**
+      lib/tamagui-config/**
+  mobile-patterns:
+    description: "File patterns for mobile project changes (newline-separated)"
+    required: false
+    default: |
+      apps/app/**
+      lib/shared-components/**
+      lib/tamagui-config/**
+  lambdas-patterns:
+    description: "File patterns for lambda changes (newline-separated)"
+    required: false
+    default: |
+      lambdas/**
+      lib/api/**
+      lib/db-client/**
+  terraform-patterns:
+    description: "File patterns for infrastructure changes (newline-separated)"
+    required: false
+    default: |
+      terraform/**
+  core-patterns:
+    description: "File patterns for core library changes (newline-separated)"
+    required: false
+    default: |
+      lib/**
+      tools/**
+      nx.json
+      tsconfig*.json
+  dependency-patterns:
+    description: "File patterns for dependency changes (newline-separated)"
+    required: false
+    default: |
+      **/package.json
+      package-lock.json
+
+outputs:
+  web:
+    description: "Whether web project is affected"
+    value: ${{ steps.detect-changes.outputs.web }}
+  mobile:
+    description: "Whether mobile project is affected"
+    value: ${{ steps.detect-changes.outputs.mobile }}
+  lambdas:
+    description: "Whether lambda functions are affected"
+    value: ${{ steps.detect-changes.outputs.lambdas }}
+  terraform:
+    description: "Whether infrastructure is affected"
+    value: ${{ steps.detect-changes.outputs.terraform }}
+  core:
+    description: "Whether core libraries are affected"
+    value: ${{ steps.detect-changes.outputs.core }}
+  dependencies:
+    description: "Whether dependencies have changed"
+    value: ${{ steps.detect-changes.outputs.package-json }}
+  affected-components:
+    description: "JSON array of affected components"
+    value: ${{ steps.analyze.outputs.affected-components }}
+  change-summary:
+    description: "Human-readable change summary"
+    value: ${{ steps.analyze.outputs.change-summary }}
+  requires-full-build:
+    description: "Whether changes require full mono-repo build"
+    value: ${{ steps.analyze.outputs.requires-full-build }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🔍 Detect Changed Files"
+      id: detect-changes
+      uses: dorny/paths-filter@v3
+      with:
+        base: ${{ inputs.base-ref }}
+        ref: ${{ inputs.head-ref }}
+        filters: |
+          web: ${{ inputs.web-patterns }}
+          mobile: ${{ inputs.mobile-patterns }}
+          lambdas: ${{ inputs.lambdas-patterns }}
+          terraform: ${{ inputs.terraform-patterns }}
+          package-json: ${{ inputs.dependency-patterns }}
+          core: ${{ inputs.core-patterns }}
+
+    - name: "📊 Analyze Change Impact"
+      id: analyze
+      shell: bash
+      run: |
+        echo "::group::📊 Change Impact Analysis"
+
+        # Collect change detection results
+        WEB_AFFECTED="${{ steps.detect-changes.outputs.web }}"
+        MOBILE_AFFECTED="${{ steps.detect-changes.outputs.mobile }}"
+        LAMBDAS_AFFECTED="${{ steps.detect-changes.outputs.lambdas }}"
+        TERRAFORM_AFFECTED="${{ steps.detect-changes.outputs.terraform }}"
+        CORE_AFFECTED="${{ steps.detect-changes.outputs.core }}"
+        DEPS_AFFECTED="${{ steps.detect-changes.outputs.package-json }}"
+
+        # Create affected components array
+        AFFECTED_COMPONENTS='[]'
+        
+        if [ "$WEB_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["web"]')
+        fi
+        
+        if [ "$MOBILE_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["mobile"]')
+        fi
+        
+        if [ "$LAMBDAS_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["lambdas"]')
+        fi
+        
+        if [ "$TERRAFORM_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["terraform"]')
+        fi
+        
+        if [ "$CORE_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["core"]')
+        fi
+        
+        if [ "$DEPS_AFFECTED" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["dependencies"]')
+        fi
+
+        # Determine if full build is required
+        REQUIRES_FULL_BUILD="false"
+        if [ "$CORE_AFFECTED" == "true" ] || [ "$DEPS_AFFECTED" == "true" ]; then
+          REQUIRES_FULL_BUILD="true"
+          echo "🚨 Core changes or dependency updates detected - full build required"
+        fi
+
+        # Generate human-readable summary
+        COMPONENT_COUNT=$(echo "$AFFECTED_COMPONENTS" | jq 'length')
+        
+        if [ "$COMPONENT_COUNT" -eq 0 ]; then
+          CHANGE_SUMMARY="No significant changes detected - minimal CI execution"
+        elif [ "$COMPONENT_COUNT" -eq 1 ]; then
+          SINGLE_COMPONENT=$(echo "$AFFECTED_COMPONENTS" | jq -r '.[0]')
+          CHANGE_SUMMARY="Single component affected: $SINGLE_COMPONENT"
+        else
+          CHANGE_SUMMARY="Multiple components affected: $(echo "$AFFECTED_COMPONENTS" | jq -r 'join(", ")')"
+        fi
+
+        # Set outputs
+        echo "affected-components=$AFFECTED_COMPONENTS" >> $GITHUB_OUTPUT
+        echo "change-summary=$CHANGE_SUMMARY" >> $GITHUB_OUTPUT
+        echo "requires-full-build=$REQUIRES_FULL_BUILD" >> $GITHUB_OUTPUT
+
+        # Create detailed summary
+        echo "## 🔍 Change Detection Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Components Affected**: $COMPONENT_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Summary**: $CHANGE_SUMMARY" >> $GITHUB_STEP_SUMMARY
+        echo "- **Requires Full Build**: $REQUIRES_FULL_BUILD" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### Component Status" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status | Impact |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Web App | $( [ "$WEB_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$WEB_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile App | $( [ "$MOBILE_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$MOBILE_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambda Functions | $( [ "$LAMBDAS_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$LAMBDAS_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Infrastructure | $( [ "$TERRAFORM_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$TERRAFORM_AFFECTED" == "true" ] && echo "Validation required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Core Libraries | $( [ "$CORE_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$CORE_AFFECTED" == "true" ] && echo "Full rebuild required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Dependencies | $( [ "$DEPS_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$DEPS_AFFECTED" == "true" ] && echo "Full rebuild required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
+
+        # Add notices for significant changes
+        if [ "$REQUIRES_FULL_BUILD" == "true" ]; then
+          echo "::notice title=Full Build Required::Core or dependency changes detected - all components will be rebuilt"
+        elif [ "$COMPONENT_COUNT" -gt 0 ]; then
+          echo "::notice title=Selective Build::$COMPONENT_COUNT component(s) affected - optimized CI execution"
+        else
+          echo "::notice title=Minimal CI::No significant changes detected - fast-track execution"
+        fi
+
+        echo "::endgroup::"
+
+    - name: "📋 Generate Change Context"
+      shell: bash
+      run: |
+        echo "::group::📋 Detailed Change Context"
+        
+        # Show changed files for debugging (limited to prevent log overflow)
+        echo "### Changed Files (Last 10)"
+        
+        if command -v git >/dev/null 2>&1; then
+          echo "Recent file changes:"
+          git diff --name-only ${{ inputs.base-ref }}..${{ inputs.head-ref }} | head -10 || true
+          
+          # Count total changed files
+          TOTAL_FILES=$(git diff --name-only ${{ inputs.base-ref }}..${{ inputs.head-ref }} | wc -l || echo 0)
+          echo "Total files changed: $TOTAL_FILES"
+          
+          if [ "$TOTAL_FILES" -gt 10 ]; then
+            echo "... and $((TOTAL_FILES - 10)) more files"
+          fi
+        else
+          echo "Git not available - unable to show detailed file changes"
+        fi
+
+        echo "::endgroup::"

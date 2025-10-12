@@ -1,0 +1,203 @@
+name: "CI Badge Reporter"
+description: "Update CI status badges in Gist for integration builds only"
+
+inputs:
+  gist-token:
+    description: "GitHub Personal Access Token for Gist API access"
+    required: true
+  gist-id:
+    description: "ID of the Gist containing badge JSON files"
+    required: true
+  pipeline-status:
+    description: "Overall pipeline status (success/failure/skipped)"
+    required: true
+  format-status:
+    description: "Code formatting check result"
+    required: false
+    default: "success"
+  lint-status:
+    description: "ESLint validation result"
+    required: false
+    default: "success"
+  typecheck-status:
+    description: "TypeScript type checking result"
+    required: false
+    default: "success"
+  test-status:
+    description: "Unit test execution result"
+    required: false
+    default: "success"
+  build-status:
+    description: "Build process result"
+    required: false
+    default: "success"
+  event-name:
+    description: "GitHub event name (for integration build detection)"
+    required: true
+  ref:
+    description: "GitHub ref (for integration build detection)"
+    required: true
+  integration-only:
+    description: "Only update badges on integration builds (main/merge_group)"
+    required: false
+    default: "true"
+
+outputs:
+  badges-updated:
+    description: "Whether badges were actually updated"
+    value: ${{ steps.badge-update.outputs.updated }}
+  integration-build:
+    description: "Whether this was detected as an integration build"
+    value: ${{ steps.check-integration.outputs.is-integration }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🔍 Check Integration Build"
+      id: check-integration
+      shell: bash
+      run: |
+        echo "::group::🔍 Integration Build Detection"
+        
+        EVENT_NAME="${{ inputs.event-name }}"
+        REF="${{ inputs.ref }}"
+        INTEGRATION_ONLY="${{ inputs.integration-only }}"
+        
+        echo "🎯 Event: $EVENT_NAME"
+        echo "🔗 Ref: $REF"
+        echo "⚙️ Integration Only: $INTEGRATION_ONLY"
+        
+        IS_INTEGRATION=false
+        
+        if [ "$INTEGRATION_ONLY" == "true" ]; then
+          if [ "$EVENT_NAME" == "push" ] && [ "$REF" == "refs/heads/main" ]; then
+            IS_INTEGRATION=true
+            echo "✅ Integration build detected: Push to main branch"
+          elif [ "$EVENT_NAME" == "merge_group" ]; then
+            IS_INTEGRATION=true  
+            echo "✅ Integration build detected: Merge queue"
+          else
+            echo "⏭️ Not an integration build - skipping badge update"
+          fi
+        else
+          IS_INTEGRATION=true
+          echo "✅ Integration-only disabled - will update badges"
+        fi
+        
+        echo "is-integration=$IS_INTEGRATION" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
+    - name: "🏆 Update CI Status Badges"
+      id: badge-update
+      if: steps.check-integration.outputs.is-integration == 'true'
+      shell: bash
+      run: |
+        echo "::group::🏆 Updating CI Status Badges"
+        
+        GIST_TOKEN="${{ inputs.gist-token }}"
+        GIST_ID="${{ inputs.gist-id }}"
+        
+        if [ -z "$GIST_TOKEN" ] || [ -z "$GIST_ID" ]; then
+          echo "⚠️ GIST_TOKEN or GIST_ID not provided - skipping badge update"
+          echo "updated=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Generate badge data in shields.io format
+        generate_badge() {
+          local label="$1"
+          local status="$2"
+          local color="$3"
+          echo "{\"schemaVersion\": 1, \"label\": \"$label\", \"message\": \"$status\", \"color\": \"$color\"}"
+        }
+
+        # Determine colors and status text based on result
+        get_color() {
+          case "$1" in
+            "success") echo "brightgreen" ;;
+            "failure") echo "red" ;;
+            "skipped") echo "lightgrey" ;;
+            *) echo "orange" ;;
+          esac
+        }
+
+        get_status_text() {
+          case "$1" in
+            "success") echo "passing" ;;
+            "failure") echo "failing" ;;
+            "skipped") echo "skipped" ;;
+            *) echo "unknown" ;;
+          esac
+        }
+
+        # Create badge JSON files
+        echo "🎨 Generating badge data..."
+        mkdir -p badges
+        
+        # Generate individual badges
+        generate_badge "CI Pipeline" "$(get_status_text "${{ inputs.pipeline-status }}")" "$(get_color "${{ inputs.pipeline-status }}")" > badges/ci-pipeline.json
+        generate_badge "Code Format" "$(get_status_text "${{ inputs.format-status }}")" "$(get_color "${{ inputs.format-status }}")" > badges/code-format.json
+        generate_badge "ESLint" "$(get_status_text "${{ inputs.lint-status }}")" "$(get_color "${{ inputs.lint-status }}")" > badges/eslint.json
+        generate_badge "TypeScript" "$(get_status_text "${{ inputs.typecheck-status }}")" "$(get_color "${{ inputs.typecheck-status }}")" > badges/typescript.json
+        generate_badge "Tests" "$(get_status_text "${{ inputs.test-status }}")" "$(get_color "${{ inputs.test-status }}")" > badges/tests.json
+        generate_badge "Build" "$(get_status_text "${{ inputs.build-status }}")" "$(get_color "${{ inputs.build-status }}")" > badges/build.json
+
+        # Timestamp badge
+        TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+        generate_badge "Last Updated" "$TIMESTAMP" "blue" > badges/last-updated.json
+
+        echo "📤 Uploading badges to Gist..."
+        
+        # Function to update individual badge file in Gist
+        update_gist_file() {
+          local filename="$1"
+          local content="$2"
+          
+          echo "📋 Updating $filename..."
+          
+          HTTP_STATUS=$(curl -s -w "%{http_code}" -o /dev/null \
+            -X PATCH \
+            -H "Authorization: token $GIST_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/gists/$GIST_ID" \
+            -d "{\"files\":{\"$filename\":{\"content\":\"$content\"}}}")
+            
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Successfully updated $filename"
+          else
+            echo "⚠️ Failed to update $filename (HTTP $HTTP_STATUS)"
+          fi
+        }
+        
+        # Update all badge files in Gist
+        SUCCESS_COUNT=0
+        TOTAL_COUNT=0
+        
+        for badge_file in badges/*.json; do
+          filename=$(basename "$badge_file")
+          content=$(cat "$badge_file")
+          update_gist_file "$filename" "$content"
+          TOTAL_COUNT=$((TOTAL_COUNT + 1))
+        done
+
+        echo "✅ Badge update completed"
+        echo "📊 Updated badges for integration build:"
+        echo "  - CI Pipeline: $(get_status_text "${{ inputs.pipeline-status }}")"
+        echo "  - Code Format: $(get_status_text "${{ inputs.format-status }}")"  
+        echo "  - ESLint: $(get_status_text "${{ inputs.lint-status }}")"
+        echo "  - TypeScript: $(get_status_text "${{ inputs.typecheck-status }}")"
+        echo "  - Tests: $(get_status_text "${{ inputs.test-status }}")"
+        echo "  - Build: $(get_status_text "${{ inputs.build-status }}")"
+        echo "  - Last Updated: $TIMESTAMP"
+        
+        echo "updated=true" >> $GITHUB_OUTPUT
+        echo "::notice::CI badges updated in Gist $GIST_ID for integration build"
+        echo "::endgroup::"
+
+    - name: "📋 Upload Badge Artifacts"
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-badges-${{ github.run_id }}
+        path: badges/*.json
+        retention-days: 3

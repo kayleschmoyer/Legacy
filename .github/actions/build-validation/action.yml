@@ -1,0 +1,389 @@
+name: "Build Validation"
+description: "Comprehensive build validation for web, mobile, and lambda functions with platform-specific optimizations and artifact verification"
+
+inputs:
+  should-build-web:
+    description: "Whether web build should be executed"
+    required: true
+  should-build-mobile:
+    description: "Whether mobile build should be executed"
+    required: true
+  should-build-lambdas:
+    description: "Whether lambda build should be executed"
+    required: true
+  should-validate-terraform:
+    description: "Whether Terraform validation should be executed"
+    required: true
+  execution-mode:
+    description: "Execution mode (distributed/local)"
+    required: true
+  optimal-agents:
+    description: "Number of optimal agents/parallel processes"
+    required: true
+  base-ref:
+    description: "Base reference for affected detection"
+    required: false
+    default: "origin/main"
+  head-ref:
+    description: "Head reference for affected detection"
+    required: false
+    default: "HEAD"
+  timeout-minutes:
+    description: "Timeout for build operations"
+    required: false
+    default: "15"
+
+outputs:
+  web-result:
+    description: "Web build result (success/failure/skipped)"
+    value: ${{ steps.build-web.outputs.result }}
+  mobile-result:
+    description: "Mobile build validation result (success/failure/skipped)"
+    value: ${{ steps.validate-mobile.outputs.result }}
+  lambdas-result:
+    description: "Lambda functions build result (success/failure/skipped)"
+    value: ${{ steps.build-lambdas.outputs.result }}
+  terraform-result:
+    description: "Terraform validation result (success/failure/skipped)"
+    value: ${{ steps.terraform-validation.outputs.result }}
+  overall-result:
+    description: "Overall build validation result (success/failure)"
+    value: ${{ steps.check-results.outputs.result }}
+  artifacts-ready:
+    description: "Whether all build artifacts are ready for deployment"
+    value: ${{ steps.check-results.outputs.artifacts-ready }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "📦 Build Web Application"
+      id: build-web
+      if: inputs.should-build-web == 'true'
+      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
+      shell: bash
+      run: |
+        echo "::group::📦 Web Application Build"
+        echo "::notice::To reproduce locally: npx nx build web --verbose"
+
+        ERROR_CONTEXT="build-web-$(date +%s)"
+        
+        # Use appropriate build command based on execution mode
+        if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
+          echo "🚀 Building web application with DTE..."
+          BUILD_CMD="npx nx build web --parallel=${{ inputs.optimal-agents }}"
+        else
+          echo "🚀 Building web application locally..."
+          BUILD_CMD="npx nx build web"
+        fi
+
+        if $BUILD_CMD --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
+          echo "✅ Web application built successfully"
+          
+          # Check build artifacts and report metrics
+          if [ -d "dist/apps/web" ]; then
+            BUILD_SIZE=$(du -sh dist/apps/web | cut -f1)
+            FILE_COUNT=$(find dist/apps/web -type f | wc -l)
+            echo "📊 Build Metrics:"
+            echo "  - Build size: $BUILD_SIZE"
+            echo "  - File count: $FILE_COUNT"
+            
+            # Verify essential files exist
+            ESSENTIAL_FILES=("index.html" "main.js")
+            MISSING_FILES=()
+            
+            for file in "${ESSENTIAL_FILES[@]}"; do
+              if [ ! -f "dist/apps/web/$file" ] && [ ! -f "dist/apps/web/assets/$file" ]; then
+                MISSING_FILES+=("$file")
+              fi
+            done
+            
+            if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+              echo "✅ All essential build artifacts present"
+            else
+              echo "⚠️ Missing essential files: ${MISSING_FILES[*]}"
+            fi
+            
+            # Create build summary
+            echo "## 📦 Web Build Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            echo "- **Build Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **File Count**: $FILE_COUNT files" >> $GITHUB_STEP_SUMMARY
+            echo "- **Output Directory**: dist/apps/web" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Build output directory not found"
+          fi
+          
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Web application build failed"
+          
+          # Parse and report build errors
+          echo "## Build Errors Summary"
+          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+          
+          echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "⚡ Build Lambda Functions"
+      id: build-lambdas
+      if: inputs.should-build-lambdas == 'true'
+      timeout-minutes: 10
+      shell: bash
+      run: |
+        echo "::group::⚡ Lambda Functions Build"
+        echo "::notice::To reproduce locally: npx nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
+
+        ERROR_CONTEXT="build-lambdas-$(date +%s)"
+
+        # Define lambda projects to build
+        LAMBDA_PROJECTS="draft-processor,game-selection,oauth-proxy,stats-lambda"
+        
+        # Use appropriate build command based on execution mode
+        if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
+          echo "🚀 Building lambda functions with DTE..."
+          BUILD_CMD="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=${{ inputs.optimal-agents }}"
+        else
+          echo "🚀 Building lambda functions locally..."
+          BUILD_CMD="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
+        fi
+
+        if $BUILD_CMD 2>&1 | tee "${ERROR_CONTEXT}.log"; then
+          echo "✅ Lambda functions built successfully"
+          
+          # Attempt to package lambdas for deployment validation
+          echo "📦 Attempting lambda packaging..."
+          if npx nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
+            echo "✅ Lambda functions packaged successfully"
+            
+            # Check package sizes if available
+            PACKAGE_INFO=""
+            for project in ${LAMBDA_PROJECTS//,/ }; do
+              if [ -d "dist/lambdas/$project" ]; then
+                PACKAGE_SIZE=$(du -sh "dist/lambdas/$project" | cut -f1)
+                PACKAGE_INFO="$PACKAGE_INFO\n  - $project: $PACKAGE_SIZE"
+              fi
+            done
+            
+            if [ -n "$PACKAGE_INFO" ]; then
+              echo "📊 Lambda Package Sizes:$PACKAGE_INFO"
+            fi
+          else
+            echo "⚠️ Lambda packaging failed (may be expected if no package target configured)"
+          fi
+          
+          # Create lambda build summary
+          echo "## ⚡ Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Projects Built**: $LAMBDA_PROJECTS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Output Directory**: dist/lambdas/" >> $GITHUB_STEP_SUMMARY
+          
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Lambda functions build failed"
+          
+          # Parse and report build errors
+          echo "## Lambda Build Errors"
+          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+          
+          echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "📱 Validate Mobile Build Configuration"
+      id: validate-mobile
+      if: inputs.should-build-mobile == 'true'
+      timeout-minutes: 5
+      shell: bash
+      run: |
+        echo "::group::📱 Mobile Build Configuration Validation"
+        echo "::notice::To reproduce locally: npx nx build app --dry-run"
+
+        # Validate mobile build configuration without full build
+        # Full mobile builds require platform-specific runners (macOS for iOS)
+        if npx nx build app --dry-run 2>&1 | tee mobile-config.log; then
+          echo "✅ Mobile build configuration is valid"
+          echo "ℹ️ Full mobile builds will run on platform-specific runners"
+          
+          # Check for mobile-specific configuration files
+          CONFIG_FILES=("apps/app/app.json" "apps/app/project.json")
+          MISSING_CONFIG=()
+          
+          for file in "${CONFIG_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              MISSING_CONFIG+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_CONFIG[@]} -eq 0 ]; then
+            echo "✅ All mobile configuration files present"
+          else
+            echo "⚠️ Missing configuration files: ${MISSING_CONFIG[*]}"
+          fi
+          
+          # Create mobile validation summary
+          echo "## 📱 Mobile Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Configuration Valid" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Mode**: Dry-run validation only" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform Support**: iOS (macOS runner required), Android (any runner)" >> $GITHUB_STEP_SUMMARY
+          
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Mobile build configuration is invalid"
+          
+          # Show configuration errors
+          echo "## Mobile Configuration Errors"
+          grep -E "ERROR|Failed|Error:" mobile-config.log | head -10 || true
+          
+          echo "::error::Mobile build config validation failed."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "🔐 AWS Infrastructure Validation"
+      id: terraform-validation
+      if: inputs.should-validate-terraform == 'true'
+      timeout-minutes: 5
+      shell: bash
+      run: |
+        echo "::group::🔐 Terraform Infrastructure Validation"
+        echo "::notice::To reproduce locally: cd terraform && terraform validate"
+
+        # Change to terraform directory
+        if [ ! -d "terraform" ]; then
+          echo "❌ Terraform directory not found"
+          echo "::error::Terraform directory missing - infrastructure changes detected but no terraform/ directory found"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        cd terraform
+
+        # Initialize terraform (validation mode)
+        echo "🔧 Initializing Terraform..."
+        if terraform init -backend=false -input=false 2>&1 | tee terraform-init.log; then
+          echo "✅ Terraform initialization succeeded"
+        else
+          echo "❌ Terraform initialization failed"
+          echo "## Terraform Initialization Errors"
+          cat terraform-init.log
+          echo "::error::Terraform initialization failed"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        # Validate terraform configuration
+        echo "🔍 Validating Terraform configuration..."
+        if terraform validate 2>&1 | tee terraform-validate.log; then
+          echo "✅ Terraform configuration is valid"
+          
+          # Check for common terraform files
+          TERRAFORM_FILES=("main.tf" "variables.tf" "outputs.tf")
+          PRESENT_FILES=()
+          
+          for file in "${TERRAFORM_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              PRESENT_FILES+=("$file")
+            fi
+          done
+          
+          # Create terraform validation summary
+          echo "## 🔐 Terraform Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Configuration Valid" >> $GITHUB_STEP_SUMMARY
+          echo "- **Configuration Files**: ${PRESENT_FILES[*]}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation Mode**: Syntax and structure check only" >> $GITHUB_STEP_SUMMARY
+          
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Terraform validation failed"
+          echo "## Terraform Configuration Errors"
+          cat terraform-validate.log
+          echo "::error::Terraform configuration is invalid."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "📊 Check Build Results"
+      id: check-results
+      if: always()
+      shell: bash
+      run: |
+        echo "::group::📊 Build Validation Summary"
+        
+        # Collect all results
+        WEB_RESULT="${{ steps.build-web.outputs.result || 'skipped' }}"
+        MOBILE_RESULT="${{ steps.validate-mobile.outputs.result || 'skipped' }}"
+        LAMBDAS_RESULT="${{ steps.build-lambdas.outputs.result || 'skipped' }}"
+        TERRAFORM_RESULT="${{ steps.terraform-validation.outputs.result || 'skipped' }}"
+        
+        # Determine overall result
+        OVERALL_RESULT="success"
+        ARTIFACTS_READY="true"
+        
+        if [ "$WEB_RESULT" = "failure" ] || [ "$MOBILE_RESULT" = "failure" ] || [ "$LAMBDAS_RESULT" = "failure" ] || [ "$TERRAFORM_RESULT" = "failure" ]; then
+          OVERALL_RESULT="failure"
+          ARTIFACTS_READY="false"
+        fi
+        
+        # Set outputs
+        echo "result=$OVERALL_RESULT" >> $GITHUB_OUTPUT
+        echo "artifacts-ready=$ARTIFACTS_READY" >> $GITHUB_OUTPUT
+        
+        # Create comprehensive summary
+        echo "## 🏗️ Build Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status | Result |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Web Application | $( [ "$WEB_RESULT" = "success" ] && echo "✅ Built" || [ "$WEB_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$WEB_RESULT" = "success" ] && echo "Ready for deployment" || [ "$WEB_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile App Config | $( [ "$MOBILE_RESULT" = "success" ] && echo "✅ Valid" || [ "$MOBILE_RESULT" = "failure" ] && echo "❌ Invalid" || echo "⏭️ Skipped" ) | $( [ "$MOBILE_RESULT" = "success" ] && echo "Configuration validated" || [ "$MOBILE_RESULT" = "failure" ] && echo "Configuration errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambda Functions | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "✅ Built" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "Ready for deployment" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Infrastructure | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "✅ Valid" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "❌ Invalid" || echo "⏭️ Skipped" ) | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "Configuration validated" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "Configuration errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Overall Result**: $( [ "$OVERALL_RESULT" = "success" ] && echo "✅ **All Builds Successful**" || echo "❌ **Build Failures Detected**" )" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployment Ready**: $( [ "$ARTIFACTS_READY" = "true" ] && echo "✅ **All Artifacts Ready**" || echo "❌ **Artifacts Not Ready**" )" >> $GITHUB_STEP_SUMMARY
+        
+        # Add deployment readiness context
+        if [ "$ARTIFACTS_READY" = "true" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Deployment Readiness" >> $GITHUB_STEP_SUMMARY
+          echo "All required build artifacts have been successfully created and validated:" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$WEB_RESULT" = "success" ]; then
+            echo "- **Web Application**: Build artifacts available in \`dist/apps/web/\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$LAMBDAS_RESULT" = "success" ]; then
+            echo "- **Lambda Functions**: Build artifacts available in \`dist/lambdas/\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$TERRAFORM_RESULT" = "success" ]; then
+            echo "- **Infrastructure**: Terraform configuration validated" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
+        # Set appropriate notices
+        if [ "$OVERALL_RESULT" = "success" ]; then
+          echo "::notice title=Build Validation Success::All required builds completed successfully - artifacts ready for deployment"
+        else
+          echo "::error title=Build Validation Failed::One or more builds failed - check individual build logs for details"
+        fi
+        
+        echo "🏗️ Build validation completed: $OVERALL_RESULT"
+        echo "::endgroup::"
+
+    - name: "⏭️ Skipped Builds Notice"
+      if: inputs.should-build-web != 'true' && inputs.should-build-mobile != 'true' && inputs.should-build-lambdas != 'true' && inputs.should-validate-terraform != 'true'
+      shell: bash
+      run: |
+        echo "::notice title=No Builds Required::No build changes detected - all build validations skipped for optimal CI performance"

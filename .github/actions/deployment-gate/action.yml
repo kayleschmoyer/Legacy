@@ -1,0 +1,235 @@
+name: "Deployment Gate"
+description: "Comprehensive deployment readiness validation with configurable criteria and detailed artifact verification"
+
+inputs:
+  artifacts-ready:
+    description: "Whether build artifacts are ready"
+    required: true
+  quality-passed:
+    description: "Whether quality gates passed"
+    required: true
+  execution-plan:
+    description: "JSON execution plan with component details"
+    required: false
+  required-components:
+    description: "Comma-separated list of required components for deployment"
+    required: false
+    default: "web,lambdas"
+  environment:
+    description: "Target deployment environment"
+    required: false
+    default: "production"
+  skip-on-no-changes:
+    description: "Skip deployment gate if no changes detected"
+    required: false
+    default: "false"
+
+outputs:
+  deployment-ready:
+    description: "Whether deployment should proceed (true/false)"
+    value: ${{ steps.gate.outputs.deployment-ready }}
+  readiness-summary:
+    description: "JSON summary of deployment readiness"
+    value: ${{ steps.gate.outputs.readiness-summary }}
+  required-artifacts:
+    description: "List of required artifacts for deployment"
+    value: ${{ steps.gate.outputs.required-artifacts }}
+  deployment-strategy:
+    description: "Recommended deployment strategy"
+    value: ${{ steps.gate.outputs.deployment-strategy }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🚀 Deployment Readiness Gate"
+      id: gate
+      shell: bash
+      run: |
+        echo "::group::🚀 Deployment Readiness Assessment"
+
+        # Parse inputs
+        ARTIFACTS_READY="${{ inputs.artifacts-ready }}"
+        QUALITY_PASSED="${{ inputs.quality-passed }}"
+        EXECUTION_PLAN='${{ inputs.execution-plan }}'
+        REQUIRED_COMPONENTS="${{ inputs.required-components }}"
+        ENVIRONMENT="${{ inputs.environment }}"
+        SKIP_ON_NO_CHANGES="${{ inputs.skip-on-no-changes }}"
+        
+        echo "📋 Deployment Gate Configuration:"
+        echo "  - Environment: $ENVIRONMENT"
+        echo "  - Required Components: $REQUIRED_COMPONENTS"
+        echo "  - Artifacts Ready: $ARTIFACTS_READY"
+        echo "  - Quality Passed: $QUALITY_PASSED"
+        
+        # Initialize readiness tracking
+        DEPLOYMENT_READY="false"
+        READINESS_ISSUES=()
+        REQUIRED_ARTIFACTS=()
+        
+        # Check basic prerequisites
+        if [ "$QUALITY_PASSED" != "true" ]; then
+          READINESS_ISSUES+=("Quality gates not passed")
+          echo "❌ Quality gates prerequisite failed"
+        else
+          echo "✅ Quality gates prerequisite met"
+        fi
+        
+        if [ "$ARTIFACTS_READY" != "true" ]; then
+          READINESS_ISSUES+=("Build artifacts not ready")
+          echo "❌ Artifact readiness prerequisite failed"
+        else
+          echo "✅ Artifact readiness prerequisite met"
+        fi
+        
+        # Parse execution plan if provided
+        AFFECTED_COMPONENTS=()
+        if [ -n "$EXECUTION_PLAN" ] && [ "$EXECUTION_PLAN" != "null" ]; then
+          echo "📊 Analyzing execution plan..."
+          
+          # Extract affected components from execution plan
+          if echo "$EXECUTION_PLAN" | jq . >/dev/null 2>&1; then
+            BUILDS=$(echo "$EXECUTION_PLAN" | jq -r '.execution_plan.builds // {} | to_entries[] | select(.value == true) | .key')
+            for build in $BUILDS; do
+              AFFECTED_COMPONENTS+=("$build")
+            done
+            
+            echo "🔍 Affected components: ${AFFECTED_COMPONENTS[*]}"
+          else
+            echo "⚠️ Invalid execution plan JSON, using default validation"
+          fi
+        fi
+        
+        # Check required components
+        IFS=',' read -ra REQUIRED_COMP_ARRAY <<< "$REQUIRED_COMPONENTS"
+        MISSING_COMPONENTS=()
+        
+        for component in "${REQUIRED_COMP_ARRAY[@]}"; do
+          component=$(echo "$component" | xargs) # trim whitespace
+          
+          case "$component" in
+            "web")
+              if [ -d "dist/apps/web" ] && [ -f "dist/apps/web/index.html" ]; then
+                echo "✅ Web application artifacts present"
+                REQUIRED_ARTIFACTS+=("web:dist/apps/web")
+              else
+                echo "❌ Web application artifacts missing"
+                MISSING_COMPONENTS+=("web")
+              fi
+              ;;
+            "lambdas")
+              if [ -d "dist/lambdas" ] && [ "$(find dist/lambdas -name "*.js" | wc -l)" -gt 0 ]; then
+                echo "✅ Lambda function artifacts present"
+                REQUIRED_ARTIFACTS+=("lambdas:dist/lambdas")
+              else
+                echo "❌ Lambda function artifacts missing"
+                MISSING_COMPONENTS+=("lambdas")
+              fi
+              ;;
+            "mobile")
+              # Mobile builds typically run on different runners
+              echo "ℹ️ Mobile deployment verification (platform-specific)"
+              REQUIRED_ARTIFACTS+=("mobile:platform-specific")
+              ;;
+            *)
+              echo "⚠️ Unknown component: $component"
+              ;;
+          esac
+        done
+        
+        # Add missing components to issues
+        if [ ${#MISSING_COMPONENTS[@]} -gt 0 ]; then
+          READINESS_ISSUES+=("Missing required components: ${MISSING_COMPONENTS[*]}")
+        fi
+        
+        # Check for no-changes skip condition
+        if [ "$SKIP_ON_NO_CHANGES" = "true" ] && [ ${#AFFECTED_COMPONENTS[@]} -eq 0 ]; then
+          echo "ℹ️ No changes detected and skip-on-no-changes enabled"
+          DEPLOYMENT_READY="skipped"
+          DEPLOYMENT_STRATEGY="skip"
+        # Determine final readiness
+        elif [ ${#READINESS_ISSUES[@]} -eq 0 ]; then
+          DEPLOYMENT_READY="true"
+          echo "✅ All deployment prerequisites met"
+          
+          # Determine deployment strategy based on affected components
+          if [ ${#AFFECTED_COMPONENTS[@]} -eq 0 ]; then
+            DEPLOYMENT_STRATEGY="full"
+          elif [ ${#AFFECTED_COMPONENTS[@]} -eq 1 ]; then
+            DEPLOYMENT_STRATEGY="selective-${AFFECTED_COMPONENTS[0]}"
+          else
+            DEPLOYMENT_STRATEGY="selective-multiple"
+          fi
+        else
+          DEPLOYMENT_READY="false"
+          echo "❌ Deployment readiness failed"
+          DEPLOYMENT_STRATEGY="blocked"
+        fi
+        
+        # Create comprehensive readiness summary
+        READINESS_SUMMARY=$(cat << EOF
+        {
+          "ready": "$DEPLOYMENT_READY",
+          "environment": "$ENVIRONMENT",
+          "strategy": "$DEPLOYMENT_STRATEGY",
+          "prerequisites": {
+            "quality_passed": $QUALITY_PASSED,
+            "artifacts_ready": "$ARTIFACTS_READY"
+          },
+          "components": {
+            "required": [$(printf '"%s",' "${REQUIRED_COMP_ARRAY[@]}" | sed 's/,$//')],
+            "affected": [$(printf '"%s",' "${AFFECTED_COMPONENTS[@]}" | sed 's/,$//')],
+            "missing": [$(printf '"%s",' "${MISSING_COMPONENTS[@]}" | sed 's/,$//')]
+          },
+          "artifacts": [$(printf '"%s",' "${REQUIRED_ARTIFACTS[@]}" | sed 's/,$//')],
+          "issues": [$(printf '"%s",' "${READINESS_ISSUES[@]}" | sed 's/,$//')]
+        }
+        EOF
+        )
+        
+        # Set outputs
+        echo "deployment-ready=$DEPLOYMENT_READY" >> $GITHUB_OUTPUT
+        echo "readiness-summary=$(echo "$READINESS_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
+        echo "required-artifacts=$(printf '%s,' "${REQUIRED_ARTIFACTS[@]}" | sed 's/,$//')" >> $GITHUB_OUTPUT
+        echo "deployment-strategy=$DEPLOYMENT_STRATEGY" >> $GITHUB_OUTPUT
+        
+        # Create deployment summary
+        echo "## 🚀 Deployment Readiness Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: $( [ "$DEPLOYMENT_READY" = "true" ] && echo "✅ Ready" || [ "$DEPLOYMENT_READY" = "skipped" ] && echo "⏭️ Skipped (No Changes)" || echo "❌ Not Ready" )" >> $GITHUB_STEP_SUMMARY
+        echo "- **Strategy**: $DEPLOYMENT_STRATEGY" >> $GITHUB_STEP_SUMMARY
+        
+        if [ ${#REQUIRED_ARTIFACTS[@]} -gt 0 ]; then
+          echo "- **Required Artifacts**: $(printf '%s, ' "${REQUIRED_ARTIFACTS[@]}" | sed 's/, $//')" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ ${#READINESS_ISSUES[@]} -gt 0 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ Readiness Issues" >> $GITHUB_STEP_SUMMARY
+          for issue in "${READINESS_ISSUES[@]}"; do
+            echo "- $issue" >> $GITHUB_STEP_SUMMARY
+          done
+        fi
+        
+        if [ ${#AFFECTED_COMPONENTS[@]} -gt 0 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Components for Deployment" >> $GITHUB_STEP_SUMMARY
+          for component in "${AFFECTED_COMPONENTS[@]}"; do
+            echo "- $component" >> $GITHUB_STEP_SUMMARY
+          done
+        fi
+        
+        # Set appropriate notices
+        case "$DEPLOYMENT_READY" in
+          "true")
+            echo "::notice title=Deployment Ready::All components validated and ready for $ENVIRONMENT deployment using $DEPLOYMENT_STRATEGY strategy"
+            ;;
+          "skipped")
+            echo "::notice title=Deployment Skipped::No changes detected - deployment not required"
+            ;;
+          "false")
+            echo "::error title=Deployment Blocked::$(printf '%s; ' "${READINESS_ISSUES[@]}" | sed 's/; $//')"
+            ;;
+        esac
+        
+        echo "🚀 Deployment gate completed: $DEPLOYMENT_READY"
+        echo "::endgroup::"

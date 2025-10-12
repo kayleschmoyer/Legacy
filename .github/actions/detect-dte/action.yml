@@ -1,0 +1,189 @@
+name: "Detect Nx Cloud DTE Availability"
+description: "Intelligently detects Nx Cloud DTE availability and configures optimal execution settings with quota monitoring and fallback handling"
+
+inputs:
+  nx-cloud-token:
+    description: "Nx Cloud access token"
+    required: false
+    default: ""
+  max-retries:
+    description: "Maximum retry attempts for DTE detection"
+    required: false
+    default: "2"
+  timeout-seconds:
+    description: "Timeout for cloud connectivity tests"
+    required: false
+    default: "30"
+  min-agents:
+    description: "Minimum agents required for DTE to be considered viable"
+    required: false
+    default: "2"
+  quota-threshold:
+    description: "Minimum quota remaining percentage for DTE (0-100)"
+    required: false
+    default: "10"
+
+outputs:
+  cloud-available:
+    description: "Whether Nx Cloud is accessible"
+    value: ${{ steps.detect.outputs.cloud-available }}
+  dte-available:
+    description: "Whether DTE is available and viable"
+    value: ${{ steps.detect.outputs.dte-available }}
+  execution-mode:
+    description: "Recommended execution mode (distributed/local)"
+    value: ${{ steps.detect.outputs.execution-mode }}
+  optimal-agents:
+    description: "Optimal number of agents/parallel processes"
+    value: ${{ steps.detect.outputs.optimal-agents }}
+  fallback-reason:
+    description: "Reason for fallback to local execution"
+    value: ${{ steps.detect.outputs.fallback-reason }}
+  memory-limit:
+    description: "Recommended Node.js memory limit"
+    value: ${{ steps.detect.outputs.memory-limit }}
+  nx-parallel:
+    description: "Recommended NX_PARALLEL value"
+    value: ${{ steps.detect.outputs.nx-parallel }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "☁️ Intelligent DTE Detection & Quota Check"
+      id: detect
+      shell: bash
+      run: |
+        echo "::group::🧠 Smart Nx Cloud Detection with Usage Limits"
+
+        # Initialize defaults
+        CLOUD_AVAILABLE="false"
+        DTE_AVAILABLE="false"  
+        EXECUTION_MODE="local"
+        OPTIMAL_AGENTS=4
+        FALLBACK_REASON=""
+        MEMORY_LIMIT="4096"
+
+        # Get input values
+        NX_CLOUD_TOKEN="${{ inputs.nx-cloud-token }}"
+        MAX_RETRIES="${{ inputs.max-retries }}"
+        TIMEOUT_SECONDS="${{ inputs.timeout-seconds }}"
+        MIN_AGENTS="${{ inputs.min-agents }}"
+        QUOTA_THRESHOLD="${{ inputs.quota-threshold }}"
+
+        if [ -n "$NX_CLOUD_TOKEN" ]; then
+          echo "✅ Nx Cloud token found"
+          
+          # Test basic cloud connectivity with timeout
+          echo "🌐 Testing cloud connectivity..."
+          if timeout "${TIMEOUT_SECONDS}s" npx nx-cloud --version >/dev/null 2>&1; then
+            echo "✅ Nx Cloud CLI accessible"
+            CLOUD_AVAILABLE="true"
+            
+            # Test DTE availability and quota with retry logic
+            echo "🎯 Testing DTE quota and availability..."
+            
+            RETRY_COUNT=0
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$DTE_AVAILABLE" != "true" ]; do
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "🔄 DTE test attempt $RETRY_COUNT/$MAX_RETRIES"
+              
+              # Get DTE status (with timeout)
+              DTE_STATUS=$(timeout 20s npx nx-cloud dte-status --json 2>/dev/null || echo '{"error": "timeout"}')
+              
+              if echo "$DTE_STATUS" | jq -e '.agentsAvailable' >/dev/null 2>&1; then
+                AGENTS_AVAILABLE=$(echo "$DTE_STATUS" | jq -r '.agentsAvailable // 0')
+                QUOTA_REMAINING=$(echo "$DTE_STATUS" | jq -r '.quotaRemaining // 0')
+                
+                echo "📊 DTE Status:"
+                echo "  - Agents Available: $AGENTS_AVAILABLE"
+                echo "  - Quota Remaining: $QUOTA_REMAINING%"
+                
+                # Check if DTE is viable
+                if [ "$AGENTS_AVAILABLE" -ge "$MIN_AGENTS" ] && [ "$QUOTA_REMAINING" -ge "$QUOTA_THRESHOLD" ]; then
+                  DTE_AVAILABLE="true"
+                  EXECUTION_MODE="distributed"
+                  OPTIMAL_AGENTS=$AGENTS_AVAILABLE
+                  MEMORY_LIMIT="6144"
+                  echo "🚀 DTE is viable - using $AGENTS_AVAILABLE agents"
+                  break
+                elif [ "$AGENTS_AVAILABLE" -lt "$MIN_AGENTS" ]; then
+                  FALLBACK_REASON="Insufficient agents available ($AGENTS_AVAILABLE < $MIN_AGENTS)"
+                  echo "⚠️ $FALLBACK_REASON"
+                  break
+                elif [ "$QUOTA_REMAINING" -lt "$QUOTA_THRESHOLD" ]; then
+                  FALLBACK_REASON="Quota too low ($QUOTA_REMAINING% < $QUOTA_THRESHOLD%)"
+                  echo "⚠️ $FALLBACK_REASON"
+                  break
+                fi
+              else
+                echo "❌ DTE status check failed (attempt $RETRY_COUNT/$MAX_RETRIES)"
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "⏳ Retrying in 2 seconds..."
+                  sleep 2
+                fi
+              fi
+            done
+            
+            if [ "$DTE_AVAILABLE" != "true" ] && [ -z "$FALLBACK_REASON" ]; then
+              FALLBACK_REASON="DTE detection failed after $MAX_RETRIES attempts"
+            fi
+          else
+            FALLBACK_REASON="Nx Cloud CLI not accessible or timed out"
+            echo "❌ $FALLBACK_REASON"
+          fi
+        else
+          FALLBACK_REASON="No Nx Cloud token provided"
+          echo "ℹ️ $FALLBACK_REASON"
+        fi
+
+        # Set outputs
+        echo "cloud-available=$CLOUD_AVAILABLE" >> $GITHUB_OUTPUT
+        echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
+        echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
+        echo "optimal-agents=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
+        echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
+        echo "memory-limit=$MEMORY_LIMIT" >> $GITHUB_OUTPUT
+        echo "nx-parallel=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
+
+        # Create summary report
+        echo "## ☁️ Execution Mode Detection" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cloud Available**: $CLOUD_AVAILABLE" >> $GITHUB_STEP_SUMMARY
+        echo "- **DTE Available**: $DTE_AVAILABLE" >> $GITHUB_STEP_SUMMARY  
+        echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Agents/Parallel**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Memory Limit**: ${MEMORY_LIMIT}MB" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$EXECUTION_MODE" == "local" ] && [ -n "$FALLBACK_REASON" ]; then
+          echo "- **Fallback Reason**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Set appropriate notices
+        if [ "$DTE_AVAILABLE" == "true" ]; then
+          echo "::notice title=Nx Cloud DTE::Using distributed execution with $OPTIMAL_AGENTS agents"
+        else
+          echo "::notice title=Local Execution::$FALLBACK_REASON - using GitHub Actions ($OPTIMAL_AGENTS processes)"
+        fi
+
+        echo "::endgroup::"
+
+    - name: "🔧 Configure Environment Variables"
+      shell: bash
+      run: |
+        echo "Setting environment variables based on DTE detection results..."
+        
+        # Set environment variables for subsequent workflow steps
+        echo "NX_PARALLEL=${{ steps.detect.outputs.nx-parallel }}" >> $GITHUB_ENV
+        echo "NODE_OPTIONS=--max_old_space_size=${{ steps.detect.outputs.memory-limit }}" >> $GITHUB_ENV
+        echo "NX_CLOUD_DISTRIBUTED_EXECUTION=${{ steps.detect.outputs.dte-available }}" >> $GITHUB_ENV
+        
+        # Set cache configuration based on execution mode
+        if [ "${{ steps.detect.outputs.dte-available }}" == "true" ]; then
+          echo "NX_DAEMON=false" >> $GITHUB_ENV
+          echo "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV
+        else
+          echo "NX_DAEMON=false" >> $GITHUB_ENV
+          echo "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV
+        fi
+        
+        echo "✅ Environment configured for ${{ steps.detect.outputs.execution-mode }} execution"

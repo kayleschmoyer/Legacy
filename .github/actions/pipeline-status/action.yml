@@ -1,0 +1,212 @@
+name: "Pipeline Status Handler"
+description: "Standardized pipeline completion handling with contextual success/failure messages and summary generation"
+
+inputs:
+  overall-status:
+    description: "Overall pipeline status (success/failure)"
+    required: true
+  execution-plan:
+    description: "JSON execution plan for context"
+    required: false
+  workflow-duration:
+    description: "Workflow duration in seconds"
+    required: false
+  execution-mode:
+    description: "Execution mode used (distributed/local)"
+    required: false
+  step-results:
+    description: "JSON object with individual step results"
+    required: false
+  event-name:
+    description: "GitHub event name"
+    required: false
+    default: "unknown"
+  deployment-ready:
+    description: "Whether deployment is ready (for main branch)"
+    required: false
+  deployment-strategy:
+    description: "Deployment strategy if ready"
+    required: false
+  include-performance-summary:
+    description: "Include performance analysis in output"
+    required: false
+    default: "true"
+
+outputs:
+  status-message:
+    description: "Human-readable status message"
+    value: ${{ steps.status.outputs.status-message }}
+  completion-summary:
+    description: "JSON summary of pipeline completion"
+    value: ${{ steps.status.outputs.completion-summary }}
+  next-steps:
+    description: "Recommended next steps based on status"
+    value: ${{ steps.status.outputs.next-steps }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🎯 Generate Pipeline Status"
+      id: status
+      shell: bash
+      run: |
+        echo "::group::🎯 Pipeline Status Analysis"
+        
+        # Parse inputs
+        OVERALL_STATUS="${{ inputs.overall-status }}"
+        EXECUTION_PLAN='${{ inputs.execution-plan }}'
+        WORKFLOW_DURATION="${{ inputs.workflow-duration }}"
+        EXECUTION_MODE="${{ inputs.execution-mode }}"
+        STEP_RESULTS='${{ inputs.step-results }}'
+        EVENT_NAME="${{ inputs.event-name }}"
+        DEPLOYMENT_READY="${{ inputs.deployment-ready }}"
+        DEPLOYMENT_STRATEGY="${{ inputs.deployment-strategy }}"
+        INCLUDE_PERF="${{ inputs.include-performance-summary }}"
+        
+        echo "📋 Analyzing pipeline completion..."
+        echo "  - Status: $OVERALL_STATUS"
+        echo "  - Event: $EVENT_NAME"
+        echo "  - Duration: ${WORKFLOW_DURATION}s"
+        echo "  - Mode: $EXECUTION_MODE"
+        
+        # Generate contextual status message
+        STATUS_MESSAGE=""
+        NEXT_STEPS=""
+        
+        if [ "$OVERALL_STATUS" = "success" ]; then
+          STATUS_MESSAGE="🎉 CI Pipeline completed successfully!"
+          
+          # Add context based on event type
+          case "$EVENT_NAME" in
+            "pull_request")
+              STATUS_MESSAGE="$STATUS_MESSAGE This PR is ready for review and merge!"
+              NEXT_STEPS="1. Request code review from team members\n2. Address any review feedback\n3. Merge when approved"
+              ;;
+            "push")
+              if [ "$DEPLOYMENT_READY" = "true" ]; then
+                STATUS_MESSAGE="$STATUS_MESSAGE Ready for deployment using $DEPLOYMENT_STRATEGY strategy!"
+                NEXT_STEPS="1. Review deployment readiness\n2. Execute deployment pipeline\n3. Monitor deployment health"
+              else
+                STATUS_MESSAGE="$STATUS_MESSAGE Main branch validation complete!"
+                NEXT_STEPS="1. Review changes\n2. Monitor for any issues\n3. Prepare for next deployment"
+              fi
+              ;;
+            "workflow_dispatch")
+              STATUS_MESSAGE="$STATUS_MESSAGE Manual workflow execution completed!"
+              NEXT_STEPS="1. Review validation results\n2. Take appropriate action based on findings"
+              ;;
+            *)
+              STATUS_MESSAGE="$STATUS_MESSAGE All validations passed!"
+              NEXT_STEPS="1. Review pipeline results\n2. Continue with your development workflow"
+              ;;
+          esac
+          
+        else
+          STATUS_MESSAGE="❌ CI Pipeline failed - validation issues detected"
+          
+          # Add failure context
+          FAILED_STEPS=""
+          if [ -n "$STEP_RESULTS" ] && echo "$STEP_RESULTS" | jq . >/dev/null 2>&1; then
+            FAILED_STEPS=$(echo "$STEP_RESULTS" | jq -r 'to_entries[] | select(.value == "failure") | .key' | tr '\n' ',' | sed 's/,$//')
+          fi
+          
+          if [ -n "$FAILED_STEPS" ]; then
+            STATUS_MESSAGE="$STATUS_MESSAGE\nFailed components: $FAILED_STEPS"
+          fi
+          
+          NEXT_STEPS="1. Check the PR comment for specific error details\n2. Run reproduction commands locally\n3. Fix the identified issues\n4. Push changes to re-trigger CI"
+        fi
+        
+        # Generate performance context if available
+        PERFORMANCE_CONTEXT=""
+        if [ "$INCLUDE_PERF" = "true" ] && [ -n "$WORKFLOW_DURATION" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then
+          DURATION_MIN=$((WORKFLOW_DURATION / 60))
+          DURATION_SEC=$((WORKFLOW_DURATION % 60))
+          
+          if [ "$WORKFLOW_DURATION" -lt 300 ]; then
+            PERFORMANCE_CONTEXT="⚡ Excellent performance: ${DURATION_MIN}m ${DURATION_SEC}s"
+          elif [ "$WORKFLOW_DURATION" -lt 600 ]; then
+            PERFORMANCE_CONTEXT="✅ Good performance: ${DURATION_MIN}m ${DURATION_SEC}s"
+          elif [ "$WORKFLOW_DURATION" -lt 1200 ]; then
+            PERFORMANCE_CONTEXT="⚠️ Acceptable performance: ${DURATION_MIN}m ${DURATION_SEC}s"
+          else
+            PERFORMANCE_CONTEXT="🐌 Slow performance: ${DURATION_MIN}m ${DURATION_SEC}s (consider optimization)"
+          fi
+          
+          if [ "$EXECUTION_MODE" = "distributed" ]; then
+            PERFORMANCE_CONTEXT="$PERFORMANCE_CONTEXT (DTE enabled)"
+          fi
+        fi
+        
+        # Extract execution strategy if available
+        EXECUTION_STRATEGY="unknown"
+        if [ -n "$EXECUTION_PLAN" ] && echo "$EXECUTION_PLAN" | jq . >/dev/null 2>&1; then
+          EXECUTION_STRATEGY=$(echo "$EXECUTION_PLAN" | jq -r '.strategy // "unknown"')
+        fi
+        
+        # Create comprehensive completion summary
+        COMPLETION_SUMMARY=$(cat << EOF
+        {
+          "status": "$OVERALL_STATUS",
+          "event": "$EVENT_NAME",
+          "performance": {
+            "duration_seconds": "$WORKFLOW_DURATION",
+            "execution_mode": "$EXECUTION_MODE",
+            "strategy": "$EXECUTION_STRATEGY",
+            "context": "$PERFORMANCE_CONTEXT"
+          },
+          "deployment": {
+            "ready": "$DEPLOYMENT_READY",
+            "strategy": "$DEPLOYMENT_STRATEGY"
+          },
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        }
+        EOF
+        )
+        
+        # Set outputs
+        echo "status-message<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$STATUS_MESSAGE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "completion-summary=$(echo "$COMPLETION_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
+        
+        echo "next-steps<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$NEXT_STEPS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        # Create step summary
+        echo "## 🎯 Pipeline Completion Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "✅ Success" || echo "❌ Failed" )" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -n "$PERFORMANCE_CONTEXT" ]; then
+          echo "**Performance**: $PERFORMANCE_CONTEXT" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$OVERALL_STATUS" = "success" ]; then
+            echo "**Action**: Ready for code review and merge" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Action**: Fix issues and push changes to re-trigger CI" >> $GITHUB_STEP_SUMMARY
+          fi
+        elif [ "$EVENT_NAME" = "push" ] && [ "$DEPLOYMENT_READY" = "true" ]; then
+          echo "**Action**: Ready for deployment ($DEPLOYMENT_STRATEGY)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Display status message
+        echo ""
+        echo "📊 Final Status:"
+        echo -e "$STATUS_MESSAGE"
+        
+        if [ -n "$PERFORMANCE_CONTEXT" ]; then
+          echo ""
+          echo "⏱️ Performance: $PERFORMANCE_CONTEXT"
+        fi
+        
+        if [ -n "$NEXT_STEPS" ]; then
+          echo ""
+          echo "📋 Next Steps:"
+          echo -e "$NEXT_STEPS"
+        fi
+        
+        echo "::endgroup::"

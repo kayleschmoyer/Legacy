@@ -1,0 +1,350 @@
+name: "Code Quality Gates"
+description: "Comprehensive code quality validation with formatting, linting, type checking, and intelligent parallel execution"
+
+inputs:
+  execution-mode:
+    description: "Execution mode (distributed/local)"
+    required: true
+  dte-available:
+    description: "Whether DTE is available"
+    required: true
+  optimal-agents:
+    description: "Number of optimal agents/parallel processes"
+    required: true
+  base-ref:
+    description: "Base reference for affected detection"
+    required: false
+    default: "origin/main"
+  head-ref:
+    description: "Head reference for affected detection"
+    required: false
+    default: "HEAD"
+  skip-formatting:
+    description: "Skip code formatting check"
+    required: false
+    default: "false"
+  timeout-minutes:
+    description: "Timeout for quality gates"
+    required: false
+    default: "15"
+
+outputs:
+  result:
+    description: "Overall quality gates result (success/failure)"
+    value: ${{ steps.check-results.outputs.result }}
+  formatting-result:
+    description: "Code formatting check result"
+    value: ${{ steps.formatting.outputs.result }}
+  lint-result:
+    description: "ESLint validation result"
+    value: ${{ steps.distributed.outputs.lint-result || steps.local.outputs.lint-result }}
+  typecheck-result:
+    description: "TypeScript type checking result"
+    value: ${{ steps.distributed.outputs.typecheck-result || steps.local.outputs.typecheck-result }}
+  test-result:
+    description: "Unit tests result"
+    value: ${{ steps.distributed.outputs.test-result || steps.local.outputs.test-result }}
+  execution-strategy:
+    description: "Strategy used (distributed/local-affected/local-full)"
+    value: ${{ steps.distributed.outputs.strategy || steps.local.outputs.strategy }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🎨 Code Formatting Check"
+      id: formatting
+      if: inputs.skip-formatting != 'true'
+      timeout-minutes: 3
+      shell: bash
+      run: |
+        echo "::group::🎨 Code Formatting Validation"
+        echo "::notice::To reproduce locally: npx nx format:check"
+
+        if npx nx format:check --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee format-check.log; then
+          echo "✅ All files are properly formatted"
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Code formatting issues detected"
+          echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+          
+          # Show specific files that need formatting
+          echo "Files requiring formatting:"
+          grep -E "would be reformatted|needs formatting" format-check.log || true
+          
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "⚡ Distributed Quality Gates"
+      id: distributed
+      if: inputs.dte-available == 'true'
+      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
+      shell: bash
+      run: |
+        echo "::group::⚡ Nx Cloud Distributed Task Execution"
+
+        AGENTS="${{ inputs.optimal-agents }}"
+        echo "🎯 Starting DTE with $AGENTS agents..."
+
+        # Start DTE session with optimal agent count
+        npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=$AGENTS
+
+        echo "strategy=distributed" >> $GITHUB_OUTPUT
+
+        # Initialize result tracking
+        LINT_SUCCESS=true
+        TYPECHECK_SUCCESS=true
+        TEST_SUCCESS=true
+
+        echo "🔧 Running lint and typecheck with DTE..."
+        if npx nx affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
+          echo "✅ Code quality checks passed (DTE)"
+          echo "lint-result=success" >> $GITHUB_OUTPUT
+          echo "typecheck-result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Code quality checks failed (DTE)"
+          echo "## DTE Quality Errors"
+          grep -E "error|warning|failed" dte-quality.log | head -20 || true
+          echo "::error::Code quality checks failed in DTE mode. Check dte-quality.log for details."
+          
+          # Determine which specific checks failed
+          if grep -q "lint.*failed\|ESLint" dte-quality.log; then
+            echo "lint-result=failure" >> $GITHUB_OUTPUT
+            LINT_SUCCESS=false
+          else
+            echo "lint-result=success" >> $GITHUB_OUTPUT
+          fi
+          
+          if grep -q "typecheck.*failed\|TypeScript\|TS[0-9]" dte-quality.log; then
+            echo "typecheck-result=failure" >> $GITHUB_OUTPUT
+            TYPECHECK_SUCCESS=false
+          else
+            echo "typecheck-result=success" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+        echo "🧪 Running tests with DTE..."  
+        if npx nx affected -t test --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-test.log; then
+          echo "✅ Tests passed (DTE)"
+          echo "test-result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Tests failed (DTE)"
+          echo "## DTE Test Errors"
+          grep -E "FAIL|error" dte-test.log | head -10 || true
+          echo "::error::Tests failed in DTE mode. Check dte-test.log for details."
+          echo "test-result=failure" >> $GITHUB_OUTPUT
+          TEST_SUCCESS=false
+        fi
+
+        # Check overall success
+        if [ "$LINT_SUCCESS" = true ] && [ "$TYPECHECK_SUCCESS" = true ] && [ "$TEST_SUCCESS" = true ]; then
+          echo "🎉 Distributed execution completed successfully"
+        else
+          echo "❌ Distributed execution failed"
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "🔧 Local Parallel Quality Gates"
+      id: local
+      if: inputs.dte-available != 'true'
+      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
+      shell: bash
+      run: |
+        echo "::group::⚡ Parallel Quality Gates (GitHub Actions)"
+
+        echo "📋 Using local execution with parallel quality gates"
+        echo "🎯 Running lint, typecheck, and tests in parallel for optimized execution"
+
+        # Check if we have any affected projects to optimize execution
+        AFFECTED_PROJECTS=$(npx nx print-affected --select=projects --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --type=lib,app 2>/dev/null || echo "")
+        
+        if [ -z "$AFFECTED_PROJECTS" ] || [ "$AFFECTED_PROJECTS" = "" ]; then
+          echo "ℹ️ No affected projects detected - running full validation"
+          EXECUTION_STRATEGY="local-full"
+        else
+          echo "🎯 Affected projects detected: $AFFECTED_PROJECTS"
+          echo "⚡ Using smart affected-only execution"
+          EXECUTION_STRATEGY="local-affected"
+        fi
+
+        echo "strategy=$EXECUTION_STRATEGY" >> $GITHUB_OUTPUT
+
+        # Initialize parallel execution with timestamp for unique file names
+        TIMESTAMP=$(date +%s)
+        LINT_LOG="lint-${TIMESTAMP}.log"
+        TYPECHECK_LOG="typecheck-${TIMESTAMP}.log" 
+        TEST_LOG="test-${TIMESTAMP}.log"
+
+        echo "🚀 Starting parallel quality gates..."
+        
+        # Start all quality checks in parallel background processes
+        if [ "$EXECUTION_STRATEGY" = "local-affected" ]; then
+          # Affected-only execution for faster feedback
+          echo "🔧 [PARALLEL] Starting ESLint validation (affected)..."
+          (npx nx affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
+          LINT_PID=$!
+
+          echo "📝 [PARALLEL] Starting TypeScript type checking (affected)..."
+          (npx nx affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
+          TYPECHECK_PID=$!
+
+          echo "🧪 [PARALLEL] Starting unit tests (affected)..."
+          (npx nx affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
+          TEST_PID=$!
+        else
+          # Full execution fallback
+          echo "🔧 [PARALLEL] Starting ESLint validation (full)..."
+          (npx nx run-many -t lint --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
+          LINT_PID=$!
+
+          echo "📝 [PARALLEL] Starting TypeScript type checking (full)..."
+          (npx nx run-many -t typecheck --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
+          TYPECHECK_PID=$!
+
+          echo "🧪 [PARALLEL] Starting unit tests (full)..."
+          (npx nx run-many -t test --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
+          TEST_PID=$!
+        fi
+
+        echo "⏳ Waiting for parallel quality gates to complete..."
+        echo "📊 Progress tracking: Lint(PID:$LINT_PID) | TypeCheck(PID:$TYPECHECK_PID) | Test(PID:$TEST_PID)"
+
+        # Wait for all processes and track completion
+        LINT_DONE=false
+        TYPECHECK_DONE=false
+        TEST_DONE=false
+
+        while [ "$LINT_DONE" = false ] || [ "$TYPECHECK_DONE" = false ] || [ "$TEST_DONE" = false ]; do
+          # Check lint completion
+          if [ "$LINT_DONE" = false ] && ! kill -0 $LINT_PID 2>/dev/null; then
+            wait $LINT_PID
+            echo "✅ ESLint validation completed"
+            LINT_DONE=true
+          fi
+
+          # Check typecheck completion
+          if [ "$TYPECHECK_DONE" = false ] && ! kill -0 $TYPECHECK_PID 2>/dev/null; then
+            wait $TYPECHECK_PID
+            echo "✅ TypeScript type checking completed"
+            TYPECHECK_DONE=true
+          fi
+
+          # Check test completion
+          if [ "$TEST_DONE" = false ] && ! kill -0 $TEST_PID 2>/dev/null; then
+            wait $TEST_PID
+            echo "✅ Unit tests completed"
+            TEST_DONE=true
+          fi
+
+          # Avoid busy waiting
+          if [ "$LINT_DONE" = false ] || [ "$TYPECHECK_DONE" = false ] || [ "$TEST_DONE" = false ]; then
+            sleep 2
+          fi
+        done
+
+        echo "🔍 Checking results from parallel execution..."
+
+        # Check results and provide comprehensive error reporting
+        LINT_EXIT_CODE=$(cat lint-exit.code 2>/dev/null || echo 1)
+        TYPECHECK_EXIT_CODE=$(cat typecheck-exit.code 2>/dev/null || echo 1)
+        TEST_EXIT_CODE=$(cat test-exit.code 2>/dev/null || echo 1)
+
+        OVERALL_SUCCESS=true
+
+        # Process lint results
+        if [ "$LINT_EXIT_CODE" -eq 0 ]; then
+          echo "✅ ESLint validation: PASSED"
+          echo "lint-result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ESLint validation: FAILED (exit code: $LINT_EXIT_CODE)"
+          echo "## ESLint Errors Summary"
+          grep -E "error|warning" "$LINT_LOG" | head -20 || echo "No specific errors found in log"
+          echo "::error::ESLint validation failed. Check $LINT_LOG for details."
+          echo "lint-result=failure" >> $GITHUB_OUTPUT
+          OVERALL_SUCCESS=false
+        fi
+
+        # Process typecheck results  
+        if [ "$TYPECHECK_EXIT_CODE" -eq 0 ]; then
+          echo "✅ TypeScript type checking: PASSED"
+          echo "typecheck-result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ TypeScript type checking: FAILED (exit code: $TYPECHECK_EXIT_CODE)"
+          echo "## TypeScript Errors Summary"
+          grep -E "error|TS[0-9]" "$TYPECHECK_LOG" | head -15 || echo "No specific errors found in log"
+          echo "::error::TypeScript validation failed. Check $TYPECHECK_LOG for details."
+          echo "typecheck-result=failure" >> $GITHUB_OUTPUT
+          OVERALL_SUCCESS=false
+        fi
+
+        # Process test results
+        if [ "$TEST_EXIT_CODE" -eq 0 ]; then
+          echo "✅ Unit tests: PASSED"
+          echo "test-result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Unit tests: FAILED (exit code: $TEST_EXIT_CODE)"
+          echo "## Test Errors Summary"
+          grep -E "FAIL|error" "$TEST_LOG" | head -10 || echo "No specific errors found in log"
+          echo "::error::Unit tests failed. Check $TEST_LOG for details."
+          echo "test-result=failure" >> $GITHUB_OUTPUT
+          OVERALL_SUCCESS=false
+        fi
+
+        # Final status check
+        if [ "$OVERALL_SUCCESS" = true ]; then
+          echo "🎉 All parallel quality gates passed successfully!"
+          echo "::notice::To reproduce locally ($EXECUTION_STRATEGY mode): npx nx affected -t lint,typecheck,test --parallel=4"
+        else
+          echo "❌ One or more quality gates failed"
+          echo "🔧 Reproduction commands:"
+          echo "  Lint: npx nx affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  TypeCheck: npx nx affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  Test: npx nx affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: "📊 Check Overall Results"
+      id: check-results
+      if: always()
+      shell: bash
+      run: |
+        echo "::group::📊 Quality Gates Summary"
+        
+        # Collect all results
+        FORMATTING_RESULT="${{ steps.formatting.outputs.result || 'skipped' }}"
+        LINT_RESULT="${{ steps.distributed.outputs.lint-result || steps.local.outputs.lint-result }}"
+        TYPECHECK_RESULT="${{ steps.distributed.outputs.typecheck-result || steps.local.outputs.typecheck-result }}"
+        TEST_RESULT="${{ steps.distributed.outputs.test-result || steps.local.outputs.test-result }}"
+        
+        # Determine overall result
+        OVERALL_RESULT="success"
+        if [ "$FORMATTING_RESULT" = "failure" ] || [ "$LINT_RESULT" = "failure" ] || [ "$TYPECHECK_RESULT" = "failure" ] || [ "$TEST_RESULT" = "failure" ]; then
+          OVERALL_RESULT="failure"
+        fi
+        
+        echo "result=$OVERALL_RESULT" >> $GITHUB_OUTPUT
+        
+        # Create summary
+        echo "## 🔍 Quality Gates Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Result | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Formatting | $( [ "$FORMATTING_RESULT" = "success" ] && echo "✅ Passed" || [ "$FORMATTING_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$FORMATTING_RESULT" = "success" ] && echo "All files properly formatted" || [ "$FORMATTING_RESULT" = "failure" ] && echo "Formatting issues detected" || echo "Formatting check disabled" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| ESLint Validation | $( [ "$LINT_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$LINT_RESULT" = "success" ] && echo "No linting issues" || echo "Linting issues detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| TypeScript Check | $( [ "$TYPECHECK_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$TYPECHECK_RESULT" = "success" ] && echo "No type errors" || echo "Type errors detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Unit Tests | $( [ "$TEST_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$TEST_RESULT" = "success" ] && echo "All tests passing" || echo "Test failures detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Overall Result**: $( [ "$OVERALL_RESULT" = "success" ] && echo "✅ **All Quality Gates Passed**" || echo "❌ **Quality Gates Failed**" )" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$OVERALL_RESULT" = "success" ]; then
+          echo "🎉 All quality gates passed successfully!"
+        else
+          echo "❌ Quality gates failed - see individual check results above"
+        fi
+        
+        echo "::endgroup::"

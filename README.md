@@ -2,6 +2,20 @@
 
 A modern sports data management platform built with React Native CLI, Next.js web, and AWS serverless backend.
 
+## 🚀 CI Status
+
+[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![DTE Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/DTE%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Change%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Execution Plan](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Execution%20Plan.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Quality%20Gates.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Build%20Validation.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/E2E%20Testing.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Deployment Gate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Deployment%20Gate.json)](https://github.com/bkrupa/legacy-sports/actions)
+
+[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Last%20Updated.json)](https://github.com/bkrupa/legacy-sports/actions)
+
 ## � Download Mobile App
 
 ### Android APK

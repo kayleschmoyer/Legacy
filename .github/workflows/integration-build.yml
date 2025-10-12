@@ -506,6 +506,26 @@ jobs:
 
           echo "::endgroup::"
 
+      # Update CI status badges (only on main branch integration builds)
+      - name: "🎖️ Update CI Status Badges"
+        if: always() && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/update-badges
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          workflow-status: ${{ job.status }}
+          step-results: |
+            {
+              "DTE Detection": "${{ steps['dte-detect'].outcome }}",
+              "Execution Plan": "${{ steps['execution-plan'].outcome }}",
+              "Format Check": "${{ steps['format-check'].outcome }}",
+              "Distributed Execution": "${{ steps['distributed-execution'].outcome }}",
+              "Local Execution": "${{ steps['local-execution'].outcome }}"
+            }
+          workflow-run-id: ${{ github.run_id }}
+          branch: ${{ github.ref_name }}
+          commit-sha: ${{ github.sha }}
+
       # Enable Nx Cloud Self-Healing CI (only when Nx Cloud is available)
       - name: "🔧 Auto-Fix CI Issues"
         run: |

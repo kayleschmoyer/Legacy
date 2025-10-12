@@ -1,0 +1,245 @@
+name: "Update CI Status Badges"
+description: "Updates gist files with CI status badges for each pipeline step"
+
+inputs:
+  github-token:
+    description: "GitHub token with gist access"
+    required: true
+  gist-id:
+    description: "Gist ID to update with badge data"
+    required: true
+  workflow-status:
+    description: "Overall workflow status (success/failure)"
+    required: true
+  step-results:
+    description: "JSON string containing step results"
+    required: true
+  workflow-run-id:
+    description: "GitHub workflow run ID"
+    required: true
+  branch:
+    description: "Git branch name"
+    required: true
+    default: ${{ github.ref_name }}
+  commit-sha:
+    description: "Git commit SHA"
+    required: true
+    default: ${{ github.sha }}
+
+outputs:
+  badges-updated:
+    description: "Whether badges were successfully updated"
+    value: ${{ steps.update-badges.outputs.success }}
+  update-summary:
+    description: "Summary of badge updates"
+    value: ${{ steps.update-badges.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: "📊 Update CI Status Badges"
+      id: update-badges
+      shell: bash
+      run: |
+        echo "::group::🎖️ Updating CI Status Badges"
+        
+        # Parse workflow inputs
+        WORKFLOW_STATUS="${{ inputs.workflow-status }}"
+        STEP_RESULTS='${{ inputs.step-results }}'
+        RUN_ID="${{ inputs.workflow-run-id }}"
+        BRANCH="${{ inputs.branch }}"
+        COMMIT_SHA="${{ inputs.commit-sha }}"
+        GIST_ID="${{ inputs.gist-id }}"
+        
+        # Function to create badge JSON
+        create_badge_json() {
+          local step_name="$1"
+          local status="$2" 
+          local message="$3"
+          local color="$4"
+          local run_url="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
+          
+          cat > "${step_name}.json" << EOF
+        {
+          "schemaVersion": 1,
+          "label": "${step_name}",
+          "message": "${message}",
+          "color": "${color}",
+          "namedLogo": "github",
+          "logoColor": "white",
+          "style": "flat",
+          "cacheSeconds": 300
+        }
+        EOF
+        }
+        
+        # Function to determine status color
+        get_status_color() {
+          case "$1" in
+            "success") echo "brightgreen" ;;
+            "failure") echo "red" ;;
+            "cancelled") echo "yellow" ;;
+            "skipped") echo "lightgrey" ;;
+            *) echo "inactive" ;;
+          esac
+        }
+        
+        # Function to format status message
+        format_status_message() {
+          case "$1" in
+            "success") echo "passing" ;;
+            "failure") echo "failing" ;;
+            "cancelled") echo "cancelled" ;;
+            "skipped") echo "skipped" ;;
+            *) echo "unknown" ;;
+          esac
+        }
+        
+        echo "Generating badge files for CI steps..."
+        
+        # Overall pipeline status
+        OVERALL_COLOR=$(get_status_color "$WORKFLOW_STATUS")
+        OVERALL_MESSAGE=$(format_status_message "$WORKFLOW_STATUS")
+        create_badge_json "CI Pipeline" "$WORKFLOW_STATUS" "$OVERALL_MESSAGE" "$OVERALL_COLOR"
+        
+        # Parse step results and create individual badges
+        if [ -n "$STEP_RESULTS" ] && [ "$STEP_RESULTS" != "null" ]; then
+          echo "Parsing step results: $STEP_RESULTS"
+          
+          # Extract individual step statuses using jq if available, otherwise parse manually
+          if command -v jq >/dev/null 2>&1; then
+            # Use jq for robust JSON parsing
+            echo "$STEP_RESULTS" | jq -r 'to_entries[] | "\(.key):\(.value)"' | while IFS=: read -r step status; do
+              if [ -n "$step" ] && [ -n "$status" ]; then
+                color=$(get_status_color "$status")
+                message=$(format_status_message "$status")
+                create_badge_json "$step" "$status" "$message" "$color"
+              fi
+            done
+          else
+            # Fallback: basic parsing for common step results
+            echo "jq not available, using basic parsing"
+            
+            # Create badges for known CI steps with default success status
+            declare -a ci_steps=(
+              "DTE Detection"
+              "Change Detection"  
+              "Execution Plan"
+              "Quality Gates"
+              "Build Validation"
+              "E2E Testing"
+              "Deployment Gate"
+            )
+            
+            for step in "${ci_steps[@]}"; do
+              # Default to success if overall workflow passed, failure if it failed
+              step_status="$WORKFLOW_STATUS"
+              color=$(get_status_color "$step_status")
+              message=$(format_status_message "$step_status")
+              create_badge_json "$step" "$step_status" "$message" "$color"
+            done
+          fi
+        fi
+        
+        # Create last updated badge
+        TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+        create_badge_json "Last Updated" "success" "$TIMESTAMP" "blue"
+        
+        # Create branch status badge
+        if [ "$BRANCH" = "main" ]; then
+          create_badge_json "Branch" "success" "main" "brightgreen"
+        else
+          create_badge_json "Branch" "success" "$BRANCH" "blue"
+        fi
+        
+        echo "Generated badge files:"
+        ls -la *.json
+        
+        # Update gist files using GitHub API
+        echo "Updating gist $GIST_ID..."
+        
+        # Prepare gist update payload
+        FILES_JSON=""
+        for badge_file in *.json; do
+          if [ -f "$badge_file" ]; then
+            filename="${badge_file}"
+            content=$(cat "$badge_file" | sed 's/"/\\"/g' | tr -d '\n')
+            
+            if [ -n "$FILES_JSON" ]; then
+              FILES_JSON="${FILES_JSON},"
+            fi
+            FILES_JSON="${FILES_JSON}\"${filename}\": {\"content\": \"${content}\"}"
+          fi
+        done
+        
+        # Create gist update payload
+        GIST_PAYLOAD="{\"files\": {${FILES_JSON}}}"
+        
+        # Update the gist
+        RESPONSE=$(curl -s \
+          -X PATCH \
+          -H "Authorization: Bearer ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/gists/$GIST_ID" \
+          -d "$GIST_PAYLOAD")
+        
+        # Check if update was successful
+        if echo "$RESPONSE" | grep -q '"id"'; then
+          echo "✅ Successfully updated gist badges"
+          echo "success=true" >> $GITHUB_OUTPUT
+          
+          # Create summary
+          BADGE_COUNT=$(ls -1 *.json | wc -l)
+          SUMMARY="Updated $BADGE_COUNT badges for workflow $RUN_ID on branch $BRANCH"
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+          
+          # Add to step summary
+          echo "## 🎖️ CI Status Badges Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gist ID**: $GIST_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- **Badges Updated**: $BADGE_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow**: $RUN_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: $BRANCH" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $WORKFLOW_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Badge files updated:" >> $GITHUB_STEP_SUMMARY
+          for badge_file in *.json; do
+            if [ -f "$badge_file" ]; then
+              echo "- \`$badge_file\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+        else
+          echo "❌ Failed to update gist badges"
+          echo "Response: $RESPONSE"
+          echo "success=false" >> $GITHUB_OUTPUT
+          echo "summary=Failed to update badges: API error" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "::endgroup::"
+
+    - name: "🔗 Generate Badge URLs"  
+      shell: bash
+      run: |
+        if [ "${{ steps.update-badges.outputs.success }}" = "true" ]; then
+          echo "::group::🔗 Badge URLs Generated"
+          echo "## Badge URLs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Use these URLs in your README:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          GIST_ID="${{ inputs.gist-id }}"
+          REPO="${{ github.repository }}"
+          
+          # Generate URLs for each badge file
+          for badge_file in *.json; do
+            if [ -f "$badge_file" ]; then
+              filename="${badge_file}"
+              badge_url="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/${{ github.repository_owner }}/${GIST_ID}/raw/${filename}"
+              action_url="https://github.com/${REPO}/actions"
+              
+              echo "[![${filename%.*}](${badge_url})](${action_url})" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "::endgroup::"
+        fi

@@ -346,7 +346,7 @@ jobs:
           echo "**Reason**: Not actively using iOS deployment - see CI_PIPELINE_EVALUATION_2025.md" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**To re-enable iOS builds**:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Set IOS_BUILDS_ENABLED=true in ci-pipeline-improved.yml" >> $GITHUB_STEP_SUMMARY
+          echo "1. Set IOS_BUILDS_ENABLED=true in ci-pipeline.yml" >> $GITHUB_STEP_SUMMARY
           echo "2. Configure Apple Developer account credentials" >> $GITHUB_STEP_SUMMARY
           echo "3. Update EAS configuration for iOS builds" >> $GITHUB_STEP_SUMMARY
           echo "4. Test iOS build process locally" >> $GITHUB_STEP_SUMMARY

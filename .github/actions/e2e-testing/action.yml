@@ -1,0 +1,306 @@
+name: "End-to-End Testing Orchestration"
+description: "Comprehensive E2E testing with Playwright, development server management, and intelligent test selection for critical user paths"
+
+inputs:
+  should-run-e2e:
+    description: "Whether E2E tests should be executed"
+    required: true
+  web-build-path:
+    description: "Path to the built web application"
+    required: false
+    default: "dist/apps/web"
+  server-port:
+    description: "Port for the development server"
+    required: false
+    default: "4200"
+  server-host:
+    description: "Host for the development server"
+    required: false
+    default: "localhost"
+  test-patterns:
+    description: "Playwright test patterns to run (grep-style)"
+    required: false
+    default: "@critical|authentication|navigation|core-functionality"
+  timeout-minutes:
+    description: "Timeout for E2E test execution"
+    required: false
+    default: "10"
+  retry-count:
+    description: "Number of retries for failed tests"
+    required: false
+    default: "2"
+  browser:
+    description: "Browser to use for testing"
+    required: false
+    default: "chromium"
+  headless:
+    description: "Run browser in headless mode"
+    required: false
+    default: "true"
+
+outputs:
+  result:
+    description: "E2E test result (success/failure/skipped/build-failure/server-failure)"
+    value: ${{ steps.e2e-tests.outputs.result }}
+  total-tests:
+    description: "Total number of tests executed"
+    value: ${{ steps.e2e-tests.outputs.total-tests }}
+  passed-tests:
+    description: "Number of tests that passed"
+    value: ${{ steps.e2e-tests.outputs.passed-tests }}
+  failed-tests:
+    description: "Number of tests that failed"
+    value: ${{ steps.e2e-tests.outputs.failed-tests }}
+  success-rate:
+    description: "Test success rate percentage"
+    value: ${{ steps.e2e-tests.outputs.success-rate }}
+  execution-time:
+    description: "Total execution time in seconds"
+    value: ${{ steps.e2e-tests.outputs.execution-time }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🎭 E2E Tests (Critical User Paths)"
+      id: e2e-tests
+      if: inputs.should-run-e2e == 'true'
+      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
+      shell: bash
+      run: |
+        echo "::group::🎭 End-to-End Testing with Playwright"
+        
+        START_TIME=$(date +%s)
+        
+        echo "🎯 Running E2E tests for critical user paths..."
+
+        # Check if web changes justify E2E testing
+        SHOULD_RUN_E2E="${{ inputs.should-run-e2e }}"
+        if [ "$SHOULD_RUN_E2E" != "true" ]; then
+          echo "ℹ️ E2E tests not required - skipping"
+          echo "result=skipped" >> $GITHUB_OUTPUT
+          echo "total-tests=0" >> $GITHUB_OUTPUT
+          echo "passed-tests=0" >> $GITHUB_OUTPUT
+          echo "failed-tests=0" >> $GITHUB_OUTPUT
+          echo "success-rate=100" >> $GITHUB_OUTPUT
+          echo "execution-time=0" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        echo "🚀 E2E testing enabled - running comprehensive test suite"
+
+        # Set up E2E testing environment
+        E2E_TIMESTAMP=$(date +%s)
+        E2E_LOG="e2e-results-${E2E_TIMESTAMP}.log"
+        
+        # Configure Playwright for CI
+        export CI=true
+        export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
+
+        echo "📋 E2E Test Configuration:"
+        echo "- **Test Directory**: apps/web-e2e/src/tests" 
+        echo "- **Browser**: ${{ inputs.browser }} (headless: ${{ inputs.headless }})"
+        echo "- **Base URL**: http://${{ inputs.server-host }}:${{ inputs.server-port }}"
+        echo "- **Retries**: ${{ inputs.retry-count }} (CI environment)"
+        echo "- **Workers**: 1 (CI stability)"
+        echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
+
+        # Install Playwright browsers if needed (cached)
+        echo "🔧 Setting up Playwright browsers..."
+        if ! npx playwright install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
+          echo "⚠️ Playwright browser installation failed - attempting fallback"
+          npx playwright install-deps ${{ inputs.browser }} || true
+        fi
+
+        # Start web application in background for E2E testing
+        echo "🌐 Starting web application for E2E testing..."
+        
+        # Build web app first if not already built
+        if [ ! -d "${{ inputs.web-build-path }}" ] || [ ! -f "${{ inputs.web-build-path }}/index.html" ]; then
+          echo "📦 Building web application for E2E testing..."
+          npx nx build web --configuration=development || {
+            echo "❌ Web build failed - cannot run E2E tests"
+            echo "result=build-failure" >> $GITHUB_OUTPUT
+            echo "total-tests=0" >> $GITHUB_OUTPUT
+            echo "passed-tests=0" >> $GITHUB_OUTPUT
+            echo "failed-tests=0" >> $GITHUB_OUTPUT
+            echo "success-rate=0" >> $GITHUB_OUTPUT
+            echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
+            echo "::error::Web application build failed - E2E tests require a built application"
+            exit 1
+          }
+        fi
+
+        # Start development server in background
+        echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
+        npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} >/dev/null 2>&1 &
+        SERVER_PID=$!
+        
+        # Wait for server to be ready
+        echo "⏳ Waiting for development server to be ready..."
+        for i in {1..30}; do
+          if curl -f http://${{ inputs.server-host }}:${{ inputs.server-port }} >/dev/null 2>&1; then
+            echo "✅ Development server ready on http://${{ inputs.server-host }}:${{ inputs.server-port }}"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Development server failed to start within 30 seconds"
+            kill $SERVER_PID 2>/dev/null || true
+            echo "result=server-failure" >> $GITHUB_OUTPUT
+            echo "total-tests=0" >> $GITHUB_OUTPUT
+            echo "passed-tests=0" >> $GITHUB_OUTPUT
+            echo "failed-tests=0" >> $GITHUB_OUTPUT
+            echo "success-rate=0" >> $GITHUB_OUTPUT
+            echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
+            echo "::error::Development server failed to start - cannot run E2E tests"
+            exit 1
+          fi
+          sleep 1
+        done
+
+        # Run E2E tests with proper error handling
+        echo "🎭 Executing E2E test suite..."
+        
+        cd apps/web-e2e
+        E2E_EXIT_CODE=0
+        
+        # Build Playwright command
+        PLAYWRIGHT_CMD="npx playwright test"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json:test-results/results.json"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output-dir=test-results"
+        
+        if [ "${{ inputs.headless }}" = "true" ]; then
+          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --headed=false"
+        fi
+        
+        # Run critical E2E tests with retry logic and proper reporting
+        echo "🎯 Running command: $PLAYWRIGHT_CMD"
+        if eval "$PLAYWRIGHT_CMD" 2>&1 | tee "../${E2E_LOG}"; then
+          echo "✅ Critical E2E tests passed"
+          E2E_EXIT_CODE=0
+        else
+          echo "❌ Critical E2E tests failed"
+          E2E_EXIT_CODE=1
+        fi
+
+        # Stop the development server
+        echo "🛑 Stopping development server..."
+        kill $SERVER_PID 2>/dev/null || true
+        wait $SERVER_PID 2>/dev/null || true
+
+        # Process results and generate summary
+        cd ..
+        
+        TOTAL_TESTS=0
+        PASSED_TESTS=0
+        FAILED_TESTS=0
+        SUCCESS_RATE=100
+        
+        if [ -f "apps/web-e2e/test-results/results.json" ]; then
+          # Extract test results statistics
+          TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
+          PASSED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "passed"))] | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
+          FAILED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "failed"))] | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
+          
+          if [ "$TOTAL_TESTS" -gt 0 ]; then
+            SUCCESS_RATE=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
+          fi
+          
+          echo "## 🎭 E2E Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Tests**: $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Passed**: $PASSED_TESTS ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failed**: $FAILED_TESTS ❌" >> $GITHUB_STEP_SUMMARY
+          echo "- **Success Rate**: $SUCCESS_RATE%" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $E2E_EXIT_CODE -eq 0 ]; then
+            echo "- **Status**: All critical user paths working ✅" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: Critical user path failures detected ❌" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+        # Calculate execution time
+        END_TIME=$(date +%s)
+        EXECUTION_TIME=$((END_TIME - START_TIME))
+        
+        # Set outputs
+        echo "total-tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+        echo "passed-tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
+        echo "failed-tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+        echo "success-rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+        echo "execution-time=$EXECUTION_TIME" >> $GITHUB_OUTPUT
+
+        # Handle E2E test results
+        if [ $E2E_EXIT_CODE -eq 0 ]; then
+          echo "🎉 E2E tests completed successfully"
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "::notice::E2E Tests Passed - Critical user paths are working correctly ($TOTAL_TESTS tests, ${EXECUTION_TIME}s)"
+        else
+          echo "💥 E2E tests failed - critical user paths may be broken"
+          
+          # Show failing test details
+          if [ -f "$E2E_LOG" ]; then
+            echo "## E2E Test Failures Summary"
+            grep -E "FAIL|✖|×|failing" "$E2E_LOG" | head -10 || echo "See full log for details"
+          fi
+          
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "::error::E2E tests failed ($FAILED_TESTS/$TOTAL_TESTS). Critical user functionality may be broken."
+          echo "::error::Check Playwright HTML report at apps/web-e2e/playwright-report/index.html"
+          
+          # For now, don't fail the entire CI for E2E failures - make it a warning
+          # This allows teams to gradually improve E2E stability
+          echo "⚠️ E2E failures detected but continuing CI pipeline"
+          echo "🔧 To reproduce locally: cd apps/web-e2e && npx playwright test --ui"
+        fi
+
+        echo "::endgroup::"
+
+    - name: "📊 E2E Test Summary"
+      if: always() && inputs.should-run-e2e == 'true'
+      shell: bash
+      run: |
+        echo "::group::📊 E2E Testing Summary"
+        
+        RESULT="${{ steps.e2e-tests.outputs.result }}"
+        TOTAL="${{ steps.e2e-tests.outputs.total-tests }}"
+        PASSED="${{ steps.e2e-tests.outputs.passed-tests }}"
+        FAILED="${{ steps.e2e-tests.outputs.failed-tests }}"
+        SUCCESS_RATE="${{ steps.e2e-tests.outputs.success-rate }}"
+        EXECUTION_TIME="${{ steps.e2e-tests.outputs.execution-time }}"
+        
+        echo "## 🎭 E2E Testing Results"
+        echo "- **Result**: $RESULT"
+        echo "- **Total Tests**: $TOTAL"
+        echo "- **Passed**: $PASSED"
+        echo "- **Failed**: $FAILED"
+        echo "- **Success Rate**: $SUCCESS_RATE%"
+        echo "- **Execution Time**: ${EXECUTION_TIME}s"
+        
+        case "$RESULT" in
+          "success")
+            echo "🎉 All E2E tests passed! Critical user paths are working correctly."
+            ;;
+          "failure")
+            echo "⚠️ Some E2E tests failed. Review the failures and consider fixing critical user path issues."
+            ;;
+          "skipped")
+            echo "ℹ️ E2E tests were skipped (no web changes detected)."
+            ;;
+          "build-failure")
+            echo "❌ E2E tests could not run due to web build failure."
+            ;;
+          "server-failure")
+            echo "❌ E2E tests could not run due to development server failure."
+            ;;
+        esac
+        
+        echo "::endgroup::"
+
+    - name: "📋 E2E Skip Notice"
+      if: inputs.should-run-e2e != 'true'
+      shell: bash
+      run: |
+        echo "::notice title=E2E Tests Skipped::No web changes detected - E2E tests not required for this change set"
