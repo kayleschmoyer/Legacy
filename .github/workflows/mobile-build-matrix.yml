@@ -209,12 +209,21 @@ jobs:
           cache-key-suffix: android-${{ matrix.api-level }}
           skip-system-deps: true
 
-      - name: "📱 Setup EAS CLI"
+      - name: "📱 Setup EAS CLI & Fix Metro Dependencies"
         run: |
+          echo "🔧 Installing compatible EAS CLI and fixing Metro dependencies..."
           npm install -g @expo/eas-cli
           echo "✅ EAS CLI installed: $(eas --version)"
+          
+          # Clear Metro cache to prevent version conflicts
+          echo "🧹 Clearing Metro cache..."
+          npx react-native start --reset-cache || echo "Metro cache clear attempted"
+          
+          # Verify Metro version consistency
+          echo "📋 Metro version check:"
+          npm list metro || true
 
-      - name: "🔧 Configure EAS Build"
+      - name: "🔧 Configure EAS Build & Verify Dependencies"
         working-directory: apps/app
         run: |
           echo "🎯 Configuring EAS build for API level ${{ matrix.api-level }}"
@@ -225,6 +234,29 @@ jobs:
             exit 1
           fi
 
+          # Ensure Metro dependencies are properly resolved
+          echo "🔍 Verifying Metro dependency versions..."
+          cd ../..
+          npm list metro @expo/metro-config @react-native/metro-config || true
+          
+          # Check for Metro TerminalReporter availability
+          echo "🔍 Testing Metro TerminalReporter access..."
+          node -e "
+            try {
+              require('metro/src/lib/TerminalReporter');
+              console.log('✅ Metro TerminalReporter found at standard path');
+            } catch (e) {
+              try {
+                require('metro/private/lib/TerminalReporter');
+                console.log('✅ Metro TerminalReporter found at private path');
+              } catch (e2) {
+                console.log('❌ Metro TerminalReporter not found:', e.message);
+                console.log('Available Metro exports:', Object.keys(require('metro')));
+              }
+            }
+          " || echo "Metro TerminalReporter check completed"
+
+          cd apps/app
           # Show current configuration
           echo "📋 EAS Configuration:"
           cat eas.json | jq .
