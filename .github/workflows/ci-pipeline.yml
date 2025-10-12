@@ -126,7 +126,7 @@ jobs:
 
       - name: "🏗️ Build Validation"
         id: build-validation
-        if: steps.quality-gates.outputs.result == 'success'
+        if: success() && steps.quality-gates.outputs.result == 'success'
         uses: ./.github/actions/build-validation
         with:
           should-build-web: ${{ steps.execution-plan.outputs.should-build-web }}
@@ -154,12 +154,12 @@ jobs:
         with:
           step-results: |
             {
-              "detect-dte": "${{ steps.detect-dte.conclusion || 'unknown' }}",
-              "detect-changes": "${{ steps.detect-changes.conclusion || 'unknown' }}",
-              "execution-plan": "${{ steps.execution-plan.conclusion || 'unknown' }}",
-              "quality-gates": "${{ steps.quality-gates.outputs.result || 'unknown' }}",
-              "build-validation": "${{ steps.build-validation.outputs.overall-result || 'unknown' }}",
-              "e2e-testing": "${{ steps.e2e-testing.outputs.result || 'unknown' }}"
+              "detect-dte": "${{ steps.detect-dte.conclusion }}",
+              "detect-changes": "${{ steps.detect-changes.conclusion }}",
+              "execution-plan": "${{ steps.execution-plan.conclusion }}",
+              "quality-gates": "${{ steps.quality-gates.outputs.result || steps.quality-gates.conclusion }}",
+              "build-validation": "${{ steps.build-validation.outputs.overall-result || steps.build-validation.conclusion }}",
+              "e2e-testing": "${{ steps.e2e-testing.outputs.result || steps.e2e-testing.conclusion }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
           failure-threshold: "quality-gates,build-validation"
