@@ -219,16 +219,22 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*"
         ]
       },
-      # RDS and RDS Proxy read permissions
+      # RDS and RDS Proxy permissions (read + write for Terraform apply)
       {
         Effect = "Allow"
         Action = [
+          # Read permissions
           "rds:DescribeDBInstances",
           "rds:DescribeDBProxies",
           "rds:DescribeDBProxyTargetGroups",
           "rds:DescribeDBProxyTargets",
           "rds:DescribeDBSubnetGroups",
-          "rds:ListTagsForResource"
+          "rds:ListTagsForResource",
+          # Write permissions for Terraform apply
+          "rds:ModifyDBProxy",
+          "rds:ModifyDBProxyTargetGroup",
+          "rds:AddTagsToResource",
+          "rds:RemoveTagsFromResource"
         ]
         Resource = "*"
       },
