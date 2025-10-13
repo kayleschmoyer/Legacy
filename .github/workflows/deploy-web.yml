@@ -56,6 +56,10 @@ jobs:
           echo "✅ Basic Nx environment configured for web deployment"
 
       - name: Build Web App
+        env:
+          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
         run: npx nx build web
 
       - name: Setup Pages
