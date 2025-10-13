@@ -182,10 +182,11 @@ runs:
         TF_TARGET="${{ inputs.terraform-target }}"
         
         echo "📋 Planning Terraform changes for $TF_TARGET..."
-        terraform plan -target="$TF_TARGET"
+        echo "⏳ Will wait up to 10 minutes if state is locked by another deployment..."
+        terraform plan -target="$TF_TARGET" -lock-timeout=10m
         
         echo "🚀 Applying Terraform changes..."
-        terraform apply -target="$TF_TARGET" -auto-approve
+        terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
         
         echo "✅ Infrastructure deployment completed for $LAMBDA_NAME"
         
