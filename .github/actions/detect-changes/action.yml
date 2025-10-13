@@ -1,11 +1,11 @@
 name: "Detect Project Changes"
-description: "Intelligent change detection for mono-repo projects with configurable file patterns and affected component analysis"
+description: "Intelligent change detec    - name: "🔧 Determine Base Reference"ion for     - name: "🔍 Detect Changed Files"ono-repo projects with configurable file patterns and affected component analysis"
 
 inputs:
   base-ref:
     description: "Base reference for change detection"
     required: false
-    default: "origin/main"
+    default: ""
   head-ref:
     description: "Head reference for change detection"
     required: false
@@ -67,11 +67,60 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: "🔍 Detect Changed Files"
+    - name: "� Determine Base Reference"
+      id: determine-base
+      shell: bash
+      run: |
+        # Determine the appropriate base reference based on GitHub event context
+        echo "Event: ${{ github.event_name }}"
+        echo "Available refs:"
+        git branch -r || true
+        git log --oneline -5 || true
+        
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, use the base branch (target branch)
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
+          echo "Using PR base SHA: $BASE_REF"
+        elif [ "${{ github.event_name }}" = "push" ]; then
+          # For pushes, use the previous commit
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE_REF="${{ github.event.before }}"
+            echo "Using previous commit: $BASE_REF"
+          else
+            # First commit or new branch, use main branch
+            if git show-ref --verify --quiet refs/remotes/origin/main; then
+              BASE_REF="origin/main"
+              echo "Using origin/main for new branch"
+            else
+              BASE_REF="HEAD^"
+              echo "Using HEAD^ as fallback"
+            fi
+          fi
+        else
+          # For other events (workflow_dispatch, etc)
+          if [ -n "${{ inputs.base-ref }}" ]; then
+            BASE_REF="${{ inputs.base-ref }}"
+            echo "Using provided base-ref: $BASE_REF"
+          else
+            # Try to use main branch, fallback to HEAD^
+            if git show-ref --verify --quiet refs/remotes/origin/main; then
+              BASE_REF="origin/main"
+              echo "Using origin/main as fallback"
+            else
+              BASE_REF="HEAD^"
+              echo "Using HEAD^ as final fallback"
+            fi
+          fi
+        fi
+        
+        echo "Final BASE_REF: $BASE_REF"
+        echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
+
+    - name: "�🔍 Detect Changed Files"
       id: detect-changes
       uses: dorny/paths-filter@v3
       with:
-        base: ${{ inputs.base-ref }}
+        base: ${{ steps.determine-base.outputs.base-ref }}
         ref: ${{ inputs.head-ref }}
         filters: |
           web:
