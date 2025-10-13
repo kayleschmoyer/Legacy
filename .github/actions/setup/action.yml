@@ -204,6 +204,42 @@ runs:
           ls -la node_modules/.bin/ | grep nx || echo "No nx-related binaries"
           echo "🔧 Attempting to check npm linking..."
           npm ls nx 2>/dev/null || echo "npm ls nx failed"
+          
+          # If we had a cache hit but nx binary is missing, force reinstall
+          if [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
+            echo "🔄 Cache hit but nx binary missing - forcing fresh install..."
+            rm -rf node_modules
+            npm ci --prefer-offline --no-audit --no-fund
+            
+            # Re-verify after reinstall
+            if [ ! -f "node_modules/.bin/nx" ]; then
+              echo "❌ nx binary still missing after fresh install"
+              exit 1
+            fi
+            echo "✅ Fresh install completed, nx binary now available"
+          fi
+        else
+          # Test if the nx binary actually works
+          echo "🧪 Testing nx binary functionality..."
+          if ! node_modules/.bin/nx --version >/dev/null 2>&1; then
+            echo "⚠️ nx binary exists but not functional"
+            
+            # If cache hit but nx is broken, force reinstall
+            if [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
+              echo "🔄 Cache hit but nx broken - forcing fresh install..."
+              rm -rf node_modules
+              npm ci --prefer-offline --no-audit --no-fund
+              
+              # Re-verify after reinstall
+              if ! node_modules/.bin/nx --version >/dev/null 2>&1; then
+                echo "❌ nx still not functional after fresh install"
+                exit 1
+              fi
+              echo "✅ Fresh install completed, nx now functional"
+            fi
+          else
+            echo "✅ nx binary is functional"
+          fi
         fi
 
         echo "✅ Dependencies verified successfully!"
