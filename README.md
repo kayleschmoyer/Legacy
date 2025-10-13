@@ -24,7 +24,7 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 **Auto-Deploy:** Pushes to `main` branch automatically deploy via GitHub Pages
 
-## � Download Mobile App
+## 📱 Download Mobile App
 
 ### Android APK
 
@@ -40,7 +40,7 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
-## �🚀 Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -125,21 +125,21 @@ npm run web:deploy
 
 ```
 legacy-sports/
-├── apps/                    # Applications
-│   ├── app/                # React Native mobile app
-│   ├── web/                # Next.js web app
-│   ├── cli/                # Command-line tools
-│   └── graphql-explorer/   # GraphQL API explorer
-├── lib/                    # Shared libraries
-│   ├── shared-components/  # Cross-platform UI components
-│   ├── db-client/         # Database client & migrations
-│   ├── api/               # API utilities
-│   └── utils/             # Common utilities
-├── lambdas/               # AWS Lambda functions
-│   ├── graphql/           # GraphQL API
-│   ├── oauth-proxy/       # Authentication
-│   └── stats-lambda/      # Data processing
-└── terraform/             # Infrastructure as Code
+├── apps/                     # Applications
+│   ├── app/                  # React Native mobile app
+│   ├── web/                  # Next.js web app
+│   ├── cli/                  # Command-line tools
+│   └── graphql-explorer/     # GraphQL API explorer
+├── lib/                      # Shared libraries
+│   ├── shared-components/    # Cross-platform UI components
+│   ├── db-client/            # Database client & migrations
+│   ├── api/                  # API utilities
+│   └── utils/                # Common utilities
+├── lambdas/                  # AWS Lambda functions
+│   ├── graphql/              # GraphQL API
+│   ├── oauth-proxy/          # Authentication
+│   └── stats-lambda/         # Data processing
+└── terraform/                # Infrastructure as Code
 ```
 
 ### Technology Stack
@@ -153,7 +153,7 @@ legacy-sports/
 
 Legacy Sports uses a **hybrid platform resolution system** that combines the best of both worlds:
 
-#### 🎯 **Magic String System** (Complex UI Components)
+#### 🔧 **Magic String System** (Complex UI Components)
 
 - **Used for**: Icons, Tables, OAuth Providers, Complex React Components
 - **Benefits**: Build-time optimization, strong type contracts, dead code elimination
@@ -167,7 +167,7 @@ import { Icon, Table, OAuthProvider } from '@legacy-sports/shared-components';
 <Table headers={headers} data={data} />
 ```
 
-#### 📱 **Metro Native Resolution** (Simple Utilities)
+#### 🔧 **Metro Native Resolution** (Simple Utilities)
 
 - **Used for**: DbOptions, AwsSecrets, SecureStorage, Configuration
 - **Benefits**: Native Metro support, simple developer experience, CI reliability
@@ -183,7 +183,7 @@ const options = getDbOptions();
 
 **📚 Learn More**: [Hybrid Platform Resolution Guide](./docs/HYBRID_PLATFORM_RESOLUTION_GUIDE.md)
 
-## 🔧 Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -221,7 +221,7 @@ npx nx test web --watch
 npx nx e2e web-e2e
 ```
 
-## 📦 Building & Deployment
+## 🚀 Building & Deployment
 
 ### Automated Mobile Builds
 
@@ -229,7 +229,7 @@ Android APKs are automatically built and released on every push to `main`:
 
 - **📱 Download**: [Latest Android APK](https://github.com/bkrupa/legacy-sports/releases/latest)
 - **🔄 Auto-builds**: Triggered on app code changes
-- **📋 Workflow**: `.github/workflows/build-android-app.yml`
+- **⚙️ Workflow**: `.github/workflows/build-android-app.yml`
 
 Manual builds can also be triggered from [GitHub Actions](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml).
 
@@ -298,7 +298,7 @@ npm run format
 npm run validate:packages
 ```
 
-## 🔍 Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
@@ -373,10 +373,3 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 ---
 
 Built with ❤️ using modern development tools and practices.
-#   T e s t   w o r k f l o w   f i x 
- 
- #   Y A M L   s y n t a x   t e s t   c o m p l e t e d 
- 
- #   G i t   r e f e r e n c e   f i x   t e s t 
- 
- 
