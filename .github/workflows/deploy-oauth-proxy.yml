@@ -49,7 +49,7 @@ jobs:
         with:
           artifacts-ready: 'true'
           quality-passed: 'true'
-          required-components: 'lambdas'
+          required-components: ''
           environment: 'production'
 
       - name: "☁️ Configure AWS Credentials"
