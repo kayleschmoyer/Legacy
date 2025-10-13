@@ -1,0 +1,128 @@
+name: Deploy OAuth Proxy Lambda
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "lambdas/oauth-proxy/**"
+      - ".github/workflows/deploy-oauth-proxy.yml"
+
+# Cancel in-progress deployments for the same workflow
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  AWS_SERVICE_NAME: legacy-sports-oauth-proxy
+  AWS_STAGE: dev
+  AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2,sg-07083f37d7e8e24c5,sg-05999e0f1cbd13139
+  AWS_VPC_SUBNET_IDS: subnet-031d24899cb105d13
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy OAuth Proxy Lambda
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: Validate Deployment Readiness
+        uses: ./.github/actions/deployment-gate
+        with:
+          artifacts-ready: 'true'
+          quality-passed: 'true'
+          required-components: 'lambdas'
+          environment: 'production'
+
+      - name: "☁️ Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          role-session-name: GitHubActions-DeployOAuthProxy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build OAuth Proxy Lambda
+        uses: ./.github/actions/build-validation
+        with:
+          should-build-lambdas: 'true'
+          should-build-web: 'false'
+          should-build-mobile: 'false'
+          should-validate-terraform: 'false'
+          execution-mode: 'local'
+          optimal-agents: '1'
+
+      - name: Package and Deploy OAuth Proxy Lambda
+        working-directory: lambdas/oauth-proxy
+        run: |
+          # Create version string
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+
+          # Create deployment package from built artifacts
+          zip -r "oauth-proxy-${VERSION}.zip" dist/
+
+          # Get S3 bucket name from Terraform output or SSM
+          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
+
+          # Upload to S3
+          aws s3 cp "oauth-proxy-${VERSION}.zip" "s3://${S3_BUCKET}/oauth-proxy/" --region ${{ env.AWS_REGION }}
+
+          # Update SSM parameter
+          aws ssm put-parameter \
+            --name "/legacy-sports/${AWS_STAGE}/lambda/oauth-proxy/version" \
+            --value "$VERSION" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Lambda package uploaded: oauth-proxy-${VERSION}.zip"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: "🏗️ Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.0"
+
+      - name: "🔧 Initialize Terraform"
+        working-directory: terraform
+        run: |
+          echo "🔧 Initializing Terraform..."
+          if terraform init; then
+            echo "✅ Terraform initialization successful"
+          else
+            echo "❌ Terraform initialization failed"
+            echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
+            echo "Check that:" >> $GITHUB_STEP_SUMMARY
+            echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
+            echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
+            echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: "🚀 Deploy Infrastructure"
+        working-directory: terraform
+        run: |
+          echo "📋 Planning Terraform changes..."
+          terraform plan -target=aws_lambda_function.oauth_proxy
+          
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -target=aws_lambda_function.oauth_proxy -auto-approve
+          
+          echo "✅ Infrastructure deployment completed"

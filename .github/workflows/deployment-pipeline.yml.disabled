@@ -277,7 +277,7 @@ jobs:
           install-dependencies: true
 
       - name: "☁️ Setup AWS"
-        uses: ./.github/actions/setup-aws
+        uses: ./.github/workflows/setup-aws
         id: setup-aws
 
       - name: "🔐 Get RDS Credentials"
@@ -377,7 +377,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: "☁️ Setup AWS"
-        uses: ./.github/actions/setup-aws
+        uses: ./.github/workflows/setup-aws
 
       - name: "🏗️ Setup Terraform"
         uses: hashicorp/setup-terraform@v3

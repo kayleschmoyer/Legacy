@@ -34,8 +34,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup NPM
-        uses: ./.github/workflows/setup-npm
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
 
       - name: Configure Basic Nx Environment
         shell: bash

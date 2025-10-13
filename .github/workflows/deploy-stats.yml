@@ -1,12 +1,12 @@
-name: Deploy GraphQL Lambda
+name: Deploy Stats Lambda
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "lambdas/db/**"
-      - ".github/workflows/publish-gql.yml"
+      - "lambdas/stats-lambda/**"
+      - ".github/workflows/deploy-stats.yml"
 
 # Cancel in-progress deployments for the same workflow
 concurrency:
@@ -15,12 +15,8 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
-  AWS_SERVICE_NAME: legacy-sports-gql
+  AWS_SERVICE_NAME: legacy-sports-stats
   AWS_STAGE: dev
-  AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2,sg-07083f37d7e8e24c5
-  AWS_VPC_SUBNET_IDS: subnet-06f49eeff089ef92d
-  DATABASE_SCHEMAS: public
-  DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
 
 permissions:
   id-token: write
@@ -28,81 +24,73 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy GraphQL Lambda
+    name: Deploy Stats Lambda
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Check out code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Verify Main Branch
-        run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "❌ Deployment can only run from main branch"
-            echo "Current branch: ${{ github.ref }}"
-            exit 1
-          fi
-          echo "✅ Deploying from main branch"
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
 
-      - name: Setup NPM
-        uses: ./.github/workflows/setup-npm
+      - name: Validate Deployment Readiness
+        uses: ./.github/actions/deployment-gate
+        with:
+          artifacts-ready: 'true'
+          quality-passed: 'true'
+          required-components: 'lambdas'
+          environment: 'production'
 
       - name: "☁️ Configure AWS Credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
-          role-session-name: GitHubActions-DeployGraphQL
+          role-session-name: GitHubActions-DeployStats
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get RDS Secret
-        id: rds-secret
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+      - name: Build Stats Lambda
+        uses: ./.github/actions/build-validation
         with:
-          secret-ids: |
-            DB_CREDS, legacy-sports-dev-db-creds-20250925194630368900000002
-          parse-json-secrets: true
+          should-build-lambdas: 'true'
+          should-build-web: 'false'
+          should-build-mobile: 'false'
+          should-validate-terraform: 'false'
+          execution-mode: 'local'
+          optimal-agents: '1'
 
-      - name: Build and Deploy GraphQL Lambda
-        env:
-          DB_HOST: ${{env.DB_HOST}}
-          DB_PASSWORD: ${{ steps.rds-secret.outputs.DB_CREDS_password }}
-          DB_USER: ${{ steps.rds-secret.outputs.DB_CREDS_username }}
-          DB_CERT_LOCATION: "/usr/local/share/ca-certificates/rds-ca-2019-root.crt"
-        working-directory: lambdas/db
+      - name: Package and Deploy Stats Lambda
+        working-directory: lambdas/stats-lambda
         run: |
-          # Create cache
-          npm run make-cache
-
-          # Build the Lambda
-          npm run build
-
           # Create version string
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
           VERSION="${TIMESTAMP}-${COMMIT_SHA}"
 
-          # Create deployment package
-          zip -r "graphql-${VERSION}.zip" dist/
+          # Create deployment package from built artifacts
+          zip -r "stats-${VERSION}.zip" dist/
 
           # Get S3 bucket name from Terraform output or SSM
           S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
 
           # Upload to S3
-          aws s3 cp "graphql-${VERSION}.zip" "s3://${S3_BUCKET}/graphql/" --region ${{ env.AWS_REGION }}
+          aws s3 cp "stats-${VERSION}.zip" "s3://${S3_BUCKET}/stats/" --region ${{ env.AWS_REGION }}
 
           # Update SSM parameter
           aws ssm put-parameter \
-            --name "/legacy-sports/${AWS_STAGE}/lambda/graphql/version" \
+            --name "/legacy-sports/${AWS_STAGE}/lambda/stats/version" \
             --value "$VERSION" \
             --overwrite \
             --region ${{ env.AWS_REGION }}
 
-          echo "✅ Lambda package uploaded: graphql-${VERSION}.zip"
+          echo "✅ Lambda package uploaded: stats-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: "🏗️ Setup Terraform"
@@ -130,9 +118,9 @@ jobs:
         working-directory: terraform
         run: |
           echo "📋 Planning Terraform changes..."
-          terraform plan -target=aws_lambda_function.graphql
+          terraform plan -target=aws_lambda_function.stats
           
           echo "🚀 Applying Terraform changes..."
-          terraform apply -target=aws_lambda_function.graphql -auto-approve
+          terraform apply -target=aws_lambda_function.stats -auto-approve
           
           echo "✅ Infrastructure deployment completed"

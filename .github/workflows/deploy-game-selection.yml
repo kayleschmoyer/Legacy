@@ -1,0 +1,126 @@
+name: Deploy Game Selection Lambda
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "lambdas/game-selection/**"
+      - ".github/workflows/deploy-game-selection.yml"
+
+# Cancel in-progress deployments for the same workflow
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  AWS_SERVICE_NAME: legacy-sports-game-selection
+  AWS_STAGE: dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Game Selection Lambda
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+
+      - name: Validate Deployment Readiness
+        uses: ./.github/actions/deployment-gate
+        with:
+          artifacts-ready: 'true'
+          quality-passed: 'true'
+          required-components: 'lambdas'
+          environment: 'production'
+
+      - name: "☁️ Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          role-session-name: GitHubActions-DeployGameSelection
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Game Selection Lambda
+        uses: ./.github/actions/build-validation
+        with:
+          should-build-lambdas: 'true'
+          should-build-web: 'false'
+          should-build-mobile: 'false'
+          should-validate-terraform: 'false'
+          execution-mode: 'local'
+          optimal-agents: '1'
+
+      - name: Package and Deploy Game Selection Lambda
+        working-directory: lambdas/game-selection
+        run: |
+          # Create version string
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+
+          # Create deployment package from built artifacts
+          zip -r "game-selection-${VERSION}.zip" dist/
+
+          # Get S3 bucket name from Terraform output or SSM
+          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
+
+          # Upload to S3
+          aws s3 cp "game-selection-${VERSION}.zip" "s3://${S3_BUCKET}/game-selection/" --region ${{ env.AWS_REGION }}
+
+          # Update SSM parameter
+          aws ssm put-parameter \
+            --name "/legacy-sports/${AWS_STAGE}/lambda/game-selection/version" \
+            --value "$VERSION" \
+            --overwrite \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Lambda package uploaded: game-selection-${VERSION}.zip"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: "🏗️ Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.0"
+
+      - name: "🔧 Initialize Terraform"
+        working-directory: terraform
+        run: |
+          echo "🔧 Initializing Terraform..."
+          if terraform init; then
+            echo "✅ Terraform initialization successful"
+          else
+            echo "❌ Terraform initialization failed"
+            echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
+            echo "Check that:" >> $GITHUB_STEP_SUMMARY
+            echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
+            echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
+            echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: "🚀 Deploy Infrastructure"
+        working-directory: terraform
+        run: |
+          echo "📋 Planning Terraform changes..."
+          terraform plan -target=aws_lambda_function.game_selection
+          
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -target=aws_lambda_function.game_selection -auto-approve
+          
+          echo "✅ Infrastructure deployment completed"
