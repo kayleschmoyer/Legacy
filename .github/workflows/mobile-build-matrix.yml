@@ -167,7 +167,13 @@ jobs:
           echo "should-build-android=$SHOULD_BUILD_ANDROID" >> $GITHUB_OUTPUT
           echo "should-build-ios=$SHOULD_BUILD_IOS" >> $GITHUB_OUTPUT
           echo "build-strategy=$BUILD_STRATEGY" >> $GITHUB_OUTPUT
-          echo "matrix-configs=$MATRIX_CONFIGS" >> $GITHUB_OUTPUT
+          
+          # Use multiline output for JSON to avoid parsing issues
+          {
+            echo "matrix-configs<<EOF"
+            echo "$MATRIX_CONFIGS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
           # Create summary
           echo "## 📱 Mobile Build Analysis" >> $GITHUB_STEP_SUMMARY
