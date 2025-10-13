@@ -8,10 +8,10 @@ on:
       - "lambdas/game-selection/**"
       - ".github/workflows/deploy-game-selection.yml"
 
-# Cancel in-progress deployments for the same workflow
+# Serialize all Lambda deployments to prevent Terraform state locking conflicts
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
+  group: lambda-deployment
+  cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1
