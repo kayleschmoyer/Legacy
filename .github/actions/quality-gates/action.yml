@@ -51,6 +51,53 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: "🔍 Validate Workspace Setup"
+      shell: bash
+      run: |
+        echo "::group::🔍 Workspace Validation"
+        
+        echo "🔧 Verifying workspace dependencies..."
+        
+        # Check if node_modules exists
+        if [ ! -d "node_modules" ]; then
+          echo "❌ node_modules directory not found"
+          echo "::error::Dependencies not installed. Setup action may have failed."
+          exit 1
+        fi
+        
+        # Check if Nx is available
+        if ! npx nx --version >/dev/null 2>&1; then
+          echo "❌ Nx CLI not available"
+          echo "::error::Nx not found in node_modules. Check dependency installation."
+          exit 1
+        fi
+        
+        # Check if nx.json exists (workspace root indicator)
+        if [ ! -f "nx.json" ]; then
+          echo "❌ nx.json not found - not in Nx workspace root"
+          echo "::error::Not in Nx workspace root directory"
+          exit 1
+        fi
+        
+        # Verify Nx can read workspace configuration
+        if ! npx nx show projects >/dev/null 2>&1; then
+          echo "⚠️ Nx workspace validation failed, attempting daemon reset..."
+          npx nx reset 2>/dev/null || true
+          
+          if ! npx nx show projects >/dev/null 2>&1; then
+            echo "❌ Nx workspace configuration invalid"
+            echo "::error::Nx cannot read workspace configuration after reset"
+            exit 1
+          fi
+        fi
+        
+        echo "✅ Workspace validation passed"
+        echo "   Nx version: $(npx nx --version)"
+        echo "   Working directory: $(pwd)"
+        echo "   Projects found: $(npx nx show projects | wc -l)"
+        
+        echo "::endgroup::"
+
     - name: "🎨 Code Formatting Check"
       id: formatting
       if: inputs.skip-formatting != 'true'
@@ -59,19 +106,45 @@ runs:
         echo "::group::🎨 Code Formatting Validation"
         echo "::notice::To reproduce locally: npx nx format:check"
 
-        if npx nx format:check --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee format-check.log; then
-          echo "✅ All files are properly formatted"
+        # First try with affected detection using base/head refs
+        echo "🔍 Checking formatting for affected files..."
+        echo "Base ref: ${{ inputs.base-ref }}"
+        echo "Head ref: ${{ inputs.head-ref }}"
+        
+        if npx nx format:check --base="${{ inputs.base-ref }}" --head="${{ inputs.head-ref }}" 2>&1 | tee format-check.log; then
+          echo "✅ All affected files are properly formatted"
           echo "result=success" >> $GITHUB_OUTPUT
         else
-          echo "❌ Code formatting issues detected"
-          echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
-          
-          # Show specific files that need formatting
-          echo "Files requiring formatting:"
-          grep -E "would be reformatted|needs formatting" format-check.log || true
-          
-          echo "result=failure" >> $GITHUB_OUTPUT
-          exit 1
+          # Check if the error was due to affected detection issues
+          if grep -q "Could not find Nx modules\|Unable to determine affected\|No base found" format-check.log; then
+            echo "⚠️ Affected detection failed, falling back to full format check..."
+            
+            # Fallback to full workspace format check
+            if npx nx format:check 2>&1 | tee format-check-full.log; then
+              echo "✅ All files are properly formatted (full check)"
+              echo "result=success" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Code formatting issues detected (full workspace)"
+              echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+              
+              # Show specific files that need formatting
+              echo "Files requiring formatting:"
+              grep -E "would be reformatted|needs formatting|✖" format-check-full.log || true
+              
+              echo "result=failure" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "❌ Code formatting issues detected in affected files"
+            echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+            
+            # Show specific files that need formatting
+            echo "Files requiring formatting:"
+            grep -E "would be reformatted|needs formatting|✖" format-check.log || true
+            
+            echo "result=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
         fi
 
         echo "::endgroup::"

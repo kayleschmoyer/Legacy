@@ -198,8 +198,42 @@ runs:
         # Set conservative defaults for Nx execution
         echo "NX_DAEMON=false" >> $GITHUB_ENV
         echo "NX_PARALLEL=2" >> $GITHUB_ENV
+        
+        # Ensure Nx cache directory exists and is properly configured
+        if [ -n "${NX_CACHE_DIRECTORY:-}" ]; then
+          mkdir -p "$NX_CACHE_DIRECTORY"
+          echo "📁 Created Nx cache directory: $NX_CACHE_DIRECTORY"
+        fi
 
-        echo "✅ Basic Nx environment configured"
+        # Validate Nx installation and workspace
+        echo "🔍 Validating Nx installation..."
+        
+        if ! npx nx --version >/dev/null 2>&1; then
+          echo "❌ Nx not found after dependency installation"
+          echo "Available packages in node_modules/.bin:"
+          ls -la node_modules/.bin/ | grep nx || echo "No nx binaries found"
+          exit 1
+        fi
+        
+        # Test basic Nx functionality
+        echo "🧪 Testing Nx workspace detection..."
+        if ! npx nx show projects --quiet >/dev/null 2>&1; then
+          echo "⚠️ Nx workspace detection failed, attempting reset..."
+          npx nx reset || echo "Reset failed, continuing..."
+          
+          # Try again after reset
+          if ! npx nx show projects --quiet >/dev/null 2>&1; then
+            echo "❌ Nx workspace still not accessible"
+            echo "Working directory: $(pwd)"
+            echo "Files in root: $(ls -la | head -10)"
+            echo "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
+            exit 1
+          fi
+        fi
+
+        echo "✅ Basic Nx environment configured and validated"
+        echo "   Nx version: $(npx nx --version)"
+        echo "   Projects detected: $(npx nx show projects | wc -l)"
 
     - name: Workspace Setup Complete
       shell: bash
