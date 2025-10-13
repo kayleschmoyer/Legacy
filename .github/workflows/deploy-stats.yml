@@ -90,7 +90,7 @@ jobs:
             exit 1
           fi
 
-      - name: Package and Deploy Stats Lambda
+      - name: Package Stats Lambda
         working-directory: lambdas/stats-lambda
         run: |
           # Create version string

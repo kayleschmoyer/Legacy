@@ -1,0 +1,196 @@
+name: Deploy Lambda Function
+description: Build, package, and deploy a Lambda function using Nx and Terraform
+
+inputs:
+  lambda-name:
+    description: 'Name of the Lambda function (e.g., draft-processor, game-selection)'
+    required: true
+  nx-project-name:
+    description: 'Nx project name to build (defaults to lambda-name)'
+    required: false
+  lambda-directory:
+    description: 'Path to Lambda directory (defaults to lambdas/{lambda-name})'
+    required: false
+  build-output-file:
+    description: 'Expected build output file relative to dist/ (defaults to index.js)'
+    required: false
+    default: 'index.js'
+  terraform-target:
+    description: 'Terraform target resource (e.g., aws_lambda_function.draft_processor)'
+    required: true
+  aws-region:
+    description: 'AWS region for deployment'
+    required: false
+    default: 'us-east-1'
+  aws-stage:
+    description: 'Deployment stage (dev, staging, prod)'
+    required: false
+    default: 'dev'
+
+outputs:
+  version:
+    description: 'Deployed Lambda version'
+    value: ${{ steps.package.outputs.version }}
+  s3-bucket:
+    description: 'S3 bucket used for deployment'
+    value: ${{ steps.package.outputs.s3-bucket }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set derived values
+      shell: bash
+      id: config
+      run: |
+        LAMBDA_NAME="${{ inputs.lambda-name }}"
+        NX_PROJECT="${{ inputs.nx-project-name }}"
+        LAMBDA_DIR="${{ inputs.lambda-directory }}"
+        
+        # Use lambda-name as defaults if not specified
+        if [ -z "$NX_PROJECT" ]; then
+          NX_PROJECT="$LAMBDA_NAME"
+        fi
+        
+        if [ -z "$LAMBDA_DIR" ]; then
+          LAMBDA_DIR="lambdas/$LAMBDA_NAME"
+        fi
+        
+        echo "lambda-name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
+        echo "nx-project=$NX_PROJECT" >> $GITHUB_OUTPUT
+        echo "lambda-dir=$LAMBDA_DIR" >> $GITHUB_OUTPUT
+
+    - name: Build Lambda with Nx
+      shell: bash
+      run: |
+        LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
+        NX_PROJECT="${{ steps.config.outputs.nx-project }}"
+        LAMBDA_DIR="${{ steps.config.outputs.lambda-dir }}"
+        BUILD_FILE="${{ inputs.build-output-file }}"
+        
+        echo "🚀 Building $LAMBDA_NAME Lambda..."
+        echo "::notice::Building $NX_PROJECT project for targeted deployment"
+        
+        # Build the project
+        if npx nx build "$NX_PROJECT" --verbose 2>&1 | tee build.log; then
+          echo "✅ $LAMBDA_NAME Lambda built successfully"
+          
+          # Verify build artifacts exist
+          BUILD_PATH="$LAMBDA_DIR/dist/$BUILD_FILE"
+          if [ -f "$BUILD_PATH" ]; then
+            echo "✅ Build artifacts verified: $BUILD_PATH"
+            BUILD_SIZE=$(du -sh "$BUILD_PATH" | cut -f1)
+            echo "📊 $LAMBDA_NAME Lambda bundle size: $BUILD_SIZE"
+            
+            echo "## 🚀 $LAMBDA_NAME Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            echo "- **Project**: $NX_PROJECT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Output**: $LAMBDA_DIR/dist/" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Build artifacts missing: $BUILD_PATH"
+            exit 1
+          fi
+        else
+          echo "❌ $LAMBDA_NAME Lambda build failed"
+          echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -20 build.log >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: Package and Upload Lambda
+      id: package
+      shell: bash
+      working-directory: ${{ steps.config.outputs.lambda-dir }}
+      run: |
+        LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
+        AWS_STAGE="${{ inputs.aws-stage }}"
+        AWS_REGION="${{ inputs.aws-region }}"
+        
+        # Create version string
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+        VERSION="${TIMESTAMP}-${COMMIT_SHA}"
+        
+        echo "📦 Creating deployment package: $LAMBDA_NAME-${VERSION}.zip"
+        
+        # Create deployment package from built artifacts
+        zip -r "${LAMBDA_NAME}-${VERSION}.zip" dist/
+        
+        # Get S3 bucket name from SSM parameter store
+        echo "🔍 Getting S3 bucket name from SSM..."
+        if S3_BUCKET=$(aws ssm get-parameter \
+          --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" \
+          --query "Parameter.Value" \
+          --output text \
+          --region "$AWS_REGION" 2>/dev/null); then
+          echo "✅ Found S3 bucket from SSM: $S3_BUCKET"
+        else
+          echo "⚠️ SSM parameter not found, using default bucket name"
+          S3_BUCKET="legacy-sports-dev-lambdas-cca20ad9"
+        fi
+        
+        # Upload to S3
+        echo "⬆️ Uploading to S3: s3://${S3_BUCKET}/${LAMBDA_NAME}/"
+        aws s3 cp "${LAMBDA_NAME}-${VERSION}.zip" \
+          "s3://${S3_BUCKET}/${LAMBDA_NAME}/" \
+          --region "$AWS_REGION"
+        
+        # Update SSM parameter with version
+        aws ssm put-parameter \
+          --name "/legacy-sports/${AWS_STAGE}/lambda/${LAMBDA_NAME}/version" \
+          --value "$VERSION" \
+          --overwrite \
+          --region "$AWS_REGION"
+        
+        echo "✅ Lambda package uploaded: ${LAMBDA_NAME}-${VERSION}.zip"
+        
+        # Output for use in subsequent steps
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "s3-bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "~1.13"
+
+    - name: Initialize Terraform
+      shell: bash
+      working-directory: terraform
+      run: |
+        echo "🔧 Initializing Terraform..."
+        if terraform init; then
+          echo "✅ Terraform initialization successful"
+        else
+          echo "❌ Terraform initialization failed"
+          echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
+          echo "Check that:" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
+          echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: Deploy Infrastructure with Terraform
+      shell: bash
+      working-directory: terraform
+      run: |
+        LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
+        TF_TARGET="${{ inputs.terraform-target }}"
+        
+        echo "📋 Planning Terraform changes for $TF_TARGET..."
+        terraform plan -target="$TF_TARGET"
+        
+        echo "🚀 Applying Terraform changes..."
+        terraform apply -target="$TF_TARGET" -auto-approve
+        
+        echo "✅ Infrastructure deployment completed for $LAMBDA_NAME"
+        
+        echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "- **Lambda**: $LAMBDA_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- **S3 Bucket**: $S3_BUCKET" >> $GITHUB_STEP_SUMMARY
+        echo "- **Terraform Target**: $TF_TARGET" >> $GITHUB_STEP_SUMMARY

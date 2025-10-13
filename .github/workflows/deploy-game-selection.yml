@@ -57,104 +57,14 @@ jobs:
           role-session-name: GitHubActions-DeployGameSelection
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build Game Selection Lambda
-        run: |
-          echo "🚀 Building Game Selection Lambda specifically..."
-          echo "::notice::Building only game-selection project for targeted deployment"
-          
-          # Build only the game-selection and its dependencies
-          if npx nx build game-selection --verbose 2>&1 | tee build.log; then
-            echo "✅ Game Selection Lambda built successfully"
-            
-            # Verify build artifacts exist (note: game-selection uses dev.js not index.js)
-            if [ -f "lambdas/game-selection/dist/dev.js" ]; then
-              echo "✅ Build artifacts verified: lambdas/game-selection/dist/dev.js"
-              BUILD_SIZE=$(du -sh lambdas/game-selection/dist/dev.js | cut -f1)
-              echo "📊 Game Selection Lambda bundle size: $BUILD_SIZE"
-            else
-              echo "❌ Build artifacts missing: lambdas/game-selection/dist/dev.js"
-              exit 1
-            fi
-            
-            echo "## 🚀 Game Selection Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
-            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
-            echo "- **Project**: game-selection" >> $GITHUB_STEP_SUMMARY
-            echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
-            echo "- **Output**: lambdas/game-selection/dist/" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Game Selection Lambda build failed"
-            echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            tail -20 build.log >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-
-      - name: Package and Deploy Game Selection Lambda
-        working-directory: lambdas/game-selection
-        run: |
-          # Create version string
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
-          VERSION="${TIMESTAMP}-${COMMIT_SHA}"
-
-          # Create deployment package from built artifacts
-          zip -r "game-selection-${VERSION}.zip" dist/
-
-          # Get S3 bucket name from SSM parameter store
-          echo "🔍 Getting S3 bucket name from SSM..."
-          if S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text --region ${{ env.AWS_REGION }} 2>/dev/null); then
-            echo "✅ Found S3 bucket from SSM: $S3_BUCKET"
-          else
-            echo "⚠️ SSM parameter not found, using default bucket name"
-            S3_BUCKET="legacy-sports-dev-lambdas-cca20ad9"
-          fi
-
-          # Upload to S3
-          aws s3 cp "game-selection-${VERSION}.zip" "s3://${S3_BUCKET}/game-selection/" --region ${{ env.AWS_REGION }}
-
-          # Update SSM parameter
-          aws ssm put-parameter \
-            --name "/legacy-sports/${AWS_STAGE}/lambda/game-selection/version" \
-            --value "$VERSION" \
-            --overwrite \
-            --region ${{ env.AWS_REGION }}
-
-          echo "✅ Lambda package uploaded: game-selection-${VERSION}.zip"
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "S3_BUCKET=${S3_BUCKET}" >> $GITHUB_ENV
-
-      - name: "🏗️ Setup Terraform"
-        uses: hashicorp/setup-terraform@v3
+      - name: Deploy Game Selection Lambda
+        uses: ./.github/actions/deploy-lambda
         with:
-          terraform_version: "~1.13"
-
-      - name: "🔧 Initialize Terraform"
-        working-directory: terraform
-        run: |
-          echo "🔧 Initializing Terraform..."
-          if terraform init; then
-            echo "✅ Terraform initialization successful"
-          else
-            echo "❌ Terraform initialization failed"
-            echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
-            echo "Check that:" >> $GITHUB_STEP_SUMMARY
-            echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
-            echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
-            echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-
-      - name: "🚀 Deploy Infrastructure"
-        working-directory: terraform
-        run: |
-          echo "📋 Planning Terraform changes..."
-          terraform plan -target=aws_lambda_function.game_selection
-          
-          echo "🚀 Applying Terraform changes..."
-          terraform apply -target=aws_lambda_function.game_selection -auto-approve
-          
-          echo "✅ Infrastructure deployment completed"
+          lambda-name: game-selection
+          build-output-file: dev.js
+          terraform-target: aws_lambda_function.game_selection
+          aws-region: ${{ env.AWS_REGION }}
+          aws-stage: ${{ env.AWS_STAGE }}
 
       - name: Update Deployment Badge
         if: always()
