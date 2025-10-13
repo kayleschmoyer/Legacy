@@ -11,45 +11,29 @@ inputs:
     required: false
     default: "HEAD"
   web-patterns:
-    description: "File patterns for web project changes (newline-separated)"
+    description: "File patterns for web project changes (currently fixed in action)"
     required: false
-    default: |
-      apps/web/**
-      lib/shared-components/**
-      lib/tamagui-config/**
+    default: "apps/web/**,lib/shared-components/**,lib/tamagui-config/**"
   mobile-patterns:
-    description: "File patterns for mobile project changes (newline-separated)"
+    description: "File patterns for mobile project changes (currently fixed in action)"
     required: false
-    default: |
-      apps/app/**
-      lib/shared-components/**
-      lib/tamagui-config/**
+    default: "apps/app/**,lib/shared-components/**,lib/tamagui-config/**"
   lambdas-patterns:
-    description: "File patterns for lambda changes (newline-separated)"
+    description: "File patterns for lambda changes (currently fixed in action)"
     required: false
-    default: |
-      lambdas/**
-      lib/api/**
-      lib/db-client/**
+    default: "lambdas/**,lib/api/**,lib/db-client/**"
   terraform-patterns:
-    description: "File patterns for infrastructure changes (newline-separated)"
+    description: "File patterns for infrastructure changes (currently fixed in action)"
     required: false
-    default: |
-      terraform/**
+    default: "terraform/**"
   core-patterns:
-    description: "File patterns for core library changes (newline-separated)"
+    description: "File patterns for core library changes (currently fixed in action)"
     required: false
-    default: |
-      lib/**
-      tools/**
-      nx.json
-      tsconfig*.json
+    default: "lib/**,tools/**,nx.json,tsconfig*.json"
   dependency-patterns:
-    description: "File patterns for dependency changes (newline-separated)"
+    description: "File patterns for dependency changes (currently fixed in action)"
     required: false
-    default: |
-      **/package.json
-      package-lock.json
+    default: "package.json,package-lock.json,apps/*/package.json,lib/*/package.json"
 
 outputs:
   web:
@@ -90,12 +74,30 @@ runs:
         base: ${{ inputs.base-ref }}
         ref: ${{ inputs.head-ref }}
         filters: |
-          web: ${{ inputs.web-patterns }}
-          mobile: ${{ inputs.mobile-patterns }}
-          lambdas: ${{ inputs.lambdas-patterns }}
-          terraform: ${{ inputs.terraform-patterns }}
-          package-json: ${{ inputs.dependency-patterns }}
-          core: ${{ inputs.core-patterns }}
+          web:
+            - apps/web/**
+            - lib/shared-components/**
+            - lib/tamagui-config/**
+          mobile:
+            - apps/app/**
+            - lib/shared-components/**
+            - lib/tamagui-config/**
+          lambdas:
+            - lambdas/**
+            - lib/api/**
+            - lib/db-client/**
+          terraform:
+            - terraform/**
+          package-json:
+            - package.json
+            - package-lock.json
+            - apps/*/package.json
+            - lib/*/package.json
+          core:
+            - lib/**
+            - tools/**
+            - nx.json
+            - tsconfig*.json
 
     - name: "📊 Analyze Change Impact"
       id: analyze
