@@ -177,11 +177,36 @@ runs:
         fi
 
         if [ ! -d "node_modules" ]; then
-          echo "❌ node_modules directory not found"
+          echo "❌ node_modules directory not found after installation"
+          echo "🔍 Current directory: $(pwd)"
+          echo "📁 Directory contents:"
+          ls -la | head -10
           exit 1
         fi
 
-        echo "Dependencies verified successfully!"
+        # Verify critical dependencies are actually installed
+        echo "🔍 Verifying critical dependencies..."
+        
+        # Check for Nx specifically
+        if [ ! -d "node_modules/nx" ] && [ ! -d "node_modules/@nx" ]; then
+          echo "❌ Nx packages not found in node_modules"
+          echo "📦 Available packages starting with 'n':"
+          ls -la node_modules/ | grep "^d.*\sn" | head -5 || echo "No packages found"
+          echo "📦 Available @-scoped packages:"
+          ls -la node_modules/ | grep "^d.*@" | head -10 || echo "No @-scoped packages found"
+          exit 1
+        fi
+        
+        # Check if nx binary was installed
+        if [ ! -f "node_modules/.bin/nx" ]; then
+          echo "⚠️ nx binary not found in node_modules/.bin/"
+          echo "📦 Available binaries:"
+          ls -la node_modules/.bin/ | grep nx || echo "No nx-related binaries"
+          echo "🔧 Attempting to check npm linking..."
+          npm ls nx 2>/dev/null || echo "npm ls nx failed"
+        fi
+
+        echo "✅ Dependencies verified successfully!"
 
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
@@ -220,27 +245,76 @@ runs:
         echo "node_modules/nx exists: $([ -d node_modules/nx ] && echo 'yes' || echo 'no')"
         echo "@nx packages: $(ls node_modules/ | grep '^@nx' | wc -l)"
         
-        # Try different methods to access Nx
+        # Try different methods to access Nx with enhanced debugging
         NX_COMMAND=""
+        echo "🔍 Attempting Nx CLI detection..."
         
         # Method 1: npx nx
+        echo "  Testing Method 1: npx nx"
         if npx nx --version >/dev/null 2>&1; then
           NX_COMMAND="npx nx"
-          echo "✅ Nx accessible via: npx nx"
-        # Method 2: Direct path to nx binary  
-        elif [ -f "node_modules/.bin/nx" ] && node_modules/.bin/nx --version >/dev/null 2>&1; then
-          NX_COMMAND="node_modules/.bin/nx"
-          echo "✅ Nx accessible via: node_modules/.bin/nx"
-        # Method 3: npm exec
-        elif npm exec nx -- --version >/dev/null 2>&1; then
-          NX_COMMAND="npm exec nx --"
-          echo "✅ Nx accessible via: npm exec nx --"
+          echo "  ✅ Nx accessible via: npx nx"
         else
+          echo "  ❌ npx nx failed"
+        fi
+        
+        # Method 2: Direct path to nx binary  
+        if [ -z "$NX_COMMAND" ]; then
+          echo "  Testing Method 2: node_modules/.bin/nx"
+          if [ -f "node_modules/.bin/nx" ]; then
+            if node_modules/.bin/nx --version >/dev/null 2>&1; then
+              NX_COMMAND="node_modules/.bin/nx"
+              echo "  ✅ Nx accessible via: node_modules/.bin/nx"
+            else
+              echo "  ❌ node_modules/.bin/nx exists but not executable"
+            fi
+          else
+            echo "  ❌ node_modules/.bin/nx does not exist"
+          fi
+        fi
+        
+        # Method 3: npm exec
+        if [ -z "$NX_COMMAND" ]; then
+          echo "  Testing Method 3: npm exec nx"
+          if npm exec nx -- --version >/dev/null 2>&1; then
+            NX_COMMAND="npm exec nx --"
+            echo "  ✅ Nx accessible via: npm exec nx --"
+          else
+            echo "  ❌ npm exec nx failed"
+          fi
+        fi
+        
+        # Method 4: Try to manually find and execute nx
+        if [ -z "$NX_COMMAND" ]; then
+          echo "  Testing Method 4: Manual nx resolution"
+          
+          # Look for nx in various locations
+          for nx_path in "node_modules/.bin/nx" "node_modules/nx/bin/nx.js" "node_modules/@nx/cli/bin/nx.js"; do
+            if [ -f "$nx_path" ]; then
+              echo "  Found potential nx at: $nx_path"
+              if node "$nx_path" --version >/dev/null 2>&1; then
+                NX_COMMAND="node $nx_path"
+                echo "  ✅ Nx accessible via: node $nx_path"
+                break
+              fi
+            fi
+          done
+        fi
+        
+        # If all methods failed
+        if [ -z "$NX_COMMAND" ]; then
           echo "❌ Nx not accessible through any method"
-          echo "Available binaries in node_modules/.bin:"
-          ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "No nx binaries found"
-          echo "Nx package contents:"
-          ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "No nx directory found"
+          echo ""
+          echo "🔍 Diagnostic information:"
+          echo "  Available binaries in node_modules/.bin:"
+          ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "    No nx binaries found"
+          echo "  Nx package directory:"
+          ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "    No nx directory found"
+          echo "  @nx packages:"
+          ls -la node_modules/@nx/ 2>/dev/null | head -5 || echo "    No @nx directory found"
+          echo "  NPX debug:"
+          npx nx --version 2>&1 || echo "    npx nx failed"
+          echo ""
           exit 1
         fi
         
