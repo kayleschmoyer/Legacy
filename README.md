@@ -42,6 +42,15 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 ## 🚀 Quick Start
 
+### 📚 Documentation Hub
+**👉 [Complete Documentation](docs/README.md)** - Central hub for all guides and references
+
+### Essential Guides
+- **🛠️ [Development Setup](docs/guides/development-setup.md)** - Complete environment setup  
+- **🔐 [Authentication Guide](docs/guides/authentication-guide.md)** - OAuth implementation and usage
+- **🛠️ [Troubleshooting](docs/guides/troubleshooting.md)** - Common issues and quick fixes
+- **🏗️ [Architecture Overview](docs/architecture/cross-platform-system.md)** - System design and patterns
+
 ### Prerequisites
 
 - **Node.js**: v18+ (recommended: use [nvm](https://github.com/nvm-sh/nvm))
@@ -358,9 +367,11 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 
 ### Documentation
 
-- [`terraform/README.md`](terraform/README.md) - Infrastructure setup and deployment
-- [`AWS_INFRASTRUCTURE_DOCUMENTATION.md`](AWS_INFRASTRUCTURE_DOCUMENTATION.md) - Comprehensive architecture guide
-- [`INFRASTRUCTURE_CHANGELOG.md`](INFRASTRUCTURE_CHANGELOG.md) - Detailed change history
+- **📖 [Complete Documentation Hub](docs/README.md)** - Central documentation portal
+- **🚀 [Deployment Guides](docs/deployment/)** - AWS, Terraform, and CI/CD setup
+- **🏗️ [Architecture Docs](docs/architecture/)** - System design and technical documentation
+- **📚 [Migration History](docs/migration-history/)** - Completed migrations and improvements
+- **🤖 [AI Agent Instructions](docs/agents/)** - Structured guidance for AI development
 
 ## 📚 Additional Resources
 
