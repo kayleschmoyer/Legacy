@@ -119,6 +119,24 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks"
         ]
+      },
+      # IAM read permissions for Terraform plan/apply
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListPolicyVersions",
+          "iam:ListInstanceProfilesForRole"
+        ]
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+        ]
       }
     ]
   })
