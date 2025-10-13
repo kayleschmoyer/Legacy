@@ -64,7 +64,6 @@ runs:
     - name: "🎭 E2E Tests (Critical User Paths)"
       id: e2e-tests
       if: inputs.should-run-e2e == 'true'
-      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
       shell: bash
       run: |
         echo "::group::🎭 End-to-End Testing with Playwright"

@@ -59,7 +59,6 @@ runs:
     - name: "📦 Build Web Application"
       id: build-web
       if: inputs.should-build-web == 'true'
-      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
       shell: bash
       run: |
         echo "::group::📦 Web Application Build"
@@ -132,7 +131,6 @@ runs:
     - name: "⚡ Build Lambda Functions"
       id: build-lambdas
       if: inputs.should-build-lambdas == 'true'
-      timeout-minutes: 10
       shell: bash
       run: |
         echo "::group::⚡ Lambda Functions Build"
@@ -201,7 +199,6 @@ runs:
     - name: "📱 Validate Mobile Build Configuration"
       id: validate-mobile
       if: inputs.should-build-mobile == 'true'
-      timeout-minutes: 5
       shell: bash
       run: |
         echo "::group::📱 Mobile Build Configuration Validation"
@@ -253,7 +250,6 @@ runs:
     - name: "🔐 AWS Infrastructure Validation"
       id: terraform-validation
       if: inputs.should-validate-terraform == 'true'
-      timeout-minutes: 5
       shell: bash
       run: |
         echo "::group::🔐 Terraform Infrastructure Validation"

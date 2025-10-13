@@ -54,7 +54,6 @@ runs:
     - name: "🎨 Code Formatting Check"
       id: formatting
       if: inputs.skip-formatting != 'true'
-      timeout-minutes: 3
       shell: bash
       run: |
         echo "::group::🎨 Code Formatting Validation"
@@ -80,7 +79,6 @@ runs:
     - name: "⚡ Distributed Quality Gates"
       id: distributed
       if: inputs.dte-available == 'true'
-      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
       shell: bash
       run: |
         echo "::group::⚡ Nx Cloud Distributed Task Execution"
@@ -151,7 +149,6 @@ runs:
     - name: "🔧 Local Parallel Quality Gates"
       id: local
       if: inputs.dte-available != 'true'
-      timeout-minutes: ${{ fromJson(inputs.timeout-minutes) }}
       shell: bash
       run: |
         echo "::group::⚡ Parallel Quality Gates (GitHub Actions)"
