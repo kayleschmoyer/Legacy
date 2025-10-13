@@ -97,16 +97,16 @@ EOF
         # Prepare gist update payload
         BADGE_CONTENT=$(cat "${FILENAME}.json" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n')
         
-        PAYLOAD=$(cat <<PAYLOAD_EOF
-{
-  "files": {
-    "${FILENAME}.json": {
-      "content": "${BADGE_CONTENT}"
-    }
-  }
-}
-PAYLOAD_EOF
-)
+        # Build JSON payload using jq if available, otherwise use string concatenation
+        if command -v jq >/dev/null 2>&1; then
+          PAYLOAD=$(jq -n \
+            --arg filename "${FILENAME}.json" \
+            --arg content "${BADGE_CONTENT}" \
+            '{files: {($filename): {content: $content}}}')
+        else
+          # Fallback: build payload manually
+          PAYLOAD="{\"files\":{\"${FILENAME}.json\":{\"content\":\"${BADGE_CONTENT}\"}}}"
+        fi
         
         # Update the gist
         RESPONSE=$(curl -s \
