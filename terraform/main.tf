@@ -11,7 +11,6 @@ terraform {
     encrypt = true
     
     # State locking with DynamoDB
-    use_lockfile = true
     dynamodb_table = "terraform-state-locks"
   }
   
