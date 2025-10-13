@@ -427,7 +427,7 @@ jobs:
           node-version: 22
           install-dependencies: true
 
-      - name: "🛡️ CodeQL Analysis"
+      - name: "🛡️ CodeQL Analysis Setup"
         uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
@@ -446,12 +446,76 @@ jobs:
           
           echo "✅ Build completed for SAST analysis"
 
-      - name: "🔍 Perform CodeQL Analysis" 
+      - name: "🔍 Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript"
+          upload: false
+          output: sarif-results
+          
+      - name: "📊 Process CodeQL Results"
+        id: process-codeql-results
+        if: always()
+        run: |
+          echo "::group::🔍 CodeQL Results Processing"
+          
+          # Check if SARIF results were generated
+          if [ -d "sarif-results" ]; then
+            echo "✅ CodeQL analysis completed successfully"
+            
+            # Count findings by severity
+            SARIF_FILES=$(find sarif-results -name "*.sarif" 2>/dev/null || echo "")
+            
+            if [ -n "$SARIF_FILES" ]; then
+              echo "📊 Processing SARIF results..."
+              
+              # Basic SARIF parsing for summary (requires jq if available)
+              if command -v jq &> /dev/null; then
+                for file in $SARIF_FILES; do
+                  if [ -f "$file" ]; then
+                    RULE_COUNT=$(jq '.runs[0].results | length' "$file" 2>/dev/null || echo "0")
+                    echo "📄 Found $RULE_COUNT potential issues in $(basename "$file")"
+                  fi
+                done
+              else
+                echo "📄 SARIF files generated (jq not available for detailed parsing)"
+                ls -la sarif-results/
+              fi
+              
+              # Create summary for PR/commit
+              echo "## 🛡️ CodeQL Security Analysis" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "✅ **Status**: Analysis completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "📊 **Files Analyzed**: JavaScript/TypeScript codebase" >> $GITHUB_STEP_SUMMARY
+              echo "🔍 **Query Suites**: security-extended, security-and-quality" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "📁 **Results**: SARIF files generated for offline review" >> $GITHUB_STEP_SUMMARY
+              
+              # Set output for downstream jobs
+              echo "codeql-status=success" >> $GITHUB_OUTPUT
+              echo "sarif-generated=true" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ No SARIF files found - analysis may have failed"
+              echo "codeql-status=no-results" >> $GITHUB_OUTPUT  
+              echo "sarif-generated=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ CodeQL analysis failed - no results directory found"
+            echo "codeql-status=failed" >> $GITHUB_OUTPUT
+            echo "sarif-generated=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "::endgroup::"
 
-      - name: "🔐 ESLint Security Rules"
+      - name: "� Upload CodeQL Results"
+        if: steps.process-codeql-results.outputs.sarif-generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-results
+          path: sarif-results/
+          retention-days: 30
+
+      - name: "�🔐 ESLint Security Rules"
         id: eslint-security
         run: |
           echo "::group::🔒 ESLint Security Rule Analysis"
@@ -504,10 +568,18 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # CodeQL Results
+          CODEQL_STATUS="${{ steps.process-codeql-results.outputs.codeql-status || 'unknown' }}"
           echo "### CodeQL Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **CodeQL**: Analysis completed - results available in Security tab" >> $GITHUB_STEP_SUMMARY
+          if [ "$CODEQL_STATUS" = "success" ]; then
+            echo "✅ **CodeQL**: Analysis completed successfully (private repo mode)" >> $GITHUB_STEP_SUMMARY
+          elif [ "$CODEQL_STATUS" = "no-results" ]; then
+            echo "⚠️ **CodeQL**: Analysis completed but no results generated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **CodeQL**: Analysis failed or incomplete" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- Language: JavaScript/TypeScript" >> $GITHUB_STEP_SUMMARY
           echo "- Query Suite: security-extended,security-and-quality" >> $GITHUB_STEP_SUMMARY
+          echo "- Results: SARIF files generated for offline review" >> $GITHUB_STEP_SUMMARY
           
           # ESLint Security Results
           ESLINT_ISSUES="${{ steps.eslint-security.outputs.eslint-security-issues || 0 }}"
@@ -521,9 +593,10 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 Review CodeQL results in Security → Code scanning alerts" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔧 Address any high-severity security findings" >> $GITHUB_STEP_SUMMARY
-          echo "- 📚 Follow secure coding practices" >> $GITHUB_STEP_SUMMARY
+          echo "- � Review SARIF results generated in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 Address any high-severity security findings from CodeQL/ESLint" >> $GITHUB_STEP_SUMMARY
+          echo "- 📚 Follow secure coding practices and SAST recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️ Note: CodeQL runs in private repo mode (no GitHub Security tab upload)" >> $GITHUB_STEP_SUMMARY
 
   # ======================================================================
   # SECURITY SCAN SUMMARY & REPORTING  
