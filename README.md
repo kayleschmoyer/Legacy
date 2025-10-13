@@ -4,17 +4,25 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 ## 🚀 CI Status
 
-[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![DTE Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/DTE%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Change%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Execution Plan](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Execution%20Plan.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Quality%20Gates.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Build%20Validation.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/E2E%20Testing.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Deployment Gate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Deployment%20Gate.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![DTE Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DTE%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Change%20Detection.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Execution Plan](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Execution%20Plan.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Quality%20Gates.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build%20Validation.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/E2E%20Testing.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Deployment Gate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deployment%20Gate.json)](https://github.com/bkrupa/legacy-sports/actions)
 
-[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions)
-[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Last%20Updated.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last%20Updated.json)](https://github.com/bkrupa/legacy-sports/actions)
+
+## 🌐 Live Web App
+
+[![Launch Web App](https://img.shields.io/badge/Launch-Web%20App-blue?style=for-the-badge&logo=vercel)](https://bkrupa.github.io/legacy-sports/)
+
+**Production URL:** [https://bkrupa.github.io/legacy-sports/](https://bkrupa.github.io/legacy-sports/)
+
+**Auto-Deploy:** Pushes to `main` branch automatically deploy via GitHub Pages
 
 ## � Download Mobile App
 
@@ -365,7 +373,10 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 ---
 
 Built with ❤️ using modern development tools and practices.
-#   T e s t   w o r k f l o w   f i x  
- #   Y A M L   s y n t a x   t e s t   c o m p l e t e d  
- #   G i t   r e f e r e n c e   f i x   t e s t  
+#   T e s t   w o r k f l o w   f i x 
+ 
+ #   Y A M L   s y n t a x   t e s t   c o m p l e t e d 
+ 
+ #   G i t   r e f e r e n c e   f i x   t e s t 
+ 
  

@@ -21,7 +21,7 @@ This guide will help you set up the CI badges system for the Legacy Sports proje
    This gist stores the badge JSON files for the Legacy Sports CI pipeline.
    Updated automatically by GitHub Actions on main branch builds.
    ```
-4. Create the gist and copy the **Gist ID** from the URL (e.g., `abc123def456`)
+4. Create the gist and copy the **Gist ID** from the URL (e.g., `c0b25f4a406c1216b17211cc13a9c1af`)
 
 ### Step 2: Add Repository Secrets
 
@@ -189,7 +189,7 @@ To create them manually:
 Replace `YOUR_GIST_ID` in the README.md with your actual gist ID:
 
 ```markdown
-[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
 ```
 
 ### Step 5: Test the Setup
