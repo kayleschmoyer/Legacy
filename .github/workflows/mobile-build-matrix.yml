@@ -218,7 +218,7 @@ jobs:
       - name: "📱 Setup EAS CLI & Fix Metro Dependencies"
         run: |
           echo "🔧 Installing compatible EAS CLI and fixing Metro dependencies..."
-          npm install -g @expo/eas-cli
+          npm install -g eas-cli
           echo "✅ EAS CLI installed: $(eas --version)"
           
           # Clear Metro cache to prevent version conflicts
