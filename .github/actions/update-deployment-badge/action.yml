@@ -101,17 +101,16 @@ runs:
         # Update gist file using GitHub API
         echo "Updating gist $GIST_ID..."
         
-        # Prepare gist update payload
-        BADGE_CONTENT=$(cat "${FILENAME}.json" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n')
-        
-        # Build JSON payload using jq if available, otherwise use string concatenation
+        # Prepare gist update payload - read the badge file content directly with jq
         if command -v jq >/dev/null 2>&1; then
+          # Use jq to properly read and encode the JSON content
           PAYLOAD=$(jq -n \
             --arg filename "${FILENAME}.json" \
-            --arg content "${BADGE_CONTENT}" \
+            --rawfile content "${FILENAME}.json" \
             '{files: {($filename): {content: $content}}}')
         else
-          # Fallback: build payload manually
+          # Fallback: escape content manually
+          BADGE_CONTENT=$(cat "${FILENAME}.json" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n')
           PAYLOAD="{\"files\":{\"${FILENAME}.json\":{\"content\":\"${BADGE_CONTENT}\"}}}"
         fi
         
@@ -123,8 +122,8 @@ runs:
           "https://api.github.com/gists/$GIST_ID" \
           -d "$PAYLOAD")
         
-        # Check if update was successful
-        if echo "$RESPONSE" | grep -q '"id"'; then
+        # Check if update was successful - use a safer grep method
+        if echo "$RESPONSE" | grep -qi '"id"' 2>/dev/null; then
           echo "✅ Successfully updated deployment badge"
           echo "success=true" >> $GITHUB_OUTPUT
           
