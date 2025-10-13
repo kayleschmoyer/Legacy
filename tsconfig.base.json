@@ -39,5 +39,16 @@
       ]
     }
   },
-  "exclude": ["node_modules", "tmp"]
+  "exclude": [
+    "node_modules",
+    "tmp",
+    "android/**/*",
+    "terraform/**/*",
+    ".nx/**/*",
+    "dist/**/*",
+    "playwright-report/**/*",
+    "test-results/**/*",
+    "resources/**/*",
+    "static/**/*"
+  ]
 }
