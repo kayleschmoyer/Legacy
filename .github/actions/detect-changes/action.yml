@@ -1,5 +1,8 @@
 name: "Detect Project Changes"
-description: "Intelligent change detec    - name: "Determine Base Reference"   - name: "Determine Base Reference"ion for mono-repo    - name: "Detect Changed Files"projects with configurable file patterns and affected component analysis"
+description: "Intelligent change dete  steps:
+    - name: "Determine Base Reference"
+      id: determine-base
+      shell: bashn for mono-repo projects with configurable file patterns and affected component analysis"
 
 inputs:
   base-ref:
