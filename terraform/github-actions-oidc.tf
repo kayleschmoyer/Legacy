@@ -137,6 +137,108 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
           "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
         ]
+      },
+      # CloudWatch Logs read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:ListTagsLogGroup"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*"
+        ]
+      },
+      # Secrets Manager read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecretVersionIds"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
+        ]
+      },
+      # S3 read permissions for Lambda deployment bucket
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketTagging",
+          "s3:GetBucketPublicAccessBlock"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-*"
+        ]
+      },
+      # VPC and networking read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeInstances",
+          "ec2:DescribeAddresses"
+        ]
+        Resource = "*"
+      },
+      # SSM Parameter Store read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:DescribeParameters"
+        ]
+        Resource = [
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*"
+        ]
+      },
+      # RDS and RDS Proxy read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBProxies",
+          "rds:DescribeDBProxyTargetGroups",
+          "rds:DescribeDBProxyTargets",
+          "rds:DescribeDBSubnetGroups",
+          "rds:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      # SQS read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:GetQueueAttributes",
+          "sqs:ListQueueTags"
+        ]
+        Resource = [
+          "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-*"
+        ]
+      },
+      # API Gateway read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET"
+        ]
+        Resource = [
+          "arn:aws:apigateway:${local.region}::/restapis",
+          "arn:aws:apigateway:${local.region}::/restapis/*"
+        ]
       }
     ]
   })
