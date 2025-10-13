@@ -148,7 +148,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
         ]
       },
       # Secrets Manager read permissions
@@ -156,7 +157,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Effect = "Allow"
         Action = [
           "secretsmanager:DescribeSecret",
-          "secretsmanager:ListSecretVersionIds"
+          "secretsmanager:ListSecretVersionIds",
+          "secretsmanager:GetResourcePolicy"
         ]
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
@@ -170,7 +172,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:GetBucketPolicy",
           "s3:GetBucketVersioning",
           "s3:GetBucketTagging",
-          "s3:GetBucketPublicAccessBlock"
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketAcl"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*"
@@ -189,7 +192,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:DescribeVpcEndpoints",
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeInstances",
-          "ec2:DescribeAddresses"
+          "ec2:DescribeAddresses",
+          "ec2:DescribeVpcAttribute"
         ]
         Resource = "*"
       },
