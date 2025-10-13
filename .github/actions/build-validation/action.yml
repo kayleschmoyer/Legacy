@@ -247,7 +247,14 @@ runs:
 
         echo "::endgroup::"
 
-    - name: "🔐 AWS Infrastructure Validation"
+    - name: "� Setup Terraform"
+      if: inputs.should-validate-terraform == 'true'
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "~1.0"
+        terraform_wrapper: false
+
+    - name: "�🔐 AWS Infrastructure Validation"
       id: terraform-validation
       if: inputs.should-validate-terraform == 'true'
       shell: bash
@@ -264,6 +271,16 @@ runs:
         fi
 
         cd terraform
+
+        # Verify Terraform is available
+        echo "🔍 Verifying Terraform installation..."
+        if ! command -v terraform &> /dev/null; then
+          echo "❌ Terraform command not found"
+          echo "::error::Terraform is not installed or not in PATH"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Terraform version: $(terraform version -json | grep -o '"terraform_version":"[^"]*' | cut -d'"' -f4)"
 
         # Initialize terraform (validation mode)
         echo "🔧 Initializing Terraform..."
