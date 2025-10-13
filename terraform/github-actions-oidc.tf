@@ -131,7 +131,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
           "iam:ListPolicyVersions",
-          "iam:ListInstanceProfilesForRole"
+          "iam:ListInstanceProfilesForRole",
+          "iam:PassRole"
         ]
         Resource = [
           "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
