@@ -59,6 +59,39 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
+# Bucket policy to allow GitHub Actions role to access state
+resource "aws_s3_bucket_policy" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowGitHubActionsAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.github_actions.arn
+        }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${aws_s3_bucket.terraform_state.arn}/*"
+      },
+      {
+        Sid    = "AllowGitHubActionsListBucket"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.github_actions.arn
+        }
+        Action = "s3:ListBucket"
+        Resource = aws_s3_bucket.terraform_state.arn
+      }
+    ]
+  })
+}
+
 # DynamoDB table for state locking
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = "terraform-state-locks"
