@@ -120,10 +120,10 @@ const baseOAuthHandler = async (
           body: JSON.stringify({
             message: 'Secure OAuth Proxy Service',
             description:
-              'OAuth authentication with user pre-authorization security',
+              'OAuth authentication with automatic user provisioning',
             endpoints: [
               '/oauth/verify',
-              '/oauth/google (NEW: secure flow with user pre-check)',
+              '/oauth/google (secure flow with auto-provisioning)',
               '/oauth/google/legacy (original flow for backward compatibility)',
               '/oauth/google/authorize (OAuth initiation)',
               '/oauth/google/callback (OAuth callback)',
@@ -135,7 +135,7 @@ const baseOAuthHandler = async (
               '/oauth/device/verify (CLI device flow)',
             ],
             security:
-              'Only pre-authorized users can complete OAuth authentication',
+              'New users are automatically created on first OAuth login with default access level',
             note: 'User management is handled internally during authentication flow',
           }),
         });

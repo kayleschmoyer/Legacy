@@ -9,7 +9,7 @@ import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { InternalUser } from '@legacy-sports/db-client';
-import { checkUserExists } from './UserManager';
+import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
 import { getUserFromGoogleJwt } from '../util/users';
@@ -200,14 +200,19 @@ function getRedirectUri(event: APIGatewayEvent): string {
 }
 
 /**
- * NEW SECURE FLOW: Check user exists first, then validate OAuth
- * This implements the requirement that only pre-authorized users can authenticate
+ * Secure Google authentication flow with automatic user provisioning
+ * This flow automatically creates new users on their first login
+ * Steps:
+ * 1. Decode OAuth token to get user email
+ * 2. Get or create user record in database (auto-provisions new users)
+ * 3. Complete full OAuth validation
+ * 4. Create JWT and authenticated session
  */
 export const handleSecureGoogleAuth = async (
   event: ExtendedAPIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info(
-    'Starting secure Google authentication flow (user-first validation)',
+    'Starting secure Google authentication flow with auto-provisioning',
   );
 
   try {
@@ -300,30 +305,19 @@ export const handleSecureGoogleAuth = async (
       };
     }
 
-    // Step 2: SECURITY GATE - Check if user exists in our database
-    LOGGER.info(`Checking if user is pre-authorized: ${userEmail}`);
+    // Step 2: Get or create user in the database
+    // This automatically creates new users with default access level on first login
+    LOGGER.info(`Getting or creating user: ${userEmail}`);
 
-    const existingUser = await checkUserExists(userEmail);
-
-    if (!existingUser) {
-      LOGGER.warn(`Authentication denied for unauthorized user: ${userEmail}`);
-      return {
-        statusCode: 403,
-        body: JSON.stringify({
-          error: 'User not authorized',
-          message: 'This user is not pre-authorized to access the application',
-          userEmail: userEmail,
-        }),
-      };
-    }
+    const user = await getOrCreateUser(userEmail);
 
     LOGGER.info(
-      `User pre-authorization confirmed: ${userEmail} (ID: ${existingUser.id})`,
+      `User ready for authentication: ${userEmail} (ID: ${user.id})`,
     );
 
-    // Step 3: NOW do full OAuth validation since user is pre-authorized
+    // Step 3: NOW do full OAuth validation since user exists
     LOGGER.debug(
-      'User is pre-authorized, proceeding with full OAuth validation',
+      'User record confirmed, proceeding with full OAuth validation',
     );
 
     // Delegate to the original handleGoogleAuth for the actual OAuth processing

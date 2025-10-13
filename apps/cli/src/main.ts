@@ -68,6 +68,10 @@ import {
   listUsersCommandBuilder,
 } from './commands/listUsers';
 import {
+  addUserCommandBuilder,
+  handleAddUser,
+} from './commands/addUser';
+import {
   authCommandBuilder,
   handleAuth,
 } from './commands/auth';
@@ -204,6 +208,12 @@ async function run(): Promise<void> {
       'List existing users with their IDs and email addresses',
       listUsersCommandBuilder,
       handleListUsers,
+    )
+    .command(
+      'add-user',
+      'Add a new user to the database (required for OAuth authentication)',
+      addUserCommandBuilder,
+      handleAddUser,
     )
     .command(
       'auth <action>',
