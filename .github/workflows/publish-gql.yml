@@ -53,10 +53,8 @@ jobs:
         uses: ./.github/workflows/setup-npm
 
       - name: "☁️ Configure AWS Credentials"
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: ./.github/workflows/setup-aws
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: GitHubActions-DeployGraphQL
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Get RDS Secret
