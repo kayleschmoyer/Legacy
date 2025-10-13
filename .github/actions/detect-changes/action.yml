@@ -1,8 +1,5 @@
 name: "Detect Project Changes"
-description: "Intelligent change dete  steps:
-    - name: "Determine Base Reference"
-      id: determine-base
-      shell: bashn for mono-repo projects with configurable file patterns and affected component analysis"
+description: "Intelligent change detection for mono-repo projects with configurable file patterns and affected component analysis"
 
 inputs:
   base-ref:
@@ -70,7 +67,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: "� Determine Base Reference"
+    - name: "Determine Base Reference"
       id: determine-base
       shell: bash
       run: |
@@ -125,7 +122,7 @@ runs:
         echo "Final BASE_REF: $BASE_REF"
         echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
 
-    - name: "�🔍 Detect Changed Files"
+    - name: "Detect Changed Files"
       id: detect-changes
       uses: dorny/paths-filter@v3
       with:
@@ -157,7 +154,7 @@ runs:
             - nx.json
             - tsconfig*.json
 
-    - name: "📊 Analyze Change Impact"
+    - name: "Analyze Change Impact"
       id: analyze
       shell: bash
       run: |
@@ -202,7 +199,7 @@ runs:
         REQUIRES_FULL_BUILD="false"
         if [ "$CORE_AFFECTED" == "true" ] || [ "$DEPS_AFFECTED" == "true" ]; then
           REQUIRES_FULL_BUILD="true"
-          echo "🚨 Core changes or dependency updates detected - full build required"
+          echo "⚠️ Core or dependency changes detected - full build required"
         fi
 
         # Generate human-readable summary
@@ -212,65 +209,73 @@ runs:
           CHANGE_SUMMARY="No significant changes detected - minimal CI execution"
         elif [ "$COMPONENT_COUNT" -eq 1 ]; then
           SINGLE_COMPONENT=$(echo "$AFFECTED_COMPONENTS" | jq -r '.[0]')
-          CHANGE_SUMMARY="Single component affected: $SINGLE_COMPONENT"
+          CHANGE_SUMMARY="Changes detected in: $SINGLE_COMPONENT"
         else
-          CHANGE_SUMMARY="Multiple components affected: $(echo "$AFFECTED_COMPONENTS" | jq -r 'join(", ")')"
+          COMPONENT_LIST=$(echo "$AFFECTED_COMPONENTS" | jq -r 'join(", ")')
+          CHANGE_SUMMARY="Changes detected in multiple components: $COMPONENT_LIST"
         fi
 
         # Set outputs
-        echo "affected-components=$AFFECTED_COMPONENTS" >> $GITHUB_OUTPUT
+        echo "affected-components=$(echo "$AFFECTED_COMPONENTS" | jq -c .)" >> $GITHUB_OUTPUT
         echo "change-summary=$CHANGE_SUMMARY" >> $GITHUB_OUTPUT
         echo "requires-full-build=$REQUIRES_FULL_BUILD" >> $GITHUB_OUTPUT
 
         # Create detailed summary
-        echo "## 🔍 Change Detection Results" >> $GITHUB_STEP_SUMMARY
-        echo "- **Components Affected**: $COMPONENT_COUNT" >> $GITHUB_STEP_SUMMARY
-        echo "- **Summary**: $CHANGE_SUMMARY" >> $GITHUB_STEP_SUMMARY
-        echo "- **Requires Full Build**: $REQUIRES_FULL_BUILD" >> $GITHUB_STEP_SUMMARY
+        echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Affected Components**: $COMPONENT_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- **Web**: $([ "$WEB_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mobile**: $([ "$MOBILE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Lambdas**: $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Terraform**: $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Core Libraries**: $([ "$CORE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Dependencies**: $([ "$DEPS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        echo "### Component Status" >> $GITHUB_STEP_SUMMARY
-        echo "| Component | Status | Impact |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Web App | $( [ "$WEB_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$WEB_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Mobile App | $( [ "$MOBILE_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$MOBILE_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Lambda Functions | $( [ "$LAMBDAS_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$LAMBDAS_AFFECTED" == "true" ] && echo "Build & test required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Infrastructure | $( [ "$TERRAFORM_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$TERRAFORM_AFFECTED" == "true" ] && echo "Validation required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Core Libraries | $( [ "$CORE_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$CORE_AFFECTED" == "true" ] && echo "Full rebuild required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Dependencies | $( [ "$DEPS_AFFECTED" == "true" ] && echo "🔄 **Changed**" || echo "✅ No Changes" ) | $( [ "$DEPS_AFFECTED" == "true" ] && echo "Full rebuild required" || echo "Skipped" ) |" >> $GITHUB_STEP_SUMMARY
 
-        # Add notices for significant changes
-        if [ "$REQUIRES_FULL_BUILD" == "true" ]; then
-          echo "::notice title=Full Build Required::Core or dependency changes detected - all components will be rebuilt"
+        # Build Strategy
+        echo "### 🎯 Build Strategy" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status | Action |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|---------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Web | $([ "$WEB_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$WEB_AFFECTED" = "true" ] && echo "Build & Test" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile | $([ "$MOBILE_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$MOBILE_AFFECTED" = "true" ] && echo "Build & Test" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambdas | $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "Build & Deploy" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
+        echo "| Infrastructure | $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "Validate & Plan" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Add notes for significant changes
+        if [ "$REQUIRES_FULL_BUILD" = "true" ]; then
+          echo "🔴 **Full Build Required**: Core or dependency changes will be rebuilt"
         elif [ "$COMPONENT_COUNT" -gt 0 ]; then
-          echo "::notice title=Selective Build::$COMPONENT_COUNT component(s) affected - optimized CI execution"
+          echo "🟡 **Targeted Build**: Only affected components will have optimized CI execution"
         else
-          echo "::notice title=Minimal CI::No significant changes detected - fast-track execution"
+          echo "🟢 **Minimal Execution**: No significant changes detected, fast-track execution"
         fi
 
         echo "::endgroup::"
 
-    - name: "📋 Generate Change Context"
+    - name: "Generate Change Context"
       shell: bash
       run: |
-        echo "::group::📋 Detailed Change Context"
+        echo "::group::📋 Additional Change Context"
         
-        # Show changed files for debugging (limited to prevent log overflow)
-        echo "### Changed Files (Last 10)"
+        # Show recent changes (limit output to prevent log overflow)
+        echo "### 📄 Recent Files (Last 10)"
+        echo ""
         
         if command -v git >/dev/null 2>&1; then
           echo "Recent file changes:"
-          git diff --name-only ${{ inputs.base-ref }}..${{ inputs.head-ref }} | head -10 || true
+          git diff --name-only ${{ steps.determine-base.outputs.base-ref }}..HEAD | head -10 || true
+          echo ""
           
           # Count total changed files
-          TOTAL_FILES=$(git diff --name-only ${{ inputs.base-ref }}..${{ inputs.head-ref }} | wc -l || echo 0)
-          echo "Total files changed: $TOTAL_FILES"
+          TOTAL_FILES=$(git diff --name-only ${{ steps.determine-base.outputs.base-ref }}..HEAD | wc -l || echo 0)
+          echo "Total changed files: $TOTAL_FILES"
+          echo ""
           
           if [ "$TOTAL_FILES" -gt 10 ]; then
             echo "... and $((TOTAL_FILES - 10)) more files"
           fi
         else
-          echo "Git not available - unable to show detailed file changes"
+          echo "Git not available - skipping detailed file changes"
         fi
 
         echo "::endgroup::"
