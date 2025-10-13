@@ -101,8 +101,14 @@ jobs:
           # Create deployment package from built artifacts
           zip -r "draft-processor-${VERSION}.zip" dist/
 
-          # Get S3 bucket name from Terraform output or SSM
-          S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text 2>/dev/null || echo "${{ env.AWS_SERVICE_NAME }}-lambdas")
+          # Get S3 bucket name from SSM parameter store
+          echo "🔍 Getting S3 bucket name from SSM..."
+          if S3_BUCKET=$(aws ssm get-parameter --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" --query "Parameter.Value" --output text --region ${{ env.AWS_REGION }} 2>/dev/null); then
+            echo "✅ Found S3 bucket from SSM: $S3_BUCKET"
+          else
+            echo "⚠️ SSM parameter not found, using default bucket name"
+            S3_BUCKET="legacy-sports-dev-lambdas-cca20ad9"
+          fi
 
           # Upload to S3
           aws s3 cp "draft-processor-${VERSION}.zip" "s3://${S3_BUCKET}/draft-processor/" --region ${{ env.AWS_REGION }}
@@ -116,6 +122,7 @@ jobs:
 
           echo "✅ Lambda package uploaded: draft-processor-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "S3_BUCKET=${S3_BUCKET}" >> $GITHUB_ENV
 
       - name: "🏗️ Setup Terraform"
         uses: hashicorp/setup-terraform@v3
