@@ -538,7 +538,7 @@ jobs:
         if: always() && github.ref == 'refs/heads/main'
         uses: ./.github/actions/update-badges
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GIST_TOKEN }}
           gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
           workflow-status: ${{ job.status }}
           step-results: |
