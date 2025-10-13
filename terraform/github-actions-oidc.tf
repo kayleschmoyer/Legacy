@@ -86,15 +86,38 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*"
         ]
       },
-      # Terraform state and operations (if using remote state)
+      # Terraform state and operations
       {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = [
+          "arn:aws:s3:::legacy-sports-terraform-state/*",
           "arn:aws:s3:::terraform-state-*/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::legacy-sports-terraform-state",
+          "arn:aws:s3:::terraform-state-*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks"
         ]
       }
     ]
