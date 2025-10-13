@@ -21,7 +21,7 @@ ERRORS=0
 echo -e "${BLUE}1. Checking workflows that use the new configure-nx-cloud action...${NC}"
 
 # Workflows that should use the new action
-DISTRIBUTED_WORKFLOWS=("pr-validation.yml" "integration-build.yml")
+DISTRIBUTED_WORKFLOWS=("pr-validation.yml")
 
 for workflow in "${DISTRIBUTED_WORKFLOWS[@]}"; do
     if [ -f "$WORKFLOWS_DIR/$workflow" ]; then
@@ -59,7 +59,7 @@ echo ""
 echo -e "${BLUE}3. Checking for enhanced nx-cloud fix-ci commands...${NC}"
 
 # Workflows that use nx-cloud fix-ci
-FIXCI_WORKFLOWS=("integration-build.yml" "publish-oauth-proxy.yml" "publish-stats-lambda.yml")
+FIXCI_WORKFLOWS=("publish-oauth-proxy.yml" "publish-stats-lambda.yml")
 
 for workflow in "${FIXCI_WORKFLOWS[@]}"; do
     if [ -f "$WORKFLOWS_DIR/$workflow" ]; then
