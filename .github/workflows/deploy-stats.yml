@@ -122,35 +122,43 @@ jobs:
 
           echo "✅ Lambda package uploaded: stats-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "S3_BUCKET=${S3_BUCKET}" >> $GITHUB_ENV
 
-      - name: "🏗️ Setup Terraform"
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.0"
-
-      - name: "🔧 Initialize Terraform"
-        working-directory: terraform
+      - name: "🚀 Update Lambda Function"
+        working-directory: lambdas/stats-lambda
         run: |
-          echo "🔧 Initializing Terraform..."
-          if terraform init; then
-            echo "✅ Terraform initialization successful"
-          else
-            echo "❌ Terraform initialization failed"
-            echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
-            echo "Check that:" >> $GITHUB_STEP_SUMMARY
-            echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
-            echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
-            echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-
-      - name: "🚀 Deploy Infrastructure"
-        working-directory: terraform
-        run: |
-          echo "📋 Planning Terraform changes..."
-          terraform plan -target=aws_lambda_function.stats
+          echo "🚀 Updating Stats Lambda function code..."
           
-          echo "🚀 Applying Terraform changes..."
-          terraform apply -target=aws_lambda_function.stats -auto-approve
+          # Get the Lambda function name (legacy-sports-dev-stats)
+          LAMBDA_FUNCTION_NAME="legacy-sports-${AWS_STAGE}-stats"
+          echo "🎯 Target Lambda function: $LAMBDA_FUNCTION_NAME"
           
-          echo "✅ Infrastructure deployment completed"
+          # Update Lambda function code using the uploaded S3 package
+          echo "📦 Updating Lambda function code from S3..."
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-key "stats/stats-${VERSION}.zip" \
+            --region ${{ env.AWS_REGION }}
+          
+          # Wait for the update to complete
+          echo "⏳ Waiting for function update to complete..."
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region ${{ env.AWS_REGION }}
+          
+          # Get the updated function info
+          FUNCTION_INFO=$(aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region ${{ env.AWS_REGION }})
+          FUNCTION_VERSION=$(echo "$FUNCTION_INFO" | jq -r '.Configuration.Version')
+          FUNCTION_SIZE=$(echo "$FUNCTION_INFO" | jq -r '.Configuration.CodeSize')
+          
+          echo "✅ Stats Lambda updated successfully!"
+          echo "   Function: $LAMBDA_FUNCTION_NAME"
+          echo "   Version: $FUNCTION_VERSION"
+          echo "   Code Size: $FUNCTION_SIZE bytes"
+          
+          echo "## 🚀 Lambda Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Function**: $LAMBDA_FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: $FUNCTION_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: stats-${VERSION}.zip" >> $GITHUB_STEP_SUMMARY
+          echo "- **Code Size**: $FUNCTION_SIZE bytes" >> $GITHUB_STEP_SUMMARY
