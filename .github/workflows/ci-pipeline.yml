@@ -99,6 +99,8 @@ jobs:
       - name: "🔍 Detect Project Changes"
         id: detect-changes
         uses: ./.github/actions/detect-changes
+        with:
+          force-full-build: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_mode == 'true' }}
 
       - name: "📊 Generate Execution Plan"
         id: execution-plan

@@ -34,6 +34,10 @@ inputs:
     description: "File patterns for dependency changes (currently fixed in action)"
     required: false
     default: "package.json,package-lock.json,apps/*/package.json,lib/*/package.json"
+  force-full-build:
+    description: "Force full build regardless of detected changes (useful for integration builds)"
+    required: false
+    default: "false"
 
 outputs:
   web:
@@ -96,19 +100,53 @@ runs:
               echo "Using HEAD^ as fallback"
             fi
           fi
+        elif [ "${{ github.event_name }}" = "merge_group" ]; then
+          # For merge group/queue events (integration builds)
+          # Compare against the base branch to ensure we test all accumulated changes
+          if [ -n "${{ github.event.merge_group.base_sha }}" ]; then
+            BASE_REF="${{ github.event.merge_group.base_sha }}"
+            echo "Using merge group base SHA: $BASE_REF"
+          else
+            # Fallback to main branch for integration builds
+            if git show-ref --verify --quiet refs/remotes/origin/main; then
+              BASE_REF="origin/main"
+              echo "Using origin/main for merge group fallback"
+            else
+              BASE_REF="HEAD^"
+              echo "Using HEAD^ as merge group fallback"
+            fi
+          fi
+        elif [ "${{ github.event_name }}" = "schedule" ]; then
+          # For scheduled builds, force full build by using empty tree
+          # This ensures comprehensive testing on schedule
+          BASE_REF="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+          echo "Using empty tree for scheduled full build"
         else
           # For other events (workflow_dispatch, etc)
           if [ -n "${{ inputs.base-ref }}" ]; then
             BASE_REF="${{ inputs.base-ref }}"
             echo "Using provided base-ref: $BASE_REF"
           else
-            # Try to use main branch, fallback to HEAD^
-            if git show-ref --verify --quiet refs/remotes/origin/main; then
-              BASE_REF="origin/main"
-              echo "Using origin/main as fallback"
+            # For manual/integration builds, default to comprehensive comparison
+            # Check if this might be an integration build context
+            if [ "${{ github.ref }}" = "refs/heads/main" ] || [[ "${{ github.ref }}" == *"integration"* ]] || [[ "${{ github.ref }}" == *"release"* ]]; then
+              echo "Detected integration/release context - using comprehensive change detection"
+              if git show-ref --verify --quiet refs/remotes/origin/main; then
+                BASE_REF="origin/main"
+                echo "Using origin/main for integration build"
+              else
+                BASE_REF="HEAD^"
+                echo "Using HEAD^ for integration build"
+              fi
             else
-              BASE_REF="HEAD^"
-              echo "Using HEAD^ as final fallback"
+              # Regular fallback logic
+              if git show-ref --verify --quiet refs/remotes/origin/main; then
+                BASE_REF="origin/main"
+                echo "Using origin/main as fallback"
+              else
+                BASE_REF="HEAD^"
+                echo "Using HEAD^ as final fallback"
+              fi
             fi
           fi
         fi
@@ -167,6 +205,40 @@ runs:
         TERRAFORM_AFFECTED="${{ steps.detect-changes.outputs.terraform }}"
         CORE_AFFECTED="${{ steps.detect-changes.outputs.core }}"
         DEPS_AFFECTED="${{ steps.detect-changes.outputs.package-json }}"
+        
+        # Check for integration build scenarios
+        FORCE_FULL_BUILD="${{ inputs.force-full-build }}"
+        IS_INTEGRATION_BUILD="false"
+        
+        # Detect integration build scenarios
+        if [ "${{ github.event_name }}" = "merge_group" ]; then
+          IS_INTEGRATION_BUILD="true"
+          echo "🔄 Merge group detected - treating as integration build"
+        elif [ "${{ github.event_name }}" = "schedule" ]; then
+          IS_INTEGRATION_BUILD="true"
+          echo "📅 Scheduled build detected - treating as integration build"
+        elif [ "$FORCE_FULL_BUILD" = "true" ]; then
+          IS_INTEGRATION_BUILD="true"
+          echo "🔧 Force full build enabled - treating as integration build"
+        elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
+          # Check if this is a push to main with multiple commits (potential merge/integration)
+          COMMIT_COUNT=$(git rev-list --count ${{ steps.determine-base.outputs.base-ref }}..HEAD || echo 1)
+          if [ "$COMMIT_COUNT" -gt 1 ]; then
+            IS_INTEGRATION_BUILD="true"
+            echo "🔀 Multiple commits to main detected ($COMMIT_COUNT commits) - treating as integration build"
+          fi
+        fi
+        
+        # For integration builds, force all components as affected to ensure comprehensive testing
+        if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
+          echo "🚀 Integration build mode: Enabling comprehensive testing"
+          WEB_AFFECTED="true"
+          MOBILE_AFFECTED="true"  
+          LAMBDAS_AFFECTED="true"
+          TERRAFORM_AFFECTED="true"
+          CORE_AFFECTED="true"
+          DEPS_AFFECTED="true"
+        fi
 
         # Create affected components array
         AFFECTED_COMPONENTS='[]'
@@ -197,7 +269,10 @@ runs:
 
         # Determine if full build is required
         REQUIRES_FULL_BUILD="false"
-        if [ "$CORE_AFFECTED" == "true" ] || [ "$DEPS_AFFECTED" == "true" ]; then
+        if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
+          REQUIRES_FULL_BUILD="true"
+          echo "🚀 Integration build - full build required for comprehensive testing"
+        elif [ "$CORE_AFFECTED" == "true" ] || [ "$DEPS_AFFECTED" == "true" ]; then
           REQUIRES_FULL_BUILD="true"
           echo "⚠️ Core or dependency changes detected - full build required"
         fi
@@ -205,7 +280,9 @@ runs:
         # Generate human-readable summary
         COMPONENT_COUNT=$(echo "$AFFECTED_COMPONENTS" | jq 'length')
         
-        if [ "$COMPONENT_COUNT" -eq 0 ]; then
+        if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
+          CHANGE_SUMMARY="Integration build: Comprehensive testing of all components (Event: ${{ github.event_name }})"
+        elif [ "$COMPONENT_COUNT" -eq 0 ]; then
           CHANGE_SUMMARY="No significant changes detected - minimal CI execution"
         elif [ "$COMPONENT_COUNT" -eq 1 ]; then
           SINGLE_COMPONENT=$(echo "$AFFECTED_COMPONENTS" | jq -r '.[0]')
@@ -222,6 +299,10 @@ runs:
 
         # Create detailed summary
         echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
+        if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
+          echo "🚀 **Integration Build Mode**: Comprehensive testing enabled" >> $GITHUB_STEP_SUMMARY
+          echo "**Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "**Affected Components**: $COMPONENT_COUNT" >> $GITHUB_STEP_SUMMARY
         echo "- **Web**: $([ "$WEB_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Mobile**: $([ "$MOBILE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
