@@ -253,6 +253,24 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/restapis",
           "arn:aws:apigateway:${local.region}::/restapis/*"
         ]
+      },
+      # Lambda read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:GetFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:GetFunctionConfiguration",
+          "lambda:GetPolicy",
+          "lambda:ListTags",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetEventSourceMapping",
+          "lambda:ListEventSourceMappings"
+        ]
+        Resource = [
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*",
+          "arn:aws:lambda:${local.region}:${local.account_id}:event-source-mapping:*"
+        ]
       }
     ]
   })
