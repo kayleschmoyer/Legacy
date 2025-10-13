@@ -9,7 +9,7 @@ inputs:
   head-ref:
     description: "Head reference for change detection"
     required: false
-    default: "HEAD"
+    default: ""
   web-patterns:
     description: "File patterns for web project changes (currently fixed in action)"
     required: false
@@ -67,6 +67,12 @@ outputs:
   requires-full-build:
     description: "Whether changes require full mono-repo build"
     value: ${{ steps.analyze.outputs.requires-full-build }}
+  base-ref-used:
+    description: "The actual base reference used for change detection"
+    value: ${{ steps.determine-base.outputs.base-ref }}
+  head-ref-used:
+    description: "The actual head reference used for change detection"
+    value: ${{ steps.determine-base.outputs.head-ref }}
 
 runs:
   using: "composite"
@@ -151,21 +157,71 @@ runs:
           fi
         fi
         
-        # Final validation - ensure the reference exists
+        # Final validation - ensure the base reference exists and resolve to SHA
         if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
           echo "Warning: BASE_REF '$BASE_REF' not found, using empty tree as fallback"
           BASE_REF="4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # Empty tree SHA
+        else
+          # Resolve to full SHA for consistency
+          if [[ ! "$BASE_REF" =~ ^[a-f0-9]{40}$ ]]; then
+            RESOLVED_BASE=$(git rev-parse "$BASE_REF" 2>/dev/null || echo "")
+            if [ -n "$RESOLVED_BASE" ]; then
+              BASE_REF="$RESOLVED_BASE"
+              echo "Resolved BASE_REF to SHA: $BASE_REF"
+            fi
+          fi
         fi
         
         echo "Final BASE_REF: $BASE_REF"
         echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
+        
+        # Determine HEAD reference
+        if [ -n "${{ inputs.head-ref }}" ]; then
+          HEAD_REF="${{ inputs.head-ref }}"
+          echo "Using provided head-ref: $HEAD_REF"
+        else
+          # For GitHub Actions, use the current SHA directly
+          # This avoids issues with HEAD not being properly resolved
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            HEAD_REF="${{ github.event.pull_request.head.sha }}"
+            echo "Using PR head SHA: $HEAD_REF"
+          else
+            HEAD_REF="${{ github.sha }}"
+            echo "Using GitHub event SHA: $HEAD_REF"
+          fi
+        fi
+        
+        # Final validation - ensure we have a valid SHA
+        if [[ ! "$HEAD_REF" =~ ^[a-f0-9]{40}$ ]]; then
+          echo "HEAD_REF '$HEAD_REF' doesn't look like a SHA, trying to resolve..."
+          RESOLVED_HEAD=$(git rev-parse "$HEAD_REF" 2>/dev/null || echo "")
+          if [ -n "$RESOLVED_HEAD" ]; then
+            HEAD_REF="$RESOLVED_HEAD"
+            echo "Resolved to: $HEAD_REF"
+          else
+            echo "Could not resolve HEAD_REF, using current commit"
+            HEAD_REF=$(git rev-parse HEAD)
+          fi
+        fi
+        
+        echo "Final HEAD_REF: $HEAD_REF"
+        echo "head-ref=$HEAD_REF" >> $GITHUB_OUTPUT
+        
+        # Additional debugging for dorny/paths-filter
+        echo "Git status for debugging:"
+        git status --porcelain || true
+        echo "Current commit info:"
+        git log --oneline -1 || true
+        echo "References validation:"
+        echo "BASE_REF exists: $(git rev-parse --verify "$BASE_REF" >/dev/null 2>&1 && echo "✅" || echo "❌")"
+        echo "HEAD_REF exists: $(git rev-parse --verify "$HEAD_REF" >/dev/null 2>&1 && echo "✅" || echo "❌")"
 
     - name: "Detect Changed Files"
       id: detect-changes
       uses: dorny/paths-filter@v3
       with:
         base: ${{ steps.determine-base.outputs.base-ref }}
-        ref: ${{ inputs.head-ref }}
+        ref: ${{ steps.determine-base.outputs.head-ref }}
         filters: |
           web:
             - apps/web/**
