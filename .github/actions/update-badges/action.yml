@@ -147,30 +147,43 @@ runs:
         # Update gist files using GitHub API
         echo "Updating gist $GIST_ID..."
         
-        # Prepare gist update payload
-        FILES_JSON=""
+        # Prepare gist update payload using a temporary file to avoid "Argument list too long"
+        TEMP_PAYLOAD=$(mktemp)
+        echo '{"files": {' > "$TEMP_PAYLOAD"
+        
+        FIRST_FILE=true
         for badge_file in *.json; do
           if [ -f "$badge_file" ]; then
             filename="${badge_file}"
-            content=$(cat "$badge_file" | sed 's/"/\\"/g' | tr -d '\n')
             
-            if [ -n "$FILES_JSON" ]; then
-              FILES_JSON="${FILES_JSON},"
+            # Add comma separator for subsequent files
+            if [ "$FIRST_FILE" = "true" ]; then
+              FIRST_FILE=false
+            else
+              echo ',' >> "$TEMP_PAYLOAD"
             fi
-            FILES_JSON="${FILES_JSON}\"${filename}\": {\"content\": \"${content}\"}"
+            
+            # Add file entry to payload (escaping content properly)
+            echo -n "\"${filename}\": {\"content\": \"" >> "$TEMP_PAYLOAD"
+            cat "$badge_file" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n' >> "$TEMP_PAYLOAD"
+            echo -n '"}' >> "$TEMP_PAYLOAD"
           fi
         done
         
-        # Create gist update payload
-        GIST_PAYLOAD="{\"files\": {${FILES_JSON}}}"
+        echo '}}' >> "$TEMP_PAYLOAD"
         
-        # Update the gist
+        echo "Gist payload size: $(wc -c < "$TEMP_PAYLOAD") bytes"
+        
+        # Update the gist using the temporary file
         RESPONSE=$(curl -s \
           -X PATCH \
           -H "Authorization: Bearer ${{ inputs.github-token }}" \
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/gists/$GIST_ID" \
-          -d "$GIST_PAYLOAD")
+          -d "@$TEMP_PAYLOAD")
+        
+        # Clean up temporary file
+        rm -f "$TEMP_PAYLOAD"
         
         # Check if update was successful
         if echo "$RESPONSE" | grep -q '"id"'; then
@@ -202,7 +215,17 @@ runs:
           echo "❌ Failed to update gist badges"
           echo "Response: $RESPONSE"
           echo "success=false" >> $GITHUB_OUTPUT
-          echo "summary=Failed to update badges: API error" >> $GITHUB_OUTPUT
+          
+          # Check for specific error types
+          if echo "$RESPONSE" | grep -q "message.*too long"; then
+            echo "summary=Failed to update badges: Payload too large (consider reducing badge count)" >> $GITHUB_OUTPUT
+          elif echo "$RESPONSE" | grep -q "Not Found"; then
+            echo "summary=Failed to update badges: Gist not found (check GIST_ID)" >> $GITHUB_OUTPUT
+          elif echo "$RESPONSE" | grep -q "Bad credentials"; then
+            echo "summary=Failed to update badges: Authentication failed (check token permissions)" >> $GITHUB_OUTPUT
+          else
+            echo "summary=Failed to update badges: API error" >> $GITHUB_OUTPUT
+          fi
         fi
         
         echo "::endgroup::"
