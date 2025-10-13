@@ -190,13 +190,17 @@ jobs:
 
           # Set environment variables for subsequent steps
           if [ "$DTE_AVAILABLE" == "true" ]; then
-            echo "NX_PARALLEL=$OPTIMAL_AGENTS" >> $GITHUB_ENV
-            echo "NODE_OPTIONS=--max_old_space_size=6144" >> $GITHUB_ENV
-            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=true" >> $GITHUB_ENV
+            {
+              echo "NX_PARALLEL=$OPTIMAL_AGENTS"
+              echo "NODE_OPTIONS=--max_old_space_size=6144"
+              echo "NX_CLOUD_DISTRIBUTED_EXECUTION=true"
+            } >> "$GITHUB_ENV"
           else
-            echo "NX_PARALLEL=4" >> $GITHUB_ENV  
-            echo "NODE_OPTIONS=--max_old_space_size=4096" >> $GITHUB_ENV
-            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false" >> $GITHUB_ENV
+            {
+              echo "NX_PARALLEL=4"
+              echo "NODE_OPTIONS=--max_old_space_size=4096"
+              echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false"
+            } >> "$GITHUB_ENV"
           fi
 
           # Output results for other steps

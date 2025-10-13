@@ -42,13 +42,14 @@ jobs:
         run: |
           echo "🔧 Configuring basic Nx environment for web deployment..."
           # Set conservative local settings for deployment builds
-          echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false" >> $GITHUB_ENV
-          echo "NX_LOCAL_FALLBACK=true" >> $GITHUB_ENV
-          echo "NX_PARALLEL=2" >> $GITHUB_ENV
-          echo "NX_DAEMON=false" >> $GITHUB_ENV
-          echo "NX_VERBOSE_LOGGING=false" >> $GITHUB_ENV
-          # Clear cloud access token to prevent failed connection attempts
-          echo "NX_CLOUD_ACCESS_TOKEN=" >> $GITHUB_ENV
+          {
+            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false"
+            echo "NX_LOCAL_FALLBACK=true"
+            echo "NX_PARALLEL=2"
+            echo "NX_DAEMON=false"
+            echo "NX_VERBOSE_LOGGING=false"
+            echo "NX_CLOUD_ACCESS_TOKEN="
+          } >> "$GITHUB_ENV"
           echo "✅ Basic Nx environment configured for web deployment"
 
       - name: Build Web App

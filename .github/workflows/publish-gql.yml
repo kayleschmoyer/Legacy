@@ -52,9 +52,12 @@ jobs:
       - name: Setup NPM
         uses: ./.github/workflows/setup-npm
 
-      - name: Setup AWS
-        uses: ./.github/workflows/setup-aws
-        id: setup-aws
+      - name: "☁️ Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-DeployGraphQL
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Get RDS Secret
         id: rds-secret
@@ -69,7 +72,7 @@ jobs:
           DB_HOST: ${{env.DB_HOST}}
           DB_PASSWORD: ${{ steps.rds-secret.outputs.POSTGRES_PASSWORD }}
           DB_USER: ${{ steps.rds-secret.outputs.POSTGRES_USERNAME }}
-          DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
+          DB_CERT_LOCATION: "/usr/local/share/ca-certificates/rds-ca-2019-root.crt"
         working-directory: lambdas/db
         run: |
           # Create cache
@@ -102,10 +105,34 @@ jobs:
           echo "✅ Lambda package uploaded: graphql-${VERSION}.zip"
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: Deploy Infrastructure
+      - name: "🏗️ Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.0"
+
+      - name: "🔧 Initialize Terraform"
         working-directory: terraform
         run: |
-          # Apply Terraform to deploy the new Lambda version
-          terraform init
+          echo "🔧 Initializing Terraform..."
+          if terraform init; then
+            echo "✅ Terraform initialization successful"
+          else
+            echo "❌ Terraform initialization failed"
+            echo "## Terraform Initialization Errors" >> $GITHUB_STEP_SUMMARY
+            echo "Check that:" >> $GITHUB_STEP_SUMMARY
+            echo "- Terraform configuration files exist in terraform/" >> $GITHUB_STEP_SUMMARY
+            echo "- Backend configuration is valid" >> $GITHUB_STEP_SUMMARY
+            echo "- AWS credentials are properly configured" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: "🚀 Deploy Infrastructure"
+        working-directory: terraform
+        run: |
+          echo "📋 Planning Terraform changes..."
           terraform plan -target=aws_lambda_function.graphql
+          
+          echo "🚀 Applying Terraform changes..."
           terraform apply -target=aws_lambda_function.graphql -auto-approve
+          
+          echo "✅ Infrastructure deployment completed"
