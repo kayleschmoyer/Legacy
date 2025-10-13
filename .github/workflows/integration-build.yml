@@ -2,6 +2,13 @@ name: "Integration Build (Optimized)"
 
 # This workflow runs integration builds on main branch to ensure the full repository is always passing
 # It runs ALL projects (not just affected) to catch integration issues after merges
+#
+# WORKFLOW DEPENDENCIES:
+# - Automatically triggers after CI Pipeline succeeds on main branch
+# - Only runs if CI Pipeline passed (prevents wasted resources on broken builds)
+# - Can still be triggered manually via workflow_dispatch
+# - Direct pushes to main will also trigger (fallback for CI pipeline bypass)
+#
 # OPTIMIZATIONS APPLIED:
 # - Intelligent Nx Cloud DTE detection with quota management
 # - Smart agent allocation based on workspace size and available quota
@@ -17,6 +24,12 @@ on:
         required: false
         default: false
         type: boolean
+  # Run integration build after CI pipeline succeeds on main branch
+  workflow_run:
+    workflows: ["🚀 Legacy Sports CI Pipeline"]
+    types: [completed]
+    branches: [main]
+  # Also run on direct push to main (for cases where CI pipeline is skipped)
   push:
     branches:
       - main
@@ -26,6 +39,14 @@ on:
       - lib/**
       - package-lock.json
       - poetry.lock
+      - nx.json
+      - tsconfig*.json
+    paths-ignore:
+      - docs/**
+      - "*.md"
+      - "**/*.md"
+      - .github/workflows/README*.md
+      - scripts/documentation/**
 
 # Cancel in-progress runs for the same workflow on the same branch
 concurrency:
@@ -61,6 +82,10 @@ jobs:
     name: "Integration Build"
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Only run if CI pipeline succeeded (for workflow_run) or for direct triggers
+    if: >
+      github.event_name != 'workflow_run' || 
+      github.event.workflow_run.conclusion == 'success'
 
     outputs:
       execution-plan: ${{ steps.execution-plan.outputs.plan }}
