@@ -176,7 +176,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:GetBucketPublicAccessBlock",
           "s3:GetBucketAcl",
           "s3:GetBucketCORS",
-          "s3:GetBucketWebsite"
+          "s3:GetBucketWebsite",
+          "s3:GetAccelerateConfiguration"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*"
