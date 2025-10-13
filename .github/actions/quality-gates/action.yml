@@ -65,12 +65,26 @@ runs:
           exit 1
         fi
         
-        # Check if Nx is available
-        if ! npx nx --version >/dev/null 2>&1; then
-          echo "❌ Nx CLI not available"
-          echo "::error::Nx not found in node_modules. Check dependency installation."
-          exit 1
+        # Determine Nx command to use (from setup action or fallback)
+        if [ -n "${NX_COMMAND:-}" ]; then
+          NX_CMD="$NX_COMMAND"
+          echo "📋 Using Nx command from setup: $NX_CMD"
+        else
+          echo "⚠️ NX_COMMAND not set, attempting to detect Nx..."
+          if npx nx --version >/dev/null 2>&1; then
+            NX_CMD="npx nx"
+          elif [ -f "node_modules/.bin/nx" ] && node_modules/.bin/nx --version >/dev/null 2>&1; then
+            NX_CMD="node_modules/.bin/nx"
+          elif npm exec nx -- --version >/dev/null 2>&1; then
+            NX_CMD="npm exec nx --"
+          else
+            echo "❌ Nx CLI not available through any method"
+            echo "::error::Nx not found. Check dependency installation."
+            exit 1
+          fi
         fi
+        
+        echo "🔧 Using Nx command: $NX_CMD"
         
         # Check if nx.json exists (workspace root indicator)
         if [ ! -f "nx.json" ]; then
@@ -80,21 +94,33 @@ runs:
         fi
         
         # Verify Nx can read workspace configuration
-        if ! npx nx show projects >/dev/null 2>&1; then
-          echo "⚠️ Nx workspace validation failed, attempting daemon reset..."
-          npx nx reset 2>/dev/null || true
+        if ! $NX_CMD show projects >/dev/null 2>&1; then
+          echo "⚠️ Nx workspace validation failed, attempting recovery..."
           
-          if ! npx nx show projects >/dev/null 2>&1; then
-            echo "❌ Nx workspace configuration invalid"
-            echo "::error::Nx cannot read workspace configuration after reset"
+          # Try reset
+          $NX_CMD reset 2>/dev/null || echo "Reset command failed"
+          
+          # Clear caches
+          rm -rf .nx node_modules/.cache/nx 2>/dev/null || true
+          
+          if ! $NX_CMD show projects >/dev/null 2>&1; then
+            echo "❌ Nx workspace configuration invalid after recovery attempt"
+            echo "::error::Nx cannot read workspace configuration"
+            echo "Debug info:"
+            $NX_CMD show projects 2>&1 | head -10 || echo "Show projects failed"
             exit 1
           fi
         fi
         
+        # Store the working command for later steps
+        echo "NX_CMD=$NX_CMD" >> $GITHUB_ENV
+        
         echo "✅ Workspace validation passed"
-        echo "   Nx version: $(npx nx --version)"
+        echo "   Nx command: $NX_CMD"
+        echo "   Nx version: $($NX_CMD --version 2>/dev/null || echo 'unknown')"
         echo "   Working directory: $(pwd)"
-        echo "   Projects found: $(npx nx show projects | wc -l)"
+        PROJECT_COUNT=$($NX_CMD show projects 2>/dev/null | wc -l || echo "unknown")
+        echo "   Projects found: $PROJECT_COUNT"
         
         echo "::endgroup::"
 
@@ -104,14 +130,18 @@ runs:
       shell: bash
       run: |
         echo "::group::🎨 Code Formatting Validation"
-        echo "::notice::To reproduce locally: npx nx format:check"
+        
+        # Use the validated Nx command
+        NX_CMD="${NX_CMD:-npx nx}"
+        echo "🔧 Using Nx command: $NX_CMD"
+        echo "::notice::To reproduce locally: $NX_CMD format:check"
 
         # First try with affected detection using base/head refs
         echo "🔍 Checking formatting for affected files..."
         echo "Base ref: ${{ inputs.base-ref }}"
         echo "Head ref: ${{ inputs.head-ref }}"
         
-        if npx nx format:check --base="${{ inputs.base-ref }}" --head="${{ inputs.head-ref }}" 2>&1 | tee format-check.log; then
+        if $NX_CMD format:check --base="${{ inputs.base-ref }}" --head="${{ inputs.head-ref }}" 2>&1 | tee format-check.log; then
           echo "✅ All affected files are properly formatted"
           echo "result=success" >> $GITHUB_OUTPUT
         else
@@ -120,12 +150,12 @@ runs:
             echo "⚠️ Affected detection failed, falling back to full format check..."
             
             # Fallback to full workspace format check
-            if npx nx format:check 2>&1 | tee format-check-full.log; then
+            if $NX_CMD format:check 2>&1 | tee format-check-full.log; then
               echo "✅ All files are properly formatted (full check)"
               echo "result=success" >> $GITHUB_OUTPUT
             else
               echo "❌ Code formatting issues detected (full workspace)"
-              echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+              echo "::error::Code formatting check failed. Run '$NX_CMD format:write' to fix."
               
               # Show specific files that need formatting
               echo "Files requiring formatting:"
@@ -136,7 +166,7 @@ runs:
             fi
           else
             echo "❌ Code formatting issues detected in affected files"
-            echo "::error::Code formatting check failed. Run 'npx nx format:write' to fix."
+            echo "::error::Code formatting check failed. Run '$NX_CMD format:write' to fix."
             
             # Show specific files that need formatting
             echo "Files requiring formatting:"
@@ -170,7 +200,7 @@ runs:
         TEST_SUCCESS=true
 
         echo "🔧 Running lint and typecheck with DTE..."
-        if npx nx affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
+        if $NX_CMD affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
           echo "✅ Code quality checks passed (DTE)"
           echo "lint-result=success" >> $GITHUB_OUTPUT
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
@@ -197,7 +227,7 @@ runs:
         fi
 
         echo "🧪 Running tests with DTE..."  
-        if npx nx affected -t test --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-test.log; then
+        if $NX_CMD affected -t test --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-test.log; then
           echo "✅ Tests passed (DTE)"
           echo "test-result=success" >> $GITHUB_OUTPUT
         else
@@ -230,7 +260,7 @@ runs:
         echo "🎯 Running lint, typecheck, and tests in parallel for optimized execution"
 
         # Check if we have any affected projects to optimize execution
-        AFFECTED_PROJECTS=$(npx nx print-affected --select=projects --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --type=lib,app 2>/dev/null || echo "")
+        AFFECTED_PROJECTS=$($NX_CMD print-affected --select=projects --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --type=lib,app 2>/dev/null || echo "")
         
         if [ -z "$AFFECTED_PROJECTS" ] || [ "$AFFECTED_PROJECTS" = "" ]; then
           echo "ℹ️ No affected projects detected - running full validation"
@@ -255,28 +285,28 @@ runs:
         if [ "$EXECUTION_STRATEGY" = "local-affected" ]; then
           # Affected-only execution for faster feedback
           echo "🔧 [PARALLEL] Starting ESLint validation (affected)..."
-          (npx nx affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
+          ($NX_CMD affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
           LINT_PID=$!
 
           echo "📝 [PARALLEL] Starting TypeScript type checking (affected)..."
-          (npx nx affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
+          ($NX_CMD affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
           TYPECHECK_PID=$!
 
           echo "🧪 [PARALLEL] Starting unit tests (affected)..."
-          (npx nx affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
+          ($NX_CMD affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
           TEST_PID=$!
         else
           # Full execution fallback
           echo "🔧 [PARALLEL] Starting ESLint validation (full)..."
-          (npx nx run-many -t lint --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
+          ($NX_CMD run-many -t lint --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
           LINT_PID=$!
 
           echo "📝 [PARALLEL] Starting TypeScript type checking (full)..."
-          (npx nx run-many -t typecheck --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
+          ($NX_CMD run-many -t typecheck --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
           TYPECHECK_PID=$!
 
           echo "🧪 [PARALLEL] Starting unit tests (full)..."
-          (npx nx run-many -t test --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
+          ($NX_CMD run-many -t test --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
           TEST_PID=$!
         fi
 
@@ -367,13 +397,13 @@ runs:
         # Final status check
         if [ "$OVERALL_SUCCESS" = true ]; then
           echo "🎉 All parallel quality gates passed successfully!"
-          echo "::notice::To reproduce locally ($EXECUTION_STRATEGY mode): npx nx affected -t lint,typecheck,test --parallel=4"
+          echo "::notice::To reproduce locally ($EXECUTION_STRATEGY mode): $NX_CMD affected -t lint,typecheck,test --parallel=4"
         else
           echo "❌ One or more quality gates failed"
           echo "🔧 Reproduction commands:"
-          echo "  Lint: npx nx affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
-          echo "  TypeCheck: npx nx affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
-          echo "  Test: npx nx affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  Lint: $NX_CMD affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  TypeCheck: $NX_CMD affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  Test: $NX_CMD affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
           exit 1
         fi
 

@@ -205,35 +205,105 @@ runs:
           echo "📁 Created Nx cache directory: $NX_CACHE_DIRECTORY"
         fi
 
-        # Validate Nx installation and workspace
+        # Comprehensive Nx installation and workspace validation
         echo "🔍 Validating Nx installation..."
         
-        if ! npx nx --version >/dev/null 2>&1; then
-          echo "❌ Nx not found after dependency installation"
-          echo "Available packages in node_modules/.bin:"
-          ls -la node_modules/.bin/ | grep nx || echo "No nx binaries found"
+        # Check if node_modules has Nx
+        if [ ! -d "node_modules" ]; then
+          echo "❌ node_modules directory missing"
+          exit 1
+        fi
+        
+        # Debug node_modules structure
+        echo "📁 Checking Nx installation paths..."
+        echo "node_modules/.bin/nx exists: $([ -f node_modules/.bin/nx ] && echo 'yes' || echo 'no')"
+        echo "node_modules/nx exists: $([ -d node_modules/nx ] && echo 'yes' || echo 'no')"
+        echo "@nx packages: $(ls node_modules/ | grep '^@nx' | wc -l)"
+        
+        # Try different methods to access Nx
+        NX_COMMAND=""
+        
+        # Method 1: npx nx
+        if npx nx --version >/dev/null 2>&1; then
+          NX_COMMAND="npx nx"
+          echo "✅ Nx accessible via: npx nx"
+        # Method 2: Direct path to nx binary  
+        elif [ -f "node_modules/.bin/nx" ] && node_modules/.bin/nx --version >/dev/null 2>&1; then
+          NX_COMMAND="node_modules/.bin/nx"
+          echo "✅ Nx accessible via: node_modules/.bin/nx"
+        # Method 3: npm exec
+        elif npm exec nx -- --version >/dev/null 2>&1; then
+          NX_COMMAND="npm exec nx --"
+          echo "✅ Nx accessible via: npm exec nx --"
+        else
+          echo "❌ Nx not accessible through any method"
+          echo "Available binaries in node_modules/.bin:"
+          ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "No nx binaries found"
+          echo "Nx package contents:"
+          ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "No nx directory found"
           exit 1
         fi
         
         # Test basic Nx functionality
-        echo "🧪 Testing Nx workspace detection..."
-        if ! npx nx show projects --quiet >/dev/null 2>&1; then
-          echo "⚠️ Nx workspace detection failed, attempting reset..."
-          npx nx reset || echo "Reset failed, continuing..."
+        echo "🧪 Testing Nx workspace detection with: $NX_COMMAND"
+        echo "Current directory: $(pwd)"
+        echo "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
+        
+        # Try to get version first
+        NX_VERSION=$($NX_COMMAND --version 2>/dev/null || echo "unknown")
+        echo "Nx version: $NX_VERSION"
+        
+        # Test workspace detection
+        if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then
+          echo "⚠️ Nx workspace detection failed, attempting diagnostics..."
           
-          # Try again after reset
-          if ! npx nx show projects --quiet >/dev/null 2>&1; then
-            echo "❌ Nx workspace still not accessible"
-            echo "Working directory: $(pwd)"
-            echo "Files in root: $(ls -la | head -10)"
-            echo "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
+          # Enhanced diagnostics
+          echo "🔧 Workspace diagnostic information:"
+          echo "  - Working directory: $(pwd)"
+          echo "  - nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
+          echo "  - package.json exists: $([ -f package.json ] && echo 'yes' || echo 'no')"
+          
+          if [ -f nx.json ]; then
+            echo "  - nx.json size: $(wc -c nx.json | awk '{print $1}') bytes"
+            echo "  - nx.json first few lines:"
+            head -5 nx.json 2>/dev/null || echo "    Cannot read nx.json"
+          fi
+          
+          # Try reset with full path
+          echo "🔄 Attempting Nx reset..."
+          $NX_COMMAND reset 2>&1 || echo "Reset failed"
+          
+          # Try clearing any potential cache issues
+          if [ -d ".nx" ]; then
+            echo "🗑️ Removing .nx directory..."
+            rm -rf .nx
+          fi
+          
+          if [ -d "node_modules/.cache/nx" ]; then
+            echo "🗑️ Removing nx cache..."
+            rm -rf node_modules/.cache/nx
+          fi
+          
+          # Try again after cleanup
+          echo "🔄 Retrying workspace detection..."
+          if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then
+            echo "❌ Nx workspace still not accessible after cleanup"
+            echo "🔍 Final diagnostic - attempting to show projects with verbose output:"
+            $NX_COMMAND show projects 2>&1 || echo "Command failed"
             exit 1
           fi
         fi
 
+        # Store the working command for later use
+        echo "NX_COMMAND=$NX_COMMAND" >> $GITHUB_ENV
+        
         echo "✅ Basic Nx environment configured and validated"
-        echo "   Nx version: $(npx nx --version)"
-        echo "   Projects detected: $(npx nx show projects | wc -l)"
+        echo "   Nx version: $NX_VERSION"
+        echo "   Command: $NX_COMMAND"
+        
+        # Try to count projects safely
+        PROJECT_COUNT=$($NX_COMMAND show projects 2>/dev/null | wc -l || echo "unknown")
+        echo "   Projects detected: $PROJECT_COUNT"
 
     - name: Workspace Setup Complete
       shell: bash
