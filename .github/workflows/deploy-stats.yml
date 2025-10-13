@@ -8,9 +8,10 @@ on:
       - "lambdas/stats-lambda/**"
       - ".github/workflows/deploy-stats.yml"
 
-# Serialize all Lambda deployments to prevent Terraform state locking conflicts
+# Prevent concurrent deployments of the same Lambda
+# Terraform state locking (DynamoDB) handles cross-Lambda conflicts
 concurrency:
-  group: lambda-deployment
+  group: lambda-deployment-stats
   cancel-in-progress: false
 
 env:
