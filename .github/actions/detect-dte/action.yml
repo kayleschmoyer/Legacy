@@ -174,7 +174,9 @@ runs:
         
         # Set environment variables for subsequent workflow steps
         echo "NX_PARALLEL=${{ steps.detect.outputs.nx-parallel }}" >> $GITHUB_ENV
-        echo "NODE_OPTIONS=--max_old_space_size=${{ steps.detect.outputs.memory-limit }}" >> $GITHUB_ENV
+        # NOTE: NODE_OPTIONS cannot be set via $GITHUB_ENV (GitHub Actions restriction)
+        # Use the memory-limit output directly in workflow steps if needed:
+        # NODE_OPTIONS=--max_old_space_size=${{ steps.detect-dte.outputs.memory-limit }}
         echo "NX_CLOUD_DISTRIBUTED_EXECUTION=${{ steps.detect.outputs.dte-available }}" >> $GITHUB_ENV
         
         # Set cache configuration based on execution mode
