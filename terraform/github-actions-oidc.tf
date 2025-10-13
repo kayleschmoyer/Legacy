@@ -144,7 +144,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Action = [
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
-          "logs:ListTagsLogGroup"
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
@@ -173,7 +174,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:GetBucketVersioning",
           "s3:GetBucketTagging",
           "s3:GetBucketPublicAccessBlock",
-          "s3:GetBucketAcl"
+          "s3:GetBucketAcl",
+          "s3:GetBucketCORS"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*"
