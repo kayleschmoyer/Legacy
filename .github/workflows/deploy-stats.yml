@@ -58,14 +58,37 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build Stats Lambda
-        uses: ./.github/actions/build-validation
-        with:
-          should-build-lambdas: 'true'
-          should-build-web: 'false'
-          should-build-mobile: 'false'
-          should-validate-terraform: 'false'
-          execution-mode: 'local'
-          optimal-agents: '1'
+        run: |
+          echo "🚀 Building Stats Lambda specifically..."
+          echo "::notice::Building only stats-lambda project for targeted deployment"
+          
+          # Build only the stats-lambda and its dependencies
+          if npx nx build stats-lambda --verbose 2>&1 | tee build.log; then
+            echo "✅ Stats Lambda built successfully"
+            
+            # Verify build artifacts exist
+            if [ -f "lambdas/stats-lambda/dist/index.js" ]; then
+              echo "✅ Build artifacts verified: lambdas/stats-lambda/dist/index.js"
+              BUILD_SIZE=$(du -sh lambdas/stats-lambda/dist/index.js | cut -f1)
+              echo "📊 Stats Lambda bundle size: $BUILD_SIZE"
+            else
+              echo "❌ Build artifacts missing: lambdas/stats-lambda/dist/index.js"
+              exit 1
+            fi
+            
+            echo "## 🚀 Stats Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            echo "- **Project**: stats-lambda" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Output**: lambdas/stats-lambda/dist/" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Stats Lambda build failed"
+            echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -20 build.log >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Package and Deploy Stats Lambda
         working-directory: lambdas/stats-lambda

@@ -60,14 +60,37 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build OAuth Proxy Lambda
-        uses: ./.github/actions/build-validation
-        with:
-          should-build-lambdas: 'true'
-          should-build-web: 'false'
-          should-build-mobile: 'false'
-          should-validate-terraform: 'false'
-          execution-mode: 'local'
-          optimal-agents: '1'
+        run: |
+          echo "🚀 Building OAuth Proxy Lambda specifically..."
+          echo "::notice::Building only oauth-proxy project for targeted deployment"
+          
+          # Build only the oauth-proxy and its dependencies
+          if npx nx build oauth-proxy --verbose 2>&1 | tee build.log; then
+            echo "✅ OAuth Proxy Lambda built successfully"
+            
+            # Verify build artifacts exist
+            if [ -f "lambdas/oauth-proxy/dist/index.js" ]; then
+              echo "✅ Build artifacts verified: lambdas/oauth-proxy/dist/index.js"
+              BUILD_SIZE=$(du -sh lambdas/oauth-proxy/dist/index.js | cut -f1)
+              echo "📊 OAuth Proxy Lambda bundle size: $BUILD_SIZE"
+            else
+              echo "❌ Build artifacts missing: lambdas/oauth-proxy/dist/index.js"
+              exit 1
+            fi
+            
+            echo "## 🚀 OAuth Proxy Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            echo "- **Project**: oauth-proxy" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Output**: lambdas/oauth-proxy/dist/" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ OAuth Proxy Lambda build failed"
+            echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -20 build.log >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Package and Deploy OAuth Proxy Lambda
         working-directory: lambdas/oauth-proxy

@@ -58,14 +58,37 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build Game Selection Lambda
-        uses: ./.github/actions/build-validation
-        with:
-          should-build-lambdas: 'true'
-          should-build-web: 'false'
-          should-build-mobile: 'false'
-          should-validate-terraform: 'false'
-          execution-mode: 'local'
-          optimal-agents: '1'
+        run: |
+          echo "🚀 Building Game Selection Lambda specifically..."
+          echo "::notice::Building only game-selection project for targeted deployment"
+          
+          # Build only the game-selection and its dependencies
+          if npx nx build game-selection --verbose 2>&1 | tee build.log; then
+            echo "✅ Game Selection Lambda built successfully"
+            
+            # Verify build artifacts exist (note: game-selection uses dev.js not index.js)
+            if [ -f "lambdas/game-selection/dist/dev.js" ]; then
+              echo "✅ Build artifacts verified: lambdas/game-selection/dist/dev.js"
+              BUILD_SIZE=$(du -sh lambdas/game-selection/dist/dev.js | cut -f1)
+              echo "📊 Game Selection Lambda bundle size: $BUILD_SIZE"
+            else
+              echo "❌ Build artifacts missing: lambdas/game-selection/dist/dev.js"
+              exit 1
+            fi
+            
+            echo "## 🚀 Game Selection Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+            echo "- **Project**: game-selection" >> $GITHUB_STEP_SUMMARY
+            echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Output**: lambdas/game-selection/dist/" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Game Selection Lambda build failed"
+            echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -20 build.log >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Package and Deploy Game Selection Lambda
         working-directory: lambdas/game-selection
