@@ -1,4 +1,0 @@
-{
-  "query": "query GetTeamMembers($teamId: Int!) { teamMembers(teamId: $teamId) { id playerId teamId leagueId positionId player { id firstName lastName } } }",
-  "variables": { "teamId": 25 }
-}

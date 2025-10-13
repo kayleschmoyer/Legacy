@@ -1,5 +1,0 @@
-# Simple startDraft mutation test - returns basic success string
-# Use this for testing the mutation without needing League field selections
-mutation StartDraft($leagueId: Int!, $draftType: String) {
-  startDraft(leagueId: $leagueId, draftType: $draftType)
-}

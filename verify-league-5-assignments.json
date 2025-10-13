@@ -1,3 +1,0 @@
-{
-  "query": "query VerifyLeague5Teams { league(id: 5) { id name draftStatus teams { id name teamMembers { id playerId player { firstName lastName } } } leaguePositions(leagueId: 5) { id positionType } } }"
-}

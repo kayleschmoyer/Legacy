@@ -1,3 +1,0 @@
-{
-  "query": "{ teams(leagueId: 5) { id name leagueId } }"
-}

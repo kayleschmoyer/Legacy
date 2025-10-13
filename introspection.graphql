@@ -1,7 +1,0 @@
-query IntrospectionQuery {
-  __type(name: "Query") {
-    fields {
-      name
-    }
-  }
-}

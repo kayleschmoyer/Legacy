@@ -1,7 +1,0 @@
-mutation TestStartDraftAgain {
-  startDraft(leagueId: 1, draftType: "random-draft") {
-    id
-    name
-    draftStatus
-  }
-}

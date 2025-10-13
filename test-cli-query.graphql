@@ -1,7 +1,0 @@
-query GetLeague($leagueId: Int!) {
-  league(leagueId: $leagueId) {
-    id
-    name
-    draftStatus
-  }
-}
