@@ -64,14 +64,14 @@ jobs:
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
-            POSTGRES, rds!db-99c143a8-70a6-4da7-bcd6-cab7837608a1
+            DB_CREDS, legacy-sports-dev-db-creds-20250925194630368900000002
           parse-json-secrets: true
 
       - name: Build and Deploy GraphQL Lambda
         env:
           DB_HOST: ${{env.DB_HOST}}
-          DB_PASSWORD: ${{ steps.rds-secret.outputs.POSTGRES_PASSWORD }}
-          DB_USER: ${{ steps.rds-secret.outputs.POSTGRES_USERNAME }}
+          DB_PASSWORD: ${{ steps.rds-secret.outputs.DB_CREDS_password }}
+          DB_USER: ${{ steps.rds-secret.outputs.DB_CREDS_username }}
           DB_CERT_LOCATION: "/usr/local/share/ca-certificates/rds-ca-2019-root.crt"
         working-directory: lambdas/db
         run: |
