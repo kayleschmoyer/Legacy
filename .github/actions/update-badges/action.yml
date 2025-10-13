@@ -59,7 +59,10 @@ runs:
           local color="$4"
           local run_url="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
           
-          printf '%s\n' "{\"schemaVersion\":1,\"label\":\"${step_name}\",\"message\":\"${message}\",\"color\":\"${color}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${step_name}.json"
+          # Create filename-safe version (replace spaces with hyphens)
+          local filename=$(echo "${step_name}" | sed 's/ /-/g')
+          
+          printf '%s\n' "{\"schemaVersion\":1,\"label\":\"${step_name}\",\"message\":\"${message}\",\"color\":\"${color}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${filename}.json"
         }
         
         # Function to determine status color
@@ -140,6 +143,10 @@ runs:
         else
           create_badge_json "Branch" "success" "$BRANCH" "blue"
         fi
+        
+        # Create last updated badge with current timestamp
+        CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M UTC")
+        create_badge_json "Last Updated" "success" "$CURRENT_TIME" "blue"
         
         echo "Generated badge files:"
         ls -la *.json
