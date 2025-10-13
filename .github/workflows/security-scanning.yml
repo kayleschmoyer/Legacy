@@ -211,8 +211,9 @@ jobs:
           npm install -g snyk
           
           # Authenticate if token available
-          if [ -n "${{ secrets.SNYK_TOKEN }}" ]; then
-            snyk auth "${{ secrets.SNYK_TOKEN }}"
+          SNYK_TOKEN="${{ secrets.SNYK_TOKEN || '' }}"
+          if [ -n "$SNYK_TOKEN" ]; then
+            snyk auth "$SNYK_TOKEN"
             echo "✅ Snyk authenticated"
           else
             echo "ℹ️ Running Snyk in anonymous mode (limited features)"
@@ -312,7 +313,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE || '' }}
         continue-on-error: true
 
       - name: "🔐 Manual Secret Pattern Detection"

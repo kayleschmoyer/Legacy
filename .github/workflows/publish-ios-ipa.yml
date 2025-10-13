@@ -184,6 +184,7 @@ jobs:
             -allowProvisioningUpdates
 
       - name: Rename and Prepare Artifacts
+        id: artifacts
         run: |
           cd apps/app/ios
 
@@ -194,15 +195,15 @@ jobs:
             # Create a latest symlink
             ln -s ${{ steps.version.outputs.artifact_name }}.ipa build/export/legacy-sports-ios-latest.ipa
             
-            echo "IPA_PATH=apps/app/ios/build/export/${{ steps.version.outputs.artifact_name }}.ipa" >> $GITHUB_ENV
-            echo "LATEST_PATH=apps/app/ios/build/export/legacy-sports-ios-latest.ipa" >> $GITHUB_ENV
+            echo "ipa_path=apps/app/ios/build/export/${{ steps.version.outputs.artifact_name }}.ipa" >> $GITHUB_OUTPUT
+            echo "latest_path=apps/app/ios/build/export/legacy-sports-ios-latest.ipa" >> $GITHUB_OUTPUT
           else
             # For Debug builds, create a zip of the .app bundle
             cd build/Build/Products/Debug-iphonesimulator
             zip -r "${{ steps.version.outputs.artifact_name }}.app.zip" App.app
             mv "${{ steps.version.outputs.artifact_name }}.app.zip" ../../../../
             
-            echo "APP_ZIP_PATH=apps/app/ios/${{ steps.version.outputs.artifact_name }}.app.zip" >> $GITHUB_ENV
+            echo "app_zip_path=apps/app/ios/${{ steps.version.outputs.artifact_name }}.app.zip" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload IPA as GitHub Artifact (Release)
@@ -211,8 +212,8 @@ jobs:
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: |
-            ${{ env.IPA_PATH }}
-            ${{ env.LATEST_PATH }}
+            ${{ steps.artifacts.outputs.ipa_path }}
+            ${{ steps.artifacts.outputs.latest_path }}
           retention-days: 90
           if-no-files-found: error
 
@@ -221,7 +222,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact_name }}
-          path: ${{ env.APP_ZIP_PATH }}
+          path: ${{ steps.artifacts.outputs.app_zip_path }}
           retention-days: 30
           if-no-files-found: error
 
@@ -262,7 +263,7 @@ jobs:
             - Upload to App Store Connect for TestFlight distribution
 
             > **Note:** This is a development build without proper code signing. For production use, proper provisioning profiles and distribution certificates are required.
-          files: ${{ env.IPA_PATH }}
+          files: ${{ steps.artifacts.outputs.ipa_path }}
           draft: false
           prerelease: true
           generate_release_notes: true
@@ -289,8 +290,8 @@ jobs:
             echo "- **Xcode:** Install via Xcode Devices and Simulators" >> $GITHUB_STEP_SUMMARY
             echo "- **TestFlight:** Upload to App Store Connect (requires developer account)" >> $GITHUB_STEP_SUMMARY
             
-            if [ -f "${{ env.IPA_PATH }}" ]; then
-              IPA_SIZE=$(du -h "${{ env.IPA_PATH }}" | cut -f1)
+            if [ -f "${{ steps.artifacts.outputs.ipa_path }}" ]; then
+              IPA_SIZE=$(du -h "${{ steps.artifacts.outputs.ipa_path }}" | cut -f1)
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "### 📱 IPA Details:" >> $GITHUB_STEP_SUMMARY
               echo "**File Size:** $IPA_SIZE" >> $GITHUB_STEP_SUMMARY

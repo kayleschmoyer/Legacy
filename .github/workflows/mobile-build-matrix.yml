@@ -44,8 +44,8 @@ permissions:
   pull-requests: write
 
 env:
-  # EAS Build Configuration
-  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  # EAS Build Configuration  
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN || '' }}
   EAS_BUILD_PROFILE: ${{ github.event.inputs.build_type || 'development' }}
   
   # Nx Configuration

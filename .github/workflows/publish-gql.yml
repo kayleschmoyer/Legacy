@@ -57,6 +57,7 @@ jobs:
         id: setup-aws
 
       - name: Get RDS Secret
+        id: rds-secret
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
@@ -66,8 +67,8 @@ jobs:
       - name: Build and Deploy GraphQL Lambda
         env:
           DB_HOST: ${{env.DB_HOST}}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_USER: ${{ env.POSTGRES_USERNAME }}
+          DB_PASSWORD: ${{ steps.rds-secret.outputs.POSTGRES_PASSWORD }}
+          DB_USER: ${{ steps.rds-secret.outputs.POSTGRES_USERNAME }}
           DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
         working-directory: lambdas/db
         run: |

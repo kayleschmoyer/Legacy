@@ -215,7 +215,7 @@ jobs:
     needs: validate-deployment
     if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-web == 'true'
     environment:
-      name: production-web
+      name: production
       url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
@@ -262,7 +262,7 @@ jobs:
     timeout-minutes: 20
     needs: validate-deployment
     if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-lambdas == 'true'
-    environment: production-aws
+    environment: production
 
     steps:
       - name: "🚀 Checkout Repository"
@@ -281,6 +281,7 @@ jobs:
         id: setup-aws
 
       - name: "🔐 Get RDS Credentials"
+        id: rds-credentials
         uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
@@ -290,8 +291,8 @@ jobs:
       - name: "📦 Build and Deploy GraphQL Lambda"
         env:
           DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_USER: ${{ env.POSTGRES_USERNAME }}
+          DB_PASSWORD: ${{ steps.rds-credentials.outputs.POSTGRES_PASSWORD }}
+          DB_USER: ${{ steps.rds-credentials.outputs.POSTGRES_USERNAME }}
           DB_CERT_LOCATION: ${{ steps.setup-aws.outputs.installed-cert-location }}
         working-directory: lambdas/db
         run: |
@@ -369,7 +370,7 @@ jobs:
     timeout-minutes: 15
     needs: validate-deployment
     if: needs.validate-deployment.outputs.should-deploy == 'true' && needs.validate-deployment.outputs.deploy-terraform == 'true'
-    environment: production-aws
+    environment: production
 
     steps:
       - name: "🚀 Checkout Repository"

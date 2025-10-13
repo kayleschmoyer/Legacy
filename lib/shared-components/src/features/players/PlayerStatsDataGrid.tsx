@@ -699,7 +699,7 @@ export function PlayerStatsDataGrid({
               paddingHorizontal="$3"
               pressStyle={{ backgroundColor: '$color4' }}
               onPress={() => handleRowClick(player)}
-              // @ts-ignore - onClick is added for web test compatibility
+              // @ts-expect-error - onClick is added for web test compatibility
               onClick={() => handleRowClick(player)}
               cursor="pointer"
             >
