@@ -5,10 +5,13 @@ terraform {
   # This allows Terraform to track what resources already exist in AWS
   # and only apply changes when needed (e.g., Lambda code updates via SSM)
   backend "s3" {
-    bucket         = "legacy-sports-terraform-state"
-    key            = "legacy-sports/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
+    bucket = "legacy-sports-terraform-state"
+    key    = "legacy-sports/terraform.tfstate"
+    region = "us-east-1"
+    encrypt = true
+    
+    # State locking with DynamoDB
+    use_lockfile = true
     dynamodb_table = "terraform-state-locks"
   }
   
