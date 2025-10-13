@@ -142,11 +142,18 @@ jobs:
 
       - name: "🚀 Deploy Infrastructure"
         working-directory: terraform
+        env:
+          # OAuth Lambda requires these secrets for authentication functionality
+          # Set these in GitHub repository secrets: Settings → Secrets and variables → Actions
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
         run: |
-          echo "📋 Planning Terraform changes..."
-          terraform plan -target=aws_lambda_function.oauth_proxy
+          echo "🔐 Deploying OAuth Lambda with required authentication secrets..."
+          
+          echo "📋 Planning Terraform changes for OAuth proxy..."
+          terraform plan -target=aws_lambda_function.oauth_proxy -input=false
           
           echo "🚀 Applying Terraform changes..."
-          terraform apply -target=aws_lambda_function.oauth_proxy -auto-approve
+          terraform apply -target=aws_lambda_function.oauth_proxy -auto-approve -input=false
           
-          echo "✅ Infrastructure deployment completed"
+          echo "✅ OAuth proxy infrastructure deployment completed"
