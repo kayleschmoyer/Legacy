@@ -1,4 +1,4 @@
-name: Build and Publish iOS IPA (DISABLED)
+name: Build iOS App (DISABLED)
 
 # DISABLED: iOS builds require Apple Developer Program ($99/year)
 # This workflow is disabled until iOS certificates are configured
