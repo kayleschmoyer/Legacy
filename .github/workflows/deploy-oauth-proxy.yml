@@ -164,3 +164,14 @@ jobs:
           terraform apply -target=aws_lambda_function.oauth_proxy -auto-approve -input=false
           
           echo "✅ OAuth proxy infrastructure deployment completed"
+
+      - name: Update Deployment Badge
+        if: always()
+        uses: ./.github/actions/update-deployment-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          deployment-name: "OAuth Proxy Lambda"
+          deployment-status: ${{ job.status }}
+          workflow-run-id: ${{ github.run_id }}
+          branch: ${{ github.ref_name }}

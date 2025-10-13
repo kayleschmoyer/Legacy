@@ -16,6 +16,15 @@ A modern sports data management platform built with React Native CLI, Next.js we
 [![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions)
 [![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions)
 
+## 🚢 Deployment Status
+
+[![Deploy Web](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Web.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml)
+[![Deploy Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-stats.yml)
+[![Deploy Game Selection Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Game-Selection-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-game-selection.yml)
+[![Deploy OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-oauth-proxy.yml)
+[![Deploy GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-gql.yml)
+[![Deploy Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-draft-processor.yml)
+
 ## 🌐 Live Web App
 
 [![Launch Web App](https://img.shields.io/badge/Launch-Web%20App-blue?style=for-the-badge&logo=vercel)](https://bkrupa.github.io/legacy-sports/)

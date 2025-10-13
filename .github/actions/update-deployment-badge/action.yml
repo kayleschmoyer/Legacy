@@ -1,0 +1,162 @@
+name: "Update Deployment Badge"
+description: "Updates gist file with deployment status badge"
+
+inputs:
+  github-token:
+    description: "GitHub token with gist access"
+    required: true
+  gist-id:
+    description: "Gist ID to update with badge data"
+    required: true
+  deployment-name:
+    description: "Name of the deployment (e.g., 'Web', 'Stats Lambda')"
+    required: true
+  deployment-status:
+    description: "Deployment status (success/failure/cancelled)"
+    required: true
+  workflow-run-id:
+    description: "GitHub workflow run ID"
+    required: true
+  branch:
+    description: "Git branch name"
+    required: true
+    default: ${{ github.ref_name }}
+
+outputs:
+  badge-updated:
+    description: "Whether badge was successfully updated"
+    value: ${{ steps.update-badge.outputs.success }}
+
+runs:
+  using: composite
+  steps:
+    - name: "🎖️ Update Deployment Badge"
+      id: update-badge
+      shell: bash
+      run: |
+        echo "::group::🎖️ Updating ${{ inputs.deployment-name }} Badge"
+        
+        DEPLOYMENT_NAME="${{ inputs.deployment-name }}"
+        STATUS="${{ inputs.deployment-status }}"
+        RUN_ID="${{ inputs.workflow-run-id }}"
+        BRANCH="${{ inputs.branch }}"
+        GIST_ID="${{ inputs.gist-id }}"
+        
+        # Function to determine status color
+        get_status_color() {
+          case "$1" in
+            "success") echo "brightgreen" ;;
+            "failure") echo "red" ;;
+            "cancelled") echo "yellow" ;;
+            *) echo "inactive" ;;
+          esac
+        }
+        
+        # Function to format status message
+        format_status_message() {
+          local status="$1"
+          local timestamp="$2"
+          case "$status" in
+            "success") echo "deployed ${timestamp}" ;;
+            "failure") echo "failed ${timestamp}" ;;
+            "cancelled") echo "cancelled ${timestamp}" ;;
+            *) echo "unknown" ;;
+          esac
+        }
+        
+        # Get current timestamp in UTC
+        TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+        
+        # Determine color and message
+        COLOR=$(get_status_color "$STATUS")
+        MESSAGE=$(format_status_message "$STATUS" "$TIMESTAMP")
+        
+        # Create filename-safe version (replace spaces with hyphens)
+        FILENAME=$(echo "Deploy-${DEPLOYMENT_NAME}" | sed 's/ /-/g')
+        
+        # Create badge JSON
+        cat > "${FILENAME}.json" <<EOF
+{
+  "schemaVersion": 1,
+  "label": "Deploy ${DEPLOYMENT_NAME}",
+  "message": "${MESSAGE}",
+  "color": "${COLOR}",
+  "namedLogo": "github",
+  "logoColor": "white",
+  "style": "flat",
+  "cacheSeconds": 300
+}
+EOF
+        
+        echo "Generated badge file: ${FILENAME}.json"
+        cat "${FILENAME}.json"
+        
+        # Update gist file using GitHub API
+        echo "Updating gist $GIST_ID..."
+        
+        # Prepare gist update payload
+        BADGE_CONTENT=$(cat "${FILENAME}.json" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n')
+        
+        PAYLOAD=$(cat <<PAYLOAD_EOF
+{
+  "files": {
+    "${FILENAME}.json": {
+      "content": "${BADGE_CONTENT}"
+    }
+  }
+}
+PAYLOAD_EOF
+)
+        
+        # Update the gist
+        RESPONSE=$(curl -s \
+          -X PATCH \
+          -H "Authorization: Bearer ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/gists/$GIST_ID" \
+          -d "$PAYLOAD")
+        
+        # Check if update was successful
+        if echo "$RESPONSE" | grep -q '"id"'; then
+          echo "✅ Successfully updated deployment badge"
+          echo "success=true" >> $GITHUB_OUTPUT
+          
+          # Add to step summary
+          echo "## 🎖️ Deployment Badge Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment**: ${DEPLOYMENT_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${STATUS} (${MESSAGE})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Badge File**: \`${FILENAME}.json\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gist ID**: ${GIST_ID}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${BRANCH}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Generate badge URL
+          BADGE_URL="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/${{ github.repository_owner }}/${GIST_ID}/raw/${FILENAME}.json"
+          ACTION_URL="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
+          echo "### Badge Markdown" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`markdown" >> $GITHUB_STEP_SUMMARY
+          echo "[![Deploy ${DEPLOYMENT_NAME}](${BADGE_URL})](${ACTION_URL})" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+        else
+          echo "❌ Failed to update deployment badge"
+          echo "Response: $RESPONSE"
+          echo "success=false" >> $GITHUB_OUTPUT
+          
+          # Add error to step summary
+          echo "## ❌ Badge Update Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Failed to update badge for ${DEPLOYMENT_NAME}" >> $GITHUB_STEP_SUMMARY
+          
+          # Check for specific error types
+          if echo "$RESPONSE" | grep -q "Not Found"; then
+            echo "- **Error**: Gist not found (check GIST_ID)" >> $GITHUB_STEP_SUMMARY
+          elif echo "$RESPONSE" | grep -q "Bad credentials"; then
+            echo "- **Error**: Authentication failed (check token permissions)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Error**: API error" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
+        echo "::endgroup::"
