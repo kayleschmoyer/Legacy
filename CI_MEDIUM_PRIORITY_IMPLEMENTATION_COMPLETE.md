@@ -79,7 +79,7 @@ Deployment (15-20 minutes):
 **Status**: ✅ IMPLEMENTED
 
 **Files Created**:
-- `.github/workflows/mobile-build-matrix.yml` - Advanced mobile build workflow
+- `.github/workflows/build-android-matrix.yml` - Android compatibility build workflow
 
 **Key Features**:
 - **Intelligent Build Strategy**: Detects JS-only vs native changes

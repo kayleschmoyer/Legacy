@@ -19,7 +19,7 @@ troubleshooting,nx_workspace,SYSTEMATIC,project_json_sync,Ensure project.json ta
 troubleshooting,nx_workspace,DO,affected_calculation,Use nx affected to understand what changed,"nx affected:dep-graph --base=origin/main","nx.json"
 troubleshooting,platform_specific,REACT_NATIVE,metro_cache_clear,Clear Metro cache for React Native issues,"npx react-native start --reset-cache","apps/app/metro.config.js"
 troubleshooting,platform_specific,WEB,vite_cache_clear,Clear Vite cache for web build issues,"rm -rf node_modules/.vite","apps/web/vite.config.mts"
-troubleshooting,platform_specific,EXPO,eas_build_clear,Clear EAS build cache for mobile issues,"eas build --clear-cache","apps/app/eas.json"
+troubleshooting,platform_specific,GRADLE,gradle_clean_build,Clear Gradle build cache for Android issues,"./gradlew clean && ./gradlew build","apps/app/android/gradlew"
 troubleshooting,database_connection,CRITICAL,credentials_sync,Database connection fails without proper credentials,"npm run sync-env && check .env.local","scripts/sync-env.ps1"
 troubleshooting,database_connection,DO,test_connection_first,Test database connection before running queries,"npm run cli:test-connection","package.json"
 troubleshooting,database_connection,DO,check_rds_status,Verify RDS instance is running in AWS,"AWS Console → RDS → legacy-sports-db","terraform/main.tf"

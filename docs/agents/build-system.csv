@@ -13,7 +13,7 @@ build_system,cache_management,DO,nx_cache_optimization,Use Nx caching for faster
 build_system,cache_management,DO,clean_on_errors,Clear cache when build errors occur,"nx reset && npm run build","package.json"
 build_system,platform_builds,CRITICAL,separate_build_targets,Maintain separate targets for web/mobile builds,"build-web, build-mobile, build-android, build-ios","package.json"
 build_system,platform_builds,DO,vite_web_builds,Use Vite for web application builds,"nx build-web app uses Vite config","apps/web/vite.config.mts"
-build_system,platform_builds,DO,expo_mobile_builds,Use Expo for React Native builds,"nx build-android app uses EAS Build","apps/app/eas.json"
+build_system,platform_builds,DO,gradle_mobile_builds,Use Gradle for React Native Android builds,"nx build-android app uses direct Gradle assembleDebug","apps/app/android/gradlew"
 build_system,error_resolution,TROUBLESHOOT,missing_types,Rebuild packages when types are missing,"nx build lib-name && npm run codegen","lib/*/tsconfig.json"
 build_system,error_resolution,TROUBLESHOOT,circular_deps,Check for circular dependencies in monorepo,"nx graph --file=graph.html","nx.json"
 build_system,error_resolution,TROUBLESHOOT,version_mismatches,Sync package versions across workspace,"npm run sync-deps or check workspace: versions","package.json"
