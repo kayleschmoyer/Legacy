@@ -6,6 +6,7 @@ import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 import { resolve } from 'path';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
+import { execSync } from 'child_process';
 
 export default defineConfig(async ({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -13,6 +14,20 @@ export default defineConfig(async ({ mode }) => {
 
   // Merge environment variables into process.env so Vite can pick them up
   Object.assign(process.env, env);
+
+  // Get build information - fallback to local git if not in CI
+  const commitSha = process.env.VITE_COMMIT_SHA || 
+    process.env.GITHUB_SHA ||
+    (() => {
+      try {
+        return execSync('git rev-parse --short HEAD').toString().trim();
+      } catch {
+        return 'dev';
+      }
+    })();
+  
+  const appVersion = process.env.VITE_APP_VERSION || '0.0.0';
+  const buildDate = new Date().toISOString();
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/web',
@@ -121,6 +136,10 @@ export default defineConfig(async ({ mode }) => {
       'import.meta.env.VITE_GRAPHQL_HOST': JSON.stringify(
         env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
       ),
+      // Build information for About page
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
+      'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
+      'import.meta.env.VITE_BUILD_DATE': JSON.stringify(buildDate),
     },
   };
 });

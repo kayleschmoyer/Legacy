@@ -61,6 +61,8 @@ jobs:
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
+          VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
+          VITE_COMMIT_SHA: ${{ github.sha }}
         run: npx nx build web
 
       - name: Setup Pages
