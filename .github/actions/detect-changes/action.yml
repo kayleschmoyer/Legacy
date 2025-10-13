@@ -1,5 +1,5 @@
 name: "Detect Project Changes"
-description: "Intelligent change detec    - name: "Determine Base Reference"   - name:     - name: "Detect Changed Files"🔧 Determine Base Reference"ion for     - name: "🔍 Detect Changed Files"ono-repo projects with configurable file patterns and affected component analysis"
+description: "Intelligent change detec    - name: "Determine Base Reference"   - name: "Determine Base Reference"ion for mono-repo    - name: "Detect Changed Files"projects with configurable file patterns and affected component analysis"
 
 inputs:
   base-ref:
