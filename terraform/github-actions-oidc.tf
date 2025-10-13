@@ -79,6 +79,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:UpdateFunctionCode",
           "lambda:UpdateFunctionConfiguration",
           "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration",
           "lambda:ListVersionsByFunction"
         ]
         Resource = [
