@@ -196,7 +196,7 @@
     "tamagui": "1.132.23",
     "tamedevil": "^0.0.0-beta.9",
     "tslib": "^2.3.0",
-    "utf-8-validate": "^5.0.10",
+    "utf-8-validate": "^6.0.5",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
