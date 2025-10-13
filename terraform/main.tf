@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.13"
   
   # Backend configuration for state management
   # This allows Terraform to track what resources already exist in AWS
