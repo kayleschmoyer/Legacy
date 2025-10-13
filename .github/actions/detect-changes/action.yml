@@ -1,5 +1,5 @@
 name: "Detect Project Changes"
-description: "Intelligent change detec    - name: "Determine Base Reference"   - name: "🔧 Determine Base Reference"ion for     - name: "🔍 Detect Changed Files"ono-repo projects with configurable file patterns and affected component analysis"
+description: "Intelligent change detec    - name: "Determine Base Reference"   - name:     - name: "Detect Changed Files"🔧 Determine Base Reference"ion for     - name: "🔍 Detect Changed Files"ono-repo projects with configurable file patterns and affected component analysis"
 
 inputs:
   base-ref:
@@ -111,6 +111,12 @@ runs:
               echo "Using HEAD^ as final fallback"
             fi
           fi
+        fi
+        
+        # Final validation - ensure the reference exists
+        if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+          echo "Warning: BASE_REF '$BASE_REF' not found, using empty tree as fallback"
+          BASE_REF="4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # Empty tree SHA
         fi
         
         echo "Final BASE_REF: $BASE_REF"
