@@ -69,7 +69,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:rds!db-*"
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*"
         ]
       },
       # Lambda function updates
