@@ -170,6 +170,20 @@ To create them manually:
 }
 ```
 
+#### `Nx DTE Status.json`
+```json
+{
+  "schemaVersion": 1,
+  "label": "Nx DTE Status",
+  "message": "disabled",
+  "color": "orange",
+  "namedLogo": "github",
+  "logoColor": "white",
+  "style": "flat",
+  "cacheSeconds": 300
+}
+```
+
 #### `Last Updated.json`
 ```json
 {

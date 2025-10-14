@@ -25,6 +25,10 @@ inputs:
     description: "Git commit SHA"
     required: true
     default: ${{ github.sha }}
+  dte-status:
+    description: "Whether DTE was available and used (true/false)"
+    required: false
+    default: "false"
 
 outputs:
   badges-updated:
@@ -50,6 +54,7 @@ runs:
         BRANCH="${{ inputs.branch }}"
         COMMIT_SHA="${{ inputs.commit-sha }}"
         GIST_ID="${{ inputs.gist-id }}"
+        DTE_STATUS="${{ inputs.dte-status }}"
         
         # Function to create badge JSON
         create_badge_json() {
@@ -142,6 +147,13 @@ runs:
           create_badge_json "Branch" "success" "main" "brightgreen"
         else
           create_badge_json "Branch" "success" "$BRANCH" "blue"
+        fi
+        
+        # Create DTE Status badge
+        if [ "$DTE_STATUS" = "true" ]; then
+          create_badge_json "Nx DTE Status" "success" "enabled" "brightgreen"
+        else
+          create_badge_json "Nx DTE Status" "success" "disabled" "orange"
         fi
         
         # Create last updated badge with current timestamp

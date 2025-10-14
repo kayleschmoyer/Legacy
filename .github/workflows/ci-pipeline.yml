@@ -225,8 +225,9 @@ jobs:
           workflow-run-id: ${{ github.run_id }}
           branch: ${{ github.ref_name }}
           commit-sha: ${{ github.sha }}
+          dte-status: ${{ steps.detect-dte.outputs.dte-available }}
 
-      - name: "�🎉 Success Summary"
+      - name: "🎉 Success Summary"
         if: steps.collect-results.outputs.overall-status == 'success'
         run: |
           echo "🎉 CI Pipeline completed successfully!"
