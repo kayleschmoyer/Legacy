@@ -6,12 +6,44 @@ import App from './app';
 
 // Mock all the components that might have complex dependencies
 jest.mock('@legacy-sports/shared-components', () => ({
-  Button: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
-    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>{children}</button>
+  Button: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
+      {children}
+    </button>
   ),
-  H1: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>{children}</h1>,
-  XStack: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
-  YStack: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
+  H1: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>{children}</h1>
+  ),
+  XStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  ),
+  YStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  ),
   BaseballScreen: () => <div>Baseball Screen</div>,
   FootballScreen: () => <div>Football Screen</div>,
   PlayersScreen: () => <div>Players Screen</div>,
@@ -198,9 +230,9 @@ describe('App', () => {
 
       // Verify navigation is present
       const homeLink = container.querySelector('[href="/"]');
-      const footballLink = container.querySelector('[href="/football"]');
       expect(homeLink).toBeInTheDocument();
-      expect(footballLink).toBeInTheDocument();
+      // Sports dropdown should be present (football link is now in a dropdown)
+      expect(container).toHaveTextContent('Sports');
     });
 
     it('should match football screen snapshot', () => {
@@ -232,9 +264,9 @@ describe('App', () => {
 
       // Should show navigation links
       const homeLink = container.querySelector('[href="/"]');
-      const footballLink = container.querySelector('[href="/football"]');
       expect(homeLink).toBeInTheDocument();
-      expect(footballLink).toBeInTheDocument();
+      // Sports dropdown should be present (football link is now in a dropdown)
+      expect(container).toHaveTextContent('Sports');
 
       // Should show authenticated content instead of OAuth login
       expect(container).toHaveTextContent('User Profile Dropdown');

@@ -1,6 +1,7 @@
 import React from 'react';
 import { H1, H3, XStack, YStack } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
+import { env } from '../config/environment';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -44,10 +45,8 @@ const Value = styled(Text, {
 });
 
 export default function AboutPage() {
-  // Read build-time environment variables injected by Vite
-  const version = import.meta.env.VITE_APP_VERSION || 'unknown';
-  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'unknown';
-  const buildDate = import.meta.env.VITE_BUILD_DATE || 'unknown';
+  // Read build-time environment variables from centralized config
+  const { appVersion, commitSha, buildDate } = env;
 
   return (
     <Container>
@@ -68,7 +67,7 @@ export default function AboutPage() {
 
         <InfoRow>
           <Label>Version:</Label>
-          <Value>{version}</Value>
+          <Value>{appVersion}</Value>
         </InfoRow>
 
         <InfoRow>
@@ -87,12 +86,12 @@ export default function AboutPage() {
 
         <InfoRow>
           <Label>Environment:</Label>
-          <Value>{import.meta.env.MODE}</Value>
+          <Value>{env.isDev ? 'development' : 'production'}</Value>
         </InfoRow>
 
         <InfoRow>
           <Label>Base URL:</Label>
-          <Value>{import.meta.env.BASE_URL}</Value>
+          <Value>{env.baseUrl}</Value>
         </InfoRow>
       </InfoCard>
     </Container>

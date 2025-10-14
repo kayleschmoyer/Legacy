@@ -13,6 +13,9 @@ export interface EnvironmentConfig {
   readonly isDev: boolean;
   readonly authTestMode: boolean;
   readonly baseUrl: string;
+  readonly appVersion: string;
+  readonly commitSha: string;
+  readonly buildDate: string;
 }
 
 /**
@@ -31,6 +34,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   isDev: import.meta.env.DEV === true,
   authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
   baseUrl: import.meta.env.BASE_URL || '/',
+  appVersion: (import.meta.env.VITE_APP_VERSION as string) || 'unknown',
+  commitSha: (import.meta.env.VITE_COMMIT_SHA as string) || 'unknown',
+  buildDate: (import.meta.env.VITE_BUILD_DATE as string) || 'unknown',
 });
 
 /**

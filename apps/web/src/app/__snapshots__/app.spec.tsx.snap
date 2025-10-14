@@ -48,74 +48,36 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             Home
           </button>
         </a>
-        <a
-          href="/football"
-          style="text-decoration: none;"
+        <div
+          position="relative"
         >
-          <button
-            variant="primary"
-          >
+          <button>
             <span
-              aria-label="football"
+              aria-label="sports"
               role="img"
             >
-              🏈
+              🏆
             </span>
              
-            Football
+            Sports 
+            ▼
           </button>
-        </a>
-        <a
-          href="/baseball"
-          style="text-decoration: none;"
+        </div>
+        <div
+          position="relative"
         >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="baseball"
-              role="img"
-            >
-              ⚾
-            </span>
-             
-            Baseball
-          </button>
-        </a>
-        <a
-          href="/players"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
+          <button>
             <span
               aria-label="players"
               role="img"
             >
-              👤
+              👥
             </span>
              
-            Players
+            Players 
+            ▼
           </button>
-        </a>
-        <a
-          href="/players/stats"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="statistics"
-              role="img"
-            >
-              📊
-            </span>
-             
-            Player Stats
-          </button>
-        </a>
+        </div>
         <a
           href="/management"
           style="text-decoration: none;"
@@ -131,6 +93,23 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             </span>
              
             Management
+          </button>
+        </a>
+        <a
+          href="/about"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="info"
+              role="img"
+            >
+              ℹ️
+            </span>
+             
+            About
           </button>
         </a>
       </div>
@@ -207,74 +186,36 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             Home
           </button>
         </a>
-        <a
-          href="/football"
-          style="text-decoration: none;"
+        <div
+          position="relative"
         >
-          <button
-            variant="secondary"
-          >
+          <button>
             <span
-              aria-label="football"
+              aria-label="sports"
               role="img"
             >
-              🏈
+              🏆
             </span>
              
-            Football
+            Sports 
+            ▼
           </button>
-        </a>
-        <a
-          href="/baseball"
-          style="text-decoration: none;"
+        </div>
+        <div
+          position="relative"
         >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="baseball"
-              role="img"
-            >
-              ⚾
-            </span>
-             
-            Baseball
-          </button>
-        </a>
-        <a
-          href="/players"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
+          <button>
             <span
               aria-label="players"
               role="img"
             >
-              👤
+              👥
             </span>
              
-            Players
+            Players 
+            ▼
           </button>
-        </a>
-        <a
-          href="/players/stats"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="statistics"
-              role="img"
-            >
-              📊
-            </span>
-             
-            Player Stats
-          </button>
-        </a>
+        </div>
         <a
           href="/management"
           style="text-decoration: none;"
@@ -290,6 +231,23 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             </span>
              
             Management
+          </button>
+        </a>
+        <a
+          href="/about"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="info"
+              role="img"
+            >
+              ℹ️
+            </span>
+             
+            About
           </button>
         </a>
       </div>
@@ -364,74 +322,36 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             Home
           </button>
         </a>
-        <a
-          href="/football"
-          style="text-decoration: none;"
+        <div
+          position="relative"
         >
-          <button
-            variant="secondary"
-          >
+          <button>
             <span
-              aria-label="football"
+              aria-label="sports"
               role="img"
             >
-              🏈
+              🏆
             </span>
              
-            Football
+            Sports 
+            ▼
           </button>
-        </a>
-        <a
-          href="/baseball"
-          style="text-decoration: none;"
+        </div>
+        <div
+          position="relative"
         >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="baseball"
-              role="img"
-            >
-              ⚾
-            </span>
-             
-            Baseball
-          </button>
-        </a>
-        <a
-          href="/players"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
+          <button>
             <span
               aria-label="players"
               role="img"
             >
-              👤
+              👥
             </span>
              
-            Players
+            Players 
+            ▼
           </button>
-        </a>
-        <a
-          href="/players/stats"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="statistics"
-              role="img"
-            >
-              📊
-            </span>
-             
-            Player Stats
-          </button>
-        </a>
+        </div>
         <a
           href="/management"
           style="text-decoration: none;"
@@ -447,6 +367,23 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             </span>
              
             Management
+          </button>
+        </a>
+        <a
+          href="/about"
+          style="text-decoration: none;"
+        >
+          <button
+            variant="secondary"
+          >
+            <span
+              aria-label="info"
+              role="img"
+            >
+              ℹ️
+            </span>
+             
+            About
           </button>
         </a>
       </div>
