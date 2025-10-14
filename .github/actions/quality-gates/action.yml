@@ -190,8 +190,9 @@ runs:
         echo "🎯 Starting DTE with $AGENTS agents..."
 
         # Start DTE session with automatic agent provisioning
-        # Use --distribute-on with agent count for automatic Nx Cloud agent management
-        npx nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" --stop-agents-after="build"
+        # Don't stop agents after build - let them continue for all build targets
+        # This allows build-validation step to also use DTE
+        npx nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js"
 
         echo "strategy=distributed" >> $GITHUB_OUTPUT
 

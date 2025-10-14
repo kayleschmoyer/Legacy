@@ -46,7 +46,10 @@ runs:
       shell: bash
       run: |
         echo "::group::🎖️ Updating CI Status Badges"
-        
+
+        # Check verbose logging setting
+        VERBOSE="${NX_VERBOSE_LOGGING:-false}"
+
         # Parse workflow inputs
         WORKFLOW_STATUS="${{ inputs.workflow-status }}"
         STEP_RESULTS='${{ inputs.step-results }}'
@@ -55,7 +58,14 @@ runs:
         COMMIT_SHA="${{ inputs.commit-sha }}"
         GIST_ID="${{ inputs.gist-id }}"
         DTE_STATUS="${{ inputs.dte-status }}"
-        
+
+        # Logging helper function
+        log_verbose() {
+          if [ "$VERBOSE" = "true" ]; then
+            echo "$@"
+          fi
+        }
+
         # Function to create badge JSON
         create_badge_json() {
           local step_name="$1"
@@ -69,7 +79,7 @@ runs:
           
           printf '%s\n' "{\"schemaVersion\":1,\"label\":\"${step_name}\",\"message\":\"${message}\",\"color\":\"${color}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${filename}.json"
         }
-        
+
         # Function to determine status color
         get_status_color() {
           case "$1" in
@@ -80,7 +90,7 @@ runs:
             *) echo "inactive" ;;
           esac
         }
-        
+
         # Function to format status message
         format_status_message() {
           case "$1" in
@@ -91,31 +101,33 @@ runs:
             *) echo "unknown" ;;
           esac
         }
-        
-        echo "Generating badge files for CI steps..."
-        
+
+        log_verbose "Generating badge files for CI steps..."
+
         # Overall pipeline status
         OVERALL_COLOR=$(get_status_color "$WORKFLOW_STATUS")
         OVERALL_MESSAGE=$(format_status_message "$WORKFLOW_STATUS")
         create_badge_json "CI Pipeline" "$WORKFLOW_STATUS" "$OVERALL_MESSAGE" "$OVERALL_COLOR"
-        
+
         # Parse step results and create individual badges
         if [ -n "$STEP_RESULTS" ] && [ "$STEP_RESULTS" != "null" ]; then
-          echo "Parsing step results: $STEP_RESULTS"
+          log_verbose "Parsing step results: $STEP_RESULTS"
           
           # Extract individual step statuses using jq if available, otherwise parse manually
           if command -v jq >/dev/null 2>&1; then
             # Use jq for robust JSON parsing
+            log_verbose "Using jq for JSON parsing"
             echo "$STEP_RESULTS" | jq -r 'to_entries[] | "\(.key):\(.value)"' | while IFS=: read -r step status; do
               if [ -n "$step" ] && [ -n "$status" ]; then
                 color=$(get_status_color "$status")
                 message=$(format_status_message "$status")
                 create_badge_json "$step" "$status" "$message" "$color"
+                log_verbose "  ✓ Created badge for '$step' - $message"
               fi
             done
           else
             # Fallback: basic parsing for common step results
-            echo "jq not available, using basic parsing"
+            log_verbose "jq not available, using basic parsing"
             
             # Create badges for known CI steps with default success status
             declare -a ci_steps=(
@@ -137,39 +149,44 @@ runs:
             done
           fi
         fi
-        
+
         # Create last updated badge
         TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
         create_badge_json "Last Updated" "success" "$TIMESTAMP" "blue"
-        
+
         # Create branch status badge
         if [ "$BRANCH" = "main" ]; then
           create_badge_json "Branch" "success" "main" "brightgreen"
         else
           create_badge_json "Branch" "success" "$BRANCH" "blue"
         fi
-        
+
         # Create DTE Status badge
         if [ "$DTE_STATUS" = "true" ]; then
           create_badge_json "Nx DTE Status" "success" "enabled" "brightgreen"
         else
           create_badge_json "Nx DTE Status" "success" "disabled" "orange"
         fi
-        
+
         # Create last updated badge with current timestamp
         CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M UTC")
         create_badge_json "Last Updated" "success" "$CURRENT_TIME" "blue"
-        
-        echo "Generated badge files:"
-        ls -la *.json
-        
+
+        if [ "$VERBOSE" = "true" ]; then
+          echo "Generated badge files:"
+          ls -la *.json
+        else
+          BADGE_COUNT=$(ls -1 *.json 2>/dev/null | wc -l)
+          echo "Generated $BADGE_COUNT badge files"
+        fi
+
         # Update gist files using GitHub API
-        echo "Updating gist $GIST_ID..."
-        
+        log_verbose "Updating gist $GIST_ID..."
+
         # Prepare gist update payload using a temporary file to avoid "Argument list too long"
         TEMP_PAYLOAD=$(mktemp)
         echo '{"files": {' > "$TEMP_PAYLOAD"
-        
+
         FIRST_FILE=true
         for badge_file in *.json; do
           if [ -f "$badge_file" ]; then
@@ -188,11 +205,11 @@ runs:
             echo -n '"}' >> "$TEMP_PAYLOAD"
           fi
         done
-        
+
         echo '}}' >> "$TEMP_PAYLOAD"
-        
-        echo "Gist payload size: $(wc -c < "$TEMP_PAYLOAD") bytes"
-        
+
+        log_verbose "Gist payload size: $(wc -c < "$TEMP_PAYLOAD") bytes"
+
         # Update the gist using the temporary file
         RESPONSE=$(curl -s \
           -X PATCH \
@@ -200,10 +217,10 @@ runs:
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/gists/$GIST_ID" \
           -d "@$TEMP_PAYLOAD")
-        
+
         # Clean up temporary file
         rm -f "$TEMP_PAYLOAD"
-        
+
         # Check if update was successful
         if echo "$RESPONSE" | grep -q '"id"'; then
           echo "✅ Successfully updated gist badges"
@@ -214,25 +231,30 @@ runs:
           SUMMARY="Updated $BADGE_COUNT badges for workflow $RUN_ID on branch $BRANCH"
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
           
-          # Add to step summary
-          echo "## 🎖️ CI Status Badges Updated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Gist ID**: $GIST_ID" >> $GITHUB_STEP_SUMMARY
-          echo "- **Badges Updated**: $BADGE_COUNT" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow**: $RUN_ID" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch**: $BRANCH" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: $WORKFLOW_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Badge files updated:" >> $GITHUB_STEP_SUMMARY
-          for badge_file in *.json; do
-            if [ -f "$badge_file" ]; then
-              echo "- \`$badge_file\`" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          # Add to step summary (only in verbose mode or show condensed version)
+          if [ "$VERBOSE" = "true" ]; then
+            echo "## 🎖️ CI Status Badges Updated" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Gist ID**: $GIST_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- **Badges Updated**: $BADGE_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Workflow**: $RUN_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch**: $BRANCH" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $WORKFLOW_STATUS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Badge files updated:" >> $GITHUB_STEP_SUMMARY
+            for badge_file in *.json; do
+              if [ -f "$badge_file" ]; then
+                echo "- \`$badge_file\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          else
+            echo "## 🎖️ Badges Updated" >> $GITHUB_STEP_SUMMARY
+            echo "Updated $BADGE_COUNT badges for $BRANCH" >> $GITHUB_STEP_SUMMARY
+          fi
           
         else
           echo "❌ Failed to update gist badges"
-          echo "Response: $RESPONSE"
+          log_verbose "Response: $RESPONSE"
           echo "success=false" >> $GITHUB_OUTPUT
           
           # Check for specific error types
@@ -246,13 +268,15 @@ runs:
             echo "summary=Failed to update badges: API error" >> $GITHUB_OUTPUT
           fi
         fi
-        
+
         echo "::endgroup::"
 
-    - name: "🔗 Generate Badge URLs"  
+    - name: "🔗 Generate Badge URLs"
       shell: bash
       run: |
-        if [ "${{ steps.update-badges.outputs.success }}" = "true" ]; then
+        VERBOSE="${NX_VERBOSE_LOGGING:-false}"
+
+        if [ "${{ steps.update-badges.outputs.success }}" = "true" ] && [ "$VERBOSE" = "true" ]; then
           echo "::group::🔗 Badge URLs Generated"
           echo "## Badge URLs" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

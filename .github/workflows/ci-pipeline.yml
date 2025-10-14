@@ -158,7 +158,14 @@ jobs:
       # STAGE 3: RESULTS & DEPLOYMENT READINESS
       # ======================================================================
 
-      - name: "📊 Collect Results"
+      - name: "� Stop DTE Agents"
+        if: always() && steps.detect-dte.outputs.dte-available == 'true'
+        run: |
+          echo "🛑 Stopping Nx Cloud DTE agents..."
+          npx nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          echo "✅ Agent cleanup complete"
+
+      - name: "�📊 Collect Results"
         id: collect-results
         if: always()
         uses: ./.github/actions/collect-results
