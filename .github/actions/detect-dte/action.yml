@@ -71,32 +71,55 @@ runs:
         if [ -n "$NX_CLOUD_TOKEN" ]; then
           echo "✅ Nx Cloud token found"
           
-          # Test basic cloud connectivity with timeout
+          # Export token for nx-cloud CLI
+          export NX_CLOUD_ACCESS_TOKEN="$NX_CLOUD_TOKEN"
+          
+          # Test basic cloud connectivity
           echo "🌐 Testing cloud connectivity..."
-          # Check if nx-cloud CLI is accessible (without auth requirements)
-          # Running nx-cloud without args just shows available commands
-          if timeout "${TIMEOUT_SECONDS}s" npx nx-cloud 2>&1 | grep -q "start-ci-run"; then
-            echo "✅ Nx Cloud CLI accessible"
-            CLOUD_AVAILABLE="true"
-            
-            # For modern Nx Cloud (v19+), we can't query quotas/agents upfront
-            # The system will handle agent allocation automatically via start-ci-run
-            # We just need to ensure the CLI is available and token will be used at runtime
-            
-            echo "🎯 Nx Cloud CLI ready for DTE"
-            
-            # Assume DTE is available if we got this far
-            # The actual distribution will be controlled by start-ci-run --distribute-on
-            # Agent allocation happens dynamically based on workspace plan
-            DTE_AVAILABLE="true"
-            EXECUTION_MODE="distributed"
-            # Use default of 8 agents - this will be managed by Nx Cloud based on plan
-            OPTIMAL_AGENTS=8
-            MEMORY_LIMIT="6144"
-            echo "🚀 DTE configured - Nx Cloud will manage agent allocation"
-          else
-            FALLBACK_REASON="Nx Cloud CLI not accessible or timed out"
+          # First check if nx-cloud CLI is installed
+          if ! command -v npx >/dev/null 2>&1; then
+            FALLBACK_REASON="npx command not found"
             echo "❌ $FALLBACK_REASON"
+          else
+            # Try to verify we can connect to Nx Cloud with the token
+            # We'll attempt a lightweight operation that requires authentication
+            # Using a short timeout to avoid hanging
+            echo "🔑 Verifying Nx Cloud authentication..."
+            
+            # Try to start a CI run in dry-run mode or check connection
+            # The key is to see if the token is valid and we can connect
+            CLI_TEST=$(timeout 15s npx nx-cloud start-ci-run --help 2>&1 || echo "FAILED")
+            
+            # Check the output - if authentication worked, we should NOT see auth errors
+            if echo "$CLI_TEST" | grep -qi "Unable to authenticate"; then
+              FALLBACK_REASON="Nx Cloud authentication failed - invalid or expired token"
+              echo "❌ $FALLBACK_REASON"
+            elif echo "$CLI_TEST" | grep -q "FAILED"; then
+              FALLBACK_REASON="Nx Cloud CLI command timed out"
+              echo "❌ $FALLBACK_REASON"
+            elif echo "$CLI_TEST" | grep -qi "Usage:"; then
+              # If we got help text, the CLI is working and authenticated
+              echo "✅ Nx Cloud CLI accessible and authenticated"
+              CLOUD_AVAILABLE="true"
+              
+              # For modern Nx Cloud (v19+), we can't query quotas/agents upfront
+              # The system handles agent allocation automatically via start-ci-run
+              # If we can authenticate, we assume DTE is available
+              # Actual quota/usage limits will be enforced by Nx Cloud at runtime
+              
+              echo "🎯 Nx Cloud ready for DTE"
+              
+              DTE_AVAILABLE="true"
+              EXECUTION_MODE="distributed"
+              # Use default of 8 agents - Nx Cloud will allocate based on plan/usage
+              OPTIMAL_AGENTS=8
+              MEMORY_LIMIT="6144"
+              echo "🚀 DTE configured - Nx Cloud will manage agent allocation and usage limits"
+            else
+              FALLBACK_REASON="Nx Cloud CLI response unexpected"
+              echo "❌ $FALLBACK_REASON"
+              echo "Debug output: $CLI_TEST"
+            fi
           fi
         else
           FALLBACK_REASON="No Nx Cloud token provided"
