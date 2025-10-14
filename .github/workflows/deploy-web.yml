@@ -56,6 +56,13 @@ jobs:
         with:
           nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
+      - name: "☁️ Start Nx Cloud CI Run"
+        if: steps.detect-dte.outputs.dte-available == 'true'
+        run: |
+          echo "🚀 Starting Nx Cloud DTE with ${{ steps.detect-dte.outputs.optimal-agents }} agents..."
+          npx nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js"
+          echo "✅ DTE session started"
+
       - name: Build Web App
         env:
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
@@ -71,6 +78,13 @@ jobs:
       - name: Add CNAME for Custom Domain
         if: github.ref == 'refs/heads/main'
         run: echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
+
+      - name: "🛑 Stop Nx Cloud Agents"
+        if: always() && steps.detect-dte.outputs.dte-available == 'true'
+        run: |
+          echo "🛑 Stopping Nx Cloud DTE agents..."
+          npx nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          echo "✅ Agent cleanup complete"
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main'
