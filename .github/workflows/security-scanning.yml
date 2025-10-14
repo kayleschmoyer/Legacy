@@ -7,8 +7,32 @@ name: "Security & Vulnerability Scanning"
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      # Only run when security-relevant files change
+      - 'package*.json'
+      - '**/package.json'
+      - 'apps/**/*.{ts,tsx,js,jsx}'
+      - 'lib/**/*.{ts,tsx,js,jsx}'
+      - 'lambdas/**/*.{ts,j          echo "::endgroup::"
+
+      - name: "📤 Upload CodeQL Results"
+        # Skip on PRs since CodeQL is not run
+        if: github.event_name != 'pull_request' && steps.process-codeql-results.outputs.sarif-generated == 'true'
+        uses: actions/upload-artifact@v4     - 'tools/**/*.{ts,js}'
+      - '.github/workflows/security-scanning.yml'
+      - 'tsconfig*.json'
+      - '.npmrc'
   push:
     branches: [main, develop]
+    paths:
+      # Run on main/develop when security-relevant files change
+      - 'package*.json'
+      - '**/package.json'
+      - 'apps/**/*.{ts,tsx,js,jsx}'
+      - 'lib/**/*.{ts,tsx,js,jsx}'
+      - 'lambdas/**/*.{ts,js}'
+      - 'tools/**/*.{ts,js}'
+      - '.github/workflows/security-scanning.yml'
   schedule:
     # Weekly comprehensive security scan
     - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
@@ -429,12 +453,16 @@ jobs:
           install-dependencies: true
 
       - name: "🛡️ CodeQL Analysis Setup"
+        # Skip CodeQL on PRs for faster feedback (runs on main branch & weekly scans)
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
           queries: security-extended,security-and-quality
 
       - name: "📦 Build for Analysis"
+        # Skip build on PRs when CodeQL is skipped
+        if: github.event_name != 'pull_request'
         run: |
           echo "🏗️ Building applications for SAST analysis..."
           
@@ -448,6 +476,8 @@ jobs:
           echo "✅ Build completed for SAST analysis"
 
       - name: "🔍 Perform CodeQL Analysis"
+        # Skip CodeQL on PRs for faster feedback
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript"
@@ -456,7 +486,8 @@ jobs:
           
       - name: "📊 Process CodeQL Results"
         id: process-codeql-results
-        if: always()
+        # Skip CodeQL results processing on PRs
+        if: always() && github.event_name != 'pull_request'
         run: |
           echo "::group::🔍 CodeQL Results Processing"
           
@@ -508,15 +539,16 @@ jobs:
           
           echo "::endgroup::"
 
-      - name: "� Upload CodeQL Results"
-        if: steps.process-codeql-results.outputs.sarif-generated == 'true'
+      - name: "📤 Upload CodeQL Results"
+        # Skip on PRs since CodeQL is not run
+        if: github.event_name != 'pull_request' && steps.process-codeql-results.outputs.sarif-generated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif-results
           path: sarif-results/
           retention-days: 30
 
-      - name: "�🔐 ESLint Security Rules"
+      - name: "🔐 ESLint Security Rules"
         id: eslint-security
         run: |
           echo "::group::🔒 ESLint Security Rule Analysis"
