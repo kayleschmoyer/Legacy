@@ -77,7 +77,10 @@ jobs:
       # GitHub can't auto-create this since we're not using a branch
       - name: Add CNAME for Custom Domain
         if: github.ref == 'refs/heads/main'
-        run: echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
+        run: |
+          mkdir -p ./dist/apps/web
+          echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
+          echo "✅ CNAME file created for legacy-fantasy.com"
 
       - name: "🛑 Stop Nx Cloud Agents"
         if: always() && steps.detect-dte.outputs.dte-available == 'true'
