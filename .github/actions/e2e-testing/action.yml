@@ -115,32 +115,66 @@ runs:
         echo "🌐 Starting web application for E2E testing..."
         echo "ℹ️ Development server will build and serve the application automatically"
         
-        # Start development server in background
+        # Start development server in background with output logging
         echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
-        npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} >/dev/null 2>&1 &
+        
+        SERVER_LOG="dev-server-${E2E_TIMESTAMP}.log"
+        npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
         SERVER_PID=$!
         
-        # Wait for server to be ready
-        echo "⏳ Waiting for development server to be ready..."
-        for i in {1..30}; do
-          if curl -f http://${{ inputs.server-host }}:${{ inputs.server-port }} >/dev/null 2>&1; then
-            echo "✅ Development server ready on http://${{ inputs.server-host }}:${{ inputs.server-port }}"
-            break
-          fi
-          if [ $i -eq 30 ]; then
-            echo "❌ Development server failed to start within 30 seconds"
-            kill $SERVER_PID 2>/dev/null || true
+        echo "📝 Server output logged to: $SERVER_LOG"
+        echo "🔍 Server PID: $SERVER_PID"
+        
+        # Wait for server to be ready (increased timeout for initial build)
+        echo "⏳ Waiting for development server to be ready (max 60 seconds)..."
+        READY=false
+        for i in {1..60}; do
+          # Check if server process is still running
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "❌ Development server process died unexpectedly"
+            echo "📋 Last 20 lines of server log:"
+            tail -20 "$SERVER_LOG" || true
             echo "result=server-failure" >> $GITHUB_OUTPUT
             echo "total-tests=0" >> $GITHUB_OUTPUT
             echo "passed-tests=0" >> $GITHUB_OUTPUT
             echo "failed-tests=0" >> $GITHUB_OUTPUT
             echo "success-rate=0" >> $GITHUB_OUTPUT
             echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
-            echo "::error::Development server failed to start - cannot run E2E tests"
+            echo "::error::Development server process crashed. Check logs for details."
             exit 1
           fi
+          
+          # Check if server is responding
+          if curl -f -s http://${{ inputs.server-host }}:${{ inputs.server-port }} >/dev/null 2>&1; then
+            echo "✅ Development server ready on http://${{ inputs.server-host }}:${{ inputs.server-port }}"
+            READY=true
+            break
+          fi
+          
+          # Show progress every 10 seconds
+          if [ $((i % 10)) -eq 0 ]; then
+            echo "⏳ Still waiting... ($i/60 seconds)"
+            echo "📋 Recent server output:"
+            tail -5 "$SERVER_LOG" || true
+          fi
+          
           sleep 1
         done
+        
+        if [ "$READY" = false ]; then
+          echo "❌ Development server failed to start within 60 seconds"
+          echo "📋 Full server log:"
+          cat "$SERVER_LOG" || true
+          kill $SERVER_PID 2>/dev/null || true
+          echo "result=server-failure" >> $GITHUB_OUTPUT
+          echo "total-tests=0" >> $GITHUB_OUTPUT
+          echo "passed-tests=0" >> $GITHUB_OUTPUT
+          echo "failed-tests=0" >> $GITHUB_OUTPUT
+          echo "success-rate=0" >> $GITHUB_OUTPUT
+          echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
+          echo "::error::Development server failed to start - cannot run E2E tests"
+          exit 1
+        fi
 
         # Run E2E tests with proper error handling
         echo "🎭 Executing E2E test suite..."
