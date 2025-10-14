@@ -57,6 +57,13 @@
       "when": 1760024758403,
       "tag": "0007_add_stats_last_fetched_at_to_players",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1760025000000,
+      "tag": "0008_add_invite_code_to_leagues",
+      "breakpoints": true
     }
   ]
 }

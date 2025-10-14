@@ -82,9 +82,17 @@ program
   .option('--production', 'Use production credentials')
   .action(async (options: CliOptions) => {
     try {
+      // Default to AWS Secrets Manager unless explicitly using local
+      const useLocal = process.env.USE_LOCAL_CREDENTIALS === 'true';
       const config = options.production
         ? ProductionCredentialConfig
-        : DevelopmentCredentialConfig;
+        : {
+            useLocalCredentials: useLocal,
+            secretName: process.env.DB_SECRET_NAME || process.env.DB_CREDS_PATH,
+            defaultDatabase: 'postgres',
+            defaultHost: process.env.DB_HOST || process.env.DB_HOST_DIRECT,
+            defaultPort: 5432,
+          };
 
       console.log('Testing database connection...');
       const credentials = await resolveDatabaseCredentials(config);
@@ -189,9 +197,19 @@ program
   .option('--production', 'Use production credentials')
   .action(async (options: CliOptions) => {
     try {
+      // Default to AWS Secrets Manager unless explicitly using local
+      const useLocal = process.env.USE_LOCAL_CREDENTIALS === 'true';
       const config = options.production
         ? ProductionCredentialConfig
-        : DevelopmentCredentialConfig;
+        : {
+            useLocalCredentials: useLocal,
+            secretName: process.env.DB_SECRET_NAME || process.env.DB_CREDS_PATH,
+            defaultDatabase: 'postgres',
+            defaultHost: process.env.DB_HOST || process.env.DB_HOST_DIRECT,
+            defaultPort: 5432,
+          };
+
+      console.log('Resolving database credentials from environment variables');
       const credentials = await resolveDatabaseCredentials(config);
 
       console.log('PostgreSQL Connection Commands:');
@@ -214,5 +232,85 @@ program
       process.exit(1);
     }
   });
+
+program
+  .command('query')
+  .description('Execute a SQL query against the database')
+  .argument('<query>', 'SQL query to execute')
+  .option('--production', 'Use production credentials')
+  .option('--json', 'Output results as JSON')
+  .option('--table', 'Output results as a formatted table (default)')
+  .action(
+    async (
+      query: string,
+      options: CliOptions & { json?: boolean; table?: boolean },
+    ) => {
+      try {
+        // Default to AWS Secrets Manager unless explicitly using local
+        const useLocal = process.env.USE_LOCAL_CREDENTIALS === 'true';
+        const config = options.production
+          ? ProductionCredentialConfig
+          : {
+              useLocalCredentials: useLocal,
+              secretName:
+                process.env.DB_SECRET_NAME || process.env.DB_CREDS_PATH,
+              defaultDatabase: 'postgres',
+              defaultHost: process.env.DB_HOST || process.env.DB_HOST_DIRECT,
+              defaultPort: 5432,
+            };
+
+        console.log('🔍 Executing query...');
+        const credentials = await resolveDatabaseCredentials(config);
+
+        // Create database connection
+        const { Pool } = await import('pg');
+        const { readFileSync } = await import('fs');
+
+        const pool = new Pool({
+          host: credentials.host,
+          port: credentials.port,
+          user: credentials.user,
+          password: credentials.password,
+          database: credentials.database,
+          ssl: {
+            rejectUnauthorized: true,
+            ca: readFileSync(
+              path.join(__dirname, '../../../../certs/us-east-1-bundle.pem'),
+            ).toString(),
+          },
+        });
+
+        try {
+          const result = await pool.query(query);
+
+          console.log('');
+          if (options.json) {
+            // JSON output
+            console.log(JSON.stringify(result.rows, null, 2));
+          } else {
+            // Table output (default)
+            if (result.rows.length === 0) {
+              console.log('✅ Query executed successfully. No rows returned.');
+            } else {
+              console.log(`✅ Query returned ${result.rows.length} row(s):`);
+              console.log('');
+              console.table(result.rows);
+            }
+          }
+
+          if (result.command !== 'SELECT' && !options.json) {
+            console.log(
+              `\n📝 ${result.command} affected ${result.rowCount} row(s)`,
+            );
+          }
+        } finally {
+          await pool.end();
+        }
+      } catch (error) {
+        console.error('❌ Query failed:', error);
+        process.exit(1);
+      }
+    },
+  );
 
 program.parse();

@@ -6,16 +6,11 @@
  * This is useful when transitioning from a custom migration system to Drizzle.
  */
 
-import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
-import { resolve } from 'path';
 import { getDatabaseConfig } from '../config/database';
-
-// Load .env from the project root (two levels up from this script)
-config({ path: resolve(__dirname, '../../../..', '.env') });
 
 async function resetDatabase() {
   try {

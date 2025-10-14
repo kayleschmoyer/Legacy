@@ -2,19 +2,19 @@
 
 /**
  * Database Schema Verification
- * 
+ *
  * This script checks the current database schema to verify column existence
  */
 
 import { config } from 'dotenv';
 import { Pool } from 'pg';
 import { resolve } from 'path';
-import { 
+import {
   extractSingleTypedResult,
   extractTypedResults,
   isDatabaseIntrospectionResult,
   isEnumValueResult,
-  MigrationHistoryResult
+  MigrationHistoryResult,
 } from '../types/RawSqlTypes';
 
 // Interface for column details
@@ -36,7 +36,8 @@ function isColumnDetailsResult(obj: unknown): obj is ColumnDetailsResult {
     'is_nullable' in obj &&
     typeof (obj as ColumnDetailsResult).column_name === 'string' &&
     typeof (obj as ColumnDetailsResult).data_type === 'string' &&
-    (typeof (obj as ColumnDetailsResult).column_default === 'string' || (obj as ColumnDetailsResult).column_default === null) &&
+    (typeof (obj as ColumnDetailsResult).column_default === 'string' ||
+      (obj as ColumnDetailsResult).column_default === null) &&
     typeof (obj as ColumnDetailsResult).is_nullable === 'string'
   );
 }
@@ -68,7 +69,7 @@ async function verifyDraftStatusColumn() {
 
   try {
     console.log('🔍 Checking for draft_status enum...');
-    
+
     // Check if draft_status enum exists
     const enumResult = await pool.query(`
       SELECT EXISTS (
@@ -77,11 +78,16 @@ async function verifyDraftStatusColumn() {
         WHERE typname = 'draft_status'
       ) as enum_exists;
     `);
-    
-    const enumExists = extractSingleTypedResult(enumResult, isDatabaseIntrospectionResult);
-    
-    console.log(`Draft status enum exists: ${enumExists ? enumExists.enum_exists : false}`);
-    
+
+    const enumExists = extractSingleTypedResult(
+      enumResult,
+      isDatabaseIntrospectionResult,
+    );
+
+    console.log(
+      `Draft status enum exists: ${enumExists ? enumExists.enum_exists : false}`,
+    );
+
     if (enumExists && enumExists.enum_exists) {
       // Get enum values
       const enumValues = await pool.query(`
@@ -91,13 +97,19 @@ async function verifyDraftStatusColumn() {
         WHERE pg_type.typname = 'draft_status'
         ORDER BY enumsortorder;
       `);
-      
-      const enumValuesTyped = extractTypedResults(enumValues, isEnumValueResult);
-      console.log('Enum values:', enumValuesTyped.map((r) => r.enumlabel));
+
+      const enumValuesTyped = extractTypedResults(
+        enumValues,
+        isEnumValueResult,
+      );
+      console.log(
+        'Enum values:',
+        enumValuesTyped.map((r) => r.enumlabel),
+      );
     }
-    
+
     console.log('🔍 Checking for draft_status column in leagues table...');
-    
+
     // Check if draft_status column exists in leagues table
     const columnResult = await pool.query(`
       SELECT EXISTS (
@@ -107,11 +119,16 @@ async function verifyDraftStatusColumn() {
         AND column_name = 'draft_status'
       ) as column_exists;
     `);
-    
-    const columnExists = extractSingleTypedResult(columnResult, isDatabaseIntrospectionResult);
-    
-    console.log(`Draft status column exists: ${columnExists ? columnExists.column_exists : false}`);
-    
+
+    const columnExists = extractSingleTypedResult(
+      columnResult,
+      isDatabaseIntrospectionResult,
+    );
+
+    console.log(
+      `Draft status column exists: ${columnExists ? columnExists.column_exists : false}`,
+    );
+
     if (columnExists && columnExists.column_exists) {
       // Get column details
       const columnDetails = await pool.query(`
@@ -120,25 +137,30 @@ async function verifyDraftStatusColumn() {
         WHERE table_name = 'leagues' 
         AND column_name = 'draft_status';
       `);
-      
-      const columnDetail = extractSingleTypedResult(columnDetails, isColumnDetailsResult);
+
+      const columnDetail = extractSingleTypedResult(
+        columnDetails,
+        isColumnDetailsResult,
+      );
       console.log('Column details:', columnDetail);
     }
-    
+
     // Check migration history
     console.log('🔍 Checking migration history...');
     const migrationResult = await pool.query(`
       SELECT * FROM drizzle.__drizzle_migrations 
       ORDER BY created_at;
     `);
-    
-    const migrations = extractTypedResults(migrationResult, isMigrationHistoryResult);
-    
+
+    const migrations = extractTypedResults(
+      migrationResult,
+      isMigrationHistoryResult,
+    );
+
     console.log('Applied migrations:');
     migrations.forEach((row) => {
       console.log(`- ${row.hash} (${row.created_at.toISOString()})`);
     });
-    
   } catch (error) {
     console.error('❌ Error:', error);
   } finally {
@@ -146,4 +168,7 @@ async function verifyDraftStatusColumn() {
   }
 }
 
-void verifyDraftStatusColumn();
+// Run verification if this script is executed directly
+if (require.main === module) {
+  void verifyDraftStatusColumn();
+}

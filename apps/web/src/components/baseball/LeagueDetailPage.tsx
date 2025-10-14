@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { 
-  Button, 
-  Card, 
-  useAuth, 
+import {
+  Button,
+  Card,
+  useAuth,
   XStack,
-  YStack
+  YStack,
 } from '@legacy-sports/shared-components';
 import { H1, H2, Spinner, Text } from 'tamagui';
-import { Copy, Check } from '@tamagui/lucide-icons';
+import { Check, Copy } from '@tamagui/lucide-icons';
 import { gql, useLazyQuery } from '@apollo/client';
-import { 
+import { env } from '../../config/environment';
+import {
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
@@ -31,7 +32,7 @@ const GET_USER_TEAM_ID = gql`
 // Helper functions for draft status display
 function formatDraftStatus(status?: string | null): string {
   if (!status) return 'Unknown';
-  
+
   switch (status) {
     case 'not-started':
       return 'Not Started';
@@ -42,7 +43,7 @@ function formatDraftStatus(status?: string | null): string {
     case 'completed':
       return 'Completed';
     default:
-      return status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+      return status.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   }
 }
 
@@ -99,7 +100,7 @@ function getDraftButtonText(status?: string | null, loading = false): string {
   if (loading) {
     return 'Starting...';
   }
-  
+
   switch (status) {
     case 'not-started':
       return 'Start Draft';
@@ -117,80 +118,57 @@ function getDraftButtonText(status?: string | null, loading = false): string {
 export function LeagueDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const leagueId = parseInt(id || '0', 10);
-  const [activeTab, setActiveTab] = useState<'info' | 'roster' | 'commissioner'>('info');
+  const [activeTab, setActiveTab] = useState<
+    'info' | 'roster' | 'commissioner'
+  >('info');
   const [linkCopied, setLinkCopied] = useState(false);
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const { user } = useAuth();
 
   const { data, loading, error } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId),
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
-    onCompleted: (queryData) => {
-      console.log('📥 League query completed:', queryData?.league);
-    },
-    onError: (queryError) => {
-      console.error('📥 League query error:', queryError);
-    }
-  });
-
-  // Debug logging for league data
-  console.log('🏟️ LeagueDetailPage render:', {
-    leagueId,
-    loading,
-    error: error?.message,
-    leagueData: data?.league,
-    draftStatus: data?.league?.draftStatus,
-    user: user ? { id: user.id, accessLevel: user.accessLevel } : null
   });
 
   // Fetch league positions for roster management
-  const { data: positionsData, loading: positionsLoading } = useGetPositionsForLeagueQuery({
-    skip: isNaN(leagueId),
-    variables: { leagueId }
-  });
+  const { data: positionsData, loading: positionsLoading } =
+    useGetPositionsForLeagueQuery({
+      skip: isNaN(leagueId),
+      variables: { leagueId },
+    });
 
   // Use the proper userTeamId GraphQL query to get the user's team in this league
-  const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] = useLazyQuery(GET_USER_TEAM_ID);
-  
+  const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
+    useLazyQuery(GET_USER_TEAM_ID);
+
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(leagueId) && user?.id) {
       void getUserTeamId({
         variables: { leagueId },
-        onCompleted: (data) => {
-          console.log('🏀 User team ID query completed:', data);
-        },
-        onError: (error) => {
-          console.error('🚨 User team ID query error:', error);
-        }
       });
     }
   }, [leagueId, user?.id, getUserTeamId]);
 
   const userTeamId = userTeamData?.userTeamId;
-  const { data: teamMembersData, loading: teamMembersLoading } = useGetTeamMembersQuery({
-    skip: !userTeamId,
-    variables: {
-      teamId: userTeamId || 0,
-    },
-  });
+  const { data: teamMembersData, loading: teamMembersLoading } =
+    useGetTeamMembersQuery({
+      skip: !userTeamId,
+      variables: {
+        teamId: userTeamId || 0,
+      },
+    });
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
   // StartDraft mutation - now returns League object, eliminating need for manual refetch
   const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
-    onCompleted: (data) => {
-      console.log('✅ Draft mutation completed successfully:', data);
-      console.log('🎯 Returned League object with updated status:', data.startDraft);
-      console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
-      console.log('🚀 Apollo Client cache automatically updated - no manual refetch needed!');
+    onCompleted: () => {
       alert('Draft has been started and queued for processing!');
     },
     onError: (error) => {
-      console.error('❌ Error starting draft:', error);
-      console.error('📋 GraphQL errors:', error.graphQLErrors);
-      console.error('🌐 Network error:', error.networkError);
-      console.error('🔍 Full error object:', error);
+      console.error('Error starting draft:', error);
       alert(`Failed to start draft: ${error.message}`);
     },
   });
@@ -202,70 +180,77 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [data?.league, user]);
 
   const handleStartDraft = useCallback(() => {
-    console.log('🚀 handleStartDraft called');
-    console.log('👤 User:', user);
-    console.log('🏆 League owner:', data?.league?.owner);
-    console.log('⚖️ Is commissioner:', isCommissioner);
-    console.log('📊 Current draft status:', data?.league?.draftStatus);
-    
     if (!isCommissioner) {
-      console.log('❌ User is not a commissioner');
       alert('Only league commissioners can start drafts.');
       return;
     }
 
-    if (window.confirm('Are you sure you want to start the draft? This will randomly assign players to all teams.')) {
-      console.log('✅ User confirmed, calling startDraft mutation');
-      console.log('🎯 Variables:', { leagueId, draftType: 'random-draft' });
-      
+    if (
+      window.confirm(
+        'Are you sure you want to start the draft? This will randomly assign players to all teams.',
+      )
+    ) {
       void startDraft({
         variables: {
           leagueId: leagueId,
-          draftType: 'random-draft'
-        }
-      });
-    } else {
-      console.log('❌ User cancelled draft start');
-    }
-  }, [startDraft, leagueId, isCommissioner, user, data?.league]);
-
-  const handlePlayerAssign = useCallback(async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
-    if (!player.id) {
-      console.error('Player ID is required');
-      return;
-    }
-    
-    try {
-      await updateTeamMemberPosition({
-        variables: {
-          teamMemberId: player.id,
-          positionId: position.id,
+          draftType: 'random-draft',
         },
       });
-    } catch (error) {
-      console.error('Error assigning player:', error);
     }
-  }, [updateTeamMemberPosition]);
+  }, [startDraft, leagueId, isCommissioner]);
 
-  const handlePlayerRemove = useCallback(async (position: LeaguePositionFragment) => {
-    try {
-      // Find the player assigned to this position
-      const assignedPlayer = teamMembersData?.teamMembers?.find(
-        member => member?.positionId === position.id
-      );
-      
-      if (assignedPlayer?.id) {
+  const handlePlayerAssign = useCallback(
+    async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+      if (!player.id) {
+        console.error('Player ID is required');
+        return;
+      }
+
+      try {
         await updateTeamMemberPosition({
           variables: {
-            teamMemberId: assignedPlayer.id,
-            positionId: null,
+            teamMemberId: player.id,
+            positionId: position.id,
           },
         });
+      } catch (error) {
+        console.error('Error assigning player:', error);
       }
-    } catch (error) {
-      console.error('Error removing player:', error);
-    }
-  }, [updateTeamMemberPosition, teamMembersData?.teamMembers]);
+    },
+    [updateTeamMemberPosition],
+  );
+
+  const handlePlayerRemove = useCallback(
+    async (position: LeaguePositionFragment) => {
+      try {
+        // Find the player assigned to this position
+        const assignedPlayer = teamMembersData?.teamMembers?.find(
+          (member) => member?.positionId === position.id,
+        );
+
+        if (assignedPlayer?.id) {
+          await updateTeamMemberPosition({
+            variables: {
+              teamMemberId: assignedPlayer.id,
+              positionId: null,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error removing player:', error);
+      }
+    },
+    [updateTeamMemberPosition, teamMembersData?.teamMembers],
+  );
+
+  // Generate the full invite URL for display and copying
+  const inviteUrl = useMemo(() => {
+    if (!data?.league?.inviteCode) return null;
+    const baseUrl = env.baseUrl.endsWith('/')
+      ? env.baseUrl.slice(0, -1)
+      : env.baseUrl;
+    return `${window.location.origin}${baseUrl}/#/baseball/league/join/${data.league.inviteCode}`;
+  }, [data?.league?.inviteCode]);
 
   const handleCopyInviteCode = useCallback(async () => {
     try {
@@ -276,7 +261,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
       await navigator.clipboard.writeText(inviteCode);
       setLinkCopied(true);
-      
+
       // Reset the copied state after 2 seconds
       setTimeout(() => {
         setLinkCopied(false);
@@ -287,11 +272,33 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [data?.league?.inviteCode]);
 
+  const handleCopyInviteLink = useCallback(async () => {
+    try {
+      if (!inviteUrl) {
+        alert('Invite code not available');
+        return;
+      }
+
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteLinkCopied(true);
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setInviteLinkCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Error copying invite link:', error);
+      alert('Failed to copy invite link to clipboard');
+    }
+  }, [inviteUrl]);
+
   if (loading || positionsLoading || teamMembersLoading) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$6">
         <Spinner size="large" />
-        <Text marginTop="$4" color="$gray10">Loading league...</Text>
+        <Text marginTop="$4" color="$gray10">
+          Loading league...
+        </Text>
       </YStack>
     );
   }
@@ -302,10 +309,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         <Text color="$red10" fontSize="$5" textAlign="center">
           {error ? `Error: ${error.message}` : `League not found`}
         </Text>
-        <Button 
-          marginTop="$4"
-          onPress={() => window.history.back()}
-        >
+        <Button marginTop="$4" onPress={() => window.history.back()}>
           Go Back
         </Button>
       </YStack>
@@ -321,8 +325,8 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* League Info Cards */}
       <XStack gap="$4" flexWrap="wrap">
         {/* Basic Info Card */}
-        <Card 
-          flex={1} 
+        <Card
+          flex={1}
           minWidth={300}
           backgroundColor="$blue2"
           borderColor="$blue6"
@@ -334,15 +338,19 @@ export function LeagueDetailPage(): React.JSX.Element {
           <YStack space="$2">
             <XStack justifyContent="space-between">
               <Text color="$gray11">Owner:</Text>
-              <Text color="$gray12" fontWeight="600">User {league.owner}</Text>
+              <Text color="$gray12" fontWeight="600">
+                User {league.owner}
+              </Text>
             </XStack>
             <XStack justifyContent="space-between">
               <Text color="$gray11">Max Roster:</Text>
-              <Text color="$gray12" fontWeight="600">{league.maxRosterSize} players</Text>
+              <Text color="$gray12" fontWeight="600">
+                {league.maxRosterSize} players
+              </Text>
             </XStack>
             <XStack justifyContent="space-between" alignItems="center">
               <Text color="$gray11">Draft Status:</Text>
-              <XStack 
+              <XStack
                 backgroundColor={getDraftStatusBgColor(league.draftStatus)}
                 borderColor={getDraftStatusColor(league.draftStatus)}
                 borderWidth={1}
@@ -350,8 +358,8 @@ export function LeagueDetailPage(): React.JSX.Element {
                 paddingHorizontal="$2"
                 paddingVertical="$1"
               >
-                <Text 
-                  color={getDraftStatusColor(league.draftStatus)} 
+                <Text
+                  color={getDraftStatusColor(league.draftStatus)}
                   fontWeight="600"
                   fontSize="$3"
                   textTransform="capitalize"
@@ -370,8 +378,8 @@ export function LeagueDetailPage(): React.JSX.Element {
         </Card>
 
         {/* Stats Card */}
-        <Card 
-          flex={1} 
+        <Card
+          flex={1}
           minWidth={300}
           backgroundColor="$green2"
           borderColor="$green6"
@@ -383,16 +391,20 @@ export function LeagueDetailPage(): React.JSX.Element {
           <YStack space="$2">
             <XStack justifyContent="space-between">
               <Text color="$gray11">Total Positions:</Text>
-              <Text color="$gray12" fontWeight="600">{positions.length}</Text>
+              <Text color="$gray12" fontWeight="600">
+                {positions.length}
+              </Text>
             </XStack>
             <XStack justifyContent="space-between">
               <Text color="$gray11">Players:</Text>
-              <Text color="$gray12" fontWeight="600">{teamMembers.length}</Text>
+              <Text color="$gray12" fontWeight="600">
+                {teamMembers.length}
+              </Text>
             </XStack>
             <XStack justifyContent="space-between">
               <Text color="$gray11">Assigned:</Text>
               <Text color="$gray12" fontWeight="600">
-                {teamMembers.filter(p => p?.positionId).length}
+                {teamMembers.filter((p) => p?.positionId).length}
               </Text>
             </XStack>
           </YStack>
@@ -400,71 +412,116 @@ export function LeagueDetailPage(): React.JSX.Element {
       </XStack>
 
       {/* Invite Friends Card */}
-      <Card 
-        backgroundColor="$purple2"
-        borderColor="$purple6"
-        padding="$4"
-      >
+      <Card backgroundColor="$purple2" borderColor="$purple6" padding="$4">
         <YStack space="$3">
           <H2 size="$6" color="$purple11" marginBottom="$2">
-            👥 Invite Friends
+            <span role="img" aria-label="people">
+              👥
+            </span>{' '}
+            Invite Friends
           </H2>
-          <Text color="$gray11" fontSize="$4">
-            Share this invite code with friends to join your league:
+          <Text color="$gray11" fontSize="$4" marginBottom="$2">
+            Share this link or code with friends to join your league:
           </Text>
-          <XStack 
-            gap="$3" 
-            alignItems="center" 
-            flexWrap="wrap"
-          >
-            <Card
-              flex={1}
-              minWidth={200}
-              backgroundColor="$purple3"
-              borderColor="$purple7"
-              padding="$3"
-              borderRadius="$3"
-            >
-              <Text 
-                color="$purple12" 
-                fontSize="$7"
-                fontFamily="$mono"
-                fontWeight="700"
-                letterSpacing={2}
-                textAlign="center"
+
+          {/* Invite Link Section */}
+          <YStack space="$2">
+            <Text color="$purple11" fontSize="$3" fontWeight="600">
+              Invite Link (Click to Join)
+            </Text>
+            <XStack gap="$3" alignItems="center" flexWrap="wrap">
+              <Card
+                flex={1}
+                minWidth={250}
+                backgroundColor="$purple3"
+                borderColor="$purple7"
+                padding="$3"
+                borderRadius="$3"
               >
-                {league.inviteCode || 'Loading...'}
-              </Text>
-            </Card>
-            <Button
-              backgroundColor={linkCopied ? '$green9' : '$purple9'}
-              color="white"
-              onPress={handleCopyInviteCode}
-              minWidth={120}
-              size="$4"
-              icon={linkCopied ? <Check size={20} /> : <Copy size={20} />}
-            >
-              {linkCopied ? 'Copied!' : 'Copy Code'}
-            </Button>
-          </XStack>
-          <Text color="$gray10" fontSize="$3" fontStyle="italic">
-            Friends can join by entering this code on the join league page
-          </Text>
+                <Text
+                  color="$purple11"
+                  fontSize="$3"
+                  fontFamily="$mono"
+                  textAlign="center"
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {inviteUrl || 'Loading...'}
+                </Text>
+              </Card>
+              <Button
+                backgroundColor={inviteLinkCopied ? '$green9' : '$purple9'}
+                color="white"
+                onPress={handleCopyInviteLink}
+                minWidth={120}
+                size="$4"
+                icon={
+                  inviteLinkCopied ? <Check size={20} /> : <Copy size={20} />
+                }
+              >
+                {inviteLinkCopied ? 'Copied!' : 'Copy Link'}
+              </Button>
+            </XStack>
+            <Text color="$gray10" fontSize="$2" fontStyle="italic">
+              Friends can click this link to automatically join your league
+            </Text>
+          </YStack>
+
+          {/* Divider */}
+          <YStack height={1} backgroundColor="$purple6" marginVertical="$2" />
+
+          {/* Invite Code Section */}
+          <YStack space="$2">
+            <Text color="$purple11" fontSize="$3" fontWeight="600">
+              Invite Code (Manual Entry)
+            </Text>
+            <XStack gap="$3" alignItems="center" flexWrap="wrap">
+              <Card
+                flex={1}
+                minWidth={200}
+                backgroundColor="$purple3"
+                borderColor="$purple7"
+                padding="$3"
+                borderRadius="$3"
+              >
+                <Text
+                  color="$purple12"
+                  fontSize="$7"
+                  fontFamily="$mono"
+                  fontWeight="700"
+                  letterSpacing={2}
+                  textAlign="center"
+                >
+                  {league.inviteCode || 'Loading...'}
+                </Text>
+              </Card>
+              <Button
+                backgroundColor={linkCopied ? '$green9' : '$purple9'}
+                color="white"
+                onPress={handleCopyInviteCode}
+                minWidth={120}
+                size="$4"
+                icon={linkCopied ? <Check size={20} /> : <Copy size={20} />}
+              >
+                {linkCopied ? 'Copied!' : 'Copy Code'}
+              </Button>
+            </XStack>
+            <Text color="$gray10" fontSize="$2" fontStyle="italic">
+              Friends can enter this code on the join league page
+            </Text>
+          </YStack>
         </YStack>
       </Card>
 
       {/* Development Notice */}
-      <Card 
-        backgroundColor="$yellow2"
-        borderColor="$yellow6"
-        padding="$4"
-      >
+      <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
         <H2 size="$5" color="$yellow11" marginBottom="$2">
           � League Features
         </H2>
         <Text color="$yellow11">
-          Use the "My Roster" tab to manage your team's lineup and player positions. 
-          Additional league features like standings, member management, and draft tools are coming soon.
+          Use the "My Roster" tab to manage your team's lineup and player
+          positions. Additional league features like standings, member
+          management, and draft tools are coming soon.
         </Text>
       </Card>
     </YStack>
@@ -474,7 +531,9 @@ export function LeagueDetailPage(): React.JSX.Element {
     <LeagueRosterManagement
       positions={positions}
       teamPlayers={teamMembers}
-      onPlayerAssign={(player, position) => void handlePlayerAssign(player, position)}
+      onPlayerAssign={(player, position) =>
+        void handlePlayerAssign(player, position)
+      }
       onPlayerRemove={(player) => void handlePlayerRemove(player)}
       loading={positionsLoading || teamMembersLoading || userTeamLoading}
     />
@@ -484,13 +543,26 @@ export function LeagueDetailPage(): React.JSX.Element {
     <YStack space="$4">
       <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
         <YStack space="$3">
-          <H2 size="$6" color="$blue11">Draft Management</H2>
+          <H2 size="$6" color="$blue11">
+            Draft Management
+          </H2>
           <Text color="$gray11" fontSize="$4">
-            Start a random draft to automatically assign players to all teams in the league.
+            Start a random draft to automatically assign players to all teams in
+            the league.
           </Text>
-          <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$3">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+            gap="$3"
+          >
             <YStack flex={1} minWidth={300}>
-              <Text fontSize="$5" fontWeight="600" color="$blue11" marginBottom="$2">
+              <Text
+                fontSize="$5"
+                fontWeight="600"
+                color="$blue11"
+                marginBottom="$2"
+              >
                 Random Draft
               </Text>
               <Text fontSize="$3" color="$gray10">
@@ -502,7 +574,11 @@ export function LeagueDetailPage(): React.JSX.Element {
               color="white"
               onPress={handleStartDraft}
               disabled={startDraftLoading || !canStartDraft(league.draftStatus)}
-              opacity={(startDraftLoading || !canStartDraft(league.draftStatus)) ? 0.6 : 1}
+              opacity={
+                startDraftLoading || !canStartDraft(league.draftStatus)
+                  ? 0.6
+                  : 1
+              }
               minWidth={140}
               size="$4"
             >
@@ -515,11 +591,14 @@ export function LeagueDetailPage(): React.JSX.Element {
       <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
         <YStack space="$3">
           <H2 size="$5" color="$yellow11">
-            <span role="img" aria-label="Warning">⚠️</span> Commissioner Features
+            <span role="img" aria-label="Warning">
+              ⚠️
+            </span>{' '}
+            Commissioner Features
           </H2>
           <Text color="$yellow11" fontSize="$4">
-            Additional commissioner features like member management, league settings, 
-            and advanced draft options are coming soon.
+            Additional commissioner features like member management, league
+            settings, and advanced draft options are coming soon.
           </Text>
         </YStack>
       </Card>
@@ -527,7 +606,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   return (
-    <YStack flex={1} padding="$6" maxWidth={1200} alignSelf="center" width="100%">
+    <YStack
+      flex={1}
+      padding="$6"
+      maxWidth={1200}
+      alignSelf="center"
+      width="100%"
+    >
       {/* Header */}
       <YStack marginBottom="$6">
         <H1 size="$9" color="$blue11" marginBottom="$2">
@@ -574,14 +659,13 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* Tab Content */}
       {activeTab === 'info' && renderLeagueInfo()}
       {activeTab === 'roster' && renderRosterManagement()}
-      {activeTab === 'commissioner' && isCommissioner && renderCommissionerSettings()}
+      {activeTab === 'commissioner' &&
+        isCommissioner &&
+        renderCommissionerSettings()}
 
       {/* Back Button */}
       <XStack justifyContent="center" marginTop="$6">
-        <Button 
-          backgroundColor="$gray9"
-          onPress={() => window.history.back()}
-        >
+        <Button backgroundColor="$gray9" onPress={() => window.history.back()}>
           <Text color="white">Back to Leagues</Text>
         </Button>
       </XStack>

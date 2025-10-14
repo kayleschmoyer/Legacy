@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  YStack,
-  XStack,
-} from '@legacy-sports/shared-components';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { useJoinLeagueByCodeMutation } from '../../api/db/graphql.generated';
 
 export function JoinLeagueByCode(): React.JSX.Element {
   const navigate = useNavigate();
+  const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
   const [inviteCode, setInviteCode] = useState('');
   const [teamName, setTeamName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Auto-fill invite code from URL parameter if present
+  useEffect(() => {
+    if (urlInviteCode) {
+      setInviteCode(urlInviteCode.toUpperCase());
+    }
+  }, [urlInviteCode]);
+
   const [joinLeague, { loading }] = useJoinLeagueByCodeMutation({
     onCompleted: (data) => {
       if (data.joinLeagueByCode?.leagueId) {
@@ -63,22 +66,49 @@ export function JoinLeagueByCode(): React.JSX.Element {
   };
 
   return (
-    <YStack flex={1} padding="$6" space="$4" maxWidth={600} margin="auto" width="100%">
+    <YStack
+      flex={1}
+      padding="$6"
+      space="$4"
+      maxWidth={600}
+      margin="auto"
+      width="100%"
+    >
       <YStack space="$2">
         <H1 size="$9" color="$blue11">
-          🎟️ Join League
+          <span role="img" aria-label="ticket">
+            🎟️
+          </span>{' '}
+          Join League
         </H1>
         <Text color="$gray11" fontSize="$5">
-          Enter the invite code shared by your league commissioner
+          {urlInviteCode
+            ? 'Your invite code has been pre-filled. Just enter your team name to join!'
+            : 'Enter the invite code shared by your league commissioner'}
         </Text>
       </YStack>
 
-      <Card
-        backgroundColor="$blue2"
-        borderColor="$blue6"
-        padding="$5"
-      >
-        <form onSubmit={handleSubmit}>
+      {urlInviteCode && (
+        <Card backgroundColor="$green2" borderColor="$green6" padding="$3">
+          <XStack gap="$2" alignItems="center">
+            <Text fontSize="$4">
+              <span role="img" aria-label="check">
+                ✅
+              </span>
+            </Text>
+            <Text color="$green11" fontSize="$3" fontWeight="600">
+              Invite code loaded from link! Ready to join.
+            </Text>
+          </XStack>
+        </Card>
+      )}
+
+      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$5">
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(e);
+          }}
+        >
           <YStack space="$4">
             {/* Invite Code Input */}
             <YStack space="$2">
@@ -88,7 +118,9 @@ export function JoinLeagueByCode(): React.JSX.Element {
               <Input
                 placeholder="Enter 8-character code"
                 value={inviteCode}
-                onChangeText={(text: string) => setInviteCode(text.toUpperCase())}
+                onChangeText={(text: string) =>
+                  setInviteCode(text.toUpperCase())
+                }
                 maxLength={8}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -128,7 +160,10 @@ export function JoinLeagueByCode(): React.JSX.Element {
             {error && (
               <Card backgroundColor="$red2" borderColor="$red6" padding="$3">
                 <Text color="$red11" fontSize="$3">
-                  ❌ {error}
+                  <span role="img" aria-label="error">
+                    ❌
+                  </span>{' '}
+                  {error}
                 </Text>
               </Card>
             )}
@@ -165,14 +200,13 @@ export function JoinLeagueByCode(): React.JSX.Element {
       </Card>
 
       {/* Info Card */}
-      <Card
-        backgroundColor="$purple2"
-        borderColor="$purple6"
-        padding="$4"
-      >
+      <Card backgroundColor="$purple2" borderColor="$purple6" padding="$4">
         <YStack space="$2">
           <H2 size="$5" color="$purple11">
-            💡 How It Works
+            <span role="img" aria-label="lightbulb">
+              💡
+            </span>{' '}
+            How It Works
           </H2>
           <Text color="$gray11" fontSize="$3">
             • Get an invite code from your league's commissioner

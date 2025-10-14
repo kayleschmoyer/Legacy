@@ -20,8 +20,8 @@ function Button({
   // Use chromeless for secondary and outlined variants, default theme for primary
   const buttonProps =
     variant === 'secondary' || variant === 'outlined'
-      ? { chromeless: true, ...props }
-      : props;
+      ? { chromeless: true, type: 'button' as const, ...props }
+      : { type: 'button' as const, ...props };
 
   // Auto-wrap string children in Text component for React Native compatibility
   const processChildren = (child: React.ReactNode): React.ReactNode => {
@@ -32,7 +32,9 @@ function Button({
   };
 
   const content = children || title;
-  const wrappedContent = React.isValidElement(content) ? content : processChildren(content);
+  const wrappedContent = React.isValidElement(content)
+    ? content
+    : processChildren(content);
 
   return (
     <TamaguiButton size="$4" {...buttonProps}>

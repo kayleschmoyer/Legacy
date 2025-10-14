@@ -1,5 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { getUserByEmail, InternalUser, createUser } from '@legacy-sports/db-client';
+import {
+  createUser,
+  getUserByEmail,
+  InternalUser,
+} from '@legacy-sports/db-client';
 import { getDbClient } from '../util/db';
 
 /**
@@ -7,9 +11,7 @@ import { getDbClient } from '../util/db';
  * If the user doesn't exist, automatically creates them with default access level
  * Used by the OAuth flow to ensure all authenticated users have a database record
  */
-export async function getOrCreateUser(
-  email: string,
-): Promise<InternalUser> {
+export async function getOrCreateUser(email: string): Promise<InternalUser> {
   LOGGER.debug(`Getting or creating user: ${email}`);
 
   try {

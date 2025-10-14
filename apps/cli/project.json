@@ -3,75 +3,8 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/cli/src",
   "projectType": "application",
-  "tags": [
-    "platform:node",
-    "scope:app",
-    "type:cli"
-  ],
+  "tags": ["platform:node", "scope:app", "type:cli"],
   "targets": {
-    "build": {
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": [
-        "{options.outputPath}"
-      ],
-      "defaultConfiguration": "production",
-      "options": {
-        "platform": "node",
-        "outputPath": "dist/apps/cli",
-        "format": [
-          "cjs"
-        ],
-        "bundle": true,
-        "main": "apps/cli/src/main.ts",
-        "tsConfig": "apps/cli/tsconfig.app.json",
-        "assets": [
-          "apps/cli/src/assets"
-        ],
-        "generatePackageJson": true,
-        "esbuildOptions": {
-          "sourcemap": true,
-          "outExtension": {
-            ".js": ".js"
-          },
-          "external": [
-            "pg-native"
-          ]
-        }
-      },
-      "configurations": {
-        "development": {},
-        "production": {
-          "esbuildOptions": {
-            "sourcemap": false,
-            "outExtension": {
-              ".js": ".js"
-            },
-            "external": [
-              "pg-native"
-            ]
-          }
-        }
-      }
-    },
-    "serve": {
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "dependsOn": [
-        "build"
-      ],
-      "options": {
-        "buildTarget": "cli:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "cli:build:development"
-        },
-        "production": {
-          "buildTarget": "cli:build:production"
-        }
-      }
-    },
     "codegen": {
       "executor": "nx:run-commands",
       "options": {
@@ -98,28 +31,6 @@
       "options": {
         "command": "ts-node -r tsconfig-paths/register src/main.ts",
         "cwd": "apps/cli"
-      }
-    },
-    "run": {
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "dependsOn": [
-        "build"
-      ],
-      "options": {
-        "buildTarget": "cli:build",
-        "runBuildTargetDependencies": false,
-        "watch": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "cli:build:development",
-          "watch": false
-        },
-        "production": {
-          "buildTarget": "cli:build:production",
-          "watch": false
-        }
       }
     },
     "compute-scoring": {

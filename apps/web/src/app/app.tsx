@@ -8,6 +8,8 @@ import {
 } from '@legacy-sports/shared-components';
 import { WebHomeScreen } from '../components/WebHomeScreen';
 import { UserProfileDropdown } from '../components/UserProfileDropdown';
+import { SportsDropdown } from '../components/SportsDropdown';
+import { PlayersDropdown } from '../components/PlayersDropdown';
 import { BaseballScreen } from '../components/baseball';
 
 import {
@@ -54,26 +56,6 @@ const NavLinks = styled(XStack, {
 
 // Note: Using regular Link instead of styled to avoid "Functions are not valid as a React child" error
 
-function BaseballDropdownMenu() {
-  const location = useLocation();
-  const isBaseballActive = location.pathname?.startsWith('/baseball') ?? false;
-
-  // Temporary fix: Use direct link instead of Popover dropdown to avoid Popover.Trigger issue
-  return (
-    <Link to="/baseball" style={{ textDecoration: 'none' }}>
-      <Button
-        variant={isBaseballActive ? 'primary' : 'secondary'}
-        size="$3"
-      >
-        <span role="img" aria-label="baseball">
-          ⚾
-        </span>{' '}
-        Baseball
-      </Button>
-    </Link>
-  );
-}
-
 function Navigation() {
   const location = useLocation();
 
@@ -83,7 +65,12 @@ function Navigation() {
         {/* Logo/Brand Section */}
         <XStack alignItems="center" space="$4">
           <Link to="/" style={{ textDecoration: 'none' }}>
-            <H1 color="$color" size="$6" cursor="pointer" hoverStyle={{ opacity: 0.8 }}>
+            <H1
+              color="$color"
+              size="$6"
+              cursor="pointer"
+              hoverStyle={{ opacity: 0.8 }}
+            >
               <span role="img" aria-label="football">
                 🏈
               </span>{' '}
@@ -105,47 +92,13 @@ function Navigation() {
               Home
             </Button>
           </Link>
-          <Link to="/football" style={{ textDecoration: 'none' }}>
-            <Button
-              variant={
-                location.pathname === '/football' ? 'primary' : 'secondary'
-              }
-              size="$3"
-            >
-              <span role="img" aria-label="football">
-                🏈
-              </span>{' '}
-              Football
-            </Button>
-          </Link>
-          {/* Baseball Dropdown Menu */}
-          <BaseballDropdownMenu />
-          <Link to="/players" style={{ textDecoration: 'none' }}>
-            <Button
-              variant={
-                location.pathname === '/players' ? 'primary' : 'secondary'
-              }
-              size="$3"
-            >
-              <span role="img" aria-label="players">
-                👤
-              </span>{' '}
-              Players
-            </Button>
-          </Link>
-          <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-            <Button
-              variant={
-                location.pathname === '/players/stats' ? 'primary' : 'secondary'
-              }
-              size="$3"
-            >
-              <span role="img" aria-label="statistics">
-                📊
-              </span>{' '}
-              Player Stats
-            </Button>
-          </Link>
+
+          {/* Sports Dropdown - Football and Baseball */}
+          <SportsDropdown />
+
+          {/* Players Dropdown - All Players and Stats */}
+          <PlayersDropdown />
+
           <Link to="/management" style={{ textDecoration: 'none' }}>
             <Button
               variant={
@@ -161,9 +114,7 @@ function Navigation() {
           </Link>
           <Link to="/about" style={{ textDecoration: 'none' }}>
             <Button
-              variant={
-                location.pathname === '/about' ? 'primary' : 'secondary'
-              }
+              variant={location.pathname === '/about' ? 'primary' : 'secondary'}
               size="$3"
             >
               <span role="img" aria-label="info">
@@ -211,8 +162,15 @@ function App() {
           <Route path="/" element={<NavigableHomeScreen />} />
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
-          <Route path="/baseball/league/create" element={<LeagueCreatePage />} />
+          <Route
+            path="/baseball/league/create"
+            element={<LeagueCreatePage />}
+          />
           <Route path="/baseball/league/join" element={<JoinLeagueByCode />} />
+          <Route
+            path="/baseball/league/join/:inviteCode"
+            element={<JoinLeagueByCode />}
+          />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { YStack, H1, H3, XStack } from '@legacy-sports/shared-components';
+import { H1, H3, XStack, YStack } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
 
 const Container = styled(YStack, {
@@ -65,7 +65,7 @@ export default function AboutPage() {
 
       <InfoCard>
         <H3 marginBottom="$2">Build Information</H3>
-        
+
         <InfoRow>
           <Label>Version:</Label>
           <Value>{version}</Value>
@@ -84,7 +84,7 @@ export default function AboutPage() {
 
       <InfoCard>
         <H3 marginBottom="$2">Application Info</H3>
-        
+
         <InfoRow>
           <Label>Environment:</Label>
           <Value>{import.meta.env.MODE}</Value>

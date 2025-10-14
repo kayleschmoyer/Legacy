@@ -9,17 +9,18 @@
  * - Handles cross-schema dependencies in correct order
  */
 
+// Load environment variables from root .env file
+import { config } from 'dotenv';
+import { resolve } from 'path';
+config({ path: resolve(__dirname, '../../../../.env') });
+
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
-import { config } from 'dotenv';
 import { LOGGER } from '@legacy-sports/logging';
 import { existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { getDatabaseConfig } from '../config/database';
-
-// Load .env from the project root (two levels up from this script)
-config({ path: resolve(__dirname, '../../../..', '.env') });
 
 async function runMigrations() {
   try {
@@ -54,9 +55,11 @@ async function runMigrations() {
     // Run all migrations from the unified migrations folder
     const migrationsPath = join(process.cwd(), 'migrations');
     LOGGER.info(`� Migrations path: ${migrationsPath}`);
-    
+
     if (existsSync(migrationsPath)) {
-      LOGGER.info('📋 Applying all migrations (both public and internal schemas)...');
+      LOGGER.info(
+        '📋 Applying all migrations (both public and internal schemas)...',
+      );
       await migrate(db, { migrationsFolder: migrationsPath });
       LOGGER.info('✅ All migrations applied successfully');
     } else {

@@ -2,7 +2,7 @@
 
 /**
  * Database Credentials Environment Loader
- * 
+ *
  * This script fetches database credentials and outputs them as environment variables
  * that can be used by Drizzle Kit and other tools.
  */
@@ -17,7 +17,7 @@ import { resolveDatabaseCredentials } from '../config/credentials';
 async function loadDbCredentialsToEnv() {
   try {
     console.log('🔧 Loading database credentials...');
-    
+
     // Debug environment variables
     console.log('Environment variables:');
     console.log(`USE_LOCAL_CREDENTIALS: ${process.env.USE_LOCAL_CREDENTIALS}`);
@@ -25,17 +25,17 @@ async function loadDbCredentialsToEnv() {
     console.log(`DB_CREDS_PATH: ${process.env.DB_CREDS_PATH}`);
     console.log(`DB_HOST: ${process.env.DB_HOST}`);
     console.log(`AWS_REGION: ${process.env.AWS_REGION}`);
-    
+
     // Get the secret name from environment
     const secretName = process.env.DB_SECRET_NAME || process.env.DB_CREDS_PATH;
     console.log(`Using secret name: ${secretName}`);
-    
+
     // Force use of AWS Secrets Manager instead of local credentials
     const credentials = await resolveDatabaseCredentials({
       useLocalCredentials: false,
       secretName: secretName,
     });
-    
+
     console.log('✅ Credentials loaded successfully');
     console.log('');
     console.log('Copy and paste the following environment variables:');
@@ -61,11 +61,13 @@ async function loadDbCredentialsToEnv() {
     console.log('Then run your Drizzle commands like:');
     console.log('npx drizzle-kit introspect');
     console.log('npx drizzle-kit generate');
-    
   } catch (error) {
     console.error('❌ Failed to load database credentials:', error);
     process.exit(1);
   }
 }
 
-void loadDbCredentialsToEnv();
+// Run if this script is executed directly
+if (require.main === module) {
+  void loadDbCredentialsToEnv();
+}

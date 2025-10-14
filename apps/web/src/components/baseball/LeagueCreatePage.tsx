@@ -1,18 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { Button, DateTimePicker } from '@legacy-sports/shared-components';
 import {
-  Button,
-  Card,
-  H1,
-  H2,
-  Input,
-  ScrollView,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
-import { DateTimePicker } from '@legacy-sports/shared-components';
-import { GetUserLeagues, GetUserLeaguesQuery, useCreateLeagueAndTeamsMutation } from '../../api/db/graphql.generated';
+  GetUserLeagues,
+  GetUserLeaguesQuery,
+  useCreateLeagueAndTeamsMutation,
+} from '../../api/db/graphql.generated';
 
 // Now using codegen-generated hooks and types
 
@@ -48,53 +42,60 @@ export function LeagueCreatePage(): React.JSX.Element {
     draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 1 week from now
   });
 
-  const [createLeagueAndTeams, { loading, error }] = useCreateLeagueAndTeamsMutation({
-    update: (cache, { data }) => {
-      // Update the cache with the new league
-      if (data?.createLeagueAndTeams?.league) {
-        const newLeague = data.createLeagueAndTeams.league;
-        
-        try {
-          // Read the existing user leagues from cache
-          const existingData = cache.readQuery<GetUserLeaguesQuery>({
-            query: GetUserLeagues,
-          });
+  const [createLeagueAndTeams, { loading, error }] =
+    useCreateLeagueAndTeamsMutation({
+      update: (cache, { data }) => {
+        // Update the cache with the new league
+        if (data?.createLeagueAndTeams?.league) {
+          const newLeague = data.createLeagueAndTeams.league;
 
-          // If we have existing data, add the new league to it
-          if (existingData?.userLeagues) {
-            cache.writeQuery({
+          try {
+            // Read the existing user leagues from cache
+            const existingData = cache.readQuery<GetUserLeaguesQuery>({
               query: GetUserLeagues,
-              data: {
-                userLeagues: [...existingData.userLeagues, newLeague],
-              },
             });
-          }
-        } catch (error) {
-          // If cache read fails (e.g., query hasn't been executed yet), 
-          // fallback to refetchQueries approach
-          console.log('Cache read failed, will refetch queries instead:', error);
-        }
-      }
-    },
-    refetchQueries: [
-      {
-        query: GetUserLeagues,
-      },
-    ],
-    onCompleted: (data) => {
-      if (data.createLeagueAndTeams?.league?.id) {
-        // Navigate to the newly created league
-        navigate(`/baseball/league/${data.createLeagueAndTeams.league.id}`);
-      }
-    },
-    onError: (error) => {
-      console.error('Error creating league:', error);
-      alert(error.message || 'Failed to create league');
-    },
-  });
 
-  const handleInputChange = (field: keyof CreateLeagueFormData, value: string | number | boolean | Date) => {
-    setFormData(prev => ({
+            // If we have existing data, add the new league to it
+            if (existingData?.userLeagues) {
+              cache.writeQuery({
+                query: GetUserLeagues,
+                data: {
+                  userLeagues: [...existingData.userLeagues, newLeague],
+                },
+              });
+            }
+          } catch (error) {
+            // If cache read fails (e.g., query hasn't been executed yet),
+            // fallback to refetchQueries approach
+            console.log(
+              'Cache read failed, will refetch queries instead:',
+              error,
+            );
+          }
+        }
+      },
+      refetchQueries: [
+        {
+          query: GetUserLeagues,
+        },
+      ],
+      onCompleted: (data) => {
+        if (data.createLeagueAndTeams?.league?.id) {
+          // Navigate to the newly created league
+          navigate(`/baseball/league/${data.createLeagueAndTeams.league.id}`);
+        }
+      },
+      onError: (error) => {
+        console.error('Error creating league:', error);
+        alert(error.message || 'Failed to create league');
+      },
+    });
+
+  const handleInputChange = (
+    field: keyof CreateLeagueFormData,
+    value: string | number | boolean | Date,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -134,7 +135,7 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Form validation
     const validationError = validateForm();
     if (validationError) {
@@ -149,7 +150,9 @@ export function LeagueCreatePage(): React.JSX.Element {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
             draftType: formData.draftType,
-            startDate: formData.draftDate ? formData.draftDate.toISOString().split('T')[0] : undefined, // Format as YYYY-MM-DD
+            startDate: formData.draftDate
+              ? formData.draftDate.toISOString().split('T')[0]
+              : undefined, // Format as YYYY-MM-DD
             isPublic: false, // Default to private leagues
             tradingEnabled: true, // Default settings
             waiverEnabled: true,
@@ -162,15 +165,15 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
   };
 
-
-
   return (
     <ScrollView flex={1} backgroundColor="$background">
       <YStack padding="$6" space="$6" maxWidth={600} alignSelf="center">
         {/* Header */}
         <YStack alignItems="center" space="$3">
           <H1 size="$8" color="$color" textAlign="center">
-            <span role="img" aria-label="baseball">⚾</span>{' '}
+            <span role="img" aria-label="baseball">
+              ⚾
+            </span>{' '}
             Create Baseball League
           </H1>
           <Text size="$4" color="$gray11" textAlign="center">
@@ -192,7 +195,11 @@ export function LeagueCreatePage(): React.JSX.Element {
             </H2>
           </Card.Header>
 
-          <form onSubmit={(e) => { void handleSubmit(e); }}>
+          <form
+            onSubmit={(e) => {
+              void handleSubmit(e);
+            }}
+          >
             <YStack padding="$4" space="$5">
               {/* League Name */}
               <YStack space="$2">
@@ -203,7 +210,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                   size="$4"
                   placeholder="Enter your league name"
                   value={formData.leagueName}
-                  onChangeText={(text: string) => handleInputChange('leagueName', text)}
+                  onChangeText={(text: string) =>
+                    handleInputChange('leagueName', text)
+                  }
                   borderColor="$borderColor"
                   backgroundColor="$color1"
                   disabled={loading}
@@ -220,27 +229,52 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <Button
                       key={count}
                       size="$3"
-                      variant={formData.numberOfTeams === count ? 'primary' : 'outlined'}
+                      variant={
+                        formData.numberOfTeams === count
+                          ? 'primary'
+                          : 'outlined'
+                      }
                       onPress={() => {
                         handleInputChange('numberOfTeams', count);
                       }}
                       disabled={loading}
                       minWidth="$5"
-                      backgroundColor={formData.numberOfTeams === count ? '$blue8' : '$color2'}
-                      borderColor={formData.numberOfTeams === count ? '$blue8' : '$borderColor'}
+                      backgroundColor={
+                        formData.numberOfTeams === count ? '$blue8' : '$color2'
+                      }
+                      borderColor={
+                        formData.numberOfTeams === count
+                          ? '$blue8'
+                          : '$borderColor'
+                      }
                       borderWidth={formData.numberOfTeams === count ? 2 : 1}
-                      hoverStyle={{ 
-                        backgroundColor: formData.numberOfTeams === count ? '$blue9' : '$color3',
-                        borderColor: formData.numberOfTeams === count ? '$blue9' : '$borderColorHover'
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.numberOfTeams === count
+                            ? '$blue9'
+                            : '$color3',
+                        borderColor:
+                          formData.numberOfTeams === count
+                            ? '$blue9'
+                            : '$borderColorHover',
                       }}
-                      pressStyle={{ 
+                      pressStyle={{
                         scale: 0.95,
-                        backgroundColor: formData.numberOfTeams === count ? '$blue7' : '$color4'
+                        backgroundColor:
+                          formData.numberOfTeams === count
+                            ? '$blue7'
+                            : '$color4',
                       }}
                     >
-                      <Text 
-                        color={formData.numberOfTeams === count ? '$blue12' : '$color'}
-                        fontWeight={formData.numberOfTeams === count ? '600' : '400'}
+                      <Text
+                        color={
+                          formData.numberOfTeams === count
+                            ? '$blue12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.numberOfTeams === count ? '600' : '400'
+                        }
                       >
                         {count}
                       </Text>
@@ -262,27 +296,48 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <Button
                       key={size}
                       size="$3"
-                      variant={formData.maxRosterSize === size ? 'primary' : 'outlined'}
+                      variant={
+                        formData.maxRosterSize === size ? 'primary' : 'outlined'
+                      }
                       onPress={() => {
                         handleInputChange('maxRosterSize', size);
                       }}
                       disabled={loading}
                       minWidth="$5"
-                      backgroundColor={formData.maxRosterSize === size ? '$blue8' : '$color2'}
-                      borderColor={formData.maxRosterSize === size ? '$blue8' : '$borderColor'}
+                      backgroundColor={
+                        formData.maxRosterSize === size ? '$blue8' : '$color2'
+                      }
+                      borderColor={
+                        formData.maxRosterSize === size
+                          ? '$blue8'
+                          : '$borderColor'
+                      }
                       borderWidth={formData.maxRosterSize === size ? 2 : 1}
-                      hoverStyle={{ 
-                        backgroundColor: formData.maxRosterSize === size ? '$blue9' : '$color3',
-                        borderColor: formData.maxRosterSize === size ? '$blue9' : '$borderColorHover'
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.maxRosterSize === size
+                            ? '$blue9'
+                            : '$color3',
+                        borderColor:
+                          formData.maxRosterSize === size
+                            ? '$blue9'
+                            : '$borderColorHover',
                       }}
-                      pressStyle={{ 
+                      pressStyle={{
                         scale: 0.95,
-                        backgroundColor: formData.maxRosterSize === size ? '$blue7' : '$color4'
+                        backgroundColor:
+                          formData.maxRosterSize === size
+                            ? '$blue7'
+                            : '$color4',
                       }}
                     >
-                      <Text 
-                        color={formData.maxRosterSize === size ? '$blue12' : '$color'}
-                        fontWeight={formData.maxRosterSize === size ? '600' : '400'}
+                      <Text
+                        color={
+                          formData.maxRosterSize === size ? '$blue12' : '$color'
+                        }
+                        fontWeight={
+                          formData.maxRosterSize === size ? '600' : '400'
+                        }
                       >
                         {size}
                       </Text>
@@ -304,27 +359,54 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <Button
                       key={type.value}
                       size="$3"
-                      variant={formData.draftType === type.value ? 'primary' : 'outlined'}
+                      variant={
+                        formData.draftType === type.value
+                          ? 'primary'
+                          : 'outlined'
+                      }
                       onPress={() => {
                         handleInputChange('draftType', type.value);
                       }}
                       disabled={loading}
                       flex={1}
-                      backgroundColor={formData.draftType === type.value ? '$green8' : '$color2'}
-                      borderColor={formData.draftType === type.value ? '$green8' : '$borderColor'}
+                      backgroundColor={
+                        formData.draftType === type.value
+                          ? '$green8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.draftType === type.value
+                          ? '$green8'
+                          : '$borderColor'
+                      }
                       borderWidth={formData.draftType === type.value ? 2 : 1}
-                      hoverStyle={{ 
-                        backgroundColor: formData.draftType === type.value ? '$green9' : '$color3',
-                        borderColor: formData.draftType === type.value ? '$green9' : '$borderColorHover'
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.draftType === type.value
+                            ? '$green9'
+                            : '$color3',
+                        borderColor:
+                          formData.draftType === type.value
+                            ? '$green9'
+                            : '$borderColorHover',
                       }}
-                      pressStyle={{ 
+                      pressStyle={{
                         scale: 0.95,
-                        backgroundColor: formData.draftType === type.value ? '$green7' : '$color4'
+                        backgroundColor:
+                          formData.draftType === type.value
+                            ? '$green7'
+                            : '$color4',
                       }}
                     >
-                      <Text 
-                        color={formData.draftType === type.value ? '$green12' : '$color'}
-                        fontWeight={formData.draftType === type.value ? '600' : '400'}
+                      <Text
+                        color={
+                          formData.draftType === type.value
+                            ? '$green12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.draftType === type.value ? '600' : '400'
+                        }
                       >
                         {type.label}
                       </Text>
@@ -332,12 +414,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                   ))}
                 </XStack>
                 <Text size="$2" color="$gray10">
-                  {formData.draftType === 'NORMAL' 
+                  {formData.draftType === 'NORMAL'
                     ? 'Standard draft where you can see other picks'
                     : formData.draftType === 'BLIND'
-                    ? 'Blind draft where picks are hidden until reveal' 
-                    : 'Random draft where players are automatically assigned to teams'
-                  }
+                      ? 'Blind draft where picks are hidden until reveal'
+                      : 'Random draft where players are automatically assigned to teams'}
                 </Text>
               </YStack>
 
@@ -348,14 +429,17 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </Text>
                 <DateTimePicker
                   value={formData.draftDate}
-                  onChange={(date: Date) => handleInputChange('draftDate', date)}
+                  onChange={(date: Date) =>
+                    handleInputChange('draftDate', date)
+                  }
                   placeholder="Select draft date and time"
                   disabled={loading}
                   minDate={new Date()} // Can't select past dates
                   useNativeInput={false} // Use custom picker popup on web
                 />
                 <Text size="$2" color="$gray10">
-                  When do you want to hold your draft? Include the time for scheduling.
+                  When do you want to hold your draft? Include the time for
+                  scheduling.
                 </Text>
               </YStack>
 
@@ -396,12 +480,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         </Card>
 
         {/* Info Card */}
-        <Card
-          size="$4"
-          bordered
-          backgroundColor="$blue2"
-          borderColor="$blue6"
-        >
+        <Card size="$4" bordered backgroundColor="$blue2" borderColor="$blue6">
           <Card.Header padded>
             <H2 size="$5" color="$blue11">
               What happens next?

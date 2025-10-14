@@ -12,6 +12,8 @@
     "db:url:production": "tsx src/cli/db-cli.ts url --production",
     "db:psql": "tsx src/cli/db-cli.ts psql",
     "db:psql:production": "tsx src/cli/db-cli.ts psql --production",
+    "db:query": "tsx src/cli/db-cli.ts query",
+    "db:query:production": "tsx src/cli/db-cli.ts query --production",
     "db:credentials": "tsx src/cli/db-cli.ts credentials",
     "db:credentials:production": "tsx src/cli/db-cli.ts credentials --production",
     "db:env": "tsx src/scripts/load-db-env.ts",

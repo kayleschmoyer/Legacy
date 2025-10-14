@@ -26,14 +26,20 @@ export interface DatabaseConfig {
  * Get database configuration using the new unified credential system
  */
 export async function getDatabaseConfig(): Promise<DatabaseConfig> {
+  console.log('Resolving database credentials from environment variables');
+
   // Determine credential configuration based on environment
+  // Default to AWS Secrets Manager unless explicitly set to use local credentials
+  const useLocal =
+    getEnvVarOptional(EnvironmentVariable.USE_LOCAL_CREDENTIALS) === 'true';
   const credentialConfig: CredentialConfig = {
     secretName:
       getEnvVarOptional(EnvironmentVariable.DB_SECRET_NAME) ??
       getEnvVarOptional(EnvironmentVariable.DB_CREDS_PATH), // Legacy support
-    useLocalCredentials:
-      getEnvVarOptional(EnvironmentVariable.USE_LOCAL_CREDENTIALS) === 'true',
+    useLocalCredentials: useLocal,
     defaultDatabase: 'postgres',
+    defaultHost: getEnvVarOptional(EnvironmentVariable.DB_HOST),
+    defaultPort: 5432,
   };
 
   // Resolve credentials using the new unified system
