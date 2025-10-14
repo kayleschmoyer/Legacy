@@ -56,6 +56,7 @@ env:
   NX_SKIP_NX_CACHE: false
   NODE_OPTIONS: "--max_old_space_size=4096"
   NX_VERBOSE_LOGGING: ${{ github.event.inputs.debug_mode == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 jobs:
   ci-pipeline:
