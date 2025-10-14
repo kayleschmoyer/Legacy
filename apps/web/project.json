@@ -27,6 +27,12 @@
         "production": {
           "mode": "production",
           "sourcemap": false
+        },
+        "deploy": {
+          "mode": "production",
+          "sourcemap": true,
+          "minify": true,
+          "reportCompressedSize": true
         }
       }
     }

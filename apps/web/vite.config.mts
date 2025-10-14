@@ -8,12 +8,16 @@ import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
   const env = loadEnv(mode, resolve(__dirname, '../../'), '');
 
   // Merge environment variables into process.env so Vite can pick them up
   Object.assign(process.env, env);
+
+  // Determine if this is a deploy build (uses deploy configuration)
+  const isDeployBuild = process.env.NX_TASK_TARGET_CONFIGURATION === 'deploy';
+  const isProduction = mode === 'production' || isDeployBuild;
 
   // Get build information - fallback to local git if not in CI
   const commitSha = process.env.VITE_COMMIT_SHA || 
@@ -28,6 +32,15 @@ export default defineConfig(async ({ mode }) => {
   
   const appVersion = process.env.VITE_APP_VERSION || '0.0.0';
   const buildDate = new Date().toISOString();
+
+  console.log(`🔧 Build Configuration:
+    - Mode: ${mode}
+    - Is Deploy Build: ${isDeployBuild}
+    - Is Production: ${isProduction}
+    - App Version: ${appVersion}
+    - Commit SHA: ${commitSha}
+  `);
+
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/web',
@@ -87,11 +100,25 @@ export default defineConfig(async ({ mode }) => {
     build: {
       outDir: '../../dist/web',
       emptyOutDir: true,
-      reportCompressedSize: process.env.NX_VERBOSE_LOGGING === 'true',
+      // Report compressed size for deploy builds to track bundle growth
+      reportCompressedSize: isDeployBuild || process.env.NX_VERBOSE_LOGGING === 'true',
+      // Enable minification for production and deploy builds
+      minify: isProduction ? 'esbuild' : false,
+      // Generate sourcemaps for deploy builds to aid debugging
+      sourcemap: isDeployBuild ? true : false,
       commonjsOptions: {
         transformMixedEsModules: true,
       },
-      rollupOptions: {},
+      rollupOptions: {
+        output: {
+          // Better chunk splitting for deploy builds
+          manualChunks: isDeployBuild ? {
+            'react-vendor': ['react', 'react-dom'],
+            'apollo-vendor': ['@apollo/client'],
+            'tamagui-vendor': ['tamagui', '@tamagui/core'],
+          } : undefined,
+        },
+      },
     },
     resolve: {
       alias: {

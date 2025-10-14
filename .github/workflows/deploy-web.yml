@@ -63,7 +63,7 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-        run: npx nx build web
+        run: npx nx build web --configuration=deploy
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main'

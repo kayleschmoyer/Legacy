@@ -69,10 +69,10 @@ runs:
         # Use appropriate build command based on execution mode
         if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
           echo "🚀 Building web application with DTE..."
-          BUILD_CMD="npx nx build web --parallel=${{ inputs.optimal-agents }}"
+          BUILD_CMD="npx nx build web --configuration=production --parallel=${{ inputs.optimal-agents }}"
         else
           echo "🚀 Building web application locally..."
-          BUILD_CMD="npx nx build web"
+          BUILD_CMD="npx nx build web --configuration=production"
         fi
 
         if $BUILD_CMD --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
