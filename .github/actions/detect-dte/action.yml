@@ -188,4 +188,7 @@ runs:
           echo "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV
         fi
         
+        # Note: NX_VERBOSE_LOGGING is controlled at the workflow level via ci-debug label or debug_mode input
+        # This action does not override that setting to respect user preferences
+        
         echo "✅ Environment configured for ${{ steps.detect.outputs.execution-mode }} execution"
