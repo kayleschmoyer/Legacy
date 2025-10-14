@@ -87,7 +87,7 @@ export default defineConfig(async ({ mode }) => {
     build: {
       outDir: '../../dist/web',
       emptyOutDir: true,
-      reportCompressedSize: true,
+      reportCompressedSize: process.env.NX_VERBOSE_LOGGING === 'true',
       commonjsOptions: {
         transformMixedEsModules: true,
       },

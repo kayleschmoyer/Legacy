@@ -22,7 +22,7 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     outDir: '../../dist/apps/graphql-explorer',
-    reportCompressedSize: true,
+    reportCompressedSize: process.env.NX_VERBOSE_LOGGING === 'true',
   },
 
   define: {

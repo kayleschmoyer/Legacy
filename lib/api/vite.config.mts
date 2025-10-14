@@ -26,7 +26,7 @@ export default defineConfig(() => ({
   build: {
     outDir: '../../dist/api',
     emptyOutDir: true,
-    reportCompressedSize: true,
+    reportCompressedSize: process.env.NX_VERBOSE_LOGGING === 'true',
     commonjsOptions: {
       transformMixedEsModules: true,
     },
