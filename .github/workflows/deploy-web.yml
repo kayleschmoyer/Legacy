@@ -65,6 +65,13 @@ jobs:
           VITE_COMMIT_SHA: ${{ github.sha }}
         run: npx nx build web --configuration=deploy
 
+      # Add CNAME file for custom domain
+      # Required when using actions/deploy-pages (artifact-based deployment)
+      # GitHub can't auto-create this since we're not using a branch
+      - name: Add CNAME for Custom Domain
+        if: github.ref == 'refs/heads/main'
+        run: echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
+
       - name: Setup Pages
         if: github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
