@@ -28,7 +28,7 @@ jobs:
   deploy:
     name: Deploy Game Selection Lambda
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
 
     steps:
@@ -58,14 +58,21 @@ jobs:
           role-session-name: GitHubActions-DeployGameSelection
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Game Selection Lambda
-        uses: ./.github/actions/deploy-lambda
+      - name: 🏗️ Build and Package Game Selection Lambda
+        id: build
+        uses: ./.github/actions/build-lambda
         with:
           lambda-name: game-selection
           build-output-file: dev.js
-          terraform-target: aws_lambda_function.game_selection
           aws-region: ${{ env.AWS_REGION }}
           aws-stage: ${{ env.AWS_STAGE }}
+
+      - name: 🚀 Deploy Game Selection Infrastructure
+        uses: ./.github/actions/deploy-lambda-infrastructure
+        with:
+          lambda-name: game-selection
+          terraform-target: aws_lambda_function.game_selection
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Update Deployment Badge
         if: always()

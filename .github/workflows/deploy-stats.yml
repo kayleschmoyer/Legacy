@@ -28,7 +28,7 @@ jobs:
   deploy:
     name: Deploy Stats Lambda
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
 
     steps:

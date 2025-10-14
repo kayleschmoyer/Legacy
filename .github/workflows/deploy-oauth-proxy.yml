@@ -30,7 +30,7 @@ jobs:
   deploy:
     name: Deploy OAuth Proxy Lambda
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
 
     steps:
@@ -60,13 +60,20 @@ jobs:
           role-session-name: GitHubActions-DeployOAuthProxy
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy OAuth Proxy Lambda
-        uses: ./.github/actions/deploy-lambda
+      - name: 🏗️ Build and Package OAuth Proxy Lambda
+        id: build
+        uses: ./.github/actions/build-lambda
+        with:
+          lambda-name: oauth-proxy
+          aws-region: ${{ env.AWS_REGION }}
+          aws-stage: ${{ env.AWS_STAGE }}
+
+      - name: 🚀 Deploy OAuth Proxy Infrastructure
+        uses: ./.github/actions/deploy-lambda-infrastructure
         with:
           lambda-name: oauth-proxy
           terraform-target: aws_lambda_function.oauth_proxy
           aws-region: ${{ env.AWS_REGION }}
-          aws-stage: ${{ env.AWS_STAGE }}
         env:
           # OAuth Lambda requires these secrets for authentication functionality
           TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}

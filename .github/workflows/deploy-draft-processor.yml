@@ -28,7 +28,7 @@ jobs:
   deploy:
     name: Deploy Draft Processor Lambda
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
 
     steps:
@@ -58,13 +58,20 @@ jobs:
           role-session-name: GitHubActions-DeployDraftProcessor
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy Draft Processor Lambda
-        uses: ./.github/actions/deploy-lambda
+      - name: 🏗️ Build and Package Draft Processor Lambda
+        id: build
+        uses: ./.github/actions/build-lambda
+        with:
+          lambda-name: draft-processor
+          aws-region: ${{ env.AWS_REGION }}
+          aws-stage: ${{ env.AWS_STAGE }}
+
+      - name: 🚀 Deploy Draft Processor Infrastructure
+        uses: ./.github/actions/deploy-lambda-infrastructure
         with:
           lambda-name: draft-processor
           terraform-target: aws_lambda_function.draft_processor
           aws-region: ${{ env.AWS_REGION }}
-          aws-stage: ${{ env.AWS_STAGE }}
 
       - name: Update Deployment Badge
         if: always()

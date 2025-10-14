@@ -32,7 +32,7 @@ jobs:
   deploy:
     name: Deploy GraphQL Lambda
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -71,15 +71,22 @@ jobs:
             DB_CREDS, legacy-sports-dev-db-creds-20250925194630368900000002
           parse-json-secrets: true
 
-      - name: Deploy GraphQL Lambda
-        uses: ./.github/actions/deploy-lambda
+      - name: 🏗️ Build and Package GraphQL Lambda
+        id: build
+        uses: ./.github/actions/build-lambda
         with:
           lambda-name: graphql
           nx-project-name: db
           lambda-directory: lambdas/db
-          terraform-target: aws_lambda_function.graphql
           aws-region: ${{ env.AWS_REGION }}
           aws-stage: ${{ env.AWS_STAGE }}
+
+      - name: 🚀 Deploy GraphQL Infrastructure
+        uses: ./.github/actions/deploy-lambda-infrastructure
+        with:
+          lambda-name: graphql
+          terraform-target: aws_lambda_function.graphql
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Update Deployment Badge
         if: always()
