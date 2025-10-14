@@ -29,10 +29,10 @@ on:
         default: true
         type: boolean
 
-# Required permissions for nx-set-shas action
+# Required permissions for nx-set-shas action and creating releases
 permissions:
   actions: read
-  contents: read
+  contents: write  # Required for creating GitHub releases
 
 # Cancel in-progress builds for the same workflow
 concurrency:
