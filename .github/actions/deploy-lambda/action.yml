@@ -183,7 +183,28 @@ runs:
         
         echo "📋 Planning Terraform changes for $TF_TARGET..."
         echo "⏳ Will wait up to 10 minutes if state is locked by another deployment..."
-        terraform plan -target="$TF_TARGET" -lock-timeout=10m
+        
+        # Retry logic for terraform plan with lock timeout
+        MAX_RETRIES=20
+        RETRY_DELAY=30
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          if terraform plan -target="$TF_TARGET" -lock-timeout=10m; then
+            echo "✅ Terraform plan successful"
+            break
+          else
+            EXIT_CODE=$?
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️  Terraform plan failed (attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            else
+              echo "❌ Terraform plan failed after $MAX_RETRIES attempts"
+              exit $EXIT_CODE
+            fi
+          fi
+        done
         
         echo "🚀 Applying Terraform changes..."
         terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
