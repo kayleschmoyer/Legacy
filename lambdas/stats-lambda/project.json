@@ -46,9 +46,16 @@
       ],
       "options": {
         "commands": [
-          "cd lambdas/stats-lambda/dist && zip -j index.js.zip index.js"
+          "cd lambdas/stats-lambda/dist && (command -v zip > /dev/null 2>&1 && zip -j index.js.zip index.js || echo 'Warning: zip utility not found - skipping packaging. This is expected in DTE environments.')"
         ],
         "parallel": false
+      },
+      "configurations": {
+        "production": {
+          "commands": [
+            "cd lambdas/stats-lambda/dist && zip -j index.js.zip index.js"
+          ]
+        }
       }
     },
     "deploy": {

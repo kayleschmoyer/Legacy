@@ -65,6 +65,18 @@
       "dependsOn": ["^build"],
       "inputs": ["default", "^default"]
     },
+    "package": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
+      "options": {}
+    },
+    "zip": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
+      "options": {}
+    },
     "deploy": {
       "cache": false,
       "dependsOn": ["build"]
