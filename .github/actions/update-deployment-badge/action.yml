@@ -115,15 +115,15 @@ runs:
         fi
         
         # Update the gist
-        RESPONSE=$(curl -s \
+        HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/gist_response.json \
           -X PATCH \
           -H "Authorization: Bearer ${{ inputs.github-token }}" \
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/gists/$GIST_ID" \
           -d "$PAYLOAD")
         
-        # Check if update was successful - use a safer grep method
-        if echo "$RESPONSE" | grep -qi '"id"' 2>/dev/null; then
+        # Check if update was successful by HTTP status code
+        if [ "$HTTP_CODE" = "200" ]; then
           echo "✅ Successfully updated deployment badge"
           echo "success=true" >> $GITHUB_OUTPUT
           
@@ -146,16 +146,19 @@ runs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
         else
-          echo "❌ Failed to update deployment badge"
-          echo "Response: $RESPONSE"
+          echo "❌ Failed to update deployment badge (HTTP $HTTP_CODE)"
+          echo "Response:"
+          cat /tmp/gist_response.json
           echo "success=false" >> $GITHUB_OUTPUT
           
           # Add error to step summary
           echo "## ❌ Badge Update Failed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Failed to update badge for ${DEPLOYMENT_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "- **HTTP Status**: ${HTTP_CODE}" >> $GITHUB_STEP_SUMMARY
           
-          # Check for specific error types
+          # Check for specific error types from response
+          RESPONSE=$(cat /tmp/gist_response.json)
           if echo "$RESPONSE" | grep -q "Not Found"; then
             echo "- **Error**: Gist not found (check GIST_ID)" >> $GITHUB_STEP_SUMMARY
           elif echo "$RESPONSE" | grep -q "Bad credentials"; then
