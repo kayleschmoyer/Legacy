@@ -95,14 +95,20 @@ runs:
         # Configure Playwright for CI
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
+        
+        # Force local execution for E2E tests - disable Nx Cloud DTE
+        export NX_CLOUD_DISTRIBUTED_EXECUTION=false
+        export NX_CLOUD_NO_TIMEOUTS=true
+        echo "� Nx Cloud DTE disabled - running E2E tests locally for reliability"
 
-        echo "📋 E2E Test Configuration:"
+        echo "�📋 E2E Test Configuration:"
         echo "- **Test Directory**: apps/web-e2e/src/tests" 
         echo "- **Browser**: ${{ inputs.browser }} (headless: ${{ inputs.headless }})"
         echo "- **Base URL**: http://${{ inputs.server-host }}:${{ inputs.server-port }}"
         echo "- **Retries**: ${{ inputs.retry-count }} (CI environment)"
         echo "- **Workers**: 1 (CI stability)"
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
+        echo "- **Execution Mode**: Local (Nx Cloud DTE disabled)"
 
         # Install Playwright browsers if needed (cached)
         echo "🔧 Setting up Playwright browsers..."
@@ -119,7 +125,7 @@ runs:
         echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
         
         SERVER_LOG="dev-server-${E2E_TIMESTAMP}.log"
-        npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
+        NX_CLOUD_DISTRIBUTED_EXECUTION=false npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
         SERVER_PID=$!
         
         echo "📝 Server output logged to: $SERVER_LOG"
