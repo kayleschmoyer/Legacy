@@ -311,11 +311,11 @@ runs:
 
         echo "::endgroup::"
 
-    - name: "� Setup Terraform"
+    - name: "🔧 Setup Terraform"
       if: inputs.should-validate-terraform == 'true'
       uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: "~1.0"
+        terraform_version: "~1.13"
         terraform_wrapper: false
 
     - name: "�🔐 AWS Infrastructure Validation"
