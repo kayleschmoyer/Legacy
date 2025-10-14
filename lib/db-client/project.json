@@ -20,6 +20,13 @@
         "tsConfig": "lib/db-client/tsconfig.lib.json",
         "assets": []
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.lib.json",
+        "cwd": "lib/db-client"
+      }
     }
   }
 }
