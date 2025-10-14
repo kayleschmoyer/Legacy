@@ -20,6 +20,13 @@ permissions:
   id-token: write
   actions: read
 
+env:
+  NX_DAEMON: false
+  NX_PARALLEL: 2
+  NX_CACHE_DIRECTORY: .nx-cache
+  NX_SKIP_NX_CACHE: false
+  NODE_OPTIONS: "--max_old_space_size=4096"
+
 jobs:
   build-and-deploy:
     name: Build and Deploy Web
@@ -40,21 +47,13 @@ jobs:
         with:
           node-version: 22
           install-dependencies: true
+          set-nx-shas: true
 
-      - name: Configure Basic Nx Environment
-        shell: bash
-        run: |
-          echo "🔧 Configuring basic Nx environment for web deployment..."
-          # Set conservative local settings for deployment builds
-          {
-            echo "NX_CLOUD_DISTRIBUTED_EXECUTION=false"
-            echo "NX_LOCAL_FALLBACK=true"
-            echo "NX_PARALLEL=2"
-            echo "NX_DAEMON=false"
-            echo "NX_VERBOSE_LOGGING=false"
-            echo "NX_CLOUD_ACCESS_TOKEN="
-          } >> "$GITHUB_ENV"
-          echo "✅ Basic Nx environment configured for web deployment"
+      - name: "☁️ Detect DTE Availability"
+        id: detect-dte
+        uses: ./.github/actions/detect-dte
+        with:
+          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
       - name: Build Web App
         env:
