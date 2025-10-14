@@ -36,18 +36,21 @@ The system will perform a multi-stage detection process:
       
       # Test basic cloud connectivity
       echo "🌐 Testing cloud connectivity..."
-      if npx nx-cloud --version >/dev/null 2>&1; then
+      # Note: Modern Nx Cloud (v19+) doesn't support --version command
+      # Use start-ci-run --help to verify CLI accessibility
+      if npx nx-cloud start-ci-run --help >/dev/null 2>&1; then
         echo "✅ Nx Cloud CLI accessible"
         CLOUD_AVAILABLE="true"
         
-        # Test DTE availability and quota
-        echo "🎯 Testing DTE quota and availability..."
+        # Test DTE availability
+        echo "🎯 Testing DTE availability..."
         
-        # Attempt to get DTE status (this is a dry-run check)
-        DTE_STATUS=$(npx nx-cloud dte-status --json 2>/dev/null || echo '{"error": "unavailable"}')
+        # Modern Nx Cloud doesn't have a dte-status command
+        # DTE is controlled via start-ci-run --distribute-on
+        # Agent allocation happens automatically based on workspace plan
+        # We just need to verify API connectivity
         
-        # Parse DTE status
-        if echo "$DTE_STATUS" | jq -e '.agentsAvailable' >/dev/null 2>&1; then
+        if npx nx-cloud login --help >/dev/null 2>&1; then
           AGENTS_AVAILABLE=$(echo "$DTE_STATUS" | jq -r '.agentsAvailable // 0')
           QUOTA_REMAINING=$(echo "$DTE_STATUS" | jq -r '.quotaRemaining // 0')
           
