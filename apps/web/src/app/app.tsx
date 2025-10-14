@@ -16,6 +16,7 @@ import {
 } from '../components/WebPlayerStatsPage';
 import LeagueCreatePage from '../components/baseball/LeagueCreatePage';
 import LeagueDetailPage from '../components/baseball/LeagueDetailPage';
+import JoinLeagueByCode from '../components/baseball/JoinLeagueByCode';
 import ManagementPage from '../components/ManagementPage';
 import AboutPage from '../components/AboutPage';
 
@@ -211,6 +212,7 @@ function App() {
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
           <Route path="/baseball/league/create" element={<LeagueCreatePage />} />
+          <Route path="/baseball/league/join" element={<JoinLeagueByCode />} />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />

@@ -8,6 +8,7 @@ import {
   YStack
 } from '@legacy-sports/shared-components';
 import { H1, H2, Spinner, Text } from 'tamagui';
+import { Copy, Check } from '@tamagui/lucide-icons';
 import { gql, useLazyQuery } from '@apollo/client';
 import { 
   LeaguePositionFragment,
@@ -117,6 +118,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const leagueId = parseInt(id || '0', 10);
   const [activeTab, setActiveTab] = useState<'info' | 'roster' | 'commissioner'>('info');
+  const [linkCopied, setLinkCopied] = useState(false);
   const { user } = useAuth();
 
   const { data, loading, error } = useGetLeagueByIdQuery({
@@ -265,6 +267,26 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [updateTeamMemberPosition, teamMembersData?.teamMembers]);
 
+  const handleCopyInviteCode = useCallback(async () => {
+    try {
+      const inviteCode = data?.league?.inviteCode;
+      if (!inviteCode) {
+        alert('Invite code not available');
+        return;
+      }
+      await navigator.clipboard.writeText(inviteCode);
+      setLinkCopied(true);
+      
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setLinkCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Error copying invite code:', error);
+      alert('Failed to copy invite code to clipboard');
+    }
+  }, [data?.league?.inviteCode]);
+
   if (loading || positionsLoading || teamMembersLoading) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$6">
@@ -376,6 +398,60 @@ export function LeagueDetailPage(): React.JSX.Element {
           </YStack>
         </Card>
       </XStack>
+
+      {/* Invite Friends Card */}
+      <Card 
+        backgroundColor="$purple2"
+        borderColor="$purple6"
+        padding="$4"
+      >
+        <YStack space="$3">
+          <H2 size="$6" color="$purple11" marginBottom="$2">
+            👥 Invite Friends
+          </H2>
+          <Text color="$gray11" fontSize="$4">
+            Share this invite code with friends to join your league:
+          </Text>
+          <XStack 
+            gap="$3" 
+            alignItems="center" 
+            flexWrap="wrap"
+          >
+            <Card
+              flex={1}
+              minWidth={200}
+              backgroundColor="$purple3"
+              borderColor="$purple7"
+              padding="$3"
+              borderRadius="$3"
+            >
+              <Text 
+                color="$purple12" 
+                fontSize="$7"
+                fontFamily="$mono"
+                fontWeight="700"
+                letterSpacing={2}
+                textAlign="center"
+              >
+                {league.inviteCode || 'Loading...'}
+              </Text>
+            </Card>
+            <Button
+              backgroundColor={linkCopied ? '$green9' : '$purple9'}
+              color="white"
+              onPress={handleCopyInviteCode}
+              minWidth={120}
+              size="$4"
+              icon={linkCopied ? <Check size={20} /> : <Copy size={20} />}
+            >
+              {linkCopied ? 'Copied!' : 'Copy Code'}
+            </Button>
+          </XStack>
+          <Text color="$gray10" fontSize="$3" fontStyle="italic">
+            Friends can join by entering this code on the join league page
+          </Text>
+        </YStack>
+      </Card>
 
       {/* Development Notice */}
       <Card 

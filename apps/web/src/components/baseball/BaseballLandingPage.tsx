@@ -207,7 +207,7 @@ export function BaseballLandingPage() {
   };
 
   const handleJoinLeague = () => {
-    alert('League joining functionality will be available once the GraphQL schema includes league membership data.');
+    navigate('/baseball/league/join');
   };
 
   if (isLoading) {

@@ -9,6 +9,46 @@ import { builder } from './builder';
 // Updated for player field support - 2025-10-06
 const dbService = createDatabaseService(getDbOptions());
 
+// Helper function to generate unique invite codes
+// Uses uppercase letters and numbers (excluding confusable characters: 0, O, 1, I, l)
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Helper to check if an invite code already exists
+async function isInviteCodeUnique(db: PublicDb, code: string): Promise<boolean> {
+  const existing = await db
+    .select({ id: PublicSchema.leagues.id })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.inviteCode, code))
+    .limit(1);
+  return existing.length === 0;
+}
+
+// Helper to generate a unique invite code
+async function generateUniqueInviteCode(db: PublicDb): Promise<string> {
+  let code: string;
+  let isUnique = false;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  do {
+    code = generateInviteCode();
+    isUnique = await isInviteCodeUnique(db, code);
+    attempts++;
+    if (attempts >= maxAttempts) {
+      throw new Error('Failed to generate unique invite code after maximum attempts');
+    }
+  } while (!isUnique);
+  
+  return code;
+}
+
 // Default roster positions for new leagues
 // These represent a standard fantasy baseball roster configuration
 const DEFAULT_ROSTER_POSITIONS = [
@@ -44,6 +84,7 @@ const League = builder.objectRef<{
   maxRosterSize: number;
   currentMatchup: number | null;
   draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+  inviteCode: string;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -61,6 +102,7 @@ League.implement({
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
     draftStatus: t.exposeString('draftStatus'),
+    inviteCode: t.exposeString('inviteCode'),
     userMembership: t.field({
       type: LeagueMember,
       nullable: true,
@@ -279,6 +321,7 @@ builder.queryField('league', (t) =>
               maxRosterSize: PublicSchema.leagues.maxRosterSize,
               currentMatchup: PublicSchema.leagues.currentMatchup,
               draftStatus: PublicSchema.leagues.draftStatus,
+              inviteCode: PublicSchema.leagues.inviteCode,
             })
             .from(PublicSchema.leagues)
             .where(eq(PublicSchema.leagues.id, leagueId))
@@ -316,6 +359,7 @@ builder.queryField('league', (t) =>
             maxRosterSize: league.maxRosterSize,
             currentMatchup: league.currentMatchup,
             draftStatus: league.draftStatus,
+            inviteCode: league.inviteCode,
             userMembership,
           };
         });
@@ -360,6 +404,8 @@ builder.queryField('userLeagues', (t) =>
                 owner: PublicSchema.leagues.owner,
                 maxRosterSize: PublicSchema.leagues.maxRosterSize,
                 currentMatchup: PublicSchema.leagues.currentMatchup,
+                draftStatus: PublicSchema.leagues.draftStatus,
+                inviteCode: PublicSchema.leagues.inviteCode,
               })
               .from(PublicSchema.leagues)
               .limit(5);
@@ -383,6 +429,7 @@ builder.queryField('userLeagues', (t) =>
                 maxRosterSize: PublicSchema.leagues.maxRosterSize,
                 currentMatchup: PublicSchema.leagues.currentMatchup,
                 draftStatus: PublicSchema.leagues.draftStatus,
+                inviteCode: PublicSchema.leagues.inviteCode,
               })
               .from(PublicSchema.leagues)
               .innerJoin(
@@ -401,6 +448,7 @@ builder.queryField('userLeagues', (t) =>
               maxRosterSize: league.maxRosterSize,
               currentMatchup: league.currentMatchup,
               draftStatus: league.draftStatus,
+              inviteCode: league.inviteCode,
             }));
             
           } catch (dbError) {
@@ -531,12 +579,16 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           // Calculate roster size: use frontend value or fallback to 25
           const rosterSize = maxRosterSize || 25;
           
+          // Generate unique invite code
+          const inviteCode = await generateUniqueInviteCode(db);
+          
           // Prepare league data for insert
           const leagueData = {
             name: leagueName,
             owner: userId,
             maxRosterSize: rosterSize, // Frontend-controlled with fallback
             currentMatchup: null,
+            inviteCode: inviteCode,
           };
 
           // Insert league
@@ -549,6 +601,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               maxRosterSize: PublicSchema.leagues.maxRosterSize,
               currentMatchup: PublicSchema.leagues.currentMatchup,
               draftStatus: PublicSchema.leagues.draftStatus,
+              inviteCode: PublicSchema.leagues.inviteCode,
             });
 
           const league = insertedLeagues[0];
@@ -988,6 +1041,106 @@ builder.mutationField('startDraft', (t) =>
       } catch (error) {
         console.error('Error starting draft:', error);
         throw new Error(`Failed to start draft: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    },
+  })
+);
+
+// Mutation field to join a league using an invite code
+builder.mutationField('joinLeagueByCode', (t) =>
+  t.field({
+    type: Team,
+    args: {
+      inviteCode: t.arg.string({ required: true }),
+      teamName: t.arg.string({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      // Check if user is authenticated
+      if (!context.user) {
+        throw new Error('Authentication required to join a league');
+      }
+
+      const { inviteCode, teamName } = args;
+      const userId = context.user.id;
+
+      try {
+        // Find league by invite code
+        const result = await runWithPublicClient(getDbOptions(), async (db) => {
+          // Look up league by invite code
+          const leagues = await db
+            .select({
+              id: PublicSchema.leagues.id,
+              name: PublicSchema.leagues.name,
+              owner: PublicSchema.leagues.owner,
+              maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.inviteCode, inviteCode.toUpperCase()))
+            .limit(1);
+
+          if (leagues.length === 0) {
+            throw new Error('Invalid invite code. Please check the code and try again.');
+          }
+
+          const league = leagues[0];
+
+          // Check if user is already a member of this league
+          const existingMembership = await db
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, league.id),
+                eq(PublicSchema.leagueMembers.userId, userId)
+              )
+            )
+            .limit(1);
+
+          if (existingMembership.length > 0) {
+            throw new Error('You are already a member of this league');
+          }
+
+          // Create a new team for the user
+          const insertedTeams = await db
+            .insert(PublicSchema.teams)
+            .values({
+              name: teamName,
+              leagueId: league.id,
+            })
+            .returning({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+              leagueId: PublicSchema.teams.leagueId,
+            });
+
+          const team = insertedTeams[0];
+
+          // Add user to league members with explicit typing
+          const leagueMemberData: {
+            leagueId: number;
+            userId: number;
+            teamId: number;
+            permissionLevel: 'owner' | 'commissioner';
+          } = {
+            leagueId: league.id,
+            userId: userId,
+            teamId: team.id,
+            permissionLevel: 'commissioner',
+          };
+
+          await db
+            .insert(PublicSchema.leagueMembers)
+            .values(leagueMemberData);
+
+          console.log(`✅ User ${userId} joined league ${league.id} with team ${team.id}`);
+
+          return team;
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Error joining league:', error);
+        throw new Error(`Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
   })

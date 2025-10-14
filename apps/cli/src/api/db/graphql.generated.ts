@@ -116,6 +116,7 @@ export type CreateLeagueAndTeamsInput = {
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -135,6 +136,7 @@ export type League = {
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
@@ -174,6 +176,7 @@ export type Mutation = {
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
+  joinLeagueByCode?: Maybe<Team>;
   startDraft?: Maybe<League>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
 };
@@ -186,6 +189,12 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
 
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
+};
+
+
+export type MutationJoinLeagueByCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
 };
 
 

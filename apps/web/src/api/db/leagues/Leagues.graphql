@@ -5,6 +5,7 @@ fragment League on League {
   maxRosterSize
   currentMatchup
   draftStatus
+  inviteCode
   userMembership {
     ...LeagueMember
   }
@@ -56,5 +57,13 @@ mutation DeleteAllLeagues {
 mutation StartDraft($leagueId: Int!, $draftType: String) {
   startDraft(leagueId: $leagueId, draftType: $draftType) {
     ...League
+  }
+}
+
+mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
+  joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
+    id
+    name
+    leagueId
   }
 }

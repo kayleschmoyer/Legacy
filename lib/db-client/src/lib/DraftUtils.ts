@@ -98,6 +98,7 @@ export async function fetchLeagueDetails(leagueId: number) {
       maxRosterSize: PublicSchema.leagues.maxRosterSize,
       currentMatchup: PublicSchema.leagues.currentMatchup,
       draftStatus: PublicSchema.leagues.draftStatus,
+      inviteCode: PublicSchema.leagues.inviteCode,
     })
       .from(PublicSchema.leagues)
       .where(eq(PublicSchema.leagues.id, leagueId))

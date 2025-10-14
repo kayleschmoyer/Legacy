@@ -15,6 +15,7 @@ export interface DraftTriggerResult {
     maxRosterSize: number;
     currentMatchup: number | null;
     draftStatus: string;
+    inviteCode: string;
   };
   message: string;
   error?: string;
@@ -160,6 +161,7 @@ export class DraftService {
           maxRosterSize: 0,
           currentMatchup: null,
           draftStatus: 'not-started',
+          inviteCode: 'UNKNOWN',
         };
       }
 

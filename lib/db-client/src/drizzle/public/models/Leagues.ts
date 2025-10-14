@@ -30,9 +30,12 @@ export const leagues = pgTable(
     maxRosterSize: integer('max_roster_size').notNull().default(25),
     currentMatchup: integer('current_matchup'),
     draftStatus: draftStatus('draft_status').notNull().default('not-started'),
+    inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
   },
   (table) => {
-    return {};
+    return {
+      inviteCodeIdx: index('leagues_invite_code_idx').on(table.inviteCode),
+    };
   },
 );
 
