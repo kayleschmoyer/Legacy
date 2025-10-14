@@ -202,47 +202,111 @@ runs:
       shell: bash
       run: |
         echo "::group::📱 Mobile Build Configuration Validation"
-        echo "::notice::To reproduce locally: npx nx build app --dry-run"
+        echo "::notice::To reproduce locally: Check mobile config files and validate project.json targets"
 
         # Validate mobile build configuration without full build
         # Full mobile builds require platform-specific runners (macOS for iOS)
-        if npx nx build app --dry-run 2>&1 | tee mobile-config.log; then
+        
+        VALIDATION_FAILED=false
+        
+        # Check for mobile-specific configuration files
+        echo "🔍 Validating mobile configuration files..."
+        CONFIG_FILES=("apps/app/app.json" "apps/app/project.json" "apps/app/package.json")
+        MISSING_CONFIG=()
+        
+        for file in "${CONFIG_FILES[@]}"; do
+          if [ ! -f "$file" ]; then
+            MISSING_CONFIG+=("$file")
+            echo "❌ Missing required file: $file"
+            VALIDATION_FAILED=true
+          else
+            echo "✅ Found: $file"
+          fi
+        done
+        
+        # Validate app.json structure
+        if [ -f "apps/app/app.json" ]; then
+          echo "🔍 Validating app.json structure..."
+          if ! jq -e '.expo.name' apps/app/app.json > /dev/null 2>&1; then
+            echo "❌ app.json is missing required 'expo.name' field"
+            VALIDATION_FAILED=true
+          elif ! jq -e '.expo.version' apps/app/app.json > /dev/null 2>&1; then
+            echo "❌ app.json is missing required 'expo.version' field"
+            VALIDATION_FAILED=true
+          elif ! jq -e '.expo.android.package' apps/app/app.json > /dev/null 2>&1; then
+            echo "❌ app.json is missing required 'expo.android.package' field"
+            VALIDATION_FAILED=true
+          else
+            echo "✅ app.json structure is valid"
+            APP_NAME=$(jq -r '.expo.name' apps/app/app.json)
+            APP_VERSION=$(jq -r '.expo.version' apps/app/app.json)
+            echo "  - App Name: $APP_NAME"
+            echo "  - Version: $APP_VERSION"
+          fi
+        fi
+        
+        # Validate project.json has required build targets
+        if [ -f "apps/app/project.json" ]; then
+          echo "🔍 Validating project.json build targets..."
+          if ! jq -e '.targets.build' apps/app/project.json > /dev/null 2>&1; then
+            echo "❌ project.json is missing 'build' target"
+            VALIDATION_FAILED=true
+          else
+            echo "✅ Found build target"
+          fi
+          
+          if ! jq -e '.targets["build-android"]' apps/app/project.json > /dev/null 2>&1; then
+            echo "⚠️ Warning: project.json is missing 'build-android' target"
+          else
+            echo "✅ Found build-android target"
+          fi
+          
+          if ! jq -e '.targets["build-ios"]' apps/app/project.json > /dev/null 2>&1; then
+            echo "⚠️ Warning: project.json is missing 'build-ios' target"
+          else
+            echo "✅ Found build-ios target"
+          fi
+        fi
+        
+        # Check for Android build configuration
+        if [ -d "apps/app/android" ]; then
+          echo "✅ Android directory exists"
+          if [ -f "apps/app/android/build.gradle" ]; then
+            echo "✅ Android build.gradle found"
+          else
+            echo "⚠️ Warning: Android build.gradle not found"
+          fi
+        else
+          echo "⚠️ Warning: Android directory not found"
+        fi
+        
+        # Create mobile validation summary
+        if [ "$VALIDATION_FAILED" = true ]; then
+          echo "❌ Mobile build configuration is invalid"
+          
+          echo "## 📱 Mobile Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ❌ Validation Failed" >> $GITHUB_STEP_SUMMARY
+          if [ ${#MISSING_CONFIG[@]} -gt 0 ]; then
+            echo "- **Missing Files**: ${MISSING_CONFIG[*]}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Action Required**: Fix configuration issues listed above" >> $GITHUB_STEP_SUMMARY
+          
+          echo "::error::Mobile build config validation failed. Check configuration files."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        else
           echo "✅ Mobile build configuration is valid"
           echo "ℹ️ Full mobile builds will run on platform-specific runners"
           
-          # Check for mobile-specific configuration files
-          CONFIG_FILES=("apps/app/app.json" "apps/app/project.json")
-          MISSING_CONFIG=()
-          
-          for file in "${CONFIG_FILES[@]}"; do
-            if [ ! -f "$file" ]; then
-              MISSING_CONFIG+=("$file")
-            fi
-          done
-          
-          if [ ${#MISSING_CONFIG[@]} -eq 0 ]; then
-            echo "✅ All mobile configuration files present"
-          else
-            echo "⚠️ Missing configuration files: ${MISSING_CONFIG[*]}"
-          fi
-          
-          # Create mobile validation summary
           echo "## 📱 Mobile Validation Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ✅ Configuration Valid" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Mode**: Dry-run validation only" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation Mode**: Configuration file checks" >> $GITHUB_STEP_SUMMARY
           echo "- **Platform Support**: iOS (macOS runner required), Android (any runner)" >> $GITHUB_STEP_SUMMARY
+          if [ -f "apps/app/app.json" ]; then
+            echo "- **App Version**: $(jq -r '.expo.version' apps/app/app.json)" >> $GITHUB_STEP_SUMMARY
+          fi
           
           echo "result=success" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Mobile build configuration is invalid"
-          
-          # Show configuration errors
-          echo "## Mobile Configuration Errors"
-          grep -E "ERROR|Failed|Error:" mobile-config.log | head -10 || true
-          
-          echo "::error::Mobile build config validation failed."
-          echo "result=failure" >> $GITHUB_OUTPUT
-          exit 1
         fi
 
         echo "::endgroup::"
