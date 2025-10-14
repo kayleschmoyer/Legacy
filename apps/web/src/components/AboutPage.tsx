@@ -1,6 +1,6 @@
 import React from 'react';
-import { YStack, H1, H3, XStack, Text } from '@legacy-sports/shared-components';
-import { styled } from 'tamagui';
+import { YStack, H1, H3, XStack } from '@legacy-sports/shared-components';
+import { styled, Text } from 'tamagui';
 
 const Container = styled(YStack, {
   maxWidth: 800,
