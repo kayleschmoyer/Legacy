@@ -175,6 +175,7 @@ runs:
         fi
 
     - name: Deploy Infrastructure with Terraform
+      id: terraform-deploy
       shell: bash
       working-directory: terraform
       run: |
@@ -188,14 +189,26 @@ runs:
         MAX_RETRIES=20
         RETRY_DELAY=30
         RETRY_COUNT=0
+        PLAN_SUCCESS=false
         
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-          if terraform plan -target="$TF_TARGET" -lock-timeout=10m; then
+          if terraform plan -target="$TF_TARGET" -lock-timeout=10m 2>&1 | tee plan.log; then
             echo "✅ Terraform plan successful"
+            PLAN_SUCCESS=true
             break
           else
             EXIT_CODE=$?
             RETRY_COUNT=$((RETRY_COUNT + 1))
+            
+            # Check if this was a lock error and capture lock ID
+            if grep -q "Error acquiring the state lock" plan.log; then
+              LOCK_ID=$(grep -A 10 "Lock Info:" plan.log | grep "ID:" | awk '{print $2}')
+              if [ -n "$LOCK_ID" ]; then
+                echo "lock_id=$LOCK_ID" >> $GITHUB_OUTPUT
+                echo "🔒 Detected lock held by another process (ID: $LOCK_ID)"
+              fi
+            fi
+            
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
               echo "⚠️  Terraform plan failed (attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in ${RETRY_DELAY}s..."
               sleep $RETRY_DELAY
@@ -206,13 +219,44 @@ runs:
           fi
         done
         
-        echo "🚀 Applying Terraform changes..."
-        terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
+        if [ "$PLAN_SUCCESS" = true ]; then
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
+          
+          echo "✅ Infrastructure deployment completed for $LAMBDA_NAME"
+          
+          echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lambda**: $LAMBDA_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Bucket**: $S3_BUCKET" >> $GITHUB_STEP_SUMMARY
+          echo "- **Terraform Target**: $TF_TARGET" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Cleanup Terraform Lock on Failure
+      if: failure() && steps.terraform-deploy.outputs.lock_id != ''
+      shell: bash
+      working-directory: terraform
+      run: |
+        LOCK_ID="${{ steps.terraform-deploy.outputs.lock_id }}"
+        echo "🔓 Attempting to release stuck Terraform lock: $LOCK_ID"
+        echo "⚠️  This workflow failed and may have left the state locked"
         
-        echo "✅ Infrastructure deployment completed for $LAMBDA_NAME"
-        
-        echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
-        echo "- **Lambda**: $LAMBDA_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
-        echo "- **S3 Bucket**: $S3_BUCKET" >> $GITHUB_STEP_SUMMARY
-        echo "- **Terraform Target**: $TF_TARGET" >> $GITHUB_STEP_SUMMARY
+        # Try to force unlock if we captured a lock ID
+        if [ -n "$LOCK_ID" ]; then
+          echo "Running: terraform force-unlock -force $LOCK_ID"
+          if terraform force-unlock -force "$LOCK_ID" 2>&1; then
+            echo "✅ Successfully released Terraform state lock"
+            echo "## 🔓 Lock Cleanup" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Successfully released stuck lock" >> $GITHUB_STEP_SUMMARY
+            echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  Could not automatically release lock (may have already been released)"
+            echo "## ⚠️  Manual Lock Cleanup May Be Required" >> $GITHUB_STEP_SUMMARY
+            echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+            echo "- Run manually: \`terraform force-unlock $LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "⚠️  No lock ID captured, cannot automatically unlock"
+          echo "## ⚠️  Manual Lock Check Recommended" >> $GITHUB_STEP_SUMMARY
+          echo "If state is locked, check DynamoDB table \`terraform-state-locks\`" >> $GITHUB_STEP_SUMMARY
+        fi
