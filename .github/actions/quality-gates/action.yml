@@ -189,9 +189,9 @@ runs:
         AGENTS="${{ inputs.optimal-agents }}"
         echo "🎯 Starting DTE with $AGENTS agents..."
 
-        # Start DTE session with optimal agent count
-        # Use --distribute-on="manual" for legacy DTE setup with manual agent management
-        npx nx-cloud start-ci-run --distribute-on="manual" --stop-agents-after="build" --agent-count=$AGENTS
+        # Start DTE session with automatic agent provisioning
+        # Use --distribute-on with agent count for automatic Nx Cloud agent management
+        npx nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" --stop-agents-after="build"
 
         echo "strategy=distributed" >> $GITHUB_OUTPUT
 
