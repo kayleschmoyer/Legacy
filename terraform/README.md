@@ -43,6 +43,22 @@ terraform apply
 
 ## 🔧 Infrastructure Components
 
+### Custom Domain & DNS (Route 53)
+
+Manage your custom domain with Terraform:
+
+- **Domain**: Configurable via `domain_name` variable
+- **DNS Provider**: AWS Route 53
+- **Frontend**: Points to GitHub Pages deployment
+- **API**: Optional `api.yourdomain.com` subdomain
+- **SSL**: Automatic via Let's Encrypt (GitHub Pages)
+
+**Quick Start**: See [`docs/route53-setup-quickstart.md`](../docs/route53-setup-quickstart.md)
+
+**Full Guide**: [`docs/deployment/route53-github-pages-setup.md`](../docs/deployment/route53-github-pages-setup.md)
+
+**Cost**: ~$0.50/month (Route 53 hosted zone) + domain registration
+
 ### API Gateway
 
 Central entry point for all API requests:

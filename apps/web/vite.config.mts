@@ -41,10 +41,19 @@ export default defineConfig(({ mode }) => {
     - Commit SHA: ${commitSha}
   `);
 
+  // Determine base path based on deployment target
+  // Custom domain (legacy-fantasy.com) = root path /
+  // GitHub Pages subdirectory (bkrupa.github.io/legacy-sports/) = /legacy-sports/
+  const basePath = process.env.VITE_USE_CUSTOM_DOMAIN === 'true' || isDeployBuild 
+    ? '/' 
+    : (process.env.NODE_ENV === 'production' ? '/legacy-sports/' : '/');
+
+  console.log(`📍 Base Path: ${basePath}`);
+
   return {
     root: __dirname,
     cacheDir: '../../node_modules/.vite/web',
-    base: process.env.NODE_ENV === 'production' ? '/legacy-sports/' : '/',
+    base: basePath,
     // Read environment variables from workspace root
     envDir: resolve(__dirname, '../../'),
     // Help Tamagui find the correct paths

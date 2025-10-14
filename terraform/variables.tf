@@ -104,3 +104,16 @@ variable "sentry_dsn" {
   default     = "https://9cde57d0dba3d0dd1e85a797ef980e97@o4509922239315968.ingest.us.sentry.io/4510161844043776"
   sensitive   = true
 }
+
+# Route 53 / DNS Configuration
+variable "domain_name" {
+  description = "Primary domain name for the application (e.g., legacysports.com)"
+  type        = string
+  default     = "legacy-fantasy.com"  # Set in terraform.tfvars or via -var flag
+}
+
+variable "github_username" {
+  description = "GitHub username/organization for GitHub Pages (e.g., bkrupa)"
+  type        = string
+  default     = "bkrupa"
+}

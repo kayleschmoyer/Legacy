@@ -70,6 +70,7 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_USE_CUSTOM_DOMAIN: 'true'
         run: npx nx build web --configuration=deploy
 
       # Add CNAME file for custom domain

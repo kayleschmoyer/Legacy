@@ -25,3 +25,8 @@ allowed_public_ips = ["0.0.0.0"]
 
 # RDS Proxy Configuration
 enable_rds_proxy = true       # Production RDS Proxy (private)
+
+# Route 53 / Custom Domain Configuration
+# Replace with your actual domain name (leave empty to skip DNS setup)
+domain_name      = ""  # e.g., "legacysports.com"
+github_username  = "bkrupa"  # Your GitHub username/organization
