@@ -71,27 +71,23 @@ runs:
         if [ -n "$NX_CLOUD_TOKEN" ]; then
           echo "✅ Nx Cloud token found"
           
-          # Export token for nx-cloud CLI
-          export NX_CLOUD_ACCESS_TOKEN="$NX_CLOUD_TOKEN"
-          
           # Test basic cloud connectivity with timeout
           echo "🌐 Testing cloud connectivity..."
-          # Modern nx-cloud (v19+) requires authentication for most commands
-          # We'll use a simple command to verify CLI works
-          
-          # Try to run nx-cloud with a valid command to test accessibility
-          if timeout "${TIMEOUT_SECONDS}s" npx nx-cloud start-ci-run --help >/dev/null 2>&1; then
+          # Check if nx-cloud CLI is accessible (without auth requirements)
+          # Running nx-cloud without args just shows available commands
+          if timeout "${TIMEOUT_SECONDS}s" npx nx-cloud 2>&1 | grep -q "start-ci-run"; then
             echo "✅ Nx Cloud CLI accessible"
             CLOUD_AVAILABLE="true"
             
-            # For modern Nx Cloud, we can't query quotas/agents directly
+            # For modern Nx Cloud (v19+), we can't query quotas/agents upfront
             # The system will handle agent allocation automatically via start-ci-run
-            # We just verify that the token is valid and system is accessible
+            # We just need to ensure the CLI is available and token will be used at runtime
             
-            echo "🎯 Verifying Nx Cloud authentication..."
+            echo "🎯 Nx Cloud CLI ready for DTE"
             
             # Assume DTE is available if we got this far
             # The actual distribution will be controlled by start-ci-run --distribute-on
+            # Agent allocation happens dynamically based on workspace plan
             DTE_AVAILABLE="true"
             EXECUTION_MODE="distributed"
             # Use default of 8 agents - this will be managed by Nx Cloud based on plan
