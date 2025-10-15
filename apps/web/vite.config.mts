@@ -63,10 +63,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 4200,
       host: 'localhost',
+      strictPort: true,
     },
     preview: {
       port: 4200,
       host: 'localhost',
+      strictPort: true,
     },
     plugins: [
       // Load TS paths first to ensure proper resolution

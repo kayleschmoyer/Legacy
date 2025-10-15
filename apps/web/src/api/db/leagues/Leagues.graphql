@@ -81,4 +81,3 @@ query GetLeagueTeams($leagueId: Int!) {
     leagueId
   }
 }
-

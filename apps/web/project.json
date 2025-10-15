@@ -14,14 +14,16 @@
       "executor": "@nx/vite:dev",
       "options": {
         "port": 4200,
-        "host": "localhost"
+        "host": "localhost",
+        "strictPort": true
       }
     },
     "serve": {
       "executor": "@nx/vite:dev",
       "options": {
         "port": 4200,
-        "host": "localhost"
+        "host": "localhost",
+        "strictPort": true
       }
     },
     "build": {
