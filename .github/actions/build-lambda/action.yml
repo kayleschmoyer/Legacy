@@ -68,11 +68,16 @@ runs:
       shell: bash
       working-directory: ${{ steps.config.outputs.lambda-dir }}
       run: |
+        # Disable Nx Cloud for lambda builds to avoid quota issues
+        # Lambda builds are typically fast and don't benefit much from DTE
+        unset NX_CLOUD_ACCESS_TOKEN
+        export NX_CLOUD_NO_TIMEOUTS=true
+        
         LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
         NX_PROJECT="${{ steps.config.outputs.nx-project }}"
         BUILD_OUTPUT="${{ inputs.build-output-file }}"
         
-        echo "🏗️  Building $LAMBDA_NAME Lambda using Nx..."
+        echo "🏗️  Building $LAMBDA_NAME Lambda using Nx (local build)..."
         echo "📦 Project: $NX_PROJECT"
         echo "📄 Expected output: dist/$BUILD_OUTPUT"
         

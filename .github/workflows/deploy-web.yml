@@ -26,7 +26,7 @@ env:
   NX_CACHE_DIRECTORY: .nx-cache
   NX_SKIP_NX_CACHE: false
   NODE_OPTIONS: "--max_old_space_size=4096"
-  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  # NX_CLOUD_ACCESS_TOKEN set conditionally in build step based on DTE availability
 
 jobs:
   build-and-deploy:
@@ -71,15 +71,9 @@ jobs:
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_USE_CUSTOM_DOMAIN: 'true'
-        run: |
-          # Disable Nx Cloud if DTE is not available
-          if [ "${{ steps.detect-dte.outputs.dte-available }}" != "true" ]; then
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_CLOUD_NO_TIMEOUTS=true
-            echo "ℹ️ Nx Cloud disabled - building locally"
-          fi
-          
-          npx nx build web --configuration=deploy
+          # Only set Nx Cloud token if DTE is available, otherwise unset to avoid quota errors
+          NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
+        run: npx nx build web --configuration=deploy
 
       # Add CNAME file for custom domain
       # Required when using actions/deploy-pages (artifact-based deployment)
