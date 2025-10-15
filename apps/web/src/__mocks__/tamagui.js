@@ -6,8 +6,8 @@ export const View = ({ children, ...props }) =>
   React.createElement('div', props, children);
 export const Text = ({ children, ...props }) =>
   React.createElement('span', props, children);
-export const Button = ({ children, ...props }) =>
-  React.createElement('button', props, children);
+export const Button = ({ children, onPress, onClick, ...props }) =>
+  React.createElement('button', { ...props, onClick: onClick || onPress }, children);
 export const Input = ({ ...props }) => React.createElement('input', props);
 export const XStack = ({ children, ...props }) =>
   React.createElement(
@@ -74,8 +74,22 @@ export const Fieldset = ({ children, ...props }) =>
   React.createElement('fieldset', props, children);
 export const Sheet = ({ children, ...props }) =>
   React.createElement('div', props, children);
-export const Dialog = ({ children, ...props }) =>
+// Create compound Dialog component
+const DialogBase = ({ children, ...props }) =>
+  React.createElement('div', { role: 'dialog', ...props }, children);
+DialogBase.Portal = ({ children, ...props }) =>
   React.createElement('div', props, children);
+DialogBase.Overlay = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+DialogBase.Content = ({ children, ...props }) =>
+  React.createElement('div', props, children);
+DialogBase.Title = ({ children, ...props }) =>
+  React.createElement('h2', props, children);
+DialogBase.Description = ({ children, ...props }) =>
+  React.createElement('p', props, children);
+DialogBase.Close = ({ children, ...props }) =>
+  React.createElement('button', props, children);
+export const Dialog = DialogBase;
 // Create compound Popover component
 const PopoverBase = ({ children, ...props }) =>
   React.createElement('div', props, children);

@@ -9,9 +9,13 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { styled, Text } from 'tamagui';
+import { styled, Text, Dialog, Input, Separator } from 'tamagui';
 import { League, LeagueCard } from './LeagueCard';
-import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
+import {
+  useGetUserLeaguesQuery,
+  useCreateLeagueAndTeamsMutation,
+  GetUserLeagues,
+} from '../../api/db/graphql.generated';
 
 const PageContainer = styled(YStack, {
   flex: 1,
@@ -138,35 +142,35 @@ const ActionButtonsRow = styled(XStack, {
 });
 
 const PrimaryButton = styled(Button, {
-  backgroundColor: '$orange8',
-  borderColor: '$orange8',
+  backgroundColor: '$sportBaseballPrimary',
+  borderColor: '$sportBaseballPrimary',
   borderRadius: '$4',
   height: '$5',
   fontSize: '$4',
   fontWeight: '600',
   paddingHorizontal: '$6',
   hoverStyle: {
-    backgroundColor: '$orange9',
-    borderColor: '$orange9',
+    backgroundColor: '$blue7',
+    borderColor: '$blue7',
   },
   pressStyle: {
-    backgroundColor: '$orange10',
+    backgroundColor: '$blue8',
   },
 });
 
 const SecondaryButton = styled(Button, {
   backgroundColor: 'transparent',
-  borderColor: '$orange8',
+  borderColor: '$sportBaseballPrimary',
   borderWidth: 2,
   borderRadius: '$4',
   height: '$5',
   fontSize: '$4',
   fontWeight: '600',
   paddingHorizontal: '$6',
-  color: '$orange10',
+  color: '$sportBaseballPrimary',
   hoverStyle: {
-    backgroundColor: '$orange2',
-    borderColor: '$orange9',
+    backgroundColor: '$blue1',
+    borderColor: '$blue7',
   },
 });
 
@@ -182,11 +186,40 @@ const NoticeCard = styled(YStack, {
 export function BaseballLandingPage() {
   const navigate = useNavigate();
   const auth = useAuth();
+  const [showCreateDialog, setShowCreateDialog] = React.useState(false);
+  const [leagueName, setLeagueName] = React.useState('');
+  const [teamCount, setTeamCount] = React.useState<number>(10);
+  const [search, setSearch] = React.useState('');
   
   // Fetch user leagues from GraphQL
   const { data, loading: isLoading, error } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
     skip: !auth?.user,
+  });
+
+  const [createLeague, { loading: creating }] = useCreateLeagueAndTeamsMutation({
+    update: (cache, { data }) => {
+      const newLeague = data?.createLeagueAndTeams?.league;
+      if (!newLeague) return;
+      try {
+        const existing = cache.readQuery({ query: GetUserLeagues }) as
+          | { userLeagues: unknown[] }
+          | null
+          | undefined;
+        if (existing?.userLeagues) {
+          cache.writeQuery({
+            query: GetUserLeagues,
+            data: { userLeagues: [...existing.userLeagues, newLeague] },
+          });
+        }
+      } catch {
+        // ignore; query may not be in cache yet
+      }
+    },
+    onCompleted: (res) => {
+      const id = res.createLeagueAndTeams?.league?.id;
+      if (id) navigate(`/baseball/league/${id}`);
+    },
   });
 
   // Map GraphQL data to our League interface
@@ -203,7 +236,7 @@ export function BaseballLandingPage() {
   };
 
   const handleCreateLeague = () => {
-    navigate('/baseball/league/create');
+    setShowCreateDialog(true);
   };
 
   const handleJoinLeague = () => {
@@ -212,9 +245,9 @@ export function BaseballLandingPage() {
 
   if (isLoading) {
     return (
-      <PageContainer>
+      <PageContainer role="main" aria-busy="true" aria-live="polite">
         <ContentContainer>
-          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400}>
+          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400} role="status">
             <Paragraph fontSize="$6" color="$color11">Loading your leagues...</Paragraph>
           </YStack>
         </ContentContainer>
@@ -224,9 +257,9 @@ export function BaseballLandingPage() {
 
   if (error) {
     return (
-      <PageContainer>
+      <PageContainer role="main" aria-live="assertive">
         <ContentContainer>
-          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400} gap="$4">
+          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400} gap="$4" role="alert">
             <Paragraph fontSize="$6" color="$red10">Failed to load leagues</Paragraph>
             <SecondaryButton onPress={() => window.location.reload()}>
               <Text>Try Again</Text>
@@ -237,8 +270,14 @@ export function BaseballLandingPage() {
     );
   }
 
+  const filteredLeagues = leagues.filter((l) =>
+    (l?.name || '').toLowerCase().includes(search.toLowerCase()),
+  );
+
   return (
     <PageContainer
+      role="main"
+      aria-label="Baseball fantasy landing page"
       style={{
         background: `
           radial-gradient(circle at 20% 30%, rgba(255, 165, 0, 0.1) 0%, transparent 50%),
@@ -252,11 +291,13 @@ export function BaseballLandingPage() {
       <ContentContainer>
         {/* Hero Section */}
         <HeroSection
+          role="region"
+          aria-labelledby="baseball-hero-title"
           style={{
             background: 'linear-gradient(135deg, hsl(var(--orange2)) 0%, hsl(var(--orange3)) 100%)',
           }}
         >
-          <HeroTitle>
+          <HeroTitle id="baseball-hero-title">
             <span role="img" aria-label="baseball">⚾</span>
             {' '}Baseball Fantasy
           </HeroTitle>
@@ -292,20 +333,39 @@ export function BaseballLandingPage() {
         )}
 
         {/* Leagues Section */}
-        <LeaguesSection>
+        <LeaguesSection role="region" aria-labelledby="your-leagues-title">
           <SectionHeader>
-            <SectionTitle>Your Leagues</SectionTitle>
+            <SectionTitle id="your-leagues-title">Your Leagues</SectionTitle>
+            {leagues.length > 0 && (
+              <XStack alignItems="center" gap="$3">
+                {/* Accessible label for search */}
+                <label htmlFor="league-search" className="sr-only">Search leagues</label>
+                <Input
+                  size="$4"
+                  placeholder="Search leagues..."
+                  value={search}
+                  onChangeText={setSearch}
+                  backgroundColor="$color1"
+                  borderColor="$borderColor"
+                  width={280}
+                  id="league-search"
+                  role="searchbox"
+                  aria-label="Search leagues"
+                />
+              </XStack>
+            )}
           </SectionHeader>
 
-          {leagues.length > 0 ? (
+          {filteredLeagues.length > 0 ? (
             <LeaguesGrid
+              data-testid="leagues-grid"
               justifyContent="center"
               $gtSm={{ justifyContent: 'flex-start', gap: '$5' }}
               style={{
                 animation: 'fadeInUp 0.5s ease-out',
               }}
             >
-              {leagues.map((league, index) => (
+              {filteredLeagues.map((league, index) => (
                 <LeagueCard
                   key={league.id}
                   league={league}
@@ -332,6 +392,96 @@ export function BaseballLandingPage() {
           )}
         </LeaguesSection>
       </ContentContainer>
+
+      {/* Create League - Quick Dialog */}
+      <Dialog modal open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay animation="quick" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+          <Dialog.Content
+            bordered
+            elevate
+            maxWidth={560}
+            width="100%"
+            backgroundColor="$color2"
+            borderColor="$borderColor"
+            animation="quick"
+            enterStyle={{ opacity: 0, y: -10 }}
+            exitStyle={{ opacity: 0, y: 10 }}
+            aria-labelledby="create-league-title"
+            aria-describedby="create-league-desc"
+          >
+            <YStack space="$4">
+              <YStack>
+                <H2 size="$6" id="create-league-title">Create League</H2>
+                <Paragraph color="$gray11" id="create-league-desc">Create a new league in seconds. You can fine-tune settings later.</Paragraph>
+              </YStack>
+
+              <YStack space="$3">
+                <Text fontWeight="600" color="$gray12">League Name</Text>
+                <Input
+                  placeholder="e.g., Saturday Sluggers"
+                  value={leagueName}
+                  onChangeText={setLeagueName}
+                  autoFocus
+                  aria-label="League name"
+                />
+              </YStack>
+
+              <YStack space="$3">
+                <Text fontWeight="600" color="$gray12">Number of Teams</Text>
+                <XStack gap="$2" flexWrap="wrap">
+                  {[6, 8, 10, 12, 14, 16].map((n) => (
+                    <Button
+                      key={n}
+                      size="$3"
+                      variant={teamCount === n ? 'primary' : 'outlined'}
+                      onPress={() => setTeamCount(n)}
+                      backgroundColor={teamCount === n ? '$blue8' : '$color2'}
+                      borderColor={teamCount === n ? '$blue8' : '$borderColor'}
+                      borderWidth={teamCount === n ? 2 : 1}
+                      aria-pressed={teamCount === n}
+                      aria-label={`Select ${n} teams`}
+                    >
+                      <Text color={teamCount === n ? '$blue12' : '$color'}>{n}</Text>
+                    </Button>
+                  ))}
+                </XStack>
+              </YStack>
+
+              <Separator />
+
+              <XStack justifyContent="flex-end" gap="$3">
+                <Dialog.Close asChild>
+                  <SecondaryButton disabled={creating}>Cancel</SecondaryButton>
+                </Dialog.Close>
+                <PrimaryButton
+                  disabled={creating || leagueName.trim().length < 3}
+                  onPress={() => {
+                    const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .split('T')[0];
+                    void createLeague({
+                      variables: {
+                        input: {
+                          leagueName: leagueName.trim(),
+                          numberOfTeams: teamCount,
+                          draftType: 'NORMAL',
+                          startDate,
+                          isPublic: false,
+                          tradingEnabled: true,
+                          waiverEnabled: true,
+                        },
+                      },
+                    });
+                  }}
+                >
+                  {creating ? 'Creating…' : 'Create League'}
+                </PrimaryButton>
+              </XStack>
+            </YStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
     </PageContainer>
   );
 }

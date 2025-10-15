@@ -1,104 +1,219 @@
 import { config } from '@tamagui/config';
 import { createTamagui, type TamaguiConfig } from 'tamagui';
 
-// Custom theme tokens for Legacy Sports
-const legacySportsTheme = {
-  // Background colors
-  background: '#0f0f23',
-  backgroundHover: '#1a1a2e',
-  backgroundPress: '#16213e',
-  backgroundFocus: '#1e1e3f',
-  backgroundStrong: '#2a2a4a',
-  backgroundTransparent: 'rgba(15, 15, 35, 0.8)',
+// Professional, modern brand themes tuned for fantasy Baseball + Football
+// - Night-stadium dark with crisp surfaces
+// - Team-adjacent accents (royal blue + seam red; turf green + amber)
+// Keep existing token names for compatibility; ensure AA contrast
+const brandDark = {
+  // Backgrounds (neutral slate)
+  background: '#0A0F1A', // deep navy/charcoal
+  backgroundHover: '#0E1624',
+  backgroundPress: '#0B1220',
+  backgroundFocus: '#13203A',
+  backgroundStrong: '#17253F',
+  backgroundTransparent: 'rgba(10, 15, 26, 0.85)',
 
-  // Card and surface colors
-  color1: '#0f0f23',
-  color2: '#1a1a2e',
-  color3: '#16213e',
-  color4: '#1e1e3f',
-  color5: '#2a2a4a',
-  color6: '#3a3a5a',
-  color7: '#4a4a6a',
-  color8: '#5a5a7a',
-  color9: '#6a6a8a',
-  color10: '#7a7a9a',
-  color11: '#9a9aaa',
-  color12: '#bababaa',
+  // Surfaces (elevations)
+  color1: '#0D1526',
+  color2: '#111B2F',
+  color3: '#16223A',
+  color4: '#1C2A47',
+  color5: '#243357',
+  color6: '#2E3F6B',
+  color7: '#394B7E',
+  color8: '#475B95',
+  color9: '#5B6FA8',
+  color10: '#6C80BA',
+  color11: '#DEE6FF', // subtle text on dark surfaces
+  color12: '#F5F7FA', // high contrast text
 
-  // Text colors
-  color: '#ffffff',
-  colorHover: '#f0f0f0',
-  colorPress: '#e0e0e0',
-  colorFocus: '#f5f5f5',
-  colorTransparent: 'rgba(255, 255, 255, 0.8)',
+  // Text
+  color: '#F8FAFC',
+  colorHover: '#FFFFFF',
+  colorPress: '#E2E8F0',
+  colorFocus: '#FFFFFF',
+  colorTransparent: 'rgba(248, 250, 252, 0.85)',
 
-  // Border colors
-  borderColor: '#3a3a5a',
-  borderColorHover: '#4a4a6a',
-  borderColorPress: '#2a2a4a',
-  borderColorFocus: '#5a5a7a',
+  // Borders
+  borderColor: '#2F3B53',
+  borderColorHover: '#3A4866',
+  borderColorPress: '#263043',
+  borderColorFocus: '#4D5D80',
 
-  // Shadow colors
-  shadowColor: 'rgba(0, 0, 0, 0.5)',
-  shadowColorHover: 'rgba(0, 0, 0, 0.6)',
-  shadowColorPress: 'rgba(0, 0, 0, 0.4)',
-  shadowColorFocus: 'rgba(0, 0, 0, 0.7)',
+  // Shadows
+  shadowColor: 'rgba(8, 12, 20, 0.6)',
+  shadowColorHover: 'rgba(8, 12, 20, 0.7)',
+  shadowColorPress: 'rgba(8, 12, 20, 0.5)',
+  shadowColorFocus: 'rgba(8, 12, 20, 0.8)',
 
-  // Accent colors - Blues
-  blue1: '#0c1b3d',
-  blue2: '#1a2f5a',
-  blue3: '#284377',
-  blue4: '#365794',
-  blue5: '#446bb1',
-  blue6: '#5280ce',
-  blue7: '#6094eb',
-  blue8: '#7dabf8',
-  blue9: '#9bc2ff',
-  blue10: '#b8d9ff',
-  blue11: '#d5f0ff',
-  blue12: '#f2fbff',
+  // Primary (blue)
+  blue1: '#0A1A37',
+  blue2: '#0E2652',
+  blue3: '#12316B',
+  blue4: '#173B83',
+  blue5: '#1C479C',
+  blue6: '#2156B6',
+  blue7: '#2869D1',
+  blue8: '#2F7FEC',
+  blue9: '#3B82F6', // links/focus
+  blue10: '#60A5FA',
+  blue11: '#93C5FD',
+  blue12: '#EAF2FF',
 
-  // Accent colors - Greens (for success states)
-  green1: '#0d2818',
-  green2: '#1a5030',
-  green3: '#277848',
-  green4: '#34a060',
-  green5: '#41c878',
-  green6: '#4ef090',
-  green7: '#6bf5a8',
-  green8: '#88fac0',
-  green9: '#a5ffd8',
-  green10: '#c2ffef',
-  green11: '#e0fff7',
-  green12: '#f0fffc',
+  // Success
+  green1: '#072915',
+  green2: '#0C3A20',
+  green3: '#104B2A',
+  green4: '#145C34',
+  green5: '#166A3B',
+  green6: '#178143',
+  green7: '#199A4C', // turf
+  green8: '#22C55E', // success base
+  green9: '#4ADE80',
+  green10: '#86EFAC',
+  green11: '#BBF7D0',
+  green12: '#ECFDF5',
 
-  // Accent colors - Reds (for error states)
-  red1: '#2d0c18',
-  red2: '#5a1930',
-  red3: '#872648',
-  red4: '#b43360',
-  red5: '#e14078',
-  red6: '#f54d90',
-  red7: '#ff6ba8',
-  red8: '#ff88c0',
-  red9: '#ffa5d8',
-  red10: '#ffc2ef',
-  red11: '#ffe0f7',
-  red12: '#fff0fc',
+  // Error
+  red1: '#3A0A12',
+  red2: '#5C121B',
+  red3: '#7F1D1D',
+  red4: '#991B1B',
+  red5: '#B91C1C',
+  red6: '#DC2626', // seam red
+  red7: '#EF4444',
+  red8: '#F87171',
+  red9: '#FCA5A5',
+  red10: '#FECACA',
+  red11: '#FEE2E2',
+  red12: '#FEF2F2',
 
-  // Accent colors - Purples (for secondary actions)
-  purple1: '#1a0d2d',
-  purple2: '#341a5a',
-  purple3: '#4e2787',
-  purple4: '#6834b4',
-  purple5: '#8241e1',
-  purple6: '#9c4ef5',
-  purple7: '#b66bff',
-  purple8: '#d088ff',
-  purple9: '#eaa5ff',
-  purple10: '#f4c2ff',
-  purple11: '#fde0ff',
-  purple12: '#fef0ff',
+  // Secondary (amber) for football UI hints
+  amber1: '#2A1805',
+  amber2: '#3B2107',
+  amber3: '#4A2A09',
+  amber4: '#5A330B',
+  amber5: '#6B3D0E',
+  amber6: '#8C4E12',
+  amber7: '#B35F15',
+  amber8: '#D97706',
+  amber9: '#F59E0B',
+  amber10: '#FBBF24',
+  amber11: '#FDE68A',
+  amber12: '#FEF3C7',
+
+  // Sport-specific accents (semantic helpers)
+  sportBaseballPrimary: '#2563EB', // royal blue
+  sportBaseballSecondary: '#DC2626', // seam red
+  sportFootballPrimary: '#16A34A', // turf green
+  sportFootballSecondary: '#F59E0B', // amber
+  focusRing: '#60A5FA',
+};
+
+const brandLight = {
+  // Backgrounds (neutral warm gray)
+  background: '#FFFFFF',
+  backgroundHover: '#F8FAFC',
+  backgroundPress: '#F2F4F8',
+  backgroundFocus: '#E8F0FF',
+  backgroundStrong: '#E6EAF2',
+  backgroundTransparent: 'rgba(255, 255, 255, 0.85)',
+
+  // Surfaces
+  color1: '#FFFFFF',
+  color2: '#F7FAFC',
+  color3: '#EFF3F8',
+  color4: '#E6EBF2',
+  color5: '#D5DDE8',
+  color6: '#C3CDDA',
+  color7: '#9CAAC5',
+  color8: '#7D8EAD',
+  color9: '#5F7295',
+  color10: '#4A5B82',
+  color11: '#1F2937', // main text
+  color12: '#0B1220', // strongest text
+
+  // Text
+  color: '#0B1220',
+  colorHover: '#111827',
+  colorPress: '#1F2937',
+  colorFocus: '#0B1220',
+  colorTransparent: 'rgba(11, 18, 32, 0.85)',
+
+  // Borders
+  borderColor: '#CBD5E1',
+  borderColorHover: '#B7C3D4',
+  borderColorPress: '#9EABC1',
+  borderColorFocus: '#7F90AE',
+
+  // Shadows
+  shadowColor: 'rgba(2, 6, 23, 0.12)',
+  shadowColorHover: 'rgba(2, 6, 23, 0.18)',
+  shadowColorPress: 'rgba(2, 6, 23, 0.08)',
+  shadowColorFocus: 'rgba(2, 6, 23, 0.22)',
+
+  // Primary (blue)
+  blue1: '#EFF6FF',
+  blue2: '#DBEAFE',
+  blue3: '#C7DBFD',
+  blue4: '#9DC3FB',
+  blue5: '#74A9F7',
+  blue6: '#4F8EF4',
+  blue7: '#2F73EC',
+  blue8: '#2563EB',
+  blue9: '#1D4ED8', // brand link
+  blue10: '#1E40AF',
+  blue11: '#1E3A8A',
+  blue12: '#0B1220',
+
+  // Success
+  green1: '#ECFDF5',
+  green2: '#D1FAE5',
+  green3: '#A7F3D0',
+  green4: '#6EE7B7',
+  green5: '#34D399',
+  green6: '#22C55E',
+  green7: '#16A34A', // turf
+  green8: '#15803D',
+  green9: '#166534',
+  green10: '#14532D',
+  green11: '#0F3C22',
+  green12: '#072315',
+
+  // Error
+  red1: '#FEF2F2',
+  red2: '#FEE2E2',
+  red3: '#FECACA',
+  red4: '#FCA5A5',
+  red5: '#F87171',
+  red6: '#EF4444', // seam red
+  red7: '#DC2626',
+  red8: '#B91C1C',
+  red9: '#991B1B',
+  red10: '#7F1D1D',
+  red11: '#5C121B',
+  red12: '#3A0A12',
+  // Secondary (amber) for football UI hints
+  amber1: '#FFFBEB',
+  amber2: '#FEF3C7',
+  amber3: '#FDE68A',
+  amber4: '#FCD34D',
+  amber5: '#FBBF24',
+  amber6: '#F59E0B',
+  amber7: '#D97706',
+  amber8: '#B45309',
+  amber9: '#92400E',
+  amber10: '#78350F',
+  amber11: '#4A250A',
+  amber12: '#2A1805',
+
+  // Sport-specific accents (semantic helpers)
+  sportBaseballPrimary: '#1D4ED8', // royal blue
+  sportBaseballSecondary: '#DC2626', // seam red
+  sportFootballPrimary: '#16A34A', // turf green
+  sportFootballSecondary: '#F59E0B', // amber
+  focusRing: '#2563EB',
 };
 
 // Custom configuration extending the base config
@@ -106,18 +221,16 @@ const customConfig = {
   ...config,
   themes: {
     ...config.themes,
-    // Override the dark theme with our custom theme
-    dark: legacySportsTheme,
-    // Set dark as the default theme
-    light: legacySportsTheme, // Use dark theme for light mode too for consistency
-    // Create branded themes
-    legacy_dark: legacySportsTheme,
-    legacy: legacySportsTheme,
+    // Branded themes
+    dark: brandDark,
+    light: brandLight,
+    legacy_dark: brandDark,
+    legacy: brandLight,
   },
   settings: {
     ...config.settings,
-    // Default to dark theme
-    defaultTheme: 'dark',
+    // Follow system preference by default; fall back to light
+    defaultTheme: 'light',
   },
 };
 

@@ -339,7 +339,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [watchlist, setWatchlist] = React.useState<number[]>([]);
   const [chatOpen, setChatOpen] = React.useState(false);
 
+  // Live region announcements for screen readers
+  const [liveMessage, setLiveMessage] = React.useState<string>('');
+  const [urgentMessage, setUrgentMessage] = React.useState<string>('');
+  const prevTimeRef = React.useRef<number>(timeRemaining);
+
   const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
+  const viewModes: Array<'grid' | 'list' | 'compact'> = ['grid', 'list', 'compact'];
 
   // Filter players
   const filteredPlayers = mockBaseballPlayers.filter((player) => {
@@ -361,6 +367,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     setCurrentPick((prev) => prev + 1);
     setTimeRemaining(90);
     setIsMyPick((prev) => !prev);
+    setLiveMessage(`Drafted ${player.name} at pick #${currentPick}`);
   };
 
   // Timer effect
@@ -382,6 +389,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             }
             setCurrentPick((prevPick) => prevPick + 1);
             setIsMyPick((prevPick) => !prevPick);
+            setUrgentMessage(`Time expired. Auto-drafted ${playerToDraft.name}.`);
+            setLiveMessage(
+              `Pick #${currentPick + 1}. ${isMyPick ? 'Opponent\'s pick' : 'Your pick'}.`,
+            );
           }
           return 90;
         }
@@ -390,6 +401,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     }, 1000);
     return () => clearInterval(timer);
   }, [draftedPlayers, isMyPick]);
+
+  // Announce when it's user's turn or waiting
+  React.useEffect(() => {
+    setLiveMessage(isMyPick ? "It's your pick." : 'Waiting for other teams.');
+  }, [isMyPick]);
+
+  // Announce when crossing critical time thresholds (<= 10s)
+  React.useEffect(() => {
+    const prev = prevTimeRef.current;
+    if (prev > 10 && timeRemaining <= 10 && isMyPick) {
+      setUrgentMessage('10 seconds remaining to make your pick.');
+    }
+    prevTimeRef.current = timeRemaining;
+  }, [timeRemaining, isMyPick]);
 
   return (
     <div
@@ -428,7 +453,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         }}
       >
         {/* Left Sidebar - My Team & Controls */}
-        <div
+        <aside
+          role="complementary"
+          aria-label="My team and draft controls"
           style={{
             background: 'rgba(0, 0, 0, 0.4)',
             backdropFilter: 'blur(10px)',
@@ -461,6 +488,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Timer */}
           <div
+            role="timer"
+            aria-live="off"
+            aria-label={isMyPick ? 'Your pick timer' : 'Waiting timer'}
+            className={timeRemaining <= 10 ? 'reduced-shake' : undefined}
             style={{
               background:
                 timeRemaining <= 10
@@ -489,6 +520,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
             <div
               style={{ fontSize: '12px', opacity: 0.9, letterSpacing: '1px' }}
+              aria-live="off"
             >
               {isMyPick ? 'YOUR PICK!' : 'WAITING...'}
             </div>
@@ -504,6 +536,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             }}
           >
             <h3
+              id="my-roster-heading"
               style={{
                 margin: '0 0 16px 0',
                 fontSize: '18px',
@@ -545,47 +578,54 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
             {/* Drafted Players */}
             {myTeam.length > 0 ? (
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {myTeam.map((player) => (
-                  <div
-                    key={player.id}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      marginBottom: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
+              <div
+                role="region"
+                aria-labelledby="my-roster-heading"
+                style={{ maxHeight: '300px', overflowY: 'auto' }}
+              >
+                <div role="list">
+                  {myTeam.map((player) => (
                     <div
+                      role="listitem"
+                      key={player.id}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
                       }}
                     >
-                      <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-                          {player.name}
-                        </div>
-                        <div style={{ fontSize: '12px', opacity: 0.7 }}>
-                          {player.team} • {player.position}
-                        </div>
-                      </div>
                       <div
                         style={{
-                          background: getPositionColor(player.position),
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                         }}
                       >
-                        {player.position}
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                            {player.name}
+                          </div>
+                          <div style={{ fontSize: '12px', opacity: 0.7 }}>
+                            {player.team} • {player.position}
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            background: getPositionColor(player.position),
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {player.position}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : (
               <div
@@ -620,6 +660,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
               }}
+              aria-pressed={aiMode}
+              aria-label={`AI Assistant ${aiMode ? 'on' : 'off'}`}
             >
               <span role="img" aria-label="Robot">
                 🤖
@@ -639,6 +681,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 fontWeight: '600',
                 cursor: 'pointer',
               }}
+              aria-pressed={chatOpen}
+              aria-label={`League chat ${chatOpen ? 'open' : 'closed'}`}
             >
               <span role="img" aria-label="Speech bubble">
                 💬
@@ -660,6 +704,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 fontWeight: '600',
                 cursor: 'pointer',
               }}
+              aria-pressed={vrMode}
+              aria-label={`VR mode ${vrMode ? 'on' : 'off'}`}
             >
               <span role="img" aria-label="VR Goggles">
                 🥽
@@ -667,10 +713,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               VR Mode {vrMode ? 'ON' : 'OFF'}
             </button>
           </div>
-        </div>
+        </aside>
 
         {/* Center - Player Board */}
-        <div style={{ padding: '20px', overflowY: 'auto' }}>
+        <div role="main" aria-label="Player draft board" style={{ padding: '20px', overflowY: 'auto' }}>
           {/* Header Controls */}
           <div
             style={{
@@ -690,6 +736,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               <input
                 type="text"
                 placeholder="🔍 Search elite baseball players..."
+                aria-label="Search players"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -706,11 +753,35 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
 
             {/* Position Filters */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div
+              role="radiogroup"
+              aria-label="Filter by position"
+              style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
+            >
               {positions.map((pos) => (
                 <button
                   key={pos}
                   onClick={() => setSelectedPosition(pos)}
+                  role="radio"
+                  aria-checked={selectedPosition === pos}
+                  onKeyDown={(e) => {
+                    const currentIndex = positions.indexOf(selectedPosition);
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const nextIndex = (currentIndex + 1) % positions.length;
+                      setSelectedPosition(positions[nextIndex]);
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prevIndex = (currentIndex - 1 + positions.length) % positions.length;
+                      setSelectedPosition(positions[prevIndex]);
+                    } else if (e.key === 'Home') {
+                      e.preventDefault();
+                      setSelectedPosition(positions[0]);
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      setSelectedPosition(positions[positions.length - 1]);
+                    }
+                  }}
                   style={{
                     padding: '8px 14px',
                     borderRadius: '20px',
@@ -732,11 +803,35 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
 
             {/* View Mode */}
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {(['grid', 'list', 'compact'] as const).map((mode) => (
+            <div
+              role="radiogroup"
+              aria-label="View mode"
+              style={{ display: 'flex', gap: '4px' }}
+            >
+              {viewModes.map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
+                  role="radio"
+                  aria-checked={viewMode === mode}
+                  onKeyDown={(e) => {
+                    const currentIndex = viewModes.indexOf(viewMode);
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const nextIndex = (currentIndex + 1) % viewModes.length;
+                      setViewMode(viewModes[nextIndex]);
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prevIndex = (currentIndex - 1 + viewModes.length) % viewModes.length;
+                      setViewMode(viewModes[prevIndex]);
+                    } else if (e.key === 'Home') {
+                      e.preventDefault();
+                      setViewMode(viewModes[0]);
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      setViewMode(viewModes[viewModes.length - 1]);
+                    }
+                  }}
                   style={{
                     padding: '8px 12px',
                     borderRadius: '8px',
@@ -769,6 +864,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           >
             {filteredPlayers.map((player, index) => (
               <div
+                role="group"
+                aria-labelledby={`player-name-${player.id}`}
                 key={player.id}
                 style={{
                   background:
@@ -777,7 +874,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   border: `1px solid ${player.injury === 'healthy' ? 'rgba(34, 197, 94, 0.3)' : player.injury === 'questionable' ? 'rgba(251, 191, 36, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
                   borderRadius: '16px',
                   padding: '20px',
-                  cursor: 'pointer',
+                  cursor: 'default',
                   transition: 'all 0.3s ease',
                   position: 'relative',
                   overflow: 'hidden',
@@ -842,6 +939,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     }}
                   >
                     <h3
+                      id={`player-name-${player.id}`}
                       style={{
                         margin: 0,
                         fontSize: '20px',
@@ -1018,6 +1116,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   <button
                     onClick={() => draftPlayer(player)}
                     disabled={!isMyPick}
+                    aria-disabled={!isMyPick}
+                    aria-label={
+                      isMyPick
+                        ? `Draft ${player.name} now`
+                        : `Waiting for your turn to draft ${player.name}`
+                    }
                     style={{
                       flex: 1,
                       background: isMyPick
@@ -1044,6 +1148,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                           : [...prev, player.id],
                       );
                     }}
+                    aria-pressed={watchlist.includes(player.id)}
+                    aria-label={
+                      watchlist.includes(player.id)
+                        ? `Remove ${player.name} from watchlist`
+                        : `Add ${player.name} to watchlist`
+                    }
                     style={{
                       background: watchlist.includes(player.id)
                         ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
@@ -1066,7 +1176,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         </div>
 
         {/* Right Sidebar - AI & Analytics */}
-        <div
+        <aside
+          role="complementary"
+          aria-label="AI suggestions and analytics"
           style={{
             background: 'rgba(0, 0, 0, 0.4)',
             backdropFilter: 'blur(10px)',
@@ -1107,23 +1219,26 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             >
               Based on your roster construction:
             </div>
-            {filteredPlayers.slice(0, 3).map((player) => (
-              <div
-                key={`ai-${player.id}`}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  fontSize: '12px',
-                }}
-              >
-                <div style={{ fontWeight: 'bold' }}>{player.name}</div>
-                <div style={{ opacity: 0.7 }}>
-                  Best available {player.position}
+            <div role="list">
+              {filteredPlayers.slice(0, 3).map((player) => (
+                <div
+                  role="listitem"
+                  key={`ai-${player.id}`}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{player.name}</div>
+                  <div style={{ opacity: 0.7 }}>
+                    Best available {player.position}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Recent Picks */}
@@ -1147,25 +1262,28 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               </span>{' '}
               Recent Picks
             </h3>
-            {draftedPlayers.slice(-5).map((playerId, idx) => {
-              const player = mockBaseballPlayers.find((p) => p.id === playerId);
-              return player ? (
-                <div
-                  key={`recent-${playerId}`}
-                  style={{
-                    padding: '6px 0',
-                    borderBottom:
-                      idx < 4 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                    fontSize: '12px',
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold' }}>{player.name}</div>
-                  <div style={{ opacity: 0.7 }}>
-                    Pick #{draftedPlayers.indexOf(playerId) + 1}
+            <div role="list">
+              {draftedPlayers.slice(-5).map((playerId, idx) => {
+                const player = mockBaseballPlayers.find((p) => p.id === playerId);
+                return player ? (
+                  <div
+                    role="listitem"
+                    key={`recent-${playerId}`}
+                    style={{
+                      padding: '6px 0',
+                      borderBottom:
+                        idx < 4 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>{player.name}</div>
+                    <div style={{ opacity: 0.7 }}>
+                      Pick #{draftedPlayers.indexOf(playerId) + 1}
+                    </div>
                   </div>
-                </div>
-              ) : null;
-            })}
+                ) : null;
+              })}
+            </div>
           </div>
 
           {/* Live Analytics */}
@@ -1232,26 +1350,29 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               Watchlist ({watchlist.length})
             </h3>
             {watchlist.length > 0 ? (
-              watchlist.map((playerId) => {
-                const player = mockBaseballPlayers.find(
-                  (p) => p.id === playerId,
-                );
-                return player ? (
-                  <div
-                    key={`watch-${playerId}`}
-                    style={{
-                      padding: '6px 0',
-                      fontSize: '12px',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    <div style={{ fontWeight: 'bold' }}>{player.name}</div>
-                    <div style={{ opacity: 0.7 }}>
-                      {player.position} • ADP {player.adp}
+              <div role="list">
+                {watchlist.map((playerId) => {
+                  const player = mockBaseballPlayers.find(
+                    (p) => p.id === playerId,
+                  );
+                  return player ? (
+                    <div
+                      role="listitem"
+                      key={`watch-${playerId}`}
+                      style={{
+                        padding: '6px 0',
+                        fontSize: '12px',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold' }}>{player.name}</div>
+                      <div style={{ opacity: 0.7 }}>
+                        {player.position} • ADP {player.adp}
+                      </div>
                     </div>
-                  </div>
-                ) : null;
-              })
+                  ) : null;
+                })}
+              </div>
             ) : (
               <div
                 style={{ fontSize: '12px', opacity: 0.7, fontStyle: 'italic' }}
@@ -1260,8 +1381,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               </div>
             )}
           </div>
-        </div>
+        </aside>
       </div>
+
+      {/* Custom CSS for animations */}
+      <div className="sr-only" aria-live="polite">{liveMessage}</div>
+      <div className="sr-only" aria-live="assertive">{urgentMessage}</div>
 
       {/* Custom CSS for animations */}
       <style>{`
@@ -1273,6 +1398,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-2px); }
           75% { transform: translateX(2px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .reduced-shake { animation: none !important; }
         }
       `}</style>
     </div>

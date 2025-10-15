@@ -21,6 +21,8 @@ import LeagueDetailPage from '../components/baseball/LeagueDetailPage';
 import JoinLeagueByCode from '../components/baseball/JoinLeagueByCode';
 import ManagementPage from '../components/ManagementPage';
 import AboutPage from '../components/AboutPage';
+import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
+import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 
 // Styled Tamagui components for navigation
 const NavContainer = styled(YStack, {
@@ -49,7 +51,7 @@ const NavContent = styled(XStack, {
 
 const NavLinks = styled(XStack, {
   alignItems: 'center',
-  gap: '$2',
+  gap: '$3',
   flex: 1,
   justifyContent: 'center',
 });
@@ -58,13 +60,16 @@ const NavLinks = styled(XStack, {
 
 function Navigation() {
   const location = useLocation();
+  const inBaseball = location.pathname.startsWith('/baseball');
+  const inFootball = location.pathname === '/football';
+  const accentBg = inBaseball ? '$sportBaseballPrimary' : inFootball ? '$sportFootballPrimary' : undefined;
 
   return (
-    <NavContainer>
+    <NavContainer role="banner">
       <NavContent>
         {/* Logo/Brand Section */}
         <XStack alignItems="center" space="$4">
-          <Link to="/" style={{ textDecoration: 'none' }}>
+          <Link to="/" aria-label="Legacy Sports home" style={{ textDecoration: 'none' }}>
             <H1
               color="$color"
               size="$6"
@@ -80,31 +85,31 @@ function Navigation() {
         </XStack>
 
         {/* Center Navigation Links */}
-        <NavLinks display="none" $gtMd={{ display: 'flex' }}>
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <Button
-              variant={location.pathname === '/' ? 'primary' : 'secondary'}
-              size="$3"
-            >
-              <span role="img" aria-label="home">
-                🏠
-              </span>{' '}
-              Home
-            </Button>
-          </Link>
-
+        <NavLinks
+          as="nav"
+          role="navigation"
+          aria-label="Primary"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
           {/* Sports Dropdown - Football and Baseball */}
           <SportsDropdown />
 
           {/* Players Dropdown - All Players and Stats */}
           <PlayersDropdown />
 
-          <Link to="/management" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/management"
+            style={{ textDecoration: 'none' }}
+            aria-current={
+              location.pathname === '/management' ? 'page' : undefined
+            }
+          >
             <Button
-              variant={
-                location.pathname === '/management' ? 'primary' : 'secondary'
-              }
-              size="$3"
+              variant={location.pathname === '/management' && !accentBg ? 'primary' : 'secondary'}
+              backgroundColor={location.pathname === '/management' && accentBg ? accentBg : undefined}
+              color={location.pathname === '/management' && accentBg ? 'white' : undefined}
+              size="$2"
             >
               <span role="img" aria-label="management">
                 ⚙️
@@ -112,10 +117,16 @@ function Navigation() {
               Management
             </Button>
           </Link>
-          <Link to="/about" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/about"
+            style={{ textDecoration: 'none' }}
+            aria-current={location.pathname === '/about' ? 'page' : undefined}
+          >
             <Button
-              variant={location.pathname === '/about' ? 'primary' : 'secondary'}
-              size="$3"
+              variant={location.pathname === '/about' && !accentBg ? 'primary' : 'secondary'}
+              backgroundColor={location.pathname === '/about' && accentBg ? accentBg : undefined}
+              color={location.pathname === '/about' && accentBg ? 'white' : undefined}
+              size="$2"
             >
               <span role="img" aria-label="info">
                 ℹ️
@@ -155,13 +166,31 @@ function App() {
 
   return (
     <MainLayout>
+      {/* Global screen reader announcer */}
+      <GlobalAnnouncer />
+      {/* Skip link for keyboard users */}
+      <a
+        href="#main-content"
+        className="skip-link sr-only"
+        onClick={(e) => {
+          // Improve focus behavior across browsers
+          const target = document.getElementById('main-content');
+          if (target) {
+            e.preventDefault();
+            target.focus();
+          }
+        }}
+      >
+        Skip to main content
+      </a>
       <Navigation />
-      <YStack flex={1} padding="$4">
+      <YStack flex={1} padding="$4" id="main-content" tabIndex={-1}>
         <Routes>
           {/* All routes are now authenticated by default */}
           <Route path="/" element={<NavigableHomeScreen />} />
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
+          <Route path="/baseball/draft" element={<EliteDraftBoardScreen />} />
           <Route
             path="/baseball/league/create"
             element={<LeagueCreatePage />}

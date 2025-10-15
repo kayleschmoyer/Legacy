@@ -17,31 +17,37 @@ export const LeagueManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
+  const [liveMsg, setLiveMsg] = useState('');
   
   const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation({
     onCompleted: (data) => {
       setIsDeleting(false);
       setShowFinalConfirm(false);
+      setLiveMsg('All leagues deleted successfully.');
       alert(`Success: ${data.deleteAllLeagues || 'All leagues have been deleted successfully'}`);
     },
     onError: (error) => {
       setIsDeleting(false);
       setShowFinalConfirm(false);
+      setLiveMsg(`Error deleting leagues: ${error.message}`);
       alert(`Error: Failed to delete leagues: ${error.message}`);
     }
   });
 
   const handleDeleteAllLeagues = () => {
     setShowDialog(true);
+    setLiveMsg('Delete all leagues dialog opened.');
   };
 
   const handleConfirmDelete = () => {
     setShowDialog(false);
     setShowFinalConfirm(true);
+    setLiveMsg('Final confirmation dialog opened.');
   };
 
   const handleFinalConfirm = () => {
     setIsDeleting(true);
+    setLiveMsg('Deleting all leagues has started.');
     void deleteAllLeagues();
   };
 
@@ -122,13 +128,21 @@ export const LeagueManagement: React.FC = () => {
       <Dialog modal open={showDialog} onOpenChange={setShowDialog}>
         <Dialog.Portal>
           <Dialog.Overlay />
-          <Dialog.Content padding="$4" space="$4" maxWidth={500}>
-            <Dialog.Title color="$red11">Delete All Leagues</Dialog.Title>
-            <Dialog.Description>
+          <Dialog.Content
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            aria-describedby="delete-dialog-desc delete-dialog-list"
+            padding="$4"
+            space="$4"
+            maxWidth={500}
+          >
+            <Dialog.Title id="delete-dialog-title" color="$red11">Delete All Leagues</Dialog.Title>
+            <Dialog.Description id="delete-dialog-desc">
               Are you sure you want to delete ALL of your leagues? This action cannot be undone and will remove:
             </Dialog.Description>
             
-            <YStack space="$2" paddingLeft="$2">
+            <YStack id="delete-dialog-list" space="$2" paddingLeft="$2">
               <Text fontSize="$3">• All leagues you own</Text>
               <Text fontSize="$3">• All teams in those leagues</Text>
               <Text fontSize="$3">• All roster data</Text>
@@ -140,7 +154,7 @@ export const LeagueManagement: React.FC = () => {
               <Dialog.Close asChild>
                 <Button variant="outlined">Cancel</Button>
               </Dialog.Close>
-              <Button theme="red" onPress={handleConfirmDelete}>
+              <Button theme="red" onPress={handleConfirmDelete} autoFocus>
                 Continue
               </Button>
             </XStack>
@@ -152,9 +166,17 @@ export const LeagueManagement: React.FC = () => {
       <Dialog modal open={showFinalConfirm} onOpenChange={setShowFinalConfirm}>
         <Dialog.Portal>
           <Dialog.Overlay />
-          <Dialog.Content padding="$4" space="$4" maxWidth={500}>
-            <Dialog.Title color="$red11">Final Confirmation</Dialog.Title>
-            <Dialog.Description fontWeight="600" color="$red10">
+          <Dialog.Content
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="final-dialog-title"
+            aria-describedby="final-dialog-desc"
+            padding="$4"
+            space="$4"
+            maxWidth={500}
+          >
+            <Dialog.Title id="final-dialog-title" color="$red11">Final Confirmation</Dialog.Title>
+            <Dialog.Description id="final-dialog-desc" fontWeight="600" color="$red10">
               This is your last chance to cancel. Are you absolutely sure you want to delete ALL your leagues?
             </Dialog.Description>
 
@@ -166,6 +188,7 @@ export const LeagueManagement: React.FC = () => {
                 theme="red" 
                 onPress={handleFinalConfirm}
                 disabled={isDeleting}
+                aria-busy={isDeleting}
                 icon={isDeleting ? <Spinner size="small" /> : undefined}
               >
                 {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
@@ -174,6 +197,9 @@ export const LeagueManagement: React.FC = () => {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog>
+
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite">{liveMsg}</div>
     </>
   );
 };

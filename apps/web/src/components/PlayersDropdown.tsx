@@ -4,18 +4,24 @@ import { Button, YStack } from '@legacy-sports/shared-components';
 import { styled } from 'tamagui';
 
 const DropdownButton = styled(Button, {
-  size: '$3',
+  size: '$2',
   gap: '$2',
   width: '100%',
+  backgroundColor: 'transparent',
+  borderWidth: 1,
+  borderColor: '$borderColor',
+  hoverStyle: {
+    backgroundColor: '$color2',
+  },
+  pressStyle: {
+    backgroundColor: '$color3',
+  },
   variants: {
-    isActive: {
+    highlight: {
       true: {
         backgroundColor: '$blue9',
+        borderColor: '$blue9',
         color: 'white',
-      },
-      false: {
-        backgroundColor: '$gray4',
-        color: '$color',
       },
     },
   } as const,
@@ -55,9 +61,25 @@ export const PlayersDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const buttonId = 'players-menu-button';
+  const menuId = 'players-menu';
 
   const isActive =
     location.pathname === '/players' || location.pathname === '/players/stats';
+  const isHighlighted = isActive || isOpen;
+
+  // Use sport-specific accents when within a sport section
+  const sportTone = location.pathname.startsWith('/baseball')
+    ? 'baseball'
+    : location.pathname === '/football'
+    ? 'football'
+    : 'neutral';
+  const highlightBg =
+    sportTone === 'baseball'
+      ? '$sportBaseballPrimary'
+      : sportTone === 'football'
+      ? '$sportFootballPrimary'
+      : '$blue9';
 
   // Click outside handler
   useEffect(() => {
@@ -78,9 +100,23 @@ export const PlayersDropdown: React.FC = () => {
     }
   }, [isOpen]);
 
+  const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key === 'Escape') setIsOpen(false);
+  };
+
   return (
-    <YStack position="relative" ref={dropdownRef}>
-      <DropdownButton isActive={isActive} onPress={() => setIsOpen(!isOpen)}>
+    <YStack position="relative" ref={dropdownRef} onKeyDown={onKeyDown}>
+      <DropdownButton
+        highlight={isHighlighted}
+        backgroundColor={isHighlighted ? highlightBg : 'transparent'}
+        borderColor={isHighlighted ? highlightBg : '$borderColor'}
+        color={isHighlighted ? 'white' : undefined}
+        onPress={() => setIsOpen(!isOpen)}
+        id={buttonId}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
+      >
         <span role="img" aria-label="players">
           👥
         </span>{' '}
@@ -94,9 +130,12 @@ export const PlayersDropdown: React.FC = () => {
           left={0}
           marginTop="$2"
           zIndex={100}
+          role="menu"
+          id={menuId}
+          aria-labelledby={buttonId}
         >
           <Link to="/players" style={{ textDecoration: 'none' }}>
-            <MenuItem onPress={() => setIsOpen(false)}>
+            <MenuItem onPress={() => setIsOpen(false)} role="menuitem">
               <span role="img" aria-label="players list">
                 👤
               </span>{' '}
@@ -105,7 +144,7 @@ export const PlayersDropdown: React.FC = () => {
           </Link>
 
           <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-            <MenuItem onPress={() => setIsOpen(false)}>
+            <MenuItem onPress={() => setIsOpen(false)} role="menuitem">
               <span role="img" aria-label="statistics">
                 📊
               </span>{' '}

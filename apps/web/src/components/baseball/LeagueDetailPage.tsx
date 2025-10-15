@@ -294,9 +294,9 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   if (loading || positionsLoading || teamMembersLoading) {
     return (
-      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6">
+      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" role="main" aria-busy="true">
         <Spinner size="large" />
-        <Text marginTop="$4" color="$gray10">
+        <Text marginTop="$4" color="$gray10" role="status" aria-live="polite">
           Loading league...
         </Text>
       </YStack>
@@ -305,11 +305,11 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   if (error || !data?.league) {
     return (
-      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6">
-        <Text color="$red10" fontSize="$5" textAlign="center">
+      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" role="main" aria-live="assertive">
+        <Text color="$red10" fontSize="$5" textAlign="center" role="alert">
           {error ? `Error: ${error.message}` : `League not found`}
         </Text>
-        <Button marginTop="$4" onPress={() => window.history.back()}>
+        <Button marginTop="$4" onPress={() => window.history.back()} aria-label="Go back">
           Go Back
         </Button>
       </YStack>
@@ -321,7 +321,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const teamMembers = teamMembersData?.teamMembers || [];
 
   const renderLeagueInfo = () => (
-    <YStack space="$4">
+    <YStack space="$4" role="tabpanel" id="panel-info" aria-labelledby="tab-info">
       {/* League Info Cards */}
       <XStack gap="$4" flexWrap="wrap">
         {/* Basic Info Card */}
@@ -458,9 +458,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                 icon={
                   inviteLinkCopied ? <Check size={20} /> : <Copy size={20} />
                 }
+                aria-label="Copy invite link"
               >
                 {inviteLinkCopied ? 'Copied!' : 'Copy Link'}
               </Button>
+              {/* Live region to announce copy status */}
+              <Text className="sr-only" aria-live="polite" role="status">
+                {inviteLinkCopied ? 'Invite link copied to clipboard' : ''}
+              </Text>
             </XStack>
             <Text color="$gray10" fontSize="$2" fontStyle="italic">
               Friends can click this link to automatically join your league
@@ -502,9 +507,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                 minWidth={120}
                 size="$4"
                 icon={linkCopied ? <Check size={20} /> : <Copy size={20} />}
+                aria-label="Copy invite code"
               >
                 {linkCopied ? 'Copied!' : 'Copy Code'}
               </Button>
+              <Text className="sr-only" aria-live="polite" role="status">
+                {linkCopied ? 'Invite code copied to clipboard' : ''}
+              </Text>
             </XStack>
             <Text color="$gray10" fontSize="$2" fontStyle="italic">
               Friends can enter this code on the join league page
@@ -516,7 +525,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* Development Notice */}
       <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
         <H2 size="$5" color="$yellow11" marginBottom="$2">
-          � League Features
+          <span role="img" aria-label="tools">🛠️</span> League Features
         </H2>
         <Text color="$yellow11">
           Use the "My Roster" tab to manage your team's lineup and player
@@ -540,7 +549,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   const renderCommissionerSettings = () => (
-    <YStack space="$4">
+    <YStack space="$4" role="tabpanel" id="panel-commissioner" aria-labelledby="tab-commissioner">
       <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
         <YStack space="$3">
           <H2 size="$6" color="$blue11">
@@ -581,6 +590,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               }
               minWidth={140}
               size="$4"
+              aria-label={getDraftButtonText(league.draftStatus, startDraftLoading)}
             >
               {getDraftButtonText(league.draftStatus, startDraftLoading)}
             </Button>
@@ -612,10 +622,12 @@ export function LeagueDetailPage(): React.JSX.Element {
       maxWidth={1200}
       alignSelf="center"
       width="100%"
+      role="main"
+      aria-labelledby="league-title"
     >
       {/* Header */}
       <YStack marginBottom="$6">
-        <H1 size="$9" color="$blue11" marginBottom="$2">
+        <H1 size="$9" color="$blue11" marginBottom="$2" id="league-title">
           {league.name}
         </H1>
         <Text color="$gray10" fontSize="$4">
@@ -624,13 +636,17 @@ export function LeagueDetailPage(): React.JSX.Element {
       </YStack>
 
       {/* Tab Navigation */}
-      <XStack marginBottom="$4" gap="$2">
+      <XStack marginBottom="$4" gap="$2" role="tablist" aria-label="League sections">
         <Button
           size="$4"
           variant={activeTab === 'info' ? 'primary' : 'secondary'}
           backgroundColor={activeTab === 'info' ? '$blue9' : '$gray6'}
           color={activeTab === 'info' ? 'white' : '$gray12'}
           onPress={() => setActiveTab('info')}
+          role="tab"
+          id="tab-info"
+          aria-selected={activeTab === 'info'}
+          aria-controls="panel-info"
         >
           League Info
         </Button>
@@ -640,6 +656,10 @@ export function LeagueDetailPage(): React.JSX.Element {
           backgroundColor={activeTab === 'roster' ? '$blue9' : '$gray6'}
           color={activeTab === 'roster' ? 'white' : '$gray12'}
           onPress={() => setActiveTab('roster')}
+          role="tab"
+          id="tab-roster"
+          aria-selected={activeTab === 'roster'}
+          aria-controls="panel-roster"
         >
           My Roster
         </Button>
@@ -650,6 +670,10 @@ export function LeagueDetailPage(): React.JSX.Element {
             backgroundColor={activeTab === 'commissioner' ? '$blue9' : '$gray6'}
             color={activeTab === 'commissioner' ? 'white' : '$gray12'}
             onPress={() => setActiveTab('commissioner')}
+            role="tab"
+            id="tab-commissioner"
+            aria-selected={activeTab === 'commissioner'}
+            aria-controls="panel-commissioner"
           >
             Commissioner
           </Button>
@@ -658,14 +682,16 @@ export function LeagueDetailPage(): React.JSX.Element {
 
       {/* Tab Content */}
       {activeTab === 'info' && renderLeagueInfo()}
-      {activeTab === 'roster' && renderRosterManagement()}
-      {activeTab === 'commissioner' &&
-        isCommissioner &&
-        renderCommissionerSettings()}
+      {activeTab === 'roster' && (
+        <YStack role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
+          {renderRosterManagement()}
+        </YStack>
+      )}
+      {activeTab === 'commissioner' && isCommissioner && renderCommissionerSettings()}
 
       {/* Back Button */}
       <XStack justifyContent="center" marginTop="$6">
-        <Button backgroundColor="$gray9" onPress={() => window.history.back()}>
+        <Button backgroundColor="$gray9" onPress={() => window.history.back()} aria-label="Back to leagues">
           <Text color="white">Back to Leagues</Text>
         </Button>
       </XStack>

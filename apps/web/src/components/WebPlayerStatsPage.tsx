@@ -21,6 +21,7 @@ import type {
 export function WebPlayerStatsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [liveMsg, setLiveMsg] = React.useState('');
 
   // Parse URL parameters for initial state
   const initialState = useMemo(() => {
@@ -121,6 +122,7 @@ export function WebPlayerStatsPage() {
       URL.revokeObjectURL(url);
 
       console.log('Exported player statistics:', exportData);
+      setLiveMsg('Player statistics exported. Download started.');
     },
     [],
   );
@@ -145,6 +147,7 @@ export function WebPlayerStatsPage() {
         setTimeout(() => {
           document.title = originalTitle;
         }, 2000);
+        setLiveMsg('Link copied to clipboard.');
       }
     } catch (error) {
       console.error('Error sharing:', error);
@@ -152,10 +155,12 @@ export function WebPlayerStatsPage() {
       try {
         await navigator.clipboard.writeText(url);
         alert('Link copied to clipboard!');
+        setLiveMsg('Link copied to clipboard.');
       } catch (clipboardError) {
         console.error('Clipboard error:', clipboardError);
         // Ultimate fallback - show the URL
         prompt('Copy this link to share:', url);
+        setLiveMsg('Showing a prompt with a sharable link.');
       }
     }
   }, []);
@@ -169,6 +174,7 @@ export function WebPlayerStatsPage() {
         padding: 0, // Remove default padding as PlayerStatsPage handles its own
       }}
     >
+      <div className="sr-only" aria-live="polite">{liveMsg}</div>
       <PlayerStatsPage
         title="MLB Player Statistics"
         initialViewMode={initialState.viewMode}

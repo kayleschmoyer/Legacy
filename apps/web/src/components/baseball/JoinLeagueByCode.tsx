@@ -73,9 +73,11 @@ export function JoinLeagueByCode(): React.JSX.Element {
       maxWidth={600}
       margin="auto"
       width="100%"
+      role="main"
+      aria-labelledby="join-league-title"
     >
       <YStack space="$2">
-        <H1 size="$9" color="$blue11">
+        <H1 size="$9" color="$blue11" id="join-league-title">
           <span role="img" aria-label="ticket">
             🎟️
           </span>{' '}
@@ -89,7 +91,7 @@ export function JoinLeagueByCode(): React.JSX.Element {
       </YStack>
 
       {urlInviteCode && (
-        <Card backgroundColor="$green2" borderColor="$green6" padding="$3">
+        <Card backgroundColor="$green2" borderColor="$green6" padding="$3" role="status" aria-live="polite">
           <XStack gap="$2" alignItems="center">
             <Text fontSize="$4">
               <span role="img" aria-label="check">
@@ -108,13 +110,16 @@ export function JoinLeagueByCode(): React.JSX.Element {
           onSubmit={(e) => {
             void handleSubmit(e);
           }}
+          aria-describedby="join-form-help"
+          aria-busy={loading}
         >
           <YStack space="$4">
             {/* Invite Code Input */}
             <YStack space="$2">
-              <Text color="$gray12" fontWeight="600" fontSize="$4">
+              <Text color="$gray12" fontWeight="600" fontSize="$4" id="invite-code-label">
                 Invite Code
               </Text>
+              <label htmlFor="invite-code" className="sr-only">Invite Code</label>
               <Input
                 placeholder="Enter 8-character code"
                 value={inviteCode}
@@ -131,17 +136,25 @@ export function JoinLeagueByCode(): React.JSX.Element {
                 backgroundColor="$background"
                 borderColor="$blue7"
                 disabled={loading}
+                id="invite-code"
+                aria-labelledby="invite-code-label"
+                aria-describedby={`invite-code-help${error?.toLowerCase().includes('invite code') || error?.toLowerCase().includes('8') ? ' invite-code-error' : ''}`}
+                aria-required="true"
+                aria-invalid={Boolean(error && (error.toLowerCase().includes('invite code') || error.toLowerCase().includes('8')))}
+                inputMode="text"
+                autoComplete="off"
               />
-              <Text color="$gray10" fontSize="$2">
+              <Text color="$gray10" fontSize="$2" id="invite-code-help">
                 Example: ABC12XYZ
               </Text>
             </YStack>
 
             {/* Team Name Input */}
             <YStack space="$2">
-              <Text color="$gray12" fontWeight="600" fontSize="$4">
+              <Text color="$gray12" fontWeight="600" fontSize="$4" id="team-name-label">
                 Team Name
               </Text>
+              <label htmlFor="team-name" className="sr-only">Team Name</label>
               <Input
                 placeholder="Enter your team name"
                 value={teamName}
@@ -150,16 +163,23 @@ export function JoinLeagueByCode(): React.JSX.Element {
                 backgroundColor="$background"
                 borderColor="$blue7"
                 disabled={loading}
+                id="team-name"
+                aria-labelledby="team-name-label"
+                aria-describedby={`team-name-help${error?.toLowerCase().includes('team name') ? ' team-name-error' : ''}`}
+                aria-required="true"
+                aria-invalid={Boolean(error && error.toLowerCase().includes('team name'))}
+                inputMode="text"
+                autoComplete="off"
               />
-              <Text color="$gray10" fontSize="$2">
+              <Text color="$gray10" fontSize="$2" id="team-name-help">
                 Choose a unique name for your team
               </Text>
             </YStack>
 
             {/* Error Message */}
             {error && (
-              <Card backgroundColor="$red2" borderColor="$red6" padding="$3">
-                <Text color="$red11" fontSize="$3">
+              <Card backgroundColor="$red2" borderColor="$red6" padding="$3" role="alert" aria-live="assertive">
+                <Text color="$red11" fontSize="$3" id={error.toLowerCase().includes('invite code') || error.toLowerCase().includes('8') ? 'invite-code-error' : error.toLowerCase().includes('team name') ? 'team-name-error' : 'form-error'}>
                   <span role="img" aria-label="error">
                     ❌
                   </span>{' '}
@@ -184,6 +204,7 @@ export function JoinLeagueByCode(): React.JSX.Element {
                 onPress={handleSubmit}
                 disabled={loading || !inviteCode.trim() || !teamName.trim()}
                 minWidth={150}
+                aria-label="Join league"
               >
                 {loading ? (
                   <XStack gap="$2" alignItems="center">

@@ -89,6 +89,13 @@ function RosterSlot({
 
   const canAcceptSelectedPlayer = selectedPlayer && selectedPlayer.id && canPlayerPlayPosition(selectedPlayer, position);
 
+  const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSlotPress();
+    }
+  };
+
   return (
     <Card 
       padding="$3"
@@ -118,6 +125,11 @@ function RosterSlot({
         borderColor: "$blue10"
       }}
       onPress={handleSlotPress}
+      role="button"
+      tabIndex={0}
+      aria-pressed={Boolean(assignedPlayer)}
+      aria-label={assignedPlayer ? `Slot ${position.positionType} filled by ${getPlayerName(assignedPlayer)}` : `Empty ${position.positionType} slot, press to assign selected player`}
+      onKeyDown={onKeyDown}
       minWidth={120}
       maxWidth={200}
     >
@@ -149,6 +161,7 @@ function RosterSlot({
             theme="red"
             onPress={handleRemovePlayer}
             marginLeft="$2"
+            aria-label={`Remove ${getPlayerName(assignedPlayer)} from ${position.positionType}`}
           >
             Remove
           </Button>
@@ -174,14 +187,14 @@ function AvailablePlayerList({
   }, [players]);
 
   return (
-    <YStack space="$2">
-      <H5>Available Players</H5>
+    <YStack space="$2" role="region" aria-labelledby="available-players-title">
+      <H5 id="available-players-title">Available Players</H5>
       {unassignedPlayers.length === 0 ? (
         <Text color="$gray10" fontSize="$3" textAlign="center" padding="$4">
           No unassigned players
         </Text>
       ) : (
-        <YStack space="$2">
+        <YStack space="$2" role="list">
           {unassignedPlayers.map((player) => (
             <Card
               key={player.id}
@@ -195,6 +208,10 @@ function AvailablePlayerList({
                 borderColor: "$blue10"
               }}
               onPress={() => onPlayerSelect(selectedPlayer?.id === player.id ? null : player)}
+              role="listitem"
+              tabIndex={0}
+              aria-selected={selectedPlayer?.id === player.id}
+              aria-label={`${getPlayerName(player)}${selectedPlayer?.id === player.id ? ' selected' : ''}`}
             >
               <XStack justifyContent="space-between" alignItems="center">
                 <YStack>
@@ -271,7 +288,7 @@ export function LeagueRosterManagement({
 
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center">
+      <YStack padding="$4" alignItems="center" role="status" aria-live="polite">
         <Text>Loading roster...</Text>
       </YStack>
     );
@@ -281,15 +298,15 @@ export function LeagueRosterManagement({
   const emptyPositions = positions.filter(position => !getAssignedPlayer(position));
 
   return (
-    <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+    <div style={{ maxHeight: '80vh', overflowY: 'auto' }} role="region" aria-label="Roster management">
       <YStack padding="$4" space="$4" maxWidth={1200} alignSelf="center">
-        <H4>Roster Management</H4>
+        <H4 id="roster-management-title">Roster Management</H4>
         
         {/* Roster Status Summary */}
-        <Card padding="$3" backgroundColor="$gray2" borderColor="$gray6" borderWidth={1}>
+        <Card padding="$3" backgroundColor="$gray2" borderColor="$gray6" borderWidth={1} aria-labelledby="roster-status-title">
           <XStack justifyContent="space-between" alignItems="center">
             <YStack>
-              <Text fontSize="$5" fontWeight="600" color="$gray12">
+              <Text fontSize="$5" fontWeight="600" color="$gray12" id="roster-status-title">
                 Roster Status
               </Text>
               <Text fontSize="$3" color="$gray10">
@@ -325,14 +342,14 @@ export function LeagueRosterManagement({
         )}
 
         {/* Pitching Positions */}
-        <YStack space="$2">
+        <YStack space="$2" role="region" aria-labelledby="pitchers-title">
           <XStack alignItems="center" justifyContent="space-between">
-            <H5>Pitchers</H5>
+            <H5 id="pitchers-title">Pitchers</H5>
             <Text fontSize="$3" color="$gray10">
               {groupedPositions.pitching.filter(p => getAssignedPlayer(p)).length} / {groupedPositions.pitching.length} filled
             </Text>
           </XStack>
-          <XStack flexWrap="wrap" gap="$2">
+          <XStack flexWrap="wrap" gap="$2" role="list">
             {groupedPositions.pitching.map((position) => (
               <RosterSlot
                 key={position.id}
@@ -352,14 +369,14 @@ export function LeagueRosterManagement({
         <Separator />
 
         {/* Batting Positions */}
-        <YStack space="$2">
+        <YStack space="$2" role="region" aria-labelledby="position-players-title">
           <XStack alignItems="center" justifyContent="space-between">
-            <H5>Position Players</H5>
+            <H5 id="position-players-title">Position Players</H5>
             <Text fontSize="$3" color="$gray10">
               {groupedPositions.batting.filter(p => getAssignedPlayer(p)).length} / {groupedPositions.batting.length} filled
             </Text>
           </XStack>
-          <XStack flexWrap="wrap" gap="$2">
+          <XStack flexWrap="wrap" gap="$2" role="list">
             {groupedPositions.batting.map((position) => (
               <RosterSlot
                 key={position.id}
@@ -380,14 +397,14 @@ export function LeagueRosterManagement({
 
         {/* Utility Positions */}
         {groupedPositions.utility.length > 0 && (
-          <YStack space="$2">
+          <YStack space="$2" role="region" aria-labelledby="utility-title">
             <XStack alignItems="center" justifyContent="space-between">
-              <H5>Utility</H5>
+              <H5 id="utility-title">Utility</H5>
               <Text fontSize="$3" color="$gray10">
                 {groupedPositions.utility.filter(p => getAssignedPlayer(p)).length} / {groupedPositions.utility.length} filled
               </Text>
             </XStack>
-            <XStack flexWrap="wrap" gap="$2">
+            <XStack flexWrap="wrap" gap="$2" role="list">
               {groupedPositions.utility.map((position) => (
                 <RosterSlot
                   key={position.id}

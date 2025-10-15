@@ -11,11 +11,7 @@ import '@tamagui/font-inter/css/400.css';
 import '@tamagui/font-inter/css/700.css';
 import './styles.css';
 
-import {
-  AppProvider,
-  AuthProvider,
-  EnhancedAuthGuard,
-} from '@legacy-sports/shared-components';
+import { AppProvider, AuthProvider, EnhancedAuthGuard } from '@legacy-sports/shared-components';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
@@ -32,11 +28,16 @@ const authConfig: OAuthConfig = {
 };
 
 function AuthenticatedApp() {
+  const initialColorScheme: 'light' | 'dark' =
+    typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+
   return (
     <HashRouter>
       <AppProvider
         apolloClient={apolloClient}
-        colorScheme="dark"
+        colorScheme={initialColorScheme}
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         tamaguiConfig={tamaguiConfig}
       >
@@ -62,7 +63,6 @@ try {
       <TamaguiProvider
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         config={tamaguiConfig}
-        defaultTheme="dark"
       >
         <AuthProvider config={authConfig}>
           <EnhancedAuthGuard
