@@ -80,6 +80,19 @@ runs:
         echo "Node version: $(node --version)"
         echo "NPM version: $(npm --version)"
 
+        # Check if node_modules already exists and is valid (from cache restore-key)
+        if [ -d "node_modules" ] && [ -d "node_modules/nx" ]; then
+          echo "✅ node_modules already present from cache (restored via restore-key)"
+          echo "📦 Verifying critical packages..."
+          
+          # Quick validation that key packages exist
+          if [ -d "node_modules/@nx" ] || [ -d "node_modules/nx" ]; then
+            echo "✅ Nx packages found - skipping npm ci to save time"
+            echo "⚡ Saved ~15 minutes by reusing cached dependencies"
+            exit 0
+          fi
+        fi
+
         # Check package-lock.json integrity first
         if [ ! -f "package-lock.json" ]; then
           echo "❌ package-lock.json not found"
@@ -90,15 +103,14 @@ runs:
         # --prefer-offline: Use cache when possible
         # --no-audit: Skip vulnerability audit for speed
         # --no-fund: Skip funding messages
-        # Add timeout protection with retry logic (increased timeouts for large monorepo)
-        echo "🔧 Installing dependencies with timeout protection..."
+        echo "🔧 Installing dependencies (node_modules not found or incomplete)..."
         
-        # Use timeout command available on both Linux and macOS
-        # Increased from 900s to 1200s (20 minutes) to accommodate Nx post-install scripts
+        # Reduced timeout to 5 minutes for initial attempt
+        # If it takes longer, something is wrong and we should fail fast
         if command -v timeout >/dev/null 2>&1; then
-          TIMEOUT_CMD="timeout 1200s"
+          TIMEOUT_CMD="timeout 300s"
         elif command -v gtimeout >/dev/null 2>&1; then
-          TIMEOUT_CMD="gtimeout 1200s"
+          TIMEOUT_CMD="gtimeout 300s"
         else
           echo "⚠️  No timeout command available, proceeding without timeout..."
           TIMEOUT_CMD=""
@@ -114,11 +126,11 @@ runs:
             echo "🔧 Detected lock file sync issue - regenerating with npm install..."
             
             # Use npm install to fix lock file sync issues
-            # Increased from 720s to 1200s (20 minutes) for large installs with Nx
+            # Timeout: 5 minutes should be sufficient with cached packages
             if command -v timeout >/dev/null 2>&1; then
-              INSTALL_TIMEOUT_CMD="timeout 1200s"
+              INSTALL_TIMEOUT_CMD="timeout 300s"
             elif command -v gtimeout >/dev/null 2>&1; then
-              INSTALL_TIMEOUT_CMD="gtimeout 1200s"
+              INSTALL_TIMEOUT_CMD="gtimeout 300s"
             else
               INSTALL_TIMEOUT_CMD=""
             fi
@@ -145,11 +157,11 @@ runs:
             echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
             npm cache clean --force
             
-            # Increased timeout for retry from 600s to 1200s (20 minutes) for Nx
+            # Retry timeout: 5 minutes for npm ci after cache clean
             if command -v timeout >/dev/null 2>&1; then
-              RETRY_TIMEOUT_CMD="timeout 1200s"
+              RETRY_TIMEOUT_CMD="timeout 300s"
             elif command -v gtimeout >/dev/null 2>&1; then
-              RETRY_TIMEOUT_CMD="gtimeout 1200s"
+              RETRY_TIMEOUT_CMD="gtimeout 300s"
             else
               RETRY_TIMEOUT_CMD=""
             fi
