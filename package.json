@@ -39,6 +39,8 @@
     "db:migrate": "cd lib/db-client && npm run db:migrate",
     "security:validate": "node scripts/validate-secrets.js",
     "security:install-hooks": "node scripts/install-git-hooks.js",
+    "terraform:unlock": "node scripts/terraform-unlock.js",
+    "terraform:check-lock": "node scripts/terraform-unlock.js --check",
     "android:validate-versions": "node scripts/validate-android-versions.js",
     "android:validate-versions:report": "node scripts/validate-android-versions.js --report",
     "dev:db": "nx run db:serve",
