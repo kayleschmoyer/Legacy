@@ -301,6 +301,7 @@
     "jiti": "2.4.2",
     "jsdom": "^26.1.0",
     "jsonc-eslint-parser": "^2.1.0",
+    "jsonlint": "^1.6.3",
     "msw": "^2.11.1",
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.5",

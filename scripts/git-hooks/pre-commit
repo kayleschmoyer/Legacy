@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Git Pre-Commit Hook - Secret Validation & YAML Linting
+ * Git Pre-Commit Hook - Secret Validation, YAML & JSON Linting
  * 
  * This hook automatically runs before every git commit to ensure:
  * 1. No secrets are accidentally committed to the repository
  * 2. All YAML files have valid syntax
+ * 3. All JSON files have valid syntax
  * 
  * Installation: Copy this file to .git/hooks/pre-commit and make executable
  */
@@ -58,6 +59,55 @@ try {
     }
   } catch (error) {
     console.error('\n❌ YAML validation failed!');
+    console.error(error.message);
+    process.exit(1);
+  }
+  
+  // Run JSON linting on staged JSON files
+  console.log('📋 Running JSON validation...\n');
+  
+  try {
+    // Get staged JSON files
+    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
+      encoding: 'utf8' 
+    }).trim();
+    
+    if (stagedFiles) {
+      const jsonFiles = stagedFiles
+        .split('\n')
+        .filter(file => file.match(/\.json$/i));
+      
+      if (jsonFiles.length > 0) {
+        console.log(`Found ${jsonFiles.length} JSON file(s) to validate:`);
+        jsonFiles.forEach(file => console.log(`  • ${file}`));
+        console.log('');
+        
+        // Run jsonlint on each file
+        for (const file of jsonFiles) {
+          try {
+            execSync(`npx jsonlint -q "${file}"`, { stdio: 'pipe' });
+          } catch (error) {
+            console.error(`\n❌ JSON validation failed for: ${file}`);
+            
+            // Try to get better error output
+            try {
+              execSync(`npx jsonlint "${file}"`, { stdio: 'inherit' });
+            } catch (e) {
+              // Error already displayed
+            }
+            
+            console.error('Please fix the JSON syntax errors before committing.\n');
+            process.exit(1);
+          }
+        }
+        
+        console.log('✅ JSON validation passed!\n');
+      } else {
+        console.log('No JSON files staged for commit.\n');
+      }
+    }
+  } catch (error) {
+    console.error('\n❌ JSON validation failed!');
     console.error(error.message);
     process.exit(1);
   }
