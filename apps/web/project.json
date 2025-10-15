@@ -10,6 +10,20 @@
   ],
   "// targets": "to see all targets run: nx show project web --web",
   "targets": {
+    "dev": {
+      "executor": "@nx/vite:dev",
+      "options": {
+        "port": 4200,
+        "host": "localhost"
+      }
+    },
+    "serve": {
+      "executor": "@nx/vite:dev",
+      "options": {
+        "port": 4200,
+        "host": "localhost"
+      }
+    },
     "build": {
       "executor": "@nx/vite:build",
       "outputs": [

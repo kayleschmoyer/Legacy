@@ -234,6 +234,7 @@ export type Query = {
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
+  leagueTeams?: Maybe<Array<Team>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -298,6 +299,11 @@ export type QueryLeagueArgs = {
 
 
 export type QueryLeaguePositionsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+
+export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -628,6 +634,13 @@ export type JoinLeagueByCodeMutationVariables = Exact<{
 
 
 export type JoinLeagueByCodeMutation = { __typename?: 'Mutation', joinLeagueByCode?: { __typename?: 'Team', id?: number | null, name?: string | null, leagueId?: number | null } | null };
+
+export type GetLeagueTeamsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+
+export type GetLeagueTeamsQuery = { __typename?: 'Query', leagueTeams?: Array<{ __typename?: 'Team', id?: number | null, name?: string | null, leagueId?: number | null }> | null };
 
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
@@ -986,6 +999,48 @@ export function useJoinLeagueByCodeMutation(baseOptions?: Apollo.MutationHookOpt
 export type JoinLeagueByCodeMutationHookResult = ReturnType<typeof useJoinLeagueByCodeMutation>;
 export type JoinLeagueByCodeMutationResult = Apollo.MutationResult<JoinLeagueByCodeMutation>;
 export type JoinLeagueByCodeMutationOptions = Apollo.BaseMutationOptions<JoinLeagueByCodeMutation, JoinLeagueByCodeMutationVariables>;
+export const GetLeagueTeams = gql`
+    query GetLeagueTeams($leagueId: Int!) {
+  leagueTeams(leagueId: $leagueId) {
+    id
+    name
+    leagueId
+  }
+}
+    `;
+
+/**
+ * __useGetLeagueTeamsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueTeamsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueTeamsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueTeamsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueTeamsQuery(baseOptions: Apollo.QueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables> & ({ variables: GetLeagueTeamsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
+      }
+export function useGetLeagueTeamsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
+        }
+export function useGetLeagueTeamsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
+        }
+export type GetLeagueTeamsQueryHookResult = ReturnType<typeof useGetLeagueTeamsQuery>;
+export type GetLeagueTeamsLazyQueryHookResult = ReturnType<typeof useGetLeagueTeamsLazyQuery>;
+export type GetLeagueTeamsSuspenseQueryHookResult = ReturnType<typeof useGetLeagueTeamsSuspenseQuery>;
+export type GetLeagueTeamsQueryResult = Apollo.QueryResult<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>;
 export const GetUserTeamId = gql`
     query GetUserTeamId($leagueId: Int!) {
   userTeamId(leagueId: $leagueId)

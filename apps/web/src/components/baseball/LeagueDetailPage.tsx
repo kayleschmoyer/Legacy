@@ -21,11 +21,23 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
+import { LeagueStandings } from '../roster/LeagueStandings';
 
 // Manual GraphQL query for getting user's team ID in a league
 const GET_USER_TEAM_ID = gql`
   query GetUserTeamId($leagueId: Int!) {
     userTeamId(leagueId: $leagueId)
+  }
+`;
+
+// Manual GraphQL query for getting league teams (for standings)
+const GET_LEAGUE_TEAMS = gql`
+  query GetLeagueTeams($leagueId: Int!) {
+    leagueTeams(leagueId: $leagueId) {
+      id
+      name
+      leagueId
+    }
   }
 `;
 
@@ -119,7 +131,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const leagueId = parseInt(id || '0', 10);
   const [activeTab, setActiveTab] = useState<
-    'info' | 'roster' | 'commissioner'
+    'info' | 'roster' | 'commissioner' | 'standings'
   >('info');
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
@@ -142,6 +154,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
     useLazyQuery(GET_USER_TEAM_ID);
 
+  // Fetch league teams for standings
+  const [getLeagueTeams, { data: leagueTeamsData, loading: leagueTeamsLoading }] =
+    useLazyQuery(GET_LEAGUE_TEAMS);
+
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(leagueId) && user?.id) {
@@ -150,6 +166,15 @@ export function LeagueDetailPage(): React.JSX.Element {
       });
     }
   }, [leagueId, user?.id, getUserTeamId]);
+
+  // Effect to fetch league teams when on standings tab
+  useEffect(() => {
+    if (activeTab === 'standings' && !isNaN(leagueId)) {
+      void getLeagueTeams({
+        variables: { leagueId },
+      });
+    }
+  }, [activeTab, leagueId, getLeagueTeams]);
 
   const userTeamId = userTeamData?.userTeamId;
   const { data: teamMembersData, loading: teamMembersLoading } =
@@ -663,6 +688,19 @@ export function LeagueDetailPage(): React.JSX.Element {
         >
           My Roster
         </Button>
+        <Button
+          size="$4"
+          variant={activeTab === 'standings' ? 'primary' : 'secondary'}
+          backgroundColor={activeTab === 'standings' ? '$blue9' : '$gray6'}
+          color={activeTab === 'standings' ? 'white' : '$gray12'}
+          onPress={() => setActiveTab('standings')}
+          role="tab"
+          id="tab-standings"
+          aria-selected={activeTab === 'standings'}
+          aria-controls="panel-standings"
+        >
+          Standings
+        </Button>
         {isCommissioner && (
           <Button
             size="$4"
@@ -685,6 +723,15 @@ export function LeagueDetailPage(): React.JSX.Element {
       {activeTab === 'roster' && (
         <YStack role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
           {renderRosterManagement()}
+        </YStack>
+      )}
+      {activeTab === 'standings' && (
+        <YStack role="tabpanel" id="panel-standings" aria-labelledby="tab-standings">
+          <LeagueStandings
+            teams={leagueTeamsData?.leagueTeams || []}
+            loading={leagueTeamsLoading}
+            userTeamId={userTeamId}
+          />
         </YStack>
       )}
       {activeTab === 'commissioner' && isCommissioner && renderCommissionerSettings()}

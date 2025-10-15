@@ -33,7 +33,10 @@ export type CareerBatting = {
   intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
   onBasePercentage?: Maybe<Scalars['Float']['output']>;
   plateAppearances?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
+  positionsPlayed?: Maybe<Scalars['String']['output']>;
+  primaryPosition?: Maybe<Scalars['String']['output']>;
   rbi?: Maybe<Scalars['Int']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   sacrificeHits?: Maybe<Scalars['Int']['output']>;
@@ -42,6 +45,20 @@ export type CareerBatting = {
   strikeouts?: Maybe<Scalars['Int']['output']>;
   totalBases?: Maybe<Scalars['Int']['output']>;
   triples?: Maybe<Scalars['Int']['output']>;
+};
+
+export type CareerBattingConnection = {
+  __typename?: 'CareerBattingConnection';
+  edges?: Maybe<Array<Maybe<CareerBattingEdge>>>;
+  pageInfo: PageInfo;
+  /** Total number of career batting records matching the filters */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type CareerBattingEdge = {
+  __typename?: 'CareerBattingEdge';
+  cursor: Scalars['String']['output'];
+  node?: Maybe<CareerBatting>;
 };
 
 export type CareerFielding = {
@@ -99,6 +116,7 @@ export type CreateLeagueAndTeamsInput = {
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -118,9 +136,11 @@ export type League = {
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  userMembership?: Maybe<LeagueMember>;
 };
 
 /** A member of a league */
@@ -128,6 +148,7 @@ export type LeagueMember = {
   __typename?: 'LeagueMember';
   leagueId?: Maybe<Scalars['Int']['output']>;
   permissionLevel?: Maybe<Scalars['String']['output']>;
+  team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
@@ -155,6 +176,7 @@ export type Mutation = {
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
+  joinLeagueByCode?: Maybe<Team>;
   startDraft?: Maybe<League>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
 };
@@ -170,6 +192,12 @@ export type MutationCreateLeagueAndTeamsArgs = {
 };
 
 
+export type MutationJoinLeagueByCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+};
+
+
 export type MutationStartDraftArgs = {
   draftType?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
@@ -179,6 +207,14 @@ export type MutationStartDraftArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type PageInfo = {
+  __typename?: 'PageInfo';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+  hasPreviousPage: Scalars['Boolean']['output'];
+  startCursor?: Maybe<Scalars['String']['output']>;
 };
 
 export type Player = {
@@ -192,12 +228,13 @@ export type Player = {
 
 export type Query = {
   __typename?: 'Query';
-  careerBattingStats?: Maybe<Array<CareerBatting>>;
+  careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
+  leagueTeams?: Maybe<Array<Team>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -216,6 +253,7 @@ export type Query = {
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
   userLeagues: Array<League>;
+  userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
@@ -223,12 +261,12 @@ export type Query = {
 
 
 export type QueryCareerBattingStatsArgs = {
-  limit?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
   minRBI?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
@@ -261,6 +299,11 @@ export type QueryLeagueArgs = {
 
 
 export type QueryLeaguePositionsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+
+export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -380,6 +423,11 @@ export type QueryUserArgs = {
 
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
+};
+
+
+export type QueryUserTeamIdArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 

@@ -4,9 +4,4 @@ fragment Player on Player {
   firstName
   lastName
   brefId
-  playerEligiblePositions {
-    nodes {
-      position
-    }
-  }
 }

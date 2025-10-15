@@ -2,11 +2,19 @@ fragment League on League {
   id
   name
   owner
+  maxRosterSize
   currentMatchup
   draftStatus
+  inviteCode
   userMembership {
     ...LeagueMember
   }
+  # teams field not available in deployed schema - needs Lambda deployment
+  # teams {
+  #   id
+  #   name
+  #   leagueId
+  # }
   # leagueMembers field not available
   # leagueMembers @include(if: $withMembers) {
   #   nodes {
@@ -16,12 +24,6 @@ fragment League on League {
   # matchupByCurrentMatchup field not available  
   # matchupByCurrentMatchup @include(if: $withMatchup) {
   #   ...Matchup
-  # }
-  # teams field not available
-  # teams @include(if: $withTeams) {
-  #   nodes {
-  #     ...Team
-  #   }
   # }
 }
 
@@ -87,3 +89,12 @@ mutation StartDraft($leagueId: Int!, $draftType: String) {
     ...League
   }
 }
+
+query GetLeagueTeams($leagueId: Int!) {
+  leagueTeams(leagueId: $leagueId) {
+    id
+    name
+    leagueId
+  }
+}
+

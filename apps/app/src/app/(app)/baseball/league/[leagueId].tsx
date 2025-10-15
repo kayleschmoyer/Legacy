@@ -19,6 +19,7 @@ import {
   useUpdateTeamMemberPositionMutation 
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
+import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 
@@ -26,6 +27,17 @@ import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserCon
 const GET_USER_TEAM_ID = gql`
   query GetUserTeamId($leagueId: Int!) {
     userTeamId(leagueId: $leagueId)
+  }
+`;
+
+// Manual GraphQL query for getting league teams (for standings)
+const GET_LEAGUE_TEAMS = gql`
+  query GetLeagueTeams($leagueId: Int!) {
+    leagueTeams(leagueId: $leagueId) {
+      id
+      name
+      leagueId
+    }
   }
 `;
 
@@ -102,6 +114,21 @@ export default function LeagueId(): React.JSX.Element {
       console.error('🚨 Team members query error:', error);
     }
   });
+
+  // Fetch league teams for standings
+  const [getLeagueTeams, { data: leagueTeamsData, loading: leagueTeamsLoading }] = useLazyQuery(GET_LEAGUE_TEAMS);
+
+  // Effect to fetch league teams when on standings tab
+  useEffect(() => {
+    if (selectedTab === 'standings' && !isNaN(numLeagueId)) {
+      getLeagueTeams({
+        variables: { leagueId: numLeagueId },
+        onError: (error) => {
+          console.error('🚨 Error fetching league teams:', error);
+        }
+      });
+    }
+  }, [selectedTab, numLeagueId, getLeagueTeams]);
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -223,10 +250,11 @@ export default function LeagueId(): React.JSX.Element {
         </Tabs.Content>
 
         <Tabs.Content value="standings" flex={1}>
-          <YStack padding="$4">
-            <H3 marginBottom="$3">League Standings</H3>
-            <Text color="$gray10">Standings feature coming soon...</Text>
-          </YStack>
+          <LeagueStandings
+            teams={leagueTeamsData?.leagueTeams || []}
+            loading={leagueTeamsLoading}
+            userTeamId={userTeamId}
+          />
         </Tabs.Content>
 
         {isCommissioner && (

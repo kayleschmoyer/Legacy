@@ -834,21 +834,32 @@ builder.queryField('teamMembers', (t) =>
       try {
         // Fetch team members from the database
         const members = await runWithPublicClient(getDbOptions(), async (db) => {
-          // First verify user has access to this team
-          const teamAccess = await db.select()
+          // First verify user is in the same league as this team (allows read-only access)
+          const team = await db.select({
+            leagueId: PublicSchema.teams.leagueId,
+          })
+            .from(PublicSchema.teams)
+            .where(eq(PublicSchema.teams.id, teamId))
+            .limit(1);
+
+          if (team.length === 0) {
+            throw new Error('Team not found');
+          }
+
+          // Check if user is a member of this league
+          const leagueMember = await db.select()
             .from(PublicSchema.leagueMembers)
-            .innerJoin(PublicSchema.teams, eq(PublicSchema.teams.id, teamId))
             .where(and(
-              eq(PublicSchema.leagueMembers.teamId, teamId),
+              eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
               eq(PublicSchema.leagueMembers.userId, userId)
             ))
             .limit(1);
 
-          if (teamAccess.length === 0) {
+          if (leagueMember.length === 0) {
             throw new Error('User does not have access to this team');
           }
 
-          // Fetch team members
+          // Fetch team members (read access granted for all league members)
           const teamMembers = await db.select({
             id: PublicSchema.teamMembers.id,
             teamId: PublicSchema.teamMembers.teamId,
@@ -909,6 +920,59 @@ builder.queryField('userTeamId', (t) =>
       } catch (error) {
         console.error('Error fetching user team ID:', error);
         throw new Error('Failed to fetch user team ID');
+      }
+    },
+  })
+);
+
+// Query field to get all teams in a league for standings
+builder.queryField('leagueTeams', (t) =>
+  t.field({
+    type: [Team],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      // Check if user is authenticated
+      if (!context.user) {
+        throw new Error('Authentication required to fetch league teams');
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+
+      try {
+        const teams = await runWithPublicClient(getDbOptions(), async (db) => {
+          // First verify user has access to this league
+          const leagueAccess = await db.select()
+            .from(PublicSchema.leagueMembers)
+            .where(and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId)
+            ))
+            .limit(1);
+
+          if (leagueAccess.length === 0) {
+            throw new Error('User does not have access to this league');
+          }
+
+          // Fetch all teams in the league
+          const leagueTeams = await db.select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+            .from(PublicSchema.teams)
+            .where(eq(PublicSchema.teams.leagueId, leagueId))
+            .orderBy(PublicSchema.teams.name);
+
+          return leagueTeams;
+        });
+
+        return teams;
+      } catch (error) {
+        console.error('Error fetching league teams:', error);
+        throw new Error('Failed to fetch league teams');
       }
     },
   })

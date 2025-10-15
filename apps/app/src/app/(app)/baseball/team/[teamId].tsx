@@ -20,6 +20,7 @@ import { LoadingPanel } from '../../../../common/components/LoadingPanel';
 import {
   useGetPositionsForLeagueQuery,
 } from '../../../../api/db/leagues/Leagues.generated';
+import { useGetUserTeamIdQuery } from '../../../../api/db/graphql.generated';
 import {
   isBatter,
   isBattingSlot,
@@ -51,6 +52,7 @@ interface TabContentProps {
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly (TeamMemberFragment | null)[];
+  isOwner: boolean;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -62,6 +64,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     onPlayerRemoved,
     selectedTab,
     rosterSlots,
+    isOwner,
   } = props;
 
   const { data: stats, loading: loadingStats } = useGetMatchupStatsQuery({
@@ -199,14 +202,16 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     return result;
   }, [stats, pitchers, loadingStats]);
 
+  const noOp = () => {};
+
   switch (selectedTab) {
     case 'Lineup':
       return (
         <LineupEditor
           availableRosterSlots={lineupSlots}
-          onPlayerAdded={onPlayerAdded}
-          onPlayerMoved={onPlayerMoved}
-          onPlayerRemoved={onPlayerRemoved}
+          onPlayerAdded={isOwner ? onPlayerAdded : noOp}
+          onPlayerMoved={isOwner ? onPlayerMoved : noOp}
+          onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
           projections={hitterProjections}
           team={hitters}
           actual={hittersActual}
@@ -216,9 +221,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       return (
         <LineupEditor
           availableRosterSlots={pitchingSlots}
-          onPlayerAdded={onPlayerAdded}
-          onPlayerMoved={onPlayerMoved}
-          onPlayerRemoved={onPlayerRemoved}
+          onPlayerAdded={isOwner ? onPlayerAdded : noOp}
+          onPlayerMoved={isOwner ? onPlayerMoved : noOp}
+          onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
           projections={pitcherProjections}
           team={pitchers}
           actual={pitchersActual}
@@ -249,6 +254,16 @@ export default function Team(): React.JSX.Element {
       withPositions: true,
     },
   });
+
+  // Get user's team in this league to check ownership
+  const { data: userTeamData } = useGetUserTeamIdQuery({
+    skip: team?.team?.leagueId === undefined,
+    variables: {
+      leagueId: team?.team?.leagueId || -1,
+    },
+  });
+
+  const isOwner = userTeamData?.userTeamId === numTeamId;
 
   // League data query removed as matchup feature not currently used
   const loadingLeague = false;
@@ -374,6 +389,7 @@ export default function Team(): React.JSX.Element {
           onPlayerRemoved={onPlayerRemoved}
           selectedTab={TABS[selectedTabIdx]}
           rosterSlots={positions?.leaguePositions || []}
+          isOwner={isOwner}
         />
       </YStack>
     </ScrollView>

@@ -234,6 +234,7 @@ export type Query = {
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
+  leagueTeams?: Maybe<Array<Team>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -298,6 +299,11 @@ export type QueryLeagueArgs = {
 
 
 export type QueryLeaguePositionsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+
+export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 

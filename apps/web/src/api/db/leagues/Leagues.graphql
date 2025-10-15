@@ -9,6 +9,12 @@ fragment League on League {
   userMembership {
     ...LeagueMember
   }
+  # teams field not available in deployed schema - needs Lambda deployment
+  # teams {
+  #   id
+  #   name
+  #   leagueId
+  # }
 }
 
 fragment LeagueMember on LeagueMember {
@@ -67,3 +73,12 @@ mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
     leagueId
   }
 }
+
+query GetLeagueTeams($leagueId: Int!) {
+  leagueTeams(leagueId: $leagueId) {
+    id
+    name
+    leagueId
+  }
+}
+
