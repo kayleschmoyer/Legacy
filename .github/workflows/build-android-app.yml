@@ -1,12 +1,7 @@
 name: Build Android App
 
 on:
-  # Build Android app after CI pipeline succeeds (for mobile-specific changes)
-  workflow_run:
-    workflows: ["🚀 Legacy Sports CI Pipeline"]
-    types: [completed]
-    branches: [main]
-  # Also run on direct push to main for mobile changes
+  # Run on direct push to main for mobile changes
   push:
     branches: [main]
     paths:
@@ -60,8 +55,6 @@ jobs:
   setup:
     name: Setup and Version
     runs-on: ubuntu-latest
-    # Only run if CI pipeline succeeded (for workflow_run) or for direct triggers
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
