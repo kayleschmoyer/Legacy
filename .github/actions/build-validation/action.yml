@@ -62,6 +62,14 @@ runs:
       shell: bash
       run: |
         echo "::group::📦 Web Application Build"
+        
+        # Disable Nx Cloud if not using DTE to avoid quota errors
+        if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
+          unset NX_CLOUD_ACCESS_TOKEN
+          export NX_CLOUD_NO_TIMEOUTS=true
+          echo "ℹ️ Nx Cloud disabled for local build"
+        fi
+        
         echo "::notice::To reproduce locally: npx nx build web --verbose"
 
         ERROR_CONTEXT="build-web-$(date +%s)"
@@ -159,6 +167,14 @@ runs:
       shell: bash
       run: |
         echo "::group::⚡ Lambda Functions Build"
+        
+        # Disable Nx Cloud if not using DTE to avoid quota errors
+        if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
+          unset NX_CLOUD_ACCESS_TOKEN
+          export NX_CLOUD_NO_TIMEOUTS=true
+          echo "ℹ️ Nx Cloud disabled for local build"
+        fi
+        
         echo "::notice::To reproduce locally: npx nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
 
         ERROR_CONTEXT="build-lambdas-$(date +%s)"
