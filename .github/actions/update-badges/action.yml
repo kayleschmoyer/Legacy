@@ -201,7 +201,8 @@ runs:
             
             # Add file entry to payload (escaping content properly)
             echo -n "\"${filename}\": {\"content\": \"" >> "$TEMP_PAYLOAD"
-            cat "$badge_file" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n' >> "$TEMP_PAYLOAD"
+            # Use a subshell to avoid broken pipe issues with multiple pipes
+            (cat "$badge_file" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\n') >> "$TEMP_PAYLOAD"
             echo -n '"}' >> "$TEMP_PAYLOAD"
           fi
         done
@@ -221,8 +222,8 @@ runs:
         # Clean up temporary file
         rm -f "$TEMP_PAYLOAD"
 
-        # Check if update was successful
-        if echo "$RESPONSE" | grep -q '"id"'; then
+        # Check if update was successful (using string matching to avoid broken pipe)
+        if [[ "$RESPONSE" == *'"id"'* ]]; then
           echo "✅ Successfully updated gist badges"
           echo "success=true" >> $GITHUB_OUTPUT
           
@@ -257,12 +258,12 @@ runs:
           log_verbose "Response: $RESPONSE"
           echo "success=false" >> $GITHUB_OUTPUT
           
-          # Check for specific error types
-          if echo "$RESPONSE" | grep -q "message.*too long"; then
+          # Check for specific error types (using string matching to avoid broken pipe)
+          if [[ "$RESPONSE" == *"message"*"too long"* ]]; then
             echo "summary=Failed to update badges: Payload too large (consider reducing badge count)" >> $GITHUB_OUTPUT
-          elif echo "$RESPONSE" | grep -q "Not Found"; then
+          elif [[ "$RESPONSE" == *"Not Found"* ]]; then
             echo "summary=Failed to update badges: Gist not found (check GIST_ID)" >> $GITHUB_OUTPUT
-          elif echo "$RESPONSE" | grep -q "Bad credentials"; then
+          elif [[ "$RESPONSE" == *"Bad credentials"* ]]; then
             echo "summary=Failed to update badges: Authentication failed (check token permissions)" >> $GITHUB_OUTPUT
           else
             echo "summary=Failed to update badges: API error" >> $GITHUB_OUTPUT

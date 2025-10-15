@@ -213,8 +213,9 @@ jobs:
       # FINAL STATUS ORCHESTRATION
       # ======================================================================
 
-      - name: "�️ Update CI Status Badges"
+      - name: "🎖️ Update CI Status Badges"
         if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
         uses: ./.github/actions/update-badges
         with:
           github-token: ${{ secrets.GIST_TOKEN }}
