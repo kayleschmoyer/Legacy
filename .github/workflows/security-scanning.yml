@@ -13,12 +13,8 @@ on:
       - '**/package.json'
       - 'apps/**/*.{ts,tsx,js,jsx}'
       - 'lib/**/*.{ts,tsx,js,jsx}'
-      - 'lambdas/**/*.{ts,j          echo "::endgroup::"
-
-      - name: "📤 Upload CodeQL Results"
-        # Skip on PRs since CodeQL is not run
-        if: github.event_name != 'pull_request' && steps.process-codeql-results.outputs.sarif-generated == 'true'
-        uses: actions/upload-artifact@v4     - 'tools/**/*.{ts,js}'
+      - 'lambdas/**/*.{ts,js}'
+      - 'tools/**/*.{ts,js}'
       - '.github/workflows/security-scanning.yml'
       - 'tsconfig*.json'
       - '.npmrc'
