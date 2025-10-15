@@ -94,11 +94,11 @@ runs:
         echo "🔧 Installing dependencies with timeout protection..."
         
         # Use timeout command available on both Linux and macOS
-        # Increased from 480s to 900s (15 minutes) to accommodate post-install scripts
+        # Increased from 900s to 1200s (20 minutes) to accommodate Nx post-install scripts
         if command -v timeout >/dev/null 2>&1; then
-          TIMEOUT_CMD="timeout 900s"
+          TIMEOUT_CMD="timeout 1200s"
         elif command -v gtimeout >/dev/null 2>&1; then
-          TIMEOUT_CMD="gtimeout 900s"
+          TIMEOUT_CMD="gtimeout 1200s"
         else
           echo "⚠️  No timeout command available, proceeding without timeout..."
           TIMEOUT_CMD=""
@@ -114,11 +114,11 @@ runs:
             echo "🔧 Detected lock file sync issue - regenerating with npm install..."
             
             # Use npm install to fix lock file sync issues
-            # Increased from 420s to 720s (12 minutes) for large installs
+            # Increased from 720s to 1200s (20 minutes) for large installs with Nx
             if command -v timeout >/dev/null 2>&1; then
-              INSTALL_TIMEOUT_CMD="timeout 720s"
+              INSTALL_TIMEOUT_CMD="timeout 1200s"
             elif command -v gtimeout >/dev/null 2>&1; then
-              INSTALL_TIMEOUT_CMD="gtimeout 720s"
+              INSTALL_TIMEOUT_CMD="gtimeout 1200s"
             else
               INSTALL_TIMEOUT_CMD=""
             fi
@@ -145,11 +145,11 @@ runs:
             echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
             npm cache clean --force
             
-            # Increased timeout for retry from 300s to 600s (10 minutes)
+            # Increased timeout for retry from 600s to 1200s (20 minutes) for Nx
             if command -v timeout >/dev/null 2>&1; then
-              RETRY_TIMEOUT_CMD="timeout 600s"
+              RETRY_TIMEOUT_CMD="timeout 1200s"
             elif command -v gtimeout >/dev/null 2>&1; then
-              RETRY_TIMEOUT_CMD="gtimeout 600s"
+              RETRY_TIMEOUT_CMD="gtimeout 1200s"
             else
               RETRY_TIMEOUT_CMD=""
             fi
