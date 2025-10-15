@@ -75,56 +75,81 @@ runs:
           BUILD_CMD="npx nx build web --configuration=production"
         fi
 
+        # Try the build command, with fallback to local if DTE fails
         if $BUILD_CMD --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
           echo "✅ Web application built successfully"
-          
-          # Check build artifacts and report metrics
-          if [ -d "dist/apps/web" ]; then
-            BUILD_SIZE=$(du -sh dist/apps/web | cut -f1)
-            FILE_COUNT=$(find dist/apps/web -type f | wc -l)
-            echo "📊 Build Metrics:"
-            echo "  - Build size: $BUILD_SIZE"
-            echo "  - File count: $FILE_COUNT"
+        else
+          # Check if this was a DTE/Nx Cloud failure
+          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan" "${ERROR_CONTEXT}.log"; then
+            echo "⚠️ Nx Cloud DTE failed - falling back to local build"
+            echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
             
-            # Verify essential files exist
-            ESSENTIAL_FILES=("index.html" "main.js")
-            MISSING_FILES=()
-            
-            for file in "${ESSENTIAL_FILES[@]}"; do
-              if [ ! -f "dist/apps/web/$file" ] && [ ! -f "dist/apps/web/assets/$file" ]; then
-                MISSING_FILES+=("$file")
-              fi
-            done
-            
-            if [ ${#MISSING_FILES[@]} -eq 0 ]; then
-              echo "✅ All essential build artifacts present"
+            # Retry with local execution (no DTE)
+            BUILD_CMD_LOCAL="npx nx build web --configuration=production"
+            if $BUILD_CMD_LOCAL --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
+              echo "✅ Web application built successfully (local fallback)"
             else
-              echo "⚠️ Missing essential files: ${MISSING_FILES[*]}"
+              echo "❌ Web application build failed even with local execution"
+              
+              # Parse and report build errors
+              echo "## Build Errors Summary"
+              grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+              
+              echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
+              echo "result=failure" >> $GITHUB_OUTPUT
+              echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+              exit 1
             fi
-            
-            # Create build summary
-            echo "## 📦 Web Build Summary" >> $GITHUB_STEP_SUMMARY
-            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
-            echo "- **Build Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
-            echo "- **File Count**: $FILE_COUNT files" >> $GITHUB_STEP_SUMMARY
-            echo "- **Output Directory**: dist/apps/web" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Build output directory not found"
+            # Non-DTE failure, exit immediately
+            echo "❌ Web application build failed"
+            
+            # Parse and report build errors
+            echo "## Build Errors Summary"
+            grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+            
+            echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
+            echo "result=failure" >> $GITHUB_OUTPUT
+            echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        fi
+
+        # Check build artifacts and report metrics
+        if [ -d "dist/apps/web" ]; then
+          BUILD_SIZE=$(du -sh dist/apps/web | cut -f1)
+          FILE_COUNT=$(find dist/apps/web -type f | wc -l)
+          echo "📊 Build Metrics:"
+          echo "  - Build size: $BUILD_SIZE"
+          echo "  - File count: $FILE_COUNT"
+          
+          # Verify essential files exist
+          ESSENTIAL_FILES=("index.html" "main.js")
+          MISSING_FILES=()
+          
+          for file in "${ESSENTIAL_FILES[@]}"; do
+            if [ ! -f "dist/apps/web/$file" ] && [ ! -f "dist/apps/web/assets/$file" ]; then
+              MISSING_FILES+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All essential build artifacts present"
+          else
+            echo "⚠️ Missing essential files: ${MISSING_FILES[*]}"
           fi
           
-          echo "result=success" >> $GITHUB_OUTPUT
+          # Create build summary
+          echo "## 📦 Web Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **File Count**: $FILE_COUNT files" >> $GITHUB_STEP_SUMMARY
+          echo "- **Output Directory**: dist/apps/web" >> $GITHUB_STEP_SUMMARY
         else
-          echo "❌ Web application build failed"
-          
-          # Parse and report build errors
-          echo "## Build Errors Summary"
-          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-          
-          echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
-          echo "result=failure" >> $GITHUB_OUTPUT
-          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-          exit 1
+          echo "⚠️ Build output directory not found"
         fi
+        
+        echo "result=success" >> $GITHUB_OUTPUT
 
         echo "::endgroup::"
 
@@ -150,49 +175,74 @@ runs:
           BUILD_CMD="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
         fi
 
+        # Try the build command, with fallback to local if DTE fails
         if $BUILD_CMD 2>&1 | tee "${ERROR_CONTEXT}.log"; then
           echo "✅ Lambda functions built successfully"
-          
-          # Attempt to package lambdas for deployment validation
-          echo "📦 Attempting lambda packaging..."
-          if npx nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
-            echo "✅ Lambda functions packaged successfully"
+        else
+          # Check if this was a DTE/Nx Cloud failure
+          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan" "${ERROR_CONTEXT}.log"; then
+            echo "⚠️ Nx Cloud DTE failed - falling back to local build"
+            echo "::warning::Nx Cloud connection failed during lambda build. Retrying with local execution..."
             
-            # Check package sizes if available
-            PACKAGE_INFO=""
-            for project in ${LAMBDA_PROJECTS//,/ }; do
-              if [ -d "dist/lambdas/$project" ]; then
-                PACKAGE_SIZE=$(du -sh "dist/lambdas/$project" | cut -f1)
-                PACKAGE_INFO="$PACKAGE_INFO\n  - $project: $PACKAGE_SIZE"
-              fi
-            done
-            
-            if [ -n "$PACKAGE_INFO" ]; then
-              echo "📊 Lambda Package Sizes:$PACKAGE_INFO"
+            # Retry with local execution
+            BUILD_CMD_LOCAL="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
+            if $BUILD_CMD_LOCAL 2>&1 | tee "${ERROR_CONTEXT}.log"; then
+              echo "✅ Lambda functions built successfully (local fallback)"
+            else
+              echo "❌ Lambda functions build failed even with local execution"
+              
+              # Parse and report build errors
+              echo "## Lambda Build Errors"
+              grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+              
+              echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
+              echo "result=failure" >> $GITHUB_OUTPUT
+              echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+              exit 1
             fi
           else
-            echo "⚠️ Lambda packaging failed (may be expected if no package target configured)"
+            # Non-DTE failure, exit immediately
+            echo "❌ Lambda functions build failed"
+            
+            # Parse and report build errors
+            echo "## Lambda Build Errors"
+            grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+            
+            echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
+            echo "result=failure" >> $GITHUB_OUTPUT
+            echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+            exit 1
           fi
-          
-          # Create lambda build summary
-          echo "## ⚡ Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Projects Built**: $LAMBDA_PROJECTS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Output Directory**: dist/lambdas/" >> $GITHUB_STEP_SUMMARY
-          
-          echo "result=success" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Lambda functions build failed"
-          
-          # Parse and report build errors
-          echo "## Lambda Build Errors"
-          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-          
-          echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
-          echo "result=failure" >> $GITHUB_OUTPUT
-          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-          exit 1
         fi
+        
+        # Attempt to package lambdas for deployment validation
+        echo "📦 Attempting lambda packaging..."
+        if npx nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
+          echo "✅ Lambda functions packaged successfully"
+          
+          # Check package sizes if available
+          PACKAGE_INFO=""
+          for project in ${LAMBDA_PROJECTS//,/ }; do
+            if [ -d "dist/lambdas/$project" ]; then
+              PACKAGE_SIZE=$(du -sh "dist/lambdas/$project" | cut -f1)
+              PACKAGE_INFO="$PACKAGE_INFO\n  - $project: $PACKAGE_SIZE"
+            fi
+          done
+          
+          if [ -n "$PACKAGE_INFO" ]; then
+            echo "📊 Lambda Package Sizes:$PACKAGE_INFO"
+          fi
+        else
+          echo "⚠️ Lambda packaging failed (may be expected if no package target configured)"
+        fi
+        
+        # Create lambda build summary
+        echo "## ⚡ Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        echo "- **Projects Built**: $LAMBDA_PROJECTS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Output Directory**: dist/lambdas/" >> $GITHUB_STEP_SUMMARY
+        
+        echo "result=success" >> $GITHUB_OUTPUT
 
         echo "::endgroup::"
 
