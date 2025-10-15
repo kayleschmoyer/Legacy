@@ -232,14 +232,21 @@ runs:
           echo "- **Terraform Target**: $TF_TARGET" >> $GITHUB_STEP_SUMMARY
         fi
 
-    - name: Cleanup Terraform Lock on Failure
-      if: failure() && steps.terraform-deploy.outputs.lock_id != ''
+    - name: Cleanup Terraform Lock on Failure or Cancellation
+      if: (failure() || cancelled()) && steps.terraform-deploy.outputs.lock_id != ''
       shell: bash
       working-directory: terraform
       run: |
         LOCK_ID="${{ steps.terraform-deploy.outputs.lock_id }}"
-        echo "🔓 Attempting to release stuck Terraform lock: $LOCK_ID"
-        echo "⚠️  This workflow failed and may have left the state locked"
+        STATUS="${{ job.status }}"
+        
+        if [ "$STATUS" = "cancelled" ]; then
+          echo "🔓 Workflow was cancelled - attempting to release Terraform lock: $LOCK_ID"
+          echo "⚠️  Cancellation may have left the state locked"
+        else
+          echo "🔓 Attempting to release stuck Terraform lock: $LOCK_ID"
+          echo "⚠️  This workflow failed and may have left the state locked"
+        fi
         
         # Try to force unlock if we captured a lock ID
         if [ -n "$LOCK_ID" ]; then
@@ -249,6 +256,7 @@ runs:
             echo "## 🔓 Lock Cleanup" >> $GITHUB_STEP_SUMMARY
             echo "- **Status**: Successfully released stuck lock" >> $GITHUB_STEP_SUMMARY
             echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Reason**: Workflow $STATUS" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️  Could not automatically release lock (may have already been released)"
             echo "## ⚠️  Manual Lock Cleanup May Be Required" >> $GITHUB_STEP_SUMMARY
