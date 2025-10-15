@@ -71,7 +71,15 @@ jobs:
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_USE_CUSTOM_DOMAIN: 'true'
-        run: npx nx build web --configuration=deploy
+        run: |
+          # Disable Nx Cloud if DTE is not available
+          if [ "${{ steps.detect-dte.outputs.dte-available }}" != "true" ]; then
+            unset NX_CLOUD_ACCESS_TOKEN
+            export NX_CLOUD_NO_TIMEOUTS=true
+            echo "ℹ️ Nx Cloud disabled - building locally"
+          fi
+          
+          npx nx build web --configuration=deploy
 
       # Add CNAME file for custom domain
       # Required when using actions/deploy-pages (artifact-based deployment)
