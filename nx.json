@@ -65,6 +65,12 @@
       "dependsOn": ["^build"],
       "inputs": ["default", "^default"]
     },
+    "build:lambda": {
+      "cache": true,
+      "executor": "nx:run-commands",
+      "inputs": ["production"],
+      "outputs": ["{projectRoot}/dist"]
+    },
     "package": {
       "cache": false,
       "dependsOn": ["build"],
