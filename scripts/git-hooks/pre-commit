@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Git Pre-Commit Hook - Secret Validation
+ * Git Pre-Commit Hook - Secret Validation & YAML Linting
  * 
- * This hook automatically runs before every git commit to ensure
- * no secrets are accidentally committed to the repository.
+ * This hook automatically runs before every git commit to ensure:
+ * 1. No secrets are accidentally committed to the repository
+ * 2. All YAML files have valid syntax
  * 
  * Installation: Copy this file to .git/hooks/pre-commit and make executable
  */
@@ -19,6 +20,49 @@ try {
   execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
   
   console.log('✅ Pre-commit validation passed!\n');
+  
+  // Run YAML linting on staged YAML files
+  console.log('📝 Running YAML validation...\n');
+  
+  try {
+    // Get staged YAML files
+    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
+      encoding: 'utf8' 
+    }).trim();
+    
+    if (stagedFiles) {
+      const yamlFiles = stagedFiles
+        .split('\n')
+        .filter(file => file.match(/\.(ya?ml)$/i));
+      
+      if (yamlFiles.length > 0) {
+        console.log(`Found ${yamlFiles.length} YAML file(s) to validate:`);
+        yamlFiles.forEach(file => console.log(`  • ${file}`));
+        console.log('');
+        
+        // Run yaml-lint on each file
+        for (const file of yamlFiles) {
+          try {
+            execSync(`npx yaml-lint "${file}"`, { stdio: 'inherit' });
+          } catch (error) {
+            console.error(`\n❌ YAML validation failed for: ${file}`);
+            console.error('Please fix the YAML syntax errors before committing.\n');
+            process.exit(1);
+          }
+        }
+        
+        console.log('✅ YAML validation passed!\n');
+      } else {
+        console.log('No YAML files staged for commit.\n');
+      }
+    }
+  } catch (error) {
+    console.error('\n❌ YAML validation failed!');
+    console.error(error.message);
+    process.exit(1);
+  }
+  
+  console.log('✅ All pre-commit checks passed!\n');
   process.exit(0);
 } catch (error) {
   console.error('\n❌ Pre-commit validation failed!');

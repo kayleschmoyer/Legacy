@@ -323,6 +323,7 @@
     "vite-plugin-react-native-web": "^2.2.1",
     "vitest": "^3.0.0",
     "wait-on": "^9.0.1",
-    "webdriverio": "^9.19.2"
+    "webdriverio": "^9.19.2",
+    "yaml-lint": "^1.7.0"
   }
 }

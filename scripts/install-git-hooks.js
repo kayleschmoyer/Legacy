@@ -50,6 +50,7 @@ function installGitHooks() {
   console.log('• No production database endpoints in tracked files');
   console.log('• No AWS account IDs in tracked files');
   console.log('• Safe placeholder values only');
+  console.log('• Valid YAML syntax in all .yml and .yaml files');
 }
 
 // Run installation
