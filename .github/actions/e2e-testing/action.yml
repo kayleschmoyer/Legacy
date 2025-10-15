@@ -96,10 +96,11 @@ runs:
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
         
-        # Force local execution for E2E tests - disable Nx Cloud DTE
+        # Force local execution for E2E tests - disable Nx Cloud completely
+        unset NX_CLOUD_ACCESS_TOKEN
         export NX_CLOUD_DISTRIBUTED_EXECUTION=false
         export NX_CLOUD_NO_TIMEOUTS=true
-        echo "� Nx Cloud DTE disabled - running E2E tests locally for reliability"
+        echo "ℹ️ Nx Cloud disabled - running E2E tests locally for reliability"
 
         echo "�📋 E2E Test Configuration:"
         echo "- **Test Directory**: apps/web-e2e/src/tests" 
