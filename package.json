@@ -2,6 +2,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "postinstall": "node scripts/postinstall-security.js",
     "all": "nx affected -t build lint:fix lint format test make-cache bundle typecheck",
     "android": "nx run-android app",
     "build-android": "nx build-android app",
@@ -73,6 +74,7 @@
     "validate:auth-security": "node scripts/validate-auth-security.js",
     "validate:package-json": "node scripts/validate-package-json-standards.js",
     "validate:workspace-deps": "node scripts/validate-workspace-deps.js",
+    "validate:security": "node scripts/verify-security.js",
     "validate": "npm run validate:package-json && npm run validate:workspace-deps && npm run validate:auth-security",
     "build:all": "nx run-many --target=build --all",
     "build:libs": "nx run-many --target=build --projects=tag:scope:lib",
@@ -131,7 +133,7 @@
     "@tamagui/theme-base": "1.132.23",
     "aws-lambda": "^1.0.7",
     "aws-sdk": "^2.1683.0",
-    "axios": "^1.7.5",
+    "axios": "1.12.2",
     "bcryptjs": "^3.0.2",
     "bufferutil": "^4.0.8",
     "commander": "^12.1.0",
@@ -191,6 +193,12 @@
     "tslib": "^2.3.0",
     "utf-8-validate": "^6.0.5",
     "yargs": "^18.0.0"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.10"
+    },
+    "axios": "1.12.2"
   },
   "devDependencies": {
     "@babel/core": "^7.14.5",
@@ -267,7 +275,7 @@
     "ajv": "^8.0.0",
     "appium": "^3.1.0",
     "appium-uiautomator2-driver": "^5.0.5",
-    "appium-xcuitest-driver": "^10.1.6",
+    "appium-xcuitest-driver": "^10.2.1",
     "babel-jest": "^29.7.0",
     "babel-preset-expo": "~13.0.0",
     "concurrently": "^9.2.1",

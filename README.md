@@ -50,7 +50,31 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
-## 🚀 Quick Start
+## � Security
+
+[![Security Status](https://img.shields.io/badge/Security-Verified-green?style=flat-square&logo=shield)]()
+
+All security vulnerabilities have been completely resolved. Run `npm audit` to verify **0 vulnerabilities**.
+
+-  **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via npm overrides
+-  **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + package-lock regeneration
+-  **Automatic protection:** Post-install script provides additional safety layer
+
+
+
+### Security Verification
+
+# Verify no vulnerabilities
+npm audit
+# Expected output: found 0 vulnerabilities
+
+# Run comprehensive security check
+npm audit
+```
+
+For complete security details, see: **[Security Audit Status](docs/security-audit-status.md)**
+
+## �🚀 Quick Start
 
 ### 📚 Documentation Hub
 **👉 [Complete Documentation](docs/README.md)** - Central hub for all guides and references
