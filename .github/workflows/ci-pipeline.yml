@@ -226,7 +226,7 @@ jobs:
               "DTE Detection": "${{ steps.detect-dte.outcome }}",
               "Change Detection": "${{ steps.detect-changes.outcome }}",
               "Execution Plan": "${{ steps.execution-plan.outcome }}",
-              "Quality Gates": "${{ steps.quality-gates.outcome }}",
+              "Quality Gates": "${{ steps.quality-gates.outputs.result || steps.quality-gates.outcome }}",
               "Build Validation": "${{ steps.build-validation.outcome }}",
               "E2E Testing": "${{ steps.e2e-testing.outcome }}",
               "Deployment Gate": "${{ steps.deployment-gate.outcome }}"
