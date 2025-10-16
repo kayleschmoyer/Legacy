@@ -549,11 +549,9 @@ jobs:
         run: |
           echo "::group::🔒 ESLint Security Rule Analysis"
 
-          # Install eslint security plugin if not present
-          npm install --no-save eslint-plugin-security
-
           SECURITY_LOG="eslint-security-$(date +%s).json"
           SCAN_SCOPE="full"
+          ESLINT_CONFIG=".eslintrc.security.json"
 
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             SCAN_SCOPE="changed-files"
@@ -567,7 +565,7 @@ jobs:
               echo "🔎 Scanning ${#CHANGED_FILES[@]} changed file(s):"
               printf '   - %s\n' "${CHANGED_FILES[@]}"
               npx eslint \
-                --config .eslintrc.json \
+                --config "$ESLINT_CONFIG" \
                 --no-eslintrc \
                 --plugin security \
                 --rule "security/detect-object-injection: error" \
@@ -590,7 +588,7 @@ jobs:
           else
             echo "🔍 Running full-repository ESLint security scan"
             npx eslint \
-              --config .eslintrc.json \
+              --config "$ESLINT_CONFIG" \
               --no-eslintrc \
               --plugin security \
               --rule "security/detect-object-injection: error" \

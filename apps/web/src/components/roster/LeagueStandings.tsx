@@ -153,7 +153,7 @@ export function LeagueStandings({
           borderWidth={1}
         >
           <Text fontSize="$2" color="$yellow11" textAlign="center">
-            <span role="img" aria-label="info">
+            <span role="img" aria-label="information">
               ℹ️
             </span>{' '}
             Stats and scoring coming soon!

@@ -100,8 +100,8 @@
   "private": true,
   "dependencies": {
     "@apollo/client": "^3.11.4",
-    "@apollo/server": "^4.12.2",
-    "@as-integrations/aws-lambda": "^3.1.0",
+    "@apollo/server": "^5.0.0",
+    "@as-integrations/aws-lambda": "^4.0.1",
     "@aws-sdk/client-secrets-manager": "^3.637.0",
     "@aws-sdk/client-sqs": "^3.637.0",
     "@dataplan/json": "0.0.1-beta.33",
@@ -291,6 +291,7 @@
     "eslint-plugin-playwright": "^2.2.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
+    "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-webdriverio": "^1.0.1",
     "gh-pages": "^6.3.0",
     "identity-obj-proxy": "^3.0.0",

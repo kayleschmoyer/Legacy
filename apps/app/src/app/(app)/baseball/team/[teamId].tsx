@@ -194,8 +194,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     return result;
   }, [stats, pitchers, loadingStats]);
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  const noOp = () => {};
+  const noOp = () => {
+    // Placeholder function for future implementation
+  };
 
   switch (selectedTab) {
     case 'Lineup':
