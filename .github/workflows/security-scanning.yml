@@ -553,28 +553,66 @@ jobs:
           npm install --no-save eslint-plugin-security
           
           SECURITY_LOG="eslint-security-$(date +%s).json"
+          SCAN_SCOPE="full"
           
-          # Run ESLint with security rules
-          npx eslint . \
-            --ext .ts,.tsx,.js,.jsx \
-            --format json \
-            --output-file "$SECURITY_LOG" \
-            --config .eslintrc.json \
-            --no-eslintrc \
-            --plugin security \
-            --rule "security/detect-object-injection: error" \
-            --rule "security/detect-non-literal-regexp: error" \
-            --rule "security/detect-unsafe-regex: error" \
-            --rule "security/detect-buffer-noassert: error" \
-            --rule "security/detect-child-process: error" \
-            --rule "security/detect-disable-mustache-escape: error" \
-            --rule "security/detect-eval-with-expression: error" \
-            --rule "security/detect-no-csrf-before-method-override: error" \
-            --rule "security/detect-non-literal-fs-filename: error" \
-            --rule "security/detect-non-literal-require: error" \
-            --rule "security/detect-possible-timing-attacks: error" \
-            --rule "security/detect-pseudoRandomBytes: error" \
-            2>/dev/null || true
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            SCAN_SCOPE="changed-files"
+            echo "🔍 Pull request detected – targeting changed JS/TS sources"
+            mapfile -t CHANGED_FILES < <(git diff --name-only "${NX_BASE:-origin/main}" "${NX_HEAD:-HEAD}" -- '*.ts' '*.tsx' '*.js' '*.jsx' || true)
+
+            if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
+              echo "ℹ️  No JavaScript or TypeScript changes detected; skipping ESLint security scan"
+              echo "[]" > "$SECURITY_LOG"
+            else
+              echo "🔎 Scanning ${#CHANGED_FILES[@]} changed file(s):"
+              printf '   - %s\n' "${CHANGED_FILES[@]}"
+              npx eslint \
+                --config .eslintrc.json \
+                --no-eslintrc \
+                --plugin security \
+                --rule "security/detect-object-injection: error" \
+                --rule "security/detect-non-literal-regexp: error" \
+                --rule "security/detect-unsafe-regex: error" \
+                --rule "security/detect-buffer-noassert: error" \
+                --rule "security/detect-child-process: error" \
+                --rule "security/detect-disable-mustache-escape: error" \
+                --rule "security/detect-eval-with-expression: error" \
+                --rule "security/detect-no-csrf-before-method-override: error" \
+                --rule "security/detect-non-literal-fs-filename: error" \
+                --rule "security/detect-non-literal-require: error" \
+                --rule "security/detect-possible-timing-attacks: error" \
+                --rule "security/detect-pseudoRandomBytes: error" \
+                --format json \
+                --output-file "$SECURITY_LOG" \
+                "${CHANGED_FILES[@]}" \
+                2>/dev/null || true
+            fi
+          else
+            echo "🔍 Running full-repository ESLint security scan"
+            npx eslint \
+              --config .eslintrc.json \
+              --no-eslintrc \
+              --plugin security \
+              --rule "security/detect-object-injection: error" \
+              --rule "security/detect-non-literal-regexp: error" \
+              --rule "security/detect-unsafe-regex: error" \
+              --rule "security/detect-buffer-noassert: error" \
+              --rule "security/detect-child-process: error" \
+              --rule "security/detect-disable-mustache-escape: error" \
+              --rule "security/detect-eval-with-expression: error" \
+              --rule "security/detect-no-csrf-before-method-override: error" \
+              --rule "security/detect-non-literal-fs-filename: error" \
+              --rule "security/detect-non-literal-require: error" \
+              --rule "security/detect-possible-timing-attacks: error" \
+              --rule "security/detect-pseudoRandomBytes: error" \
+              --format json \
+              --output-file "$SECURITY_LOG" \
+              --ext .ts,.tsx,.js,.jsx \
+              . \
+              2>/dev/null || true
+          fi
+
+          echo "Scan scope: $SCAN_SCOPE"
 
           # Parse results
           if [ -f "$SECURITY_LOG" ]; then
