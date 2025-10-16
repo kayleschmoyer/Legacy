@@ -28,6 +28,20 @@ const brandDark = {
   color11: '#DEE6FF', // subtle text on dark surfaces
   color12: '#F5F7FA', // high contrast text
 
+  // Extended surfaces for dashboards & roster layouts
+  surfacePanel: '#111B2F',
+  surfacePanelBorder: '#1F2D48',
+  surfaceCard: '#16223A',
+  surfaceSubtle: '#0D1526',
+  surfaceInteractive: 'rgba(59, 130, 246, 0.12)',
+  accentMuted: 'rgba(59, 130, 246, 0.18)',
+  successMuted: 'rgba(34, 197, 94, 0.18)',
+  warningMuted: 'rgba(245, 158, 11, 0.18)',
+  outlineSubtle: '#1C2740',
+  outlineStrong: '#2F3B53',
+  textMuted: '#9CAAC5',
+  textOnAccent: '#F8FAFC',
+
   // Text
   color: '#F8FAFC',
   colorHover: '#FFFFFF',
@@ -133,6 +147,20 @@ const brandLight = {
   color10: '#4A5B82',
   color11: '#1F2937', // main text
   color12: '#0B1220', // strongest text
+
+  // Extended surfaces for dashboards & roster layouts
+  surfacePanel: '#F7FAFF',
+  surfacePanelBorder: '#D0DAE8',
+  surfaceCard: '#FFFFFF',
+  surfaceSubtle: '#EFF3F8',
+  surfaceInteractive: 'rgba(37, 99, 235, 0.08)',
+  accentMuted: 'rgba(37, 99, 235, 0.12)',
+  successMuted: 'rgba(34, 197, 94, 0.12)',
+  warningMuted: 'rgba(245, 158, 11, 0.14)',
+  outlineSubtle: '#E1E7F0',
+  outlineStrong: '#C3CDDA',
+  textMuted: '#5F7295',
+  textOnAccent: '#FFFFFF',
 
   // Text
   color: '#0B1220',
