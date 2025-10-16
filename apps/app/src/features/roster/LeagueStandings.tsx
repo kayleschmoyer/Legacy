@@ -1,15 +1,8 @@
 import React from 'react';
-import {
-  Card,
-  H4,
-  H5,
-  ScrollView,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Card, H4, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 
 interface Team {
   id: number;
@@ -31,7 +24,7 @@ export function LeagueStandings({
   const router = useRouter();
 
   const handleTeamPress = (teamId: number) => {
-    router.push(`/baseball/team/${teamId}` as any);
+    router.push(`/baseball/team/${teamId}` as Href);
   };
 
   if (loading) {
@@ -54,10 +47,16 @@ export function LeagueStandings({
     <ScrollView>
       <YStack padding="$4" space="$4">
         <H4>League Standings</H4>
-        
-        <Card padding="$3" backgroundColor="$gray2" borderColor="$gray6" borderWidth={1}>
+
+        <Card
+          padding="$3"
+          backgroundColor="$gray2"
+          borderColor="$gray6"
+          borderWidth={1}
+        >
           <Text fontSize="$3" color="$gray11" marginBottom="$2">
-            {teams.length} {teams.length === 1 ? 'team' : 'teams'} in this league
+            {teams.length} {teams.length === 1 ? 'team' : 'teams'} in this
+            league
           </Text>
         </Card>
 
@@ -70,7 +69,13 @@ export function LeagueStandings({
             <Text flex={2} fontSize="$3" fontWeight="600" color="$blue11">
               Team Name
             </Text>
-            <Text flex={1} fontSize="$3" fontWeight="600" color="$blue11" textAlign="right">
+            <Text
+              flex={1}
+              fontSize="$3"
+              fontWeight="600"
+              color="$blue11"
+              textAlign="right"
+            >
               Points
             </Text>
           </XStack>
@@ -80,23 +85,25 @@ export function LeagueStandings({
         {teams.map((team, index) => {
           const isUserTeam = userTeamId === team.id;
           return (
-            <Pressable
-              key={team.id}
-              onPress={() => handleTeamPress(team.id)}
-            >
+            <Pressable key={team.id} onPress={() => handleTeamPress(team.id)}>
               <Card
                 padding="$3"
                 borderWidth={1}
-                borderColor={isUserTeam ? "$blue8" : "$gray4"}
-                backgroundColor={isUserTeam ? "$blue2" : "$background"}
+                borderColor={isUserTeam ? '$blue8' : '$gray4'}
+                backgroundColor={isUserTeam ? '$blue2' : '$background'}
                 pressStyle={{
                   scale: 0.98,
-                  backgroundColor: isUserTeam ? "$blue3" : "$gray2",
+                  backgroundColor: isUserTeam ? '$blue3' : '$gray2',
                 }}
                 cursor="pointer"
               >
                 <XStack justifyContent="space-between" alignItems="center">
-                  <Text flex={0.5} fontSize="$4" fontWeight="600" color="$blue10">
+                  <Text
+                    flex={0.5}
+                    fontSize="$4"
+                    fontWeight="600"
+                    color="$blue10"
+                  >
                     {index + 1}
                   </Text>
                   <YStack flex={2}>
@@ -114,7 +121,13 @@ export function LeagueStandings({
                       Tap to view roster
                     </Text>
                   </YStack>
-                  <Text flex={1} fontSize="$4" fontWeight="600" color="$gray12" textAlign="right">
+                  <Text
+                    flex={1}
+                    fontSize="$4"
+                    fontWeight="600"
+                    color="$gray12"
+                    textAlign="right"
+                  >
                     -
                   </Text>
                 </XStack>
@@ -123,9 +136,18 @@ export function LeagueStandings({
           );
         })}
 
-        <Card padding="$3" backgroundColor="$yellow2" borderColor="$yellow6" borderWidth={1}>
+        <Card
+          padding="$3"
+          backgroundColor="$yellow2"
+          borderColor="$yellow6"
+          borderWidth={1}
+        >
           <Text fontSize="$2" color="$yellow11" textAlign="center">
-            ℹ️ Stats and scoring coming soon!
+            {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
+            <Text role="img" aria-label="info">
+              ℹ️
+            </Text>{' '}
+            Stats and scoring coming soon!
           </Text>
         </Card>
       </YStack>

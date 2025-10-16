@@ -3,24 +3,22 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/web/src",
   "projectType": "application",
-  "tags": [
-    "platform:web",
-    "scope:app",
-    "type:frontend"
-  ],
+  "tags": ["platform:web", "scope:app", "type:frontend"],
   "// targets": "to see all targets run: nx show project web --web",
   "targets": {
     "dev": {
-      "executor": "@nx/vite:dev",
+      "executor": "@nx/vite:dev-server",
       "options": {
+        "buildTarget": "web:build",
         "port": 4200,
         "host": "localhost",
         "strictPort": true
       }
     },
     "serve": {
-      "executor": "@nx/vite:dev",
+      "executor": "@nx/vite:dev-server",
       "options": {
+        "buildTarget": "web:build",
         "port": 4200,
         "host": "localhost",
         "strictPort": true
@@ -28,9 +26,7 @@
     },
     "build": {
       "executor": "@nx/vite:build",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/web"

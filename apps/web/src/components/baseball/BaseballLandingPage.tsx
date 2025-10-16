@@ -9,12 +9,12 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { styled, Text, Dialog, Input, Separator } from 'tamagui';
+import { Dialog, Input, Separator, styled, Text } from 'tamagui';
 import { League, LeagueCard } from './LeagueCard';
 import {
-  useGetUserLeaguesQuery,
-  useCreateLeagueAndTeamsMutation,
   GetUserLeagues,
+  useCreateLeagueAndTeamsMutation,
+  useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
 
 const PageContainer = styled(YStack, {
@@ -55,7 +55,7 @@ const HeroTitle = styled(H1, {
   marginBottom: '$3',
   textAlign: 'center',
   lineHeight: '$10',
-  '$sm': {
+  $sm: {
     fontSize: '$9',
   },
 });
@@ -67,7 +67,7 @@ const HeroSubtitle = styled(Paragraph, {
   maxWidth: 600,
   textAlign: 'center',
   lineHeight: '$6',
-  '$sm': {
+  $sm: {
     fontSize: '$5',
   },
 });
@@ -80,7 +80,7 @@ const SectionHeader = styled(XStack, {
   justifyContent: 'space-between',
   alignItems: 'flex-end',
   marginBottom: '$4',
-  '$sm': {
+  $sm: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: '$3',
@@ -98,8 +98,6 @@ const LeaguesGrid = styled(XStack, {
   flexWrap: 'wrap',
   justifyContent: 'flex-start',
 });
-
-
 
 const EmptyState = styled(YStack, {
   alignItems: 'center',
@@ -190,46 +188,52 @@ export function BaseballLandingPage() {
   const [leagueName, setLeagueName] = React.useState('');
   const [teamCount, setTeamCount] = React.useState<number>(10);
   const [search, setSearch] = React.useState('');
-  
+
   // Fetch user leagues from GraphQL
-  const { data, loading: isLoading, error } = useGetUserLeaguesQuery({
+  const {
+    data,
+    loading: isLoading,
+    error,
+  } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
     skip: !auth?.user,
   });
 
-  const [createLeague, { loading: creating }] = useCreateLeagueAndTeamsMutation({
-    update: (cache, { data }) => {
-      const newLeague = data?.createLeagueAndTeams?.league;
-      if (!newLeague) return;
-      try {
-        const existing = cache.readQuery({ query: GetUserLeagues }) as
-          | { userLeagues: unknown[] }
-          | null
-          | undefined;
-        if (existing?.userLeagues) {
-          cache.writeQuery({
+  const [createLeague, { loading: creating }] = useCreateLeagueAndTeamsMutation(
+    {
+      update: (cache, { data }) => {
+        const newLeague = data?.createLeagueAndTeams?.league;
+        if (!newLeague) return;
+        try {
+          const existing = cache.readQuery<{ userLeagues: League[] }>({
             query: GetUserLeagues,
-            data: { userLeagues: [...existing.userLeagues, newLeague] },
           });
+          if (existing?.userLeagues) {
+            cache.writeQuery({
+              query: GetUserLeagues,
+              data: { userLeagues: [...existing.userLeagues, newLeague] },
+            });
+          }
+        } catch {
+          // ignore; query may not be in cache yet
         }
-      } catch {
-        // ignore; query may not be in cache yet
-      }
+      },
+      onCompleted: (res) => {
+        const id = res.createLeagueAndTeams?.league?.id;
+        if (id) navigate(`/baseball/league/${id}`);
+      },
     },
-    onCompleted: (res) => {
-      const id = res.createLeagueAndTeams?.league?.id;
-      if (id) navigate(`/baseball/league/${id}`);
-    },
-  });
+  );
 
   // Map GraphQL data to our League interface
-  const leagues: League[] = data?.userLeagues?.map(league => ({
-    id: league.id || 0,
-    name: league.name || '',
-    owner: league.owner || 0,
-    maxRosterSize: league.maxRosterSize || 25,
-    currentMatchup: league.currentMatchup,
-  })) || [];
+  const leagues: League[] =
+    data?.userLeagues?.map((league) => ({
+      id: league.id || 0,
+      name: league.name || '',
+      owner: league.owner || 0,
+      maxRosterSize: league.maxRosterSize || 25,
+      currentMatchup: league.currentMatchup,
+    })) || [];
 
   const handleViewLeague = (leagueId: number) => {
     navigate(`/baseball/league/${leagueId}`);
@@ -247,8 +251,16 @@ export function BaseballLandingPage() {
     return (
       <PageContainer role="main" aria-busy="true" aria-live="polite">
         <ContentContainer>
-          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400} role="status">
-            <Paragraph fontSize="$6" color="$color11">Loading your leagues...</Paragraph>
+          <YStack
+            alignItems="center"
+            justifyContent="center"
+            flex={1}
+            minHeight={400}
+            role="status"
+          >
+            <Paragraph fontSize="$6" color="$color11">
+              Loading your leagues...
+            </Paragraph>
           </YStack>
         </ContentContainer>
       </PageContainer>
@@ -259,8 +271,17 @@ export function BaseballLandingPage() {
     return (
       <PageContainer role="main" aria-live="assertive">
         <ContentContainer>
-          <YStack alignItems="center" justifyContent="center" flex={1} minHeight={400} gap="$4" role="alert">
-            <Paragraph fontSize="$6" color="$red10">Failed to load leagues</Paragraph>
+          <YStack
+            alignItems="center"
+            justifyContent="center"
+            flex={1}
+            minHeight={400}
+            gap="$4"
+            role="alert"
+          >
+            <Paragraph fontSize="$6" color="$red10">
+              Failed to load leagues
+            </Paragraph>
             <SecondaryButton onPress={() => window.location.reload()}>
               <Text>Try Again</Text>
             </SecondaryButton>
@@ -294,27 +315,37 @@ export function BaseballLandingPage() {
           role="region"
           aria-labelledby="baseball-hero-title"
           style={{
-            background: 'linear-gradient(135deg, hsl(var(--orange2)) 0%, hsl(var(--orange3)) 100%)',
+            background:
+              'linear-gradient(135deg, hsl(var(--orange2)) 0%, hsl(var(--orange3)) 100%)',
           }}
         >
           <HeroTitle id="baseball-hero-title">
-            <span role="img" aria-label="baseball">⚾</span>
-            {' '}Baseball Fantasy
+            <span role="img" aria-label="baseball">
+              ⚾
+            </span>{' '}
+            Baseball Fantasy
           </HeroTitle>
           <HeroSubtitle>
-            Welcome back, {auth?.user?.username || 'Player'}! {leagues.length > 0 ? `You're in ${leagues.length} league${leagues.length === 1 ? '' : 's'}.` : 'Create or join leagues to get started!'}
+            Welcome back, {auth?.user?.username || 'Player'}!{' '}
+            {leagues.length > 0
+              ? `You're in ${leagues.length} league${leagues.length === 1 ? '' : 's'}.`
+              : 'Create or join leagues to get started!'}
           </HeroSubtitle>
           <ActionButtonsRow>
             <PrimaryButton onPress={handleCreateLeague}>
               <Text>
-                <span role="img" aria-label="create">➕</span>
-                {' '}Create League
+                <span role="img" aria-label="create">
+                  ➕
+                </span>{' '}
+                Create League
               </Text>
             </PrimaryButton>
             <SecondaryButton onPress={handleJoinLeague}>
               <Text>
-                <span role="img" aria-label="join">🤝</span>
-                {' '}Join League
+                <span role="img" aria-label="join">
+                  🤝
+                </span>{' '}
+                Join League
               </Text>
             </SecondaryButton>
           </ActionButtonsRow>
@@ -323,8 +354,16 @@ export function BaseballLandingPage() {
         {/* Notice about current state - Only show if user is not authenticated */}
         {!auth?.user && (
           <NoticeCard>
-            <Paragraph fontSize="$4" color="$blue11" fontWeight="600" marginBottom="$2">
-              <span role="img" aria-label="info">ℹ️</span> Authentication Required
+            <Paragraph
+              fontSize="$4"
+              color="$blue11"
+              fontWeight="600"
+              marginBottom="$2"
+            >
+              <span role="img" aria-label="info">
+                ℹ️
+              </span>{' '}
+              Authentication Required
             </Paragraph>
             <Paragraph fontSize="$3" color="$blue10" lineHeight="$4">
               Please sign in to view and manage your fantasy baseball leagues.
@@ -339,7 +378,9 @@ export function BaseballLandingPage() {
             {leagues.length > 0 && (
               <XStack alignItems="center" gap="$3">
                 {/* Accessible label for search */}
-                <label htmlFor="league-search" className="sr-only">Search leagues</label>
+                <label htmlFor="league-search" className="sr-only">
+                  Search leagues
+                </label>
                 <Input
                   size="$4"
                   placeholder="Search leagues..."
@@ -377,11 +418,14 @@ export function BaseballLandingPage() {
           ) : (
             <EmptyState>
               <EmptyStateIcon>
-                <span role="img" aria-label="stadium">🏟️</span>
+                <span role="img" aria-label="stadium">
+                  🏟️
+                </span>
               </EmptyStateIcon>
               <EmptyStateTitle>No Leagues Yet</EmptyStateTitle>
               <EmptyStateDescription>
-                You haven't joined any leagues yet. Create your first league to get started with fantasy baseball!
+                You haven't joined any leagues yet. Create your first league to
+                get started with fantasy baseball!
               </EmptyStateDescription>
               <ActionButtonsRow>
                 <PrimaryButton onPress={handleCreateLeague}>
@@ -396,7 +440,11 @@ export function BaseballLandingPage() {
       {/* Create League - Quick Dialog */}
       <Dialog modal open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <Dialog.Portal>
-          <Dialog.Overlay animation="quick" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+          <Dialog.Overlay
+            animation="quick"
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
           <Dialog.Content
             bordered
             elevate
@@ -412,12 +460,19 @@ export function BaseballLandingPage() {
           >
             <YStack space="$4">
               <YStack>
-                <H2 size="$6" id="create-league-title">Create League</H2>
-                <Paragraph color="$gray11" id="create-league-desc">Create a new league in seconds. You can fine-tune settings later.</Paragraph>
+                <H2 size="$6" id="create-league-title">
+                  Create League
+                </H2>
+                <Paragraph color="$gray11" id="create-league-desc">
+                  Create a new league in seconds. You can fine-tune settings
+                  later.
+                </Paragraph>
               </YStack>
 
               <YStack space="$3">
-                <Text fontWeight="600" color="$gray12">League Name</Text>
+                <Text fontWeight="600" color="$gray12">
+                  League Name
+                </Text>
                 <Input
                   placeholder="e.g., Saturday Sluggers"
                   value={leagueName}
@@ -428,7 +483,9 @@ export function BaseballLandingPage() {
               </YStack>
 
               <YStack space="$3">
-                <Text fontWeight="600" color="$gray12">Number of Teams</Text>
+                <Text fontWeight="600" color="$gray12">
+                  Number of Teams
+                </Text>
                 <XStack gap="$2" flexWrap="wrap">
                   {[6, 8, 10, 12, 14, 16].map((n) => (
                     <Button
@@ -442,7 +499,9 @@ export function BaseballLandingPage() {
                       aria-pressed={teamCount === n}
                       aria-label={`Select ${n} teams`}
                     >
-                      <Text color={teamCount === n ? '$blue12' : '$color'}>{n}</Text>
+                      <Text color={teamCount === n ? '$blue12' : '$color'}>
+                        {n}
+                      </Text>
                     </Button>
                   ))}
                 </XStack>
@@ -457,7 +516,9 @@ export function BaseballLandingPage() {
                 <PrimaryButton
                   disabled={creating || leagueName.trim().length < 3}
                   onPress={() => {
-                    const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                    const startDate = new Date(
+                      Date.now() + 7 * 24 * 60 * 60 * 1000,
+                    )
                       .toISOString()
                       .split('T')[0];
                     void createLeague({

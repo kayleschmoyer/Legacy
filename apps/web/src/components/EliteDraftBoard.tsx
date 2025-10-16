@@ -345,7 +345,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const prevTimeRef = React.useRef<number>(timeRemaining);
 
   const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
-  const viewModes: Array<'grid' | 'list' | 'compact'> = ['grid', 'list', 'compact'];
+  const viewModes: Array<'grid' | 'list' | 'compact'> = [
+    'grid',
+    'list',
+    'compact',
+  ];
 
   // Filter players
   const filteredPlayers = mockBaseballPlayers.filter((player) => {
@@ -389,9 +393,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             }
             setCurrentPick((prevPick) => prevPick + 1);
             setIsMyPick((prevPick) => !prevPick);
-            setUrgentMessage(`Time expired. Auto-drafted ${playerToDraft.name}.`);
+            setUrgentMessage(
+              `Time expired. Auto-drafted ${playerToDraft.name}.`,
+            );
             setLiveMessage(
-              `Pick #${currentPick + 1}. ${isMyPick ? 'Opponent\'s pick' : 'Your pick'}.`,
+              `Pick #${currentPick + 1}. ${isMyPick ? "Opponent's pick" : 'Your pick'}.`,
             );
           }
           return 90;
@@ -405,7 +411,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // Announce when it's user's turn or waiting
   React.useEffect(() => {
     setLiveMessage(isMyPick ? "It's your pick." : 'Waiting for other teams.');
-  }, [isMyPick]);
+  }, [isMyPick, currentPick]);
 
   // Announce when crossing critical time thresholds (<= 10s)
   React.useEffect(() => {
@@ -454,7 +460,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       >
         {/* Left Sidebar - My Team & Controls */}
         <aside
-          role="complementary"
           aria-label="My team and draft controls"
           style={{
             background: 'rgba(0, 0, 0, 0.4)',
@@ -716,7 +721,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         </aside>
 
         {/* Center - Player Board */}
-        <div role="main" aria-label="Player draft board" style={{ padding: '20px', overflowY: 'auto' }}>
+        <div
+          role="main"
+          aria-label="Player draft board"
+          style={{ padding: '20px', overflowY: 'auto' }}
+        >
           {/* Header Controls */}
           <div
             style={{
@@ -772,7 +781,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       setSelectedPosition(positions[nextIndex]);
                     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                       e.preventDefault();
-                      const prevIndex = (currentIndex - 1 + positions.length) % positions.length;
+                      const prevIndex =
+                        (currentIndex - 1 + positions.length) %
+                        positions.length;
                       setSelectedPosition(positions[prevIndex]);
                     } else if (e.key === 'Home') {
                       e.preventDefault();
@@ -822,7 +833,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       setViewMode(viewModes[nextIndex]);
                     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                       e.preventDefault();
-                      const prevIndex = (currentIndex - 1 + viewModes.length) % viewModes.length;
+                      const prevIndex =
+                        (currentIndex - 1 + viewModes.length) %
+                        viewModes.length;
                       setViewMode(viewModes[prevIndex]);
                     } else if (e.key === 'Home') {
                       e.preventDefault();
@@ -1177,7 +1190,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
         {/* Right Sidebar - AI & Analytics */}
         <aside
-          role="complementary"
           aria-label="AI suggestions and analytics"
           style={{
             background: 'rgba(0, 0, 0, 0.4)',
@@ -1264,7 +1276,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </h3>
             <div role="list">
               {draftedPlayers.slice(-5).map((playerId, idx) => {
-                const player = mockBaseballPlayers.find((p) => p.id === playerId);
+                const player = mockBaseballPlayers.find(
+                  (p) => p.id === playerId,
+                );
                 return player ? (
                   <div
                     role="listitem"
@@ -1385,8 +1399,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       </div>
 
       {/* Custom CSS for animations */}
-      <div className="sr-only" aria-live="polite">{liveMessage}</div>
-      <div className="sr-only" aria-live="assertive">{urgentMessage}</div>
+      <div className="sr-only" aria-live="polite">
+        {liveMessage}
+      </div>
+      <div className="sr-only" aria-live="assertive">
+        {urgentMessage}
+      </div>
 
       {/* Custom CSS for animations */}
       <style>{`

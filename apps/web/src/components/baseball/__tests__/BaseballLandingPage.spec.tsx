@@ -1,20 +1,31 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { BaseballLandingPage } from '../BaseballLandingPage';
 
 // Mock shared-components to lightweight HTML equivalents
 jest.mock('@legacy-sports/shared-components', () => ({
   Button: ({ children, onPress, ...rest }: any) => (
-    <button onClick={onPress} {...rest}>{children}</button>
+    <button onClick={onPress} {...rest}>
+      {children}
+    </button>
   ),
   H1: ({ children, ...rest }: any) => <h1 {...rest}>{children}</h1>,
   H2: ({ children, ...rest }: any) => <h2 {...rest}>{children}</h2>,
   Paragraph: ({ children, ...rest }: any) => <p {...rest}>{children}</p>,
   XStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
   YStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
-  HolographicCard: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
-  useAuth: () => ({ isAuthenticated: true, user: { id: '1', username: 'testuser' } }),
+  HolographicCard: ({ children, ...rest }: any) => (
+    <div {...rest}>{children}</div>
+  ),
+  useAuth: () => ({
+    isAuthenticated: true,
+    user: { id: '1', username: 'testuser' },
+  }),
 }));
 
 // Mock Tamagui styled components to div/input
@@ -47,29 +58,41 @@ jest.mock('tamagui', () => {
         onChange={(e) => onChangeText?.(e.target.value)}
       />
     ),
-    Dialog: Object.assign(({ children, open }: any) => (open ? <div>{children}</div> : null), {
-      Portal: ({ children }: any) => <div>{children}</div>,
-      Overlay: (props: any) => <div>{props?.children}</div>,
-      Content: ({ children, ..._rest }: any) => (
-        <div role="dialog">{children}</div>
-      ),
-      Title: ({ children, ..._rest }: any) => <h3>{children}</h3>,
-      Description: ({ children, ..._rest }: any) => <p>{children}</p>,
-      Close: ({ asChild, children, ..._rest }: any) => (asChild ? children : <button>Close</button>),
-    }),
+    Dialog: Object.assign(
+      ({ children, open }: any) => (open ? <div>{children}</div> : null),
+      {
+        Portal: ({ children }: any) => <div>{children}</div>,
+        Overlay: (props: any) => <div>{props?.children}</div>,
+        Content: ({ children, ..._rest }: any) => (
+          <div role="dialog">{children}</div>
+        ),
+        Title: ({ children, ..._rest }: any) => <h3>{children}</h3>,
+        Description: ({ children, ..._rest }: any) => <p>{children}</p>,
+        Close: ({ asChild, children, ..._rest }: any) =>
+          asChild ? children : <button>Close</button>,
+      },
+    ),
     Separator: (_props: any) => <hr />,
   };
 });
 
 // Mock LeagueCard to a simple div for predictability
 jest.mock('../LeagueCard', () => ({
-  LeagueCard: ({ league }: any) => <div data-testid="league-card">{league.name}</div>,
+  LeagueCard: ({ league }: any) => (
+    <div data-testid="league-card">{league.name}</div>
+  ),
 }));
 
 // Mock GraphQL generated hooks (path from src/components/baseball/__tests__ to src/api/db)
 jest.mock('../../../api/db/graphql.generated', () => ({
-  useGetUserLeaguesQuery: jest.fn(() => ({ data: { userLeagues: [] }, loading: false })),
-  useCreateLeagueAndTeamsMutation: jest.fn(() => [jest.fn(), { loading: false }]),
+  useGetUserLeaguesQuery: jest.fn(() => ({
+    data: { userLeagues: [] },
+    loading: false,
+  })),
+  useCreateLeagueAndTeamsMutation: jest.fn(() => [
+    jest.fn(),
+    { loading: false },
+  ]),
   GetUserLeagues: {},
 }));
 
@@ -78,15 +101,19 @@ describe('BaseballLandingPage', () => {
     render(
       <MemoryRouter>
         <BaseballLandingPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-  expect(screen.getByText(/No Leagues Yet/i)).toBeInTheDocument();
-  expect(screen.getAllByText(/Create Your First League/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/No Leagues Yet/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Create Your First League/i).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('renders leagues grid and supports search', () => {
-  const { useGetUserLeaguesQuery }: any = require('../../../api/db/graphql.generated');
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../../api/db/graphql.generated');
     useGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [
@@ -100,7 +127,7 @@ describe('BaseballLandingPage', () => {
     render(
       <MemoryRouter>
         <BaseballLandingPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     // Two league cards rendered
@@ -117,10 +144,10 @@ describe('BaseballLandingPage', () => {
     render(
       <MemoryRouter>
         <BaseballLandingPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-  fireEvent.click(screen.getByText(/Create League/i));
-  expect(screen.getByText(/Create a new league/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Create League/i));
+    expect(screen.getByText(/Create a new league/i)).toBeInTheDocument();
   });
 });

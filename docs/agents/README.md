@@ -8,32 +8,33 @@ This document provides structured guidance for AI agents working on the Legacy S
 
 ### **Core Development Guidelines**
 
-| Topic                    | File                                                                             | Description                                                   |
-| ------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **Platform Components**  | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)   | Magic string system for cross-platform compatibility          |
-| **Type Safety**          | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                   | TypeScript standards and `any` type usage guidelines          |
-| **ESLint Standards**     | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)         | Code quality enforcement and lint error resolution            |
-| **Development Workflow** | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv) | Daily workflows, terminal compatibility, fail-fast philosophy |
+| Topic                        | File                                                                               | Description                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Contribution Workflow** ⭐ | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv) | Complete contribution process from planning to PR creation    |
+| **Platform Components**      | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)     | Magic string system for cross-platform compatibility          |
+| **Type Safety**              | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                     | TypeScript standards and `any` type usage guidelines          |
+| **ESLint Standards**         | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)           | Code quality enforcement and lint error resolution            |
+| **Development Workflow**     | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv)   | Daily workflows, terminal compatibility, fail-fast philosophy |
 
 ### **Architecture & Infrastructure**
 
-| Topic                       | File                                                                                   | Description                                                  |
-| --------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **GraphQL API**             | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration  |
-| **Database Schema**         | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management         |
-| **AWS Infrastructure**      | [`docs/agents/aws-infrastructure.csv`](./docs/agents/aws-infrastructure.csv)           | Lambda architecture, Terraform management, cost optimization |
-| **Repository Architecture** | [`docs/agents/repository-architecture.csv`](./docs/agents/repository-architecture.csv) | Nx monorepo structure, build system, file conventions        |
+| Topic                       | File                                                                                   | Description                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **GraphQL API**             | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration        |
+| **Database Schema**         | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management               |
+| **AWS Infrastructure**      | [`docs/agents/aws-infrastructure.csv`](./docs/agents/aws-infrastructure.csv)           | Lambda architecture, Terraform management, cost optimization       |
+| **Repository Architecture** | [`docs/agents/repository-architecture.csv`](./docs/agents/repository-architecture.csv) | Nx monorepo structure, build system, file conventions              |
 | **Build System**            | [`docs/agents/build-system.csv`](./docs/agents/build-system.csv)                       | Nx workspace management, dependency resolution, build optimization |
 
 ### **Quality Assurance & Operations**
 
-| Topic                   | File                                                                           | Description                                          |
-| ----------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| **Security Guidelines** | [`docs/agents/security-guidelines.csv`](./docs/agents/security-guidelines.csv) | Authentication, credential management, commit safety |
+| Topic                   | File                                                                           | Description                                           |
+| ----------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| **Security Guidelines** | [`docs/agents/security-guidelines.csv`](./docs/agents/security-guidelines.csv) | Authentication, credential management, commit safety  |
 | **Testing Strategy**    | [`docs/agents/testing-strategy.csv`](./docs/agents/testing-strategy.csv)       | Unit, integration, e2e testing patterns and practices |
-| **Troubleshooting**     | [`docs/agents/troubleshooting.csv`](./docs/agents/troubleshooting.csv)         | Common error resolution, debugging workflows        |
-| **CI/CD Patterns**      | [`docs/agents/cicd-patterns.csv`](./docs/agents/cicd-patterns.csv)             | GitHub Actions, deployment pipelines, quality gates |
-| **Common Pitfalls**     | [`docs/agents/common-pitfalls.csv`](./docs/agents/common-pitfalls.csv)         | Frequent mistakes and how to avoid them              |
+| **Troubleshooting**     | [`docs/agents/troubleshooting.csv`](./docs/agents/troubleshooting.csv)         | Common error resolution, debugging workflows          |
+| **CI/CD Patterns**      | [`docs/agents/cicd-patterns.csv`](./docs/agents/cicd-patterns.csv)             | GitHub Actions, deployment pipelines, quality gates   |
+| **Common Pitfalls**     | [`docs/agents/common-pitfalls.csv`](./docs/agents/common-pitfalls.csv)         | Frequent mistakes and how to avoid them               |
 
 ## 🚀 Usage Instructions
 
@@ -115,25 +116,29 @@ Category,Subcategory,Rule_Type,Pattern_Concept,Description,Code_Example,File_Pat
 When working on this codebase, ensure:
 
 ### **Core Development Standards**
+
 ✅ **Platform Compatibility** - Code works on both web and React Native  
 ✅ **Type Safety** - Strong typing with minimal `any` usage  
 ✅ **Build Success** - All targets compile without errors  
 ✅ **Lint Compliance** - No ESLint errors or warnings  
-✅ **Fail Fast Philosophy** - Problems surface immediately, no error hiding or workarounds  
+✅ **Fail Fast Philosophy** - Problems surface immediately, no error hiding or workarounds
 
 ### **Build & Testing Standards**
+
 ✅ **Build Order Compliance** - Shared libraries built before consuming applications  
 ✅ **Test Coverage** - Unit tests for business logic, integration tests for APIs  
 ✅ **Cross-Platform Testing** - Both web and mobile platforms validated  
-✅ **Environment Sync** - `npm run sync-env` completed before development  
+✅ **Environment Sync** - `npm run sync-env` completed before development
 
 ### **Security & Infrastructure Standards**
+
 ✅ **Security Compliance** - No authentication credentials or secrets committed to git  
 ✅ **AWS Architecture Compliance** - Lambdas in private subnets, RDS secured, cost-optimized infrastructure  
 ✅ **API Security** - User mutations isolated from public GraphQL API, OAuth operations private  
-✅ **CI/CD Pipeline Success** - All quality gates pass, proper context access in workflows  
+✅ **CI/CD Pipeline Success** - All quality gates pass, proper context access in workflows
 
 ### **Documentation & Maintenance Standards**
+
 ✅ **Documentation** - Complex decisions are documented in code comments  
 ✅ **Agent Contribution** - New patterns documented in relevant CSV files  
 ✅ **Troubleshooting Records** - Solutions to complex issues added to troubleshooting.csv
@@ -142,14 +147,14 @@ When working on this codebase, ensure:
 
 ### **Enhanced Agent Workflow:**
 
-1. **Assess Task Complexity**: 
+1. **Assess Task Complexity**:
    - Simple tasks: Reference relevant CSV files directly
    - Complex tasks: Load multiple CSV files (build-system + troubleshooting + platform-components)
    - CI/CD issues: Start with cicd-patterns.csv and troubleshooting.csv
 
 2. **Follow Systematic Troubleshooting**:
    - Build failures → Check build-system.csv for dependency order
-   - Module resolution → Reference troubleshooting.csv module_resolution category  
+   - Module resolution → Reference troubleshooting.csv module_resolution category
    - Platform compatibility → Consult platform-components.csv patterns
    - GitHub Actions issues → Use cicd-patterns.csv for proper context access
 

@@ -2,13 +2,28 @@
 
 exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
 <div>
-  <div>
+  <div
+    aria-atomic="true"
+    aria-live="polite"
+    class="sr-only"
+    data-announcer-seq="0"
+  />
+  <a
+    class="skip-link sr-only"
+    href="#main-content"
+  >
+    Skip to main content
+  </a>
+  <div
+    role="banner"
+  >
     <div>
       <div
         alignitems="center"
         space="$4"
       >
         <a
+          aria-label="Legacy Sports home"
           href="/"
           style="text-decoration: none;"
         >
@@ -29,29 +44,23 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         </a>
       </div>
       <div
+        aria-label="Primary"
+        as="nav"
         display="none"
+        role="navigation"
       >
-        <a
-          href="/"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="secondary"
-          >
-            <span
-              aria-label="home"
-              role="img"
-            >
-              🏠
-            </span>
-             
-            Home
-          </button>
-        </a>
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="sports-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="$sportFootballPrimary"
+            bordercolor="$sportFootballPrimary"
+            color="white"
+            id="sports-menu-button"
+          >
             <span
               aria-label="sports"
               role="img"
@@ -66,7 +75,14 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="players-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="transparent"
+            bordercolor="$borderColor"
+            id="players-menu-button"
+          >
             <span
               aria-label="players"
               role="img"
@@ -125,7 +141,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
   </div>
   <div
     flex="1"
+    id="main-content"
     padding="$4"
+    tabindex="-1"
   >
     <div>
       Football Screen
@@ -140,13 +158,28 @@ exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `nul
 
 exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
 <div>
-  <div>
+  <div
+    aria-atomic="true"
+    aria-live="polite"
+    class="sr-only"
+    data-announcer-seq="0"
+  />
+  <a
+    class="skip-link sr-only"
+    href="#main-content"
+  >
+    Skip to main content
+  </a>
+  <div
+    role="banner"
+  >
     <div>
       <div
         alignitems="center"
         space="$4"
       >
         <a
+          aria-label="Legacy Sports home"
           href="/"
           style="text-decoration: none;"
         >
@@ -167,29 +200,22 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         </a>
       </div>
       <div
+        aria-label="Primary"
+        as="nav"
         display="none"
+        role="navigation"
       >
-        <a
-          href="/"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="primary"
-          >
-            <span
-              aria-label="home"
-              role="img"
-            >
-              🏠
-            </span>
-             
-            Home
-          </button>
-        </a>
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="sports-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="transparent"
+            bordercolor="$borderColor"
+            id="sports-menu-button"
+          >
             <span
               aria-label="sports"
               role="img"
@@ -204,7 +230,14 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="players-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="transparent"
+            bordercolor="$borderColor"
+            id="players-menu-button"
+          >
             <span
               aria-label="players"
               role="img"
@@ -263,7 +296,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
   </div>
   <div
     flex="1"
+    id="main-content"
     padding="$4"
+    tabindex="-1"
   >
     <div>
       Web Home Screen
@@ -276,13 +311,28 @@ exports[`App Navigation should match navigation snapshot 1`] = `null`;
 
 exports[`App Navigation should render navigation with correct links 1`] = `
 <div>
-  <div>
+  <div
+    aria-atomic="true"
+    aria-live="polite"
+    class="sr-only"
+    data-announcer-seq="0"
+  />
+  <a
+    class="skip-link sr-only"
+    href="#main-content"
+  >
+    Skip to main content
+  </a>
+  <div
+    role="banner"
+  >
     <div>
       <div
         alignitems="center"
         space="$4"
       >
         <a
+          aria-label="Legacy Sports home"
           href="/"
           style="text-decoration: none;"
         >
@@ -303,29 +353,22 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         </a>
       </div>
       <div
+        aria-label="Primary"
+        as="nav"
         display="none"
+        role="navigation"
       >
-        <a
-          href="/"
-          style="text-decoration: none;"
-        >
-          <button
-            variant="primary"
-          >
-            <span
-              aria-label="home"
-              role="img"
-            >
-              🏠
-            </span>
-             
-            Home
-          </button>
-        </a>
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="sports-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="transparent"
+            bordercolor="$borderColor"
+            id="sports-menu-button"
+          >
             <span
               aria-label="sports"
               role="img"
@@ -340,7 +383,14 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         <div
           position="relative"
         >
-          <button>
+          <button
+            aria-controls="players-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            backgroundcolor="transparent"
+            bordercolor="$borderColor"
+            id="players-menu-button"
+          >
             <span
               aria-label="players"
               role="img"
@@ -399,7 +449,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
   </div>
   <div
     flex="1"
+    id="main-content"
     padding="$4"
+    tabindex="-1"
   >
     <div>
       Web Home Screen

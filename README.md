@@ -2,6 +2,8 @@
 
 A modern sports data management platform built with React Native CLI, Next.js web, and AWS serverless backend.
 
+> 🤖 **AI Agents**: Start here → [agents.md](agents.md) for complete contribution workflow and documentation index
+
 ## 🚀 CI Status
 
 [![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI-Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
@@ -56,21 +58,23 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 All security vulnerabilities have been completely resolved. Run `npm audit` to verify **0 vulnerabilities**.
 
--  **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via npm overrides
--  **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + package-lock regeneration
--  **Automatic protection:** Post-install script provides additional safety layer
-
-
+- **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via npm overrides
+- **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + package-lock regeneration
+- **Automatic protection:** Post-install script provides additional safety layer
 
 ### Security Verification
 
 # Verify no vulnerabilities
+
 npm audit
+
 # Expected output: found 0 vulnerabilities
 
 # Run comprehensive security check
+
 npm audit
-```
+
+````
 
 For complete security details, see: **[Security Audit Status](docs/security-audit-status.md)**
 
@@ -80,7 +84,7 @@ For complete security details, see: **[Security Audit Status](docs/security-audi
 **👉 [Complete Documentation](docs/README.md)** - Central hub for all guides and references
 
 ### Essential Guides
-- **🛠️ [Development Setup](docs/guides/development-setup.md)** - Complete environment setup  
+- **🛠️ [Development Setup](docs/guides/development-setup.md)** - Complete environment setup
 - **🔐 [Authentication Guide](docs/guides/authentication-guide.md)** - OAuth implementation and usage
 - **🛠️ [Troubleshooting](docs/guides/troubleshooting.md)** - Common issues and quick fixes
 - **🏗️ [Architecture Overview](docs/architecture/cross-platform-system.md)** - System design and patterns
@@ -105,7 +109,7 @@ npm install
 # Configure Python environment (for backend tools)
 # This tool will guide you through Python setup
 npm run setup:python
-```
+````
 
 ## 📱 Development
 

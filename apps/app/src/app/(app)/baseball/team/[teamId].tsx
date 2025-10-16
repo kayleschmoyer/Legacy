@@ -17,9 +17,7 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/teams/Teams.generated';
 import { LoadingPanel } from '../../../../common/components/LoadingPanel';
-import {
-  useGetPositionsForLeagueQuery,
-} from '../../../../api/db/leagues/Leagues.generated';
+import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
 import { useGetUserTeamIdQuery } from '../../../../api/db/graphql.generated';
 import {
   isBatter,
@@ -44,11 +42,11 @@ interface TabContentProps {
   rosterSlots: readonly (LeaguePositionFragment | null)[];
   onPlayerAdded: (
     player: TeamMemberFragment,
-    position: LeaguePositionFragment
+    position: LeaguePositionFragment,
   ) => void;
   onPlayerMoved: (
     playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment
+    playerTwo: TeamMemberFragment,
   ) => void;
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly (TeamMemberFragment | null)[];
@@ -78,12 +76,12 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
   const pitchingSlots = useMemo(
     () => rosterSlots.filter(isPitchingSlot),
-    [rosterSlots]
+    [rosterSlots],
   );
 
   const lineupSlots = useMemo(
     () => rosterSlots.filter(isBattingSlot),
-    [rosterSlots]
+    [rosterSlots],
   );
 
   const hitters = useMemo(() => team.filter(isBatter), [team]);
@@ -99,25 +97,19 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
     for (const hitter of hitters) {
       if (!hitter?.playerId) continue;
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const proj = (stats as any)?.matchupPlayers?.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (n: any) => n?.playerId === hitter.playerId
+        (n: any) => n?.playerId === hitter.playerId,
       );
 
       const battingStats = proj?.aggregateSeasonBattingByPlayerIdAndSeason;
       const fieldingStats = proj?.aggregateSeasonFieldingByPlayerIdAndSeason;
 
       const value =
-        computeAverageScoring(
-          battingStats,
-          DEFAULT_BATTING_SCORING
-        ) +
-        computeAverageScoring(
-          fieldingStats,
-          DEFAULT_FIELDING_SCORING
-        );
+        computeAverageScoring(battingStats, DEFAULT_BATTING_SCORING) +
+        computeAverageScoring(fieldingStats, DEFAULT_FIELDING_SCORING);
 
       result[hitter.playerId] = value * (matchup?.numberOfGames || 1);
     }
@@ -133,16 +125,16 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
     for (const pitcher of pitchers) {
       if (!pitcher?.playerId) continue;
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const proj = (stats as any)?.matchupPlayers?.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (n: any) => n?.playerId === pitcher.playerId
+        (n: any) => n?.playerId === pitcher.playerId,
       );
 
       const value = computeAverageScoring(
         proj?.aggregateSeasonPitchingByPlayerIdAndSeason,
-        DEFAULT_PITCHING_SCORING
+        DEFAULT_PITCHING_SCORING,
       );
 
       result[pitcher.playerId] = value;
@@ -159,11 +151,11 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
     for (const hitter of hitters) {
       if (!hitter?.playerId) continue;
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mp = (stats as any)?.matchupPlayers?.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (n: any) => n?.playerId === hitter.playerId
+        (n: any) => n?.playerId === hitter.playerId,
       );
 
       let sum = computeScoring(mp?.matchupBatting, DEFAULT_BATTING_SCORING);
@@ -187,21 +179,22 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
     for (const pitcher of pitchers) {
       if (!pitcher?.playerId) continue;
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mp = (stats as any)?.matchupPlayers?.find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (n: any) => n?.playerId === pitcher.playerId
+        (n: any) => n?.playerId === pitcher.playerId,
       );
 
       result[pitcher.playerId] = computeScoring(
         mp?.matchupPitching,
-        DEFAULT_PITCHING_SCORING
+        DEFAULT_PITCHING_SCORING,
       );
     }
     return result;
   }, [stats, pitchers, loadingStats]);
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   const noOp = () => {};
 
   switch (selectedTab) {
@@ -243,8 +236,8 @@ export default function Team(): React.JSX.Element {
     typeof teamId === 'string'
       ? teamId
       : Array.isArray(teamId)
-      ? teamId[0]
-      : '';
+        ? teamId[0]
+        : '';
   const numTeamId = parseInt(teamIdStr, 10);
 
   const { loading: loadingTeam, data: team } = useGetTeamByIdQuery({
@@ -282,7 +275,7 @@ export default function Team(): React.JSX.Element {
 
   const onPlayerAdded = (
     player: TeamMemberFragment,
-    positionSlot: LeaguePositionFragment
+    positionSlot: LeaguePositionFragment,
   ) => {
     // The slot is taken, cannot add the player
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -290,7 +283,7 @@ export default function Team(): React.JSX.Element {
     if (
       teamMembers.some(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (t: any) => t?.positionId === positionSlot.id
+        (t: any) => t?.positionId === positionSlot.id,
       )
     ) {
       return;
@@ -311,7 +304,7 @@ export default function Team(): React.JSX.Element {
     const teamMembers = (team as any)?.team?.teamMembers || [];
     const player = teamMembers.find(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (t: any) => t?.positionId === position.id
+      (t: any) => t?.positionId === position.id,
     );
 
     if (!player?.id) {
@@ -328,10 +321,10 @@ export default function Team(): React.JSX.Element {
 
   const onPlayerMoved = (
     playerOne: TeamMemberFragment,
-    playerTwo: TeamMemberFragment
+    playerTwo: TeamMemberFragment,
   ) => {
     if (!playerOne.id || !playerTwo.id) return;
-    
+
     updateTeamMemberPosition({
       variables: {
         positionId: playerTwo.positionId,
@@ -405,8 +398,8 @@ export function TeamIdHeader(): React.JSX.Element {
     typeof teamId === 'string'
       ? teamId
       : Array.isArray(teamId)
-      ? teamId[0]
-      : '';
+        ? teamId[0]
+        : '';
   const numTeamId = parseInt(teamIdStr, 10);
 
   const { data: team } = useGetTeamByIdQuery({

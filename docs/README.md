@@ -7,15 +7,20 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 ## 🚀 Quick Navigation
 
 ### 🎯 **Getting Started** → [`/guides/`](guides/)
-*Start here if you're new to the project*
+
+_Start here if you're new to the project_
+
 - [📖 Development Setup](guides/development-setup.md) - Complete environment setup guide
+- [🤖 AI Agent Contribution Workflow](guides/ai-agent-contribution-workflow.md) - Complete workflow for AI agents
 - [🔐 Authentication Guide](guides/authentication-guide.md) - OAuth and user management
 - [🛠️ Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
 - [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices
 - [🤖 Agent Commands](guides/agent-commands.md) - AI assistant commands reference
 
 ### 🏗️ **Architecture & Design** → [`/architecture/`](architecture/)
-*Understanding how the system works*
+
+_Understanding how the system works_
+
 - [🏗️ Build System](architecture/build-system.md) - Dependency order and build workflows
 - [📱 Cross-Platform System](architecture/cross-platform-system.md) - Magic strings and native resolution
 - [💾 Database Schema](architecture/database-schema.md) - Complete database documentation
@@ -23,7 +28,9 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 - [✅ Schema Validation](architecture/schema-validation.md) - Drizzle schema patterns
 
 ### 🔐 **Authentication** → [`/authentication/`](authentication/)
-*OAuth, user management, and access control*
+
+_OAuth, user management, and access control_
+
 - [🔑 CLI OAuth Authentication](authentication/CLI_OAUTH_AUTHENTICATION.md) - Command-line OAuth flow
 - [� OAuth Auto-Provisioning](authentication/oauth-auto-provisioning.md) - Automatic user creation
 - [🎫 Invite Code System](authentication/INVITE_CODE_IMPLEMENTATION.md) - Invite-based registration
@@ -31,7 +38,9 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 - [🌐 Google OAuth Domain Setup](authentication/google-oauth-domain-setup.md) - Google workspace config
 
 ### ⚙️ **CI/CD & Pipelines** → [`/ci-cd/`](ci-cd/)
-*Continuous integration and deployment automation*
+
+_Continuous integration and deployment automation_
+
 - [📋 CI System Documentation](ci-cd/ci-system-documentation.md) - Complete CI/CD overview
 - [� CI Troubleshooting](ci-cd/ci-troubleshooting-guide.md) - Debugging pipeline issues
 - [🎯 Intelligent DTE Detection](ci-cd/intelligent-dte-detection.md) - Smart task distribution
@@ -39,7 +48,9 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 - [🔀 Merge Queue Guide](ci-cd/merge-queue-guide.md) - GitHub merge queue setup
 
 ### 🔧 **Build & Tooling** → [`/build-and-tooling/`](build-and-tooling/)
-*Nx, Jest, and development tools*
+
+_Nx, Jest, and development tools_
+
 - [☁️ Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) - Performance tuning
 - [⚡ Nx Cloud CI Strategy](build-and-tooling/nx-cloud-ci-strategy.md) - CI integration
 - [🧪 Jest Configuration](build-and-tooling/jest-changed-files-config.md) - Test setup
@@ -47,7 +58,9 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 - [🎯 E2E Testing](build-and-tooling/e2e-testing-migration.md) - End-to-end tests
 
 ### ☁️ **Deployment** → [`/deployment/`](deployment/)
-*AWS infrastructure and deployment processes*
+
+_AWS infrastructure and deployment processes_
+
 - [☁️ AWS Infrastructure](deployment/aws-infrastructure.md) - Complete AWS setup
 - [� Cost Optimization](deployment/cost-optimization.md) - Cost management strategies
 - [⚡ Lambda Build Strategy](deployment/lambda-build-strategy.md) - Serverless deployment
@@ -59,38 +72,56 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
   - [📖 Quick Reference](deployment/terraform/terraform-quick-reference.md)
 
 ### 🛡️ **Security** → [`/security/`](security/)
-*Security scanning, secrets management, and audits*
+
+_Security scanning, secrets management, and audits_
+
 - [� Security Audit Status](security/security-audit-status.md) - Current security posture
 - [🔐 Secrets Management](security/GITHUB_SECRETS_GUIDE.md) - GitHub secrets guide
 - [🛡️ Security Scanning](security/security-scanning-implementation.md) - Automated scanning
 - [⚡ Scanning Optimization](security/security-scanning-optimization.md) - Performance tuning
 
 ### 📱 **Mobile Development** → [`/mobile/`](mobile/)
-*React Native and Android-specific documentation*
+
+_React Native and Android-specific documentation_
+
 - [🤖 Android Build Setup](mobile/android-build-setup.md) - Android development environment
 - [📊 Android Version Matrix](mobile/android-version-matrix.md) - Version compatibility
 - [🔨 Mobile Build Automation](mobile/mobile-build-automation.md) - CI/CD for mobile
 
 ### 🌐 **Web Development** → [`/web/`](web/)
-*Next.js and web application documentation*
+
+_Next.js and web application documentation_
+
 - [⚙️ Web Build Configurations](web/web-build-configurations.md) - Build setup
 - [🔗 Hash Routing](web/web-hash-routing.md) - Client-side routing
 - [📱 Navigation Menu](web/navigation-menu-reorganization.md) - Menu structure
 
 ### 💾 **Database** → [`/database/`](database/)
-*Database migrations, schema changes, and ORM*
+
+_Database migrations, schema changes, and ORM_
+
 - [📦 Drizzle Upgrade Analysis](database/drizzle-upgrade-analysis.md) - Upgrade planning
 - [✅ Drizzle Upgrade Complete](database/drizzle-upgrade-completed.md) - Migration summary
 
 ### 📚 **Additional Resources**
-- [� API Documentation](api/) - GraphQL schema and endpoints *(Coming Soon)*
+
+- [� API Documentation](api/) - GraphQL schema and endpoints _(Coming Soon)_
 - [🤖 AI Agent Instructions](agents/) - Structured CSV files for AI assistance
 - [📋 Migration History](migration-history/) - Historical implementation records
 - [🗺️ Development Plans](development-plans/) - Future planning documents
 
 ## 📋 Documentation by Role
 
+### 🤖 **For AI Agents**
+
+1. [AI Agent Contribution Workflow](guides/ai-agent-contribution-workflow.md) - Complete contribution process
+2. [AI Agent Instructions (CSV)](agents/) - Structured guidelines in CSV format
+3. [Development Workflow CSV](agents/development-workflow.csv) - Workflow patterns
+4. [Common Pitfalls CSV](agents/common-pitfalls.csv) - Mistakes to avoid
+5. [Agent Commands](guides/agent-commands.md) - CLI command reference
+
 ### 👨‍💻 **For Software Developers**
+
 1. [Development Setup](guides/development-setup.md) - Get your environment ready
 2. [Cross-Platform Architecture](architecture/cross-platform-system.md) - Understand the system
 3. [Authentication Guide](guides/authentication-guide.md) - Implement auth features
@@ -98,6 +129,7 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 5. [Troubleshooting](guides/troubleshooting.md) - Fix common issues
 
 ### ☁️ **For DevOps Engineers**
+
 1. [AWS Infrastructure](deployment/aws-infrastructure.md) - Understand cloud setup
 2. [Terraform Deployment](deployment/terraform/) - Infrastructure as code
 3. [CI/CD System](ci-cd/ci-system-documentation.md) - Pipeline management
@@ -105,24 +137,28 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 5. [Cost Optimization](deployment/cost-optimization.md) - Manage AWS costs
 
 ### 📱 **For Mobile Developers**
+
 1. [Android Build Setup](mobile/android-build-setup.md) - Mobile development environment
 2. [Cross-Platform System](architecture/cross-platform-system.md) - Shared code patterns
 3. [Authentication](authentication/) - Mobile auth implementation
 4. [Mobile Build Automation](mobile/mobile-build-automation.md) - CI/CD for mobile
 
 ### 🌐 **For Web Developers**
+
 1. [Web Build Configurations](web/web-build-configurations.md) - Next.js setup
 2. [Cross-Platform System](architecture/cross-platform-system.md) - Shared components
 3. [Authentication](authentication/) - Web auth implementation
 4. [Navigation Menu](web/navigation-menu-reorganization.md) - UI structure
 
 ### 🧪 **For QA Engineers**
+
 1. [E2E Testing](build-and-tooling/e2e-testing-migration.md) - Automated testing
 2. [Jest Configuration](build-and-tooling/jest-changed-files-config.md) - Unit test setup
 3. [CI System](ci-cd/ci-system-documentation.md) - Test automation
 4. [Troubleshooting](guides/troubleshooting.md) - Debug test issues
 
 ### 🏗️ **For Platform Engineers**
+
 1. [Build System](architecture/build-system.md) - Understanding the monorepo
 2. [Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) - Build performance
 3. [CI/CD Pipeline](ci-cd/) - Automation infrastructure
@@ -147,6 +183,7 @@ Legacy Sports Platform
 ```
 
 ### **Key Technologies**
+
 - **Frontend**: React Native, Next.js, Tamagui UI
 - **Backend**: AWS Lambda, API Gateway, PostgreSQL
 - **Build System**: Nx Monorepo, TypeScript, Vite
@@ -155,6 +192,7 @@ Legacy Sports Platform
 - **Cross-Platform**: Magic String System + Metro Native Resolution
 
 ### **Documentation Organization**
+
 ```
 docs/
 ├── guides/              # Getting started tutorials
@@ -178,17 +216,18 @@ docs/
 
 ### **Common Tasks Quick Links**
 
-| Task | Documentation |
-|------|---------------|
-| 🚀 **Deploy Lambda** | [Lambda Build Strategy](deployment/lambda-build-strategy.md) → [Terraform Deploy](deployment/terraform/terraform-lambda-deployment.md) |
-| 🔐 **Setup OAuth** | [OAuth Auto-Provisioning](authentication/oauth-auto-provisioning.md) → [CLI OAuth](authentication/CLI_OAUTH_AUTHENTICATION.md) |
-| ❌ **CI Failing** | [CI Troubleshooting](ci-cd/ci-troubleshooting-guide.md) → [Nx Cloud Quota](build-and-tooling/nx-cloud-quota-fix.md) |
-| ⚡ **Optimize Builds** | [Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) → [DTE Detection](ci-cd/intelligent-dte-detection.md) |
-| 👤 **New Developer** | [Development Setup](guides/development-setup.md) → [Authentication](guides/authentication-guide.md) → [Troubleshooting](guides/troubleshooting.md) |
-| 📱 **Build Mobile** | [Android Setup](mobile/android-build-setup.md) → [Build Automation](mobile/mobile-build-automation.md) |
-| 🗄️ **Database Change** | [Database Schema](architecture/database-schema.md) → [Schema Validation](architecture/schema-validation.md) |
+| Task                   | Documentation                                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🚀 **Deploy Lambda**   | [Lambda Build Strategy](deployment/lambda-build-strategy.md) → [Terraform Deploy](deployment/terraform/terraform-lambda-deployment.md)             |
+| 🔐 **Setup OAuth**     | [OAuth Auto-Provisioning](authentication/oauth-auto-provisioning.md) → [CLI OAuth](authentication/CLI_OAUTH_AUTHENTICATION.md)                     |
+| ❌ **CI Failing**      | [CI Troubleshooting](ci-cd/ci-troubleshooting-guide.md) → [Nx Cloud Quota](build-and-tooling/nx-cloud-quota-fix.md)                                |
+| ⚡ **Optimize Builds** | [Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) → [DTE Detection](ci-cd/intelligent-dte-detection.md)                 |
+| 👤 **New Developer**   | [Development Setup](guides/development-setup.md) → [Authentication](guides/authentication-guide.md) → [Troubleshooting](guides/troubleshooting.md) |
+| 📱 **Build Mobile**    | [Android Setup](mobile/android-build-setup.md) → [Build Automation](mobile/mobile-build-automation.md)                                             |
+| 🗄️ **Database Change** | [Database Schema](architecture/database-schema.md) → [Schema Validation](architecture/schema-validation.md)                                        |
 
 ### **Search Tips**
+
 - 📂 Browse by category in the folders above
 - 🔍 Use VS Code search (`Ctrl+Shift+F`) to find specific topics
 - 📋 Check [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md) for detailed guide
@@ -198,6 +237,7 @@ docs/
 ## 📊 Documentation Status
 
 ### ✅ **Complete & Well-Organized**
+
 - ✨ Development guides and troubleshooting
 - ✨ Cross-platform architecture
 - ✨ Authentication and OAuth systems
@@ -207,11 +247,13 @@ docs/
 - ✨ Security scanning and secrets
 
 ### 🚧 **In Progress**
+
 - 🔨 API documentation (GraphQL schema)
 - 🔨 Performance optimization guides
 - 🔨 Component library documentation
 
 ### 📝 **Planned**
+
 - 📋 Architecture Decision Records (ADRs)
 - 📋 Disaster recovery procedures
 - 📋 Monitoring and observability guides
@@ -220,6 +262,7 @@ docs/
 ## 🤝 Contributing to Documentation
 
 ### **When to Update Documentation**
+
 - ✏️ **Feature Implementation**: Document new features with examples
 - 🏗️ **Architecture Changes**: Update relevant architecture docs
 - ☁️ **Infrastructure Changes**: Update deployment and terraform docs
@@ -227,6 +270,7 @@ docs/
 - 🐛 **Bug Fixes**: Update troubleshooting guides if applicable
 
 ### **Documentation Standards**
+
 1. **Clear Structure**: Use consistent heading hierarchy (H1 → H2 → H3)
 2. **Code Examples**: Include practical, working code samples
 3. **Cross-References**: Link to related documentation
@@ -235,6 +279,7 @@ docs/
 6. **Visual Aids**: Use diagrams, tables, and emojis for clarity
 
 ### **File Naming Conventions**
+
 - Use `kebab-case.md` for new files
 - Prefix with topic for clarity (`ci-*.md`, `nx-*.md`, `oauth-*.md`)
 - Add to appropriate category folder
@@ -243,11 +288,13 @@ docs/
 ## 📞 Getting Help
 
 ### **Documentation Issues**
+
 - 📖 Can't find something? Check [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md)
 - 🔗 Broken link? Please report it or submit a PR
 - ❓ Documentation unclear? Open an issue with suggestions
 
 ### **Technical Support**
+
 - 🛠️ **Setup Issues**: [Development Setup](guides/development-setup.md)
 - 🐛 **Common Problems**: [Troubleshooting Guide](guides/troubleshooting.md)
 - 🏗️ **Architecture Questions**: [Architecture Docs](architecture/)
@@ -259,4 +306,4 @@ docs/
 
 **📌 Remember**: This documentation is your guide to the Legacy Sports platform. Start with the [Getting Started](#-quick-navigation) section and explore from there. Each category folder contains a README.md for quick orientation.
 
-*Documentation last reorganized: October 15, 2025*
+_Documentation last reorganized: October 15, 2025_
