@@ -12,6 +12,7 @@ _Start here if you're new to the project_
 
 - [📖 Development Setup](guides/development-setup.md) - Complete environment setup guide
 - [🤖 AI Agent Contribution Workflow](guides/ai-agent-contribution-workflow.md) - Complete workflow for AI agents
+- [🌳 Branch Tree Management](guides/branch-tree-management.md) - Twig tree management for clean dependent branches
 - [🔐 Authentication Guide](guides/authentication-guide.md) - OAuth and user management
 - [🛠️ Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
 - [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices

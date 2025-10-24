@@ -30,6 +30,7 @@ This comprehensive guide covers the complete development lifecycle:
 ### 🎯 Core Workflow
 
 - **[AI Agent Contribution Workflow](docs/guides/ai-agent-contribution-workflow.md)** - Complete step-by-step process
+- **[Branch Tree Management](docs/guides/branch-tree-management.md)** 🌳 - Twig tree management for clean dependent branches
 - **[Development Setup](docs/guides/development-setup.md)** - Environment configuration
 - **[Troubleshooting Guide](docs/guides/troubleshooting.md)** - Common issues and solutions
 
@@ -88,6 +89,10 @@ git checkout main; git pull                      # For new ticket
 twig github new-branch LS-1234                   # Create branch from main
 twig switch LS-1234 -p                          # Create branch from current
 
+# Verify branch tree structure
+twig tree                                        # Check branch dependencies
+git log --oneline parent-branch..current-branch  # Verify unique commits only
+
 # Pre-commit validation (run in this order)
 npx nx affected -t typecheck                        # 1. Type checking
 npx nx affected -t lint --fix                       # 2. Linting with auto-fix
@@ -111,6 +116,8 @@ twig github pr create-pr
 - Update **Jira ticket status** at each workflow stage
 - Run validation checks **in order**: typecheck → lint → test → build
 - Follow **conventional commit** format: `type(scope): message`
+- **Verify branch tree with `twig tree`** before and after creating dependent branches
+- **Check commit counts** match expected work (e.g., `[+1]` for single commit branches)
 
 #### ❌ Never Do
 
@@ -119,6 +126,8 @@ twig github pr create-pr
 - Don't suppress errors with `@ts-ignore` or `eslint-disable` without justification
 - Don't skip pre-commit validation checks
 - Don't create PRs without updating Jira status
+- **Don't create dependent branches without verifying unique commits only**
+- **Don't ignore duplicate commits** in branch tree (shown by high `[+N]` counts)
 
 #### 🔧 Environment Context
 

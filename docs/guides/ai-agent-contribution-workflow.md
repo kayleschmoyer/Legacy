@@ -175,6 +175,131 @@ Twig automatically generates branch names following the pattern:
 - `bugfix/LS-####-short-description` for bugs
 - `hotfix/LS-####-short-description` for hotfixes
 
+**Warning (Critical):** Before editing any files, run `git status` and `git branch` to confirm you are on the ticket branch (for example `feature/LS-1234-short-description`) and that your working tree is clean. If you are still on `main`, stop immediately and create or switch to the correct branch with `twig` before making changes.
+
+#### Maintaining Clean Branch Trees
+
+> ⚠️ **Critical for Large Projects**: When working on projects with multiple dependent branches, preserving a clean commit history is essential for maintainability and code review.
+
+##### Verify Your Branch Tree
+
+Always check your branch's position in the dependency tree:
+
+```powershell
+# View the complete branch tree
+twig tree
+
+# Check current branch status
+git status
+```
+
+The tree will show your branch's parent-child relationships:
+
+```
+main
+└── LS-7/design-league-scoring-data-model          [+23]
+    └── LS-17/set-up-matchup-system (current)      [+1]
+        └── LS-18/extend-matchup-schema            [+1]
+```
+
+The `[+N]` notation shows unique commits in each branch:
+- `[+1]` = 1 unique commit (✅ **clean**)
+- `[+25]` = 25 commits, possibly includes duplicates (⚠️ **investigate**)
+
+##### Avoid Duplicate Commits
+
+**Problem**: When creating dependent branches, it's easy to accidentally include parent commits, creating duplicates across the tree.
+
+**Prevention**:
+
+```powershell
+# CORRECT: Create child branch from specific parent
+git checkout parent-branch-name
+twig switch LS-1234 -p current
+
+# VERIFY: Check commit count
+git log --oneline parent-branch..current-branch
+# Should show ONLY your new commits
+
+# If you see parent commits listed, you have duplicates!
+```
+
+**Detection**:
+
+```powershell
+# Count commits between parent and current branch
+git rev-list --count parent-branch..current-branch
+
+# Compare with twig tree output
+twig tree
+# If counts don't match expected work, investigate
+```
+
+**Recovery** (if duplicates found):
+
+```powershell
+# Method 1: Cherry-pick only your unique commits
+git checkout -b branch-name-clean parent-branch
+git cherry-pick <your-commit-hash>
+git branch -D branch-name-old
+git branch -m branch-name-clean branch-name
+
+# Method 2: Use rebase with --skip for duplicates
+git checkout branch-name
+git rebase parent-branch
+# When conflicts occur on duplicate commits:
+git rebase --skip  # Skip the duplicate
+# Continue until only unique commits remain
+```
+
+##### Rebasing Dependent Branch Chains
+
+When rebasing a chain of dependent branches:
+
+```powershell
+# Use twig's cascade command to rebase children automatically
+git checkout parent-branch
+twig cascade --show-graph --autostash
+
+# This rebases all child branches on their parents
+# Handles the dependency tree automatically
+```
+
+**Best Practices**:
+
+1. **Plan your branch tree structure** before creating multiple dependent branches
+2. **Use `twig tree` frequently** to verify structure
+3. **Keep commits focused** - each branch should have only its unique work
+4. **Rebase regularly** to keep branches up-to-date with their parents
+5. **Avoid force-pushing** until you've verified the tree is clean
+
+##### Example: Clean Multi-Branch Project
+
+```powershell
+# Project: Implement matchup system (LS-17 epic)
+
+# 1. Create base branch from main
+git checkout main; git pull
+twig switch LS-17
+
+# 2. Create database schema branch from LS-17
+git checkout LS-17/set-up-matchup-system
+twig switch LS-18 -p current
+
+# 3. Verify tree structure
+twig tree
+# Should show:
+# main
+#   └── LS-17/set-up-matchup-system      [+1]
+#       └── LS-18/extend-matchup-schema  [+1]
+
+# 4. Create GraphQL branch from LS-18
+git checkout LS-18/extend-matchup-schema
+twig switch LS-19 -p current
+
+# Final tree should show each branch with only its unique commits
+```
+
 ---
 
 ### Step 3: Implement Ticket Requirements

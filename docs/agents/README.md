@@ -11,6 +11,7 @@ This document provides structured guidance for AI agents working on the Legacy S
 | Topic                        | File                                                                               | Description                                                   |
 | ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | **Contribution Workflow** ⭐ | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv) | Complete contribution process from planning to PR creation    |
+| **Branch Tree Management** 🌳 | [`docs/guides/branch-tree-management.md`](../guides/branch-tree-management.md) | Twig tree management for dependent branches and clean commits |
 | **Platform Components**      | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)     | Magic string system for cross-platform compatibility          |
 | **Type Safety**              | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                     | TypeScript standards and `any` type usage guidelines          |
 | **ESLint Standards**         | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)           | Code quality enforcement and lint error resolution            |
