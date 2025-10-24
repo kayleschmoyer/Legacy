@@ -637,6 +637,74 @@ git push -u origin feature/LS-1234-description
 git push -u origin HEAD
 ```
 
+#### Managing Scope: De-scoping Work
+
+Sometimes during implementation, you may realize the ticket scope is too large for a single PR. This is especially common when:
+
+- **Backend is complete** but UI components would make the PR too large
+- **Core feature is done** but optimizations/polish should be separate
+- **Happy path works** but edge cases deserve focused attention
+- **PR complexity** exceeds reviewable size
+
+**When to De-scope**:
+
+✅ **Good reasons to split work**:
+- PR becomes difficult to review (>500 lines changed)
+- Work naturally separates (backend vs frontend, core vs polish)
+- Additional work requires different expertise
+- Timeline pressure requires partial delivery
+
+❌ **Bad reasons to split**:
+- Avoiding fixing bugs you introduced
+- Incomplete feature that can't function independently
+- Breaking changes without migration path
+
+**How to De-scope**:
+
+1. **Create a follow-up ticket** with clear scope:
+
+```powershell
+# Create new ticket for de-scoped work
+acli jira workitem create --project LS --type Story \
+  --summary "Build UI components for tiebreaker configuration" \
+  --description "Create user interface components for managing tiebreaker rules in web and mobile apps.
+
+**Acceptance Criteria:**
+- Web tiebreaker configuration UI (Next.js)
+- Mobile tiebreaker configuration UI (React Native)
+
+**Dependencies:**
+- Requires LS-32 (backend implementation)
+
+**Parent:** LS-17"
+```
+
+2. **Link the tickets**:
+
+```powershell
+# Link follow-up to original work
+acli jira workitem link create --out LS-NEW --in LS-ORIG --type Relates
+```
+
+3. **Document the de-scope**:
+
+```powershell
+# Add comment to original ticket
+acli jira workitem comment create --key LS-ORIG \
+  --body "UI components de-scoped to LS-NEW to keep this PR focused on backend implementation."
+
+# Add comment to follow-up ticket
+acli jira workitem comment create --key LS-NEW \
+  --body "This ticket contains the UI work that was de-scoped from LS-ORIG. Backend implementation is complete in PR#123."
+```
+
+4. **Update your commit/PR** to reflect the reduced scope:
+   - Update PR description to note what was de-scoped and why
+   - Reference the follow-up ticket number
+   - Ensure the remaining work is complete and functional
+
+**Example**: See LS-32 (backend tiebreaker implementation) → LS-39 (UI components de-scoped)
+
 ---
 
 ### Step 6: Create Pull Request

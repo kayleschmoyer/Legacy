@@ -30,6 +30,8 @@ contribution_workflow,step5_commit,PATTERN,commit_example_feat,Feature commit ex
 contribution_workflow,step5_commit,PATTERN,commit_example_fix,Bug fix commit example,"git commit -m ""fix(auth): resolve OAuth token refresh issue""",""
 contribution_workflow,step5_commit,PATTERN,commit_workflow,Standard commit and push workflow,"git add .; git commit -m ""message""; git push origin HEAD",""
 contribution_workflow,step5_commit,PATTERN,first_push,First push on new branch,"git push -u origin HEAD","Sets upstream tracking"
+contribution_workflow,step5_commit,DECISION,descope_work,Create new ticket for de-scoped work to keep PR focused,"acli jira workitem create --project LS --type Story --summary ""Follow-up work"" --description ""Details""","Keep current PR scope manageable"
+contribution_workflow,step5_commit,PATTERN,track_descoped,Link de-scoped ticket to original and add to epic,"acli jira workitem link create --out LS-NEW --in LS-ORIG --type Relates; acli jira workitem comment create --key LS-ORIG --body ""UI descoped to LS-NEW""","Document the relationship"
 contribution_workflow,step6_pr,REQUIRED,create_pr,Create pull request with twig,"twig github pr create-pr","Opens browser with pre-filled details"
 contribution_workflow,step6_pr,REQUIRED,jira_review_status,Update Jira ticket to In Review after creating PR,"acli issue transition LS-1234 ""In Review""","Update immediately after PR creation"
 contribution_workflow,step6_pr,CONVENTION,pr_title,PR title must reference Jira ticket,"LS-1234: Brief description of changes",""
