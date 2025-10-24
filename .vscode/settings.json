@@ -4,5 +4,11 @@
   "java.configuration.updateBuildConfiguration": "interactive",
   "files.eol": "\n",
   "files.insertFinalNewline": true,
-  "files.trimFinalNewlines": true
+  "files.trimFinalNewlines": true,
+  "github.copilot.chat.mcp.servers": {
+    "twig": {
+      "command": "twig",
+      "args": ["mcp-server"]
+    }
+  }
 }
