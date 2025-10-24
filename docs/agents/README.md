@@ -4,6 +4,21 @@
 
 This document provides structured guidance for AI agents working on the Legacy Sports codebase. The instructions are organized into topic-based CSV files for efficient processing and selective loading.
 
+## 🤖 AI Agent Tools
+
+### Twig MCP Server (Recommended)
+
+This repository includes a **Twig MCP (Model Context Protocol) server** for AI agents:
+
+- **Enabled**: Configured in `.vscode/settings.json`
+- **Command**: `twig mcp-server`
+- **Benefits**: Direct API access to twig functionality with structured responses
+- **Use Case**: Branch management, tree visualization, cascade rebases, PR creation
+
+**Recommendation**: If your AI environment supports MCP, use the twig MCP server for all twig operations instead of running terminal commands. This provides better error handling and structured data for parsing.
+
+---
+
 ## 📁 Agent Instruction Topics
 
 ### **Core Development Guidelines**

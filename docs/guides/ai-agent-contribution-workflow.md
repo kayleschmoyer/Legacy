@@ -6,7 +6,21 @@ This guide provides a comprehensive, step-by-step workflow for AI agents contrib
 
 > **Target Audience**: AI agents working autonomously or in collaboration with developers  
 > **Prerequisites**: Development environment setup complete (see [Development Setup](development-setup.md))  
-> **Last Updated**: October 15, 2025
+> **Last Updated**: October 24, 2025
+
+---
+
+## 🤖 AI Agent Tools
+
+### Twig MCP Server (Recommended)
+
+This repository includes a **Twig MCP (Model Context Protocol) server** for AI agents. If your AI environment supports MCP:
+
+- **Use the MCP server** for all twig operations instead of terminal commands
+- **Benefits**: Structured responses, better error handling, direct API access
+- **Configuration**: See `.vscode/settings.json`
+
+If MCP is not available, use the PowerShell terminal commands documented below.
 
 ---
 

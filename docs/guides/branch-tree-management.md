@@ -4,7 +4,18 @@
 
 This guide covers best practices for maintaining clean branch dependency trees in the Legacy Sports codebase using Twig. Proper tree management is essential for large projects with multiple dependent branches to avoid duplicate commits and maintain a clean, reviewable history.
 
-**Last Updated**: October 23, 2025
+**Last Updated**: October 24, 2025
+
+---
+
+## 🤖 For AI Agents
+
+**Twig MCP Server Available**: This repository includes a Twig MCP (Model Context Protocol) server configuration. AI agents with MCP support should use the twig MCP server for all twig operations instead of running terminal commands. This provides:
+- Structured responses that are easier to parse
+- Better error handling
+- Direct access to twig functionality
+
+Check `.vscode/settings.json` for the MCP server configuration. If MCP is not available, fall back to terminal commands as documented below.
 
 ---
 

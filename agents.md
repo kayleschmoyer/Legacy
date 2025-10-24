@@ -72,6 +72,15 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 
 ## 🎯 Quick Reference
 
+### 🤖 AI Agent Tools
+
+**Twig MCP Server**: This repository includes a Twig MCP (Model Context Protocol) server for AI agents. If your AI environment supports MCP, you can use native twig commands through the MCP interface instead of terminal commands. See `.vscode/settings.json` for configuration.
+
+**Benefits of MCP**:
+- Direct access to twig operations without terminal commands
+- Structured responses for better parsing
+- Automatic error handling and retry logic
+
 ### Essential Commands
 
 ```powershell
