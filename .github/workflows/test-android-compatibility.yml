@@ -71,6 +71,8 @@ jobs:
   determine-matrix:
     name: "Determine Build Matrix"
     runs-on: ubuntu-latest
+    # Skip CI when 'skip-ci' label is present on PR
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       run-type: ${{ steps.set-matrix.outputs.run-type }}
