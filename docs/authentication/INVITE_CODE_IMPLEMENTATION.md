@@ -1,23 +1,28 @@
 # League Invite Code System Implementation Guide
 
 ## Overview
+
 This document outlines the complete implementation of an invite code system for joining leagues in the Legacy Sports application.
 
 ## Database Changes
 
 ### Migration File Created
+
 **File**: `lib/db-client/migrations/0008_add_invite_code_to_leagues.sql`
 
 This migration:
+
 - Adds `invite_code` column (8-character VARCHAR, UNIQUE, NOT NULL)
 - Creates a PostgreSQL function to generate random invite codes
 - Populates existing leagues with unique codes
 - Adds an index for fast lookups
 
 ### Drizzle Schema Update
+
 **File**: `lib/db-client/src/drizzle/public/models/Leagues.ts`
 
 Updated the `leagues` table definition to include:
+
 ```typescript
 inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
 ```
@@ -25,6 +30,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
 ## Backend (GraphQL) Changes
 
 ### Files Modified
+
 1. **`lambdas/db/src/schema/leagues.ts`**
 
 #### Changes Needed (Partially Implemented):
@@ -39,11 +45,12 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
 
 3. **Queries to Update** ⚠️ (Need to add `inviteCode` to SELECT statements)
    - `league` query - line 277 ✅ DONE
-   - `userLeagues` query - line 361 ✅ DONE  
+   - `userLeagues` query - line 361 ✅ DONE
    - Need to find and update remaining queries that fetch leagues
 
 4. **Create League Mutation** ⚠️ (line ~589)
    - Add invite code generation before inserting league
+
    ```typescript
    const inviteCode = await generateUniqueInviteCode(db);
    const leagueData = {
@@ -51,7 +58,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
      owner: userId,
      maxRosterSize: args.input.maxRosterSize,
      currentMatchup: null,
-     inviteCode: inviteCode,  // ADD THIS
+     inviteCode: inviteCode, // ADD THIS
    };
    ```
 
@@ -59,6 +66,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
    - Add `inviteCode` to the SELECT statement when fetching league after draft
 
 6. **New Mutation to Add**: `joinLeagueByCode` ❌ NOT STARTED
+
    ```typescript
    builder.mutationField('joinLeagueByCode', (t) =>
      t.field({
@@ -75,7 +83,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
          // 4. Add user to league_members
          // 5. Return the team and league info
        },
-     })
+     }),
    );
    ```
 
@@ -92,7 +100,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
          // Look up league by invite code
          // Return league info or null
        },
-     })
+     }),
    );
    ```
 
@@ -101,6 +109,7 @@ inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
 ### Files to Modify/Create
 
 #### 1. Update League Detail Page ⚠️ PARTIALLY DONE
+
 **File**: `apps/web/src/components/baseball/LeagueDetailPage.tsx`
 
 Current state: Shows full URL link
@@ -108,15 +117,20 @@ Needed: Update to show invite code instead
 
 ```typescript
 // CHANGE FROM:
-{`${window.location.origin}/baseball/league/${leagueId}`}
+{
+  `${window.location.origin}/baseball/league/${leagueId}`;
+}
 
 // TO:
-{league.inviteCode}
+{
+  league.inviteCode;
+}
 
 // Update button text and instructions accordingly
 ```
 
 #### 2. Create Join League Component ❌ NOT STARTED
+
 **File**: `apps/web/src/components/baseball/JoinLeagueByCode.tsx`
 
 ```typescript
@@ -124,15 +138,15 @@ export function JoinLeagueByCode() {
   const [inviteCode, setInviteCode] = useState('');
   const [teamName, setTeamName] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // GraphQL mutation: useJoinLeagueByCodeMutation()
-  
+
   const handleJoin = async () => {
     // Validate inputs
     // Call mutation
     // Redirect to league page on success
   };
-  
+
   return (
     // Form with:
     // - Invite code input (8 characters, uppercase)
@@ -144,20 +158,25 @@ export function JoinLeagueByCode() {
 ```
 
 #### 3. Add Route ❌ NOT STARTED
+
 **File**: `apps/web/src/app/app.tsx`
 
 Add route:
+
 ```typescript
 <Route path="/join-league" element={<JoinLeagueByCode />} />
 ```
 
 #### 4. GraphQL Schema Regeneration ❌ NOT STARTED
+
 After backend changes are complete, regenerate the TypeScript types:
+
 ```bash
-npm run codegen
+pnpm run codegen
 ```
 
 This will create:
+
 - `useJoinLeagueByCodeMutation`
 - `useValidateInviteCodeQuery`
 - Updated `League` type with `inviteCode`
@@ -165,37 +184,41 @@ This will create:
 ## Deployment Steps
 
 ### 1. Backend Deployment
+
 ```bash
 # 1. Run the migration
-npm run migrate:production
+pnpm run migrate:production
 
 # 2. Build and deploy the lambda
 cd lambdas/db
-npm run build
-npm run deploy  # or your deployment command
+pnpm run build
+pnpm run deploy  # or your deployment command
 
 # 3. Regenerate GraphQL schema
 cd ../../
-npm run codegen
+pnpm run codegen
 ```
 
 ### 2. Frontend Deployment
+
 ```bash
 # Build and deploy web app
 cd apps/web
-npm run build
-npm run deploy  # or your deployment command
+pnpm run build
+pnpm run deploy  # or your deployment command
 ```
 
 ## Testing Checklist
 
 ### Database
+
 - [ ] Migration runs successfully
 - [ ] Existing leagues have unique invite codes
 - [ ] New leagues get invite codes automatically
 - [ ] Invite codes are unique (constraint works)
 
 ### Backend (GraphQL)
+
 - [ ] `league` query returns inviteCode
 - [ ] `userLeagues` query returns inviteCodes
 - [ ] `createLeagueAndTeams` generates unique invite code
@@ -205,6 +228,7 @@ npm run deploy  # or your deployment command
 - [ ] Can't join same league twice
 
 ### Frontend
+
 - [ ] League detail page shows invite code
 - [ ] Copy button works
 - [ ] Join league page accessible
@@ -217,6 +241,7 @@ npm run deploy  # or your deployment command
 ## Remaining Work
 
 ### Critical (Must Do)
+
 1. ✅ Create migration file
 2. ✅ Update Drizzle schema
 3. ⚠️ Fix all GraphQL queries to include inviteCode
@@ -228,6 +253,7 @@ npm run deploy  # or your deployment command
 9. ❌ Update League Detail Page to show code
 
 ### Optional (Nice to Have)
+
 - [ ] Add invite code to league creation response
 - [ ] Add ability to regenerate invite codes
 - [ ] Add usage analytics for invite codes
@@ -237,6 +263,7 @@ npm run deploy  # or your deployment command
 ## Code Status Summary
 
 ✅ **Completed:**
+
 - Database migration file created
 - Drizzle schema updated
 - Helper functions for code generation added
@@ -244,9 +271,11 @@ npm run deploy  # or your deployment command
 - Two queries updated to select inviteCode
 
 ⚠️ **In Progress:**
+
 - Fixing remaining queries/mutations to include inviteCode
 
 ❌ **Not Started:**
+
 - joinLeagueByCode mutation implementation
 - validateInviteCode query implementation
 - JoinLeagueByCode frontend component
@@ -265,7 +294,7 @@ Due to the complexity and number of remaining changes, here's the recommended ap
    - Test with GraphQL playground
 
 2. **Regenerate Frontend Types:**
-   - Run `npm run codegen`
+   - Run `pnpm run codegen`
    - Verify new types are generated
 
 3. **Implement Frontend:**
@@ -279,6 +308,7 @@ Due to the complexity and number of remaining changes, here's the recommended ap
    - Deploy to production
 
 ## Estimated Time
+
 - Backend completion: 2-3 hours
 - Frontend implementation: 2-3 hours
 - Testing & deployment: 1-2 hours

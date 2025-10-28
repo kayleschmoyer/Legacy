@@ -7,7 +7,7 @@
   "types": "./src/index.d.ts",
   "dependencies": {
     "tslib": "*",
-    "@legacy-sports/logging": "*",
+    "@legacy-sports/logging": "workspace:*",
     "@sentry/node": "*",
     "@sentry/react-native": "*",
     "@sentry/browser": "*"

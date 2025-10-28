@@ -60,7 +60,11 @@ jobs:
         if: steps.detect-dte.outputs.dte-available == 'true'
         run: |
           echo "🚀 Starting Nx Cloud DTE with ${{ steps.detect-dte.outputs.optimal-agents }} agents..."
-          npx nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js"
+          if command -v pnpm >/dev/null 2>&1; then
+            pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js"
+          else
+            pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js"
+          fi
           echo "✅ DTE session started"
 
       - name: Build Web App
@@ -70,10 +74,20 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-          VITE_USE_CUSTOM_DOMAIN: 'true'
+          VITE_USE_CUSTOM_DOMAIN: "true"
           # Only set Nx Cloud token if DTE is available, otherwise unset to avoid quota errors
           NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
-        run: npx nx build web --configuration=deploy
+        run: |
+          NX_CMD="${NX_COMMAND:-}"
+          if [ -z "$NX_CMD" ]; then
+            if command -v pnpm >/dev/null 2>&1; then
+              NX_CMD="pnpm exec nx --"
+            else
+              NX_CMD="pnpm exec nx"
+            fi
+          fi
+
+          $NX_CMD build web --configuration=deploy
 
       # Add CNAME file for custom domain
       # Required when using actions/deploy-pages (artifact-based deployment)
@@ -89,7 +103,11 @@ jobs:
         if: always() && steps.detect-dte.outputs.dte-available == 'true'
         run: |
           echo "🛑 Stopping Nx Cloud DTE agents..."
-          npx nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          if command -v pnpm >/dev/null 2>&1; then
+            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          else
+            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          fi
           echo "✅ Agent cleanup complete"
 
       - name: Setup Pages

@@ -9,9 +9,11 @@ This document outlines concrete, actionable improvements for the Legacy Sports N
 ## 🔥 Critical Issues (Fix Immediately)
 
 ### 1. **Dependency Management Alignment**
+
 **Issue**: 9 projects have misaligned dependency versions, breaking workspace consistency.
 
 **Current State**:
+
 ```bash
 📁 lambdas\draft-processor:
   ⚠️  Dependency "aws-lambda" should use "*" but has "^1.0.7"
@@ -27,7 +29,9 @@ This document outlines concrete, actionable improvements for the Legacy Sports N
 ```
 
 **Action Items**:
+
 1. **Update Lambda Package Dependencies**
+
    ```bash
    # Files to modify:
    - lambdas/draft-processor/package.json
@@ -37,6 +41,7 @@ This document outlines concrete, actionable improvements for the Legacy Sports N
    ```
 
 2. **Update Library Dependencies**
+
    ```bash
    # Files to modify:
    - lib/sentry/package.json
@@ -44,16 +49,18 @@ This document outlines concrete, actionable improvements for the Legacy Sports N
    ```
 
 3. **Automated Fix Script**
+
    ```javascript
    // Create: scripts/fix-workspace-deps.js
    const fs = require('fs');
    const glob = require('glob');
-   
+
    // Auto-update all workspace dependencies to use "*"
    // when available in root package.json
    ```
 
 **Validation**:
+
 ```bash
 node scripts/validate-workspace-deps.js
 # Should show 0 issues after fixes
@@ -64,17 +71,20 @@ node scripts/validate-workspace-deps.js
 ## ⚡ High Priority (Complete This Week)
 
 ### 2. **Nx Cloud Configuration**
+
 **Issue**: Invalid CI Access Token causing distributed caching failures.
 
 **Current Error**:
+
 ```
 Invalid Credentials (CI Access Token): A workspace could not be found with the provided CI Access Token. (code: 401)
 ```
 
 **Solutions** (Choose One):
+
 ```bash
 # Option A: Fix Nx Cloud setup
-npx nx connect-to-nx-cloud
+pnpm exec nx connect-to-nx-cloud
 
 # Option B: Remove Nx Cloud if not using
 # Remove from nx.json:
@@ -82,17 +92,21 @@ npx nx connect-to-nx-cloud
 ```
 
 **Files to Update**:
+
 - `nx.json` - Remove or fix cloud token
 - `.github/workflows/*` - Update CI configuration if using cloud
 
 ### 3. **Build System Documentation**
+
 **Issue**: Missing clear build order documentation causing developer confusion.
 
 **Create**: `BUILD_SYSTEM.md`
-```markdown
+
+````markdown
 # Build System Guide
 
 ## Dependency Order
+
 1. **Core Libraries**: env-utilities, logging, utils
 2. **Platform Libraries**: tamagui-config, ui-abstractions
 3. **Data Libraries**: db-client, api
@@ -101,24 +115,27 @@ npx nx connect-to-nx-cloud
 6. **Lambda Functions**: db, oauth-proxy, draft-processor
 
 ## Quick Commands
+
 ```bash
 # Build everything in correct order
-npm run build:all
+pnpm run build:all
 
 # Build just libraries
-npm run build:libs
+pnpm run build:libs
 
 # Build for development (with watch)
-npm run dev
+pnpm run dev
 ```
-```
+````
+
+````
 
 ### 4. **ESLint Configuration Standardization**
 **Issue**: Multiple ESLint configs with potential conflicts.
 
 **Current Files**:
 - `.eslintrc.base.json`
-- `.eslintrc.json` 
+- `.eslintrc.json`
 - `.eslintrc.lambda.json`
 - `.eslintrc.lib.json`
 - `.eslintrc.react.json`
@@ -132,25 +149,27 @@ module.exports = {
   lambda: require('./lambda'),
   library: require('./library')
 };
-```
+````
 
 ---
 
 ## 🎯 Medium Priority (Complete This Month)
 
 ### 5. **Project Tagging System**
+
 **Issue**: Projects lack meaningful tags for better organization and task targeting.
 
 **Current State**: Most projects have `"tags": []`
 
 **Recommended Tagging Strategy**:
+
 ```json
 // Apps
 "tags": ["scope:app", "platform:web"]      // web app
-"tags": ["scope:app", "platform:mobile"]   // mobile app  
+"tags": ["scope:app", "platform:mobile"]   // mobile app
 "tags": ["scope:app", "platform:node"]     // cli
 
-// Libraries  
+// Libraries
 "tags": ["scope:lib", "type:ui", "platform:shared"]           // shared-components
 "tags": ["scope:lib", "type:data", "platform:shared"]         // db-client
 "tags": ["scope:lib", "type:config", "platform:shared"]       // tamagui-config
@@ -162,6 +181,7 @@ module.exports = {
 ```
 
 **Benefits**:
+
 ```bash
 # Target specific groups
 nx run-many --target=build --projects=tag:scope:lib
@@ -170,36 +190,40 @@ nx run-many --target=lint --projects=tag:type:api
 ```
 
 ### 6. **Improved Build Scripts**
+
 **Issue**: Missing convenient build orchestration scripts.
 
 **Add to `package.json`**:
+
 ```json
 {
   "scripts": {
     "build:libs": "nx run-many --target=build --projects=tag:scope:lib",
-    "build:apps": "nx run-many --target=build --projects=tag:scope:app", 
+    "build:apps": "nx run-many --target=build --projects=tag:scope:app",
     "build:lambdas": "nx run-many --target=build --projects=tag:scope:lambda",
     "build:all": "nx run-many --target=build --all",
     "test:libs": "nx run-many --target=test --projects=tag:scope:lib",
     "test:apps": "nx run-many --target=test --projects=tag:scope:app",
     "lint:fix:all": "nx run-many --target=lint --all --fix",
     "clean:nx": "nx reset",
-    "clean:deps": "rm -rf node_modules && rm -rf */node_modules && npm install"
+    "clean:deps": "rm -rf node_modules && rm -rf */node_modules && pnpm install"
   }
 }
 ```
 
 ### 7. **Enhanced Validation Scripts**
+
 **Issue**: Limited workspace validation beyond dependency checking.
 
 **Create**: `scripts/validate-workspace.js`
+
 ```javascript
 #!/usr/bin/env node
 
 /**
  * Comprehensive workspace validation
  * - Dependency alignment
- * - Project structure consistency  
+ * - Project structure consistency
  * - Build configuration validation
  * - Import path validation
  * - Tag consistency
@@ -207,47 +231,54 @@ nx run-many --target=lint --projects=tag:type:api
 
 const validations = [
   require('./validate-workspace-deps'),
-  require('./validate-project-structure'), 
+  require('./validate-project-structure'),
   require('./validate-import-paths'),
-  require('./validate-build-config')
+  require('./validate-build-config'),
 ];
 
 // Run all validations with reporting
 ```
 
 ### 8. **Development Environment Setup**
+
 **Issue**: No standardized development environment setup guide.
 
 **Create**: `DEVELOPMENT_SETUP.md`
-```markdown
+
+````markdown
 # Development Environment Setup
 
 ## Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm 9+
 - Git
 
 ## Quick Start
+
 ```bash
 # 1. Clone and install
 git clone <repo>
-npm install
+pnpm install
 
 # 2. Environment setup
-npm run sync-env
+pnpm run sync-env
 
 # 3. Build core libraries
-npm run build:libs
+pnpm run build:libs
 
 # 4. Start development
-npm run dev
+pnpm run dev
 ```
+````
 
 ## Troubleshooting
-- **Module resolution errors**: Run `npm run build:libs`
-- **Database connection issues**: Run `npm run db:test`
-- **GraphQL errors**: Ensure `npm run codegen` completed
-```
+
+- **Module resolution errors**: Run `pnpm run build:libs`
+- **Database connection issues**: Run `pnpm run db:test`
+- **GraphQL errors**: Ensure `pnpm run codegen` completed
+
+````
 
 ---
 
@@ -279,12 +310,14 @@ npm run dev
     }
   }
 }
-```
+````
 
 ### 10. **Module Boundary Rules**
+
 **Issue**: No enforcement preventing inappropriate cross-project imports.
 
 **Create**: `.eslintrc.boundaries.js`
+
 ```javascript
 module.exports = {
   extends: ['@nx/eslint-plugin-nx/recommended'],
@@ -297,68 +330,74 @@ module.exports = {
         depConstraints: [
           {
             sourceTag: 'scope:app',
-            onlyDependOnLibsWithTags: ['scope:lib', 'platform:shared']
+            onlyDependOnLibsWithTags: ['scope:lib', 'platform:shared'],
           },
           {
-            sourceTag: 'scope:lambda', 
-            onlyDependOnLibsWithTags: ['scope:lib', 'type:data']
-          }
-        ]
-      }
-    ]
-  }
+            sourceTag: 'scope:lambda',
+            onlyDependOnLibsWithTags: ['scope:lib', 'type:data'],
+          },
+        ],
+      },
+    ],
+  },
 };
 ```
 
 ### 11. **Performance Monitoring**
+
 **Issue**: No metrics on build performance and workspace health.
 
 **Create**: `scripts/workspace-metrics.js`
+
 ```javascript
 // Track and report:
 // - Build times by project
 // - Cache hit rates
-// - Dependency graph complexity  
+// - Dependency graph complexity
 // - Test coverage by project
 // - Bundle size analysis
 ```
 
 ### 12. **Automated Dependency Updates**
+
 **Issue**: Manual dependency management across 24 projects.
 
 **Create**: `.github/workflows/dependency-update.yml`
+
 ```yaml
 name: Dependency Updates
 on:
   schedule:
-    - cron: '0 0 * * MON'  # Weekly on Monday
+    - cron: '0 0 * * MON' # Weekly on Monday
 jobs:
   update-deps:
     runs-on: ubuntu-latest
     steps:
       - name: Update workspace dependencies
         run: |
-          npm run update-workspace-deps
-          npm run validate:workspace
+          pnpm run update-workspace-deps
+          pnpm run validate:workspace
 ```
 
 ### 13. **Docker Development Environment**
+
 **Issue**: Environment inconsistency across developers.
 
 **Create**: `docker-compose.dev.yml`
+
 ```yaml
 version: '3.8'
 services:
   app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.dev
     volumes:
       - .:/workspace
       - node_modules:/workspace/node_modules
     ports:
-      - "3000:3000"   # Web app
-      - "4000:4000"   # GraphQL API
+      - '3000:3000' # Web app
+      - '4000:4000' # GraphQL API
     environment:
       - NODE_ENV=development
 ```
@@ -370,23 +409,27 @@ services:
 Track these metrics to measure improvement success:
 
 ### **Build Health**
+
 - [ ] Workspace dependency validation: 0 errors (currently 9 errors)
-- [ ] Build success rate: 100% (currently ~95%)  
+- [ ] Build success rate: 100% (currently ~95%)
 - [ ] Average build time: <2 minutes for full build
 - [ ] Cache hit rate: >70% for incremental builds
 
-### **Developer Experience** 
+### **Developer Experience**
+
 - [ ] Setup time for new developers: <15 minutes
 - [ ] Documentation completeness: All major workflows documented
 - [ ] Error resolution time: <5 minutes for common issues
 
 ### **Code Quality**
+
 - [ ] ESLint errors: 0 across all projects
 - [ ] Test coverage: >80% for core libraries
 - [ ] TypeScript strict mode: Enabled everywhere
 - [ ] Circular dependencies: 0
 
 ### **Maintenance Overhead**
+
 - [ ] Manual dependency updates: <1 hour/week
 - [ ] Build configuration updates: <30 minutes/month
 - [ ] New project setup: <10 minutes
@@ -396,24 +439,28 @@ Track these metrics to measure improvement success:
 ## 🛠️ Implementation Timeline
 
 ### **Week 1 (Critical Issues)**
+
 - [x] Analyze current state
 - [ ] Fix dependency alignment issues
 - [ ] Resolve Nx Cloud configuration
 - [ ] Create build system documentation
 
-### **Week 2-4 (High Priority)** 
+### **Week 2-4 (High Priority)**
+
 - [ ] Implement project tagging system
 - [ ] Add improved build scripts
 - [ ] Create validation scripts
 - [ ] Write development setup guide
 
 ### **Month 2 (Medium Priority)**
-- [ ] Implement workspace constraints  
+
+- [ ] Implement workspace constraints
 - [ ] Add module boundary rules
 - [ ] Set up performance monitoring
 - [ ] Create automated dependency updates
 
 ### **Quarter 1 (Future Enhancements)**
+
 - [ ] Docker development environment
 - [ ] Advanced caching strategies
 - [ ] Module federation (if needed)
@@ -431,5 +478,5 @@ Track these metrics to measure improvement success:
 
 ---
 
-*Last Updated: October 12, 2025*  
-*Status: Ready for Implementation*
+_Last Updated: October 12, 2025_  
+_Status: Ready for Implementation_

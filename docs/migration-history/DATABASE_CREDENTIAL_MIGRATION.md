@@ -66,7 +66,7 @@ USE_LOCAL_CREDS=...                    # Renamed to USE_LOCAL_CREDENTIALS
 
 3. **Test connection:**
    ```bash
-   npm run db:test
+   pnpm run db:test
    ```
 
 ### Production/AWS Database Setup
@@ -82,7 +82,7 @@ USE_LOCAL_CREDS=...                    # Renamed to USE_LOCAL_CREDENTIALS
 
 2. **Test production connection:**
    ```bash
-   npm run db:test:production
+   pnpm run db:test:production
    ```
 
 ## New CLI Commands
@@ -90,23 +90,23 @@ USE_LOCAL_CREDS=...                    # Renamed to USE_LOCAL_CREDENTIALS
 ### Database Connection Testing
 
 ```bash
-npm run db:test                    # Test local database
-npm run db:test:production         # Test production database
+pnpm run db:test                    # Test local database
+pnpm run db:test:production         # Test production database
 ```
 
 ### Connection Information
 
 ```bash
-npm run db:url                     # Get connection URL (local)
-npm run db:url:production          # Get connection URL (production)
-npm run db:credentials             # Show resolved credentials
+pnpm run db:url                     # Get connection URL (local)
+pnpm run db:url:production          # Get connection URL (production)
+pnpm run db:credentials             # Show resolved credentials
 ```
 
 ### PostgreSQL Client Setup
 
 ```bash
-npm run db:psql                    # Generate psql commands (local)
-npm run db:psql:production         # Generate psql commands (production)
+pnpm run db:psql                    # Generate psql commands (local)
+pnpm run db:psql:production         # Generate psql commands (production)
 ```
 
 ## Code Migration
@@ -177,8 +177,8 @@ DB_SECRET_NAME = aws_secretsmanager_secret.database_credentials.name
 1. **Test credentials:**
 
    ```bash
-   npm run db:test
-   npm run db:credentials
+   pnpm run db:test
+   pnpm run db:credentials
    ```
 
 2. **Check SSL configuration:**
@@ -203,7 +203,7 @@ DB_SECRET_NAME = aws_secretsmanager_secret.database_credentials.name
 1. **Check variable precedence:**
 
    ```bash
-   npm run db:credentials  # Shows resolved values
+   pnpm run db:credentials  # Shows resolved values
    ```
 
 2. **Variable naming:**

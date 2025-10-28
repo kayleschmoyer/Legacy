@@ -183,7 +183,7 @@ The `sync-env` script automatically configures production OAuth proxy URLs from 
 
 ```bash
 # Run this to sync production environment variables
-npm run sync-env
+pnpm run sync-env
 
 # This will set:
 VITE_OAUTH_PROXY_URL=https://your-api-gateway.execute-api.us-east-1.amazonaws.com/dev/oauth
@@ -332,9 +332,9 @@ Test mode creates a mock JWT token and simulates successful login without requir
 
 1. **Install Dependencies** (if not already present):
 
-   ```bash
-   npm install @react-native-google-signin/google-signin expo-secure-store
-   ```
+```bash
+pnpm add @react-native-google-signin/google-signin expo-secure-store
+```
 
 2. **Configure Google OAuth**:
    - Set up Google OAuth client in Google Cloud Console
@@ -351,7 +351,7 @@ Test mode creates a mock JWT token and simulates successful login without requir
 
 ```bash
 cd apps/web
-npm run dev
+pnpm run dev
 ```
 
 Navigate to the app - you should see the login screen if not authenticated.
@@ -360,7 +360,7 @@ Navigate to the app - you should see the login screen if not authenticated.
 
 ```bash
 cd apps/app
-npm run start
+pnpm run start
 ```
 
 Use Expo Go or development build to test on device/simulator.

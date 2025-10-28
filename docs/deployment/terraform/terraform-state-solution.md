@@ -7,6 +7,7 @@ Your Terraform workflows in GitHub Actions were trying to re-apply all infrastru
 **No backend configuration = No state tracking**
 
 Without a backend, Terraform stores state locally. In GitHub Actions:
+
 1. Fresh container starts → No `terraform.tfstate` file
 2. Terraform scans AWS → Finds existing resources
 3. Compares to config → Thinks everything needs to be created
@@ -19,6 +20,7 @@ Configure a **remote backend** using S3 and DynamoDB to persistently store Terra
 ### What Was Changed
 
 #### 1. **Backend Configuration** (`terraform/main.tf`)
+
 ```hcl
 backend "s3" {
   bucket         = "legacy-sports-terraform-state"
@@ -30,12 +32,15 @@ backend "s3" {
 ```
 
 #### 2. **Backend Infrastructure** (`terraform/backend-setup.tf`)
+
 - S3 bucket for state storage (encrypted, versioned, private)
 - DynamoDB table for state locking (prevents concurrent runs)
 - SSM parameters to track backend configuration
 
 #### 3. **IAM Permissions** (`terraform/github-actions-oidc.tf`)
+
 Updated GitHub Actions role to access:
+
 - S3 bucket (read/write state files)
 - DynamoDB table (acquire/release locks)
 
@@ -44,9 +49,10 @@ Updated GitHub Actions role to access:
 Your existing workflow pattern is **perfect** and requires no changes:
 
 ### 1. **Build & Upload Lambda Code**
+
 ```yaml
 - name: Build GraphQL Lambda
-  run: npx nx build db
+  run: pnpm exec nx build db
 
 - name: Package and Upload
   run: |
@@ -56,14 +62,16 @@ Your existing workflow pattern is **perfect** and requires no changes:
 ```
 
 ### 2. **Update Version in SSM**
+
 ```yaml
 aws ssm put-parameter \
-  --name "/legacy-sports/dev/lambda/graphql/version" \
-  --value "$VERSION" \
-  --overwrite
+--name "/legacy-sports/dev/lambda/graphql/version" \
+--value "$VERSION" \
+--overwrite
 ```
 
 ### 3. **Terraform Detects Change via SSM**
+
 ```yaml
 - name: Deploy Infrastructure
   run: |
@@ -72,6 +80,7 @@ aws ssm put-parameter \
 ```
 
 **Key Configuration** (`terraform/lambda-graphql.tf`):
+
 ```hcl
 data "aws_ssm_parameter" "graphql_lambda_version" {
   name = "/legacy-sports/dev/lambda/graphql/version"
@@ -97,6 +106,7 @@ resource "aws_lambda_function" "graphql" {
 Follow the step-by-step guide in: [`docs/terraform-backend-setup.md`](./terraform-backend-setup.md)
 
 **Quick summary:**
+
 1. Comment out backend block temporarily
 2. Run `terraform apply -target=aws_s3_bucket.terraform_state -target=aws_dynamodb_table.terraform_locks`
 3. Uncomment backend block
@@ -106,26 +116,31 @@ Follow the step-by-step guide in: [`docs/terraform-backend-setup.md`](./terrafor
 ## Benefits
 
 ✅ **GitHub Actions works correctly**
-   - No more "re-apply everything" issues
-   - Terraform only applies actual changes
+
+- No more "re-apply everything" issues
+- Terraform only applies actual changes
 
 ✅ **Lambda deployments stay simple**
-   - Build → Upload → Update SSM → Terraform sees change
-   - No Terraform code edits needed
+
+- Build → Upload → Update SSM → Terraform sees change
+- No Terraform code edits needed
 
 ✅ **Infrastructure in source control**
-   - All Lambda configs, IAM roles, VPCs, etc. tracked in Git
-   - Review changes via PR process
+
+- All Lambda configs, IAM roles, VPCs, etc. tracked in Git
+- Review changes via PR process
 
 ✅ **Team collaboration**
-   - Shared state prevents conflicts
-   - State locking prevents concurrent runs
-   - Anyone can deploy without issues
+
+- Shared state prevents conflicts
+- State locking prevents concurrent runs
+- Anyone can deploy without issues
 
 ✅ **Version history**
-   - S3 versioning keeps old state files
-   - Can rollback if needed
-   - Audit trail of changes
+
+- S3 versioning keeps old state files
+- Can rollback if needed
+- Audit trail of changes
 
 ## Example: Deploying a Lambda Code Update
 
@@ -136,7 +151,7 @@ git push origin main
 # 2. GitHub Actions workflow triggers automatically
 
 # 3. Workflow steps:
-#    a. Build Lambda:        npx nx build db
+#    a. Build Lambda:        pnpm exec nx build db
 #    b. Create zip:          graphql-20251013-abc123.zip
 #    c. Upload to S3:        s3://bucket/graphql/graphql-20251013-abc123.zip
 #    d. Update SSM:          /legacy-sports/dev/lambda/graphql/version = "20251013-abc123"
@@ -151,19 +166,25 @@ git push origin main
 ## Troubleshooting
 
 ### "Error acquiring the state lock"
+
 Someone else is running Terraform. Wait for completion or:
+
 ```bash
 terraform force-unlock <LOCK_ID>
 ```
 
 ### "Backend configuration changed"
+
 Run:
+
 ```bash
 terraform init -reconfigure
 ```
 
 ### "Resource already exists"
+
 Import existing resource into state:
+
 ```bash
 terraform import aws_lambda_function.graphql legacy-sports-dev-graphql
 ```

@@ -139,19 +139,19 @@ src/
 
 ```bash
 cd lib/db-client
-npm run generate:migration:public
+pnpm run generate:migration:public
 ```
 
 ### Apply Migrations
 
 ```bash
-npm run migrate:public
+pnpm run migrate:public
 ```
 
 ### Open Database Studio
 
 ```bash
-npm run studio:public
+pnpm run studio:public
 ```
 
 ### Use in Code

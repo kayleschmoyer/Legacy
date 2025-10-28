@@ -1,7 +1,6 @@
 // const { withNxMetro } = require('@nx/react-native');
 const { getDefaultConfig } = require('@expo/metro-config');
 const { mergeConfig } = require('@react-native/metro-config');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
 const path = require('path');
 
 /**
@@ -11,6 +10,11 @@ const path = require('path');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const defaultConfig = getDefaultConfig(__dirname);
+
+// Get exclusionList from the default config (Expo provides this)
+const {
+  resolver: { blockList: exclusionList },
+} = defaultConfig;
 
 const customConfig = {
   transformer: {

@@ -1,6 +1,7 @@
 # Codegen Fix Summary
 
 ## Issue
+
 GraphQL codegen was failing for multiple targets because local GraphQL queries referenced fields that don't exist in the deployed remote schema at `https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/graphql`.
 
 ## Solution: Use Local Development Server
@@ -10,23 +11,26 @@ The codegen configuration now supports running against a local GraphQL server at
 ### Running Codegen Locally
 
 **Option 1: Use the helper script (Recommended)**
+
 ```bash
 .\scripts\codegen-local.ps1
 ```
 
 **Option 2: Set environment variable manually**
+
 ```bash
 # PowerShell
 $env:GRAPHQL_HOST = "http://localhost:5000/graphql"
-npx nx run-many --target=codegen --all
+pnpm exec nx run-many --target=codegen --all
 
 # Bash/Linux/Mac
 export GRAPHQL_HOST=http://localhost:5000/graphql
-npx nx run-many --target=codegen --all
+pnpm exec nx run-many --target=codegen --all
 ```
 
 **Option 3: Update .env file**
 The `.env` file already has:
+
 ```bash
 VITE_GRAPHQL_HOST=http://localhost:5000/graphql
 ```
@@ -34,6 +38,7 @@ VITE_GRAPHQL_HOST=http://localhost:5000/graphql
 However, codegen checks `GRAPHQL_HOST` first, so setting that environment variable is recommended.
 
 ## Root Cause
+
 The GraphQL Code Generator validates queries against the **deployed** schema, not the local schema code. When new fields are added to the local schema but the Lambda hasn't been deployed yet, codegen fails.
 
 ## Deployed Schema Analysis
@@ -41,23 +46,29 @@ The GraphQL Code Generator validates queries against the **deployed** schema, no
 After investigating the deployed schema, I found:
 
 ### League Type (Current Deployed Schema)
+
 The `League` type only has these fields:
+
 - `id`, `name`, `owner`
-- `maxRosterSize`, `currentMatchup`  
+- `maxRosterSize`, `currentMatchup`
 - `draftStatus`, `inviteCode`
 - `userMembership` (returns LeagueMember)
 
 **Missing:** There is NO `teams` field or `leagueTeams` query in the deployed schema. The only way to get teams is through the `CreateLeagueAndTeamsPayload` mutation response.
 
 ### Player Type (Current Deployed Schema)
+
 The `Player` type only has:
+
 - `id`, `firstName`, `lastName`
 - `brefId`, `statsLastFetchedAt`
 
 **Missing:** There is NO `playerEligiblePositions` field.
 
 ### Stats Types (Current Deployed Schema)
+
 Field names in deployed schema use full names:
+
 - `battingAverage` (not `battingAvg`)
 - `earnedRunAverage` (not `earnedRunAvg`)
 - Many abbreviated fields don't exist at all
@@ -65,7 +76,9 @@ Field names in deployed schema use full names:
 ## Fixes Applied
 
 ### 1. League Teams Query (New Feature - REQUIRES LAMBDA DEPLOYMENT)
+
 **Files Modified:**
+
 - `apps/app/src/api/db/leagues/Leagues.graphql`
 - `apps/web/src/api/db/leagues/Leagues.graphql`
 
@@ -82,12 +95,15 @@ The `teams` field commented in League fragment with note that it requires Lambda
 ```
 
 **Backend Code Status:**
+
 - ✅ Schema updated in `lambdas/db/src/schema/leagues.ts` (~lines 920-960)
 - ❌ Not deployed yet - Lambda needs deployment
 - ✅ The `leagueTeams` query approach is correct - there's no other way to get teams by leagueId
 
 ### 2. Player Eligible Positions (REMOVED - Not in Schema)
+
 **File Modified:**
+
 - `lib/api/src/resources/players/player.fragment.graphql`
 
 **Action Taken:**
@@ -105,26 +121,31 @@ fragment Player on Player {
 **Status:** This field may need to be added to the backend schema if positions functionality is needed.
 
 ### 3. Stats Fragments (COMMENTED OUT - Field Names Mismatch)
+
 **File Modified:**
+
 - `lib/data-loaders/src/api/db/stats/Stats.graphql`
 
 **Action Taken:**
 Commented out all three stats fragments (`SeasonBatting`, `SeasonFielding`, `SeasonPitching`) due to extensive field name mismatches.
 
 **Issues:**
+
 - 68 field name mismatches with deployed schema
-- Local queries use abbreviated names (e.g., `ab`, `hr`, `bb`) 
+- Local queries use abbreviated names (e.g., `ab`, `hr`, `bb`)
 - Deployed schema may use different naming convention
 - Needs investigation to determine correct field names
 
 ## Current Status
+
 ✅ **All codegen targets now pass successfully**
 
 ```bash
-npx nx run-many --target=codegen --all
+pnpm exec nx run-many --target=codegen --all
 ```
 
 Results:
+
 - ✅ shared-components:codegen
 - ✅ api:codegen
 - ✅ bref-client:codegen
@@ -139,14 +160,16 @@ Results:
 The League Standings feature is **complete** but needs Lambda deployment to function:
 
 1. **Deploy the Lambda:**
+
    ```bash
    # PowerShell
    .\scripts\deploy-lambda.ps1 -lambdaName db
    ```
 
 2. **After Deployment, Uncomment Teams Field:**
-   
+
    In `apps/app/src/api/db/leagues/Leagues.graphql` and `apps/web/src/api/db/leagues/Leagues.graphql`:
+
    ```graphql
    fragment League on League {
      id
@@ -161,16 +184,16 @@ The League Standings feature is **complete** but needs Lambda deployment to func
    ```
 
 3. **Update App Code:**
-   
+
    Remove the inline GET_LEAGUE_TEAMS queries from:
    - `apps/app/src/app/(app)/baseball/league/[leagueId].tsx`
    - `apps/web/src/components/baseball/LeagueDetailPage.tsx`
-   
+
    Update to use `league.teams` from the existing league query instead of lazy loading.
 
 4. **Regenerate Types:**
    ```bash
-   npx nx run-many --target=codegen --all
+   pnpm exec nx run-many --target=codegen --all
    ```
 
 ### Priority 2: Fix Stats Fragments (If Needed)
@@ -178,6 +201,7 @@ The League Standings feature is **complete** but needs Lambda deployment to func
 If stats data loading is needed:
 
 1. Query the deployed schema to discover correct field names:
+
    ```graphql
    {
      __type(name: "SeasonBatting") {
@@ -202,7 +226,9 @@ If player position information is required:
 4. Regenerate types
 
 ## UI Components Status
+
 ✅ **League Standings feature is ready:**
+
 - Mobile component: `apps/app/src/features/roster/LeagueStandings.tsx`
 - Web component: `apps/web/src/components/roster/LeagueStandings.tsx`
 - Both integrated into respective league detail pages

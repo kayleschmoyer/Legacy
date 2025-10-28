@@ -6,10 +6,10 @@
  * testing connections, and running database operations against the AWS RDS instance.
  *
  * Usage:
- *   npm run db:connect         # Interactive connection
- *   npm run db:test            # Test database connection
- *   npm run db:url             # Get connection URL
- *   npm run db:migrate         # Run migrations
+ *   pnpm run db:connect         # Interactive connection
+ *   pnpm run db:test            # Test database connection
+ *   pnpm run db:url             # Get connection URL
+ *   pnpm run db:migrate         # Run migrations
  */
 
 // Load environment variables from root .env file
@@ -157,7 +157,7 @@ program
         console.log(url);
       } else {
         console.log(
-          '\nTo see full URL with password: SHOW_PASSWORD=true npm run db:url',
+          '\nTo see full URL with password: SHOW_PASSWORD=true pnpm run db:url',
         );
       }
     } catch (error) {

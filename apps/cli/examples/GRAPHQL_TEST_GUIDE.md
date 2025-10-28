@@ -6,46 +6,47 @@ The `graphql-test` command allows you to execute arbitrary GraphQL queries again
 
 ```bash
 # Execute a simple query
-npm run cli graphql-test --query "query { users { id email } }"
+ppnpm run cli graphql-test --query "query { users { id email } }"
 
 # Execute query from file
-npm run cli graphql-test --file ./examples/queries/users.graphql
+ppnpm run cli graphql-test --file ./examples/queries/users.graphql
 
 # Query with variables
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --query "query GetPlayer($id: Int!) { player(id: $id) { name } }" \
   --variables '{"id": 123}'
 
 # Use specific authenticated user
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --query "{ users { id } }" \
   --user admin@example.com
 
 # Raw JSON output (for scripting)
-npm run cli graphql-test --query "{ users { id } }" --raw
+ppnpm run cli graphql-test --query "{ users { id } }" --raw
 ```
 
 ## Command Options
 
-| Option | Alias | Description |
-|--------|-------|-------------|
-| `--query` | `-q` | GraphQL query string to execute |
-| `--file` | `-f` | Path to file containing GraphQL query |
-| `--variables` | `-v` | JSON string of query variables |
-| `--user` | `-u` | Email of user to authenticate as |
-| `--raw` | `-r` | Output raw JSON without formatting |
-| `--pretty` | `-p` | Pretty print JSON (default: true) |
-| `--headers` | | Include response headers in output |
+| Option        | Alias | Description                           |
+| ------------- | ----- | ------------------------------------- |
+| `--query`     | `-q`  | GraphQL query string to execute       |
+| `--file`      | `-f`  | Path to file containing GraphQL query |
+| `--variables` | `-v`  | JSON string of query variables        |
+| `--user`      | `-u`  | Email of user to authenticate as      |
+| `--raw`       | `-r`  | Output raw JSON without formatting    |
+| `--pretty`    | `-p`  | Pretty print JSON (default: true)     |
+| `--headers`   |       | Include response headers in output    |
 
 ## Example Queries
 
 ### 1. List All Users
 
 ```bash
-npm run cli graphql-test --file ./examples/queries/users.graphql
+ppnpm run cli graphql-test --file ./examples/queries/users.graphql
 ```
 
 **Query:**
+
 ```graphql
 query GetAllUsers {
   users {
@@ -61,12 +62,13 @@ query GetAllUsers {
 ### 2. Get Player with Statistics
 
 ```bash
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --file ./examples/queries/player-with-stats.graphql \
   --variables '{"id": 123}'
 ```
 
 **Query:**
+
 ```graphql
 query GetPlayer($id: Int!) {
   player(id: $id) {
@@ -89,7 +91,7 @@ query GetPlayer($id: Int!) {
 ### 3. Paginated Players List
 
 ```bash
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --file ./examples/queries/players-paginated.graphql \
   --variables '{"limit": 10, "offset": 0}'
 ```
@@ -97,13 +99,13 @@ npm run cli graphql-test \
 ### 4. Schema Introspection
 
 ```bash
-npm run cli graphql-test --file ./examples/queries/introspect.graphql
+ppnpm run cli graphql-test --file ./examples/queries/introspect.graphql
 ```
 
 ### 5. Create User (Mutation)
 
 ```bash
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --file ./examples/queries/create-user.graphql \
   --variables '{
     "input": {
@@ -146,10 +148,10 @@ If you have multiple users authenticated:
 
 ```bash
 # Check available users
-npm run cli auth list
+ppnpm run cli auth list
 
 # Use specific user for query
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --query "{ users { id } }" \
   --user admin@example.com
 ```
@@ -160,7 +162,7 @@ For scripts and automation, use the `--raw` flag:
 
 ```bash
 # Get raw JSON output
-result=$(npm run cli graphql-test --query "{ users { id } }" --raw)
+result=$(ppnpm run cli graphql-test --query "{ users { id } }" --raw)
 echo $result | jq '.users | length'
 ```
 
@@ -182,7 +184,7 @@ query ComplexPlayerQuery($season: Int!, $minGames: Int!) {
 ```
 
 ```bash
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --file queries/complex-query.graphql \
   --variables '{"season": 2024, "minGames": 100}'
 ```
@@ -192,6 +194,7 @@ npm run cli graphql-test \
 The command provides detailed output including:
 
 ### Success Response
+
 ```
 🔍 Executing GraphQL query from command line...
 🔐 Authenticating as: user@example.com (admin)
@@ -222,6 +225,7 @@ query { users { id email } }
 ```
 
 ### Error Response
+
 ```
 ❌ GraphQL Errors:
 
@@ -237,27 +241,27 @@ query { users { id email } }
 
 ```bash
 # Check authentication status
-npm run cli auth status
+ppnpm run cli auth status
 
 # Re-authenticate if needed
-npm run cli auth login
+ppnpm run cli auth login
 ```
 
 ### Query Validation
 
 ```bash
 # Test with introspection first
-npm run cli graphql-test --file ./examples/queries/introspect.graphql
+ppnpm run cli graphql-test --file ./examples/queries/introspect.graphql
 
 # Validate syntax with simple query
-npm run cli graphql-test --query "{ __schema { types { name } } }"
+ppnpm run cli graphql-test --query "{ __schema { types { name } } }"
 ```
 
 ### Permission Issues
 
 ```bash
 # Check your access level
-npm run cli auth status
+ppnpm run cli auth status
 
 # Some queries require admin access
 # Contact your administrator if you need elevated permissions
@@ -270,7 +274,7 @@ npm run cli auth status
 echo $VITE_GRAPHQL_URL
 
 # Test with headers to debug
-npm run cli graphql-test --query "{ users { id } }" --headers
+ppnpm run cli graphql-test --query "{ users { id } }" --headers
 ```
 
 ## Environment Configuration

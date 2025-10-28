@@ -1,53 +1,25 @@
 name: "Test Android Compatibility"
 
-# Comprehensive Android compatibility testing across multiple environments
-# Ensures builds work across different Java, Node, and Android SDK versions
-# Runs on PRs touching Android code and scheduled for compatibility validation
+# Comprehensive Android compatibility testing across multiple environments.
+# This workflow is reusable and invoked by the orchestrator.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/app/android/**"
-      - "apps/app/src/**"
-      - "lib/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/test-android-compatibility.yml"
-  pull_request:
-    paths:
-      - "apps/app/android/**"
-      - "apps/app/src/**"
-      - "lib/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/test-android-compatibility.yml"
-  workflow_dispatch:
+  workflow_call:
     inputs:
       matrix_type:
         description: "Matrix Type"
         required: false
+        type: string
         default: "production"
-        type: choice
-        options:
-          - production       # Production config only
-          - compatibility    # Min + Recommended + Latest
-          - full            # All combinations
       build_type:
         description: "Build Type"
         required: false
+        type: string
         default: "debug"
-        type: choice
-        options:
-          - debug
-          - release
-  schedule:
-    # Run compatibility matrix weekly (Sundays at 2 AM UTC)
-    - cron: '0 2 * * 0'
 
 # Cancel in-progress builds for the same ref
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.matrix_type || 'auto' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.matrix_type || 'auto' }}
   cancel-in-progress: true
 
 permissions:
@@ -58,11 +30,11 @@ env:
   # Default build optimization settings
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000"
   NODE_OPTIONS: "--max-old-space-size=4096"
-  
+
   # React Native settings
   EXPO_NO_TELEMETRY: 1
   REACT_NATIVE_PACKAGER_CACHE_DISABLED: true
-  
+
   # Cache optimization for faster CI cleanup
   ACTIONS_CACHE_COMPRESSION_LEVEL: "1"
   ACTIONS_CACHE_MAX_SIZE: "2GB"
@@ -76,7 +48,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       run-type: ${{ steps.set-matrix.outputs.run-type }}
-    
+
     steps:
       - name: "Determine Matrix Configuration"
         id: set-matrix
@@ -85,13 +57,13 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ]; then
             MATRIX_TYPE="compatibility"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MATRIX_TYPE="${{ github.event.inputs.matrix_type }}"
+            MATRIX_TYPE="${{ inputs.matrix_type }}"
           else
-            MATRIX_TYPE="production"
+            MATRIX_TYPE="${{ inputs.matrix_type }}"
           fi
-          
+
           echo "run-type=$MATRIX_TYPE" >> $GITHUB_OUTPUT
-          
+
           if [ "$MATRIX_TYPE" = "production" ]; then
             # Production configuration only
             {
@@ -120,17 +92,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: determine-matrix
     timeout-minutes: 45
-    
+
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.determine-matrix.outputs.matrix) }}
-    
+
     env:
       JAVA_VERSION: ${{ matrix.java_version }}
       ANDROID_API_LEVEL: ${{ matrix.android_api_level }}
       NDK_VERSION: ${{ matrix.ndk_version }}
-      BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
-    
+      BUILD_TYPE: ${{ inputs.build_type }}
+
     steps:
       - name: "🚀 Checkout Repository"
         uses: actions/checkout@v5
@@ -180,26 +152,24 @@ jobs:
         run: |
           cd apps/app/android
           chmod +x gradlew
-          
+
           # Verify Gradle version compatibility
           echo "🔍 Verifying Gradle setup..."
           ${{ matrix.gradle_executable }} --version
 
-
-
       - name: "🧪 Validate Configuration"
         run: |
           cd apps/app/android
-          
+
           echo "🔍 Validating build configuration..."
-          
+
           # Check Java version
           java -version
           javac -version
-          
+
           # Check Gradle configuration
           ${{ matrix.gradle_executable }} help --no-daemon --quiet
-          
+
           # Validate Android configuration without dependency download
           echo "✅ Configuration validation passed"
 
@@ -207,9 +177,9 @@ jobs:
         timeout-minutes: 25
         run: |
           cd apps/app/android
-          
+
           echo "🔨 Building Android APK (${{ env.BUILD_TYPE }})..."
-          
+
           if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
             ${{ matrix.gradle_executable }} assembleRelease --no-daemon --parallel --build-cache
             BUILD_OUTPUT="app/build/outputs/apk/release/app-release.apk"
@@ -217,7 +187,7 @@ jobs:
             ${{ matrix.gradle_executable }} assembleDebug --no-daemon --parallel --build-cache
             BUILD_OUTPUT="app/build/outputs/apk/debug/app-debug.apk"
           fi
-          
+
           # Verify APK was created
           if [ -f "$BUILD_OUTPUT" ]; then
             APK_SIZE=$(du -h "$BUILD_OUTPUT" | cut -f1)
@@ -232,7 +202,7 @@ jobs:
         if: always()
         run: |
           echo "## 📊 Build Metrics" >> $GITHUB_STEP_SUMMARY
-          
+
           # APK info if exists
           cd apps/app/android
           if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
@@ -240,7 +210,7 @@ jobs:
           else
             APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           fi
-          
+
           if [ -f "$APK_PATH" ]; then
             APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
             echo "- **APK Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
@@ -248,7 +218,7 @@ jobs:
           else
             echo "- **Build Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           # Gradle build cache info
           if [ -d "~/.gradle/caches/build-cache-1" ]; then
             CACHE_SIZE=$(du -sh ~/.gradle/caches/build-cache-1 2>/dev/null | cut -f1 || echo "N/A")
@@ -259,16 +229,16 @@ jobs:
         if: success()
         run: |
           cd apps/app/android
-          
+
           if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
             APK_PATH="app/build/outputs/apk/release/app-release.apk"
           else
             APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           fi
-          
+
           # Basic APK validation
           echo "🔍 Validating APK structure..."
-          
+
           # Check APK can be read by aapt (if available)
           if command -v aapt >/dev/null 2>&1; then
             aapt dump badging "$APK_PATH" | head -5
@@ -276,7 +246,7 @@ jobs:
           else
             echo "ℹ️ AAPT not available, skipping detailed validation"
           fi
-          
+
           echo "- **APK Validation**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   matrix-summary:
@@ -284,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [determine-matrix, android-matrix-build]
     if: always()
-    
+
     steps:
       - name: "📋 Matrix Results Summary"
         run: |
@@ -293,10 +263,10 @@ jobs:
           echo "**Matrix Type**: ${{ needs.determine-matrix.outputs.run-type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Count results
           TOTAL_JOBS=$(echo '${{ needs.android-matrix-build.result }}' | wc -w)
-          
+
           if [ "${{ needs.android-matrix-build.result }}" = "success" ]; then
             echo "✅ **All matrix builds passed** ($TOTAL_JOBS configurations)" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.android-matrix-build.result }}" = "failure" ]; then
@@ -304,7 +274,7 @@ jobs:
           else
             echo "⚠️ **Matrix builds completed with issues** - Status: ${{ needs.android-matrix-build.result }}" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Compatibility Status" >> $GITHUB_STEP_SUMMARY
           echo "- **React Native 0.79.6**: ✅ Supported" >> $GITHUB_STEP_SUMMARY
@@ -312,7 +282,7 @@ jobs:
           echo "- **Android API 33-35**: ✅ Tested" >> $GITHUB_STEP_SUMMARY
           echo "- **Multi-platform**: ✅ Verified" >> $GITHUB_STEP_SUMMARY
 
-      - name: "🚨 Failure Notification" 
+      - name: "🚨 Failure Notification"
         if: needs.android-matrix-build.result == 'failure'
         run: |
           echo "❌ Android build matrix failed!"

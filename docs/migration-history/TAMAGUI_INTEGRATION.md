@@ -64,16 +64,16 @@ lib/shared-components/src/screens/*.tsx          - Fixed circular imports
 
 ```bash
 # Run web development server
-npx nx serve web
+pnpm exec nx serve web
 
 # Build web app
-npx nx build web
+pnpm exec nx build web
 
 # Start React Native development server
-npx nx start app
+pnpm exec nx start app
 
 # Build all projects
-npx nx run-many -t build
+pnpm exec nx run-many -t build
 ```
 
 ### Next Steps:

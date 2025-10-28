@@ -1,0 +1,3 @@
+trusted-secrets:
+  - SNYK_TOKEN
+  - GITLEAKS_LICENSE

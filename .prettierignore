@@ -3,3 +3,7 @@
 /coverage
 /.nx/cache
 /.nx/workspace-data
+# Static bundles are checked in but should not be reformatted automatically
+static/environment.js
+static/main.js
+pnpm-lock.yaml

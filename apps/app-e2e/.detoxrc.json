@@ -6,9 +6,7 @@
     },
     "jest": {
       "setupTimeout": 120000,
-      "setupFilesAfterEnv": [
-        "<rootDir>/test-setup.ts"
-      ]
+      "setupFilesAfterEnv": ["<rootDir>/test-setup.ts"]
     }
   },
   "apps": {
@@ -24,7 +22,7 @@
     },
     "ios.local": {
       "type": "ios.app",
-      "build": "cd ../../ && npx nx build-ios app",
+      "build": "cd ../../ && pnpm exec nx build-ios app",
       "binaryPath": "../../apps/app/ios/build/Build/Products/Release-iphonesimulator/App.app"
     },
     "android.debug": {
@@ -39,7 +37,7 @@
     },
     "android.local": {
       "type": "android.apk",
-      "build": "cd ../../ && npx nx build-android app",
+      "build": "cd ../../ && pnpm exec nx build-android app",
       "binaryPath": "../../apps/app/android/app/build/outputs/apk/release/app-release.apk"
     }
   },

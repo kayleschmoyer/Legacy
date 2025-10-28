@@ -44,7 +44,7 @@ try {
         // Run yaml-lint on each file
         for (const file of yamlFiles) {
           try {
-            execSync(`npx yaml-lint "${file}"`, { stdio: 'inherit' });
+            execSync(`pnpm exec yaml-lint "${file}"`, { stdio: 'inherit' });
           } catch (error) {
             console.error(`\n❌ YAML validation failed for: ${file}`);
             console.error('Please fix the YAML syntax errors before committing.\n');
@@ -85,13 +85,13 @@ try {
         // Run jsonlint on each file
         for (const file of jsonFiles) {
           try {
-            execSync(`npx jsonlint -q "${file}"`, { stdio: 'pipe' });
+            execSync(`pnpm exec jsonlint -q "${file}"`, { stdio: 'pipe' });
           } catch (error) {
             console.error(`\n❌ JSON validation failed for: ${file}`);
             
             // Try to get better error output
             try {
-              execSync(`npx jsonlint "${file}"`, { stdio: 'inherit' });
+              execSync(`pnpm exec jsonlint "${file}"`, { stdio: 'inherit' });
             } catch (e) {
               // Error already displayed
             }

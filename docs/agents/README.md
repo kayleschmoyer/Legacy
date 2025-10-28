@@ -23,14 +23,14 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 
 ### **Core Development Guidelines**
 
-| Topic                        | File                                                                               | Description                                                   |
-| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **Contribution Workflow** ⭐ | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv) | Complete contribution process from planning to PR creation    |
-| **Branch Tree Management** 🌳 | [`docs/guides/branch-tree-management.md`](../guides/branch-tree-management.md) | Twig tree management for dependent branches and clean commits |
-| **Platform Components**      | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)     | Magic string system for cross-platform compatibility          |
-| **Type Safety**              | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                     | TypeScript standards and `any` type usage guidelines          |
-| **ESLint Standards**         | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)           | Code quality enforcement and lint error resolution            |
-| **Development Workflow**     | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv)   | Daily workflows, terminal compatibility, fail-fast philosophy |
+| Topic                         | File                                                                               | Description                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Contribution Workflow** ⭐  | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv) | Complete contribution process from planning to PR creation    |
+| **Branch Tree Management** 🌳 | [`docs/guides/branch-tree-management.md`](../guides/branch-tree-management.md)     | Twig tree management for dependent branches and clean commits |
+| **Platform Components**       | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)     | Magic string system for cross-platform compatibility          |
+| **Type Safety**               | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                     | TypeScript standards and `any` type usage guidelines          |
+| **ESLint Standards**          | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)           | Code quality enforcement and lint error resolution            |
+| **Development Workflow**      | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv)   | Daily workflows, terminal compatibility, fail-fast philosophy |
 
 ### **Architecture & Infrastructure**
 
@@ -68,7 +68,7 @@ When encountering errors, follow this systematic approach:
 1. **Identify Error Category**: Build failure, module resolution, platform issue, or deployment
 2. **Consult Troubleshooting CSV**: Load `troubleshooting.csv` and search for error patterns
 3. **Check Build System**: If build-related, reference `build-system.csv` for dependency order
-4. **Validate Environment**: Ensure `npm run sync-env` has been run and credentials are set
+4. **Validate Environment**: Ensure `pnpm run sync-env` has been run and credentials are set
 5. **Apply Solution**: Follow the systematic resolution steps from the guidelines
 6. **Document Discovery**: Add new patterns to relevant CSV if solution not documented
 
@@ -144,7 +144,7 @@ When working on this codebase, ensure:
 ✅ **Build Order Compliance** - Shared libraries built before consuming applications  
 ✅ **Test Coverage** - Unit tests for business logic, integration tests for APIs  
 ✅ **Cross-Platform Testing** - Both web and mobile platforms validated  
-✅ **Environment Sync** - `npm run sync-env` completed before development
+✅ **Environment Sync** - `pnpm run sync-env` completed before development
 
 ### **Security & Infrastructure Standards**
 

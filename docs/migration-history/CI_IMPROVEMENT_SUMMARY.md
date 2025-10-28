@@ -86,7 +86,7 @@ Successfully transformed the Legacy Sports CI system from a complex, hard-to-deb
     echo "::error title=Analysis Failed::One or more analysis steps failed"
     echo "📋 DEBUGGING INFORMATION:"
     echo "- Check the logs above for specific failures"
-    echo "- Run 'npm run lint:fix' to auto-fix formatting issues"  
+    echo "- Run 'pnpm run lint:fix' to auto-fix formatting issues"  
     echo "- Run './scripts/test-ci.ps1' locally to reproduce"
 ```
 
@@ -96,7 +96,7 @@ Successfully transformed the Legacy Sports CI system from a complex, hard-to-deb
 - name: '📱 Detect Mobile Changes'
   id: mobile-changes
   run: |
-    MOBILE_AFFECTED=$(npx nx print-affected --type=app --select=projects | grep -E "(app)" || echo "")
+    MOBILE_AFFECTED=$(pnpm exec nx print-affected --type=app --select=projects | grep -E "(app)" || echo "")
     echo "mobile-affected=${MOBILE_AFFECTED}" >> $GITHUB_OUTPUT
 ```
 

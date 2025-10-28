@@ -7,19 +7,22 @@ The OAuth proxy lambda has been updated to **automatically create new users** on
 ## Previous Behavior (Pre-Authorization Required)
 
 Before this change:
+
 1. ❌ User tries to authenticate via OAuth
 2. ❌ Lambda checks if user exists in database
 3. ❌ If not found → Returns 403 "This user is not pre-authorized to access the application"
 4. ❌ User cannot log in
 
 **Required manual step:** Administrator had to pre-create users using CLI command:
+
 ```bash
-npx nx run cli:serve --args="add-user --email user@example.com"
+pnpm exec nx run cli:serve --args="add-user --email user@example.com"
 ```
 
 ## New Behavior (Auto-Provisioning)
 
 After this change:
+
 1. ✅ User tries to authenticate via OAuth
 2. ✅ Lambda checks if user exists in database
 3. ✅ If not found → **Automatically creates user with default access level**
@@ -39,7 +42,7 @@ const userEmail = extractEmailFromOAuthToken(token);
 const user = await getOrCreateUser(userEmail);
 // If user doesn't exist, creates them automatically:
 // - email: user@example.com
-// - username: user@example.com  
+// - username: user@example.com
 // - access_level: 'none' (default)
 
 // Step 3: Complete OAuth validation
@@ -52,6 +55,7 @@ return createSession(jwt);
 ### Default User Settings
 
 New users are created with these defaults:
+
 - **Email**: From OAuth provider (e.g., Google)
 - **Username**: Same as email
 - **Access Level**: `'none'` (can be upgraded later)
@@ -76,26 +80,29 @@ New users are created with these defaults:
 ### Checking Users
 
 List all users in the database:
+
 ```bash
-npx nx run cli:serve --args="list-users"
+pnpm exec nx run cli:serve --args="list-users"
 ```
 
 ### Manually Adding Users (Optional)
 
 You can still manually create users if needed:
+
 ```bash
 # Regular user
-npx nx run cli:serve --args="add-user --email user@example.com"
+pnpm exec nx run cli:serve --args="add-user --email user@example.com"
 
 # Admin user
-npx nx run cli:serve --args="add-user --email admin@example.com --access-level admin"
+pnpm exec nx run cli:serve --args="add-user --email admin@example.com --access-level admin"
 ```
 
 ### Upgrading User Access Levels
 
 To upgrade a user to admin after they've logged in:
+
 ```bash
-npx nx run cli:serve --args="set-user-type --email user@example.com --type admin"
+pnpm exec nx run cli:serve --args="set-user-type --email user@example.com --type admin"
 ```
 
 ## Security Considerations
@@ -103,6 +110,7 @@ npx nx run cli:serve --args="set-user-type --email user@example.com --type admin
 ### Access Control
 
 All new users are created with `access_level: 'none'` by default. This means:
+
 - ✅ They can authenticate (prove their identity via OAuth)
 - ⚠️ They may have limited access to resources (depends on your authorization logic)
 - 🔒 Admin privileges must be explicitly granted
@@ -110,6 +118,7 @@ All new users are created with `access_level: 'none'` by default. This means:
 ### OAuth Provider Trust
 
 This approach trusts your OAuth provider (Google) to verify user identity. Make sure:
+
 - OAuth provider is properly configured
 - Client ID and Client Secret are secure
 - Only authorized domains can authenticate (configure in Google OAuth settings)
@@ -119,10 +128,13 @@ This approach trusts your OAuth provider (Google) to verify user identity. Make 
 If you need to restrict who can create accounts, you have several options:
 
 #### Option 1: Domain Restriction (Google OAuth Console)
+
 Configure allowed domains in Google OAuth settings to only allow users from your organization.
 
 #### Option 2: Post-Creation Validation
+
 Add a check after user creation:
+
 ```typescript
 const user = await getOrCreateUser(userEmail);
 
@@ -133,7 +145,9 @@ if (!userEmail.endsWith('@yourcompany.com')) {
 ```
 
 #### Option 3: Manual Approval Workflow
+
 Add an `approved` field to users table and require admin approval:
+
 ```typescript
 const user = await getOrCreateUser(userEmail);
 
@@ -148,7 +162,7 @@ To deploy the updated OAuth proxy lambda:
 
 ```bash
 # Build the lambda
-npx nx build oauth-proxy
+pnpm exec nx build oauth-proxy
 
 # Verify the build
 ls lambdas/oauth-proxy/dist/index.js
@@ -160,6 +174,7 @@ git push origin main
 ```
 
 The GitHub Actions workflow will automatically:
+
 1. Build the oauth-proxy lambda
 2. Package it as a zip file
 3. Upload to S3
@@ -170,6 +185,7 @@ The GitHub Actions workflow will automatically:
 ### Test New User Creation
 
 1. **Clear existing user** (optional, for testing):
+
 ```sql
 DELETE FROM app_internal.users WHERE email = 'test@example.com';
 ```
@@ -177,8 +193,9 @@ DELETE FROM app_internal.users WHERE email = 'test@example.com';
 2. **Attempt OAuth login** with a new email address
 
 3. **Verify user was created**:
+
 ```bash
-npx nx run cli:serve --args="list-users"
+pnpm exec nx run cli:serve --args="list-users"
 ```
 
 You should see the new user in the list!
@@ -186,6 +203,7 @@ You should see the new user in the list!
 ### Check Lambda Logs
 
 Monitor CloudWatch logs to see the auto-provisioning in action:
+
 ```
 CloudWatch Log Group: /aws/lambda/legacy-sports-dev-oauth-proxy
 
@@ -214,6 +232,7 @@ If you need to revert to the pre-authorization behavior:
 ## Migration Notes
 
 **Existing users are not affected.** This change only impacts:
+
 - New users who haven't logged in before
 - Users who were previously blocked with "not pre-authorized" error
 

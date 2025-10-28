@@ -276,7 +276,7 @@ query CareerLeaders {
 
    ```bash
    cd lambdas/db
-   npm run dev
+   pnpm run dev
    ```
 
 2. **Access GraphQL Playground:**

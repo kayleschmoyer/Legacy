@@ -1,4 +1,3 @@
-/// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
@@ -28,16 +27,5 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env.GRAPHQL_HOST': JSON.stringify(process.env.GRAPHQL_HOST),
-  },
-
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/apps/graphql-explorer',
-      provider: 'v8',
-    },
   },
 });

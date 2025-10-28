@@ -32,7 +32,7 @@ on:
 # Required permissions for nx-set-shas action and creating releases
 permissions:
   actions: read
-  contents: write  # Required for creating GitHub releases
+  contents: write # Required for creating GitHub releases
 
 # Cancel in-progress builds for the same workflow
 concurrency:
@@ -88,7 +88,7 @@ jobs:
       - name: Generate React Native Bundle
         run: |
           cd apps/app
-          npx react-native bundle \
+          pnpm exec react-native bundle \
             --platform ios \
             --dev false \
             --entry-file index.js \

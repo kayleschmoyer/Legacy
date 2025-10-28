@@ -15,7 +15,7 @@ Successfully migrated from Detox to Appium + WebDriverIO for React Native E2E te
 ### 2. Installed Appium + WebDriverIO
 
 ```bash
-npm install --save-dev @wdio/cli webdriverio @wdio/appium-service @wdio/local-runner @wdio/mocha-framework @wdio/spec-reporter appium appium-uiautomator2-driver
+pnpm add -D @wdio/cli webdriverio @wdio/appium-service @wdio/local-runner @wdio/mocha-framework @wdio/spec-reporter appium appium-uiautomator2-driver
 ```
 
 ### 3. Created WebDriverIO Configuration
@@ -46,20 +46,20 @@ npm install --save-dev @wdio/cli webdriverio @wdio/appium-service @wdio/local-ru
 
 ```bash
 # Run Android E2E tests
-npx nx run app-e2e:e2e-android
+pnpm exec nx run app-e2e:e2e-android
 
 # Run with debug logging
-npx nx run app-e2e:e2e-android-debug
+pnpm exec nx run app-e2e:e2e-android-debug
 
 # Run setup validation
-npx nx run app-e2e:test
+pnpm exec nx run app-e2e:test
 ```
 
 ### Direct WebDriverIO Commands
 
 ```bash
 cd apps/app-e2e
-npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js
+pnpm exec wdio run ./wdio.conf.js --spec ./src/app.e2e.js
 ```
 
 ## Advantages of Appium + WebDriverIO
@@ -112,18 +112,18 @@ capabilities: [
 
    ```bash
    # Android Studio emulator or
-   npx @react-native-community/cli run-android
+   pnpm exec @react-native-community/cli run-android
    ```
 
 2. **Build React Native App**
 
    ```bash
-   npx nx run app:build-android
+   pnpm exec nx run app:build-android
    ```
 
 3. **Run E2E Tests**
    ```bash
-   npx nx run app-e2e:e2e-android
+   pnpm exec nx run app-e2e:e2e-android
    ```
 
 ## Troubleshooting
@@ -138,13 +138,13 @@ capabilities: [
 
 ```bash
 # Check WebDriverIO version
-npx wdio --version
+pnpm exec wdio --version
 
 # Run with debug logging
-npx nx run app-e2e:e2e-android-debug
+pnpm exec nx run app-e2e:e2e-android-debug
 
 # Validate setup
-npx nx run app-e2e:test
+pnpm exec nx run app-e2e:test
 ```
 
 ## Migration Status: ✅ COMPLETE

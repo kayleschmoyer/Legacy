@@ -107,7 +107,7 @@ Main API serving GraphQL queries:
 
 ```bash
 # Deploy GraphQL Lambda
-npm run deploy:graphql
+pnpm run deploy:graphql
 ```
 
 ### OAuth Proxy (`lambdas/oauth-proxy/`)
@@ -120,7 +120,7 @@ Handles Google OAuth authentication:
 
 ```bash
 # Deploy OAuth Lambda
-npm run deploy:oauth
+pnpm run deploy:oauth
 ```
 
 ### Stats Lambda (`lambdas/stats-lambda/`)
@@ -133,7 +133,7 @@ Background processing for statistics:
 
 ```bash
 # Deploy Stats Lambda
-npm run deploy:stats
+pnpm run deploy:stats
 ```
 
 ## 🔧 Configuration
@@ -176,7 +176,7 @@ PostgreSQL RDS instance with:
 ```bash
 # Test Lambda functions locally
 cd lambdas/graphql
-npm run test:local
+pnpm run test:local
 
 # Test with SAM CLI
 sam local start-api
@@ -186,10 +186,10 @@ sam local start-api
 
 ```bash
 # Test deployed endpoints
-npm run test:integration
+pnpm run test:integration
 
 # Health check all endpoints
-npm run health:check
+pnpm run health:check
 ```
 
 ## 📊 Monitoring
@@ -276,7 +276,7 @@ cd terraform
 terraform apply
 
 # Deploy specific Lambda
-npm run deploy:graphql
+pnpm run deploy:graphql
 
 # Update environment variables
 terraform apply -target=aws_lambda_function.graphql

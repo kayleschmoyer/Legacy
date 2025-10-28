@@ -5,6 +5,7 @@ This test verifies that starting a draft correctly updates the league draft stat
 ## 🎯 What This Test Validates
 
 The test confirms that the `startDraft` mutation:
+
 1. ✅ Updates the league's `draftStatus` from `not-started` to `queued`
 2. ✅ Returns the correct status in the mutation response
 3. ✅ Persists the status change in the database
@@ -16,10 +17,12 @@ The test confirms that the `startDraft` mutation:
 ## 🚀 Running the Test
 
 ### Prerequisites
+
 1. **GraphQL Server**: The test requires the GraphQL server to be running
+
    ```bash
    cd lambdas/db
-   npm run dev
+   pnpm run dev
    # Server should start on http://localhost:3001/graphql
    ```
 
@@ -30,18 +33,21 @@ The test confirms that the `startDraft` mutation:
 ### Execute the Test
 
 **Option 1: Using npm script (Recommended)**
+
 ```bash
-npm run test:draft-status
+pnpm run test:draft-status
 ```
 
 **Option 2: Direct execution**
+
 ```bash
-npx tsx --tsconfig tsconfig.base.json test-draft-status.ts
+pnpm exec tsx --tsconfig tsconfig.base.json test-draft-status.ts
 ```
 
 **Option 3: Custom GraphQL endpoint**
+
 ```bash
-GRAPHQL_ENDPOINT=http://your-server:port/graphql npm run test:draft-status
+GRAPHQL_ENDPOINT=http://your-server:port/graphql pnpm run test:draft-status
 ```
 
 ## 📋 Test Output Example
@@ -97,11 +103,13 @@ GRAPHQL_ENDPOINT=http://your-server:port/graphql npm run test:draft-status
 ## 🔍 What Gets Tested
 
 ### 1. **Authentication Flow**
+
 - Uses CLI-generated JWTs for both admin and regular users
 - Verifies JWT generation works correctly
 - Tests both admin and user permissions for draft operations
 
 ### 2. **Draft Status Persistence**
+
 - Creates a test league with `not-started` status
 - Executes `startDraft` mutation
 - Verifies mutation response shows `queued` status
@@ -109,11 +117,13 @@ GRAPHQL_ENDPOINT=http://your-server:port/graphql npm run test:draft-status
 - Performs multiple queries to ensure consistency
 
 ### 3. **Draft Type Validation**
+
 - Tests valid draft types: `random-draft`, `snake-draft`, `auction`
 - Verifies invalid draft types are rejected
 - Confirms each type is processed correctly
 
 ### 4. **Permission Testing**
+
 - Tests admin users can start drafts (as league owners)
 - Verifies regular users can start drafts (when added as league members)
 - Confirms proper error handling for unauthorized access
@@ -121,43 +131,50 @@ GRAPHQL_ENDPOINT=http://your-server:port/graphql npm run test:draft-status
 ## 🚨 Troubleshooting
 
 ### Server Not Available
+
 ```
 ❌ GraphQL server is not available: fetch failed
 ⚠️  Server not available - test cannot run
 💡 To run this test:
-   1. Start the GraphQL server: cd lambdas/db && npm run dev
+   1. Start the GraphQL server: cd lambdas/db && pnpm run dev
    2. Run this test again
 ```
 
 **Solution**: Start the GraphQL server as shown
 
 ### JWT Generation Failed
+
 ```
 ❌ Failed to generate JWT for admin@test.com: Error: Failed to extract JWT from CLI output
 ```
 
 **Solutions**:
-1. Ensure CLI is working: `npx tsx --tsconfig tsconfig.base.json apps/cli/src/main.ts generate-jwt --email test@example.com`
+
+1. Ensure CLI is working: `pnpm exec tsx --tsconfig tsconfig.base.json apps/cli/src/main.ts generate-jwt --email test@example.com`
 2. Check database connection (CLI falls back to mock users if DB unavailable)
 3. Verify Node.js and tsx are installed
 
 ### GraphQL Errors
+
 ```
 ❌ GraphQL error: Authentication required to start draft
 ```
 
 **Solutions**:
+
 1. Check JWT generation is working
 2. Verify the JWT is being sent in Authorization header
 3. Confirm the GraphQL server recognizes the JWT format
 
 ### Database Connection Issues
+
 ```
 ❌ TEST FAILED!
 Error: User does not have access to this league
 ```
 
 **Solutions**:
+
 1. Ensure database is running and accessible
 2. Check if test user was added to the league successfully
 3. Verify league creation worked correctly
@@ -165,6 +182,7 @@ Error: User does not have access to this league
 ## 📊 Success Criteria
 
 The test passes when:
+
 - ✅ GraphQL server is accessible
 - ✅ JWT generation works for both admin and user
 - ✅ Test league is created successfully
@@ -184,14 +202,14 @@ This test can be integrated into your CI/CD pipeline:
 - name: Test Draft Status Update
   run: |
     # Start GraphQL server in background
-    cd lambdas/db && npm run dev &
+    cd lambdas/db && pnpm run dev &
     sleep 10  # Wait for server to start
-    
+
     # Run the test
-    npm run test:draft-status
-    
+    pnpm run test:draft-status
+
     # Clean up
-    pkill -f "npm run dev"
+    pkill -f "pnpm run dev"
 ```
 
 ## 📚 Related Files

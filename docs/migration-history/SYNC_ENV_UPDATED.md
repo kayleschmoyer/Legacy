@@ -60,7 +60,7 @@ RDS_PROXY_ENDPOINT=proxy-endpoint.amazonaws.com
 
 # Output:
 # ✓ Production apps will automatically fetch DB credentials from AWS Secrets Manager
-# ✓ Use 'npm run db:test:production' to validate database connectivity
+# ✓ Use 'pnpm run db:test:production' to validate database connectivity
 ```
 
 ### For Database Migrations
@@ -96,13 +96,13 @@ After running the sync script, test the new credential system:
 
 ```bash
 # Test production database connectivity
-npm run db:test:production
+pnpm run db:test:production
 
 # View resolved credentials (passwords masked)
-npm run db:credentials:production
+pnpm run db:credentials:production
 
 # Get connection URL for manual testing
-npm run db:url:production
+pnpm run db:url:production
 ```
 
 ## Environment Variable Priorities
@@ -150,10 +150,10 @@ cd terraform && terraform show
 
 ```bash
 # Test the new credential system
-npm run db:test:production
+pnpm run db:test:production
 
 # Check what credentials are resolved
-npm run db:credentials:production
+pnpm run db:credentials:production
 ```
 
 ### Environment Variable Conflicts

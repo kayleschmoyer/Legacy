@@ -109,13 +109,13 @@ Each function can be developed and tested locally:
 cd lambdas/graphql
 
 # Install dependencies
-npm install
+pnpm install
 
 # Run locally (if supported)
-npm run dev
+pnpm run dev
 
 # Run tests
-npm test
+pnpm test
 ```
 
 ### Shared Dependencies
@@ -144,23 +144,23 @@ cp .env.example .env
 ```bash
 # Test specific function
 cd lambdas/graphql
-npm test
+pnpm test
 
 # Test with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Watch mode
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### Integration Testing
 
 ```bash
 # Test deployed functions
-npm run test:integration
+pnpm run test:integration
 
 # Load testing
-npm run test:load
+pnpm run test:load
 ```
 
 ### Local Testing with SAM
@@ -194,8 +194,8 @@ terraform apply -target=aws_lambda_function.graphql
 
 # Package and deploy manually
 cd lambdas/graphql
-npm run build
-npm run deploy
+pnpm run build
+pnpm run deploy
 ```
 
 ### Build Process

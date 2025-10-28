@@ -29,10 +29,10 @@ This guide ensures no sensitive information is accidentally committed to git and
 
 ```bash
 # Check if files are safe to commit
-npm run security:validate
+pnpm run security:validate
 
 # Install git pre-commit hooks (runs automatically)
-npm run security:install-hooks
+pnpm run security:install-hooks
 ```
 
 ### Manual Validation
@@ -96,7 +96,7 @@ VITE_GOOGLE_CLIENT_ID=placeholder-google-client-id
 cp .env.example .env.local
 
 # Install security hooks
-npm run security:install-hooks
+pnpm run security:install-hooks
 ```
 
 ### 2. Configure Local Development
@@ -115,7 +115,7 @@ VITE_GOOGLE_CLIENT_ID=your-real-google-client-id
 
 ```bash
 # Always run before committing
-npm run security:validate
+pnpm run security:validate
 
 # Should show: ✅ All files are secure for commit!
 ```
@@ -167,14 +167,14 @@ SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/${aws_account_id}/queue-name
 
 4. **Verify cleanup**:
    ```bash
-   npm run security:validate
+   pnpm run security:validate
    ```
 
 ## ✅ Security Checklist
 
 Before every commit:
 
-- [ ] Run `npm run security:validate`
+- [ ] Run `pnpm run security:validate`
 - [ ] Verify no real passwords in tracked files
 - [ ] Confirm `.env.local` has your local credentials
 - [ ] Check that `.env` only has placeholders
@@ -189,4 +189,4 @@ Before every commit:
 
 ---
 
-**Remember**: When in doubt, run `npm run security:validate` before committing!
+**Remember**: When in doubt, run `pnpm run security:validate` before committing!

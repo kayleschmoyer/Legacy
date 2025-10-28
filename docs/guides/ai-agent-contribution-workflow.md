@@ -46,7 +46,7 @@ twig github new-branch ticket-1234
 twig switch ticket-1234 -p
 
 # Run affected tests
-npx nx affected -t test
+pnpm exec nx affected -t test
 
 #### Scenario 1: Type Errors
 
@@ -56,16 +56,16 @@ npx nx affected -t test
 
 ```powershell
 # Run type checking to see errors
-npx npx nx affected -t typecheck
+pnpm exec pnpm exec nx affected -t typecheck
 ````
 
 # Lint affected projects (with auto-fix)
 
-npx nx affected -t lint --fix
+pnpm exec nx affected -t lint --fix
 
 # Build affected projects
 
-npx nx affected -t build
+pnpm exec nx affected -t build
 
 # Create pull request
 
@@ -217,6 +217,7 @@ main
 ```
 
 The `[+N]` notation shows unique commits in each branch:
+
 - `[+1]` = 1 unique commit (✅ **clean**)
 - `[+25]` = 25 commits, possibly includes duplicates (⚠️ **investigate**)
 
@@ -328,12 +329,12 @@ twig switch LS-19 -p current
 
 ```powershell
 # ❌ DON'T: Run commands directly
-npm run test
+pnpm run test
 
 # ✅ DO: Use nx to run targets
-npx nx affected -t test
+pnpm exec nx affected -t test
 nx run project-name:test
-npx nx run-many -t test --projects=lib1,lib2
+pnpm exec nx run-many -t test --projects=lib1,lib2
 ```
 
 ##### B. Development Servers Already Running
@@ -351,16 +352,16 @@ Use `nx affected` to only run tasks on projects impacted by your changes:
 
 ```powershell
 # Test only affected projects
-npx nx affected -t test
+pnpm exec nx affected -t test
 
 # Build only affected projects
-npx nx affected -t build
+pnpm exec nx affected -t build
 
 # Lint only affected projects
-npx nx affected -t lint
+pnpm exec nx affected -t lint
 
 # Type check only affected projects
-npx nx affected -t typecheck
+pnpm exec nx affected -t typecheck
 ```
 
 ##### D. Focus on Specific Projects
@@ -369,13 +370,13 @@ When working on a specific project:
 
 ```powershell
 # Run tests for a single project
-npx npx nx test project-name
+pnpm exec pnpm exec nx test project-name
 
 # Run build for a single project
-npx nx build project-name
+pnpm exec nx build project-name
 
 # Run multiple targets for a project
-npx nx run-many -t test,build,lint --projects=project-name
+pnpm exec nx run-many -t test,build,lint --projects=project-name
 ```
 
 #### Common Development Patterns
@@ -384,23 +385,23 @@ npx nx run-many -t test,build,lint --projects=project-name
 
 ```powershell
 # GraphQL server is already running, but if you need to regenerate types:
-npx nx codegen project-name
+pnpm exec nx codegen project-name
 
 # Run codegen for all affected projects
-npx nx affected -t codegen
+pnpm exec nx affected -t codegen
 ```
 
 ##### Working with Database
 
 ```powershell
 # Sync environment credentials first
-npm run sync-env
+pnpm run sync-env
 
 # Run migrations
-npm run db:migrate
+pnpm run db:migrate
 
 # Test database connection (CLI)
-npm run cli:test-connection
+pnpm run cli:test-connection
 ```
 
 ##### Working with React Native/Mobile
@@ -413,7 +414,7 @@ nx build-android-debug app
 nx run-android app
 
 # Validate Android versions
-npm run android:validate-versions
+pnpm run android:validate-versions
 ```
 
 ---
@@ -422,7 +423,7 @@ npm run android:validate-versions
 
 **Purpose**: Ensure all quality checks pass before committing.
 
-> **Important**: Always use `npx nx` instead of just `nx` when running Nx commands in PowerShell. This ensures the command is found even if `nx` is not in your PATH.
+> **Important**: Always use `pnpm exec nx` instead of just `nx` when running Nx commands in PowerShell. This ensures the command is found even if `nx` is not in your PATH.
 
 #### Required Checks (Must All Pass)
 
@@ -432,7 +433,7 @@ Run these checks in sequence. Fix any errors before proceeding to the next check
 
 ```powershell
 # Check types for affected projects
-npx nx affected -t typecheck
+pnpm exec nx affected -t typecheck
 
 # Or check specific project
 nx typecheck project-name
@@ -450,10 +451,10 @@ nx typecheck project-name
 
 ```powershell
 # Lint affected projects with auto-fix
-npx nx affected -t lint --fix
+pnpm exec nx affected -t lint --fix
 
 # Or lint specific project
-npx nx lint project-name --fix
+pnpm exec nx lint project-name --fix
 ```
 
 **Common Issues**:
@@ -475,13 +476,13 @@ npx nx lint project-name --fix
 
 ```powershell
 # Run tests for affected projects
-npx nx affected -t test
+pnpm exec nx affected -t test
 
 # Run tests in watch mode for development
-npx nx affected -t test --watch
+pnpm exec nx affected -t test --watch
 
 # Run tests with coverage
-npx nx affected -t test --coverage
+pnpm exec nx affected -t test --coverage
 ```
 
 **Common Issues**:
@@ -494,17 +495,17 @@ npx nx affected -t test --coverage
 
 1. Read test failure messages carefully
 2. Update tests if implementation changed intentionally
-3. Update snapshots if UI/output changed intentionally: `npx npx nx test project-name --updateSnapshot`
+3. Update snapshots if UI/output changed intentionally: `pnpm exec pnpm exec nx test project-name --updateSnapshot`
 4. Fix actual bugs if tests reveal issues
 
 ##### 4. Building
 
 ```powershell
 # Build affected projects
-npx nx affected -t build
+pnpm exec nx affected -t build
 
 # Build specific project
-npx nx build project-name
+pnpm exec nx build project-name
 ```
 
 **Common Issues**:
@@ -547,7 +548,7 @@ The repository has **automatic pre-commit hooks** that run when you commit. Thes
 **Hook Installation** (if not already installed):
 
 ```powershell
-npm run security:install-hooks
+pnpm run security:install-hooks
 ```
 
 ---
@@ -649,12 +650,14 @@ Sometimes during implementation, you may realize the ticket scope is too large f
 **When to De-scope**:
 
 ✅ **Good reasons to split work**:
+
 - PR becomes difficult to review (>500 lines changed)
 - Work naturally separates (backend vs frontend, core vs polish)
 - Additional work requires different expertise
 - Timeline pressure requires partial delivery
 
 ❌ **Bad reasons to split**:
+
 - Avoiding fixing bugs you introduced
 - Incomplete feature that can't function independently
 - Breaking changes without migration path
@@ -825,10 +828,10 @@ Snapshot Summary
 
 ```powershell
 # Update snapshots locally
-npx npx nx test project-name --updateSnapshot
+pnpm exec pnpm exec nx test project-name --updateSnapshot
 
 # Or for affected projects
-npx nx affected -t test --updateSnapshot
+pnpm exec nx affected -t test --updateSnapshot
 
 # Review the changes in git
 git diff
@@ -857,7 +860,7 @@ error: 'variable' is assigned a value but never used
 
 ```powershell
 # Fix lint issues locally
-npx nx affected -t lint --fix
+pnpm exec nx affected -t lint --fix
 
 # Commit fixes
 git add .
@@ -993,7 +996,7 @@ git commit --no-verify -m "your message"
 
 ### Issue: Nx Affected Returns No Projects
 
-**Symptom**: `npx nx affected -t test` says no projects affected.
+**Symptom**: `pnpm exec nx affected -t test` says no projects affected.
 
 **Possible Causes & Solutions**:
 
@@ -1018,7 +1021,7 @@ git status
 nx reset
 
 # Try again
-npx nx affected -t test
+pnpm exec nx affected -t test
 ```
 
 ---
@@ -1031,13 +1034,13 @@ npx nx affected -t test
 
 ```powershell
 # 1. Install dependencies
-npm install
+pnpm install
 
 # 2. Build dependencies first (libs before apps)
-npx nx run-many -t build --projects=tag:scope:lib
+pnpm exec nx run-many -t build --projects=tag:scope:lib
 
 # 3. Then build your target
-npx nx build your-project
+pnpm exec nx build your-project
 
 # 4. If still failing, check imports
 # Verify the package exists in package.json
@@ -1054,16 +1057,16 @@ npx nx build your-project
 
 ```powershell
 # 1. Sync environment variables
-npm run sync-env
+pnpm run sync-env
 
 # 2. Verify database credentials are set
-npm run db:credentials
+pnpm run db:credentials
 
 # 3. Test connection
-npm run cli:test-connection
+pnpm run cli:test-connection
 
 # 4. If using test database, check it's running
-npm run dev:db
+pnpm run dev:db
 ```
 
 ---
@@ -1085,7 +1088,7 @@ npm run dev:db
 $env:VITE_GRAPHQL_HOST = 'http://localhost:5000/graphql'
 
 # 4. Run codegen
-npx nx affected -t codegen
+pnpm exec nx affected -t codegen
 
 # 5. If still failing, restart GraphQL server
 # (This should rarely be needed)
@@ -1187,7 +1190,7 @@ As an AI agent, you should:
    - `docs/`: Documentation
 
 3. **Use Nx intelligently**:
-   - Prefer `nx affected` over `npx nx run-many --all` for efficiency
+   - Prefer `nx affected` over `pnpm exec nx run-many --all` for efficiency
    - Understand project dependencies via `nx graph`
    - Leverage Nx cache for faster builds
 
@@ -1270,10 +1273,10 @@ Use this checklist for each contribution:
 
 ### Validation
 
-- [ ] Type checking passes (`npx nx affected -t typecheck`)
-- [ ] Linting passes (`npx nx affected -t lint --fix`)
-- [ ] Tests pass (`npx nx affected -t test`)
-- [ ] Build succeeds (`npx nx affected -t build`)
+- [ ] Type checking passes (`pnpm exec nx affected -t typecheck`)
+- [ ] Linting passes (`pnpm exec nx affected -t lint --fix`)
+- [ ] Tests pass (`pnpm exec nx affected -t test`)
+- [ ] Build succeeds (`pnpm exec nx affected -t build`)
 - [ ] Pre-commit hooks pass
 
 ### Submission

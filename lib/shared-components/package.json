@@ -7,11 +7,11 @@
   "module": "./dist/web/index.es.js",
   "types": "./dist/web/index.d.ts",
   "scripts": {
-    "build": "npm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
+    "build": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
     "build:declarations": "tsc --emitDeclarationOnly --declaration --outDir dist/web",
-    "build:web": "npm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
+    "build:web": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
     "build:mobile": "cross-env BUILD_PLATFORM=mobile vite build",
-    "build:all": "npm run build:web && npm run build:mobile",
+    "build:all": "pnpm run build:web && pnpm run build:mobile",
     "codegen": "graphql-codegen --config codegen.ts",
     "storybook": "storybook dev -p 6009 -c .storybook",
     "build-storybook": "storybook build -c .storybook -o ../../dist/storybook",
@@ -20,14 +20,14 @@
     "test:coverage": "jest --coverage",
     "test:all-files": "jest",
     "test-storybook": "test-storybook",
-    "test-storybook:ci": "concurrently -k -s first -n \"SB,TEST\" -c \"magenta,blue\" \"npm run storybook\" \"wait-on tcp:6009 && npm run test-storybook\"",
+    "test-storybook:ci": "concurrently -k -s first -n \"SB,TEST\" -c \"magenta,blue\" \"pnpm run storybook\" \"wait-on tcp:6009 && pnpm run test-storybook\"",
     "test:stories": "jest --config=jest.storybook.config.ts",
-    "test:all": "npm run test && npm run test:stories"
+    "test:all": "pnpm run test && pnpm run test:stories"
   },
   "dependencies": {
-    "@legacy-sports/api": "*",
-    "@legacy-sports/logging": "*",
-    "@legacy-sports/tamagui-config": "*",
-    "@legacy-sports/ui-abstractions": "*"
+    "@legacy-sports/api": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/tamagui-config": "workspace:*",
+    "@legacy-sports/ui-abstractions": "workspace:*"
   }
 }

@@ -44,7 +44,7 @@ inputs:
 outputs:
   comment-id:
     description: "ID of the created/updated PR comment"
-    value: ${{ steps.pr-comment.outputs.comment-id }}
+    value: ${{ steps.pr-comment.outputs.comment_id }}
   report-generated:
     description: "Whether a report was generated"
     value: ${{ steps.generate-report.outputs.report-generated }}
@@ -57,14 +57,14 @@ runs:
       shell: bash
       run: |
         echo "::group::📊 CI Pipeline Report Generation"
-        
+
         STATUS="${{ inputs.status }}"
         EVENT_NAME="${{ inputs.event-name }}"
         EXECUTION_MODE="${{ inputs.execution-mode }}"
         OPTIMAL_AGENTS="${{ inputs.optimal-agents }}"
         FALLBACK_REASON="${{ inputs.fallback-reason }}"
         WORKFLOW_DURATION="${{ inputs.workflow-duration || 'unknown' }}"
-        
+
         echo "📋 Generating comprehensive CI report..."
         echo "  - Status: $STATUS"
         echo "  - Event: $EVENT_NAME"
@@ -73,7 +73,7 @@ runs:
 
         # Create comprehensive report JSON
         TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        
+
         # Determine duration category first
         if [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -gt 1200 ]; then
           DURATION_CATEGORY="slow"
@@ -82,16 +82,16 @@ runs:
         else
           DURATION_CATEGORY="normal"
         fi
-        
+
         printf '%s\n' "{\"pipeline\":{\"status\":\"$STATUS\",\"timestamp\":\"$TIMESTAMP\",\"duration_seconds\":\"$WORKFLOW_DURATION\",\"trigger\":\"$EVENT_NAME\",\"execution_mode\":\"$EXECUTION_MODE\",\"agents_used\":\"$OPTIMAL_AGENTS\",\"fallback_reason\":\"$FALLBACK_REASON\"},\"performance\":{\"mode_used\":\"$EXECUTION_MODE\",\"agent_count\":\"$OPTIMAL_AGENTS\",\"duration_category\":\"$DURATION_CATEGORY\"}}" > ci-report.json
-        
+
         echo "report-generated=true" >> $GITHUB_OUTPUT
-        
+
         # Create performance insights
         echo "## 📊 CI Performance Analysis" >> $GITHUB_STEP_SUMMARY
         echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
         echo "- **Agents/Processes**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ "$WORKFLOW_DURATION" != "unknown" ]; then
           echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY
           
@@ -103,7 +103,7 @@ runs:
             echo "- **Performance**: ✅ Good" >> $GITHUB_STEP_SUMMARY
           fi
         fi
-        
+
         if [ "$EXECUTION_MODE" = "distributed" ]; then
           echo "- **Optimization**: 🚀 DTE enabled (60-80% faster)" >> $GITHUB_STEP_SUMMARY
         else
@@ -124,7 +124,7 @@ runs:
         github-token: ${{ inputs.github-token }}
         script: |
           const commentMarker = "<!-- CI-PIPELINE-COMMENT -->";
-          
+
           // Parse step results if provided
           let stepResults = {};
           try {
@@ -148,29 +148,29 @@ runs:
 
           // Determine specific failure context and provide targeted guidance
           let failureReason = "CI pipeline failure detected";
-          let reproCommand = "npx nx affected -t lint,typecheck,test,build --parallel=4";
+          let reproCommand = "pnpm exec nx affected -t lint,typecheck,test,build --parallel=4";
           let debugSection = "A CI step failed. Run the reproduction command to identify the specific issue.";
 
           // Analyze step results for specific guidance
           const stepAnalysis = {
             'format-check': {
               reason: 'Code formatting check failed',
-              command: 'npx nx format:write',
+              command: 'pnpm exec nx format:write',
               debug: 'Code formatting issues detected. Run the command above to auto-fix formatting, then commit the changes.'
             },
             'quality-gates': {
               reason: 'Code quality validation failed',
-              command: 'npx nx affected -t lint,typecheck,test --parallel=4',
+              command: 'pnpm exec nx affected -t lint,typecheck,test --parallel=4',
               debug: 'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.'
             },
             'build-validation': {
               reason: 'Build validation failed',
-              command: 'npx nx affected -t build --parallel=4',
+              command: 'pnpm exec nx affected -t build --parallel=4',
               debug: 'Build validation failed. Check for compilation errors, missing dependencies, or configuration issues.'
             },
             'e2e-testing': {
               reason: 'End-to-end tests failed',
-              command: 'cd apps/web-e2e && npx playwright test --ui',
+              command: 'cd apps/web-e2e && pnpm exec playwright test --ui',
               debug: 'E2E tests are failing. Check for UI changes, API issues, or test environment problems.'
             }
           };
@@ -219,7 +219,7 @@ runs:
                          "# Reproduce the failure:\n" +
                          reproCommand + "\n\n" +
                          "# Full local CI simulation:\n" +
-                         "npm run ci:local  # Run full CI pipeline locally\n" +
+                         "pnpm run ci:local  # Run full CI pipeline locally\n" +
                          "```\n\n" +
                          "### 📊 Execution Context\n" +
                          "- **Mode**: " + (executionMode === 'distributed' ? 'Distributed Task Execution (DTE)' : 'Local GitHub Actions') + "\n" +
@@ -248,6 +248,7 @@ runs:
               body: comment
             });
             console.log("Updated existing CI failure comment #" + existingComment.id);
+            core.setOutput('comment_id', existingComment.id);
             return { comment_id: existingComment.id };
           } else {
             const newComment = await github.rest.issues.createComment({
@@ -257,6 +258,7 @@ runs:
               body: comment
             });
             console.log("Created new CI failure comment #" + newComment.data.id);
+            core.setOutput('comment_id', newComment.data.id);
             return { comment_id: newComment.data.id };
           }
 
@@ -341,6 +343,7 @@ runs:
               body: comment
             });
             console.log("Updated existing CI success comment #" + existingComment.id);
+            core.setOutput('comment_id', existingComment.id);
             return { comment_id: existingComment.id };
           } else {
             // Create new success comment
@@ -351,6 +354,7 @@ runs:
               body: comment
             });
             console.log("Created new CI success comment #" + newComment.data.id);
+            core.setOutput('comment_id', newComment.data.id);
             return { comment_id: newComment.data.id };
           }
 
@@ -362,11 +366,11 @@ runs:
         # Set the comment ID from either success or failure comment
         SUCCESS_COMMENT_ID="${{ steps.pr-success-comment.outputs.comment_id }}"
         FAILURE_COMMENT_ID="${{ steps.pr-failure-comment.outputs.comment_id }}"
-        
+
         if [ -n "$SUCCESS_COMMENT_ID" ]; then
-          echo "comment-id=$SUCCESS_COMMENT_ID" >> $GITHUB_OUTPUT
+          echo "comment_id=$SUCCESS_COMMENT_ID" >> $GITHUB_OUTPUT
         elif [ -n "$FAILURE_COMMENT_ID" ]; then
-          echo "comment-id=$FAILURE_COMMENT_ID" >> $GITHUB_OUTPUT
+          echo "comment_id=$FAILURE_COMMENT_ID" >> $GITHUB_OUTPUT
         fi
 
     - name: "📊 Pipeline Summary"
@@ -374,20 +378,20 @@ runs:
       shell: bash
       run: |
         echo "::group::📊 Final Pipeline Summary"
-        
+
         STATUS="${{ inputs.status }}"
         EVENT_NAME="${{ inputs.event-name }}"
         EXECUTION_MODE="${{ inputs.execution-mode }}"
-        
+
         echo "## 🎯 CI Pipeline Summary"
         echo "- **Final Status**: $( [ "$STATUS" = "success" ] && echo "✅ Success" || echo "❌ Failed" )"
         echo "- **Event**: $EVENT_NAME"
         echo "- **Execution Mode**: $EXECUTION_MODE"
-        
+
         if [ "$EVENT_NAME" = "pull_request" ] && [ -n "${{ inputs.pr-number }}" ]; then
-          echo "- **PR Comment**: $( [ -n "${{ steps.pr-comment.outputs.comment-id }}" ] && echo "Updated (ID: ${{ steps.pr-comment.outputs.comment-id }})" || echo "Not created" )"
+          echo "- **PR Comment**: $( [ -n "${{ steps.pr-comment.outputs.comment_id }}" ] && echo "Updated (ID: ${{ steps.pr-comment.outputs.comment_id }})" || echo "Not created" )"
         fi
-        
+
         if [ "$STATUS" = "success" ]; then
           echo ""
           echo "🎉 **All CI checks passed!** The pipeline completed successfully."
@@ -399,5 +403,5 @@ runs:
           echo "⚠️ **CI pipeline failed.** Check the failure details above and fix the issues."
           echo "The pipeline will automatically re-run when you push new changes."
         fi
-        
+
         echo "::endgroup::"

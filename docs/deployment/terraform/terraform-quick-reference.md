@@ -8,13 +8,13 @@
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `terraform/main.tf` | ✅ Added S3 backend configuration |
-| `terraform/backend-setup.tf` | ✅ Created S3 bucket + DynamoDB table |
-| `terraform/github-actions-oidc.tf` | ✅ Added state access permissions |
-| `docs/terraform-backend-setup.md` | 📘 Step-by-step setup guide |
-| `docs/terraform-state-solution.md` | 📘 Complete explanation |
+| File                               | Change                                |
+| ---------------------------------- | ------------------------------------- |
+| `terraform/main.tf`                | ✅ Added S3 backend configuration     |
+| `terraform/backend-setup.tf`       | ✅ Created S3 bucket + DynamoDB table |
+| `terraform/github-actions-oidc.tf` | ✅ Added state access permissions     |
+| `docs/terraform-backend-setup.md`  | 📘 Step-by-step setup guide           |
+| `docs/terraform-state-solution.md` | 📘 Complete explanation               |
 
 ## Quick Setup (5 minutes)
 
@@ -62,7 +62,7 @@ cd ../lambdas/db
 # ... make changes ...
 
 # Build
-npx nx build db
+pnpm exec nx build db
 
 # The GitHub Actions workflow will:
 # 1. Upload new code to S3
@@ -80,7 +80,7 @@ npx nx build db
                            ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. GitHub Actions: Build & Package                          │
-│    - npx nx build db                                         │
+│    - pnpm exec nx build db                                         │
 │    - zip -r graphql-20251013-abc123.zip dist/               │
 └─────────────────────────────────────────────────────────────┘
                            ↓
@@ -112,6 +112,7 @@ npx nx build db
 ## Key Configuration
 
 **Lambda Resource** (`terraform/lambda-graphql.tf`):
+
 ```hcl
 data "aws_ssm_parameter" "graphql_lambda_version" {
   name = "/legacy-sports/dev/lambda/graphql/version"
@@ -120,15 +121,16 @@ data "aws_ssm_parameter" "graphql_lambda_version" {
 resource "aws_lambda_function" "graphql" {
   s3_bucket = aws_s3_bucket.lambda_deployments.bucket
   s3_key    = "graphql/graphql-${data.aws_ssm_parameter.graphql_lambda_version.value}.zip"
-  
+
   # ⭐ This is the magic line - changes when SSM parameter changes
   source_code_hash = data.aws_ssm_parameter.graphql_lambda_version.value
-  
+
   # ... rest of config
 }
 ```
 
 **Backend** (`terraform/main.tf`):
+
 ```hcl
 terraform {
   backend "s3" {
@@ -147,7 +149,7 @@ terraform {
 ✅ **Lambda updates stay simple** - Just upload code + update SSM  
 ✅ **Infrastructure in Git** - All configs tracked and reviewed  
 ✅ **Team collaboration** - Shared state, no conflicts  
-✅ **State locking** - Prevents concurrent runs  
+✅ **State locking** - Prevents concurrent runs
 
 ## Common Commands
 
@@ -176,12 +178,12 @@ terraform force-unlock <LOCK_ID>
 
 ## Troubleshooting
 
-| Error | Solution |
-|-------|----------|
-| "Backend configuration changed" | `terraform init -reconfigure` |
-| "Failed to acquire state lock" | Wait or `terraform force-unlock <LOCK_ID>` |
-| "Resource already exists" | `terraform import <resource> <id>` |
-| "Permission denied" on S3/DynamoDB | Check GitHub Actions IAM role permissions |
+| Error                              | Solution                                   |
+| ---------------------------------- | ------------------------------------------ |
+| "Backend configuration changed"    | `terraform init -reconfigure`              |
+| "Failed to acquire state lock"     | Wait or `terraform force-unlock <LOCK_ID>` |
+| "Resource already exists"          | `terraform import <resource> <id>`         |
+| "Permission denied" on S3/DynamoDB | Check GitHub Actions IAM role permissions  |
 
 ## Next Steps
 

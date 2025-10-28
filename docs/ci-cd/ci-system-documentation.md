@@ -29,11 +29,11 @@ The Legacy Sports CI system has been completely redesigned with a focus on **deb
 2. [Improved Workflow Structure](#improved-workflow-structure)
 3. [Debugging & Visibility Features](#debugging--visibility-features)
 4. [Nx Cloud Optimization Strategy](#nx-cloud-optimization-strategy)
-4. [Migration Information](#migration-information)
-5. [Legacy Architecture (Reference)](#legacy-architecture-reference)
-6. [Deployment Architecture](#deployment-architecture)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting Guide](#troubleshooting-guide)
+5. [Migration Information](#migration-information)
+6. [Legacy Architecture (Reference)](#legacy-architecture-reference)
+7. [Deployment Architecture](#deployment-architecture)
+8. [Best Practices](#best-practices)
+9. [Troubleshooting Guide](#troubleshooting-guide)
 
 ## New Architecture Overview
 
@@ -158,11 +158,11 @@ graph TD
 ```yaml
 - name: '🔧 ESLint Validation'
   run: |
-    if ! npx nx affected -t lint; then
+    if ! pnpm exec nx affected -t lint; then
       echo "❌ ESLint validation failed"
       echo "## ESLint Errors Summary" 
       grep -E "error|warning" lint.log | head -10
-      echo "🔧 To reproduce locally: npx nx affected -t lint"
+      echo "🔧 To reproduce locally: pnpm exec nx affected -t lint"
       exit 1
     fi
 ```
@@ -214,7 +214,7 @@ apps/web/src/components/PlayerCard.tsx
 42:1 error 'React' is not defined no-undef
 45:3 error Missing return type @typescript-eslint/explicit-function-return-type
 
-🔧 To reproduce locally: npx nx affected -t lint --base=origin/main --head=HEAD
+🔧 To reproduce locally: pnpm exec nx affected -t lint --base=origin/main --head=HEAD
 💡 Quick fix: Add missing import and return type annotation
 
 ````
@@ -239,16 +239,16 @@ Every failing step includes exact reproduction instructions:
 
 ```bash
 # Format issues
-npx nx format:write
+pnpm exec nx format:write
 
 # Lint issues
-npx nx affected -t lint --fix
+pnpm exec nx affected -t lint --fix
 
 # Type errors
-npx nx affected -t typecheck
+pnpm exec nx affected -t typecheck
 
 # Build issues
-npx nx affected -t build
+pnpm exec nx affected -t build
 ```
 
 ### **📊 Performance Monitoring**
@@ -735,7 +735,7 @@ outputs:
 
 **Execution Modes:**
 
-- **Nx Cloud Distributed**: `npx nx affected --parallel=4 -t tasks`
+- **Nx Cloud Distributed**: `pnpm exec nx affected --parallel=4 -t tasks`
 - **Local Fallback**: Conservative parallelism with verbose logging
 - **Local Mode**: Standard local execution
 
@@ -957,10 +957,10 @@ The new system provides clear error messages:
 ```bash
 # When you see this in CI:
 ❌ ESLint validation failed
-🔧 To reproduce locally: npx nx affected -t lint
+🔧 To reproduce locally: pnpm exec nx affected -t lint
 
 # Run the exact command locally:
-npx nx affected -t lint --base=origin/main --head=HEAD
+pnpm exec nx affected -t lint --base=origin/main --head=HEAD
 ```
 
 #### **✅ DO: Enable Debug Mode When Needed**
@@ -999,7 +999,7 @@ The system automatically detects what needs building:
 
 ```yaml
 # Runs only affected projects
-npx nx affected -t lint test build --parallel=4
+pnpm exec nx affected -t lint test build --parallel=4
 ```
 
 ### 3. **Error Handling & Resilience**
@@ -1103,7 +1103,7 @@ jobs:
 
 ```bash
 # Check Nx Cloud status
-npx nx g @nx/workspace:ci-workflow --ci=github
+pnpm exec nx g @nx/workspace:ci-workflow --ci=github
 
 # Monitor quota usage in Nx Cloud dashboard
 # Consider upgrading plan or optimizing task usage
@@ -1168,7 +1168,7 @@ node scripts/validate-package-json-standards.js
 1. **Check Nx Cache Hit Rates**:
 
    ```bash
-   npx nx affected:build --verbose
+   pnpm exec nx affected:build --verbose
    # Look for "cache hit" vs "cache miss" in output
    ```
 
@@ -1196,7 +1196,7 @@ node scripts/validate-package-json-standards.js
 
    ```bash
    # Run tests multiple times to identify flaky ones
-   npx nx affected:test --verbose --parallel=1
+   pnpm exec nx affected:test --verbose --parallel=1
    ```
 
 2. **Add Retry Logic**:
@@ -1206,7 +1206,7 @@ node scripts/validate-package-json-standards.js
      with:
        timeout_minutes: 10
        max_attempts: 3
-       command: npx nx affected:test
+       command: pnpm exec nx affected:test
    ```
 
 ### 3. **Security Troubleshooting**
@@ -1332,12 +1332,12 @@ The current CI system is optimized for **local GitHub Actions execution**. When 
 
 ### **Expected Performance Gains with Nx Cloud**
 
-| Metric | Current (Local) | With Nx Cloud | Improvement |
-|--------|----------------|---------------|-------------|
-| **Cache Hit Rate** | 60-70% | 85-95% | +25-35% |
-| **Build Time** | 16s cached, 8-12min full | 5-10s cached, 3-5min full | 60-70% faster |
-| **Parallel Execution** | 4 processes | 8-16 agents | 2-4x parallelization |
-| **Cross-PR Benefits** | No sharing | Shared cache | Massive speedup |
+| Metric                 | Current (Local)          | With Nx Cloud             | Improvement          |
+| ---------------------- | ------------------------ | ------------------------- | -------------------- |
+| **Cache Hit Rate**     | 60-70%                   | 85-95%                    | +25-35%              |
+| **Build Time**         | 16s cached, 8-12min full | 5-10s cached, 3-5min full | 60-70% faster        |
+| **Parallel Execution** | 4 processes              | 8-16 agents               | 2-4x parallelization |
+| **Cross-PR Benefits**  | No sharing               | Shared cache              | Massive speedup      |
 
 ### **Key Nx Cloud Features**
 
@@ -1390,7 +1390,7 @@ The system is **cloud-ready** and will automatically provide 60-80% performance 
 ### **📚 Documentation Resources**
 
 - **[Improved CI Design](./improved-ci-system-design.md)** - Complete architecture design
-- **[Migration Plan](./ci-migration-plan.md)** - Implementation roadmap  
+- **[Migration Plan](./ci-migration-plan.md)** - Implementation roadmap
 - **[Troubleshooting Guide](./ci-troubleshooting-guide.md)** - Comprehensive debugging help
 - **[Nx Cloud Strategy](./nx-cloud-optimization-strategy.md)** - Cloud performance optimization
 - **[Local Testing Scripts](../scripts/)** - CI simulation tools

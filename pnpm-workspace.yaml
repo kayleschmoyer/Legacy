@@ -1,0 +1,10 @@
+# pnpm workspace configuration for the Legacy Sports monorepo
+packages:
+  # Application packages
+  - "apps/*"
+  # Libraries and shared packages
+  - "lib/*"
+  # AWS Lambda functions
+  - "lambdas/*"
+  # Tooling packages
+  - "tools/*"

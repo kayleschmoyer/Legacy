@@ -29,175 +29,175 @@
     "start": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts",
         "cwd": "apps/cli"
       }
     },
     "compute-scoring": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts compute-scoring",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts compute-scoring",
         "cwd": "apps/cli"
       }
     },
     "run-migrations": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations",
         "cwd": "apps/cli"
       }
     },
     "load-players": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts load-players",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts load-players",
         "cwd": "apps/cli"
       }
     },
     "load-career-stats": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts load-career-stats",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts load-career-stats",
         "cwd": "apps/cli"
       }
     },
     "load-single-player-stats": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts load-single-player-stats",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts load-single-player-stats",
         "cwd": "apps/cli"
       }
     },
     "list-players": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts list-players",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts list-players",
         "cwd": "apps/cli"
       }
     },
     "inspect-database": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts inspect-database",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts inspect-database",
         "cwd": "apps/cli"
       }
     },
     "test-connection": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts test-connection",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts test-connection",
         "cwd": "apps/cli"
       }
     },
     "test-db": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts test-db",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts test-db",
         "cwd": "apps/cli"
       }
     },
     "test-raw-connection": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts test-raw-connection",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts test-raw-connection",
         "cwd": "apps/cli"
       }
     },
     "create-matchup": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts create-matchup",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts create-matchup",
         "cwd": "apps/cli"
       }
     },
     "fix-users-table": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts fix-users-table",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts fix-users-table",
         "cwd": "apps/cli"
       }
     },
     "test-internal": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts test-internal",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts test-internal",
         "cwd": "apps/cli"
       }
     },
     "inspect-sqs-queue": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts inspect-sqs-queue",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts inspect-sqs-queue",
         "cwd": "apps/cli"
       }
     },
     "inspect-sqs-queue:peek": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts inspect-sqs-queue --action peek",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts inspect-sqs-queue --action peek",
         "cwd": "apps/cli"
       }
     },
     "decode-jwt": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts decode-jwt",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts decode-jwt",
         "cwd": "apps/cli"
       }
     },
     "migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations",
         "cwd": "apps/cli"
       }
     },
     "migrate:dry-run": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --dry-run --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --dry-run --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:status": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --status --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --status --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:validate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --validate --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --validate --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:production": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --production --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --production --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:production:dry-run": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --production --dry-run --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --production --dry-run --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:public": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --schema public --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --schema public --verbose",
         "cwd": "apps/cli"
       }
     },
     "migrate:internal": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "ts-node -r tsconfig-paths/register src/main.ts run-migrations --schema internal --verbose",
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --schema internal --verbose",
         "cwd": "apps/cli"
       }
     }

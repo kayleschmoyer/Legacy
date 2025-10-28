@@ -255,7 +255,7 @@ To test the two-lambda authentication flow:
 1. Start the web development server:
 
    ```bash
-   npm run dev:web
+   pnpm run dev:web
    ```
 
 2. Navigate to the auth demo:
@@ -275,7 +275,7 @@ To run the lambdas locally for testing:
 ```bash
 # Start OAuth Proxy Lambda
 cd lambdas/oauth-proxy
-npm run dev  # Runs on port 5001 (handles OAuth and user operations)
+pnpm run dev  # Runs on port 5001 (handles OAuth and user operations)
 ```
 
 Update your `.env.local` to point to local endpoints:

@@ -65,7 +65,7 @@ endif
 # Installation and Setup
 install: ## Install all dependencies (Node.js and Python)
 	@$(call echo_blue,Installing dependencies...)
-	npm ci
+	pnpm install --frozen-lockfile
 	@$(CHECK_POETRY)
 
 install-force: ## Force install dependencies (handles Windows file locks)
@@ -77,16 +77,16 @@ install-force: ## Force install dependencies (handles Windows file locks)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
 	@$(RM_FILE) package-lock.json $(NULL_REDIRECT) || echo No package-lock to remove
 	@$(call echo_blue,Installing fresh dependencies...)
-	npm install
+	pnpm install
 	@$(CHECK_POETRY)
 
 install-tools: ## Install additional development tools (npkill, rimraf)
 	@$(call echo_blue,Installing development tools...)
-	npm install -g npkill rimraf
+	pnpm add -g npkill rimraf
 
 install-node: ## Install only Node.js dependencies
 	@$(call echo_blue,Installing Node.js dependencies...)
-	npm ci
+	pnpm install --frozen-lockfile
 
 install-python: ## Install only Python dependencies
 	@$(call echo_blue,Installing Python dependencies...)
@@ -99,159 +99,171 @@ setup-force: install-force ## Setup with force install for Windows file lock iss
 # Cleaning
 clean-safe: ## Safely clean build artifacts and cache
 	@$(call echo_blue,Cleaning workspace safely...)
-	npx nx reset
+	pnpm exec nx reset
 	@$(call echo_blue,Safe clean completed)
 
-clean: ## Clean all build artifacts and dependencies (requires npkill)
+clean: ## Clean all build artifacts and dependencies
 	@$(call echo_blue,Cleaning workspace...)
-	npm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
-	npx nx reset
-	@$(call echo_yellow,Note: If npkill errors occur, run 'make install-tools' first)
+	@$(call echo_blue,Stopping Nx daemon if running...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -Command "$$job = Start-Job { pnpm exec nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+else
+	@timeout 5 pnpm exec nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+endif
+	@$(call echo_blue,Removing node_modules...)
+	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
+	@$(call echo_blue,Clearing Nx cache...)
+ifeq ($(DETECTED_OS),Windows)
+	@if exist .nx $(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
+else
+	@$(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
+endif
+	@$(call echo_green,Clean completed)
 
 clean-node: ## Clean Node.js dependencies
 	@$(call echo_blue,Cleaning Node.js dependencies...)
-	npm run clean:node $(NULL_REDIRECT) || $(call echo_yellow,npkill not found, install with 'make install-tools')
+	pnpm run clean:node $(NULL_REDIRECT) || $(call echo_yellow,npkill not found, install with 'make install-tools')
 
 clean-python: ## Clean Python dependencies only
 	@$(call echo_blue,Cleaning Python dependencies...)
-	npm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
+	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
 
 clean-cache: ## Clear Nx cache
 	@$(call echo_blue,Clearing Nx cache...)
-	npx nx reset
+	pnpm exec nx reset
 
 # Code Quality
 lint: ## Run linting on all projects
 	@$(call echo_blue,Running linters...)
-	npx nx run-many -t lint
+	pnpm exec nx run-many -t lint
 
 lint-fix: ## Run linting with auto-fix on all projects
 	@$(call echo_blue,Running linters with auto-fix...)
-	npx nx run-many -t lint --fix
+	pnpm exec nx run-many -t lint --fix
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
-	npx nx format:write
+	pnpm exec nx format:write
 
 fmt: format ## Alias for format command
 
 typecheck: ## Run TypeScript type checking
 	@$(call echo_blue,Running type checking...)
-	npx nx run-many -t typecheck
+	pnpm exec nx run-many -t typecheck
 
 validate: ## Validate package.json and workspace dependencies
 	@$(call echo_blue,Validating workspace...)
-	npm run validate
+	pnpm run validate
 
 # Testing
 test: ## Run tests on changed files
 	@$(call echo_blue,Running tests on changed files...)
-	npx nx affected -t test
+	pnpm exec nx affected -t test
 
 test-all: ## Run all tests
 	@$(call echo_blue,Running all tests...)
-	npx nx run-many -t test
+	pnpm exec nx run-many -t test
 
 test-watch: ## Run tests in watch mode
 	@$(call echo_blue,Running tests in watch mode...)
-	npx nx run-many -t test --watch
+	pnpm exec nx run-many -t test --watch
 
 test-e2e: ## Run end-to-end tests
 	@$(call echo_blue,Running e2e tests...)
-	npx nx run-many -t e2e
+	pnpm exec nx run-many -t e2e
 
 # Building
 build: ## Build all affected projects
 	@$(call echo_blue,Building affected projects...)
-	npx nx affected -t build
+	pnpm exec nx affected -t build
 
 build-all: ## Build all projects
 	@$(call echo_blue,Building all projects...)
-	npx nx run-many -t build
+	pnpm exec nx run-many -t build
 
 build-web: ## Build web application
 	@$(call echo_blue,Building web application...)
-	npx nx build web
+	pnpm exec nx build web
 
 build-mobile: ## Build mobile application
 	@$(call echo_blue,Building mobile application...)
-	npx nx build app
+	pnpm exec nx build app
 
 build-lambdas: ## Build all lambda functions
 	@$(call echo_blue,Building lambda functions...)
-	npx nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
+	pnpm exec nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
 
 build-libs: ## Build all libraries
 	@$(call echo_blue,Building libraries...)
-	npx nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
+	pnpm exec nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
 
 # Development
 dev: ## Start all development services
 	@$(call echo_blue,Starting development services...)
-	npm run dev:lambdas
+	pnpm run dev:lambdas
 
 dev-web: ## Start web development server
 	@$(call echo_blue,Starting web development server...)
-	npx nx serve web
+	pnpm exec nx serve web
 
 dev-mobile: ## Start mobile development server
 	@$(call echo_blue,Starting mobile development server...)
-	npx nx start app
+	pnpm exec nx start app
 
 dev-db: ## Start database development server
 	@$(call echo_blue,Starting database service...)
-	npm run dev:db
+	pnpm run dev:db
 
 dev-storybook: ## Start Storybook for component development
 	@$(call echo_blue,Starting Storybook...)
-	npm run storybook
+	pnpm run storybook
 
 graphiql: ## Start GraphQL explorer
 	@$(call echo_blue,Starting GraphQL explorer...)
-	npm run graphiql
+	pnpm run graphiql
 
 # Mobile Development
 android: ## Run Android application
 	@$(call echo_blue,Running Android application...)
-	npm run android
+	pnpm run android
 
 ios: ## Run iOS application  
 	@$(call echo_blue,Running iOS application...)
-	npm run ios
+	pnpm run ios
 
 build-android: ## Build Android APK
 	@$(call echo_blue,Building Android APK...)
-	npm run build-android
+	pnpm run build-android
 
 build-ios: ## Build iOS application
 	@$(call echo_blue,Building iOS application...)
-	npm run build-ios
+	pnpm run build-ios
 
 # Database Operations
 db-migrate: ## Run database migrations
 	@$(call echo_blue,Running database migrations...)
 ifeq ($(DETECTED_OS),Windows)
-	cd lib$(PATH_SEP)db-client && npm run db:migrate
+	cd lib$(PATH_SEP)db-client && pnpm run db:migrate
 else
-	cd lib$(PATH_SEP)db-client && npm run db:migrate
+	cd lib$(PATH_SEP)db-client && pnpm run db:migrate
 endif
 
 db-studio: ## Open database studio
 	@$(call echo_blue,Opening database studio...)
-	npx nx studio:public db-client
+	pnpm exec nx studio:public db-client
 
 db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
 ifeq ($(DETECTED_OS),Windows)
-	cd lib$(PATH_SEP)db-client && npm run db:reset
+	cd lib$(PATH_SEP)db-client && pnpm run db:reset
 else
-	cd lib$(PATH_SEP)db-client && npm run db:reset
+	cd lib$(PATH_SEP)db-client && pnpm run db:reset
 endif
 
 # Code Generation
 codegen: ## Run code generation
 	@$(call echo_blue,Running code generation...)
-	npm run codegen
+	pnpm run codegen
 
 # Infrastructure and Deployment
 deploy-lambdas: ## Deploy all lambda functions
@@ -308,15 +320,15 @@ check-services: ## Check service health
 # Utilities
 graph: ## Show Nx project dependency graph
 	@$(call echo_blue,Opening Nx project graph...)
-	npx nx graph
+	pnpm exec nx graph
 
 affected: ## Show affected projects
 	@$(call echo_blue,Showing affected projects...)
-	npx nx show projects --affected
+	pnpm exec nx show projects --affected
 
 list-projects: ## List all projects in workspace
 	@$(call echo_blue,Listing all projects...)
-	npx nx show projects
+	pnpm exec nx show projects
 
 workspace-lint: ## Run workspace-level validations
 	@$(call echo_blue,Running workspace validations...)
@@ -370,8 +382,10 @@ diagnose: ## Diagnose common issues
 	@$(call echo_plain,Platform: $(DETECTED_OS))
 	@$(call echo_plain,Node.js version:)
 	@node --version
-	@$(call echo_plain,NPM version:)
-	@npm --version
+	@$(call echo_plain,PNPM version:)
+	@pnpm --version
+	@$(call echo_plain,NPM version (optional):)
+	@npm --version || echo "npm not installed"
 	@$(call echo_plain,Nx version:)
-	@npx nx --version
+	@pnpm exec nx --version
 	@$(call echo_green,Diagnosis completed!)

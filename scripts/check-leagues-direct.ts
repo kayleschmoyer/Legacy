@@ -1,6 +1,6 @@
 /**
  * Simple script to check if there are any leagues in the database
- * Run with: npx tsx scripts/check-leagues-direct.ts
+ * Run with: pnpm exec tsx scripts/check-leagues-direct.ts
  */
 import { config } from 'dotenv';
 import { resolve } from 'path';

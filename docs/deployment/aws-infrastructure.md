@@ -575,7 +575,7 @@ Deployment Methods:
 
 Build Process:
 1. Source: lambdas/{function}/src/
-2. Build: npx nx run {function}:build
+2. Build: pnpm exec nx run {function}:build
 3. Package: Create deployment ZIP
 4. Upload: S3 bucket with versioning
 5. Deploy: Terraform Lambda function update

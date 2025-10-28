@@ -9,7 +9,7 @@ This document describes the OAuth authentication system for Legacy Sports CLI op
 ### Components
 
 1. **OAuth Proxy Lambda** - Handles OAuth flows and device authentication
-2. **CLI Auth Service** - Manages local token storage and authentication flows  
+2. **CLI Auth Service** - Manages local token storage and authentication flows
 3. **Auth Middleware** - Provides authentication for CLI commands
 4. **Device Flow** - Browser-based authentication for CLI applications
 
@@ -49,7 +49,7 @@ First-time setup requires authentication:
 
 ```bash
 # Authenticate with Google OAuth
-npm run cli auth login
+ppnpm run cli auth login
 
 # This will:
 # 1. Display a URL and verification code
@@ -61,63 +61,63 @@ npm run cli auth login
 
 ```bash
 # Check current authentication status
-npm run cli auth status
+ppnpm run cli auth status
 
 # List all authenticated users
-npm run cli auth list
+ppnpm run cli auth list
 ```
 
 ### 3. Using Authenticated Commands
 
 ```bash
 # Example: List users using authenticated API
-npm run cli list-users-auth
+ppnpm run cli list-users-auth
 
 # Most CLI commands now support authentication
-npm run cli <command> --help
+ppnpm run cli <command> --help
 ```
 
 ## CLI Commands
 
 ### Authentication Management
 
-| Command | Description |
-|---------|-------------|
-| `cli auth login` | Start OAuth login flow |
-| `cli auth status` | Show current authentication status |
-| `cli auth list` | List all authenticated users |
-| `cli auth switch --user <email>` | Switch to a different user |
-| `cli auth logout` | Logout current user |
-| `cli auth logout --user <email>` | Logout specific user |
-| `cli auth logout --all` | Logout all users |
+| Command                              | Description                               |
+| ------------------------------------ | ----------------------------------------- |
+| `cli auth login`                     | Start OAuth login flow                    |
+| `cli auth status`                    | Show current authentication status        |
+| `cli auth list`                      | List all authenticated users              |
+| `cli auth switch --user <email>`     | Switch to a different user                |
+| `cli auth logout`                    | Logout current user                       |
+| `cli auth logout --user <email>`     | Logout specific user                      |
+| `cli auth logout --all`              | Logout all users                          |
 | `cli graphql-test --query "<query>"` | Execute GraphQL query with authentication |
-| `cli graphql-test --file <path>` | Execute GraphQL query from file |
+| `cli graphql-test --file <path>`     | Execute GraphQL query from file           |
 
 ### Example Commands
 
 ```bash
 # Authenticate
-npm run cli auth login
+ppnpm run cli auth login
 
 # Check status
-npm run cli auth status
-# Output: 
+ppnpm run cli auth status
+# Output:
 # ✅ Authentication Status
 # Current User: user@example.com
 # Access Level: admin
 
 # List users (requires admin access)
-npm run cli list-users-auth
+ppnpm run cli list-users-auth
 
 # Test arbitrary GraphQL queries
-npm run cli graphql-test --query "query { users { id email } }"
-npm run cli graphql-test --file ./examples/queries/health-check.graphql
+ppnpm run cli graphql-test --query "query { users { id email } }"
+ppnpm run cli graphql-test --file ./examples/queries/health-check.graphql
 
 # Switch users (if multiple authenticated)
-npm run cli auth switch --user other@example.com
+ppnpm run cli auth switch --user other@example.com
 
 # Logout
-npm run cli auth logout
+ppnpm run cli auth logout
 ```
 
 ## OAuth Service Endpoints
@@ -126,17 +126,18 @@ The OAuth Lambda now includes device flow endpoints:
 
 ### New Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/oauth/device/authorize` | POST | Start device authorization flow |
-| `/oauth/device/token` | POST | Poll for authentication token |
-| `/oauth/device/verify` | GET | User verification page |
-| `/oauth/google/authorize` | GET | Initiate Google OAuth flow |
-| `/oauth/google/callback` | GET | Handle OAuth callback |
+| Endpoint                  | Method | Description                     |
+| ------------------------- | ------ | ------------------------------- |
+| `/oauth/device/authorize` | POST   | Start device authorization flow |
+| `/oauth/device/token`     | POST   | Poll for authentication token   |
+| `/oauth/device/verify`    | GET    | User verification page          |
+| `/oauth/google/authorize` | GET    | Initiate Google OAuth flow      |
+| `/oauth/google/callback`  | GET    | Handle OAuth callback           |
 
 ### Device Flow Process
 
 1. **CLI requests device authorization**:
+
    ```bash
    POST /oauth/device/authorize
    {
@@ -146,6 +147,7 @@ The OAuth Lambda now includes device flow endpoints:
    ```
 
 2. **Service returns verification info**:
+
    ```json
    {
      "device_code": "abc123...",
@@ -159,6 +161,7 @@ The OAuth Lambda now includes device flow endpoints:
 3. **User visits verification URI and enters code**
 
 4. **CLI polls for token**:
+
    ```bash
    POST /oauth/device/token
    {
@@ -210,21 +213,20 @@ import { AuthMiddleware } from '../services/AuthMiddleware';
 
 export async function handleMyCommand(args: any): Promise<void> {
   const authMiddleware = new AuthMiddleware();
-  
+
   try {
     // Require authentication
     await authMiddleware.requireAuth();
-    
+
     // Require specific access level
     await authMiddleware.requireAccessLevel('admin');
-    
+
     // Make authenticated GraphQL request
     const data = await authMiddleware.makeGraphQLRequest(
-      'query MyQuery { users { id email } }'
+      'query MyQuery { users { id email } }',
     );
-    
+
     console.log('Users:', data.users);
-    
   } catch (error) {
     if (error.message.includes('Authentication required')) {
       console.log('Please run "cli auth login" first');
@@ -241,7 +243,7 @@ export async function handleMyCommand(args: any): Promise<void> {
 // GraphQL request
 const data = await authMiddleware.makeGraphQLRequest(
   'query GetPlayer($id: Int!) { player(id: $id) { name } }',
-  { id: 123 }
+  { id: 123 },
 );
 
 // Raw API request
@@ -249,8 +251,8 @@ const response = await authMiddleware.makeAuthenticatedRequest(
   'https://api.legacysports.dev/graphql',
   {
     method: 'POST',
-    body: JSON.stringify({ query: 'query { players { name } }' })
-  }
+    body: JSON.stringify({ query: 'query { players { name } }' }),
+  },
 );
 ```
 
@@ -258,8 +260,8 @@ const response = await authMiddleware.makeAuthenticatedRequest(
 
 ```typescript
 // Skip authentication if not configured
-const token = await authMiddleware.requireAuth({ 
-  skipIfNotConfigured: true 
+const token = await authMiddleware.requireAuth({
+  skipIfNotConfigured: true,
 });
 
 if (token) {
@@ -277,34 +279,37 @@ if (token) {
 
 ### Common Errors
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Authentication required` | No valid token stored | Run `cli auth login` |
-| `User not authorized` | User not in database | Contact admin to add user |
-| `Access denied` | Insufficient permissions | Check access level with `cli auth status` |
-| `Authentication token is invalid` | Token expired or corrupted | Run `cli auth login` again |
+| Error                             | Cause                      | Solution                                  |
+| --------------------------------- | -------------------------- | ----------------------------------------- |
+| `Authentication required`         | No valid token stored      | Run `cli auth login`                      |
+| `User not authorized`             | User not in database       | Contact admin to add user                 |
+| `Access denied`                   | Insufficient permissions   | Check access level with `cli auth status` |
+| `Authentication token is invalid` | Token expired or corrupted | Run `cli auth login` again                |
 
 ### Troubleshooting
 
 1. **Check authentication status**:
+
    ```bash
-   npm run cli auth status
+   ppnpm run cli auth status
    ```
 
 2. **Clear authentication and re-login**:
+
    ```bash
-   npm run cli auth logout --all
-   npm run cli auth login
+   ppnpm run cli auth logout --all
+   ppnpm run cli auth login
    ```
 
 3. **Check OAuth service health**:
+
    ```bash
    curl https://api.legacysports.dev/oauth
    ```
 
 4. **Enable debug logging**:
    ```bash
-   LOG_LEVEL=debug npm run cli auth login
+   LOG_LEVEL=debug ppnpm run cli auth login
    ```
 
 ## Environment Configuration
@@ -317,7 +322,7 @@ VITE_OAUTH_PROXY_URL=https://api.legacysports.dev/oauth
 # OR
 OAUTH_PROXY_URL=https://api.legacysports.dev/oauth
 
-# GraphQL API URL  
+# GraphQL API URL
 VITE_GRAPHQL_URL=https://api.legacysports.dev/graphql
 # OR
 GRAPHQL_URL=https://api.legacysports.dev/graphql
@@ -334,18 +339,20 @@ GRAPHQL_URL=https://api.legacysports.dev/graphql
 ### Updating Existing Commands
 
 1. **Add authentication middleware**:
+
    ```typescript
    import { AuthMiddleware } from '../services/AuthMiddleware';
    ```
 
 2. **Replace direct database calls**:
+
    ```typescript
    // Before
    await runWithInternalClient(opts, async (db) => {
      const users = await db.select()...;
    });
-   
-   // After  
+
+   // After
    const authMiddleware = new AuthMiddleware();
    await authMiddleware.requireAuth();
    const data = await authMiddleware.makeGraphQLRequest(query);
@@ -357,7 +364,7 @@ GRAPHQL_URL=https://api.legacysports.dev/graphql
    if (useAuth) {
      // New authenticated approach
    } else {
-     // Legacy direct database approach  
+     // Legacy direct database approach
    }
    ```
 
@@ -376,13 +383,13 @@ The CLI includes a powerful GraphQL testing command for debugging and developmen
 
 ```bash
 # Simple query
-npm run cli graphql-test --query "query { users { id email } }"
+ppnpm run cli graphql-test --query "query { users { id email } }"
 
-# Query from file  
-npm run cli graphql-test --file ./examples/queries/users.graphql
+# Query from file
+ppnpm run cli graphql-test --file ./examples/queries/users.graphql
 
 # Query with variables
-npm run cli graphql-test \
+ppnpm run cli graphql-test \
   --query "query GetPlayer($id: Int!) { player(id: $id) { name } }" \
   --variables '{"id": 123}'
 ```
@@ -391,7 +398,7 @@ npm run cli graphql-test \
 
 ```bash
 # Comprehensive API health check
-npm run cli graphql-test --file ./examples/queries/health-check.graphql
+ppnpm run cli graphql-test --file ./examples/queries/health-check.graphql
 ```
 
 ### Example Output

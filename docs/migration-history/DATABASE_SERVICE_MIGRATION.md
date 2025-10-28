@@ -211,7 +211,7 @@ async function main() {
 Run the new CLI command to test the service layer:
 
 ```bash
-npm run start test-database
+pnpm run start test-database
 ```
 
 This will demonstrate:

@@ -107,7 +107,7 @@ console.log('\n🔧 Recommendations:');
 console.log('1. Move shared dependencies to root package.json');
 console.log('2. Use "*" for dependencies available in root');
 console.log('3. Keep project-specific dependencies with exact versions');
-console.log('4. Run "npm install" after making changes');
+console.log('4. Run "pnpm install" after making changes');
 
 console.log('\n📋 Summary:');
 console.log(`   Workspace projects validated: ${projectCount}`);

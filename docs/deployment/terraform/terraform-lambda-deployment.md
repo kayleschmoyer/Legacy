@@ -241,7 +241,7 @@ The old Serverless Framework deployment has been replaced with this Terraform ap
 ls -la lambdas/db/dist/
 
 # Test local build
-cd lambdas/db && npm run build
+cd lambdas/db && pnpm run build
 
 # Validate Terraform
 terraform validate

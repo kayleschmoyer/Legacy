@@ -41,25 +41,25 @@ get_s3_bucket() {
 case $FUNCTION_NAME in
     "graphql")
         LAMBDA_DIR="lambdas/db"
-        BUILD_COMMAND="npm run build"
+        BUILD_COMMAND="pnpm run build"
         DIST_DIR="dist"
         SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/graphql/version"
         ;;
     "stats")
         LAMBDA_DIR="lambdas/stats-lambda"
-        BUILD_COMMAND="npx nx run stats-lambda:build"
+        BUILD_COMMAND="pnpm exec nx run stats-lambda:build"
         DIST_DIR="dist"
         SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/stats/version"
         ;;
     "oauth-proxy")
         LAMBDA_DIR="lambdas/oauth-proxy"
-        BUILD_COMMAND="npx nx run oauth-proxy:build"
+        BUILD_COMMAND="pnpm exec nx run oauth-proxy:build"
         DIST_DIR="dist"
         SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/oauth-proxy/version"
         ;;
     "game-selection")
         LAMBDA_DIR="lambdas/game-selection"
-        BUILD_COMMAND="npx nx run game-selection:build"
+        BUILD_COMMAND="pnpm exec nx run game-selection:build"
         DIST_DIR="dist"
         SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/game-selection/version"
         ;;

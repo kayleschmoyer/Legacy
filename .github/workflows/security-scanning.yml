@@ -1,49 +1,16 @@
 name: "Security & Vulnerability Scanning"
 
-# Comprehensive security scanning pipeline for Legacy Sports
-# Includes SAST, dependency scanning, secret detection, and infrastructure security
-# Runs on all PRs and weekly scheduled scans for continuous monitoring
+# Comprehensive security scanning pipeline for Legacy Sports. This workflow is
+# reusable and invoked by the orchestrator for PR, push, or scheduled runs.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      # Only run when security-relevant files change
-      - "package*.json"
-      - "**/package.json"
-      - "apps/**/*.{ts,tsx,js,jsx}"
-      - "lib/**/*.{ts,tsx,js,jsx}"
-      - "lambdas/**/*.{ts,js}"
-      - "tools/**/*.{ts,js}"
-      - ".github/workflows/security-scanning.yml"
-      - "tsconfig*.json"
-      - ".npmrc"
-  push:
-    branches: [main, develop]
-    paths:
-      # Run on main/develop when security-relevant files change
-      - "package*.json"
-      - "**/package.json"
-      - "apps/**/*.{ts,tsx,js,jsx}"
-      - "lib/**/*.{ts,tsx,js,jsx}"
-      - "lambdas/**/*.{ts,js}"
-      - "tools/**/*.{ts,js}"
-      - ".github/workflows/security-scanning.yml"
-  schedule:
-    # Weekly comprehensive security scan
-    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
-  workflow_dispatch:
+  workflow_call:
     inputs:
       scan_type:
         description: "Type of security scan to run"
         required: false
+        type: string
         default: "comprehensive"
-        type: choice
-        options:
-          - comprehensive
-          - dependencies-only
-          - sast-only
-          - secrets-only
 
 permissions:
   actions: read
@@ -59,10 +26,6 @@ env:
   SAST_SCAN_TIMEOUT: 20
 
 jobs:
-  # ======================================================================
-  # SECURITY SCAN ORCHESTRATION
-  # ======================================================================
-
   security-scan-plan:
     name: "Security Scan Planning"
     runs-on: ubuntu-latest
@@ -86,7 +49,7 @@ jobs:
         run: |
           echo "::group::🔒 Security Scan Planning"
 
-          SCAN_TYPE="${{ github.event.inputs.scan_type || 'comprehensive' }}"
+          SCAN_TYPE="${{ inputs.scan_type || 'comprehensive' }}"
           EVENT_NAME="${{ github.event_name }}"
 
           echo "🎯 Scan Type: $SCAN_TYPE"
@@ -182,17 +145,17 @@ jobs:
           node-version: 22
           install-dependencies: true
 
-      - name: "🔍 NPM Audit Scan"
+      - name: "🔍 pnpm Audit Scan"
         id: npm-audit
         run: |
-          echo "::group::📦 NPM Dependency Audit"
+          echo "::group::📦 pnpm Dependency Audit"
 
-          # Run npm audit and capture results
+          # Run pnpm audit and capture results
           AUDIT_TIMESTAMP=$(date +%s)
-          AUDIT_LOG="npm-audit-${AUDIT_TIMESTAMP}.json"
+          AUDIT_LOG="pnpm-audit-${AUDIT_TIMESTAMP}.json"
 
-          echo "🔍 Running npm audit..."
-          if npm audit --audit-level=moderate --json > "$AUDIT_LOG" 2>&1; then
+          echo "🔍 Running pnpm audit..."
+          if pnpm audit --audit-level=moderate --json > "$AUDIT_LOG" 2>&1; then
             echo "✅ No moderate or higher vulnerabilities found"
             AUDIT_STATUS="clean"
           else
@@ -224,16 +187,14 @@ jobs:
       - name: "🛡️ Snyk Vulnerability Scan"
         id: snyk-scan
         continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "::group::🛡️ Snyk Security Scan"
 
-          # Install Snyk CLI
-          npm install -g snyk
-
           # Authenticate if token available
-          SNYK_TOKEN="${{ secrets.SNYK_TOKEN || '' }}"
-          if [ -n "$SNYK_TOKEN" ]; then
-            snyk auth "$SNYK_TOKEN"
+          if [ -n "${SNYK_TOKEN}" ]; then
+            pnpm dlx snyk@latest auth "${SNYK_TOKEN}"
             echo "✅ Snyk authenticated"
           else
             echo "ℹ️ Running Snyk in anonymous mode (limited features)"
@@ -242,7 +203,7 @@ jobs:
           # Run Snyk test
           SNYK_LOG="snyk-results-$(date +%s).json"
 
-          if snyk test --json > "$SNYK_LOG" 2>&1; then
+          if pnpm dlx snyk@latest test --json > "$SNYK_LOG" 2>&1; then
             echo "✅ Snyk scan completed - no critical vulnerabilities"
             SNYK_STATUS="clean"
           else
@@ -271,13 +232,13 @@ jobs:
         run: |
           echo "## 📦 Dependency Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
 
-          # NPM Audit Results
+          # pnpm Audit Results
           AUDIT_STATUS="${{ steps.npm-audit.outputs.audit-status || 'unknown' }}"
           TOTAL_VULNS="${{ steps.npm-audit.outputs.total-vulns || 0 }}"
           HIGH_VULNS="${{ steps.npm-audit.outputs.high-vulns || 0 }}"
           CRITICAL_VULNS="${{ steps.npm-audit.outputs.critical-vulns || 0 }}"
 
-          echo "### NPM Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "### pnpm Audit Results" >> $GITHUB_STEP_SUMMARY
           if [ "$AUDIT_STATUS" == "clean" ]; then
             echo "✅ **Status**: No moderate+ vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
           else
@@ -304,7 +265,7 @@ jobs:
 
           if [ "$CRITICAL_VULNS" -gt 0 ] || [ "$HIGH_VULNS" -gt 0 ]; then
             echo "- 🚨 **Immediate Action**: Update packages with critical/high vulnerabilities" >> $GITHUB_STEP_SUMMARY
-            echo "- 🔧 **Command**: \`npm audit fix\` or manual updates" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔧 **Command**: \`pnpm audit --fix\` or perform targeted dependency updates" >> $GITHUB_STEP_SUMMARY
             echo "- 📊 **Monitor**: Set up automated dependency updates with Dependabot" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ✅ **Status**: Dependency security looks good" >> $GITHUB_STEP_SUMMARY
@@ -333,7 +294,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE || '' }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
         continue-on-error: true
 
       - name: "🔐 Manual Secret Pattern Detection"
@@ -462,12 +423,21 @@ jobs:
         run: |
           echo "🏗️ Building applications for SAST analysis..."
 
+          NX_CMD="${NX_COMMAND:-}"
+          if [ -z "$NX_CMD" ]; then
+            if command -v pnpm >/dev/null 2>&1; then
+              NX_CMD="pnpm exec nx --"
+            else
+              NX_CMD="pnpm exec nx"
+            fi
+          fi
+
           # Build shared libraries first
-          npx nx build lib-shared-components || true
-          npx nx build lib-tamagui-config || true
+          $NX_CMD build lib-shared-components || true
+          $NX_CMD build lib-tamagui-config || true
 
           # Build applications
-          npx nx build web || echo "Web build failed - continuing analysis"
+          $NX_CMD build web || echo "Web build failed - continuing analysis"
 
           echo "✅ Build completed for SAST analysis"
 
@@ -564,7 +534,7 @@ jobs:
             else
               echo "🔎 Scanning ${#CHANGED_FILES[@]} changed file(s):"
               printf '   - %s\n' "${CHANGED_FILES[@]}"
-              npx eslint \
+              pnpm exec eslint \
                 --config "$ESLINT_CONFIG" \
                 --no-eslintrc \
                 --plugin security \
@@ -587,7 +557,7 @@ jobs:
             fi
           else
             echo "🔍 Running full-repository ESLint security scan"
-            npx eslint \
+            pnpm exec eslint \
               --config "$ESLINT_CONFIG" \
               --no-eslintrc \
               --plugin security \

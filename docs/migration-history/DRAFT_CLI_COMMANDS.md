@@ -7,7 +7,7 @@ This document outlines the new CLI commands for managing drafts in the Legacy Sp
 A new **shared DraftService** has been implemented to provide consistent draft management across all parts of the application:
 
 - ✅ **CLI Commands** for manual draft operations
-- ✅ **GraphQL Mutations** for web/mobile interfaces  
+- ✅ **GraphQL Mutations** for web/mobile interfaces
 - ✅ **Test Scripts** for automated testing
 
 ## Common Code Extraction
@@ -15,6 +15,7 @@ A new **shared DraftService** has been implemented to provide consistent draft m
 The following common draft logic has been extracted into a reusable `DraftService`:
 
 ### Key Features
+
 - **User Access Validation** - Ensures users have permission to start drafts
 - **Draft Type Validation** - Validates supported draft types (`random-draft`, `snake-draft`, `auction`)
 - **SQS Integration** - Handles message queuing for async draft processing
@@ -22,6 +23,7 @@ The following common draft logic has been extracted into a reusable `DraftServic
 - **Error Handling** - Comprehensive error handling and logging
 
 ### Components Refactored
+
 - `lambdas/db/src/schema/leagues.ts` - GraphQL `startDraft` mutation now uses shared service
 - `lib/utils/src/lib/DraftService.ts` - New shared service containing extracted logic
 - `apps/cli/src/commands/startDraft.ts` - New CLI command using shared service
@@ -31,30 +33,33 @@ The following common draft logic has been extracted into a reusable `DraftServic
 ### Start Draft Command
 
 **Basic Usage:**
+
 ```bash
 # Start a random draft for league 1
-npm run cli:start-draft -- --leagueId 1
+pnpm run cli:start-draft -- --leagueId 1
 
 # Alternative short syntax
-npm run draft:start -- --leagueId 1
+pnpm run draft:start -- --leagueId 1
 ```
 
 **Advanced Usage:**
+
 ```bash
 # Start a snake draft
-npm run draft:start -- --leagueId 1 --draftType snake-draft
+pnpm run draft:start -- --leagueId 1 --draftType snake-draft
 
 # Start draft as specific user
-npm run draft:start -- --leagueId 1 --user admin@example.com
+pnpm run draft:start -- --leagueId 1 --user admin@example.com
 
 # Admin override (skip user validation)
-npm run draft:start -- --leagueId 1 --skipUserValidation
+pnpm run draft:start -- --leagueId 1 --skipUserValidation
 
 # Preview without executing
-npm run draft:start -- --leagueId 1 --dryRun
+pnpm run draft:start -- --leagueId 1 --dryRun
 ```
 
 **Available Options:**
+
 - `--leagueId` / `-l` - League ID (required)
 - `--draftType` / `-t` - Draft type: `random-draft` (default), `snake-draft`, `auction`
 - `--user` / `-u` - Email of user to authenticate as
@@ -64,40 +69,44 @@ npm run draft:start -- --leagueId 1 --dryRun
 ### Draft Queue Management
 
 **Inspect Draft Queue:**
+
 ```bash
 # View queue status and message counts
-npm run draft:inspect
+pnpm run draft:inspect
 
 # Peek at messages without consuming them
-npm run draft:inspect -- --action peek
+pnpm run draft:inspect -- --action peek
 
 # List and consume messages for detailed inspection
-npm run draft:inspect -- --action list --maxMessages 5
+pnpm run draft:inspect -- --action list --maxMessages 5
 ```
 
 ## Authentication
 
 ### Automatic Authentication
+
 The CLI will automatically use your stored authentication:
 
 ```bash
 # Login first (if not already authenticated)
-npx nx auth cli login
+pnpm exec nx auth cli login
 
 # Then run draft commands normally
-npm run draft:start -- --leagueId 1
+pnpm run draft:start -- --leagueId 1
 ```
 
 ### Manual User Specification
+
 ```bash
 # Specify a different authenticated user
-npm run draft:start -- --leagueId 1 --user admin@example.com
+pnpm run draft:start -- --leagueId 1 --user admin@example.com
 ```
 
 ### Admin Operations
+
 ```bash
 # Skip user validation for admin operations
-npm run draft:start -- --leagueId 1 --skipUserValidation
+pnpm run draft:start -- --leagueId 1 --skipUserValidation
 ```
 
 ## Draft Flow
@@ -105,7 +114,7 @@ npm run draft:start -- --leagueId 1 --skipUserValidation
 The draft process follows this flow:
 
 1. **Validation** - Validate draft type and user access
-2. **Database Update** - Set league status to `queued`  
+2. **Database Update** - Set league status to `queued`
 3. **SQS Message** - Send message to draft processing queue
 4. **Lambda Processing** - Draft processor handles the actual drafting
 5. **Status Updates** - Automatic progression: `queued` → `in-progress` → `completed`
@@ -115,6 +124,7 @@ The draft process follows this flow:
 The CLI provides comprehensive error handling and troubleshooting:
 
 ### Authentication Errors
+
 ```
 🔑 Authentication Error
 💡 Solutions:
@@ -124,8 +134,9 @@ The CLI provides comprehensive error handling and troubleshooting:
 ```
 
 ### Access Denied
+
 ```
-🚫 Access Denied  
+🚫 Access Denied
 💡 Solutions:
    • Verify you are a member of this league
    • Use --skipUserValidation for admin operations
@@ -133,22 +144,25 @@ The CLI provides comprehensive error handling and troubleshooting:
 ```
 
 ### Configuration Errors
+
 ```
 🔧 Configuration Error
 💡 Solutions:
    • Set SQS_AUTOMATIC_DRAFTS_URL environment variable
-   • Run npm run sync-env to update environment
+   • Run pnpm run sync-env to update environment
    • Check AWS infrastructure is deployed
 ```
 
 ## Development vs Production
 
 ### Development Mode
+
 - **Local Development**: SQS messages may be skipped to avoid AWS costs
 - **Status Behavior**: Draft status may remain `queued` indefinitely
 - **Testing**: Use `--dryRun` to test configuration without side effects
 
-### Production Mode  
+### Production Mode
+
 - **Full Processing**: SQS messages are sent and processed by AWS Lambda
 - **Status Progression**: Complete flow from `queued` → `in-progress` → `completed`
 - **Monitoring**: Full observability through CloudWatch and SQS metrics
@@ -160,7 +174,7 @@ The following scripts have been added to `package.json`:
 ```json
 {
   "cli:start-draft": "nx start-draft cli",
-  "draft:start": "nx start-draft cli", 
+  "draft:start": "nx start-draft cli",
   "draft:inspect": "nx inspect-sqs-queue cli"
 }
 ```
@@ -170,59 +184,66 @@ The following scripts have been added to `package.json`:
 ### Common Issues
 
 **Circular Dependency Error:**
+
 - This is expected during build due to shared dependencies
 - Runtime functionality is unaffected
-- Use `npx tsx` instead of `nx build` for CLI operations
+- Use `pnpm exec tsx` instead of `nx build` for CLI operations
 
 **Queue Not Configured:**
+
 ```bash
 # Check environment variables
-npm run sync-env
+pnpm run sync-env
 
 # Verify SQS queue URL is set
 echo $SQS_AUTOMATIC_DRAFTS_URL
 ```
 
 **Database Connection:**
+
 ```bash
 # Test database connectivity
-npm run cli:test-connection
+pnpm run cli:test-connection
 ```
 
 **League Access:**
+
 ```bash
 # Use dry run to test without making changes
-npm run draft:start -- --leagueId 1 --dryRun
+pnpm run draft:start -- --leagueId 1 --dryRun
 
 # Check league exists and user has access
-npx tsx --tsconfig tsconfig.base.json apps/cli/src/main.ts graphql-test --query "query { league(id: 1) { id name draftStatus } }"
+pnpm exec tsx --tsconfig tsconfig.base.json apps/cli/src/main.ts graphql-test --query "query { league(id: 1) { id name draftStatus } }"
 ```
 
 ### Debug Mode
+
 ```bash
 # Enable verbose logging
-DEBUG=* npm run draft:start -- --leagueId 1
+DEBUG=* pnpm run draft:start -- --leagueId 1
 
 # Use dry run for safe testing
-npm run draft:start -- --leagueId 1 --dryRun
+pnpm run draft:start -- --leagueId 1 --dryRun
 ```
 
 ## Integration Examples
 
 ### With GraphQL
+
 The same logic is available through GraphQL mutations:
 
 ```graphql
 mutation StartDraft {
   startDraft(leagueId: 1, draftType: "random-draft") {
     id
-    name  
+    name
     draftStatus
   }
 }
 ```
 
 ### With Test Scripts
+
 Test scripts can now use the shared service:
 
 ```typescript
@@ -242,7 +263,7 @@ const result = await draftService.startDraft({
 Potential additions to the draft management system:
 
 - **Draft Scheduling** - Schedule drafts for future execution
-- **Draft Templates** - Save and reuse draft configurations  
+- **Draft Templates** - Save and reuse draft configurations
 - **Draft Monitoring** - Real-time draft progress tracking
 - **Draft Rollback** - Ability to cancel and rollback drafts
 - **Bulk Operations** - Start drafts for multiple leagues

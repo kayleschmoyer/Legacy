@@ -506,7 +506,7 @@ if (-not $SkipBuild) {
     # Build OAuth proxy functions
     Write-Host "  Building oauth-proxy..." -ForegroundColor Cyan
     Set-Location "lambdas\oauth-proxy"
-    npx nx build
+    pnpm exec nx build
     # Create deployment package
     Copy-Item "dist\index.js" "."
     Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\oauth-proxy.zip" -Force
@@ -516,7 +516,7 @@ if (-not $SkipBuild) {
     # Build GraphQL function
     Write-Host "  Building graphql..." -ForegroundColor Cyan
     Set-Location "lambdas\db"
-    npx nx build
+    pnpm exec nx build
     # Create deployment package
     Copy-Item "dist\index.js" "."
     Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\graphql-lambda.zip" -Force
@@ -526,7 +526,7 @@ if (-not $SkipBuild) {
     # Build Stats lambda
     Write-Host "  Building stats-lambda..." -ForegroundColor Cyan
     Set-Location "lambdas\stats-lambda"
-    npx nx build
+    pnpm exec nx build
     # Create deployment package
     Copy-Item "dist\index.js" "."
     Compress-Archive -Path "index.js","package.json" -DestinationPath "..\..\terraform\stats-lambda.zip" -Force

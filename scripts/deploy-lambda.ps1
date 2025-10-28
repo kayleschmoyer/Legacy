@@ -58,7 +58,7 @@ if ($FunctionName -in @('graphql', 'db')) {
     Write-Host 'Using pre-built lambda (already compiled via nx)' -ForegroundColor Green
 } else {
     # Build other lambdas using the correct project name
-    npx nx run "${ProjectName}:build"
+    pnpm exec nx run "${ProjectName}:build"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Build failed for $ProjectName"
     }

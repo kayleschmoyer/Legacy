@@ -16,32 +16,28 @@ The UI Abstractions layer provides:
 ### Step 1: Update Imports
 
 **Before (Direct Tamagui):**
+
 ```typescript
-import { 
-  Button, 
-  Text, 
-  View, 
-  XStack, 
-  YStack, 
-  TamaguiProvider 
-} from 'tamagui';
+import { Button, Text, View, XStack, YStack, TamaguiProvider } from 'tamagui';
 ```
 
 **After (UI Abstractions):**
+
 ```typescript
-import { 
-  Button, 
-  Text, 
-  View, 
-  XStack, 
-  YStack, 
-  UIThemeProvider 
+import {
+  Button,
+  Text,
+  View,
+  XStack,
+  YStack,
+  UIThemeProvider,
 } from '@legacy-sports/ui-abstractions';
 ```
 
 ### Step 2: Update Provider
 
 **Before:**
+
 ```typescript
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
@@ -52,6 +48,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 ```
 
 **After:**
+
 ```typescript
 import { UIThemeProvider } from '@legacy-sports/ui-abstractions';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
@@ -66,6 +63,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 Most props remain the same, but some are standardized:
 
 **Button variants:**
+
 ```typescript
 // Before (Tamagui-specific)
 <Button variant="outlined">Click Me</Button>
@@ -76,6 +74,7 @@ Most props remain the same, but some are standardized:
 ```
 
 **Text variants:**
+
 ```typescript
 // Before
 <Text fontSize="$sm" color="$gray11">Caption text</Text>
@@ -87,42 +86,48 @@ Most props remain the same, but some are standardized:
 ## 🔄 Component Mapping
 
 ### Text Components
-| Tamagui | UI Abstractions | Notes |
-|---------|----------------|--------|
-| `Text` | `Text` | Same API, added variants |
-| `H1`, `H2`, etc. | `H1`, `H2`, etc. | Consistent sizing |
-| `Paragraph` | `Paragraph` | Same API |
+
+| Tamagui          | UI Abstractions  | Notes                    |
+| ---------------- | ---------------- | ------------------------ |
+| `Text`           | `Text`           | Same API, added variants |
+| `H1`, `H2`, etc. | `H1`, `H2`, etc. | Consistent sizing        |
+| `Paragraph`      | `Paragraph`      | Same API                 |
 
 ### Layout Components
-| Tamagui | UI Abstractions | Notes |
-|---------|----------------|--------|
-| `View` | `View` | Same API |
-| `XStack` | `XStack` | Same API |
-| `YStack` | `YStack` | Same API |
-| `Card` | `Card` | Added `elevated` prop |
+
+| Tamagui  | UI Abstractions | Notes                 |
+| -------- | --------------- | --------------------- |
+| `View`   | `View`          | Same API              |
+| `XStack` | `XStack`        | Same API              |
+| `YStack` | `YStack`        | Same API              |
+| `Card`   | `Card`          | Added `elevated` prop |
 
 ### Button Components
-| Tamagui | UI Abstractions | Notes |
-|---------|----------------|--------|
-| `Button` | `Button` | Standardized variants |
+
+| Tamagui  | UI Abstractions | Notes                 |
+| -------- | --------------- | --------------------- |
+| `Button` | `Button`        | Standardized variants |
 
 ### Input Components
-| Tamagui | UI Abstractions | Notes |
-|---------|----------------|--------|
-| `Input` | `Input` | Same API |
-| `TextArea` | `TextArea` | Same API |
+
+| Tamagui    | UI Abstractions | Notes    |
+| ---------- | --------------- | -------- |
+| `Input`    | `Input`         | Same API |
+| `TextArea` | `TextArea`      | Same API |
 
 ### Utility Components
-| Tamagui | UI Abstractions | Notes |
-|---------|----------------|--------|
-| `Spinner` | `Spinner` | Simplified size prop |
-| `Separator` | `Separator` | Same API |
+
+| Tamagui     | UI Abstractions | Notes                |
+| ----------- | --------------- | -------------------- |
+| `Spinner`   | `Spinner`       | Simplified size prop |
+| `Separator` | `Separator`     | Same API             |
 
 ## 📝 File-by-File Migration Examples
 
 ### Example 1: Simple Component
 
 **Before:**
+
 ```typescript
 // lib/shared-components/src/LoadingPanel.tsx
 import { Spinner } from 'tamagui';
@@ -133,6 +138,7 @@ export function LoadingPanel(): React.JSX.Element {
 ```
 
 **After:**
+
 ```typescript
 // lib/shared-components/src/LoadingPanel.tsx
 import { LoadingPanel as UILoadingPanel } from '@legacy-sports/ui-abstractions';
@@ -152,6 +158,7 @@ export function LoadingPanel(): React.JSX.Element {
 ### Example 2: Layout Component
 
 **Before:**
+
 ```typescript
 // lib/shared-components/src/Layout.tsx
 import { XStack, YStack, Text, Button } from 'tamagui';
@@ -172,12 +179,13 @@ export function PlayerCard({ player, onEdit }) {
 ```
 
 **After:**
+
 ```typescript
 // lib/shared-components/src/Layout.tsx
-import { 
-  XStack, 
-  YStack, 
-  Text, 
+import {
+  XStack,
+  YStack,
+  Text,
   Button,
   Card
 } from '@legacy-sports/ui-abstractions';
@@ -202,6 +210,7 @@ export function PlayerCard({ player, onEdit }) {
 ### Example 3: Provider Setup
 
 **Before:**
+
 ```typescript
 // apps/web/src/main.tsx
 import { TamaguiProvider } from 'tamagui';
@@ -219,6 +228,7 @@ export function App() {
 ```
 
 **After:**
+
 ```typescript
 // apps/web/src/main.tsx
 import { UIThemeProvider } from '@legacy-sports/ui-abstractions';
@@ -238,12 +248,13 @@ export function App() {
 ## 🎨 Theme Usage
 
 **Before:**
+
 ```typescript
 import { useTheme } from 'tamagui';
 
 function MyComponent() {
   const theme = useTheme();
-  
+
   return (
     <View backgroundColor={theme.background.val}>
       <Text color={theme.color.val}>Hello</Text>
@@ -253,12 +264,13 @@ function MyComponent() {
 ```
 
 **After:**
+
 ```typescript
 import { useUITheme } from '@legacy-sports/ui-abstractions';
 
 function MyComponent() {
   const { theme } = useUITheme();
-  
+
   return (
     <View backgroundColor={theme.colors.background}>
       <Text color={theme.colors.text}>Hello</Text>
@@ -288,7 +300,7 @@ find . -name "*.tsx" -o -name "*.ts" | xargs sed -i 's/variant="outlined"/varian
 
 After migrating a component:
 
-1. **Build Test**: `npx nx build [project-name]`
+1. **Build Test**: `pnpm exec nx build [project-name]`
 2. **Type Check**: Ensure no TypeScript errors
 3. **Visual Test**: Check that components render correctly
 4. **Functionality Test**: Verify all interactions work
@@ -333,7 +345,7 @@ import type { ButtonProps } from '@legacy-sports/ui-abstractions';
 // Before
 <TamaguiProvider config={tamaguiConfig}>
 
-// After  
+// After
 <UIThemeProvider tamaguiConfig={tamaguiConfig}>
 ```
 
@@ -341,7 +353,7 @@ import type { ButtonProps } from '@legacy-sports/ui-abstractions';
 
 Migrate in this order for best results:
 
-1. **Provider components** (App.tsx, _layout.tsx)
+1. **Provider components** (App.tsx, \_layout.tsx)
 2. **Utility components** (LoadingPanel, etc.)
 3. **Layout components** (Views, Stacks)
 4. **Text components** (Text, Headings)

@@ -48,7 +48,7 @@ Instead of scripts, use environment variables:
 export NX_CLOUD_DISTRIBUTED_EXECUTION=false
 
 # For single command
-NX_CLOUD_DISTRIBUTED_EXECUTION=false npx nx affected -t build
+NX_CLOUD_DISTRIBUTED_EXECUTION=false pnpm exec nx affected -t build
 ```
 
 The GitHub Actions will automatically fall back when needed.

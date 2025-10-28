@@ -8,10 +8,10 @@
     "serve": "node dist/index.js"
   },
   "dependencies": {
-    "@legacy-sports/db-client": "*",
-    "@legacy-sports/logging": "*",
-    "@legacy-sports/sentry": "*",
-    "@legacy-sports/utils": "*",
+    "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/sentry": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
     "drizzle-orm": "*"
   },

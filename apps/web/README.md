@@ -6,11 +6,11 @@ The Legacy Sports web application built with Next.js and deployed to GitHub Page
 
 ```bash
 # From project root
-npm run web:start
+pnpm run web:start
 
 # Or run directly
 cd apps/web
-npm run dev
+pnpm run dev
 ```
 
 The app will be available at http://localhost:4200
@@ -76,13 +76,13 @@ Uses Hash Router for GitHub Pages compatibility:
 
 ```bash
 # Run unit tests
-npm run test
+pnpm run test
 
 # Run E2E tests
-npm run test:e2e
+pnpm run test:e2e
 
 # Test with coverage
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ## 📦 Building & Deployment
@@ -91,10 +91,10 @@ npm run test:coverage
 
 ```bash
 # Build for production
-npm run build
+pnpm run build
 
 # Preview production build
-npm run preview
+pnpm run preview
 ```
 
 ### GitHub Pages Deployment
@@ -110,7 +110,7 @@ Automatic deployment via GitHub Actions:
 
 ```bash
 # Build and deploy to GitHub Pages
-npm run deploy
+pnpm run deploy
 ```
 
 ## 🎨 UI Components
@@ -151,16 +151,16 @@ Vite provides fast HMR:
 
 ```bash
 # Lint code
-npm run lint
+pnpm run lint
 
 # Fix linting issues
-npm run lint:fix
+pnpm run lint:fix
 
 # Format code
-npm run format
+pnpm run format
 
 # Analyze bundle size
-npm run analyze
+pnpm run analyze
 ```
 
 ## 🔍 Troubleshooting
@@ -172,8 +172,8 @@ npm run analyze
 ```bash
 # Clear cache and rebuild
 rm -rf dist node_modules
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 **GraphQL connection issues**:
@@ -199,7 +199,7 @@ npm run build
 
 - Use dynamic imports for large components
 - Configure manual chunks in Vite config
-- Analyze bundle with `npm run analyze`
+- Analyze bundle with `pnpm run analyze`
 
 **Runtime performance**:
 

@@ -19,13 +19,13 @@ The test runner visits each story in a headless browser and runs basic tests.
 
 ```bash
 # Start Storybook first
-npm run storybook
+pnpm run storybook
 
 # In another terminal, run the test runner
-npm run test-storybook
+pnpm run test-storybook
 
 # For CI environments (starts Storybook automatically)
-npm run test-storybook:ci
+pnpm run test-storybook:ci
 ```
 
 ### 2. Jest Story Tests
@@ -34,13 +34,13 @@ Unit tests that import and test stories directly:
 
 ```bash
 # Run story tests
-npm run test:stories
+pnpm run test:stories
 
 # Run with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run all tests
-npm run test:all
+pnpm run test:all
 ```
 
 ### 3. Interaction Tests
@@ -72,15 +72,15 @@ export const WithInteraction: Story = {
 
 ## Available Scripts
 
-| Script                      | Description                                            |
-| --------------------------- | ------------------------------------------------------ |
-| `npm run test`              | Run standard Jest tests                                |
-| `npm run test:watch`        | Run Jest tests in watch mode                           |
-| `npm run test:coverage`     | Run tests with coverage report                         |
-| `npm run test-storybook`    | Run Storybook test runner (requires running Storybook) |
-| `npm run test-storybook:ci` | Run Storybook tests in CI mode                         |
-| `npm run test:stories`      | Run Jest tests on story files                          |
-| `npm run test:all`          | Run all test types                                     |
+| Script                       | Description                                            |
+| ---------------------------- | ------------------------------------------------------ |
+| `pnpm run test`              | Run standard Jest tests                                |
+| `pnpm run test:watch`        | Run Jest tests in watch mode                           |
+| `pnpm run test:coverage`     | Run tests with coverage report                         |
+| `pnpm run test-storybook`    | Run Storybook test runner (requires running Storybook) |
+| `pnpm run test-storybook:ci` | Run Storybook tests in CI mode                         |
+| `pnpm run test:stories`      | Run Jest tests on story files                          |
+| `pnpm run test:all`          | Run all test types                                     |
 
 ## Test Configuration
 
@@ -191,13 +191,13 @@ Coverage reports are generated in:
 
 ```bash
 # Run with verbose output
-npm run test-storybook -- --verbose
+pnpm run test-storybook -- --verbose
 
 # Run specific story
-npm run test-storybook -- --stories="Button*"
+pnpm run test-storybook -- --stories="Button*"
 
 # Run with coverage
-npm run test-storybook -- --coverage
+pnpm run test-storybook -- --coverage
 ```
 
 ## Integration with CI/CD
@@ -207,8 +207,8 @@ Add to your CI pipeline:
 ```yaml
 - name: Run Storybook Tests
   run: |
-    npm run build-storybook
-    npm run test-storybook:ci
+    pnpm run build-storybook
+    pnpm run test-storybook:ci
 ```
 
 This setup provides comprehensive testing for your Storybook stories, ensuring components work correctly in isolation and meet accessibility standards.

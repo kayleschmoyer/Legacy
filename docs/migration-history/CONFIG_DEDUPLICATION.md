@@ -107,7 +107,7 @@ To apply these changes to remaining projects:
 node tools/scripts/migrate-configs.js
 
 # Test configurations
-npx nx run-many --targets=lint --projects=game-selection,api,shared-components
+pnpm exec nx run-many --targets=lint --projects=game-selection,api,shared-components
 ```
 
 ## ⚙️ Customization

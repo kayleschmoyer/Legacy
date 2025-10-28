@@ -17,12 +17,6 @@
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true
   },
-  "ts-node": {
-    "esm": false,
-    "compilerOptions": {
-      "module": "commonjs"
-    }
-  },
   "include": ["lambdas/**/*", "lib/**/*"],
   "exclude": ["node_modules", "dist", "apps/**/*"]
 }

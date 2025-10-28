@@ -7,10 +7,12 @@ The Legacy Sports GraphQL API provides a unified interface for all data operatio
 ## API Endpoints
 
 ### Development
+
 - **GraphQL Endpoint**: `http://localhost:5001/graphql`
 - **GraphQL Playground**: `http://localhost:5001/playground`
 
 ### Production
+
 - **GraphQL Endpoint**: `https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql`
 
 ## Core Types
@@ -25,7 +27,7 @@ type User {
   profilePicture: String
   createdAt: DateTime!
   updatedAt: DateTime!
-  
+
   # Relationships
   leagues: [League!]!
   teams: [Team!]!
@@ -56,7 +58,7 @@ type League {
   draftDate: DateTime
   status: LeagueStatus!
   settings: LeagueSettings!
-  
+
   # Relationships
   teams: [Team!]!
   draftPicks: [DraftPick!]!
@@ -88,7 +90,7 @@ type Player {
   team: String!
   jerseyNumber: Int
   stats: PlayerStats
-  
+
   # Career data
   birthDate: Date
   height: String
@@ -97,12 +99,12 @@ type Player {
 }
 
 enum Position {
-  QB   # Quarterback
-  RB   # Running Back
-  WR   # Wide Receiver
-  TE   # Tight End
-  K    # Kicker
-  DEF  # Defense/Special Teams
+  QB # Quarterback
+  RB # Running Back
+  WR # Wide Receiver
+  TE # Tight End
+  K # Kicker
+  DEF # Defense/Special Teams
 }
 
 type Team {
@@ -110,10 +112,10 @@ type Team {
   name: String!
   owner: User!
   league: League!
-  
+
   # Roster
   players: [RosterPlayer!]!
-  
+
   # Performance
   wins: Int!
   losses: Int!
@@ -429,7 +431,7 @@ enum ErrorCode {
 ## Rate Limiting
 
 - **Queries**: 100 requests per minute per user
-- **Mutations**: 50 requests per minute per user  
+- **Mutations**: 50 requests per minute per user
 - **Subscriptions**: 10 concurrent connections per user
 
 ## Authentication
@@ -445,7 +447,9 @@ Tokens are obtained through the OAuth flow documented in the [Authentication Gui
 ## Development Tools
 
 ### GraphQL Playground
+
 Access the interactive GraphQL playground at:
+
 - Development: `http://localhost:5001/playground`
 - Production: Available via direct API endpoint
 
@@ -453,18 +457,18 @@ Access the interactive GraphQL playground at:
 
 ```bash
 # Generate schema documentation
-npx graphql-codegen
+pnpm exec graphql-codegen
 
 # Download schema
-npm run graphql:schema
+pnpm run graphql:schema
 ```
 
 ## Related Documentation
 
 - [Authentication Guide](../guides/authentication-guide.md) - OAuth setup and token management
-- [Database Schema](../architecture/database-schema.md) - Database design and relationships  
+- [Database Schema](../architecture/database-schema.md) - Database design and relationships
 - [GraphQL Integration](../architecture/graphql-integration.md) - Implementation details
 
 ---
 
-*This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/graphql/`.*
+_This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/graphql/`._

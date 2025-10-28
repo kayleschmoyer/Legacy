@@ -92,7 +92,7 @@ test_nx_cloud() {
     
     # Test 1: Basic CLI availability
     echo "  1️⃣  Testing Nx Cloud CLI availability..."
-    if timeout 10 npx nx-cloud --version > "$temp_output" 2>"$temp_error"; then
+    if timeout 10 pnpm exec nx-cloud --version > "$temp_output" 2>"$temp_error"; then
         echo -e "     ${GREEN}✅ Nx Cloud CLI available${NC}"
     else
         echo -e "     ${RED}❌ Nx Cloud CLI test failed${NC}"
@@ -103,7 +103,7 @@ test_nx_cloud() {
     
     # Test 2: API connectivity test with workspace info
     echo "  2️⃣  Testing API connectivity and authentication..."
-    if timeout 20 npx nx-cloud workspace-status > "$temp_output" 2>"$temp_error"; then
+    if timeout 20 pnpm exec nx-cloud workspace-status > "$temp_output" 2>"$temp_error"; then
         api_accessible=true
         echo -e "     ${GREEN}✅ API accessible and authenticated${NC}"
         
@@ -135,7 +135,7 @@ test_nx_cloud() {
     # Test 3: Try a lightweight distributed execution test (only if API is accessible)
     if [ "$api_accessible" = true ] && [ "$quota_status" = "available" ]; then
         echo "  3️⃣  Testing distributed execution capability..."
-        if timeout 15 npx nx-cloud start-ci-run --help > "$temp_output" 2>"$temp_error"; then
+        if timeout 15 pnpm exec nx-cloud start-ci-run --help > "$temp_output" 2>"$temp_error"; then
             echo -e "     ${GREEN}✅ Distributed execution available${NC}"
         else
             if grep -i "exceeding.*free.*plan\|quota.*exceeded" "$temp_error" > /dev/null 2>&1; then

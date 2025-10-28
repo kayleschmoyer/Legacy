@@ -304,17 +304,17 @@ const AppContent: React.FC = () => {
 
    ```bash
    # OAuth Proxy (handles OAuth and user operations)
-   cd lambdas/oauth-proxy && npm run dev
+   cd lambdas/oauth-proxy && pnpm run dev
    ```
 
 2. Start your application:
 
    ```bash
    # Web app
-   npm run dev:web
+   pnpm run dev:web
 
    # Mobile app
-   npm run android  # or npm run ios
+   pnpm run android  # or pnpm run ios
    ```
 
 3. Test authentication flows:

@@ -46,10 +46,10 @@ jobs:
       - name: Validate Deployment Readiness
         uses: ./.github/actions/deployment-gate
         with:
-          artifacts-ready: 'true'
-          quality-passed: 'true'
-          required-components: ''
-          environment: 'production'
+          artifacts-ready: "true"
+          quality-passed: "true"
+          required-components: ""
+          environment: "production"
 
       - name: "☁️ Configure AWS Credentials"
         uses: aws-actions/configure-aws-credentials@v4
@@ -62,9 +62,18 @@ jobs:
         run: |
           echo "🚀 Building Stats Lambda specifically..."
           echo "::notice::Building only stats-lambda project for targeted deployment"
-          
+
           # Build only the stats-lambda and its dependencies
-          if npx nx build stats-lambda --verbose 2>&1 | tee build.log; then
+          NX_CMD="${NX_COMMAND:-}"
+          if [ -z "$NX_CMD" ]; then
+            if command -v pnpm >/dev/null 2>&1; then
+              NX_CMD="pnpm exec nx --"
+            else
+              NX_CMD="pnpm exec nx"
+            fi
+          fi
+
+          if $NX_CMD build stats-lambda --verbose 2>&1 | tee build.log; then
             echo "✅ Stats Lambda built successfully"
             
             # Verify build artifacts exist
@@ -129,11 +138,11 @@ jobs:
         working-directory: lambdas/stats-lambda
         run: |
           echo "🚀 Updating Stats Lambda function code..."
-          
+
           # Get the Lambda function name (legacy-sports-dev-stats)
           LAMBDA_FUNCTION_NAME="legacy-sports-${AWS_STAGE}-stats"
           echo "🎯 Target Lambda function: $LAMBDA_FUNCTION_NAME"
-          
+
           # Update Lambda function code using the uploaded S3 package
           echo "📦 Updating Lambda function code from S3..."
           aws lambda update-function-code \
@@ -141,23 +150,23 @@ jobs:
             --s3-bucket "$S3_BUCKET" \
             --s3-key "stats/stats-${VERSION}.zip" \
             --region ${{ env.AWS_REGION }}
-          
+
           # Wait for the update to complete
           echo "⏳ Waiting for function update to complete..."
           aws lambda wait function-updated \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region ${{ env.AWS_REGION }}
-          
+
           # Get the updated function info
           FUNCTION_INFO=$(aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region ${{ env.AWS_REGION }})
           FUNCTION_VERSION=$(echo "$FUNCTION_INFO" | jq -r '.Configuration.Version')
           FUNCTION_SIZE=$(echo "$FUNCTION_INFO" | jq -r '.Configuration.CodeSize')
-          
+
           echo "✅ Stats Lambda updated successfully!"
           echo "   Function: $LAMBDA_FUNCTION_NAME"
           echo "   Version: $FUNCTION_VERSION"
           echo "   Code Size: $FUNCTION_SIZE bytes"
-          
+
           echo "## 🚀 Lambda Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Function**: $LAMBDA_FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: $FUNCTION_VERSION" >> $GITHUB_STEP_SUMMARY

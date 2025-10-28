@@ -3,8 +3,9 @@
 ## Current State Analysis
 
 ### ✅ What's Working
+
 - **Merge Queue Exists**: `merge-queue.yml` with basic merge functionality
-- **Proper Permissions**: CI has `pull-requests: write` and `issues: write`  
+- **Proper Permissions**: CI has `pull-requests: write` and `issues: write`
 - **Label-based Triggering**: Uses `merge-when-ready` label
 - **Schedule Processing**: Runs every 5 minutes to process queue
 
@@ -21,12 +22,13 @@
 
 ```yaml
 # Current logic (PROBLEMATIC):
-const allPassed = checks.check_runs.every(check => 
-  check.status === 'completed' && check.conclusion === 'success'
+const allPassed = checks.check_runs.every(check =>
+check.status === 'completed' && check.conclusion === 'success'
 );
 ```
 
 **Problems**:
+
 - Only checks `check_runs`, ignores `status_checks`
 - Doesn't validate specific required checks
 - No failure feedback to PR authors
@@ -35,6 +37,7 @@ const allPassed = checks.check_runs.every(check =>
 ### 2. Missing CI Failure Comments
 
 The improved CI workflow has no mechanism to:
+
 - Report specific failures to PR authors
 - Provide actionable error messages
 - Link to relevant logs or debugging info
@@ -43,6 +46,7 @@ The improved CI workflow has no mechanism to:
 ### 3. Merge Queue Silence
 
 When PRs fail to merge:
+
 - No notification to PR author
 - No explanation of what failed
 - No guidance on next steps
@@ -59,26 +63,26 @@ When PRs fail to merge:
   with:
     script: |
       const fs = require('fs');
-      
+
       // Determine failure context
       let failureReason = "Unknown failure";
       let reproCommand = "";
       let logContext = "";
-      
+
       // Check which step failed and provide specific guidance
       if ("${{ steps.dte-detect.result }}" === "failure") {
         failureReason = "Nx Cloud detection failed";
-        reproCommand = "npm ci && npx nx-cloud --version";
+        reproCommand = "npm ci && pnpm exec nx-cloud --version";
       } else if ("${{ steps.distributed-execution.result }}" === "failure") {
         failureReason = "Distributed execution failed";
-        reproCommand = "npx nx affected -t lint,typecheck,test,build --parallel=4";
+        reproCommand = "pnpm exec nx affected -t lint,typecheck,test,build --parallel=4";
       } else if ("${{ steps.local-execution.result }}" === "failure") {
         failureReason = "Local execution failed";
-        reproCommand = "npx nx affected -t lint,typecheck,test,build --parallel=4";
+        reproCommand = "pnpm exec nx affected -t lint,typecheck,test,build --parallel=4";
       }
-      
+
       const comment = `## ❌ CI Pipeline Failed
-      
+
 **Failure**: ${failureReason}
 
 ### 🔍 How to Debug Locally
@@ -123,10 +127,10 @@ Check the [workflow run logs](${context.payload.repository.html_url}/actions/run
   with:
     script: |
       const prs = JSON.parse('${{ steps.ready-prs.outputs.prs }}');
-      
+
       for (const pr of prs.slice(0, 1)) {
         console.log(`Processing PR #${pr.number}: ${pr.title}`);
-        
+
         try {
           // Get comprehensive check status
           const [checksData, statusesData] = await Promise.all([
@@ -141,20 +145,20 @@ Check the [workflow run logs](${context.payload.repository.html_url}/actions/run
               ref: pr.head.sha
             })
           ]);
-          
+
           // Check required CI workflows
           const requiredChecks = ['CI Pipeline (Improved)'];
-          const ciCheck = checksData.data.check_runs.find(check => 
+          const ciCheck = checksData.data.check_runs.find(check =>
             requiredChecks.some(req => check.name.includes(req))
           );
-          
+
           if (!ciCheck) {
             await github.rest.issues.createComment({
               issue_number: pr.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ⏳ Merge Queue: Waiting for CI
-              
+
 This PR is in the merge queue but CI hasn't completed yet.
 
 **Status**: Waiting for required checks
@@ -165,9 +169,9 @@ The merge will proceed automatically once CI passes.`
             });
             continue;
           }
-          
+
           const ciPassed = ciCheck.status === 'completed' && ciCheck.conclusion === 'success';
-          
+
           if (ciPassed) {
             // Attempt merge
             try {
@@ -177,16 +181,16 @@ The merge will proceed automatically once CI passes.`
                 pull_number: pr.number,
                 merge_method: 'squash'
               });
-              
+
               console.log(`✅ Successfully merged PR #${pr.number}`);
-              
+
             } catch (mergeError) {
               await github.rest.issues.createComment({
                 issue_number: pr.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 body: `## ❌ Merge Queue: Merge Failed
-                
+
 **Error**: ${mergeError.message}
 
 **Common causes**:
@@ -200,14 +204,14 @@ The merge will proceed automatically once CI passes.`
 3. The merge will retry automatically in 5 minutes`
               });
             }
-            
+
           } else {
             await github.rest.issues.createComment({
-              issue_number: pr.number,  
+              issue_number: pr.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ❌ Merge Queue: CI Failed
-              
+
 **Status**: ${ciCheck.status}
 **Conclusion**: ${ciCheck.conclusion}
 **Check**: ${ciCheck.name}
@@ -220,7 +224,7 @@ This PR cannot be merged until CI passes. The merge queue will retry automatical
 - Check the CI failure comment above for specific guidance`
             });
           }
-          
+
         } catch (error) {
           console.error(`Error processing PR #${pr.number}:`, error);
         }
@@ -237,9 +241,9 @@ This PR cannot be merged until CI passes. The merge queue will retry automatical
     script: |
       const mode = "${{ steps.dte-detect.outputs.execution-mode }}";
       const agents = "${{ steps.dte-detect.outputs.optimal-agents }}";
-      
+
       const comment = `## ✅ CI Pipeline Passed
-      
+
 All checks completed successfully!
 
 ### 📊 Execution Summary
@@ -260,7 +264,7 @@ This PR is ready for review and merge! 🚀`;
 ## Implementation Priority
 
 1. **High Priority**: Add failure commenting to CI pipeline
-2. **Medium Priority**: Enhance merge queue error handling  
+2. **Medium Priority**: Enhance merge queue error handling
 3. **Low Priority**: Add success notifications (nice-to-have)
 
 ## Expected Benefits

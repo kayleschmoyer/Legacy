@@ -36,10 +36,10 @@ DB_HOST=proxy-endpoint.amazonaws.com
 
 ```bash
 # Easy-to-use commands
-npm run sync-env              # Standard production sync
-npm run sync-env:direct       # For database migrations
-npm run sync-env:dry-run      # Preview changes
-npm run sync-env:backup       # Create backup before sync
+pnpm run sync-env              # Standard production sync
+pnpm run sync-env:direct       # For database migrations
+pnpm run sync-env:dry-run      # Preview changes
+pnpm run sync-env:backup       # Create backup before sync
 ```
 
 ### **Better Default Behavior**
@@ -53,7 +53,7 @@ npm run sync-env:backup       # Create backup before sync
 The updated scripts have been tested and are working perfectly:
 
 ```bash
-> npm run sync-env:dry-run
+> pnpm run sync-env:dry-run
 
 ✓ Database secret name: legacy-sports-dev-db-creds-xyz (will be resolved at runtime)
 ✓ Using RDS proxy endpoint for DB_HOST (recommended for production)
@@ -67,27 +67,27 @@ The updated scripts have been tested and are working perfectly:
 
 ```bash
 # Update .env with AWS production configuration
-npm run sync-env
+pnpm run sync-env
 
 # Test database connectivity
-npm run db:test:production
+pnpm run db:test:production
 ```
 
 ### **Database Migration Setup**
 
 ```bash
 # Use direct endpoint for migrations (bypasses proxy)
-npm run sync-env:direct
+pnpm run sync-env:direct
 
 # Run your database migrations
-npm run migrate
+pnpm run migrate
 ```
 
 ### **Preview Changes (Safe)**
 
 ```bash
 # See what would change without modifying files
-npm run sync-env:dry-run
+pnpm run sync-env:dry-run
 ```
 
 ## 📁 Files Updated

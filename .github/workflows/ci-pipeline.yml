@@ -3,43 +3,19 @@ name: "🚀 Legacy Sports CI Pipeline"
 # =============================================================================
 # Legacy Sports CI Pipeline - Unified PR & Integration Testing
 # =============================================================================
-# 
-# This unified pipeline serves dual purposes using composable actions:
-# 
-# 🎯 PR Mode (affected-only):
-# - Fast feedback on pull requests
-# - Tests only changed components  
-# - Optimized for developer productivity
-#
-# 🌐 Integration Mode (full workspace):
-# - Comprehensive validation on main branch
-# - Tests ALL projects to catch integration issues
-# - Replaces separate integration-build workflow
-# 
-# Architecture Benefits:
-# - Single source of truth for all validation logic
-# - Composable actions ensure consistency
-# - No code duplication between PR and integration testing
-# - 50% reduction in CI resource usage
+# This workflow is now reusable and invoked by the CI orchestrator. It retains
+# all logic for PR vs. integration branches while relying on the caller to
+# handle warmup and invocation context.
 # =============================================================================
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
-  merge_group:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       debug_mode:
         description: "Enable debug mode for detailed logging"
         required: false
-        default: false
         type: boolean
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+        default: false
 
 permissions:
   actions: read
@@ -55,7 +31,7 @@ env:
   NX_CACHE_DIRECTORY: .nx-cache
   NX_SKIP_NX_CACHE: false
   NODE_OPTIONS: "--max_old_space_size=4096"
-  NX_VERBOSE_LOGGING: ${{ github.event.inputs.debug_mode == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
+  NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 jobs:
@@ -70,13 +46,13 @@ jobs:
       # High-level results
       overall-status: ${{ steps.collect-results.outputs.overall-status }}
       deployment-ready: ${{ steps.deployment-gate.outputs.deployment-ready }}
-      
+
       # Component results
       web-affected: ${{ steps.detect-changes.outputs.web }}
       mobile-affected: ${{ steps.detect-changes.outputs.mobile }}
       lambdas-affected: ${{ steps.detect-changes.outputs.lambdas }}
       terraform-affected: ${{ steps.detect-changes.outputs.terraform }}
-      
+
       # Performance metrics
       execution-strategy: ${{ steps.execution-plan.outputs.strategy }}
       workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
@@ -99,6 +75,8 @@ jobs:
           node-version: 22
           install-dependencies: true
           set-nx-shas: true
+          # Skip optional deps (Storybook, Appium) for faster CI - ~160MB, 4-6 min savings
+          include-optional-deps: false
 
       - name: "☁️ Detect DTE Availability"
         id: detect-dte
@@ -111,7 +89,7 @@ jobs:
         uses: ./.github/actions/detect-changes
         with:
           # Force full build on main branch (integration mode) or debug mode
-          force-full-build: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.debug_mode == 'true') }}
+          force-full-build: ${{ github.ref == 'refs/heads/main' || inputs.debug_mode }}
 
       - name: "📊 Generate Execution Plan"
         id: execution-plan
@@ -164,7 +142,11 @@ jobs:
         if: always() && steps.detect-dte.outputs.dte-available == 'true'
         run: |
           echo "🛑 Stopping Nx Cloud DTE agents..."
-          npx nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          if command -v pnpm >/dev/null 2>&1; then
+            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          else
+            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+          fi
           echo "✅ Agent cleanup complete"
 
       - name: "�📊 Collect Results"

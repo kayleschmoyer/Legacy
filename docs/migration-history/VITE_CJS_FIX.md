@@ -32,9 +32,9 @@ lambdas/stats-lambda/vite.config.ts       → lambdas/stats-lambda/vite.config.m
 
 ## Verification
 
-✅ **Web builds clean**: `npx nx build web`  
-✅ **Lambda builds clean**: `npx nx build db`  
-✅ **Development server runs**: `npx nx serve web`  
+✅ **Web builds clean**: `pnpm exec nx build web`  
+✅ **Lambda builds clean**: `pnpm exec nx build db`  
+✅ **Development server runs**: `pnpm exec nx serve web`  
 ✅ **No deprecation warnings**: All output clean
 
 ## Benefits

@@ -1,7 +1,3 @@
 {
-  "extends": ["../../.eslintrc.lib.json"],
-  "ignorePatterns": ["dist"],
-  "parserOptions": {
-    "project": "./tsconfig.json"
-  }
+  "extends": ["./.eslintrc.cjs"]
 }

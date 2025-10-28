@@ -88,7 +88,7 @@ import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
 ```bash
 # Final validation - ALL PROJECTS PASS ✅
-npm run typecheck
+pnpm run typecheck
 ✓ nx run api:typecheck
 ✓ nx run shared-components:typecheck
 ✓ nx run db:typecheck
@@ -156,7 +156,7 @@ NX   Successfully ran target typecheck for 8 projects (3s) ✅
 All projects now pass TypeScript compilation:
 
 ```bash
-npm run typecheck
+pnpm run typecheck
 # ✅ 8/8 projects successful
 # ✅ 0 TypeScript errors remaining
 # ✅ Cross-platform compatibility maintained

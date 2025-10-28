@@ -6,28 +6,28 @@ const path = require('path');
 const services = [
   {
     name: 'GraphQL API',
-    command: 'npm',
+    command: 'pnpm',
     args: ['run', 'dev:db'],
     port: 5000,
     color: '\x1b[36m', // cyan
   },
   {
     name: 'OAuth Proxy',
-    command: 'npm',
+    command: 'pnpm',
     args: ['run', 'dev:oauth'],
     port: 5001,
     color: '\x1b[33m', // yellow
   },
   {
     name: 'Stats Lambda',
-    command: 'npm',
+    command: 'pnpm',
     args: ['run', 'dev:stats'],
     port: 5002,
     color: '\x1b[35m', // magenta
   },
   {
     name: 'Game Selection',
-    command: 'npm',
+    command: 'pnpm',
     args: ['run', 'dev:game-selection'],
     port: 5003,
     color: '\x1b[32m', // green
@@ -42,7 +42,7 @@ function startService(service) {
   );
 
   const child = spawn(service.command, service.args, {
-    cwd: path.join(__dirname, '..'), // Use root directory for npm commands
+    cwd: path.join(__dirname, '..'), // Use root directory for pnpm commands
     stdio: 'pipe',
     shell: true,
     env: { ...process.env, NODE_PATH: path.join(__dirname, '../node_modules') },

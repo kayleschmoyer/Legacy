@@ -22,23 +22,23 @@ import { IconButton } from '@legacy-sports/shared-components';
   icon="home"
   label="Home"
   onPress={() => console.log('Home pressed')}
-/>
+/>;
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `icon` | `string` | - | Icon name (required) |
-| `label` | `string` | - | Optional text label below icon |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Button size |
-| `variant` | `'default' \| 'primary' \| 'secondary' \| 'accent'` | `'default'` | Visual style variant |
-| `colorScheme` | `'blue' \| 'purple' \| 'green' \| 'red' \| 'gold'` | `'blue'` | Color scheme for gradients |
-| `showGradient` | `boolean` | `true` | Enable gradient shadow effects |
-| `onPress` | `() => void` | - | Press handler function |
-| `disabled` | `boolean` | `false` | Disable the button |
-| `accessibilityLabel` | `string` | - | Custom accessibility label |
-| `testID` | `string` | - | Test identifier |
+| Prop                 | Type                                                | Default     | Description                    |
+| -------------------- | --------------------------------------------------- | ----------- | ------------------------------ |
+| `icon`               | `string`                                            | -           | Icon name (required)           |
+| `label`              | `string`                                            | -           | Optional text label below icon |
+| `size`               | `'sm' \| 'md' \| 'lg'`                              | `'md'`      | Button size                    |
+| `variant`            | `'default' \| 'primary' \| 'secondary' \| 'accent'` | `'default'` | Visual style variant           |
+| `colorScheme`        | `'blue' \| 'purple' \| 'green' \| 'red' \| 'gold'`  | `'blue'`    | Color scheme for gradients     |
+| `showGradient`       | `boolean`                                           | `true`      | Enable gradient shadow effects |
+| `onPress`            | `() => void`                                        | -           | Press handler function         |
+| `disabled`           | `boolean`                                           | `false`     | Disable the button             |
+| `accessibilityLabel` | `string`                                            | -           | Custom accessibility label     |
+| `testID`             | `string`                                            | -           | Test identifier                |
 
 ## Examples
 
@@ -183,32 +183,36 @@ import { IconButton } from '@legacy-sports/shared-components';
 ## Variants
 
 ### Default
+
 - Background: `$color3`
 - Suitable for secondary actions
 - Subtle hover effects
 
 ### Primary
+
 - Background: `$blue4`
 - For main call-to-action buttons
 - Enhanced hover animations
 
 ### Secondary
+
 - Background: `$purple4`
 - For secondary but important actions
 - Purple-themed gradient effects
 
 ### Accent
+
 - Background: `$green4`
 - For success states and positive actions
 - Green-themed gradient effects
 
 ## Size Guidelines
 
-| Size | Dimensions | Icon Size | Use Case |
-|------|------------|-----------|----------|
-| `sm` | 60×60px | 20px | Compact layouts, toolbars |
-| `md` | 80×80px | 28px | Standard navigation, forms |
-| `lg` | 100×100px | 36px | Hero actions, main features |
+| Size | Dimensions | Icon Size | Use Case                    |
+| ---- | ---------- | --------- | --------------------------- |
+| `sm` | 60×60px    | 20px      | Compact layouts, toolbars   |
+| `md` | 80×80px    | 28px      | Standard navigation, forms  |
+| `lg` | 100×100px  | 36px      | Hero actions, main features |
 
 ## Color Schemes
 
@@ -221,11 +225,13 @@ import { IconButton } from '@legacy-sports/shared-components';
 ## Platform Behavior
 
 ### Web
+
 - Hover effects with scale and shadow animations
 - CSS transitions for smooth interactions
 - Mouse cursor changes on hover
 
 ### React Native
+
 - Touch feedback with scale animations
 - Native shadow effects on supported platforms
 - Haptic feedback integration ready
@@ -254,7 +260,7 @@ This component integrates seamlessly with your existing Tamagui configuration:
 View all component variations and test interactions in Storybook:
 
 ```bash
-npm run storybook
+pnpm run storybook
 ```
 
 Navigate to `Components/IconButton` to see all examples and documentation.

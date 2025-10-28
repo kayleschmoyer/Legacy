@@ -86,7 +86,7 @@ For workflows that use basic Nx commands but don't need distributed execution:
   run: |
     echo "🔧 Running Nx Cloud self-healing (if available)..."
     if [ -n "${NX_CLOUD_ACCESS_TOKEN}" ]; then
-      npx nx-cloud fix-ci || echo "⚠️  Nx Cloud fix-ci failed (quota exceeded or unavailable)"
+      pnpm exec nx-cloud fix-ci || echo "⚠️  Nx Cloud fix-ci failed (quota exceeded or unavailable)"
     else
       echo "ℹ️  Nx Cloud not configured, skipping fix-ci"
     fi
@@ -208,7 +208,7 @@ NX_CLOUD_ACCESS_TOKEN=  # Cleared to prevent connection attempts
     echo "NX_CLOUD_ACCESS_TOKEN=" >> $GITHUB_ENV
 
 - name: Build
-  run: npx nx build my-project
+  run: pnpm exec nx build my-project
 ```
 
 ## Testing

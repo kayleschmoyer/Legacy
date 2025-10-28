@@ -77,11 +77,23 @@ function Initialize-Environment {
     $nodeVersion = node --version
     Write-Host "Node.js version: $nodeVersion"
     
-    $result = npm ci --prefer-offline --no-audit
+    pnpm fetch --prefer-offline | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "⚠️  pnpm fetch encountered issues; continuing with install" -ForegroundColor Yellow
+    }
+
+    pnpm install --frozen-lockfile --offline | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✅ Dependencies installed successfully from local store" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "ℹ️  Offline install failed; retrying with network access..." -ForegroundColor Yellow
+    pnpm install --frozen-lockfile | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Dependency installation failed"
     }
-    
+
     Write-Host "✅ Dependencies installed successfully" -ForegroundColor Green
 }
 
@@ -129,37 +141,37 @@ function Get-ChangedFiles {
 function Test-CodeQuality {
     Write-Host "🎨 Checking code formatting..." -ForegroundColor Cyan
     if ($Verbose) {
-        Write-Host "Command: npx nx format:check --base=origin/main --head=HEAD"
+        Write-Host "Command: pnpm exec nx format:check --base=origin/main --head=HEAD"
     }
     
-    $result = npx nx format:check --base=origin/main --head=HEAD
+    $result = pnpm exec nx format:check --base=origin/main --head=HEAD
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Code formatting issues detected" -ForegroundColor Red
-        Write-Host "💡 Fix with: npx nx format:write" -ForegroundColor Yellow
+        Write-Host "💡 Fix with: pnpm exec nx format:write" -ForegroundColor Yellow
         throw "Format check failed"
     }
     
     Write-Host "🔧 Running ESLint validation..." -ForegroundColor Cyan
     if ($Verbose) {
-        Write-Host "Command: npx nx affected -t lint --base=origin/main --head=HEAD --parallel=4"
+        Write-Host "Command: pnpm exec nx affected -t lint --base=origin/main --head=HEAD --parallel=4"
     }
     
-    $result = npx nx affected -t lint --base=origin/main --head=HEAD --parallel=4
+    $result = pnpm exec nx affected -t lint --base=origin/main --head=HEAD --parallel=4
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ ESLint validation failed" -ForegroundColor Red
-        Write-Host "💡 Try auto-fix: npx nx affected -t lint --fix" -ForegroundColor Yellow
+        Write-Host "💡 Try auto-fix: pnpm exec nx affected -t lint --fix" -ForegroundColor Yellow
         throw "ESLint failed"
     }
     
     Write-Host "📝 Running TypeScript type check..." -ForegroundColor Cyan
     if ($Verbose) {
-        Write-Host "Command: npx nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2"
+        Write-Host "Command: pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2"
     }
     
-    $result = npx nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2
+    $result = pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ TypeScript validation failed" -ForegroundColor Red
-        Write-Host "💡 Check types: npx nx affected -t typecheck" -ForegroundColor Yellow
+        Write-Host "💡 Check types: pnpm exec nx affected -t typecheck" -ForegroundColor Yellow
         throw "TypeScript check failed"
     }
 }
@@ -168,20 +180,20 @@ function Test-CodeQuality {
 function Invoke-Tests {
     Write-Host "🧪 Running unit tests..." -ForegroundColor Cyan
     if ($Verbose) {
-        Write-Host "Command: npx nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false"
+        Write-Host "Command: pnpm exec nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false"
     }
     
-    $result = npx nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false
+    $result = pnpm exec nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Unit tests failed" -ForegroundColor Red
-        Write-Host "💡 Debug specific test: npx nx test <project-name>" -ForegroundColor Yellow
+        Write-Host "💡 Debug specific test: pnpm exec nx test <project-name>" -ForegroundColor Yellow
         throw "Unit tests failed"
     }
     
     # Check if integration tests exist
-    if ((Test-Path "jest.integration.config.js") -or (npm run test:integration --dry-run 2>$null)) {
+    if ((Test-Path "jest.integration.config.js") -or (pnpm run test:integration --dry-run 2>$null)) {
         Write-Host "🔄 Running integration tests..." -ForegroundColor Cyan
-        $result = npm run test:integration
+        $result = pnpm run test:integration
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ Integration tests failed" -ForegroundColor Red
             throw "Integration tests failed"
@@ -198,13 +210,13 @@ function Test-Builds {
     if ($Changes.web) {
         Write-Host "📦 Building web application..." -ForegroundColor Cyan
         if ($Verbose) {
-            Write-Host "Command: npx nx build web --verbose"
+            Write-Host "Command: pnpm exec nx build web --verbose"
         }
         
         $buildArgs = @("nx", "build", "web")
         if ($Verbose) { $buildArgs += "--verbose" }
         
-        $result = & npx $buildArgs
+        $result = & pnpm exec $buildArgs
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ Web application build failed" -ForegroundColor Red
             throw "Web build failed"
@@ -220,10 +232,10 @@ function Test-Builds {
     if ($Changes.lambdas) {
         Write-Host "⚡ Building lambda functions..." -ForegroundColor Cyan
         if ($Verbose) {
-            Write-Host "Command: npx nx affected -t build --base=origin/main --head=HEAD --projects='lambdas-*'"
+            Write-Host "Command: pnpm exec nx affected -t build --base=origin/main --head=HEAD --projects='lambdas-*'"
         }
         
-        $result = npx nx affected -t build --base=origin/main --head=HEAD --projects="lambdas-*"
+        $result = pnpm exec nx affected -t build --base=origin/main --head=HEAD --projects="lambdas-*"
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ Lambda functions build failed" -ForegroundColor Red
             throw "Lambda build failed"
@@ -231,7 +243,7 @@ function Test-Builds {
         
         # Try to package lambdas
         Write-Host "📦 Packaging lambda functions..." -ForegroundColor Cyan
-        $result = npx nx affected -t package --base=origin/main --head=HEAD --projects="lambdas-*" 2>$null
+        $result = pnpm exec nx affected -t package --base=origin/main --head=HEAD --projects="lambdas-*" 2>$null
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Lambda functions packaged successfully" -ForegroundColor Green
         } else {
@@ -242,10 +254,10 @@ function Test-Builds {
     if ($Changes.mobile) {
         Write-Host "📱 Validating mobile build configuration..." -ForegroundColor Cyan
         if ($Verbose) {
-            Write-Host "Command: npx nx build app --dry-run"
+            Write-Host "Command: pnpm exec nx build app --dry-run"
         }
         
-        $result = npx nx build app --dry-run
+        $result = pnpm exec nx build app --dry-run
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ Mobile build configuration is invalid" -ForegroundColor Red
             throw "Mobile build validation failed"

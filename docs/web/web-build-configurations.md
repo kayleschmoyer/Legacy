@@ -11,13 +11,15 @@ This document describes the different build configurations available for the web
 **Purpose**: Local development with hot module replacement
 
 **Usage**:
+
 ```bash
-npx nx build web --configuration=development
+pnpm exec nx build web --configuration=development
 # or
-npx nx serve web
+pnpm exec nx serve web
 ```
 
 **Characteristics**:
+
 - ✅ Source maps enabled
 - ✅ Fast build times
 - ❌ No minification
@@ -29,11 +31,13 @@ npx nx serve web
 **Purpose**: CI/CD validation builds
 
 **Usage**:
+
 ```bash
-npx nx build web --configuration=production
+pnpm exec nx build web --configuration=production
 ```
 
 **Characteristics**:
+
 - ❌ Source maps disabled (faster builds)
 - ✅ Minification enabled via esbuild
 - ❌ No compression reporting
@@ -41,6 +45,7 @@ npx nx build web --configuration=production
 - 🎯 Target: CI/CD validation
 
 **Used by**:
+
 - `.github/actions/build-validation/action.yml` - Validates builds in PR checks
 - CI pipeline for merge checks
 
@@ -49,11 +54,13 @@ npx nx build web --configuration=production
 **Purpose**: Production deployment artifacts
 
 **Usage**:
+
 ```bash
-npx nx build web --configuration=deploy
+pnpm exec nx build web --configuration=deploy
 ```
 
 **Characteristics**:
+
 - ✅ Source maps enabled (for production debugging)
 - ✅ Minification enabled
 - ✅ Compression reporting enabled
@@ -64,6 +71,7 @@ npx nx build web --configuration=deploy
 - 🎯 Target: Production deployment to GitHub Pages
 
 **Used by**:
+
 - `.github/workflows/deploy-web.yml` - Deploys to GitHub Pages
 
 ## Configuration Details
@@ -96,21 +104,22 @@ build: {
 
 ## Build Output Comparison
 
-| Feature | Development | Production | Deploy |
-|---------|------------|-----------|--------|
-| Source Maps | ✅ Yes | ❌ No | ✅ Yes |
-| Minification | ❌ No | ✅ Yes | ✅ Yes |
-| Compression Report | ❌ No | ❌ No | ✅ Yes |
-| Manual Chunks | ❌ No | ❌ No | ✅ Yes |
-| Build Speed | ⚡ Fastest | ⚡ Fast | 🐢 Slower |
-| Bundle Size | 📦 Large | 📦 Small | 📦 Smallest |
-| Debugging | 🔍 Easy | 🔍 Hard | 🔍 Possible |
+| Feature            | Development | Production | Deploy      |
+| ------------------ | ----------- | ---------- | ----------- |
+| Source Maps        | ✅ Yes      | ❌ No      | ✅ Yes      |
+| Minification       | ❌ No       | ✅ Yes     | ✅ Yes      |
+| Compression Report | ❌ No       | ❌ No      | ✅ Yes      |
+| Manual Chunks      | ❌ No       | ❌ No      | ✅ Yes      |
+| Build Speed        | ⚡ Fastest  | ⚡ Fast    | 🐢 Slower   |
+| Bundle Size        | 📦 Large    | 📦 Small   | 📦 Smallest |
+| Debugging          | 🔍 Easy     | 🔍 Hard    | 🔍 Possible |
 
 ## Why Separate Configurations?
 
 ### CI Build (production) vs Deployment Build (deploy)
 
 **CI Build Goals**:
+
 1. ✅ Verify the application builds without errors
 2. ✅ Fast feedback for developers
 3. ✅ Validate bundle structure
@@ -118,6 +127,7 @@ build: {
 5. ❌ Don't need detailed bundle analysis
 
 **Deployment Build Goals**:
+
 1. ✅ Generate optimized production artifacts
 2. ✅ Enable production debugging with source maps
 3. ✅ Report bundle sizes for monitoring
@@ -136,6 +146,7 @@ All configurations have access to the following environment variables:
 - `VITE_BUILD_DATE` - ISO 8601 build timestamp
 
 Deploy builds automatically populate these from GitHub Actions:
+
 - `VITE_APP_VERSION`: `${{ github.ref_name }}-${{ github.run_number }}`
 - `VITE_COMMIT_SHA`: `${{ github.sha }}`
 
@@ -145,16 +156,16 @@ To test each configuration locally:
 
 ```bash
 # Test development build
-npx nx build web --configuration=development
+pnpm exec nx build web --configuration=development
 
 # Test production build (what CI uses)
-npx nx build web --configuration=production
+pnpm exec nx build web --configuration=production
 
 # Test deploy build (what gets deployed)
-npx nx build web --configuration=deploy
+pnpm exec nx build web --configuration=deploy
 
 # Preview the deploy build
-npx nx serve web --configuration=production
+pnpm exec nx serve web --configuration=production
 ```
 
 ## Troubleshooting
@@ -162,13 +173,15 @@ npx nx serve web --configuration=production
 ### Source Maps Not Working in Production
 
 Make sure you're using the `deploy` configuration:
+
 ```bash
-npx nx build web --configuration=deploy
+pnpm exec nx build web --configuration=deploy
 ```
 
 ### Build Too Slow in CI
 
 The CI uses the `production` configuration which is optimized for speed. If builds are still slow, check:
+
 1. Nx Cloud cache is enabled
 2. DTE (Distributed Task Execution) is available
 3. Dependencies haven't changed drastically
@@ -176,11 +189,13 @@ The CI uses the `production` configuration which is optimized for speed. If buil
 ### Bundle Size Too Large
 
 Check the deploy build output:
+
 ```bash
-npx nx build web --configuration=deploy
+pnpm exec nx build web --configuration=deploy
 ```
 
 Look for the compression report and identify large chunks. Consider:
+
 1. Code splitting additional vendor libraries
 2. Lazy loading routes
 3. Tree shaking unused code

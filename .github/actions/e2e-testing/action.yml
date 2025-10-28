@@ -67,9 +67,9 @@ runs:
       shell: bash
       run: |
         echo "::group::🎭 End-to-End Testing with Playwright"
-        
+
         START_TIME=$(date +%s)
-        
+
         echo "🎯 Running E2E tests for critical user paths..."
 
         # Check if web changes justify E2E testing
@@ -91,11 +91,11 @@ runs:
         # Set up E2E testing environment
         E2E_TIMESTAMP=$(date +%s)
         E2E_LOG="e2e-results-${E2E_TIMESTAMP}.log"
-        
+
         # Configure Playwright for CI
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
-        
+
         # Force local execution for E2E tests - disable Nx Cloud completely
         unset NX_CLOUD_ACCESS_TOKEN
         export NX_CLOUD_DISTRIBUTED_EXECUTION=false
@@ -111,27 +111,43 @@ runs:
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Execution Mode**: Local (Nx Cloud DTE disabled)"
 
+        # Prefer pnpm-managed executables when available
+        if command -v pnpm >/dev/null 2>&1; then
+          PLAYWRIGHT_BIN="pnpm exec playwright"
+        else
+          PLAYWRIGHT_BIN="pnpm exec playwright"
+        fi
+
+        NX_CMD="${NX_COMMAND:-}"
+        if [ -z "$NX_CMD" ]; then
+          if command -v pnpm >/dev/null 2>&1; then
+            NX_CMD="pnpm exec nx"
+          else
+            NX_CMD="pnpm exec nx"
+          fi
+        fi
+
         # Install Playwright browsers if needed (cached)
         echo "🔧 Setting up Playwright browsers..."
-        if ! npx playwright install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
+        if ! $PLAYWRIGHT_BIN install ${{ inputs.browser }} --with-deps >/dev/null 2>&1; then
           echo "⚠️ Playwright browser installation failed - attempting fallback"
-          npx playwright install-deps ${{ inputs.browser }} || true
+          $PLAYWRIGHT_BIN install-deps ${{ inputs.browser }} || true
         fi
 
         # Start web application in background for E2E testing
         echo "🌐 Starting web application for E2E testing..."
         echo "ℹ️ Development server will build and serve the application automatically"
-        
+
         # Start development server in background with output logging
         echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
-        
+
         SERVER_LOG="dev-server-${E2E_TIMESTAMP}.log"
-        NX_CLOUD_DISTRIBUTED_EXECUTION=false npx nx serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
+        NX_CLOUD_DISTRIBUTED_EXECUTION=false $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
         SERVER_PID=$!
-        
+
         echo "📝 Server output logged to: $SERVER_LOG"
         echo "🔍 Server PID: $SERVER_PID"
-        
+
         # Wait for server to be ready (increased timeout for initial build)
         echo "⏳ Waiting for development server to be ready (max 60 seconds)..."
         READY=false
@@ -167,7 +183,7 @@ runs:
           
           sleep 1
         done
-        
+
         if [ "$READY" = false ]; then
           echo "❌ Development server failed to start within 60 seconds"
           echo "📋 Full server log:"
@@ -185,21 +201,21 @@ runs:
 
         # Run E2E tests with proper error handling
         echo "🎭 Executing E2E test suite..."
-        
+
         cd apps/web-e2e
         E2E_EXIT_CODE=0
-        
+
         # Build Playwright command
-        PLAYWRIGHT_CMD="npx playwright test"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json:test-results/results.json"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output-dir=test-results"
-        
+
         if [ "${{ inputs.headless }}" = "true" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --headed=false"
         fi
-        
+
         # Run critical E2E tests with retry logic and proper reporting
         echo "🎯 Running command: $PLAYWRIGHT_CMD"
         if eval "$PLAYWRIGHT_CMD" 2>&1 | tee "../${E2E_LOG}"; then
@@ -217,12 +233,12 @@ runs:
 
         # Process results and generate summary
         cd ..
-        
+
         TOTAL_TESTS=0
         PASSED_TESTS=0
         FAILED_TESTS=0
         SUCCESS_RATE=100
-        
+
         if [ -f "apps/web-e2e/test-results/results.json" ]; then
           # Extract test results statistics
           TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
@@ -249,7 +265,7 @@ runs:
         # Calculate execution time
         END_TIME=$(date +%s)
         EXECUTION_TIME=$((END_TIME - START_TIME))
-        
+
         # Set outputs
         echo "total-tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
         echo "passed-tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
@@ -278,7 +294,7 @@ runs:
           # For now, don't fail the entire CI for E2E failures - make it a warning
           # This allows teams to gradually improve E2E stability
           echo "⚠️ E2E failures detected but continuing CI pipeline"
-          echo "🔧 To reproduce locally: cd apps/web-e2e && npx playwright test --ui"
+          echo "🔧 To reproduce locally: cd apps/web-e2e && $PLAYWRIGHT_BIN test --ui"
         fi
 
         echo "::endgroup::"
@@ -288,14 +304,14 @@ runs:
       shell: bash
       run: |
         echo "::group::📊 E2E Testing Summary"
-        
+
         RESULT="${{ steps.e2e-tests.outputs.result }}"
         TOTAL="${{ steps.e2e-tests.outputs.total-tests }}"
         PASSED="${{ steps.e2e-tests.outputs.passed-tests }}"
         FAILED="${{ steps.e2e-tests.outputs.failed-tests }}"
         SUCCESS_RATE="${{ steps.e2e-tests.outputs.success-rate }}"
         EXECUTION_TIME="${{ steps.e2e-tests.outputs.execution-time }}"
-        
+
         echo "## 🎭 E2E Testing Results"
         echo "- **Result**: $RESULT"
         echo "- **Total Tests**: $TOTAL"
@@ -303,7 +319,7 @@ runs:
         echo "- **Failed**: $FAILED"
         echo "- **Success Rate**: $SUCCESS_RATE%"
         echo "- **Execution Time**: ${EXECUTION_TIME}s"
-        
+
         case "$RESULT" in
           "success")
             echo "🎉 All E2E tests passed! Critical user paths are working correctly."
@@ -321,7 +337,7 @@ runs:
             echo "❌ E2E tests could not run due to development server failure."
             ;;
         esac
-        
+
         echo "::endgroup::"
 
     - name: "📋 E2E Skip Notice"

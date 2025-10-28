@@ -115,8 +115,8 @@ $env:NX_PLUGIN_NO_TIMEOUTS="true"
 
 ## 🧪 **Testing**
 
-- ✅ Project graph generation works (`npx nx show projects`)
-- ✅ Individual Vite builds work (`npx vite build` in lambda projects)
+- ✅ Project graph generation works (`pnpm exec nx show projects`)
+- ✅ Individual Vite builds work (`pnpm exec vite build` in lambda projects)
 - ✅ ESLint with shared configs works (dist folders properly ignored)
 
 ## 📝 **Files Changed**

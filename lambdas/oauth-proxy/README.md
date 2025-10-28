@@ -72,16 +72,16 @@ LOG_LEVEL=debug  # Same level of detail, but more flexible
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run tests
 npm test
 
 # Build for deployment
-npm run build
+pnpm run build
 
 # Local development
-npm run dev
+pnpm run dev
 ```
 
 ## Deployment

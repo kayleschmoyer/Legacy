@@ -143,7 +143,7 @@ android-build:
     EOF
 
     # Run tests with proper error capture
-    if npx nx affected -t test --parallel=4 --verbose 2>&1 | tee test-output.log; then
+    if pnpm exec nx affected -t test --parallel=4 --verbose 2>&1 | tee test-output.log; then
       echo "✅ All tests passed"
       echo "test-result=success" >> $GITHUB_OUTPUT
     else
@@ -329,7 +329,7 @@ Every CI step includes local reproduction instructions:
 ```yaml
 - name: '🧪 Unit Tests'
   run: |
-    echo "::notice::To reproduce locally: npm run test:affected"
+    echo "::notice::To reproduce locally: pnpm run test:affected"
     # ... rest of test execution
 ```
 

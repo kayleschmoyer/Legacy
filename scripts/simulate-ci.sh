@@ -114,11 +114,21 @@ setup_environment() {
     node_version=$(node --version)
     echo "Node.js version: $node_version"
     
-    if ! npm ci --prefer-offline --no-audit; then
+    if ! pnpm fetch --prefer-offline; then
+        echo -e "${YELLOW}⚠️  pnpm fetch encountered issues; continuing to install with network access${NC}"
+    fi
+
+    if pnpm install --frozen-lockfile --offline; then
+        echo -e "${GREEN}✅ Dependencies installed successfully from local store${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}ℹ️  Offline install failed; retrying with network access...${NC}"
+    if ! pnpm install --frozen-lockfile; then
         echo -e "${RED}❌ Dependency installation failed${NC}"
         return 1
     fi
-    
+
     echo -e "${GREEN}✅ Dependencies installed successfully${NC}"
     return 0
 }
@@ -180,34 +190,34 @@ detect_changes() {
 code_quality_checks() {
     echo -e "${CYAN}🎨 Checking code formatting...${NC}"
     if [ "$VERBOSE" = true ]; then
-        echo "Command: npx nx format:check --base=origin/main --head=HEAD"
+        echo "Command: pnpm exec nx format:check --base=origin/main --head=HEAD"
     fi
     
-    if ! npx nx format:check --base=origin/main --head=HEAD; then
+    if ! pnpm exec nx format:check --base=origin/main --head=HEAD; then
         echo -e "${RED}❌ Code formatting issues detected${NC}"
-        echo -e "${YELLOW}💡 Fix with: npx nx format:write${NC}"
+        echo -e "${YELLOW}💡 Fix with: pnpm exec nx format:write${NC}"
         return 1
     fi
     
     echo -e "${CYAN}🔧 Running ESLint validation...${NC}"
     if [ "$VERBOSE" = true ]; then
-        echo "Command: npx nx affected -t lint --base=origin/main --head=HEAD --parallel=4"
+        echo "Command: pnpm exec nx affected -t lint --base=origin/main --head=HEAD --parallel=4"
     fi
     
-    if ! npx nx affected -t lint --base=origin/main --head=HEAD --parallel=4; then
+    if ! pnpm exec nx affected -t lint --base=origin/main --head=HEAD --parallel=4; then
         echo -e "${RED}❌ ESLint validation failed${NC}"
-        echo -e "${YELLOW}💡 Try auto-fix: npx nx affected -t lint --fix${NC}"
+        echo -e "${YELLOW}💡 Try auto-fix: pnpm exec nx affected -t lint --fix${NC}"
         return 1
     fi
     
     echo -e "${CYAN}📝 Running TypeScript type check...${NC}"
     if [ "$VERBOSE" = true ]; then
-        echo "Command: npx nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2"
+        echo "Command: pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2"
     fi
     
-    if ! npx nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2; then
+    if ! pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD --parallel=2; then
         echo -e "${RED}❌ TypeScript validation failed${NC}"
-        echo -e "${YELLOW}💡 Check types: npx nx affected -t typecheck${NC}"
+        echo -e "${YELLOW}💡 Check types: pnpm exec nx affected -t typecheck${NC}"
         return 1
     fi
     
@@ -218,19 +228,19 @@ code_quality_checks() {
 run_tests() {
     echo -e "${CYAN}🧪 Running unit tests...${NC}"
     if [ "$VERBOSE" = true ]; then
-        echo "Command: npx nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false"
+        echo "Command: pnpm exec nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false"
     fi
     
-    if ! npx nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false; then
+    if ! pnpm exec nx affected -t test --base=origin/main --head=HEAD --parallel=4 --coverage=false; then
         echo -e "${RED}❌ Unit tests failed${NC}"
-        echo -e "${YELLOW}💡 Debug specific test: npx nx test <project-name>${NC}"
+        echo -e "${YELLOW}💡 Debug specific test: pnpm exec nx test <project-name>${NC}"
         return 1
     fi
     
     # Check if integration tests exist and should run
-    if [ -f "jest.integration.config.js" ] || npm run test:integration --dry-run > /dev/null 2>&1; then
+    if [ -f "jest.integration.config.js" ] || pnpm run test:integration --dry-run > /dev/null 2>&1; then
         echo -e "${CYAN}🔄 Running integration tests...${NC}"
-        if ! npm run test:integration; then
+        if ! pnpm run test:integration; then
             echo -e "${RED}❌ Integration tests failed${NC}"
             return 1
         fi
@@ -249,10 +259,10 @@ build_validation() {
     if [ "$web" = "true" ]; then
         echo -e "${CYAN}📦 Building web application...${NC}"
         if [ "$VERBOSE" = true ]; then
-            echo "Command: npx nx build web --verbose"
+            echo "Command: pnpm exec nx build web --verbose"
         fi
         
-        if ! npx nx build web $([ "$VERBOSE" = true ] && echo "--verbose"); then
+        if ! pnpm exec nx build web $([ "$VERBOSE" = true ] && echo "--verbose"); then
             echo -e "${RED}❌ Web application build failed${NC}"
             return 1
         fi
@@ -267,17 +277,17 @@ build_validation() {
     if [ "$lambdas" = "true" ]; then
         echo -e "${CYAN}⚡ Building lambda functions...${NC}"
         if [ "$VERBOSE" = true ]; then
-            echo "Command: npx nx affected -t build --base=origin/main --head=HEAD --projects='lambdas-*'"
+            echo "Command: pnpm exec nx affected -t build --base=origin/main --head=HEAD --projects='lambdas-*'"
         fi
         
-        if ! npx nx affected -t build --base=origin/main --head=HEAD --projects="lambdas-*"; then
+        if ! pnpm exec nx affected -t build --base=origin/main --head=HEAD --projects="lambdas-*"; then
             echo -e "${RED}❌ Lambda functions build failed${NC}"
             return 1
         fi
         
         # Try to package lambdas
         echo -e "${CYAN}📦 Packaging lambda functions...${NC}"
-        if npx nx affected -t package --base=origin/main --head=HEAD --projects="lambdas-*" 2>/dev/null; then
+        if pnpm exec nx affected -t package --base=origin/main --head=HEAD --projects="lambdas-*" 2>/dev/null; then
             echo -e "${GREEN}✅ Lambda functions packaged successfully${NC}"
         else
             echo -e "${YELLOW}⚠️  Lambda packaging failed (may be expected if no package target)${NC}"
@@ -287,10 +297,10 @@ build_validation() {
     if [ "$mobile" = "true" ]; then
         echo -e "${CYAN}📱 Validating mobile build configuration...${NC}"
         if [ "$VERBOSE" = true ]; then
-            echo "Command: npx nx build app --dry-run"
+            echo "Command: pnpm exec nx build app --dry-run"
         fi
         
-        if ! npx nx build app --dry-run; then
+        if ! pnpm exec nx build app --dry-run; then
             echo -e "${RED}❌ Mobile build configuration is invalid${NC}"
             return 1
         fi

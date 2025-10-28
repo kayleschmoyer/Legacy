@@ -3,14 +3,8 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/app-e2e/src",
   "projectType": "application",
-  "tags": [
-    "platform:mobile",
-    "scope:e2e",
-    "type:test"
-  ],
-  "implicitDependencies": [
-    "app"
-  ],
+  "tags": ["platform:mobile", "scope:e2e", "type:test"],
+  "implicitDependencies": ["app"],
   "// targets": "to see all targets run: nx show project app-e2e --web",
   "targets": {
     "build": {
@@ -36,14 +30,14 @@
     "e2e-android": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js",
+        "command": "pnpm exec wdio run ./wdio.conf.js --spec ./src/app.e2e.js",
         "cwd": "apps/app-e2e"
       }
     },
     "e2e-android-debug": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js --logLevel debug",
+        "command": "pnpm exec wdio run ./wdio.conf.js --spec ./src/app.e2e.js --logLevel debug",
         "cwd": "apps/app-e2e"
       }
     },
@@ -67,13 +61,9 @@
     },
     "lint": {
       "executor": "@nx/eslint:lint",
-      "outputs": [
-        "{options.outputFile}"
-      ],
+      "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": [
-          "apps/app-e2e/**/*.{ts,tsx,js,jsx}"
-        ]
+        "lintFilePatterns": ["apps/app-e2e/**/*.{ts,tsx,js,jsx}"]
       }
     }
   }

@@ -77,6 +77,7 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 **Twig MCP Server**: This repository includes a Twig MCP (Model Context Protocol) server for AI agents. If your AI environment supports MCP, you can use native twig commands through the MCP interface instead of terminal commands. See `.vscode/settings.json` for configuration.
 
 **Benefits of MCP**:
+
 - Direct access to twig operations without terminal commands
 - Structured responses for better parsing
 - Automatic error handling and retry logic
@@ -103,10 +104,10 @@ twig tree                                        # Check branch dependencies
 git log --oneline parent-branch..current-branch  # Verify unique commits only
 
 # Pre-commit validation (run in this order)
-npx nx affected -t typecheck                        # 1. Type checking
-npx nx affected -t lint --fix                       # 2. Linting with auto-fix
-npx nx affected -t test                             # 3. Testing
-npx nx affected -t build                            # 4. Building
+pnpm exec nx affected -t typecheck                        # 1. Type checking
+pnpm exec nx affected -t lint --fix                       # 2. Linting with auto-fix
+pnpm exec nx affected -t test                             # 3. Testing
+pnpm exec nx affected -t build                            # 4. Building
 
 # Commit and PR
 git add .
@@ -119,8 +120,8 @@ twig github pr create-pr
 
 #### ✅ Always Do
 
-- Use **Nx commands** (`npx nx affected -t test`) not direct npm commands
-- Use **npx nx** prefix for all Nx commands (not just `nx`)
+- Use **Nx commands** (`pnpm exec nx affected -t test`) not direct npm commands
+- Use **pnpm exec nx** prefix for all Nx commands (not just `nx`)
 - Use **PowerShell syntax** (`;` for chaining, `$env:` for variables)
 - Update **Jira ticket status** at each workflow stage
 - Run validation checks **in order**: typecheck → lint → test → build
@@ -131,7 +132,7 @@ twig github pr create-pr
 #### ❌ Never Do
 
 - Don't start dev server or GraphQL service (already running)
-- Don't use `npm run` directly, use `nx` commands
+- Don't use `pnpm run` directly, use `nx` commands
 - Don't suppress errors with `@ts-ignore` or `eslint-disable` without justification
 - Don't skip pre-commit validation checks
 - Don't create PRs without updating Jira status

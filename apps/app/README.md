@@ -9,7 +9,7 @@ The Legacy Sports mobile application built with React Native CLI for Android pla
 ### Prerequisites
 
 - **Node.js**: v18+
-- **React Native CLI**: `npm install -g react-native-cli`
+- **React Native CLI**: `pnpm install -g react-native-cli`
 - **Android Studio**: For Android development
 - **Xcode**: For iOS development (macOS only)
 
@@ -20,14 +20,14 @@ The Legacy Sports mobile application built with React Native CLI for Android pla
 cd apps/app
 
 # Start Metro bundler
-npm run start
+pnpm run start
 # or
-npx react-native start
+pnpm exec react-native start
 
 # Run on Android (in another terminal)
-npm run android
+pnpm run android
 # or
-npx react-native run-android
+pnpm exec react-native run-android
 
 # iOS builds are currently disabled
 ```
@@ -68,10 +68,10 @@ No environment variables needed for basic development. GraphQL endpoint is confi
 npm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run E2E tests
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ## 📦 Building
@@ -80,10 +80,10 @@ npm run test:e2e
 
 ```bash
 # Debug build
-npm run build:android:debug
+pnpm run build:android:debug
 
 # Release build (requires signing configuration)
-npm run build:android:release
+pnpm run build:android:release
 
 # Build APK directly
 cd android
@@ -94,10 +94,10 @@ cd android
 
 ```bash
 # Debug build
-npm run build:ios:debug
+pnpm run build:ios:debug
 
 # Release build (requires provisioning profile)
-npm run build:ios:release
+pnpm run build:ios:release
 ```
 
 ## 🛠️ Development
@@ -118,10 +118,10 @@ npm run build:ios:release
 
 ```bash
 # Clean build artifacts
-npm run clean
+pnpm run clean
 
 # Reset Metro cache
-npm run start:reset
+pnpm run start:reset
 
 # Install iOS dependencies (macOS only)
 cd ios && pod install
@@ -143,7 +143,7 @@ Uses Tamagui for cross-platform UI components:
 
 ```bash
 # Clear cache and restart
-npx react-native start --reset-cache
+pnpm exec react-native start --reset-cache
 ```
 
 **Android build fails**:
@@ -153,7 +153,7 @@ npx react-native start --reset-cache
 cd android
 ./gradlew clean
 cd ..
-npm run android
+pnpm run android
 ```
 
 **iOS build fails**:
@@ -164,7 +164,7 @@ cd ios
 rm -rf Pods Podfile.lock
 pod install
 cd ..
-npm run ios
+pnpm run ios
 ```
 
 **App crashes on startup**:

@@ -59,8 +59,8 @@ async function loadDbCredentialsToEnv() {
     console.log('$env:DB_SSL="true"');
     console.log('');
     console.log('Then run your Drizzle commands like:');
-    console.log('npx drizzle-kit introspect');
-    console.log('npx drizzle-kit generate');
+    console.log('pnpm exec drizzle-kit introspect');
+    console.log('pnpm exec drizzle-kit generate');
   } catch (error) {
     console.error('❌ Failed to load database credentials:', error);
     process.exit(1);

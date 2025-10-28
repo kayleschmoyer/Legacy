@@ -65,7 +65,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npx nx serve web',
+    command: 'pnpm exec nx serve web',
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

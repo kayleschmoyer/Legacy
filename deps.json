@@ -15,9 +15,7 @@
             },
             "build": {
               "executor": "nx:run-commands",
-              "outputs": [
-                "{projectRoot}/dist"
-              ],
+              "outputs": ["{projectRoot}/dist"],
               "options": {
                 "commands": [
                   "vite build",
@@ -42,21 +40,17 @@
                 "command": "node dist/index.js",
                 "cwd": "lambdas/draft-processor"
               },
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "configurations": {},
               "parallelism": true
             },
             "dev": {
               "continuous": true,
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -74,20 +68,16 @@
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lambdas/draft-processor",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -122,16 +112,12 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ]
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -139,30 +125,24 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects draft-processor --includeDependentProjects -- npx nx build-deps draft-processor"
+                "command": "pnpm exec nx watch --projects draft-processor --includeDependentProjects -- pnpm exec nx build-deps draft-processor"
               },
               "configurations": {},
               "parallelism": true
             },
             "nx-release-publish": {
               "executor": "@nx/js:release-publish",
-              "dependsOn": [
-                "^nx-release-publish"
-              ],
+              "dependsOn": ["^nx-release-publish"],
               "options": {},
               "configurations": {},
               "parallelism": true
             },
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "jestConfig": "lambdas/draft-processor/jest.config.ts",
                 "passWithNoTests": true
@@ -176,17 +156,13 @@
                 "command": "cd dist && zip -r ../draft-processor-{args.version}.zip . && cd ..",
                 "cwd": "lambdas/draft-processor"
               },
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "configurations": {},
               "parallelism": true
             },
             "deploy": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "powershell -ExecutionPolicy Bypass -File scripts/deploy-lambda.ps1 -FunctionName draft-processor"
               },
@@ -196,9 +172,7 @@
             },
             "deploy:plan": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "commands": [
                   "echo '🔍 Validating Terraform configuration for Draft Processor lambda...'",
@@ -242,11 +216,7 @@
             }
           },
           "name": "draft-processor",
-          "tags": [
-            "npm:public",
-            "lambda",
-            "draft"
-          ],
+          "tags": ["npm:public", "lambda", "draft"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lambdas/draft-processor",
           "implicitDependencies": []
@@ -264,12 +234,10 @@
                 "script": "test"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -277,7 +245,7 @@
                   }
                 },
                 "scriptContent": "jest --onlyChanged",
-                "runCommand": "npm run test"
+                "runCommand": "pnpm run test"
               },
               "configurations": {},
               "parallelism": true
@@ -295,21 +263,15 @@
                 "{workspaceRoot}/lambdas/game-selection/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -323,28 +285,20 @@
             },
             "build": {
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "inputs": [
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "vite"
-                  ]
+                  "externalDependencies": ["vite"]
                 }
               ],
-              "outputs": [
-                "{projectRoot}/dist"
-              ],
+              "outputs": ["{projectRoot}/dist"],
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Run Vite build",
                 "help": {
-                  "command": "npx vite build --help",
+                  "command": "pnpm exec vite build --help",
                   "example": {
                     "options": {
                       "sourcemap": true,
@@ -383,12 +337,10 @@
                 "script": "dev"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -396,27 +348,23 @@
                   }
                 },
                 "scriptContent": "tsx watch src/dev.ts",
-                "runCommand": "npm run dev"
+                "runCommand": "pnpm run dev"
               },
               "configurations": {},
               "parallelism": true
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lambdas/game-selection",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -444,9 +392,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -455,11 +401,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -472,9 +416,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -482,12 +424,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects game-selection --includeDependentProjects -- npx nx build-deps game-selection"
+                "command": "pnpm exec nx watch --projects game-selection --includeDependentProjects -- pnpm exec nx build-deps game-selection"
               },
               "configurations": {},
               "parallelism": true
@@ -499,7 +439,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/dev.ts",
-                "runCommand": "npm run dev:no-watch"
+                "runCommand": "pnpm run dev:no-watch"
               },
               "configurations": {},
               "parallelism": true
@@ -511,7 +451,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --watch --onlyChanged",
-                "runCommand": "npm run test:watch"
+                "runCommand": "pnpm run test:watch"
               },
               "configurations": {},
               "parallelism": true
@@ -523,16 +463,14 @@
               },
               "metadata": {
                 "scriptContent": "jest",
-                "runCommand": "npm run test:all-files"
+                "runCommand": "pnpm run test:all-files"
               },
               "configurations": {},
               "parallelism": true
             },
             "package": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "echo 'Legacy serverless package command. Use nx deploy game-selection instead.'",
                 "cwd": "lambdas/game-selection"
@@ -542,9 +480,7 @@
             },
             "deploy": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "package"
-              ],
+              "dependsOn": ["package"],
               "options": {
                 "commands": [
                   "cd terraform",
@@ -560,9 +496,7 @@
             },
             "deploy:plan": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "package"
-              ],
+              "dependsOn": ["package"],
               "options": {
                 "commands": [
                   "echo '🔍 Validating Terraform configuration for game-selection lambda...'",
@@ -620,10 +554,7 @@
             }
           },
           "name": "game-selection",
-          "tags": [
-            "npm:private",
-            "lambda"
-          ],
+          "tags": ["npm:private", "lambda"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lambdas/game-selection/src",
           "implicitDependencies": []
@@ -639,9 +570,7 @@
           "targets": {
             "test": {
               "executor": "@nx/vite:test",
-              "outputs": [
-                "{options.reportsDirectory}"
-              ],
+              "outputs": ["{options.reportsDirectory}"],
               "options": {
                 "passWithNoTests": true,
                 "reportsDirectory": "../../coverage/apps/graphql-explorer"
@@ -651,9 +580,7 @@
             },
             "build": {
               "executor": "@nx/vite:build",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "defaultConfiguration": "production",
               "options": {
                 "outputPath": "dist/apps/graphql-explorer",
@@ -694,12 +621,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -744,9 +669,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -755,11 +678,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -772,9 +693,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -782,12 +701,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects graphql-explorer --includeDependentProjects -- npx nx build-deps graphql-explorer"
+                "command": "pnpm exec nx watch --projects graphql-explorer --includeDependentProjects -- pnpm exec nx build-deps graphql-explorer"
               },
               "configurations": {},
               "parallelism": true
@@ -808,10 +725,7 @@
           "targets": {
             "test": {
               "executor": "nx:noop",
-              "dependsOn": [
-                "test:web",
-                "test:mobile"
-              ],
+              "dependsOn": ["test:web", "test:mobile"],
               "options": {},
               "configurations": {},
               "parallelism": true
@@ -829,21 +743,15 @@
                 "{workspaceRoot}/lib/shared-components/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -857,10 +765,7 @@
             },
             "build": {
               "executor": "nx:noop",
-              "dependsOn": [
-                "build:web",
-                "build:mobile"
-              ],
+              "dependsOn": ["build:web", "build:mobile"],
               "options": {},
               "configurations": {},
               "parallelism": true
@@ -872,12 +777,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -897,12 +800,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -916,20 +817,16 @@
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lib/shared-components",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -957,9 +854,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -968,11 +863,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.lib.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.lib.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -985,9 +878,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -995,12 +886,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects shared-components --includeDependentProjects -- npx nx build-deps shared-components"
+                "command": "pnpm exec nx watch --projects shared-components --includeDependentProjects -- pnpm exec nx build-deps shared-components"
               },
               "configurations": {},
               "parallelism": true
@@ -1012,7 +901,7 @@
               },
               "metadata": {
                 "scriptContent": "storybook build -c .storybook -o ../../dist/storybook",
-                "runCommand": "npm run build-storybook"
+                "runCommand": "pnpm run build-storybook"
               },
               "configurations": {},
               "parallelism": true
@@ -1024,7 +913,7 @@
               },
               "metadata": {
                 "scriptContent": "storybook dev -p 6009 -c .storybook",
-                "runCommand": "npm run storybook"
+                "runCommand": "pnpm run storybook"
               },
               "configurations": {},
               "parallelism": true
@@ -1036,15 +925,13 @@
               },
               "metadata": {
                 "scriptContent": "test-storybook",
-                "runCommand": "npm run test-storybook"
+                "runCommand": "pnpm run test-storybook"
               },
               "configurations": {},
               "parallelism": true
             },
             "static-storybook": {
-              "dependsOn": [
-                "build-storybook"
-              ],
+              "dependsOn": ["build-storybook"],
               "continuous": true,
               "executor": "@nx/web:file-server",
               "options": {
@@ -1061,7 +948,7 @@
               },
               "metadata": {
                 "scriptContent": "tsc --emitDeclarationOnly --declaration --outDir dist/web",
-                "runCommand": "npm run build:declarations"
+                "runCommand": "pnpm run build:declarations"
               },
               "configurations": {},
               "parallelism": true
@@ -1072,8 +959,8 @@
                 "script": "build:web"
               },
               "metadata": {
-                "scriptContent": "npm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
-                "runCommand": "npm run build:web"
+                "scriptContent": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
+                "runCommand": "pnpm run build:web"
               },
               "configurations": {},
               "parallelism": true
@@ -1085,7 +972,7 @@
               },
               "metadata": {
                 "scriptContent": "cross-env BUILD_PLATFORM=mobile vite build",
-                "runCommand": "npm run build:mobile"
+                "runCommand": "pnpm run build:mobile"
               },
               "configurations": {},
               "parallelism": true
@@ -1096,8 +983,8 @@
                 "script": "build:all"
               },
               "metadata": {
-                "scriptContent": "npm run build:web && npm run build:mobile",
-                "runCommand": "npm run build:all"
+                "scriptContent": "pnpm run build:web && pnpm run build:mobile",
+                "runCommand": "pnpm run build:all"
               },
               "configurations": {},
               "parallelism": true
@@ -1109,7 +996,7 @@
               },
               "metadata": {
                 "scriptContent": "graphql-codegen --config codegen.ts",
-                "runCommand": "npm run codegen"
+                "runCommand": "pnpm run codegen"
               },
               "configurations": {},
               "parallelism": true
@@ -1121,7 +1008,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --watch --onlyChanged",
-                "runCommand": "npm run test:watch"
+                "runCommand": "pnpm run test:watch"
               },
               "configurations": {},
               "parallelism": true
@@ -1133,7 +1020,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --coverage",
-                "runCommand": "npm run test:coverage"
+                "runCommand": "pnpm run test:coverage"
               },
               "configurations": {},
               "parallelism": true
@@ -1145,7 +1032,7 @@
               },
               "metadata": {
                 "scriptContent": "jest",
-                "runCommand": "npm run test:all-files"
+                "runCommand": "pnpm run test:all-files"
               },
               "configurations": {},
               "parallelism": true
@@ -1156,8 +1043,8 @@
                 "script": "test-storybook:ci"
               },
               "metadata": {
-                "scriptContent": "concurrently -k -s first -n \"SB,TEST\" -c \"magenta,blue\" \"npm run storybook\" \"wait-on tcp:6009 && npm run test-storybook\"",
-                "runCommand": "npm run test-storybook:ci"
+                "scriptContent": "concurrently -k -s first -n \"SB,TEST\" -c \"magenta,blue\" \"pnpm run storybook\" \"wait-on tcp:6009 && pnpm run test-storybook\"",
+                "runCommand": "pnpm run test-storybook:ci"
               },
               "configurations": {},
               "parallelism": true
@@ -1169,7 +1056,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --config=jest.storybook.config.ts",
-                "runCommand": "npm run test:stories"
+                "runCommand": "pnpm run test:stories"
               },
               "configurations": {},
               "parallelism": true
@@ -1180,17 +1067,15 @@
                 "script": "test:all"
               },
               "metadata": {
-                "scriptContent": "npm run test && npm run test:stories",
-                "runCommand": "npm run test:all"
+                "scriptContent": "pnpm run test && pnpm run test:stories",
+                "runCommand": "pnpm run test:all"
               },
               "configurations": {},
               "parallelism": true
             },
             "test:web": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}/web"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}/web"],
               "options": {
                 "jestConfig": "lib/shared-components/jest.config.web.ts"
               },
@@ -1199,9 +1084,7 @@
             },
             "test:mobile": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}/mobile"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}/mobile"],
               "options": {
                 "jestConfig": "lib/shared-components/jest.config.mobile.ts"
               },
@@ -1236,9 +1119,7 @@
             }
           },
           "name": "shared-components",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lib/shared-components/src",
           "implicitDependencies": []
@@ -1252,9 +1133,7 @@
           "targets": {
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "jestConfig": "lambdas/stats-lambda/jest.config.ts",
                 "passWithNoTests": true
@@ -1275,21 +1154,15 @@
                 "{workspaceRoot}/lambdas/stats-lambda/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -1303,28 +1176,20 @@
             },
             "build": {
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "inputs": [
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "vite"
-                  ]
+                  "externalDependencies": ["vite"]
                 }
               ],
-              "outputs": [
-                "{projectRoot}/dist"
-              ],
+              "outputs": ["{projectRoot}/dist"],
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Run Vite build",
                 "help": {
-                  "command": "npx vite build --help",
+                  "command": "pnpm exec vite build --help",
                   "example": {
                     "options": {
                       "sourcemap": true,
@@ -1363,12 +1228,10 @@
                 "script": "dev"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -1376,27 +1239,23 @@
                   }
                 },
                 "scriptContent": "tsx watch src/dev.ts",
-                "runCommand": "npm run dev"
+                "runCommand": "pnpm run dev"
               },
               "configurations": {},
               "parallelism": true
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lambdas/stats-lambda",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -1424,9 +1283,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -1435,11 +1292,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -1452,9 +1307,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -1462,12 +1315,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects stats-lambda --includeDependentProjects -- npx nx build-deps stats-lambda"
+                "command": "pnpm exec nx watch --projects stats-lambda --includeDependentProjects -- pnpm exec nx build-deps stats-lambda"
               },
               "configurations": {},
               "parallelism": true
@@ -1479,7 +1330,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/dev.ts",
-                "runCommand": "npm run dev:no-watch"
+                "runCommand": "pnpm run dev:no-watch"
               },
               "configurations": {},
               "parallelism": true
@@ -1491,7 +1342,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --watch --onlyChanged",
-                "runCommand": "npm run test:watch"
+                "runCommand": "pnpm run test:watch"
               },
               "configurations": {},
               "parallelism": true
@@ -1503,16 +1354,14 @@
               },
               "metadata": {
                 "scriptContent": "jest",
-                "runCommand": "npm run test:all-files"
+                "runCommand": "pnpm run test:all-files"
               },
               "configurations": {},
               "parallelism": true
             },
             "package": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "commands": [
                   "cd lambdas/stats-lambda/dist && zip -j index.js.zip index.js"
@@ -1524,9 +1373,7 @@
             },
             "deploy": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "../../scripts/deploy-lambda.sh stats",
                 "cwd": "lambdas/stats-lambda"
@@ -1537,9 +1384,7 @@
             },
             "deploy:plan": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "commands": [
                   "echo '🔍 Validating Terraform configuration for stats lambda...'",
@@ -1610,10 +1455,7 @@
             }
           },
           "name": "stats-lambda",
-          "tags": [
-            "npm:private",
-            "lambda"
-          ],
+          "tags": ["npm:private", "lambda"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lambdas/stats-lambda",
           "implicitDependencies": []
@@ -1627,9 +1469,7 @@
           "targets": {
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
               "options": {
                 "jestConfig": "lambdas/oauth-proxy/jest.config.ts"
               },
@@ -1644,28 +1484,20 @@
             },
             "build": {
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "inputs": [
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "vite"
-                  ]
+                  "externalDependencies": ["vite"]
                 }
               ],
-              "outputs": [
-                "{projectRoot}/dist"
-              ],
+              "outputs": ["{projectRoot}/dist"],
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Run Vite build",
                 "help": {
-                  "command": "npx vite build --help",
+                  "command": "pnpm exec vite build --help",
                   "example": {
                     "options": {
                       "sourcemap": true,
@@ -1704,12 +1536,10 @@
                 "script": "dev"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -1717,27 +1547,23 @@
                   }
                 },
                 "scriptContent": "tsx watch src/dev.ts",
-                "runCommand": "npm run dev"
+                "runCommand": "pnpm run dev"
               },
               "configurations": {},
               "parallelism": true
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lambdas/oauth-proxy",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -1765,9 +1591,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -1776,11 +1600,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -1793,9 +1615,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -1803,12 +1623,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects oauth-proxy --includeDependentProjects -- npx nx build-deps oauth-proxy"
+                "command": "pnpm exec nx watch --projects oauth-proxy --includeDependentProjects -- pnpm exec nx build-deps oauth-proxy"
               },
               "configurations": {},
               "parallelism": true
@@ -1820,7 +1638,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/dev.ts",
-                "runCommand": "npm run dev:no-watch"
+                "runCommand": "pnpm run dev:no-watch"
               },
               "configurations": {},
               "parallelism": true
@@ -1832,7 +1650,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --watch --onlyChanged",
-                "runCommand": "npm run test:watch"
+                "runCommand": "pnpm run test:watch"
               },
               "configurations": {},
               "parallelism": true
@@ -1844,16 +1662,14 @@
               },
               "metadata": {
                 "scriptContent": "jest",
-                "runCommand": "npm run test:all-files"
+                "runCommand": "pnpm run test:all-files"
               },
               "configurations": {},
               "parallelism": true
             },
             "package": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "echo 'Legacy serverless package command. Use nx deploy oauth-proxy instead.'",
                 "cwd": "lambdas/oauth-proxy"
@@ -1863,9 +1679,7 @@
             },
             "deploy": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "../../scripts/deploy-lambda.ps1 -FunctionName oauth-proxy",
                 "cwd": "lambdas/oauth-proxy"
@@ -1876,9 +1690,7 @@
             },
             "deploy:plan": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "commands": [
                   "echo '🔍 Validating Terraform configuration for OAuth proxy lambda...'",
@@ -1941,10 +1753,7 @@
             }
           },
           "name": "oauth-proxy",
-          "tags": [
-            "npm:private",
-            "lambda"
-          ],
+          "tags": ["npm:private", "lambda"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lambdas/oauth-proxy",
           "implicitDependencies": []
@@ -1958,9 +1767,7 @@
           "targets": {
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
               "options": {
                 "jestConfig": "lib/ui-abstractions/jest.config.ts"
               },
@@ -1969,27 +1776,18 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/ui-abstractions",
                 "main": "lib/ui-abstractions/src/index.ts",
                 "tsConfig": "lib/ui-abstractions/tsconfig.lib.json",
-                "assets": [
-                  "lib/ui-abstractions/*.md"
-                ]
+                "assets": ["lib/ui-abstractions/*.md"]
               },
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             },
             "lint": {
               "executor": "@nx/eslint:lint",
@@ -1999,11 +1797,7 @@
             }
           },
           "name": "ui-abstractions",
-          "tags": [
-            "npm:private",
-            "type:util",
-            "scope:shared"
-          ],
+          "tags": ["npm:private", "type:util", "scope:shared"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -2033,12 +1827,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -2052,14 +1844,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\tamagui-config"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\tamagui-config"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -2077,21 +1865,15 @@
                 "{workspaceRoot}/lib/tamagui-config/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2105,9 +1887,7 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/tamagui-config",
                 "main": "lib/tamagui-config/src/index.ts",
@@ -2117,21 +1897,12 @@
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "tamagui-config",
-          "tags": [
-            "npm:private",
-            "type:config",
-            "scope:ui"
-          ],
+          "tags": ["npm:private", "type:config", "scope:ui"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -2165,21 +1936,15 @@
                 "{workspaceRoot}/lib/env-utilities/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2193,9 +1958,7 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/env-utilities",
                 "main": "lib/env-utilities/src/index.ts",
@@ -2205,19 +1968,12 @@
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "env-utilities",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -2247,12 +2003,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -2266,14 +2020,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\data-loaders"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\data-loaders"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -2291,21 +2041,15 @@
                 "{workspaceRoot}/lib/data-loaders/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2324,7 +2068,7 @@
               },
               "metadata": {
                 "scriptContent": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-                "runCommand": "npm run codegen:db"
+                "runCommand": "pnpm run codegen:db"
               },
               "configurations": {},
               "parallelism": true
@@ -2335,23 +2079,18 @@
                 "script": "codegen"
               },
               "metadata": {
-                "scriptContent": "npm run codegen:db",
-                "runCommand": "npm run codegen"
+                "scriptContent": "pnpm run codegen:db",
+                "runCommand": "pnpm run codegen"
               },
               "configurations": {},
               "parallelism": true
             }
           },
           "name": "data-loaders",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {
-              "NPM Scripts": [
-                "codegen:db",
-                "codegen"
-              ]
+              "NPM Scripts": ["codegen:db", "codegen"]
             },
             "js": {
               "packageName": "@legacy-sports/data-loaders",
@@ -2384,21 +2123,15 @@
                 "{workspaceRoot}/lib/bref-client/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2417,7 +2150,7 @@
               },
               "metadata": {
                 "scriptContent": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-                "runCommand": "npm run codegen:db"
+                "runCommand": "pnpm run codegen:db"
               },
               "configurations": {},
               "parallelism": true
@@ -2428,23 +2161,18 @@
                 "script": "codegen"
               },
               "metadata": {
-                "scriptContent": "npm run codegen:db",
-                "runCommand": "npm run codegen"
+                "scriptContent": "pnpm run codegen:db",
+                "runCommand": "pnpm run codegen"
               },
               "configurations": {},
               "parallelism": true
             }
           },
           "name": "bref-client",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {
-              "NPM Scripts": [
-                "codegen:db",
-                "codegen"
-              ]
+              "NPM Scripts": ["codegen:db", "codegen"]
             },
             "js": {
               "packageName": "@legacy-sports/bref-client",
@@ -2466,9 +2194,7 @@
           "targets": {
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
               "options": {
                 "jestConfig": "lib/aws-utils/jest.config.ts",
                 "passWithNoTests": true
@@ -2476,9 +2202,7 @@
               "configurations": {
                 "ci": {
                   "ci": true,
-                  "coverageReporters": [
-                    "text"
-                  ]
+                  "coverageReporters": ["text"]
                 }
               },
               "parallelism": true
@@ -2496,21 +2220,15 @@
                 "{workspaceRoot}/lib/aws-utils/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2524,35 +2242,22 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/aws-utils",
                 "main": "lib/aws-utils/src/index.ts",
                 "tsConfig": "lib/aws-utils/tsconfig.lib.json",
-                "assets": [
-                  "lib/aws-utils/*.md"
-                ]
+                "assets": ["lib/aws-utils/*.md"]
               },
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "aws-utils",
-          "tags": [
-            "npm:private",
-            "scope:server",
-            "type:util"
-          ],
+          "tags": ["npm:private", "scope:server", "type:util"],
           "metadata": {
             "targetGroups": {},
             "description": "AWS-specific utilities for server-side operations",
@@ -2583,12 +2288,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -2602,14 +2305,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\db-client"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\db-client"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -2627,21 +2326,15 @@
                 "{workspaceRoot}/lib/db-client/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -2660,7 +2353,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts test",
-                "runCommand": "npm run db:test"
+                "runCommand": "pnpm run db:test"
               },
               "configurations": {},
               "parallelism": true
@@ -2672,7 +2365,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts test --production",
-                "runCommand": "npm run db:test:production"
+                "runCommand": "pnpm run db:test:production"
               },
               "configurations": {},
               "parallelism": true
@@ -2684,7 +2377,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts url",
-                "runCommand": "npm run db:url"
+                "runCommand": "pnpm run db:url"
               },
               "configurations": {},
               "parallelism": true
@@ -2696,7 +2389,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts url --production",
-                "runCommand": "npm run db:url:production"
+                "runCommand": "pnpm run db:url:production"
               },
               "configurations": {},
               "parallelism": true
@@ -2708,7 +2401,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts psql",
-                "runCommand": "npm run db:psql"
+                "runCommand": "pnpm run db:psql"
               },
               "configurations": {},
               "parallelism": true
@@ -2720,7 +2413,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts psql --production",
-                "runCommand": "npm run db:psql:production"
+                "runCommand": "pnpm run db:psql:production"
               },
               "configurations": {},
               "parallelism": true
@@ -2732,7 +2425,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts credentials",
-                "runCommand": "npm run db:credentials"
+                "runCommand": "pnpm run db:credentials"
               },
               "configurations": {},
               "parallelism": true
@@ -2744,7 +2437,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/cli/db-cli.ts credentials --production",
-                "runCommand": "npm run db:credentials:production"
+                "runCommand": "pnpm run db:credentials:production"
               },
               "configurations": {},
               "parallelism": true
@@ -2756,7 +2449,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/load-db-env.ts",
-                "runCommand": "npm run db:env"
+                "runCommand": "pnpm run db:env"
               },
               "configurations": {},
               "parallelism": true
@@ -2768,7 +2461,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/verify-schema.ts",
-                "runCommand": "npm run db:verify"
+                "runCommand": "pnpm run db:verify"
               },
               "configurations": {},
               "parallelism": true
@@ -2780,7 +2473,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/manual-migration.ts",
-                "runCommand": "npm run db:manual-migration"
+                "runCommand": "pnpm run db:manual-migration"
               },
               "configurations": {},
               "parallelism": true
@@ -2792,7 +2485,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/test-draft-status.ts",
-                "runCommand": "npm run db:test-draft"
+                "runCommand": "pnpm run db:test-draft"
               },
               "configurations": {},
               "parallelism": true
@@ -2804,7 +2497,7 @@
               },
               "metadata": {
                 "scriptContent": "drizzle-kit generate",
-                "runCommand": "npm run db:generate"
+                "runCommand": "pnpm run db:generate"
               },
               "configurations": {},
               "parallelism": true
@@ -2816,7 +2509,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/run-drizzle-migrations.ts",
-                "runCommand": "npm run db:migrate"
+                "runCommand": "pnpm run db:migrate"
               },
               "configurations": {},
               "parallelism": true
@@ -2828,7 +2521,7 @@
               },
               "metadata": {
                 "scriptContent": "drizzle-kit push",
-                "runCommand": "npm run db:push"
+                "runCommand": "pnpm run db:push"
               },
               "configurations": {},
               "parallelism": true
@@ -2840,7 +2533,7 @@
               },
               "metadata": {
                 "scriptContent": "drizzle-kit studio",
-                "runCommand": "npm run db:studio"
+                "runCommand": "pnpm run db:studio"
               },
               "configurations": {},
               "parallelism": true
@@ -2852,16 +2545,14 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/scripts/reset-database.ts",
-                "runCommand": "npm run db:reset"
+                "runCommand": "pnpm run db:reset"
               },
               "configurations": {},
               "parallelism": true
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/db-client",
                 "main": "lib/db-client/src/index.ts",
@@ -2871,19 +2562,12 @@
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "db-client",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {
               "NPM Scripts": [
@@ -2926,13 +2610,9 @@
           "targets": {
             "lint": {
               "executor": "@nx/eslint:lint",
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "options": {
-                "lintFilePatterns": [
-                  "apps/app-e2e/**/*.{ts,tsx,js,jsx}"
-                ]
+                "lintFilePatterns": ["apps/app-e2e/**/*.{ts,tsx,js,jsx}"]
               },
               "configurations": {},
               "parallelism": true
@@ -2944,7 +2624,7 @@
               },
               "metadata": {
                 "scriptContent": "wdio run",
-                "runCommand": "npm run e2e"
+                "runCommand": "pnpm run e2e"
               },
               "configurations": {},
               "parallelism": true
@@ -2956,7 +2636,7 @@
               },
               "metadata": {
                 "scriptContent": "wdio run --spec ./src/app.e2e.js",
-                "runCommand": "npm run e2e:android"
+                "runCommand": "pnpm run e2e:android"
               },
               "configurations": {},
               "parallelism": true
@@ -2968,7 +2648,7 @@
               },
               "metadata": {
                 "scriptContent": "wdio run --spec ./src/app.e2e.js --logLevel debug",
-                "runCommand": "npm run e2e:debug"
+                "runCommand": "pnpm run e2e:debug"
               },
               "configurations": {},
               "parallelism": true
@@ -2999,7 +2679,7 @@
             "e2e-android": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js",
+                "command": "pnpm exec wdio run ./wdio.conf.js --spec ./src/app.e2e.js",
                 "cwd": "apps/app-e2e"
               },
               "configurations": {},
@@ -3008,7 +2688,7 @@
             "e2e-android-debug": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx wdio run ./wdio.conf.js --spec ./src/app.e2e.js --logLevel debug",
+                "command": "pnpm exec wdio run ./wdio.conf.js --spec ./src/app.e2e.js --logLevel debug",
                 "cwd": "apps/app-e2e"
               },
               "configurations": {},
@@ -3040,16 +2720,10 @@
             }
           },
           "name": "app-e2e",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {
-              "NPM Scripts": [
-                "e2e",
-                "e2e:android",
-                "e2e:debug"
-              ]
+              "NPM Scripts": ["e2e", "e2e:android", "e2e:debug"]
             },
             "js": {
               "packageName": "@legacy-sports/app-e2e",
@@ -3059,9 +2733,7 @@
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "apps/app-e2e/src",
           "projectType": "application",
-          "implicitDependencies": [
-            "app"
-          ]
+          "implicitDependencies": ["app"]
         }
       },
       "cli-e2e": {
@@ -3083,21 +2755,15 @@
                 "{workspaceRoot}/apps/cli-e2e/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -3111,16 +2777,12 @@
             },
             "e2e": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{e2eProjectRoot}"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
               "options": {
                 "jestConfig": "apps/cli-e2e/jest.config.json",
                 "passWithNoTests": true
               },
-              "dependsOn": [
-                "cli:build"
-              ],
+              "dependsOn": ["cli:build"],
               "configurations": {},
               "parallelism": true
             }
@@ -3128,9 +2790,7 @@
           "name": "cli-e2e",
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "projectType": "application",
-          "implicitDependencies": [
-            "cli"
-          ],
+          "implicitDependencies": ["cli"],
           "tags": []
         }
       },
@@ -3142,13 +2802,9 @@
           "targets": {
             "lint": {
               "executor": "@nx/eslint:lint",
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "options": {
-                "lintFilePatterns": [
-                  "apps/web-e2e/**/*.{ts,tsx,js,jsx}"
-                ]
+                "lintFilePatterns": ["apps/web-e2e/**/*.{ts,tsx,js,jsx}"]
               },
               "configurations": {},
               "parallelism": true
@@ -3228,13 +2884,8 @@
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "apps/web-e2e/src",
           "projectType": "application",
-          "tags": [
-            "scope:web",
-            "type:e2e"
-          ],
-          "implicitDependencies": [
-            "web"
-          ]
+          "tags": ["scope:web", "type:e2e"],
+          "implicitDependencies": ["web"]
         }
       },
       "logging": {
@@ -3252,12 +2903,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -3271,14 +2920,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\logging"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\logging"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -3296,21 +2941,15 @@
                 "{workspaceRoot}/lib/logging/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -3324,9 +2963,7 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/logging",
                 "main": "lib/logging/src/index.ts",
@@ -3336,19 +2973,12 @@
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "logging",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -3378,12 +3008,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -3397,14 +3025,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\scoring"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\scoring"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -3422,21 +3046,15 @@
                 "{workspaceRoot}/lib/scoring/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -3450,9 +3068,7 @@
             }
           },
           "name": "scoring",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -3479,12 +3095,10 @@
                 "script": "test"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -3492,7 +3106,7 @@
                   }
                 },
                 "scriptContent": "jest --onlyChanged",
-                "runCommand": "npm run test"
+                "runCommand": "pnpm run test"
               },
               "configurations": {},
               "parallelism": true
@@ -3510,21 +3124,15 @@
                 "{workspaceRoot}/lambdas/db/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -3538,28 +3146,20 @@
             },
             "build": {
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "inputs": [
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "vite"
-                  ]
+                  "externalDependencies": ["vite"]
                 }
               ],
-              "outputs": [
-                "{projectRoot}/dist"
-              ],
+              "outputs": ["{projectRoot}/dist"],
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Run Vite build",
                 "help": {
-                  "command": "npx vite build --help",
+                  "command": "pnpm exec vite build --help",
                   "example": {
                     "options": {
                       "sourcemap": true,
@@ -3598,12 +3198,10 @@
                 "script": "dev"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -3611,27 +3209,23 @@
                   }
                 },
                 "scriptContent": "tsx watch src/dev.ts",
-                "runCommand": "npm run dev"
+                "runCommand": "pnpm run dev"
               },
               "configurations": {},
               "parallelism": true
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lambdas/db",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -3659,9 +3253,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -3670,11 +3262,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -3687,9 +3277,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -3697,12 +3285,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects db --includeDependentProjects -- npx nx build-deps db"
+                "command": "pnpm exec nx watch --projects db --includeDependentProjects -- pnpm exec nx build-deps db"
               },
               "configurations": {},
               "parallelism": true
@@ -3714,7 +3300,7 @@
               },
               "metadata": {
                 "scriptContent": "tsx src/dev.ts",
-                "runCommand": "npm run dev:no-watch"
+                "runCommand": "pnpm run dev:no-watch"
               },
               "configurations": {},
               "parallelism": true
@@ -3726,7 +3312,7 @@
               },
               "metadata": {
                 "scriptContent": "jest --watch --onlyChanged",
-                "runCommand": "npm run test:watch"
+                "runCommand": "pnpm run test:watch"
               },
               "configurations": {},
               "parallelism": true
@@ -3738,16 +3324,14 @@
               },
               "metadata": {
                 "scriptContent": "jest",
-                "runCommand": "npm run test:all-files"
+                "runCommand": "pnpm run test:all-files"
               },
               "configurations": {},
               "parallelism": true
             },
             "deploy": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "../../scripts/deploy-lambda.sh graphql",
                 "cwd": "lambdas/db"
@@ -3758,9 +3342,7 @@
             },
             "deploy:plan": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "commands": [
                   "echo '🔍 Validating Terraform configuration for GraphQL lambda...'",
@@ -3786,9 +3368,7 @@
             },
             "package": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "command": "echo 'Legacy serverless package command. Use nx deploy db instead.'",
                 "cwd": "lambdas/db"
@@ -3833,9 +3413,7 @@
             }
           },
           "name": "db",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lambdas/db",
           "implicitDependencies": []
@@ -3856,12 +3434,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -3875,48 +3451,33 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\sentry"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\sentry"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/sentry",
                 "tsConfig": "lib/sentry/tsconfig.lib.json",
                 "packageJson": "lib/sentry/package.json",
                 "main": "lib/sentry/src/index.ts",
-                "assets": [
-                  "lib/sentry/*.md"
-                ]
+                "assets": ["lib/sentry/*.md"]
               },
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "sentry",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -3946,12 +3507,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -3965,14 +3524,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\utils"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\utils"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -3990,21 +3545,15 @@
                 "{workspaceRoot}/lib/utils/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -4018,9 +3567,7 @@
             },
             "build": {
               "executor": "@nx/js:tsc",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "options": {
                 "outputPath": "dist/lib/utils",
                 "main": "lib/utils/src/index.ts",
@@ -4030,19 +3577,12 @@
               "configurations": {},
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "production",
-                "^production"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
             }
           },
           "name": "utils",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -4065,9 +3605,7 @@
           "targets": {
             "test": {
               "executor": "@nx/jest:jest",
-              "outputs": [
-                "{workspaceRoot}/coverage/{projectRoot}"
-              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
               "options": {
                 "jestConfig": "apps/app/jest.config.ts"
               },
@@ -4076,13 +3614,9 @@
             },
             "lint": {
               "executor": "@nx/eslint:lint",
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "options": {
-                "lintFilePatterns": [
-                  "apps/app/**/*.{ts,tsx,js,jsx}"
-                ]
+                "lintFilePatterns": ["apps/app/**/*.{ts,tsx,js,jsx}"]
               },
               "configurations": {},
               "parallelism": true
@@ -4133,9 +3667,7 @@
             },
             "build-ios": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "ios-setup"
-              ],
+              "dependsOn": ["ios-setup"],
               "options": {
                 "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme TempIosExtraction -configuration Release -sdk iphonesimulator -arch x86_64 build",
                 "cwd": "apps/app"
@@ -4145,9 +3677,7 @@
             },
             "test-ios": {
               "executor": "nx:run-commands",
-              "dependsOn": [
-                "ios-setup"
-              ],
+              "dependsOn": ["ios-setup"],
               "options": {
                 "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme TempIosExtraction -configuration Debug -sdk iphonesimulator -arch x86_64 test",
                 "cwd": "apps/app"
@@ -4158,7 +3688,7 @@
             "serve": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native start",
+                "command": "pnpm exec react-native start",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4167,7 +3697,7 @@
             "start": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native start",
+                "command": "pnpm exec react-native start",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4176,7 +3706,7 @@
             "run-ios": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native run-ios",
+                "command": "pnpm exec react-native run-ios",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4185,7 +3715,7 @@
             "run-android": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native run-android",
+                "command": "pnpm exec react-native run-android",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4212,7 +3742,7 @@
             "android": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native run-android",
+                "command": "pnpm exec react-native run-android",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4221,7 +3751,7 @@
             "ios": {
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx react-native run-ios",
+                "command": "pnpm exec react-native run-ios",
                 "cwd": "apps/app"
               },
               "configurations": {},
@@ -4229,9 +3759,7 @@
             }
           },
           "name": "app",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -4265,21 +3793,15 @@
                 "{workspaceRoot}/apps/cli/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -4293,31 +3815,23 @@
             },
             "build": {
               "executor": "@nx/esbuild:esbuild",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "defaultConfiguration": "production",
               "options": {
                 "platform": "node",
                 "outputPath": "dist/apps/cli",
-                "format": [
-                  "cjs"
-                ],
+                "format": ["cjs"],
                 "bundle": true,
                 "main": "apps/cli/src/main.ts",
                 "tsConfig": "apps/cli/tsconfig.app.json",
-                "assets": [
-                  "apps/cli/src/assets"
-                ],
+                "assets": ["apps/cli/src/assets"],
                 "generatePackageJson": true,
                 "esbuildOptions": {
                   "sourcemap": true,
                   "outExtension": {
                     ".js": ".js"
                   },
-                  "external": [
-                    "pg-native"
-                  ]
+                  "external": ["pg-native"]
                 }
               },
               "configurations": {
@@ -4328,28 +3842,19 @@
                     "outExtension": {
                       ".js": ".js"
                     },
-                    "external": [
-                      "pg-native"
-                    ]
+                    "external": ["pg-native"]
                   }
                 }
               },
               "parallelism": true,
               "cache": true,
-              "dependsOn": [
-                "^build"
-              ],
-              "inputs": [
-                "default",
-                "^default"
-              ]
+              "dependsOn": ["^build"],
+              "inputs": ["default", "^default"]
             },
             "serve": {
               "executor": "@nx/js:node",
               "defaultConfiguration": "development",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "buildTarget": "cli:build",
                 "runBuildTargetDependencies": false
@@ -4403,9 +3908,7 @@
             "run": {
               "executor": "@nx/js:node",
               "defaultConfiguration": "development",
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "buildTarget": "cli:build",
                 "runBuildTargetDependencies": false,
@@ -4641,9 +4144,7 @@
             }
           },
           "name": "cli",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "metadata": {
             "targetGroups": {},
             "js": {
@@ -4672,12 +4173,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -4691,14 +4190,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\web"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\web"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -4716,21 +4211,15 @@
                 "{workspaceRoot}/apps/web/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -4744,9 +4233,7 @@
             },
             "build": {
               "executor": "@nx/vite:build",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "defaultConfiguration": "production",
               "options": {
                 "outputPath": "dist/apps/web"
@@ -4770,12 +4257,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -4795,12 +4280,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -4814,20 +4297,16 @@
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "apps/web",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -4855,9 +4334,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -4866,11 +4343,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.app.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.app.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -4883,9 +4358,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -4893,12 +4366,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects web --includeDependentProjects -- npx nx build-deps web"
+                "command": "pnpm exec nx watch --projects web --includeDependentProjects -- pnpm exec nx build-deps web"
               },
               "configurations": {},
               "parallelism": true
@@ -4928,12 +4399,10 @@
                 "command": "jest"
               },
               "metadata": {
-                "technologies": [
-                  "jest"
-                ],
+                "technologies": ["jest"],
                 "description": "Run Jest Tests",
                 "help": {
-                  "command": "npx jest --help",
+                  "command": "pnpm exec jest --help",
                   "example": {
                     "options": {
                       "coverage": true
@@ -4947,14 +4416,10 @@
                 "^production",
                 "{workspaceRoot}\\jest.preset.js",
                 {
-                  "externalDependencies": [
-                    "jest"
-                  ]
+                  "externalDependencies": ["jest"]
                 }
               ],
-              "outputs": [
-                "{workspaceRoot}\\coverage\\lib\\api"
-              ],
+              "outputs": ["{workspaceRoot}\\coverage\\lib\\api"],
               "executor": "nx:run-commands",
               "configurations": {},
               "parallelism": true
@@ -4972,21 +4437,15 @@
                 "{workspaceRoot}/lib/api/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
-                  "externalDependencies": [
-                    "eslint"
-                  ]
+                  "externalDependencies": ["eslint"]
                 }
               ],
-              "outputs": [
-                "{options.outputFile}"
-              ],
+              "outputs": ["{options.outputFile}"],
               "metadata": {
-                "technologies": [
-                  "eslint"
-                ],
+                "technologies": ["eslint"],
                 "description": "Runs ESLint on project",
                 "help": {
-                  "command": "npx eslint --help",
+                  "command": "pnpm exec eslint --help",
                   "example": {
                     "options": {
                       "max-warnings": 0
@@ -5000,9 +4459,7 @@
             },
             "build": {
               "executor": "@nx/vite:build",
-              "outputs": [
-                "{options.outputPath}"
-              ],
+              "outputs": ["{options.outputPath}"],
               "defaultConfiguration": "production",
               "options": {
                 "outputPath": "dist/lib/api"
@@ -5026,12 +4483,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -5051,12 +4506,10 @@
                 "command": "vite"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Starts Vite dev server",
                 "help": {
-                  "command": "npx vite --help",
+                  "command": "pnpm exec vite --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -5070,20 +4523,16 @@
             },
             "preview": {
               "continuous": true,
-              "dependsOn": [
-                "build"
-              ],
+              "dependsOn": ["build"],
               "options": {
                 "cwd": "lib/api",
                 "command": "vite preview"
               },
               "metadata": {
-                "technologies": [
-                  "vite"
-                ],
+                "technologies": ["vite"],
                 "description": "Locally preview Vite production build",
                 "help": {
-                  "command": "npx vite preview --help",
+                  "command": "pnpm exec vite preview --help",
                   "example": {
                     "options": {
                       "port": 3000
@@ -5111,9 +4560,7 @@
                 "production",
                 "^production",
                 {
-                  "externalDependencies": [
-                    "typescript"
-                  ]
+                  "externalDependencies": ["typescript"]
                 }
               ],
               "options": {
@@ -5122,11 +4569,9 @@
               },
               "metadata": {
                 "description": "Runs type-checking for the project.",
-                "technologies": [
-                  "typescript"
-                ],
+                "technologies": ["typescript"],
                 "help": {
-                  "command": "npx tsc -p tsconfig.lib.json --help",
+                  "command": "pnpm exec tsc -p tsconfig.lib.json --help",
                   "example": {
                     "options": {
                       "noEmit": true
@@ -5139,9 +4584,7 @@
               "parallelism": true
             },
             "build-deps": {
-              "dependsOn": [
-                "^build"
-              ],
+              "dependsOn": ["^build"],
               "configurations": {},
               "options": {},
               "parallelism": true,
@@ -5149,12 +4592,10 @@
             },
             "watch-deps": {
               "continuous": true,
-              "dependsOn": [
-                "build-deps"
-              ],
+              "dependsOn": ["build-deps"],
               "executor": "nx:run-commands",
               "options": {
-                "command": "npx nx watch --projects api --includeDependentProjects -- npx nx build-deps api"
+                "command": "pnpm exec nx watch --projects api --includeDependentProjects -- pnpm exec nx build-deps api"
               },
               "configurations": {},
               "parallelism": true
@@ -5166,7 +4607,7 @@
               },
               "metadata": {
                 "scriptContent": "graphql-codegen --config codegen.ts",
-                "runCommand": "npm run codegen"
+                "runCommand": "pnpm run codegen"
               },
               "configurations": {},
               "parallelism": true
@@ -5175,9 +4616,7 @@
           "projectType": "library",
           "metadata": {
             "targetGroups": {
-              "NPM Scripts": [
-                "codegen"
-              ]
+              "NPM Scripts": ["codegen"]
             },
             "js": {
               "packageName": "@legacy-sports/api",
@@ -5186,9 +4625,7 @@
             }
           },
           "name": "api",
-          "tags": [
-            "npm:private"
-          ],
+          "tags": ["npm:private"],
           "$schema": "../../node_modules/nx/schemas/project-schema.json",
           "sourceRoot": "lib/api/src",
           "implicitDependencies": []

@@ -41,13 +41,13 @@ DB_NAME=legacy_sports_dev
 
 ```bash
 # Test connections
-npm run db:test                    # Test local database
-npm run db:test:production         # Test production database
+pnpm run db:test                    # Test local database
+pnpm run db:test:production         # Test production database
 
 # Get connection information
-npm run db:credentials             # Show resolved credentials
-npm run db:url                     # Get connection URL
-npm run db:psql                    # Generate psql commands
+pnpm run db:credentials             # Show resolved credentials
+pnpm run db:url                     # Get connection URL
+pnpm run db:psql                    # Generate psql commands
 ```
 
 ### 4. **Production Security**
@@ -124,7 +124,7 @@ cp .env.example .env.local
 # Edit .env.local: DB_PASSWORD=your-local-password
 
 # 3. Test connection
-npm run db:test
+pnpm run db:test
 ```
 
 ### Production Database Access
@@ -134,17 +134,17 @@ npm run db:test
 aws configure
 
 # Test production database
-npm run db:test:production
+pnpm run db:test:production
 
 # Get connection string for tools
-npm run db:url:production
+pnpm run db:url:production
 ```
 
 ### Database Administration
 
 ```bash
 # Get psql connection command
-npm run db:psql
+pnpm run db:psql
 
 # Output:
 # PGPASSWORD="your-password" psql -h localhost -p 5432 -U postgres -d legacy_sports_dev --set=sslmode=require
@@ -175,7 +175,7 @@ npm run db:psql
 ## 📋 Next Steps
 
 1. **Update local environments**: Copy new `.env.example` to `.env.local`
-2. **Test connections**: Use `npm run db:test` to validate setup
+2. **Test connections**: Use `pnpm run db:test` to validate setup
 3. **Team onboarding**: Share CLI commands for easier database access
 4. **Production validation**: Test production database connections with new system
 

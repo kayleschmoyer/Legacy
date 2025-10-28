@@ -48,9 +48,9 @@ NX_CLOUD_DISTRIBUTED_EXECUTION_AGENT_COUNT=2  # Conservative agent count
 
 ```bash
 # Simple, Nx-native approach
-if ! npx nx affected -t lint test build; then
+if ! pnpm exec nx affected -t lint test build; then
   echo "Distributed execution failed, trying locally..."
-  NX_CLOUD_DISTRIBUTED_EXECUTION=false npx nx affected -t lint test build
+  NX_CLOUD_DISTRIBUTED_EXECUTION=false pnpm exec nx affected -t lint test build
 fi
 ```
 

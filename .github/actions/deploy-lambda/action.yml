@@ -3,36 +3,36 @@ description: Build, package, and deploy a Lambda function using Nx and Terraform
 
 inputs:
   lambda-name:
-    description: 'Name of the Lambda function (e.g., draft-processor, game-selection)'
+    description: "Name of the Lambda function (e.g., draft-processor, game-selection)"
     required: true
   nx-project-name:
-    description: 'Nx project name to build (defaults to lambda-name)'
+    description: "Nx project name to build (defaults to lambda-name)"
     required: false
   lambda-directory:
-    description: 'Path to Lambda directory (defaults to lambdas/{lambda-name})'
+    description: "Path to Lambda directory (defaults to lambdas/{lambda-name})"
     required: false
   build-output-file:
-    description: 'Expected build output file relative to dist/ (defaults to index.js)'
+    description: "Expected build output file relative to dist/ (defaults to index.js)"
     required: false
-    default: 'index.js'
+    default: "index.js"
   terraform-target:
-    description: 'Terraform target resource (e.g., aws_lambda_function.draft_processor)'
+    description: "Terraform target resource (e.g., aws_lambda_function.draft_processor)"
     required: true
   aws-region:
-    description: 'AWS region for deployment'
+    description: "AWS region for deployment"
     required: false
-    default: 'us-east-1'
+    default: "us-east-1"
   aws-stage:
-    description: 'Deployment stage (dev, staging, prod)'
+    description: "Deployment stage (dev, staging, prod)"
     required: false
-    default: 'dev'
+    default: "dev"
 
 outputs:
   version:
-    description: 'Deployed Lambda version'
+    description: "Deployed Lambda version"
     value: ${{ steps.package.outputs.version }}
   s3-bucket:
-    description: 'S3 bucket used for deployment'
+    description: "S3 bucket used for deployment"
     value: ${{ steps.package.outputs.s3-bucket }}
 
 runs:
@@ -45,16 +45,16 @@ runs:
         LAMBDA_NAME="${{ inputs.lambda-name }}"
         NX_PROJECT="${{ inputs.nx-project-name }}"
         LAMBDA_DIR="${{ inputs.lambda-directory }}"
-        
+
         # Use lambda-name as defaults if not specified
         if [ -z "$NX_PROJECT" ]; then
           NX_PROJECT="$LAMBDA_NAME"
         fi
-        
+
         if [ -z "$LAMBDA_DIR" ]; then
           LAMBDA_DIR="lambdas/$LAMBDA_NAME"
         fi
-        
+
         echo "lambda-name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
         echo "nx-project=$NX_PROJECT" >> $GITHUB_OUTPUT
         echo "lambda-dir=$LAMBDA_DIR" >> $GITHUB_OUTPUT
@@ -66,12 +66,12 @@ runs:
         NX_PROJECT="${{ steps.config.outputs.nx-project }}"
         LAMBDA_DIR="${{ steps.config.outputs.lambda-dir }}"
         BUILD_FILE="${{ inputs.build-output-file }}"
-        
+
         echo "🚀 Building $LAMBDA_NAME Lambda..."
         echo "::notice::Building $NX_PROJECT project for targeted deployment"
-        
+
         # Build the project
-        if npx nx build "$NX_PROJECT" --verbose 2>&1 | tee build.log; then
+        if pnpm exec nx build "$NX_PROJECT" --verbose 2>&1 | tee build.log; then
           echo "✅ $LAMBDA_NAME Lambda built successfully"
           
           # Verify build artifacts exist
@@ -107,17 +107,17 @@ runs:
         LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
         AWS_STAGE="${{ inputs.aws-stage }}"
         AWS_REGION="${{ inputs.aws-region }}"
-        
+
         # Create version string
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         COMMIT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
         VERSION="${TIMESTAMP}-${COMMIT_SHA}"
-        
+
         echo "📦 Creating deployment package: $LAMBDA_NAME-${VERSION}.zip"
-        
+
         # Create deployment package from built artifacts
         zip -r "${LAMBDA_NAME}-${VERSION}.zip" dist/
-        
+
         # Get S3 bucket name from SSM parameter store
         echo "🔍 Getting S3 bucket name from SSM..."
         if S3_BUCKET=$(aws ssm get-parameter \
@@ -130,22 +130,22 @@ runs:
           echo "⚠️ SSM parameter not found, using default bucket name"
           S3_BUCKET="legacy-sports-dev-lambdas-cca20ad9"
         fi
-        
+
         # Upload to S3
         echo "⬆️ Uploading to S3: s3://${S3_BUCKET}/${LAMBDA_NAME}/"
         aws s3 cp "${LAMBDA_NAME}-${VERSION}.zip" \
           "s3://${S3_BUCKET}/${LAMBDA_NAME}/" \
           --region "$AWS_REGION"
-        
+
         # Update SSM parameter with version
         aws ssm put-parameter \
           --name "/legacy-sports/${AWS_STAGE}/lambda/${LAMBDA_NAME}/version" \
           --value "$VERSION" \
           --overwrite \
           --region "$AWS_REGION"
-        
+
         echo "✅ Lambda package uploaded: ${LAMBDA_NAME}-${VERSION}.zip"
-        
+
         # Output for use in subsequent steps
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "s3-bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
@@ -181,16 +181,16 @@ runs:
       run: |
         LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
         TF_TARGET="${{ inputs.terraform-target }}"
-        
+
         echo "📋 Planning Terraform changes for $TF_TARGET..."
         echo "⏳ Will wait up to 10 minutes if state is locked by another deployment..."
-        
+
         # Retry logic for terraform plan with lock timeout
         MAX_RETRIES=20
         RETRY_DELAY=30
         RETRY_COUNT=0
         PLAN_SUCCESS=false
-        
+
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
           if terraform plan -target="$TF_TARGET" -lock-timeout=10m 2>&1 | tee plan.log; then
             echo "✅ Terraform plan successful"
@@ -218,7 +218,7 @@ runs:
             fi
           fi
         done
-        
+
         if [ "$PLAN_SUCCESS" = true ]; then
           echo "🚀 Applying Terraform changes..."
           terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
@@ -239,7 +239,7 @@ runs:
       run: |
         LOCK_ID="${{ steps.terraform-deploy.outputs.lock_id }}"
         STATUS="${{ job.status }}"
-        
+
         if [ "$STATUS" = "cancelled" ]; then
           echo "🔓 Workflow was cancelled - attempting to release Terraform lock: $LOCK_ID"
           echo "⚠️  Cancellation may have left the state locked"
@@ -247,7 +247,7 @@ runs:
           echo "🔓 Attempting to release stuck Terraform lock: $LOCK_ID"
           echo "⚠️  This workflow failed and may have left the state locked"
         fi
-        
+
         # Try to force unlock if we captured a lock ID
         if [ -n "$LOCK_ID" ]; then
           echo "Running: terraform force-unlock -force $LOCK_ID"

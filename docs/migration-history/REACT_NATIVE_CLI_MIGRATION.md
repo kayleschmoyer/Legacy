@@ -27,7 +27,7 @@ Successfully completed migration from Expo with EAS dependency to pure React Nat
 
 ```bash
 # Used the new prebuild command (replaces deprecated expo eject)
-npx expo prebuild
+pnpm exec expo prebuild
 ```
 
 This created:
@@ -59,9 +59,9 @@ This created:
   "build-ios": {
     "command": "cd ios && xcodebuild -workspace App.xcworkspace ..."
   },
-  "start": { "command": "npx react-native start" },
-  "run-ios": { "command": "npx react-native run-ios" },
-  "run-android": { "command": "npx react-native run-android" }
+  "start": { "command": "pnpm exec react-native start" },
+  "run-ios": { "command": "pnpm exec react-native run-ios" },
+  "run-android": { "command": "pnpm exec react-native run-android" }
 }
 ```
 
@@ -101,36 +101,36 @@ This created:
 
 ```bash
 # Start Metro bundler
-npm run start
-npx nx start app
+pnpm run start
+pnpm exec nx start app
 
 # Run on iOS (requires macOS + Xcode)
-npm run ios
-npx nx run-ios app
+pnpm run ios
+pnpm exec nx run-ios app
 
 # Run on Android (requires Android SDK)
-npm run android
-npx nx run-android app
+pnpm run android
+pnpm exec nx run-android app
 ```
 
 ### Building
 
 ```bash
 # Build Android APK
-npm run build-android
-npx nx build-android app
+pnpm run build-android
+pnpm exec nx build-android app
 
 # Build iOS app (requires macOS + Xcode)
-npm run build-ios
-npx nx build-ios app
+pnpm run build-ios
+pnpm exec nx build-ios app
 ```
 
 ### Testing
 
 ```bash
 # E2E tests (requires built app)
-npx nx test-android app-e2e
-npx nx test-ios app-e2e
+pnpm exec nx test-android app-e2e
+pnpm exec nx test-ios app-e2e
 ```
 
 ## Benefits Achieved
@@ -161,7 +161,7 @@ npx nx test-ios app-e2e
 1. **Upgrade Java**: Install Java 17+ for Android builds
 2. **Test Builds**: Verify Android/iOS builds work on respective platforms
 3. **Update CI/CD**: Modify any deployment scripts to use new commands
-4. **Clean Package Lock**: Run `npm install` to update package-lock.json after EAS removal
+4. **Clean Package Lock**: Run `pnpm install` to update package-lock.json after EAS removal
 
 ## File Structure Changes
 

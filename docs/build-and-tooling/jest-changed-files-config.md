@@ -53,9 +53,9 @@ module.exports = {
 
 **Available Commands:**
 
-- `npm run test:changed` - Run tests only for affected projects (default behavior)
-- `npm run test:all` - Run tests for all projects
-- `npm run test:watch` - Run tests in watch mode
+- `pnpm run test:changed` - Run tests only for affected projects (default behavior)
+- `pnpm run test:all` - Run tests for all projects
+- `pnpm run test:watch` - Run tests in watch mode
 
 ### 3. **Individual Project Scripts**
 
@@ -85,13 +85,13 @@ Example from `lib/shared-components/package.json`:
 
 ```bash
 # Run tests for changed files only (recommended for daily development)
-npm run test:changed
+pnpm run test:changed
 
 # Run tests for all files (useful for pre-commit or CI)
-npm run test:all
+pnpm run test:all
 
 # Run tests in watch mode for active development
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### **Individual Project Testing**
@@ -104,23 +104,23 @@ cd lib/shared-components
 npm test
 
 # Run all tests for this project
-npm run test:all-files
+pnpm run test:all-files
 
 # Run in watch mode
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### **NX Integration**
 
 ```bash
 # Test specific projects
-npx nx test shared-components
+pnpm exec nx test shared-components
 
 # Test affected projects (based on git changes)
-npx nx affected -t test
+pnpm exec nx affected -t test
 
 # Test all projects
-npx nx run-many -t test
+pnpm exec nx run-many -t test
 ```
 
 ## 🎯 How It Works
@@ -172,11 +172,11 @@ jest src/components/Button.test.tsx
 ```yaml
 # GitHub Actions example
 - name: Run Tests (Changed Files)
-  run: npm run test:changed
+  run: pnpm run test:changed
 
 - name: Run Tests (Full Suite - on main)
   if: github.ref == 'refs/heads/main'
-  run: npm run test:all
+  run: pnpm run test:all
 ```
 
 ## 📊 Performance Benefits
@@ -208,7 +208,7 @@ No tests found related to files changed since last commit.
 Run Jest without `-o` or with `--all` to run all tests.
 ```
 
-**Solution**: This is normal when no relevant files have changed. Use `npm run test:all-files` to run all tests.
+**Solution**: This is normal when no relevant files have changed. Use `pnpm run test:all-files` to run all tests.
 
 ### **Missing Test Dependencies**
 
@@ -233,9 +233,9 @@ If tests are slow even with `--onlyChanged`:
 ### **Commit Workflow**
 
 1. Make incremental changes
-2. Run `npm run test:changed` before committing
+2. Run `pnpm run test:changed` before committing
 3. Ensure all affected tests pass
-4. Use `npm run test:all` periodically to catch integration issues
+4. Use `pnpm run test:all` periodically to catch integration issues
 
 ### **Code Review**
 

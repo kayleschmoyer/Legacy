@@ -57,13 +57,13 @@ await db.insert(playersTable).values({
 
 ```bash
 # Run pending migrations
-npm run db:migrate
+pnpm run db:migrate
 
 # Generate new migration
-npm run db:generate
+pnpm run db:generate
 
 # Reset database (development only)
-npm run db:reset
+pnpm run db:reset
 ```
 
 ## 🔧 Configuration
@@ -132,9 +132,9 @@ Teams ──< Players
 ### Schema Changes
 
 1. **Update schema** in `src/drizzle/schema.ts`
-2. **Generate migration**: `npm run db:generate`
+2. **Generate migration**: `pnpm run db:generate`
 3. **Review migration** in `src/drizzle/migrations/`
-4. **Apply migration**: `npm run db:migrate`
+4. **Apply migration**: `pnpm run db:migrate`
 
 ### Type Generation
 
@@ -155,13 +155,13 @@ docker run --name postgres-dev \
   -d postgres:14
 
 # Set up database
-npm run db:setup
+pnpm run db:setup
 
 # Run migrations
-npm run db:migrate
+pnpm run db:migrate
 
 # Seed with test data
-npm run db:seed
+pnpm run db:seed
 ```
 
 ## 🧪 Testing
@@ -170,13 +170,13 @@ npm run db:seed
 
 ```bash
 # Run database tests
-npm run test:db
+pnpm run test:db
 
 # Test migrations
-npm run test:migrations
+pnpm run test:migrations
 
 # Integration tests
-npm run test:integration
+pnpm run test:integration
 ```
 
 ### Test Database
@@ -202,16 +202,16 @@ Uses Drizzle migration system:
 
 ```bash
 # Add new table
-npm run db:generate -- --name add_players_table
+pnpm run db:generate -- --name add_players_table
 
 # Add column
-npm run db:generate -- --name add_player_stats_column
+pnpm run db:generate -- --name add_player_stats_column
 
 # Create index
-npm run db:generate -- --name add_player_name_index
+pnpm run db:generate -- --name add_player_name_index
 
 # Data migration
-npm run db:generate -- --name migrate_player_data
+pnpm run db:generate -- --name migrate_player_data
 ```
 
 ### Migration Best Practices
@@ -337,7 +337,7 @@ docker logs postgres-dev
 EXPLAIN ANALYZE SELECT * FROM players WHERE team = 'Eagles';
 
 # Connection debugging
-npm run db:debug
+pnpm run db:debug
 ```
 
 ## 📚 Resources

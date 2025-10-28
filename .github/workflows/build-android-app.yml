@@ -28,7 +28,7 @@ on:
 # Required permissions for nx-set-shas action and creating releases
 permissions:
   actions: read
-  contents: write  # Required for creating GitHub releases
+  contents: write # Required for creating GitHub releases
 
 # Cancel in-progress builds for the same workflow
 concurrency:
@@ -37,19 +37,19 @@ concurrency:
 
 env:
   # Version Matrix Configuration
-  JAVA_VERSION: "17"                    # LTS version, compatible with RN 0.79.6
-  NODE_VERSION: "22"                    # Latest LTS, matches development environment
-  ANDROID_API_LEVEL: "35"              # Target SDK for Google Play compliance
-  NDK_VERSION: "27.1.12297006"         # Stable NDK for RN 0.79.6
-  
+  JAVA_VERSION: "17" # LTS version, compatible with RN 0.79.6
+  NODE_VERSION: "22" # Latest LTS, matches development environment
+  ANDROID_API_LEVEL: "35" # Target SDK for Google Play compliance
+  NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.79.6
+
   # Build optimization environment variables with improved network timeouts and cache limits
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.caching=true -Dorg.gradle.caching.debug=false -Dorg.gradle.cache.cleanup=true -Dorg.gradle.internal.network.retry.max.count=3"
   GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
   NODE_OPTIONS: "--max-old-space-size=4096"
-  
+
   # Cache optimization - reduce compression time during cleanup
-  ACTIONS_CACHE_COMPRESSION_LEVEL: "1"  # Lower compression = faster cleanup
-  ACTIONS_CACHE_MAX_SIZE: "5GB"         # Limit cache size
+  ACTIONS_CACHE_COMPRESSION_LEVEL: "1" # Lower compression = faster cleanup
+  ACTIONS_CACHE_MAX_SIZE: "5GB" # Limit cache size
 
 jobs:
   setup:
@@ -132,7 +132,7 @@ jobs:
           path: |
             ~/.gradle/wrapper
             ~/.gradle/caches/modules-2
-            ~/.gradle/caches/jars-9  
+            ~/.gradle/caches/jars-9
           key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/app/build.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -146,20 +146,20 @@ jobs:
         timeout-minutes: 15
         run: |
           cd apps/app/android
-          
+
           echo "📥 Ensuring Gradle wrapper is available..."
           echo "🕐 Gradle setup started at $(date)"
-          
+
           # Set network timeout environment variables for better CI reliability
           export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
-          
+
           # Version compatibility validation
           echo "🔍 Validating version matrix compatibility..."
-          
+
           # Check Java version compatibility
           JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1-2)
           echo "Java version detected: $JAVA_VERSION"
-          
+
           # Check Gradle version with increased timeout for network-dependent operations
           echo "🔍 Checking Gradle wrapper version..."
           timeout 420s ./gradlew --version --no-daemon || {
@@ -169,19 +169,19 @@ jobs:
               exit 1
             }
           }
-          
+
           # Validate Android SDK configuration
           echo "🔍 Validating Android SDK configuration..."
           echo "Target Android API Level: ${{ env.ANDROID_API_LEVEL }}"
           echo "NDK Version: ${{ env.NDK_VERSION }}"
-          
+
           # Quick validation that build.gradle is parseable (without dependency resolution)
           echo "🔍 Validating build configuration..."
           timeout 240s ./gradlew help --quiet --no-daemon > /dev/null || {
             echo "⚠️  Build configuration issue detected - showing details:"
             timeout 180s ./gradlew help --no-daemon --info  # Show error details with more info
           }
-          
+
           echo "✅ Gradle setup and version matrix verified at $(date)"
 
       - name: Check Cache Status
@@ -213,7 +213,7 @@ jobs:
 
           # Generate bundle with optimizations for CI and cache utilization
           echo "📦 Generating React Native bundle for Android (with caching)..."
-          npx react-native bundle \
+          pnpm exec react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
@@ -222,7 +222,7 @@ jobs:
             --minify true \
             --verbose || {
             echo "⚠️ Bundle generation failed, trying with reset-cache..."
-            npx react-native bundle \
+            pnpm exec react-native bundle \
               --platform android \
               --dev false \
               --entry-file index.js \
@@ -311,15 +311,15 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up cache for optimal performance..."
-          
+
           # Remove large temporary files but keep useful caches
           find ~/.gradle/caches -name "*.lock" -delete 2>/dev/null || true
           find ~/.gradle/caches -name "gc.properties" -delete 2>/dev/null || true
-          
+
           # Clean up old build outputs but preserve dependencies
           rm -rf apps/app/android/build/intermediates/incremental 2>/dev/null || true
           rm -rf apps/app/android/app/build/intermediates/incremental 2>/dev/null || true
-          
+
           # Show final cache sizes
           echo "📊 Final Cache Summary:"
           du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Not found"
@@ -337,7 +337,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up large cache directories to speed up post-job cleanup..."
-          
+
           # Remove large temporary build artifacts that don't need to be cached
           rm -rf apps/app/android/app/build/intermediates/merged_assets/ || true
           rm -rf apps/app/android/app/build/intermediates/incremental/ || true
@@ -345,18 +345,18 @@ jobs:
           rm -rf ~/.gradle/caches/build-cache-* || true
           rm -rf ~/.android/build-cache || true
           rm -rf /tmp/metro-* /tmp/haste-map-* || true
-          
+
           # Clean up large node_modules that can be restored from npm cache
           find node_modules -name "*.log" -delete || true
           find node_modules -name ".DS_Store" -delete || true
-          
+
           # Compress remaining gradle caches to reduce cleanup time
           find ~/.gradle/caches -name "*.lock" -delete || true
-          
+
           echo "✅ Cache cleanup completed. Remaining cache sizes:"
           du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Cleaned"
           du -sh node_modules 2>/dev/null || echo "  Node modules: $(du -sh node_modules | cut -f1)"
-          
+
           echo "💡 Post-job cache compression should be much faster now"
 
   create-release:

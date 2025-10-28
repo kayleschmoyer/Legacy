@@ -263,8 +263,8 @@ Write-Host "  Secrets configured: JWT, Google OAuth, Cookie" -ForegroundColor Gr
 Write-Host ""
 Write-Host "Database Credential Resolution:" -ForegroundColor Cyan
 Write-Host "  Production apps will automatically fetch DB credentials from AWS Secrets Manager" -ForegroundColor Green
-Write-Host "  Use 'npm run db:test:production' to validate database connectivity" -ForegroundColor Green
-Write-Host "  Use 'npm run db:credentials:production' to view resolved credentials" -ForegroundColor Green
+Write-Host "  Use 'pnpm run db:test:production' to validate database connectivity" -ForegroundColor Green
+Write-Host "  Use 'pnpm run db:credentials:production' to view resolved credentials" -ForegroundColor Green
 Write-Host ""
 Write-Host "Migration Notes:" -ForegroundColor Yellow
 Write-Host "  Set -DatabaseEndpoint direct for database migrations and admin tasks"

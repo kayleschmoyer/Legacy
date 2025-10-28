@@ -83,7 +83,7 @@ for workflow_file in "$WORKFLOWS_DIR"/*.yml; do
         workflow_name=$(basename "$workflow_file")
         
         # Skip workflows that don't use Nx
-        if ! grep -q "npx nx" "$workflow_file" && ! grep -q "configure-nx-cloud" "$workflow_file"; then
+        if ! grep -q "pnpm exec nx" "$workflow_file" && ! grep -q "configure-nx-cloud" "$workflow_file"; then
             continue
         fi
         

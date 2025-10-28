@@ -1,6 +1,7 @@
 # Drizzle Upgrade Analysis
 
 ## Current Versions
+
 - **drizzle-orm**: `0.33.0` → Latest: `0.44.6` (+11 minor versions)
 - **drizzle-kit**: `0.24.2` → Latest: `0.31.5` (+7 minor versions)
 
@@ -60,15 +61,17 @@
 ## Commands You Use (Compatibility Check)
 
 ✅ **All your commands are stable:**
+
 ```bash
 drizzle-kit generate  # ✅ Stable, no changes
-drizzle-kit push      # ✅ Stable, no changes  
+drizzle-kit push      # ✅ Stable, no changes
 drizzle-kit studio    # ✅ Stable, enhanced UI only
 ```
 
 ## Your Configuration (drizzle.config.ts)
 
 ✅ **100% compatible with latest versions:**
+
 ```typescript
 dialect: 'postgresql'        // ✅ Correct syntax (v0.24+)
 schema: [...]                // ✅ Array format supported
@@ -81,14 +84,17 @@ satisfies Config             // ✅ Modern TypeScript
 ## Potential Issues to Watch
 
 ### 1. TypeScript Type Errors
+
 **Risk**: Low  
 **Impact**: May reveal existing type issues that were hidden
 
 Your code uses:
+
 - `InferModelFromColumns` - Check if this is deprecated
 - Custom type utilities in `DatabaseTypes.ts`
 
 ### 2. Migration Generation Changes
+
 **Risk**: Low  
 **Impact**: New migrations may look different but should be functionally equivalent
 
@@ -96,32 +102,36 @@ Your code uses:
 - Review generated SQL before applying
 
 ### 3. Query Builder Type Inference
+
 **Risk**: Low  
 **Impact**: May need to adjust some query types
 
 Check files that use complex queries:
+
 - Relations (`relations.ts`)
 - Custom queries in CLI tools
 
 ## Upgrade Strategy
 
 ### Option 1: Conservative (Recommended)
+
 Upgrade in smaller steps to catch issues early:
 
 ```bash
 # Step 1: Minor bump
-npm install drizzle-orm@^0.36.0 drizzle-kit@^0.28.0
+ppnpm install drizzle-orm@^0.36.0 drizzle-kit@^0.28.0
 
 # Test everything, then continue
-npm install drizzle-orm@^0.40.0 drizzle-kit@^0.30.0
+ppnpm install drizzle-orm@^0.40.0 drizzle-kit@^0.30.0
 
 # Final step
-npm install drizzle-orm@latest drizzle-kit@latest
+ppnpm install drizzle-orm@latest drizzle-kit@latest
 ```
 
 ### Option 2: Direct Upgrade (Faster but riskier)
+
 ```bash
-npm install drizzle-orm@latest drizzle-kit@latest
+ppnpm install drizzle-orm@latest drizzle-kit@latest
 ```
 
 ## Testing Checklist
@@ -129,37 +139,42 @@ npm install drizzle-orm@latest drizzle-kit@latest
 After upgrade, test these areas:
 
 - [ ] **Migration Generation**
+
   ```bash
-  npm run db:generate
+   ppnpm run db:generate
   # Check generated SQL files
   ```
 
 - [ ] **Schema Introspection**
+
   ```bash
-  npm run db:studio
+   ppnpm run db:studio
   # Verify schema display
   ```
 
 - [ ] **Database Operations**
+
   ```bash
-  npm run db:test
-  npm run cli:test-connection
+   ppnpm run db:test
+   ppnpm run cli:test-connection
   ```
 
 - [ ] **Type Checking**
+
   ```bash
-  npx nx run db-client:typecheck
+   pnpm exec nx run db-client:typecheck
   ```
 
 - [ ] **Build**
+
   ```bash
-  npx nx build db-client
+   pnpm exec nx build db-client
   ```
 
 - [ ] **CLI Tools**
   ```bash
-  npm run cli:inspect-database
-  npm run cli:list-players
+   ppnpm run cli:inspect-database
+   ppnpm run cli:list-players
   ```
 
 ## Recommendation
@@ -174,6 +189,7 @@ After upgrade, test these areas:
 6. **Run your test suite** if you have one
 
 ### Why it's safe:
+
 - Your config is already using modern syntax
 - Commands you use are stable
 - No major API rewrites in these versions
@@ -181,6 +197,7 @@ After upgrade, test these areas:
 - Drizzle team maintains good backward compatibility
 
 ### Why be cautious:
+
 - Big version jumps (11 minors for ORM, 7 for kit)
 - TypeScript type inference changes might reveal hidden issues
 - Migration generation logic improvements might create different SQL

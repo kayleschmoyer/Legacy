@@ -50,9 +50,9 @@ try {
     
     # Combine script and arguments
     if ($extraArgs.Count -gt 0) {
-        $command = "npm run $npmScript -- " + ($extraArgs -join " ")
+        $command = "pnpm run $npmScript -- " + ($extraArgs -join " ")
     } else {
-        $command = "npm run $npmScript"
+        $command = "pnpm run $npmScript"
     }
     
     Write-Info "Executing: $command"

@@ -90,8 +90,8 @@
 
    ```bash
    cd lib/db-client
-   npm run generate:migration:public
-   npm run generate:migration:internal
+   pnpm run generate:migration:public
+   pnpm run generate:migration:internal
    ```
 
 2. **Review Generated SQL**

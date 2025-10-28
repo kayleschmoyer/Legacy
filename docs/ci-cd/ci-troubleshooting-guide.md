@@ -38,7 +38,7 @@ Every failing step includes a command to reproduce the issue locally:
 
 ```bash
 # Example from a failed ESLint step
-npx nx affected -t lint --base=origin/main --head=HEAD
+pnpm exec nx affected -t lint --base=origin/main --head=HEAD
 ```
 
 ## 🔍 Debugging by Failure Type
@@ -58,13 +58,13 @@ npx nx affected -t lint --base=origin/main --head=HEAD
 
 ```bash
 # 1. Reproduce locally
-npx nx affected -t lint --base=origin/main --head=HEAD
+pnpm exec nx affected -t lint --base=origin/main --head=HEAD
 
 # 2. Auto-fix common issues
-npx nx affected -t lint --fix --base=origin/main --head=HEAD
+pnpm exec nx affected -t lint --fix --base=origin/main --head=HEAD
 
 # 3. Check specific files mentioned in CI logs
-npx nx lint specific-project-name
+pnpm exec nx lint specific-project-name
 ```
 
 **Example CI Error Message**:
@@ -96,10 +96,10 @@ function PlayerCard(): React.ReactElement {
 
 ```bash
 # Fix all formatting issues
-npx nx format:write
+pnpm exec nx format:write
 
 # Check what files need formatting
-npx nx format:check
+pnpm exec nx format:check
 ```
 
 #### TypeScript Failures
@@ -109,13 +109,13 @@ npx nx format:check
 
 ```bash
 # Check type errors for affected projects
-npx nx affected -t typecheck --base=origin/main --head=HEAD
+pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD
 
 # Check specific project
-npx nx typecheck specific-project-name
+pnpm exec nx typecheck specific-project-name
 
 # Build to see compilation errors
-npx nx build specific-project-name
+pnpm exec nx build specific-project-name
 ```
 
 ### Build Failures
@@ -134,7 +134,7 @@ npx nx build specific-project-name
 
 ```bash
 # 1. Reproduce the build
-npx nx build web
+pnpm exec nx build web
 
 # 2. Check for missing dependencies
 npm ci
@@ -144,7 +144,7 @@ cp apps/web/.env.example apps/web/.env.local
 # Edit .env.local with appropriate values
 
 # 4. Check bundle analysis
-npx nx build web --analyze
+pnpm exec nx build web --analyze
 ```
 
 **Example Error & Fix**:
@@ -165,10 +165,10 @@ Module not found: Error: Can't resolve '@legacy-sports/shared-components'
 
 ```bash
 # Build specific lambda
-npx nx build lambdas-oauth-proxy
+pnpm exec nx build lambdas-oauth-proxy
 
 # Package lambda for testing
-npx nx package lambdas-oauth-proxy
+pnpm exec nx package lambdas-oauth-proxy
 
 # Check lambda dependencies
 cd lambdas/oauth-proxy && npm ci
@@ -181,13 +181,13 @@ cd lambdas/oauth-proxy && npm ci
 
 ```bash
 # Check mobile configuration
-npx nx build app --dry-run
+pnpm exec nx build app --dry-run
 
 # For iOS issues (requires macOS)
-npx nx build app --platform=ios
+pnpm exec nx build app --platform=ios
 
 # For Android issues
-npx nx build app --platform=android
+pnpm exec nx build app --platform=android
 ```
 
 ### Test Failures
@@ -199,13 +199,13 @@ npx nx build app --platform=android
 
 ```bash
 # Run tests for affected projects
-npx nx affected -t test --base=origin/main --head=HEAD
+pnpm exec nx affected -t test --base=origin/main --head=HEAD
 
 # Run specific test file
-npx nx test shared-components --testPathPattern=AuthProvider
+pnpm exec nx test shared-components --testPathPattern=AuthProvider
 
 # Run tests in watch mode for debugging
-npx nx test shared-components --watch
+pnpm exec nx test shared-components --watch
 ```
 
 **Example CI Test Failure**:
@@ -229,13 +229,13 @@ npx nx test shared-components --watch
 
 ```bash
 # Run integration tests locally
-npm run test:integration
+pnpm run test:integration
 
 # Check database connectivity (if applicable)
-npm run db:test
+pnpm run db:test
 
 # Check environment variables
-npm run sync-env
+pnpm run sync-env
 ```
 
 ## 🛠 Advanced Debugging Techniques
@@ -292,17 +292,17 @@ export NODE_OPTIONS="--max_old_space_size=4096"
 
 # Stage 1: Code Quality
 echo "🎨 Code Quality Checks"
-npx nx format:check --base=origin/main --head=HEAD
-npx nx affected -t lint --base=origin/main --head=HEAD
-npx nx affected -t typecheck --base=origin/main --head=HEAD
+pnpm exec nx format:check --base=origin/main --head=HEAD
+pnpm exec nx affected -t lint --base=origin/main --head=HEAD
+pnpm exec nx affected -t typecheck --base=origin/main --head=HEAD
 
 # Stage 2: Testing
 echo "🧪 Testing"
-npx nx affected -t test --base=origin/main --head=HEAD
+pnpm exec nx affected -t test --base=origin/main --head=HEAD
 
 # Stage 3: Building
 echo "📦 Building"
-npx nx affected -t build --base=origin/main --head=HEAD
+pnpm exec nx affected -t build --base=origin/main --head=HEAD
 
 echo "✅ Local CI simulation complete"
 ```
@@ -317,7 +317,7 @@ If CI is running slower than expected:
 
    ```bash
    # Clear local cache if needed
-   npx nx reset
+   pnpm exec nx reset
 
    # Check cache hit rates in CI logs
    grep "cache hit" *.log
@@ -327,10 +327,10 @@ If CI is running slower than expected:
 
    ```bash
    # Run with verbose timing
-   npx nx affected -t build --verbose
+   pnpm exec nx affected -t build --verbose
 
    # Check for large bundle sizes
-   npx nx build web --analyze
+   pnpm exec nx build web --analyze
    ```
 
 3. **Check Parallelization**:
@@ -355,9 +355,10 @@ node --max-old-space-size=8192 ./node_modules/.bin/nx build web
 ### Issue: "Deprecated GitHub Actions" errors
 
 **Symptoms**: CI fails with errors like:
+
 ```
-Error: This request has been automatically failed because it uses a 
-deprecated version of `actions/upload-artifact: v3`. Learn more: 
+Error: This request has been automatically failed because it uses a
+deprecated version of `actions/upload-artifact: v3`. Learn more:
 https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-actions/
 ```
 
@@ -366,14 +367,15 @@ https://github.blog/changelog/2024-04-16-deprecation-notice-v3-of-the-artifact-a
 
 ```yaml
 # Update these actions to latest versions:
-- uses: actions/upload-artifact@v4    # was v3
-- uses: actions/cache@v4              # was v3  
-- uses: actions/setup-java@v4         # was v3
-- uses: actions/checkout@v4           # should already be v4
-- uses: actions/setup-node@v4         # should already be v4
+- uses: actions/upload-artifact@v4 # was v3
+- uses: actions/cache@v4 # was v3
+- uses: actions/setup-java@v4 # was v3
+- uses: actions/checkout@v4 # should already be v4
+- uses: actions/setup-node@v4 # should already be v4
 ```
 
 **Prevention**: Regularly check for action updates using:
+
 ```bash
 # Check current action versions
 grep -r "uses: actions/" .github/workflows/
@@ -390,7 +392,7 @@ grep -r "@v[1-3]$" .github/workflows/
 ```bash
 # Set correct base for affected detection
 git fetch origin main
-npx nx affected -t build --base=origin/main --head=HEAD
+pnpm exec nx affected -t build --base=origin/main --head=HEAD
 ```
 
 ### Issue: "Module not found" errors
@@ -401,7 +403,7 @@ npx nx affected -t build --base=origin/main --head=HEAD
 ```bash
 # Clean install
 rm -rf node_modules package-lock.json
-npm install
+pnpm install
 
 # Or update specific dependencies
 npm ci --prefer-offline
@@ -414,10 +416,10 @@ npm ci --prefer-offline
 
 ```bash
 # Check platform requirements
-npx nx build app --dry-run
+pnpm exec nx build app --dry-run
 
 # Verify mobile dependencies
-cd apps/app && npx expo doctor
+cd apps/app && pnpm exec expo doctor
 
 # Check iOS dependencies (macOS only)
 cd ios && pod install
@@ -513,10 +515,10 @@ For CI failures blocking critical deployments:
 
 ```bash
 # Nx Commands
-npx nx affected -t <task> --base=origin/main --head=HEAD  # Run task on affected projects
-npx nx show projects --affected --base=origin/main        # See affected projects
-npx nx graph --affected --base=origin/main               # Visualize affected dependencies
-npx nx reset                                             # Clear Nx cache
+pnpm exec nx affected -t <task> --base=origin/main --head=HEAD  # Run task on affected projects
+pnpm exec nx show projects --affected --base=origin/main        # See affected projects
+pnpm exec nx graph --affected --base=origin/main               # Visualize affected dependencies
+pnpm exec nx reset                                             # Clear Nx cache
 
 # Git Commands
 git fetch origin main                                    # Update main branch reference
@@ -524,8 +526,8 @@ git log --oneline origin/main..HEAD                     # See commits in current
 git diff --name-only origin/main...HEAD                 # See changed files
 
 # Debugging Commands
-npm run sync-env                                         # Sync database credentials
-npm run db:test                                         # Test database connectivity
+pnpm run sync-env                                         # Sync database credentials
+pnpm run db:test                                         # Test database connectivity
 make typecheck                                          # Type check all projects
 make lint:fix                                          # Auto-fix linting issues
 ```

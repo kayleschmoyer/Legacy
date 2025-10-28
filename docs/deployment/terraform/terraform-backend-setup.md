@@ -5,6 +5,7 @@ This guide explains how to set up Terraform state management for the legacy-spor
 ## Problem We're Solving
 
 Without a backend configuration, Terraform stores state locally. In GitHub Actions, this means:
+
 - Each run starts with no state file
 - Terraform thinks all resources need to be created
 - Tries to re-apply everything, even though resources already exist
@@ -12,6 +13,7 @@ Without a backend configuration, Terraform stores state locally. In GitHub Actio
 ## Solution: Remote State in S3
 
 We use an S3 bucket to store Terraform state and a DynamoDB table for state locking. This allows:
+
 - ✅ Terraform tracks what's already deployed
 - ✅ GitHub Actions can access the same state
 - ✅ Lambda deployments happen via SSM parameter updates (no Terraform code changes)
@@ -26,7 +28,7 @@ Temporarily comment out the `backend` block in `terraform/main.tf`:
 ```hcl
 terraform {
   required_version = ">= 1.0"
-  
+
   # backend "s3" {
   #   bucket         = "legacy-sports-terraform-state"
   #   key            = "legacy-sports/terraform.tfstate"
@@ -34,7 +36,7 @@ terraform {
   #   encrypt        = true
   #   dynamodb_table = "terraform-state-locks"
   # }
-  
+
   required_providers {
     # ...
   }
@@ -56,6 +58,7 @@ terraform apply -target=aws_s3_bucket.terraform_state -target=aws_s3_bucket_vers
 ```
 
 Review the plan and type `yes` to create:
+
 - S3 bucket: `legacy-sports-terraform-state`
 - DynamoDB table: `terraform-state-locks`
 
@@ -114,7 +117,7 @@ State is automatically saved to S3.
 
 Your existing workflow continues to work:
 
-1. **Build Lambda**: `npx nx build db`
+1. **Build Lambda**: `pnpm exec nx build db`
 2. **Package**: Create zip file with timestamp
 3. **Upload to S3**: `aws s3 cp graphql-${VERSION}.zip s3://bucket/`
 4. **Update SSM**: `aws ssm put-parameter --name "/legacy-sports/dev/lambda/graphql/version" --value "$VERSION"`
@@ -125,6 +128,7 @@ Because `source_code_hash = data.aws_ssm_parameter.graphql_lambda_version.value`
 ## GitHub Actions Configuration
 
 Your workflows already use OIDC authentication, so they'll automatically have access to:
+
 - ✅ S3 bucket (for reading state)
 - ✅ DynamoDB table (for state locking)
 - ✅ All other AWS resources
@@ -137,27 +141,17 @@ The IAM role `legacy-sports-dev-github-actions` should have these permissions (a
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": "arn:aws:s3:::legacy-sports-terraform-state/*"
     },
     {
       "Effect": "Allow",
-      "Action": [
-        "s3:ListBucket"
-      ],
+      "Action": ["s3:ListBucket"],
       "Resource": "arn:aws:s3:::legacy-sports-terraform-state"
     },
     {
       "Effect": "Allow",
-      "Action": [
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:DeleteItem"
-      ],
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"],
       "Resource": "arn:aws:dynamodb:us-east-1:*:table/terraform-state-locks"
     }
   ]
@@ -197,6 +191,7 @@ terraform import <resource_type>.<resource_name> <resource_id>
 ## Summary
 
 After this one-time setup:
+
 - ✅ Terraform state is stored in S3 (not locally)
 - ✅ GitHub Actions can access the state
 - ✅ Lambda deployments work without Terraform code changes

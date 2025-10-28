@@ -62,25 +62,25 @@ runs:
       shell: bash
       run: |
         echo "::group::📦 Web Application Build"
-        
+
         # Disable Nx Cloud if not using DTE to avoid quota errors
         if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
           unset NX_CLOUD_ACCESS_TOKEN
           export NX_CLOUD_NO_TIMEOUTS=true
           echo "ℹ️ Nx Cloud disabled for local build"
         fi
-        
-        echo "::notice::To reproduce locally: npx nx build web --verbose"
+
+        echo "::notice::To reproduce locally: pnpm exec nx build web --verbose"
 
         ERROR_CONTEXT="build-web-$(date +%s)"
-        
+
         # Use appropriate build command based on execution mode
         if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
           echo "🚀 Building web application with DTE..."
-          BUILD_CMD="npx nx build web --configuration=production --parallel=${{ inputs.optimal-agents }}"
+          BUILD_CMD="pnpm exec nx build web --configuration=production --parallel=${{ inputs.optimal-agents }}"
         else
           echo "🚀 Building web application locally..."
-          BUILD_CMD="npx nx build web --configuration=production"
+          BUILD_CMD="pnpm exec nx build web --configuration=production"
         fi
 
         # Try the build command, with fallback to local if DTE fails
@@ -93,7 +93,7 @@ runs:
             echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
             
             # Retry with local execution (no DTE)
-            BUILD_CMD_LOCAL="npx nx build web --configuration=production"
+            BUILD_CMD_LOCAL="pnpm exec nx build web --configuration=production"
             if $BUILD_CMD_LOCAL --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
               echo "✅ Web application built successfully (local fallback)"
             else
@@ -156,7 +156,7 @@ runs:
         else
           echo "⚠️ Build output directory not found"
         fi
-        
+
         echo "result=success" >> $GITHUB_OUTPUT
 
         echo "::endgroup::"
@@ -167,28 +167,28 @@ runs:
       shell: bash
       run: |
         echo "::group::⚡ Lambda Functions Build"
-        
+
         # Disable Nx Cloud if not using DTE to avoid quota errors
         if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
           unset NX_CLOUD_ACCESS_TOKEN
           export NX_CLOUD_NO_TIMEOUTS=true
           echo "ℹ️ Nx Cloud disabled for local build"
         fi
-        
-        echo "::notice::To reproduce locally: npx nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
+
+        echo "::notice::To reproduce locally: pnpm exec nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
 
         ERROR_CONTEXT="build-lambdas-$(date +%s)"
 
         # Define lambda projects to build
         LAMBDA_PROJECTS="draft-processor,game-selection,oauth-proxy,stats-lambda"
-        
+
         # Use appropriate build command based on execution mode
         if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
           echo "🚀 Building lambda functions with DTE..."
-          BUILD_CMD="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=${{ inputs.optimal-agents }}"
+          BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=${{ inputs.optimal-agents }}"
         else
           echo "🚀 Building lambda functions locally..."
-          BUILD_CMD="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
+          BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
         fi
 
         # Try the build command, with fallback to local if DTE fails
@@ -201,7 +201,7 @@ runs:
             echo "::warning::Nx Cloud connection failed during lambda build. Retrying with local execution..."
             
             # Retry with local execution
-            BUILD_CMD_LOCAL="npx nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
+            BUILD_CMD_LOCAL="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
             if $BUILD_CMD_LOCAL 2>&1 | tee "${ERROR_CONTEXT}.log"; then
               echo "✅ Lambda functions built successfully (local fallback)"
             else
@@ -230,10 +230,10 @@ runs:
             exit 1
           fi
         fi
-        
+
         # Attempt to package lambdas for deployment validation
         echo "📦 Attempting lambda packaging..."
-        if npx nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
+        if pnpm exec nx run-many -t package --projects=$LAMBDA_PROJECTS 2>&1 | tee -a "${ERROR_CONTEXT}.log"; then
           echo "✅ Lambda functions packaged successfully"
           
           # Check package sizes if available
@@ -251,13 +251,13 @@ runs:
         else
           echo "⚠️ Lambda packaging failed (may be expected if no package target configured)"
         fi
-        
+
         # Create lambda build summary
         echo "## ⚡ Lambda Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
         echo "- **Projects Built**: $LAMBDA_PROJECTS" >> $GITHUB_STEP_SUMMARY
         echo "- **Output Directory**: dist/lambdas/" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "result=success" >> $GITHUB_OUTPUT
 
         echo "::endgroup::"
@@ -272,14 +272,14 @@ runs:
 
         # Validate mobile build configuration without full build
         # Full mobile builds require platform-specific runners (macOS for iOS)
-        
+
         VALIDATION_FAILED=false
-        
+
         # Check for mobile-specific configuration files
         echo "🔍 Validating mobile configuration files..."
         CONFIG_FILES=("apps/app/app.json" "apps/app/project.json" "apps/app/package.json")
         MISSING_CONFIG=()
-        
+
         for file in "${CONFIG_FILES[@]}"; do
           if [ ! -f "$file" ]; then
             MISSING_CONFIG+=("$file")
@@ -289,7 +289,7 @@ runs:
             echo "✅ Found: $file"
           fi
         done
-        
+
         # Validate app.json structure
         if [ -f "apps/app/app.json" ]; then
           echo "🔍 Validating app.json structure..."
@@ -310,7 +310,7 @@ runs:
             echo "  - Version: $APP_VERSION"
           fi
         fi
-        
+
         # Validate project.json has required build targets
         if [ -f "apps/app/project.json" ]; then
           echo "🔍 Validating project.json build targets..."
@@ -333,7 +333,7 @@ runs:
             echo "✅ Found build-ios target"
           fi
         fi
-        
+
         # Check for Android build configuration
         if [ -d "apps/app/android" ]; then
           echo "✅ Android directory exists"
@@ -345,7 +345,7 @@ runs:
         else
           echo "⚠️ Warning: Android directory not found"
         fi
-        
+
         # Create mobile validation summary
         if [ "$VALIDATION_FAILED" = true ]; then
           echo "❌ Mobile build configuration is invalid"
@@ -464,26 +464,26 @@ runs:
       shell: bash
       run: |
         echo "::group::📊 Build Validation Summary"
-        
+
         # Collect all results
         WEB_RESULT="${{ steps.build-web.outputs.result || 'skipped' }}"
         MOBILE_RESULT="${{ steps.validate-mobile.outputs.result || 'skipped' }}"
         LAMBDAS_RESULT="${{ steps.build-lambdas.outputs.result || 'skipped' }}"
         TERRAFORM_RESULT="${{ steps.terraform-validation.outputs.result || 'skipped' }}"
-        
+
         # Determine overall result
         OVERALL_RESULT="success"
         ARTIFACTS_READY="true"
-        
+
         if [ "$WEB_RESULT" = "failure" ] || [ "$MOBILE_RESULT" = "failure" ] || [ "$LAMBDAS_RESULT" = "failure" ] || [ "$TERRAFORM_RESULT" = "failure" ]; then
           OVERALL_RESULT="failure"
           ARTIFACTS_READY="false"
         fi
-        
+
         # Set outputs
         echo "result=$OVERALL_RESULT" >> $GITHUB_OUTPUT
         echo "artifacts-ready=$ARTIFACTS_READY" >> $GITHUB_OUTPUT
-        
+
         # Create comprehensive summary
         echo "## 🏗️ Build Validation Results" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Status | Result |" >> $GITHUB_STEP_SUMMARY
@@ -495,7 +495,7 @@ runs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Overall Result**: $( [ "$OVERALL_RESULT" = "success" ] && echo "✅ **All Builds Successful**" || echo "❌ **Build Failures Detected**" )" >> $GITHUB_STEP_SUMMARY
         echo "**Deployment Ready**: $( [ "$ARTIFACTS_READY" = "true" ] && echo "✅ **All Artifacts Ready**" || echo "❌ **Artifacts Not Ready**" )" >> $GITHUB_STEP_SUMMARY
-        
+
         # Add deployment readiness context
         if [ "$ARTIFACTS_READY" = "true" ]; then
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -514,14 +514,14 @@ runs:
             echo "- **Infrastructure**: Terraform configuration validated" >> $GITHUB_STEP_SUMMARY
           fi
         fi
-        
+
         # Set appropriate notices
         if [ "$OVERALL_RESULT" = "success" ]; then
           echo "::notice title=Build Validation Success::All required builds completed successfully - artifacts ready for deployment"
         else
           echo "::error title=Build Validation Failed::One or more builds failed - check individual build logs for details"
         fi
-        
+
         echo "🏗️ Build validation completed: $OVERALL_RESULT"
         echo "::endgroup::"
 

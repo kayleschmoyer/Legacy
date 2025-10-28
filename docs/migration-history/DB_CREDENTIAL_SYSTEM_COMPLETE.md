@@ -32,16 +32,16 @@ Successfully implemented a unified, best-practices database credential managemen
 
 ```bash
 # Production (AWS Secrets Manager)
-npm run db:test:production        # Test database connection
-npm run db:credentials:production # Display resolved credentials (password masked)
-npm run db:url:production         # Generate connection URL
-npm run db:psql:production        # Get psql connection commands
+pnpm run db:test:production        # Test database connection
+pnpm run db:credentials:production # Display resolved credentials (password masked)
+pnpm run db:url:production         # Generate connection URL
+pnpm run db:psql:production        # Get psql connection commands
 
 # Development (Local .env.local)
-npm run db:test                   # Test with local credentials
-npm run db:credentials            # Display local credentials
-npm run db:url                    # Generate local connection URL
-npm run db:psql                   # Get local psql commands
+pnpm run db:test                   # Test with local credentials
+pnpm run db:credentials            # Display local credentials
+pnpm run db:url                    # Generate local connection URL
+pnpm run db:psql                   # Get local psql commands
 ```
 
 **Features:**
@@ -130,7 +130,7 @@ export const DevelopmentCredentialConfig: CredentialConfig = {
 ### ✅ Production Mode Test
 
 ```bash
-PS D:\code\legacy-sports> npm run db:test:production
+PS D:\code\legacy-sports> pnpm run db:test:production
 
 Testing database connection...
 Resolving database credentials from AWS Secrets Manager: legacy-sports-dev-db-creds-20250925194630368900000002
@@ -147,7 +147,7 @@ Resolving database credentials from AWS Secrets Manager: legacy-sports-dev-db-cr
 ### ✅ Development Mode Test
 
 ```bash
-PS D:\code\legacy-sports> npm run db:test
+PS D:\code\legacy-sports> pnpm run db:test
 
 Testing database connection...
 Resolving database credentials from environment variables
@@ -198,11 +198,11 @@ process.env.DATABASE_URL = databaseUrl;
 
 ```bash
 # Use CLI to get connection details
-npm run db:psql:production
+pnpm run db:psql:production
 
 # Or get URL for migration tools
-DATABASE_URL=$(npm run db:url:production --silent)
-npm run migrate
+DATABASE_URL=$(pnpm run db:url:production --silent)
+pnpm run migrate
 ```
 
 ## 🔒 Security Benefits

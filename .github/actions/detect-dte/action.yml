@@ -76,9 +76,16 @@ runs:
           
           # Test basic cloud connectivity
           echo "🌐 Testing cloud connectivity..."
-          # First check if nx-cloud CLI is installed
-          if ! command -v npx >/dev/null 2>&1; then
-            FALLBACK_REASON="npx command not found"
+          # First locate nx-cloud CLI via pnpm or npx
+          NX_CLOUD_CMD=""
+          if command -v pnpm >/dev/null 2>&1 && pnpm exec nx-cloud --version >/dev/null 2>&1; then
+            NX_CLOUD_CMD="pnpm exec nx-cloud"
+          elif command -v pnpm exec >/dev/null 2>&1; then
+            NX_CLOUD_CMD="pnpm exec nx-cloud"
+          fi
+
+          if [ -z "$NX_CLOUD_CMD" ]; then
+            FALLBACK_REASON="Nx Cloud CLI not available (pnpm/pnpm exec missing)"
             echo "❌ $FALLBACK_REASON"
           else
             # Try to verify we can connect to Nx Cloud with the token
@@ -88,7 +95,7 @@ runs:
             
             # Try to make a simple authenticated API call to verify connection and quota
             # We'll test by attempting to check cloud status
-            CLI_TEST=$(timeout 15s npx nx-cloud status 2>&1 || echo "COMMAND_FAILED")
+            CLI_TEST=$(timeout 15s $NX_CLOUD_CMD status 2>&1 || echo "COMMAND_FAILED")
             
             # Check the output for various error conditions
             if echo "$CLI_TEST" | grep -qi "Unable to authenticate\|Bad credentials\|401"; then
@@ -164,14 +171,14 @@ runs:
       shell: bash
       run: |
         echo "Setting environment variables based on DTE detection results..."
-        
+
         # Set environment variables for subsequent workflow steps
         echo "NX_PARALLEL=${{ steps.detect.outputs.nx-parallel }}" >> $GITHUB_ENV
         # NOTE: NODE_OPTIONS cannot be set via $GITHUB_ENV (GitHub Actions restriction)
         # Use the memory-limit output directly in workflow steps if needed:
         # NODE_OPTIONS=--max_old_space_size=${{ steps.detect-dte.outputs.memory-limit }}
         echo "NX_CLOUD_DISTRIBUTED_EXECUTION=${{ steps.detect.outputs.dte-available }}" >> $GITHUB_ENV
-        
+
         # Set cache configuration based on execution mode
         if [ "${{ steps.detect.outputs.dte-available }}" == "true" ]; then
           echo "NX_DAEMON=false" >> $GITHUB_ENV
@@ -180,8 +187,8 @@ runs:
           echo "NX_DAEMON=false" >> $GITHUB_ENV
           echo "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV
         fi
-        
+
         # Note: NX_VERBOSE_LOGGING is controlled at the workflow level via ci-debug label or debug_mode input
         # This action does not override that setting to respect user preferences
-        
+
         echo "✅ Environment configured for ${{ steps.detect.outputs.execution-mode }} execution"

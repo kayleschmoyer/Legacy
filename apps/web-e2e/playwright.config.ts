@@ -95,7 +95,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'cross-env VITE_AUTH_TEST_MODE=true npx nx serve web',
+    command: 'cross-env VITE_AUTH_TEST_MODE=true pnpm exec nx serve web',
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env.CI,
     env: {

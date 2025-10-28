@@ -7,10 +7,13 @@ I've successfully updated the OAuth proxy lambda to **automatically create new u
 ## Modified Files
 
 ### 1. `lambdas/oauth-proxy/src/handlers/UserManager.ts`
+
 **Added new function:**
+
 ```typescript
-export async function getOrCreateUser(email: string): Promise<InternalUser>
+export async function getOrCreateUser(email: string): Promise<InternalUser>;
 ```
+
 - Checks if user exists in database
 - If not found, automatically creates user with default settings:
   - `email`: from OAuth provider
@@ -19,20 +22,27 @@ export async function getOrCreateUser(email: string): Promise<InternalUser>
 - Returns the user record (existing or newly created)
 
 **Kept legacy function:**
+
 ```typescript
-export async function checkUserExists(email: string): Promise<InternalUser | null>
+export async function checkUserExists(
+  email: string,
+): Promise<InternalUser | null>;
 ```
+
 - Marked as `@deprecated` for backward compatibility
 - Can be removed in future if no longer needed
 
 ### 2. `lambdas/oauth-proxy/src/handlers/Google.ts`
+
 **Updated authentication flow:**
+
 - Changed from `checkUserExists()` to `getOrCreateUser()`
 - Removed 403 rejection for non-existent users
 - Updated function documentation to reflect auto-provisioning behavior
 - Updated import statements
 
 **Before:**
+
 ```typescript
 const existingUser = await checkUserExists(userEmail);
 if (!existingUser) {
@@ -41,19 +51,23 @@ if (!existingUser) {
 ```
 
 **After:**
+
 ```typescript
 const user = await getOrCreateUser(userEmail);
 // User is now guaranteed to exist (created if needed)
 ```
 
 ### 3. `lambdas/oauth-proxy/src/index.ts`
+
 **Updated API documentation:**
+
 - Changed description from "user pre-authorization security" to "automatic user provisioning"
 - Updated security note to reflect new behavior
 
 ## Build Status
 
 ✅ **Build successful** - Lambda compiled without errors
+
 - Output: `lambdas/oauth-proxy/dist/index.js` (1.89 MB)
 - All dependencies resolved correctly
 - No TypeScript errors
@@ -61,6 +75,7 @@ const user = await getOrCreateUser(userEmail);
 ## New Behavior
 
 ### User Login Flow (First Time)
+
 1. User visits your app and clicks "Sign in with Google"
 2. Google OAuth redirects back with authentication token
 3. Lambda extracts email from token: `user@example.com`
@@ -71,6 +86,7 @@ const user = await getOrCreateUser(userEmail);
 8. User is logged in successfully!
 
 ### User Login Flow (Returning User)
+
 1. User visits your app and clicks "Sign in with Google"
 2. Google OAuth redirects back with authentication token
 3. Lambda extracts email from token: `user@example.com`
@@ -92,6 +108,7 @@ git push origin main
 ```
 
 The GitHub Actions workflow (`.github/workflows/deploy-oauth-proxy.yml`) will:
+
 1. ✅ Build the oauth-proxy lambda
 2. ✅ Package as `oauth-proxy-{timestamp}-{commit}.zip`
 3. ✅ Upload to S3 bucket
@@ -107,18 +124,20 @@ The GitHub Actions workflow (`.github/workflows/deploy-oauth-proxy.yml`) will:
 1. **Use a new email address** that doesn't exist in your database
 2. **Attempt to log in** via OAuth
 3. **Check the logs** in CloudWatch:
+
    ```
    Log Group: /aws/lambda/legacy-sports-dev-oauth-proxy
-   
+
    Expected messages:
    - "Getting or creating user: newuser@example.com"
    - "User not found, creating new user: newuser@example.com"
    - "Successfully created new user: newuser@example.com (ID: 123)"
    - "User ready for authentication: newuser@example.com (ID: 123)"
    ```
+
 4. **Verify user was created:**
    ```bash
-   npx nx run cli:serve --args="list-users"
+   pnpm exec nx run cli:serve --args="list-users"
    ```
 
 ### Test Existing Users
@@ -135,19 +154,25 @@ The GitHub Actions workflow (`.github/workflows/deploy-oauth-proxy.yml`) will:
 ## Security Notes
 
 ### Default Access Level
+
 All new users are created with `access_level: 'none'`. This provides:
+
 - ✅ Basic authentication (can prove identity)
 - ⚠️ Minimal privileges (may have limited resource access)
 - 🔒 Admin rights must be explicitly granted
 
 ### Upgrading User Access
+
 To grant admin access to a user after they've logged in:
+
 ```bash
-npx nx run cli:serve --args="set-user-type --email user@example.com --type admin"
+pnpm exec nx run cli:serve --args="set-user-type --email user@example.com --type admin"
 ```
 
 ### Domain Restrictions
+
 Consider configuring allowed domains in Google OAuth Console to restrict who can create accounts:
+
 - Google OAuth Console → Your Project → OAuth consent screen
 - Add "Authorized domains" to only allow your organization
 
@@ -156,6 +181,7 @@ Consider configuring allowed domains in Google OAuth Console to restrict who can
 If you need to revert to pre-authorization mode:
 
 1. **Revert the code changes:**
+
    ```bash
    git revert HEAD
    git push origin main
@@ -169,6 +195,7 @@ If you need to revert to pre-authorization mode:
 ## Documentation
 
 Created comprehensive documentation:
+
 - **`docs/oauth-auto-provisioning.md`** - Detailed explanation of changes
 - **`docs/oauth-pre-authorization-fix.md`** - Previous documentation (now outdated but kept for reference)
 
@@ -193,6 +220,7 @@ Created comprehensive documentation:
 ## Questions?
 
 If you need to:
+
 - Configure domain restrictions → Check Google OAuth Console settings
 - Change default access level → Modify `createUser()` function in `lib/db-client`
 - Add approval workflow → Add `approved` field to users table

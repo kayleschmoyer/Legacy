@@ -33,10 +33,11 @@ The action includes two cleanup steps:
 To check if a lock exists on the Terraform state:
 
 ```bash
-npm run terraform:check-lock
+pnpm run terraform:check-lock
 ```
 
 This will show:
+
 - Whether a lock exists
 - Lock ID
 - Who created the lock
@@ -48,7 +49,7 @@ This will show:
 #### Option 1: Release the Latest Lock
 
 ```bash
-npm run terraform:unlock -- --latest
+pnpm run terraform:unlock -- --latest
 ```
 
 This automatically detects and releases the current lock (if any).
@@ -58,12 +59,13 @@ This automatically detects and releases the current lock (if any).
 If you know the lock ID:
 
 ```bash
-npm run terraform:unlock -- <lock-id>
+pnpm run terraform:unlock -- <lock-id>
 ```
 
 Example:
+
 ```bash
-npm run terraform:unlock -- 1884e872-5270-f60b-b378-893dbd5426d5
+pnpm run terraform:unlock -- 1884e872-5270-f60b-b378-893dbd5426d5
 ```
 
 ### Direct Terraform Commands
@@ -84,7 +86,7 @@ terraform force-unlock <lock-id>
 **Solution**: The automatic cleanup should handle this. If not:
 
 ```bash
-npm run terraform:unlock -- --latest
+pnpm run terraform:unlock -- --latest
 ```
 
 ### Multiple Failed Deployments
@@ -94,18 +96,19 @@ npm run terraform:unlock -- --latest
 **Solution**: Check first, then unlock if needed:
 
 ```bash
-npm run terraform:check-lock
-npm run terraform:unlock -- --latest
+pnpm run terraform:check-lock
+pnpm run terraform:unlock -- --latest
 ```
 
 ### Lock from Another Developer
 
 **Problem**: Another developer's workflow left a lock, and you need to deploy.
 
-**Solution**: 
+**Solution**:
+
 1. Verify with the developer that their workflow is truly stuck/cancelled
-2. Get the lock ID from their error message or run `npm run terraform:check-lock`
-3. Release the lock: `npm run terraform:unlock -- <lock-id>`
+2. Get the lock ID from their error message or run `pnpm run terraform:check-lock`
+3. Release the lock: `pnpm run terraform:unlock -- <lock-id>`
 
 ## Preventing Lock Issues
 
@@ -140,9 +143,9 @@ If automatic cleanup fails:
 If you see "Error acquiring the state lock":
 
 1. Check if another workflow is running
-2. Run `npm run terraform:check-lock` to see who has the lock
+2. Run `pnpm run terraform:check-lock` to see who has the lock
 3. Contact the lock owner if it's another developer
-4. Use `npm run terraform:unlock` if the lock is stuck
+4. Use `pnpm run terraform:unlock` if the lock is stuck
 
 ### Lock ID Not Found
 
@@ -150,7 +153,7 @@ If `force-unlock` says the lock doesn't exist:
 
 1. The lock may have already been released
 2. You may be in the wrong workspace/environment
-3. Run `npm run terraform:check-lock` to verify current state
+3. Run `pnpm run terraform:check-lock` to verify current state
 
 ## Technical Details
 
@@ -177,8 +180,8 @@ Terraform state is stored in AWS with DynamoDB locking:
   - Executes `force-unlock` commands
   - Provides user-friendly CLI interface
 
-- **`npm run terraform:unlock`**: Wrapper script for unlock utility
-- **`npm run terraform:check-lock`**: Check current lock status
+- **`pnpm run terraform:unlock`**: Wrapper script for unlock utility
+- **`pnpm run terraform:check-lock`**: Check current lock status
 
 ## See Also
 

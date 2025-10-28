@@ -112,18 +112,18 @@ We've implemented automated PR checks to ensure all `package.json` files across 
 
 ```bash
 # Validate package.json standards
-npm run validate:package-json
+pnpm run validate:package-json
 
 # Validate workspace dependencies
-npm run validate:workspace-deps
+pnpm run validate:workspace-deps
 
 # Run both validations
-npm run validate
+pnpm run validate
 
 # NX targets
-npx nx validate:package-json
-npx nx validate:workspace-deps
-npx nx validate
+pnpm exec nx validate:package-json
+pnpm exec nx validate:workspace-deps
+pnpm exec nx validate
 ```
 
 ## 🛠️ How to Fix Issues
@@ -133,7 +133,7 @@ npx nx validate
 1. **Run Local Validation**
 
    ```bash
-   npm run validate
+   pnpm run validate
    ```
 
 2. **Read Error Messages**
@@ -202,14 +202,14 @@ When creating new packages:
 2. Set version to `0.0.1` and `private: true`
 3. Use wildcard dependencies for shared packages
 4. Point main/types to `./src/index.ts` for libraries
-5. Test with `npm run validate`
+5. Test with `pnpm run validate`
 
 ### Updating Dependencies
 
 1. Add new dependencies to root `package.json`
 2. Use `"*"` in project package.json files
-3. Run `npm install` to sync versions
-4. Validate with `npm run validate`
+3. Run `pnpm install` to sync versions
+4. Validate with `pnpm run validate`
 
 ### Script Guidelines
 
@@ -223,7 +223,7 @@ The validation runs:
 
 - ✅ On every PR with package.json changes
 - ✅ On main branch pushes
-- ✅ In local development with `npm run validate`
+- ✅ In local development with `pnpm run validate`
 - ✅ As part of the main CI pipeline
 
 Failed checks block PR merges and provide actionable feedback for quick resolution.

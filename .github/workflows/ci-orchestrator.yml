@@ -1,0 +1,225 @@
+name: "🧠 Legacy Sports CI Orchestrator"
+
+# Central orchestrator for pull requests, integration branches, and scheduled
+# health checks. Handles cache warmup once, determines which pipelines need to
+# run, then dispatches reusable workflows for CI, security scanning, and Android
+# compatibility testing.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+  merge_group:
+  schedule:
+    - cron: "0 2 * * 1" # Weekly security scan (Mondays 02:00 UTC)
+    - cron: "0 2 * * 0" # Weekly Android compatibility run (Sundays 02:00 UTC)
+  workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: "Enable debug mode for detailed logging"
+        required: false
+        default: false
+        type: boolean
+      scan_type:
+        description: "Security scan type"
+        required: false
+        default: "comprehensive"
+        type: choice
+        options:
+          - comprehensive
+          - dependencies-only
+          - sast-only
+          - secrets-only
+      matrix_type:
+        description: "Android matrix type"
+        required: false
+        default: "production"
+        type: choice
+        options:
+          - production
+          - compatibility
+          - full
+      build_type:
+        description: "Android build type"
+        required: false
+        default: "debug"
+        type: choice
+        options:
+          - debug
+          - release
+      run_security:
+        description: "Force security scanning"
+        required: false
+        default: true
+        type: boolean
+      run_android:
+        description: "Force Android compatibility"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: orchestrator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+  checks: read
+  issues: write
+  security-events: write
+
+jobs:
+  warmup:
+    name: "🔥 Cache Warmup"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    outputs:
+      cache-hit: ${{ steps.setup.outputs.cache-hit }}
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: "🔧 Setup Workspace & Warm Cache"
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "✅ Cache Ready"
+        run: |
+          if [ "${{ steps.setup.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache hit! Subsequent jobs will be fast (~30s setup)"
+          else
+            echo "🔥 Cache populated! First warmup takes ~1.5min, next runs will be fast"
+          fi
+
+          echo "## 🔥 Cache Warmup" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Status**: $([[ "${{ steps.setup.outputs.cache-hit }}" = "true" ]] && echo 'Hit ✅' || echo 'Populated 🔥')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version**: 22" >> $GITHUB_STEP_SUMMARY
+
+  determine-scope:
+    name: "🔍 Determine Workflow Scope"
+    runs-on: ubuntu-latest
+    outputs:
+      run-security: ${{ steps.scope.outputs.run-security }}
+      run-android: ${{ steps.scope.outputs.run-android }}
+
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: "🧮 Set Scope Outputs"
+        id: scope
+        run: |
+          set -eo pipefail
+
+          event='${{ github.event_name }}'
+          schedule='${{ github.event.schedule || '' }}'
+          manual_security='${{ github.event_name == 'workflow_dispatch' && (inputs.run_security && 'true' || 'false') }}'
+          manual_android='${{ github.event_name == 'workflow_dispatch' && (inputs.run_android && 'true' || 'false') }}'
+
+          run_security=false
+          run_android=false
+
+          if [ "$event" = "schedule" ]; then
+            case "$schedule" in
+              "0 2 * * 1")
+                run_security=true
+                ;;
+              "0 2 * * 0")
+                run_android=true
+                ;;
+              *)
+                run_security=true
+                run_android=true
+                ;;
+            esac
+          elif [ "$event" = "workflow_dispatch" ]; then
+            run_security="$manual_security"
+            run_android="$manual_android"
+          elif [ "$event" = "merge_group" ]; then
+            run_security=true
+            run_android=true
+          else
+            base_ref=""
+            if [ "$event" = "pull_request" ]; then
+              base_ref='${{ github.event.pull_request.base.sha }}'
+            elif [ "$event" = "push" ]; then
+              base_ref='${{ github.event.before }}'
+            fi
+
+            if [ "$base_ref" = "0000000000000000000000000000000000000000" ]; then
+              base_ref=""
+            fi
+
+            if [ -z "$base_ref" ]; then
+              base_ref=$(git rev-parse HEAD^ 2>/dev/null || echo "")
+            fi
+
+            if [ -n "$base_ref" ]; then
+              changed_files=$(git diff --name-only "$base_ref" "${{ github.sha }}" || true)
+            else
+              changed_files=""
+            fi
+
+            if [ -n "$changed_files" ]; then
+              if echo "$changed_files" | grep -Eq '(^|/)package\.json$|(^|/)package-lock\.json$|^apps\/.*\.(ts|tsx|js|jsx)$|^lib\/.*\.(ts|tsx|js|jsx)$|^lambdas\/.*\.(ts|js)$|^tools\/.*\.(ts|js)$|^\.github\/workflows\/security-scanning\.yml$|^tsconfig.*\.json$|^\.npmrc$'; then
+                run_security=true
+              fi
+
+              if echo "$changed_files" | grep -Eq '^apps\/app\/android\/|^apps\/app\/src\/|^lib\/|^package\.json$|^package-lock\.json$|^\.github\/workflows\/test-android-compatibility\.yml$'; then
+                run_android=true
+              fi
+            fi
+          fi
+
+          if [ "$run_security" != "true" ]; then
+            run_security=false
+          fi
+
+          if [ "$run_android" != "true" ]; then
+            run_android=false
+          fi
+
+          echo "run-security=$run_security" >> "$GITHUB_OUTPUT"
+          echo "run-android=$run_android" >> "$GITHUB_OUTPUT"
+
+  ci-pipeline:
+    name: "🚀 CI Pipeline"
+    needs: [warmup]
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
+    secrets: inherit
+
+  security-scanning:
+    name: "🔐 Security Scanning"
+    needs: [warmup, determine-scope]
+    if: ${{ needs.determine-scope.outputs.run-security == 'true' }}
+    uses: ./.github/workflows/security-scanning.yml
+    with:
+      scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || 'comprehensive' }}
+    secrets: inherit
+
+  android-compatibility:
+    name: "📱 Android Compatibility"
+    needs: [warmup, determine-scope]
+    if: ${{ needs.determine-scope.outputs.run-android == 'true' }}
+    uses: ./.github/workflows/test-android-compatibility.yml
+    with:
+      matrix_type: ${{ github.event_name == 'workflow_dispatch' && inputs.matrix_type || 'production' }}
+      build_type: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type || 'debug' }}
+    secrets: inherit

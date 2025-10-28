@@ -165,27 +165,27 @@ Domain-specific functionality:
 
 ```bash
 # Build shared components
-npx nx build shared-components
+pnpm exec nx build shared-components
 
 # Watch for changes during development
-npx nx build shared-components --watch
+pnpm exec nx build shared-components --watch
 ```
 
 ### Testing Components
 
 ```bash
 # Run component tests
-npx nx test shared-components
+pnpm exec nx test shared-components
 
 # Test with coverage
-npx nx test shared-components --coverage
+pnpm exec nx test shared-components --coverage
 ```
 
 ### Storybook (Development UI)
 
 ```bash
 # Start Storybook for component development
-npx nx storybook shared-components
+pnpm exec nx storybook shared-components
 ```
 
 ## 🎨 Tamagui Configuration
@@ -267,10 +267,10 @@ The library automatically detects platform:
 npm test
 
 # Run specific test file
-npx jest components/LoadingPanel.test.tsx
+pnpm exec jest components/LoadingPanel.test.tsx
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### Visual Testing
@@ -331,7 +331,7 @@ export { MyComponent } from './components/MyComponent';
 
 - Check component prop types
 - Verify imports and exports
-- Run `npx tsc --noEmit` for type checking
+- Run `pnpm exec tsc --noEmit` for type checking
 
 **Platform-specific issues**:
 

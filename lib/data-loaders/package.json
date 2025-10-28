@@ -6,9 +6,9 @@
   "types": "./src/index.ts",
   "scripts": {
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-    "codegen": "npm run codegen:db"
+    "codegen": "pnpm run codegen:db"
   },
   "dependencies": {
-    "@legacy-sports/sentry": "*"
+    "@legacy-sports/sentry": "workspace:*"
   }
 }

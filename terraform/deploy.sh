@@ -517,7 +517,7 @@ if [ "$SKIP_BUILD" = false ]; then
 # Build OAuth proxy functions
 echo "  Building oauth-proxy..."
 cd lambdas/oauth-proxy
-npx nx build
+pnpm exec nx build
 # Create deployment package
 cp dist/index.js .
 zip -r ../../terraform/oauth-proxy.zip index.js package.json
@@ -527,7 +527,7 @@ cd ../..
 # Build GraphQL function
 echo "  Building graphql..."
 cd lambdas/db
-npx nx build
+pnpm exec nx build
 # Create deployment package
 cp dist/index.js .
 zip -r ../../terraform/graphql-lambda.zip index.js package.json
@@ -537,7 +537,7 @@ cd ../..
 # Build Stats lambda
 echo "  Building stats-lambda..."
 cd lambdas/stats-lambda
-npx nx build
+pnpm exec nx build
 # Create deployment package
 cp dist/index.js .
 zip -r ../../terraform/stats-lambda.zip index.js package.json

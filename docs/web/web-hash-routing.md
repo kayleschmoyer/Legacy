@@ -52,26 +52,26 @@ The build supports configurable base URLs via the `VITE_BASE_URL` environment va
 ### Standard Development
 
 ```bash
-npx nx dev web              # Development server
-npx nx dev:headless web     # Headless development server
-npx nx build web            # Build with default base URL (/)
+pnpm exec nx dev web              # Development server
+pnpm exec nx dev:headless web     # Headless development server
+pnpm exec nx build web            # Build with default base URL (/)
 ```
 
 ### GitHub Pages Testing
 
 ```bash
-npx nx build:github-pages web    # Build with GitHub Pages base URL
-npx nx preview:github-pages web  # Preview the built app
+pnpm exec nx build:github-pages web    # Build with GitHub Pages base URL
+pnpm exec nx preview:github-pages web  # Preview the built app
 ```
 
 ### Manual Environment Override
 
 ```bash
 # PowerShell
-$env:VITE_BASE_URL="/custom-path/"; npx nx build web
+$env:VITE_BASE_URL="/custom-path/"; pnpm exec nx build web
 
 # Bash
-VITE_BASE_URL="/custom-path/" npx nx build web
+VITE_BASE_URL="/custom-path/" pnpm exec nx build web
 ```
 
 ## Deployment

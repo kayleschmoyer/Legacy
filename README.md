@@ -56,23 +56,23 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 [![Security Status](https://img.shields.io/badge/Security-Verified-green?style=flat-square&logo=shield)]()
 
-All security vulnerabilities have been completely resolved. Run `npm audit` to verify **0 vulnerabilities**.
+All security vulnerabilities have been completely resolved. Run `pnpm audit` to verify **0 vulnerabilities**.
 
-- **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via npm overrides
-- **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + package-lock regeneration
+- **esbuild vulnerability (GHSA-67mh-4wv8-2f99):** Fixed via pnpm overrides
+- **axios vulnerability (GHSA-4hjh-wcwx-xvwj):** Fixed via overrides + lockfile regeneration
 - **Automatic protection:** Post-install script provides additional safety layer
 
 ### Security Verification
 
 # Verify no vulnerabilities
 
-npm audit
+pnpm audit
 
 # Expected output: found 0 vulnerabilities
 
 # Run comprehensive security check
 
-npm audit
+pnpm audit
 
 ````
 
@@ -92,7 +92,7 @@ For complete security details, see: **[Security Audit Status](docs/security-audi
 ### Prerequisites
 
 - **Node.js**: v18+ (recommended: use [nvm](https://github.com/nvm-sh/nvm))
-- **npm**: Latest version
+- **pnpm**: Managed via [Corepack](https://nodejs.org/api/corepack.html)
 - **Git**: Latest version
 - **VS Code**: Recommended IDE with extensions
 
@@ -104,66 +104,66 @@ git clone https://github.com/bkrupa/legacy-sports.git
 cd legacy-sports
 
 # Install dependencies
-npm install
+pnpm install
 
 # Configure Python environment (for backend tools)
 # This tool will guide you through Python setup
-npm run setup:python
+pnpm run setup:python
 ````
 
 ## 📱 Development
 
 ### Available Applications
 
-| App                  | Description             | Command             |
-| -------------------- | ----------------------- | ------------------- |
-| **Mobile App**       | React Native CLI app    | `npm run app:start` |
-| **Web App**          | Next.js web application | `npm run web:start` |
-| **GraphQL Explorer** | API testing interface   | `npm run gql:start` |
+| App                  | Description             | Command              |
+| -------------------- | ----------------------- | -------------------- |
+| **Mobile App**       | React Native CLI app    | `pnpm run app:start` |
+| **Web App**          | Next.js web application | `pnpm run web:start` |
+| **GraphQL Explorer** | API testing interface   | `pnpm run gql:start` |
 
 ### Quick Development Commands
 
 ```bash
 # Start all development servers
-npm run dev
+pnpm run dev
 
 # Run tests across all projects
-npm test
+pnpm exec nx run-many -t test
 
 # Build all projects
-npm run build
+pnpm run build
 
 # Lint and format code
-npm run lint:fix
-npm run format
+pnpm run lint:fix
+pnpm run format
 ```
 
 ### Mobile Development
 
 ```bash
 # Start Metro bundler (from apps/app directory)
-npm run start
+pnpm run start
 
 # Run on Android (requires Android Studio)
-npm run android
+pnpm run android
 
 # iOS builds are currently disabled
 
 # Build Android APK
-npm run build-android
+pnpm run build-android
 ```
 
 ### Web Development
 
 ```bash
 # Start web development server
-npm run web:start
+pnpm run web:start
 
 # Build for production
-npm run web:build
+pnpm run web:build
 
 # Deploy to GitHub Pages (auto-deployed on main branch)
-npm run web:deploy
+pnpm run web:deploy
 ```
 
 ## 🏗️ Architecture
@@ -255,17 +255,17 @@ The application connects to a live GraphQL API hosted on AWS. The endpoint is co
 
 ```bash
 # Run all tests
-npm test
+pnpm exec nx run-many -t test
 
 # Run tests for specific project
-npx nx test web
-npx nx test app
+pnpm exec nx test web
+pnpm exec nx test app
 
 # Run tests in watch mode
-npx nx test web --watch
+pnpm exec nx test web --watch
 
 # Run E2E tests
-npx nx e2e web-e2e
+pnpm exec nx e2e web-e2e
 ```
 
 ## 🚀 Building & Deployment
@@ -291,7 +291,7 @@ The web app automatically deploys to GitHub Pages on pushes to `main`:
 
 ```bash
 # Android APK
-npm run build-android
+pnpm run build-android
 
 # iOS builds are currently disabled
 ```
@@ -317,32 +317,32 @@ cd terraform && terraform apply
 
 ```bash
 # View project graph
-npx nx graph
+pnpm exec nx graph
 
 # Run affected tests only
-npx nx affected:test
+pnpm exec nx affected:test
 
 # Build affected projects
-npx nx affected:build
+pnpm exec nx affected:build
 
 # Show project details
-npx nx show project web
+pnpm exec nx show project web
 ```
 
 ### Code Quality
 
 ```bash
 # Lint all projects
-npm run lint
+pnpm run lint
 
 # Fix lint issues
-npm run lint:fix
+pnpm run lint:fix
 
 # Format code
-npm run format
+pnpm run format
 
 # Validate package.json standards
-npm run validate:packages
+pnpm run validate:packages
 ```
 
 ## 🔧 Troubleshooting
@@ -353,11 +353,11 @@ npm run validate:packages
 
 ```bash
 # Clear Metro cache
-npx react-native start --reset-cache
+pnpm exec react-native start --reset-cache
 
 # Clean and rebuild
-npm run app:clean
-npm run app:start
+pnpm run app:clean
+pnpm run app:start
 ```
 
 **GraphQL connection issues**:
@@ -369,11 +369,11 @@ npm run app:start
 
 ```bash
 # Clean all build artifacts
-npm run clean
+pnpm run clean
 
 # Reinstall dependencies
 rm -rf node_modules package-lock.json
-npm install
+pnpm install
 ```
 
 ### Getting Help

@@ -19,18 +19,18 @@ The system will perform a multi-stage detection process:
 
 ```yaml
 # Enhanced cloud detection with quota awareness
-- name: "☁️ Smart Nx Cloud Detection & DTE Quota Check"
+- name: '☁️ Smart Nx Cloud Detection & DTE Quota Check'
   id: cloud-detect
   run: |
     echo "::group::🔍 Testing Nx Cloud Availability & DTE Quota"
-    
+
     # Initialize defaults
     CLOUD_AVAILABLE="false"
     DTE_AVAILABLE="false"
     EXECUTION_MODE="local"
     AGENTS=4
     FALLBACK_REASON=""
-    
+
     if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
       echo "✅ Nx Cloud token found"
       
@@ -38,7 +38,7 @@ The system will perform a multi-stage detection process:
       echo "🌐 Testing cloud connectivity..."
       # Note: Modern Nx Cloud (v19+) doesn't support --version command
       # Use start-ci-run --help to verify CLI accessibility
-      if npx nx-cloud start-ci-run --help >/dev/null 2>&1; then
+      if pnpm exec nx-cloud start-ci-run --help >/dev/null 2>&1; then
         echo "✅ Nx Cloud CLI accessible"
         CLOUD_AVAILABLE="true"
         
@@ -50,7 +50,7 @@ The system will perform a multi-stage detection process:
         # Agent allocation happens automatically based on workspace plan
         # We just need to verify API connectivity
         
-        if npx nx-cloud login --help >/dev/null 2>&1; then
+        if pnpm exec nx-cloud login --help >/dev/null 2>&1; then
           AGENTS_AVAILABLE=$(echo "$DTE_STATUS" | jq -r '.agentsAvailable // 0')
           QUOTA_REMAINING=$(echo "$DTE_STATUS" | jq -r '.quotaRemaining // 0')
           
@@ -61,7 +61,7 @@ The system will perform a multi-stage detection process:
             # Test if we can actually start DTE (lightweight test)
             echo "🧪 Testing DTE session initialization..."
             
-            if npx nx-cloud start-ci-run --dry-run --agent-count=2 >/dev/null 2>&1; then
+            if pnpm exec nx-cloud start-ci-run --dry-run --agent-count=2 >/dev/null 2>&1; then
               echo "✅ DTE available and within quota"
               DTE_AVAILABLE="true"
               EXECUTION_MODE="distributed"
@@ -98,32 +98,32 @@ The system will perform a multi-stage detection process:
       FALLBACK_REASON="No Nx Cloud token provided"
       echo "ℹ️ $FALLBACK_REASON"
     fi
-    
+
     # Output results
     echo "cloud-available=$CLOUD_AVAILABLE" >> $GITHUB_OUTPUT
     echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
     echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
     echo "agents=$AGENTS" >> $GITHUB_OUTPUT
     echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
-    
+
     # Create summary
     echo "## ☁️ Nx Cloud Detection Results" >> $GITHUB_STEP_SUMMARY
     echo "- **Cloud Available**: $CLOUD_AVAILABLE" >> $GITHUB_STEP_SUMMARY
     echo "- **DTE Available**: $DTE_AVAILABLE" >> $GITHUB_STEP_SUMMARY
     echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
     echo "- **Agents**: $AGENTS" >> $GITHUB_OUTPUT
-    
+
     if [ "$EXECUTION_MODE" == "local" ] && [ -n "$FALLBACK_REASON" ]; then
       echo "- **Fallback Reason**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
     fi
-    
+
     # Set notices for visibility
     if [ "$DTE_AVAILABLE" == "true" ]; then
       echo "::notice title=Nx Cloud DTE::Using distributed execution with $AGENTS agents"
     else
       echo "::notice title=Local Execution::$FALLBACK_REASON - using GitHub Actions (4 processes)"
     fi
-    
+
     echo "::endgroup::"
 ```
 
@@ -132,27 +132,27 @@ The system will perform a multi-stage detection process:
 ### Distributed Execution (When DTE Available)
 
 ```yaml
-- name: "⚡ Code Quality & Testing (Distributed)"
+- name: '⚡ Code Quality & Testing (Distributed)'
   if: steps.cloud-detect.outputs.dte-available == 'true'
   run: |
     echo "::group::🚀 Nx Cloud Distributed Task Execution"
-    
+
     AGENTS=${{ steps.cloud-detect.outputs.agents }}
     echo "Starting DTE with $AGENTS agents..."
-    
+
     # Start DTE with detected agent count
-    npx nx-cloud start-ci-run --stop-agents-after="build" --agent-count=$AGENTS
-    
+    pnpm exec nx-cloud start-ci-run --stop-agents-after="build" --agent-count=$AGENTS
+
     # Execute tasks with optimal parallelization
     echo "🔧 Running lint and typecheck..."
-    npx nx affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS
-    
+    pnpm exec nx affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS
+
     echo "🧪 Running tests..."  
-    npx nx affected -t test --parallel=$AGENTS --max-parallel=$AGENTS
-    
+    pnpm exec nx affected -t test --parallel=$AGENTS --max-parallel=$AGENTS
+
     echo "📦 Running builds..."
-    npx nx affected -t build --parallel=$AGENTS --max-parallel=$AGENTS
-    
+    pnpm exec nx affected -t build --parallel=$AGENTS --max-parallel=$AGENTS
+
     echo "✅ Distributed execution completed"
     echo "::endgroup::"
 ```
@@ -160,25 +160,25 @@ The system will perform a multi-stage detection process:
 ### Local Fallback (When DTE Unavailable)
 
 ```yaml
-- name: "🔄 Code Quality & Testing (Local Fallback)"
+- name: '🔄 Code Quality & Testing (Local Fallback)'
   if: steps.cloud-detect.outputs.dte-available != 'true'
   run: |
     echo "::group::🏠 Local Execution (GitHub Actions)"
-    
+
     REASON="${{ steps.cloud-detect.outputs.fallback-reason }}"
     echo "Using local execution: $REASON"
-    
+
     # Local execution with GitHub Actions parallelization
     echo "🔧 Running lint and typecheck..."
-    npx nx affected -t lint --parallel=4 --base=origin/main --head=HEAD
-    npx nx affected -t typecheck --parallel=4 --base=origin/main --head=HEAD
-    
+    pnpm exec nx affected -t lint --parallel=4 --base=origin/main --head=HEAD
+    pnpm exec nx affected -t typecheck --parallel=4 --base=origin/main --head=HEAD
+
     echo "🧪 Running tests..."
-    npx nx affected -t test --parallel=4 --base=origin/main --head=HEAD
-    
+    pnpm exec nx affected -t test --parallel=4 --base=origin/main --head=HEAD
+
     echo "📦 Running builds..."
-    npx nx affected -t build --parallel=4 --base=origin/main --head=HEAD
-    
+    pnpm exec nx affected -t build --parallel=4 --base=origin/main --head=HEAD
+
     echo "✅ Local execution completed"
     echo "::endgroup::"
 ```
@@ -188,17 +188,17 @@ The system will perform a multi-stage detection process:
 ### Enhanced DTE Detection with Retries
 
 ```yaml
-- name: "🔄 Resilient DTE Detection"
-  id: dte-detect-resilient  
+- name: '🔄 Resilient DTE Detection'
+  id: dte-detect-resilient
   run: |
     echo "::group::🛡️ Resilient DTE Detection with Retry Logic"
-    
+
     DTE_AVAILABLE="false"
     EXECUTION_MODE="local"
     AGENTS=4
     MAX_RETRIES=3
     RETRY_COUNT=0
-    
+
     # Retry loop for DTE detection
     while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$DTE_AVAILABLE" != "true" ]; do
       RETRY_COUNT=$((RETRY_COUNT + 1))
@@ -206,13 +206,13 @@ The system will perform a multi-stage detection process:
       
       if [ -n "$NX_CLOUD_ACCESS_TOKEN" ]; then
         # Test DTE with timeout
-        if timeout 30s npx nx-cloud start-ci-run --dry-run --agent-count=2 >/dev/null 2>&1; then
+        if timeout 30s pnpm exec nx-cloud start-ci-run --dry-run --agent-count=2 >/dev/null 2>&1; then
           echo "✅ DTE test successful on attempt $RETRY_COUNT"
           DTE_AVAILABLE="true"
           EXECUTION_MODE="distributed"
           
           # Get optimal agent count
-          QUOTA_CHECK=$(timeout 10s npx nx-cloud dte-status --json 2>/dev/null || echo '{"agentsAvailable": 4}')
+          QUOTA_CHECK=$(timeout 10s pnpm exec nx-cloud dte-status --json 2>/dev/null || echo '{"agentsAvailable": 4}')
           AGENTS_AVAILABLE=$(echo "$QUOTA_CHECK" | jq -r '.agentsAvailable // 4')
           
           if [ "$AGENTS_AVAILABLE" -ge 8 ]; then
@@ -236,18 +236,18 @@ The system will perform a multi-stage detection process:
         break
       fi
     done
-    
+
     # Output final results
     echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
     echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
     echo "agents=$AGENTS" >> $GITHUB_OUTPUT
-    
+
     if [ "$DTE_AVAILABLE" == "true" ]; then
       echo "::notice title=DTE Success::Using distributed execution with $AGENTS agents (detected after $RETRY_COUNT attempts)"
     else
       echo "::notice title=DTE Fallback::Using local execution after $RETRY_COUNT detection attempts"
     fi
-    
+
     echo "::endgroup::"
 ```
 
@@ -256,16 +256,16 @@ The system will perform a multi-stage detection process:
 ### DTE Usage Analytics
 
 ```yaml
-- name: "📈 DTE Usage Analytics"
+- name: '📈 DTE Usage Analytics'
   if: always()
   run: |
     echo "::group::📊 Nx Cloud Usage Analytics"
-    
+
     if [ "${{ steps.cloud-detect.outputs.dte-available }}" == "true" ]; then
       # Get DTE usage stats
       echo "Collecting DTE usage statistics..."
       
-      USAGE_REPORT=$(npx nx-cloud view-logs --json --since="1 hour ago" 2>/dev/null || echo '{}')
+      USAGE_REPORT=$(pnpm exec nx-cloud view-logs --json --since="1 hour ago" 2>/dev/null || echo '{}')
       
       # Extract key metrics
       AGENTS_USED=$(echo "$USAGE_REPORT" | jq -r '.agentsUsed // "N/A"')
@@ -274,7 +274,7 @@ The system will perform a multi-stage detection process:
       TASKS_DISTRIBUTED=$(echo "$USAGE_REPORT" | jq -r '.tasksDistributed // "N/A"')
       
       # Check remaining quota
-      QUOTA_STATUS=$(npx nx-cloud dte-status --json 2>/dev/null || echo '{}')
+      QUOTA_STATUS=$(pnpm exec nx-cloud dte-status --json 2>/dev/null || echo '{}')
       QUOTA_REMAINING=$(echo "$QUOTA_STATUS" | jq -r '.quotaRemaining // "N/A"')
       QUOTA_LIMIT=$(echo "$QUOTA_STATUS" | jq -r '.quotaLimit // "N/A"')
       
@@ -304,7 +304,7 @@ The system will perform a multi-stage detection process:
       echo "- **Parallelization**: 4 processes" >> $GITHUB_STEP_SUMMARY
       echo "- **Cache**: Local Nx cache only" >> $GITHUB_STEP_SUMMARY
     fi
-    
+
     echo "::endgroup::"
 ```
 
@@ -313,25 +313,25 @@ The system will perform a multi-stage detection process:
 ### Dynamic Agent Allocation Based on Quota
 
 ```yaml
-- name: "📏 Dynamic Agent Scaling"
+- name: '📏 Dynamic Agent Scaling'
   id: agent-scaling
   if: steps.cloud-detect.outputs.dte-available == 'true'
   run: |
     echo "::group::📊 Calculating Optimal Agent Count"
-    
+
     # Get current quota status
-    QUOTA_STATUS=$(npx nx-cloud dte-status --json 2>/dev/null || echo '{"quotaRemaining": 100, "agentsAvailable": 8}')
-    
+    QUOTA_STATUS=$(pnpm exec nx-cloud dte-status --json 2>/dev/null || echo '{"quotaRemaining": 100, "agentsAvailable": 8}')
+
     QUOTA_REMAINING=$(echo "$QUOTA_STATUS" | jq -r '.quotaRemaining // 100')
     AGENTS_AVAILABLE=$(echo "$QUOTA_STATUS" | jq -r '.agentsAvailable // 8')
-    
+
     # Calculate affected project count
-    AFFECTED_COUNT=$(npx nx print-affected --select=projects | wc -w)
-    
+    AFFECTED_COUNT=$(pnpm exec nx print-affected --select=projects | wc -w)
+
     echo "📊 Quota remaining: $QUOTA_REMAINING"
     echo "🤖 Agents available: $AGENTS_AVAILABLE"  
     echo "📦 Affected projects: $AFFECTED_COUNT"
-    
+
     # Smart agent allocation
     if [ "$QUOTA_REMAINING" -lt 10 ]; then
       OPTIMAL_AGENTS=2  # Conservative when quota is low
@@ -346,11 +346,11 @@ The system will perform a multi-stage detection process:
       OPTIMAL_AGENTS=2  # Minimal for small changes
       REASON="Small changeset - using minimal agents"
     fi
-    
+
     echo "🎯 Optimal agents: $OPTIMAL_AGENTS ($REASON)"
     echo "optimal-agents=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
     echo "scaling-reason=$REASON" >> $GITHUB_OUTPUT
-    
+
     echo "::notice title=Agent Scaling::Using $OPTIMAL_AGENTS agents - $REASON"
     echo "::endgroup::"
 ```
@@ -360,11 +360,11 @@ The system will perform a multi-stage detection process:
 ### Quota Monitoring
 
 ```yaml
-- name: "⚠️ Quota Monitoring & Alerts"
+- name: '⚠️ Quota Monitoring & Alerts'
   if: always()
   run: |
     if [ "${{ steps.cloud-detect.outputs.cloud-available }}" == "true" ]; then
-      QUOTA_STATUS=$(npx nx-cloud dte-status --json 2>/dev/null || echo '{}')
+      QUOTA_STATUS=$(pnpm exec nx-cloud dte-status --json 2>/dev/null || echo '{}')
       QUOTA_REMAINING=$(echo "$QUOTA_STATUS" | jq -r '.quotaRemaining // 0')
       QUOTA_LIMIT=$(echo "$QUOTA_STATUS" | jq -r '.quotaLimit // 100')
       
@@ -389,6 +389,6 @@ This intelligent DTE detection system provides:
 ✅ **Smart Agent Scaling** - Dynamic allocation based on quota and changeset size  
 ✅ **Retry Logic** - Resilient detection with multiple attempts  
 ✅ **Usage Monitoring** - Real-time quota tracking and alerts  
-✅ **Performance Analytics** - Comprehensive reporting on DTE vs local execution  
+✅ **Performance Analytics** - Comprehensive reporting on DTE vs local execution
 
 The system ensures maximum utilization of Nx Cloud benefits while maintaining 100% CI reliability through intelligent fallback mechanisms.

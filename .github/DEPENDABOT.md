@@ -54,7 +54,7 @@ Minor and patch updates without peer conflicts are automatically approved if val
 For major version updates that are ignored:
 
 1. **Create manual PR** with updated versions
-2. **Run validation**: `npm install --dry-run`
+2. **Run validation**: `pnpm install --dry-run`
 3. **Test with legacy peer deps**: `npm ci --legacy-peer-deps`
 4. **Validate functionality**: Run tests and builds
 5. **Update configs** if breaking changes detected
@@ -74,21 +74,21 @@ When Dependabot PRs show peer conflicts:
 
 ```bash
 # Usually requires updating both parser and plugin together
-npm install @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest --save-dev
+pnpm add -D @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest
 ```
 
 **React ecosystem conflicts:**
 
 ```bash
 # Often requires updating types packages
-npm install @types/react@latest @types/react-dom@latest --save-dev
+pnpm add -D @types/react@latest @types/react-dom@latest
 ```
 
 **NX ecosystem conflicts:**
 
 ```bash
 # May require NX migration
-npx nx migrate latest
+pnpm exec nx migrate latest
 ```
 
 ### 3. **Resolution strategies:**

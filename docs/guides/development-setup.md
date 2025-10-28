@@ -16,16 +16,16 @@ git clone <repository-url>
 cd legacy-sports
 
 # 2. Install dependencies
-npm install
+pnpm install
 
 # 3. Environment setup
-npm run sync-env
+pnpm run sync-env
 
-# 4. Build core libraries  
-npm run build:libs
+# 4. Build core libraries
+pnpm run build:libs
 
 # 5. Start development
-npm run dev
+pnpm run dev
 ```
 
 **That's it!** Your development environment should now be running.
@@ -36,21 +36,22 @@ npm run dev
 
 ### **Required Software**
 
-| Tool | Version | Purpose | Download Link |
-|------|---------|---------|---------------|
-| **Node.js** | 18+ | Runtime for all JavaScript/TypeScript code | [nodejs.org](https://nodejs.org) |
-| **npm** | 9+ | Package manager (comes with Node.js) | Built-in |
-| **Git** | Latest | Version control | [git-scm.com](https://git-scm.com) |
-| **PowerShell** | 5.1+ | Required for environment sync scripts (Windows) | Built-in on Windows |
+| Tool           | Version | Purpose                                                    | Download Link                                        |
+| -------------- | ------- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| **Node.js**    | 18+     | Runtime for all JavaScript/TypeScript code                 | [nodejs.org](https://nodejs.org)                     |
+| **pnpm**       | 9.12.1  | Workspace package manager (preferred; project uses 9.12.1) | [pnpm.io/installation](https://pnpm.io/installation) |
+| **npm**        | 9+      | Installed with Node.js (optional fallback)                 | Built-in                                             |
+| **Git**        | Latest  | Version control                                            | [git-scm.com](https://git-scm.com)                   |
+| **PowerShell** | 5.1+    | Required for environment sync scripts (Windows)            | Built-in on Windows                                  |
 
 ### **Optional Tools**
 
-| Tool | Purpose | Recommendation |
-|------|---------|----------------|
-| **VS Code** | Code editor with excellent TypeScript support | Highly recommended |
-| **Docker** | For running database locally | Optional - can use remote DB |
-| **Android Studio** | React Native Android development | Only if working on mobile |
-| **Xcode** | React Native iOS development | Only if working on iOS (Mac only) |
+| Tool               | Purpose                                       | Recommendation                    |
+| ------------------ | --------------------------------------------- | --------------------------------- |
+| **VS Code**        | Code editor with excellent TypeScript support | Highly recommended                |
+| **Docker**         | For running database locally                  | Optional - can use remote DB      |
+| **Android Studio** | React Native Android development              | Only if working on mobile         |
+| **Xcode**          | React Native iOS development                  | Only if working on iOS (Mac only) |
 
 ### **VS Code Extensions (Recommended)**
 
@@ -63,7 +64,7 @@ code --install-extension dbaeumer.vscode-eslint
 code --install-extension esbenp.prettier-vscode
 code --install-extension nrwl.angular-console
 
-# Helpful extensions  
+# Helpful extensions
 code --install-extension bradlc.vscode-tailwindcss
 code --install-extension GraphQL.vscode-graphql
 code --install-extension ms-vscode.vscode-json
@@ -87,8 +88,12 @@ ls -la  # Should see package.json, nx.json, and other workspace files
 ### **Step 2: Install Dependencies**
 
 ```bash
+# Ensure pnpm is available (Corepack ships with Node 18)
+corepack enable
+corepack prepare pnpm@9.12.1 --activate
+
 # Install all workspace dependencies
-npm install
+pnpm install
 
 # This will take 2-5 minutes depending on internet speed
 # You should see successful installation of 200+ packages
@@ -98,25 +103,26 @@ npm install
 
 ```bash
 # Set up environment variables and database connections
-npm run sync-env
+pnpm run sync-env
 
 # This script will:
 # - Copy environment templates
-# - Set up database credentials 
+# - Set up database credentials
 # - Configure AWS access (if available)
 # - Validate configuration
 ```
 
 **What if sync-env fails?**
+
 - Ensure you have proper AWS/database access
 - Contact team lead for credential access
-- Use `npm run sync-env:dry-run` to see what would be configured
+- Use `pnpm run sync-env:dry-run` to see what would be configured
 
 ### **Step 4: Build Core Libraries**
 
 ```bash
 # Build shared libraries that other projects depend on
-npm run build:libs
+pnpm run build:libs
 
 # This should complete in 1-2 minutes
 # You'll see successful builds for ~10 library projects
@@ -126,7 +132,7 @@ npm run build:libs
 
 ```bash
 # Run workspace validation
-npm run validate
+pnpm run validate
 
 # This checks:
 # - Package.json consistency
@@ -145,9 +151,10 @@ npm run validate
 Once setup is complete, you can start development servers:
 
 #### **Full Development Environment**
+
 ```bash
 # Starts all development servers (web + lambdas)
-npm run dev
+pnpm run dev
 
 # This will start:
 # - Web app at http://localhost:3000
@@ -156,24 +163,25 @@ npm run dev
 ```
 
 #### **Individual Services**
+
 ```bash
 # Web application only
-npm start
+pnpm start
 # or
-npm run dev:web
+pnpm run dev:web
 
 # Mobile application (React Native)
-npm run android  # Android
-npm run ios      # iOS (Mac only)
+pnpm run android  # Android
+pnpm run ios      # iOS (Mac only)
 
 # Individual lambda functions
-npm run dev:db              # GraphQL API
-npm run dev:oauth           # OAuth proxy
-npm run dev:stats           # Stats processing
-npm run dev:game-selection  # Game selection
+pnpm run dev:db              # GraphQL API
+pnpm run dev:oauth           # OAuth proxy
+pnpm run dev:stats           # Stats processing
+pnpm run dev:game-selection  # Game selection
 
 # GraphiQL playground
-npm run graphiql
+pnpm run graphiql
 ```
 
 ### **Development URLs**
@@ -184,7 +192,7 @@ After starting development servers:
 - **GraphQL API**: [http://localhost:4000](http://localhost:4000)
 - **GraphQL Playground**: [http://localhost:4000/graphql](http://localhost:4000/graphql)
 - **GraphiQL**: [http://localhost:3001](http://localhost:3001)
-- **Storybook**: `npm run storybook` → [http://localhost:6006](http://localhost:6006)
+- **Storybook**: `pnpm run storybook` → [http://localhost:6006](http://localhost:6006)
 
 ---
 
@@ -194,69 +202,69 @@ After starting development servers:
 
 ```bash
 # Build everything
-npm run build:all
+pnpm run build:all
 
 # Build by project type
-npm run build:libs      # Shared libraries only
-npm run build:apps      # Applications only  
-npm run build:lambdas   # Lambda functions only
+pnpm run build:libs      # Shared libraries only
+pnpm run build:apps      # Applications only
+pnpm run build:lambdas   # Lambda functions only
 
 # Build specific project
-npx nx build <project-name>
+pnpm exec nx build <project-name>
 ```
 
 ### **Running Tests**
 
 ```bash
 # Run all tests
-npm run test:all
+pnpm run test:all
 
 # Run tests by project type
-npm run test:libs       # Library tests
-npm run test:apps       # Application tests  
-npm run test:lambdas    # Lambda tests
+pnpm run test:libs       # Library tests
+pnpm run test:apps       # Application tests
+pnpm run test:lambdas    # Lambda tests
 
 # Run affected tests (only changed code)
-npm run test:changed
-npm run affected:test
+pnpm run test:changed
+pnpm run affected:test
 
 # Watch mode for development
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### **Code Quality & Linting**
 
 ```bash
 # Fix all linting issues automatically
-npm run lint:fix:all
+pnpm run lint:fix:all
 
 # Lint by project type
-npm run lint:libs
-npm run lint:apps
-npm run lint:lambdas
+pnpm run lint:libs
+pnpm run lint:apps
+pnpm run lint:lambdas
 
 # Type checking
-npm run typecheck
+pnpm run typecheck
 
 # Format code
-npx nx run-many --target=format
+pnpm exec nx run-many --target=format
 ```
 
 ### **Database Operations**
 
 ```bash
 # Test database connection
-npm run db:test
+pnpm run db:test
 
 # Connect to database CLI
-npm run db:psql
+pnpm run db:psql
 
 # Run migrations
-npm run migrate
+pnpm run migrate
 
 # CLI database operations
-npm run cli:inspect-database
-npm run cli:test-connection
+pnpm run cli:inspect-database
+pnpm run cli:test-connection
 ```
 
 ---
@@ -266,27 +274,31 @@ npm run cli:test-connection
 ### **Common Issues & Solutions**
 
 #### **"Module not found" Errors**
+
 ```
 Error: Cannot find module '@legacy-sports/...'
 ```
 
 **Solution**: Rebuild libraries
+
 ```bash
-npm run build:libs
+pnpm run build:libs
 ```
 
 #### **Environment Variable Issues**
+
 ```
 Error: Missing environment configuration
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Re-run environment sync
-npm run sync-env
+pnpm run sync-env
 
 # 2. Check if sync worked
-npm run sync-env:dry-run
+pnpm run sync-env:dry-run
 
 # 3. Manual environment setup (if needed)
 cp .env.template .env.local
@@ -294,126 +306,140 @@ cp .env.template .env.local
 ```
 
 #### **Database Connection Problems**
+
 ```
 Error: Connection to database failed
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Test connection
-npm run db:test
+pnpm run db:test
 
 # 2. Check credentials
-npm run db:credentials
+pnpm run db:credentials
 
 # 3. Try production database (if development DB unavailable)
-npm run db:test:production
+pnpm run db:test:production
 ```
 
 #### **Port Already in Use**
+
 ```
 Error: Port 3000 is already in use
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Kill processes using the port
-npx kill-port 3000
-npx kill-port 4000
+pnpm dlx kill-port 3000
+pnpm dlx kill-port 4000
 
 # 2. Or change ports in project configuration
 # Edit apps/web/project.json or use different port
 ```
 
 #### **Slow Build Performance**
+
 ```
 Builds taking longer than expected
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Clear Nx cache
-npm run clean:nx
+pnpm run clean:nx
 
-# 2. Use affected builds instead of full builds  
-npm run affected:build
+# 2. Use affected builds instead of full builds
+pnpm run affected:build
 
 # 3. Nuclear option - full clean
-npm run clean:deps
-npm install
-npm run build:libs
+pnpm run clean:deps
+pnpm install
+pnpm run build:libs
 ```
 
 #### **TypeScript Errors**
+
 ```
 Type checking errors in IDE or build
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Restart TypeScript language server (VS Code: Cmd+Shift+P > "TypeScript: Restart TS Server")
 
 # 2. Rebuild type definitions
-npm run build:libs
+pnpm run build:libs
 
 # 3. Check for circular dependencies
-npx nx graph
+pnpm exec nx graph
 
 # 4. Clean TypeScript cache
 rm -rf node_modules/.cache
-npm run build:libs
+pnpm run build:libs
 ```
 
 #### **React Native Issues**
+
 ```
 Metro bundler or native build failures
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Clear Metro cache
-npx react-native start --reset-cache
+pnpm exec react-native start --reset-cache
 
 # 2. Clean native builds
 cd apps/app
-npx react-native run-android --reset-cache
+pnpm exec react-native run-android --reset-cache
 
 # 3. Rebuild native dependencies
-cd apps/app && rm -rf node_modules && npm install
+cd apps/app && rm -rf node_modules && pnpm install
 ```
 
 #### **Lambda Development Issues**
+
 ```
 Lambda functions not starting or failing
 ```
 
 **Solutions**:
+
 ```bash
 # 1. Ensure libraries are built
-npm run build:libs
+pnpm run build:libs
 
 # 2. Check lambda-specific dependencies
 cd lambdas/<lambda-name>
-npm install
+pnpm install
 
 # 3. Restart lambda services
-npm run dev:lambdas
+pnpm run dev:lambdas
 ```
 
 ### **Performance Optimization**
 
 #### **Faster Development Builds**
+
 ```bash
 # Use affected commands instead of building everything
-npm run affected:build
-npm run affected:test  
-npm run affected:lint
+pnpm run affected:build
+pnpm run affected:test
+pnpm run affected:lint
 
 # Enable watch mode during active development
-npm run test:watch
+pnpm run test:watch
 ```
 
 #### **Memory Issues**
+
 ```bash
 # Increase Node.js memory limit
 export NODE_OPTIONS="--max-old-space-size=8192"
@@ -433,6 +459,7 @@ No additional setup required beyond the basic installation.
 ### **React Native (Mobile) Development**
 
 #### **Android Setup**
+
 1. Install Android Studio
 2. Set up Android SDK (API 29+)
 3. Configure environment variables:
@@ -443,9 +470,10 @@ No additional setup required beyond the basic installation.
    export PATH=$PATH:$ANDROID_HOME/platform-tools
    ```
 4. Start Android emulator or connect physical device
-5. Run: `npm run android`
+5. Run: `pnpm run android`
 
 #### **iOS Setup (Mac only)**
+
 1. Install Xcode from App Store
 2. Install Xcode Command Line Tools:
    ```bash
@@ -459,7 +487,7 @@ No additional setup required beyond the basic installation.
    ```bash
    cd apps/app/ios && pod install
    ```
-5. Run: `npm run ios`
+5. Run: `pnpm run ios`
 
 ---
 
@@ -474,51 +502,51 @@ Before starting work each day:
 git pull origin main
 
 # 2. Update dependencies (if package.json changed)
-npm install
+pnpm install
 
 # 3. Rebuild libraries (if they changed)
-npm run build:libs
+pnpm run build:libs
 
 # 4. Run validation
-npm run validate
+pnpm run validate
 
 # 5. Start development
-npm run dev
+pnpm run dev
 ```
 
 ### **Before Committing Changes**
 
 ```bash
 # 1. Run full validation
-npm run validate
+pnpm run validate
 
 # 2. Fix any linting issues
-npm run lint:fix:all
+pnpm run lint:fix:all
 
 # 3. Run type checking
-npm run typecheck
+pnpm run typecheck
 
 # 4. Test affected code
-npm run test:changed
+pnpm run test:changed
 
 # 5. Ensure everything builds
-npm run build:all
+pnpm run build:all
 ```
 
 ### **Workspace Health Commands**
 
 ```bash
 # Check project dependencies
-npx nx graph
+pnpm exec nx graph
 
 # Show project information
-npx nx show project <project-name>
+pnpm exec nx show project <project-name>
 
 # List all projects
-npx nx show projects
+pnpm exec nx show projects
 
 # Check for circular dependencies
-npx nx graph --file=dependency-graph.html
+pnpm exec nx graph --file=dependency-graph.html
 ```
 
 ---
@@ -528,7 +556,7 @@ npx nx graph --file=dependency-graph.html
 ### **Documentation**
 
 - **Build System**: See `BUILD_SYSTEM.md` for detailed build information
-- **Repository Improvements**: See `REPOSITORY_IMPROVEMENTS.md` for ongoing enhancements  
+- **Repository Improvements**: See `REPOSITORY_IMPROVEMENTS.md` for ongoing enhancements
 - **ESLint Configuration**: See `tools/eslint-config/README.md` for linting setup
 - **Agent Instructions**: See `AGENTS.md` for AI agent guidelines
 
@@ -536,7 +564,7 @@ npx nx graph --file=dependency-graph.html
 
 - **Nx Documentation**: [https://nx.dev](https://nx.dev)
 - **Nx Console**: VS Code extension for visual Nx management
-- **Dependency Graph**: `npx nx graph` for visual project relationships
+- **Dependency Graph**: `pnpm exec nx graph` for visual project relationships
 
 ### **Framework Documentation**
 
@@ -591,7 +619,7 @@ DATABASE_URL=postgresql://postgres:development@localhost:5432/legacy_sports
 For faster builds and development:
 
 ```bash
-# Enable Nx daemon for faster commands  
+# Enable Nx daemon for faster commands
 echo "NX_DAEMON=true" >> .env.local
 
 # Increase parallel build workers
@@ -609,5 +637,5 @@ For questions or issues not covered in this guide, please reach out to the devel
 
 ---
 
-*Last Updated: October 12, 2025*  
-*Development Environment Version: Node.js 18+, Nx 21.5.2*
+_Last Updated: October 12, 2025_  
+_Development Environment Version: Node.js 18+, Nx 21.5.2_
