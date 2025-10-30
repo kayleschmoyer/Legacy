@@ -29,8 +29,12 @@ export function computeScoring<
   for (const key of Object.keys(statsRecord)) {
     const multiplier = scoringSettings[key];
 
-    if (!multiplier) {
+    if (multiplier === undefined || multiplier === null) {
       continue;
+    }
+
+    if (typeof multiplier !== 'number' || !Number.isFinite(multiplier)) {
+      throw new Error(`Cannot compute with non-finite multiplier: ${key}`);
     }
 
     const value = statsRecord[key];

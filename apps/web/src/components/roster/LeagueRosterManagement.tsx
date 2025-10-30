@@ -283,7 +283,7 @@ function RosterSlot({
       cursor="pointer"
       width="100%"
       onPress={handleSlotPress}
-      role="listitem"
+      role="button"
       tabIndex={0}
       aria-pressed={Boolean(isSelected)}
       aria-label={
@@ -430,7 +430,6 @@ const RosterSection = ({
         </XStack>
         <Separator borderColor="$outlineSubtle" marginVertical="$2" />
         <YStack
-          role="list"
           borderWidth={1}
           borderColor="$surfacePanelBorder"
           borderRadius="$5"
@@ -507,7 +506,7 @@ const BenchList = ({
           </Text>
         </YStack>
       ) : (
-        <YStack space="$2" role="list">
+        <YStack space="$2">
           {players.map((player) => {
             const isActive = selectedPlayer?.id === player.id;
 
@@ -538,7 +537,7 @@ const BenchList = ({
                   scale: 0.985,
                 }}
                 cursor="pointer"
-                role="listitem"
+                role="button"
                 aria-pressed={isActive}
                 tabIndex={0}
                 onPress={handleSelect}

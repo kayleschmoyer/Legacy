@@ -1,0 +1,109 @@
+query GetLeagueScoringProfile($leagueId: Int!) {
+  leagueScoringProfile(leagueId: $leagueId) {
+    profileId
+    profileName
+    stats {
+      multiplier
+      defaultMultiplier
+      isOverride
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        description
+        sourceColumn
+        defaultMultiplier
+        minMultiplier
+        maxMultiplier
+        stepSize
+        isRequired
+        enforcePositive
+        enforceNegative
+      }
+    }
+    multiplierGroups {
+      group
+      values {
+        statKey
+        sourceColumn
+        multiplier
+      }
+    }
+  }
+}
+
+query GetDefaultScoringProfile {
+  defaultScoringProfile {
+    profileName
+    stats {
+      multiplier
+      defaultMultiplier
+      isOverride
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        description
+        sourceColumn
+        defaultMultiplier
+        minMultiplier
+        maxMultiplier
+        stepSize
+        isRequired
+        enforcePositive
+        enforceNegative
+      }
+    }
+    multiplierGroups {
+      group
+      values {
+        statKey
+        sourceColumn
+        multiplier
+      }
+    }
+  }
+}
+
+mutation UpdateLeagueScoringProfile(
+  $leagueId: Int!
+  $updates: [UpdateLeagueScoringMultiplierInput!]!
+) {
+  updateLeagueScoringProfile(leagueId: $leagueId, updates: $updates) {
+    profileId
+    profileName
+    stats {
+      multiplier
+      defaultMultiplier
+      isOverride
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        description
+        sourceColumn
+        defaultMultiplier
+        minMultiplier
+        maxMultiplier
+        stepSize
+        isRequired
+        enforcePositive
+        enforceNegative
+      }
+    }
+    multiplierGroups {
+      group
+      values {
+        statKey
+        sourceColumn
+        multiplier
+      }
+    }
+  }
+}

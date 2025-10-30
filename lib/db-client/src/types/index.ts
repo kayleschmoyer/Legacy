@@ -10,3 +10,6 @@ export * from './EnvironmentVariable';
 
 // Re-export raw SQL result types and utilities
 export * from './RawSqlTypes';
+
+// Re-export scoring-specific helper types
+export * from './ScoringTypes';

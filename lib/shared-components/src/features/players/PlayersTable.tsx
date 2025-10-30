@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Search,
   Tag,
+  TrendingUp,
   User,
 } from '@tamagui/lucide-icons';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
@@ -37,6 +38,10 @@ export interface PlayersTableProps {
   minGames?: number; // For career stats filtering
   minHomeRuns?: number; // For career stats filtering
   minRBI?: number; // For career stats filtering
+  /** Map of player ID to projected fantasy points per game (optional) */
+  projectedPoints?: Map<number, number>;
+  /** Whether to show the projected points column */
+  showProjections?: boolean;
 }
 
 interface SortOption {
@@ -56,6 +61,14 @@ const SORT_OPTIONS: SortOption[] = [
   { label: 'Bref ID (Z-A)', orderBy: 'brefId', orderDirection: 'desc' },
 ];
 
+const formatProjectionValue = (value?: number | null): string => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value.toFixed(1);
+  }
+
+  return '—';
+};
+
 export function PlayersTable({
   onPlayerSelect,
   pageSize = 50,
@@ -69,6 +82,8 @@ export function PlayersTable({
   minGames,
   minHomeRuns,
   minRBI,
+  projectedPoints,
+  showProjections = false,
 }: PlayersTableProps): React.ReactElement {
   // All hooks must be called before any conditional logic
   const [searchTerm, setSearchTerm] = useState('');
@@ -284,6 +299,16 @@ export function PlayersTable({
               <Text flex={1.5} fontWeight="bold" fontSize={compact ? 2 : 3}>
                 Bref ID
               </Text>
+              {showProjections && projectedPoints && (
+                <Text
+                  flex={1.2}
+                  fontWeight="bold"
+                  fontSize={compact ? 2 : 3}
+                  ta="center"
+                >
+                  Proj Pts/G
+                </Text>
+              )}
               {selectable && (
                 <Text flex={1} fontWeight="bold" fontSize={compact ? 2 : 3}>
                   Action
@@ -301,56 +326,74 @@ export function PlayersTable({
                 </Text>
               </XStack>
             ) : (
-              filteredPlayers.map((player, index) => (
-                <XStack
-                  key={player.id}
-                  p={compact ? '$2' : '$3'}
-                  bg={index % 2 === 0 ? '$gray1' : 'transparent'}
-                  r="$2"
-                  borderWidth={selectedPlayer?.id === player.id ? 2 : 1}
-                  borderColor={
-                    selectedPlayer?.id === player.id ? '$blue8' : 'gray'
-                  }
-                  pressStyle={{
-                    bg: '$gray3',
-                  }}
-                  onPress={() => handlePlayerClick(player)}
-                  cursor={onPlayerSelect ? 'pointer' : 'default'}
-                >
-                  <Text flex={0.8} fontSize={compact ? 2 : 3} color="gray">
-                    {player.id}
-                  </Text>
-                  <XStack flex={2} ai="center" gap="$2">
-                    <User size={compact ? 12 : 16} color="gray" />
-                    <Text fontSize={compact ? 2 : 3} fontWeight="500">
-                      {getFullName(player)}
+              filteredPlayers.map((player, index) => {
+                const projection = player.id
+                  ? projectedPoints?.get(player.id)
+                  : undefined;
+
+                return (
+                  <XStack
+                    key={player.id}
+                    p={compact ? '$2' : '$3'}
+                    bg={index % 2 === 0 ? '$gray1' : 'transparent'}
+                    r="$2"
+                    borderWidth={selectedPlayer?.id === player.id ? 2 : 1}
+                    borderColor={
+                      selectedPlayer?.id === player.id ? '$blue8' : 'gray'
+                    }
+                    pressStyle={{
+                      bg: '$gray3',
+                    }}
+                    onPress={() => handlePlayerClick(player)}
+                    cursor={onPlayerSelect ? 'pointer' : 'default'}
+                  >
+                    <Text flex={0.8} fontSize={compact ? 2 : 3} color="gray">
+                      {player.id}
                     </Text>
-                  </XStack>
-                  <XStack flex={1.5} ai="center" gap="$2">
-                    <Tag size={compact ? 10 : 14} color="gray" />
-                    <Text
-                      fontSize={compact ? 2 : 3}
-                      color="gray"
-                      fontFamily="$mono"
-                    >
-                      {player.brefId}
-                    </Text>
-                  </XStack>
-                  {selectable && (
-                    <XStack flex={1} jc="center">
-                      <Button
-                        size={compact ? '$1' : '$2'}
-                        variant="outlined"
-                        onPress={() => handlePlayerClick(player)}
-                      >
-                        {selectedPlayer?.id === player.id
-                          ? 'Selected'
-                          : 'Select'}
-                      </Button>
+                    <XStack flex={2} ai="center" gap="$2">
+                      <User size={compact ? 12 : 16} color="gray" />
+                      <Text fontSize={compact ? 2 : 3} fontWeight="500">
+                        {getFullName(player)}
+                      </Text>
                     </XStack>
-                  )}
-                </XStack>
-              ))
+                    <XStack flex={1.5} ai="center" gap="$2">
+                      <Tag size={compact ? 10 : 14} color="gray" />
+                      <Text
+                        fontSize={compact ? 2 : 3}
+                        color="gray"
+                        fontFamily="$mono"
+                      >
+                        {player.brefId}
+                      </Text>
+                    </XStack>
+                    {showProjections && projectedPoints && (
+                      <XStack flex={1.2} ai="center" jc="center" gap="$1">
+                        <TrendingUp size={compact ? 10 : 12} color="$blue10" />
+                        <Text
+                          fontSize={compact ? 2 : 3}
+                          color="$blue11"
+                          fontWeight="600"
+                        >
+                          {formatProjectionValue(projection)}
+                        </Text>
+                      </XStack>
+                    )}
+                    {selectable && (
+                      <XStack flex={1} jc="center">
+                        <Button
+                          size={compact ? '$1' : '$2'}
+                          variant="outlined"
+                          onPress={() => handlePlayerClick(player)}
+                        >
+                          {selectedPlayer?.id === player.id
+                            ? 'Selected'
+                            : 'Select'}
+                        </Button>
+                      </XStack>
+                    )}
+                  </XStack>
+                );
+              })
             )}
           </YStack>
         </ScrollView>

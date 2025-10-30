@@ -23,6 +23,8 @@ export type {
   PlayerWithStats,
 } from './PlayerStatsTypes';
 
+// Projections
+
 // API exports
 export * from './PlayersApi';
 
@@ -30,3 +32,4 @@ export * from './PlayersApi';
 export type { PlayerRowData, PlayerRowProps } from './PlayerRow';
 export type { PlayersGridProps } from './PlayersGrid';
 export type { PlayersTableProps } from './PlayersTable';
+export type { PlayerCardProps } from './PlayerCard';

@@ -28,25 +28,23 @@ If MCP is not available, use the PowerShell terminal commands documented below.
 
 ### Essential Commands
 
-````powershell
+```powershell
 # Refresh PATH if acli not found
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Update Jira ticket status
-acli issue transition LS-1234 "In Progress"    # Start work
-acli issue transition LS-1234 "In Review"      # PR created
-acli issue transition LS-1234 "Done"           # PR merged
+acli jira workitem transition --key LS-1234 --status "In Progress"    # Start work
+acli jira workitem transition --key LS-1234 --status "In Review"      # PR created
+acli jira workitem transition --key LS-1234 --status "Done"           # PR merged
 
 # Create branch (new ticket from main)
 git checkout main
 git pull
-twig github new-branch ticket-1234
+twig switch ticket-1234
 
 # Create branch (continuation from current)
 twig switch ticket-1234 -p
-
-# Run affected tests
-pnpm exec nx affected -t test
+```
 
 #### Scenario 1: Type Errors
 
@@ -55,29 +53,25 @@ pnpm exec nx affected -t test
 **Solution**:
 
 ```powershell
-# Run type checking to see errors
-pnpm exec pnpm exec nx affected -t typecheck
-````
+pnpm exec nx affected -t typecheck
+```
 
-# Lint affected projects (with auto-fix)
+#### Validation Commands
 
+```powershell
+pnpm exec nx affected -t test
 pnpm exec nx affected -t lint --fix
-
-# Build affected projects
-
 pnpm exec nx affected -t build
+```
 
-# Create pull request
+#### Pull Request and CI
 
+```powershell
 twig github pr create-pr
-
-# Check CI status and logs (after PR)
-
-gh run list --branch feature/branch --limit 5 # View recent CI runs
-gh run view RUN_ID --log-failed # View failed logs
-gh run rerun RUN_ID --failed # Re-run failed jobs
-
-````
+gh run list --branch feature/branch --limit 5
+gh run view RUN_ID --log-failed
+gh run rerun RUN_ID --failed
+```
 
 ### Pre-Commit Checklist
 
@@ -101,27 +95,31 @@ gh run rerun RUN_ID --failed # Re-run failed jobs
 
 ```powershell
 # Verify ticket exists and review details
-acli issue view LS-1234
+acli jira workitem view LS-1234
 
 # Update ticket status to "In Progress"
-acli issue transition LS-1234 "In Progress"
-````
+acli jira workitem transition --key LS-1234 --status "In Progress"
+```
+
+> ⚠️ **Epics are containers, not actionable work**: If you are given an Epic key, pause before writing code. Locate the Epic's child issues (stories, tasks, or subtasks) and perform the implementation on the appropriate child ticket instead. Create or request those child work items if they do not exist yet so the effort stays traceable at the right level of detail.
 
 #### Option B: Create New Ticket
 
 ```powershell
 # Create a new ticket in the LS project
-acli issue create --project LS --type Task --summary "Your task summary" --description "Detailed description"
+acli jira workitem create --project LS --type "Task" --summary "Your task summary" --description "Detailed description"
 
 # Or create a story
-acli issue create --project LS --type Story --summary "User story" --description "As a user, I want..."
+acli jira workitem create --project LS --type "Story" --summary "User story" --description "As a user, I want..."
 
 # Or create a bug
-acli issue create --project LS --type Bug --summary "Bug description" --description "Steps to reproduce..."
+acli jira workitem create --project LS --type "Bug" --summary "Bug description" --description "Steps to reproduce..."
 
 # After creating, transition to "In Progress"
-acli issue transition LS-1234 "In Progress"
+acli jira workitem transition --key LS-1234 --status "In Progress"
 ```
+
+> ✅ **Always add new tickets to the active sprint.** After creation, move the ticket from the backlog into the current sprint on the Jira board (or ask the product owner to place it there) so the work is tracked in the ongoing iteration before you begin implementation.
 
 #### Jira Workflow States
 
@@ -137,9 +135,9 @@ Throughout the development process, keep your Jira ticket status updated:
 
 ```powershell
 # Common status transitions
-acli issue transition LS-1234 "In Progress"    # Starting work
-acli issue transition LS-1234 "In Review"      # PR created
-acli issue transition LS-1234 "Done"           # PR merged
+acli jira workitem transition --key LS-1234 --status "In Progress"    # Starting work
+acli jira workitem transition --key LS-1234 --status "In Review"      # PR created
+acli jira workitem transition --key LS-1234 --status "Done"           # PR merged
 ```
 
 **Note**: If `acli` command is not found, refresh your PowerShell environment variables:
@@ -370,7 +368,7 @@ When working on a specific project:
 
 ```powershell
 # Run tests for a single project
-pnpm exec pnpm exec nx test project-name
+pnpm exec nx test project-name
 
 # Run build for a single project
 pnpm exec nx build project-name
@@ -495,7 +493,7 @@ pnpm exec nx affected -t test --coverage
 
 1. Read test failure messages carefully
 2. Update tests if implementation changed intentionally
-3. Update snapshots if UI/output changed intentionally: `pnpm exec pnpm exec nx test project-name --updateSnapshot`
+3. Update snapshots if UI/output changed intentionally: `pnpm exec nx test project-name --updateSnapshot`
 4. Fix actual bugs if tests reveal issues
 
 ##### 4. Building
@@ -721,7 +719,7 @@ acli jira workitem comment create --key LS-NEW \
 twig github pr create-pr
 
 # After PR is created, update Jira ticket status
-acli issue transition LS-1234 "In Review"
+acli jira workitem transition --key LS-1234 --status "In Review"
 ```
 
 Twig will:
@@ -828,7 +826,7 @@ Snapshot Summary
 
 ```powershell
 # Update snapshots locally
-pnpm exec pnpm exec nx test project-name --updateSnapshot
+pnpm exec nx test project-name --updateSnapshot
 
 # Or for affected projects
 pnpm exec nx affected -t test --updateSnapshot
@@ -882,47 +880,47 @@ Received: false
 
 ### Issue: Jira Ticket Status Transition Fails
 
-**Symptom**: `acli issue transition` command fails or status doesn't update.
+**Symptom**: `acli jira workitem transition` command fails or status doesn't update.
 
 **Possible Causes & Solutions**:
 
 **1. Invalid status name**:
 
 ```powershell
-# List available transitions for a ticket
-acli issue transitions LS-1234
+# Review allowed transitions in the Jira UI if unsure
+acli jira workitem view LS-1234 --web
 
-# Use the exact status name from the list
-acli issue transition LS-1234 "In Progress"
+# Use the exact status name shown in Jira
+acli jira workitem transition --key LS-1234 --status "In Progress"
 ```
 
 **2. Workflow doesn't allow the transition**:
 
 ```powershell
 # Check current status
-acli issue view LS-1234
+acli jira workitem view LS-1234
 
 # Some workflows require intermediate steps
 # Example: To Do → In Progress (allowed)
 # Example: To Do → Done (not allowed, must go through In Progress first)
 
 # Follow the correct workflow path
-acli issue transition LS-1234 "In Progress"
-acli issue transition LS-1234 "In Review"
-acli issue transition LS-1234 "Done"
+acli jira workitem transition --key LS-1234 --status "In Progress"
+acli jira workitem transition --key LS-1234 --status "In Review"
+acli jira workitem transition --key LS-1234 --status "Done"
 ```
 
 **3. Permission issues**:
 
 ```powershell
 # Verify you have permission to modify the ticket
-acli issue view LS-1234
+acli jira workitem view LS-1234
 
 # Check if you're assigned to the ticket
 # You may need to be assigned before transitioning
 
 # Assign to yourself if needed
-acli issue assign LS-1234 @me
+acli jira workitem assign --key LS-1234 --assignee @me
 ```
 
 ---
@@ -1332,7 +1330,7 @@ Use this checklist for each contribution:
 
 This guide is a living document. If you find areas for improvement:
 
-1. Create a ticket: `acli issue create --project LS --type Task --summary "Update AI agent workflow guide"`
+1. Create a ticket: `acli jira workitem create --project LS --type "Task" --summary "Update AI agent workflow guide"`
 2. Follow this workflow to make changes
 3. Submit a PR with improvements
 

@@ -1,4 +1,4 @@
-import {
+import type {
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
@@ -8,15 +8,15 @@ export const DEFAULT_BATTING_SCORING = Object.freeze<
   Partial<Record<keyof SeasonBatting, number>>
 >({
   cs: -1,
-  doubles: 1,
+  doubles: 2,
   h: 1,
   hbp: 1,
-  hr: 3,
+  hr: 4,
   r: 1,
   rbi: 1,
-  sb: 1,
+  sb: 2,
   so: -0.5,
-  triples: 2,
+  triples: 3,
 });
 
 export const DEFAULT_FIELDING_SCORING = Object.freeze<
@@ -37,6 +37,6 @@ export const DEFAULT_PITCHING_SCORING = Object.freeze<
   l: -2,
   outsRecorded: 1,
   so: 1,
-  sv: 3,
-  w: 2,
+  sv: 5,
+  w: 5,
 });

@@ -10,6 +10,8 @@ import {
 import { H1, H2, Spinner, Text } from 'tamagui';
 import { Check, Copy } from '@tamagui/lucide-icons';
 import { gql, useLazyQuery } from '@apollo/client';
+import { LeagueScoringSummary } from './LeagueScoringSummary';
+import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { env } from '../../config/environment';
 import {
   LeaguePositionFragment,
@@ -22,6 +24,7 @@ import {
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
 import { LeagueStandings } from '../roster/LeagueStandings';
+import { useLeagueScoringSettings } from '../../lib/scoring';
 
 // Manual GraphQL query for getting user's team ID in a league
 const GET_USER_TEAM_ID = gql`
@@ -199,6 +202,15 @@ export function LeagueDetailPage(): React.JSX.Element {
       alert(`Failed to start draft: ${error.message}`);
     },
   });
+
+  const {
+    settings: scoringSettings,
+    loading: scoringLoading,
+    error: scoringError,
+    profileName: scoringProfileName,
+    profile: scoringProfile,
+    refetch: refetchScoringProfile,
+  } = useLeagueScoringSettings(leagueId);
 
   // Check if user is league owner/commissioner
   const isCommissioner = useMemo(() => {
@@ -590,15 +602,23 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   const renderRosterManagement = () => (
-    <LeagueRosterManagement
-      positions={positions}
-      teamPlayers={teamMembers}
-      onPlayerAssign={(player, position) =>
-        void handlePlayerAssign(player, position)
-      }
-      onPlayerRemove={(player) => void handlePlayerRemove(player)}
-      loading={positionsLoading || teamMembersLoading || userTeamLoading}
-    />
+    <YStack space="$5">
+      <LeagueRosterManagement
+        positions={positions}
+        teamPlayers={teamMembers}
+        onPlayerAssign={(player, position) =>
+          void handlePlayerAssign(player, position)
+        }
+        onPlayerRemove={(player) => void handlePlayerRemove(player)}
+        loading={positionsLoading || teamMembersLoading || userTeamLoading}
+      />
+      <LeagueScoringSummary
+        loading={scoringLoading}
+        error={scoringError}
+        profileName={scoringProfileName}
+        settings={scoringSettings}
+      />
+    </YStack>
   );
 
   const renderCommissionerSettings = () => (
@@ -608,6 +628,16 @@ export function LeagueDetailPage(): React.JSX.Element {
       id="panel-commissioner"
       aria-labelledby="tab-commissioner"
     >
+      <LeagueScoringEditor
+        leagueId={leagueId}
+        profile={scoringProfile}
+        loading={scoringLoading}
+        error={scoringError}
+        onRefetch={async () => {
+          await refetchScoringProfile({ leagueId });
+        }}
+      />
+
       <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
         <YStack space="$3">
           <H2 size="$6" color="$blue11">

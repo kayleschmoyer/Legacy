@@ -15,6 +15,10 @@ import {
   matchupPlayerGames,
   teamMembers,
   leaguePosition,
+  scoringStatDefinitions,
+  leagueScoringProfiles,
+  leagueScoringProfileEntries,
+  leagueScoringChangeLog,
 } from './schema';
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -30,6 +34,7 @@ export const leaguesRelations = relations(leagues, ({ one, many }) => ({
   drafts: many(drafts),
   leagueMessages: many(leagueMessages),
   leagueMembers: many(leagueMembers),
+  scoringProfiles: many(leagueScoringProfiles),
 }));
 
 export const draftsRelations = relations(drafts, ({ one, many }) => ({
@@ -53,6 +58,55 @@ export const leagueMembersRelations = relations(leagueMembers, ({ one }) => ({
     references: [leagues.id],
   }),
 }));
+
+export const leagueScoringProfilesRelations = relations(
+  leagueScoringProfiles,
+  ({ one, many }) => ({
+    league: one(leagues, {
+      fields: [leagueScoringProfiles.leagueId],
+      references: [leagues.id],
+    }),
+    entries: many(leagueScoringProfileEntries),
+    changeLogs: many(leagueScoringChangeLog),
+  }),
+);
+
+export const scoringStatDefinitionsRelations = relations(
+  scoringStatDefinitions,
+  ({ many }) => ({
+    entries: many(leagueScoringProfileEntries),
+    changeLogs: many(leagueScoringChangeLog),
+  }),
+);
+
+export const leagueScoringProfileEntriesRelations = relations(
+  leagueScoringProfileEntries,
+  ({ one, many }) => ({
+    profile: one(leagueScoringProfiles, {
+      fields: [leagueScoringProfileEntries.profileId],
+      references: [leagueScoringProfiles.id],
+    }),
+    statDefinition: one(scoringStatDefinitions, {
+      fields: [leagueScoringProfileEntries.statDefinitionId],
+      references: [scoringStatDefinitions.id],
+    }),
+    changeLogs: many(leagueScoringChangeLog),
+  }),
+);
+
+export const leagueScoringChangeLogRelations = relations(
+  leagueScoringChangeLog,
+  ({ one }) => ({
+    profile: one(leagueScoringProfiles, {
+      fields: [leagueScoringChangeLog.profileId],
+      references: [leagueScoringProfiles.id],
+    }),
+    statDefinition: one(scoringStatDefinitions, {
+      fields: [leagueScoringChangeLog.statDefinitionId],
+      references: [scoringStatDefinitions.id],
+    }),
+  }),
+);
 
 export const draftTeamsRelations = relations(draftTeams, ({ one }) => ({
   draft: one(drafts, {

@@ -11,19 +11,29 @@ import {
   CareerPitching,
   CreateMatchupPlayer,
   CreatePlayerInput,
+  LeagueScoringProfile,
+  LeagueScoringProfileEntry,
   Matchup,
   MatchupPlayer,
   Player,
   PlayerEligiblePosition,
+  ScoringStatDefinition,
   SeasonBatting,
   SeasonFielding,
   SeasonPitching,
 } from '../../types/DatabaseTypes';
+import { LeagueScoringMultipliers } from '../../types/ScoringTypes';
 import * as Schema from '../../drizzle/public/schema';
 
 export const PublicSchema = Schema;
 
 export type PublicDb = GenericDatabase<typeof Schema>;
+
+export interface LeagueScoringMultiplierUpdateInput {
+  statDefinitionId: number;
+  multiplier?: number | null;
+  isEnabled?: boolean | null;
+}
 
 export async function getPlayerByBrefId(
   db: PublicDb,
@@ -359,3 +369,244 @@ export {
   getStatsRefreshSummary,
   getPlayersOrderedByLastFetch,
 } from './PlayerStatsUtils';
+
+function normalizeNumeric(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+}
+
+function emptyLeagueMultipliers(): LeagueScoringMultipliers {
+  return {
+    batting: Object.create(null) as Record<string, number>,
+    pitching: Object.create(null) as Record<string, number>,
+    fielding: Object.create(null) as Record<string, number>,
+  };
+}
+
+function assignMultiplier(
+  multipliers: LeagueScoringMultipliers,
+  definition: ScoringStatDefinition,
+  value: number,
+): void {
+  switch (definition.statGroup) {
+    case 'batting':
+      multipliers.batting[definition.sourceColumn] = value;
+      break;
+    case 'pitching':
+      multipliers.pitching[definition.sourceColumn] = value;
+      break;
+    case 'fielding':
+      multipliers.fielding[definition.sourceColumn] = value;
+      break;
+  }
+}
+
+export async function getScoringStatDefinitions(
+  db: PublicDb,
+): Promise<ScoringStatDefinition[]> {
+  return db.select().from(Schema.scoringStatDefinitions);
+}
+
+export async function getActiveScoringProfileForLeague(
+  db: PublicDb,
+  leagueId: number,
+): Promise<LeagueScoringProfile | null> {
+  return db
+    .select()
+    .from(Schema.leagueScoringProfiles)
+    .where(
+      and(
+        eq(Schema.leagueScoringProfiles.leagueId, leagueId),
+        eq(Schema.leagueScoringProfiles.isDefault, true),
+      ),
+    )
+    .limit(1)
+    .then(TakeUniqueOrNull);
+}
+
+export async function getScoringProfileEntriesForProfile(
+  db: PublicDb,
+  profileId: number,
+): Promise<LeagueScoringProfileEntry[]> {
+  return db
+    .select()
+    .from(Schema.leagueScoringProfileEntries)
+    .where(eq(Schema.leagueScoringProfileEntries.profileId, profileId));
+}
+
+export async function updateLeagueScoringProfileEntries(
+  db: PublicDb,
+  profileId: number,
+  updates: LeagueScoringMultiplierUpdateInput[],
+): Promise<LeagueScoringProfileEntry[]> {
+  if (updates.length === 0) {
+    return getScoringProfileEntriesForProfile(db, profileId);
+  }
+
+  const mergedUpdates = new Map<number, LeagueScoringMultiplierUpdateInput>();
+
+  for (const update of updates) {
+    mergedUpdates.set(update.statDefinitionId, {
+      ...mergedUpdates.get(update.statDefinitionId),
+      ...update,
+    });
+  }
+
+  const statDefinitionIds = Array.from(mergedUpdates.keys());
+
+  return db.transaction(async (tx) => {
+    const definitions = await tx
+      .select()
+      .from(Schema.scoringStatDefinitions)
+      .where(inArray(Schema.scoringStatDefinitions.id, statDefinitionIds));
+
+    const definitionById = new Map(
+      definitions.map((definition) => [definition.id, definition]),
+    );
+
+    const missingDefinitions = statDefinitionIds.filter(
+      (id) => !definitionById.has(id),
+    );
+
+    if (missingDefinitions.length > 0) {
+      throw new Error(
+        `Unknown scoring stat definition ids: ${missingDefinitions.join(', ')}`,
+      );
+    }
+
+    const existingEntries = await tx
+      .select()
+      .from(Schema.leagueScoringProfileEntries)
+      .where(
+        and(
+          eq(Schema.leagueScoringProfileEntries.profileId, profileId),
+          inArray(
+            Schema.leagueScoringProfileEntries.statDefinitionId,
+            statDefinitionIds,
+          ),
+        ),
+      );
+
+    const existingByDefinitionId = new Map(
+      existingEntries.map((entry) => [entry.statDefinitionId, entry]),
+    );
+
+    const values = statDefinitionIds.map((statDefinitionId) => {
+      const update = mergedUpdates.get(statDefinitionId);
+
+      if (!update) {
+        throw new Error(
+          `Missing multiplier update payload for stat definition ${statDefinitionId}`,
+        );
+      }
+
+      const definition = definitionById.get(statDefinitionId);
+
+      if (!definition) {
+        throw new Error(
+          `Unknown scoring stat definition id: ${statDefinitionId}`,
+        );
+      }
+
+      const existing = existingByDefinitionId.get(statDefinitionId);
+
+      const resolvedMultiplier =
+        update.multiplier ??
+        normalizeNumeric(existing?.multiplier) ??
+        normalizeNumeric(definition.defaultMultiplier);
+
+      if (resolvedMultiplier === null) {
+        throw new Error(
+          `Multiplier is required for stat definition ${statDefinitionId}`,
+        );
+      }
+
+      const resolvedIsEnabled =
+        update.isEnabled ?? (existing ? existing.isEnabled : true);
+
+      return {
+        profileId,
+        statDefinitionId,
+        multiplier: resolvedMultiplier.toString(),
+        isEnabled: resolvedIsEnabled,
+      };
+    });
+
+    await tx
+      .insert(Schema.leagueScoringProfileEntries)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          Schema.leagueScoringProfileEntries.profileId,
+          Schema.leagueScoringProfileEntries.statDefinitionId,
+        ],
+        set: conflictUpdateAllExcept(Schema.leagueScoringProfileEntries, [
+          'id',
+          'profileId',
+          'statDefinitionId',
+          'createdAt',
+        ]),
+      });
+
+    return tx
+      .select()
+      .from(Schema.leagueScoringProfileEntries)
+      .where(eq(Schema.leagueScoringProfileEntries.profileId, profileId));
+  });
+}
+
+export async function getScoringMultipliersForLeague(
+  db: PublicDb,
+  leagueId?: number | null,
+): Promise<LeagueScoringMultipliers> {
+  const multipliers = emptyLeagueMultipliers();
+  const definitions = await getScoringStatDefinitions(db);
+
+  let entryByDefinitionId = new Map<number, LeagueScoringProfileEntry>();
+
+  if (leagueId !== null && leagueId !== undefined) {
+    const profile = await getActiveScoringProfileForLeague(db, leagueId);
+
+    if (profile) {
+      const entries = await getScoringProfileEntriesForProfile(db, profile.id);
+      entryByDefinitionId = new Map(
+        entries.map((entry) => [entry.statDefinitionId, entry]),
+      );
+    }
+  }
+
+  for (const definition of definitions) {
+    const entry = entryByDefinitionId.get(definition.id);
+
+    if (entry && entry.isEnabled === false) {
+      // Disabled stats should not contribute to scoring
+      continue;
+    }
+
+    const overrideMultiplier = normalizeNumeric(entry?.multiplier);
+    const defaultMultiplier = normalizeNumeric(definition.defaultMultiplier);
+
+    if (overrideMultiplier !== null) {
+      assignMultiplier(multipliers, definition, overrideMultiplier);
+      continue;
+    }
+
+    if (defaultMultiplier !== null) {
+      assignMultiplier(multipliers, definition, defaultMultiplier);
+    }
+  }
+
+  return multipliers;
+}

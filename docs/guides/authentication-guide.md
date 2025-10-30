@@ -243,8 +243,9 @@ PUT /users/profile
 **Cross-platform styling issues:**
 
 ```tsx
-// Use Tamagui components for consistent styling
-import { Button, Text } from '@legacy-sports/shared-components';
+// Use Shared Components alongside UI Abstractions for Tamagui primitives
+import { Button } from '@legacy-sports/shared-components';
+import { Text } from '@legacy-sports/ui-abstractions';
 ```
 
 ### Development Testing

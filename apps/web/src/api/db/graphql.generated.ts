@@ -3,19 +3,32 @@ import { gql } from '@apollo/client';
 import * as Apollo from '@apollo/client';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
-export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+export type Exact<T extends { [key: string]: unknown }> = {
+  [K in keyof T]: T[K];
+};
+export type MakeOptional<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]?: Maybe<T[SubKey]>;
+};
+export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]: Maybe<T[SubKey]>;
+};
+export type MakeEmpty<
+  T extends { [key: string]: unknown },
+  K extends keyof T,
+> = { [_ in K]?: never };
+export type Incremental<T> =
+  | T
+  | {
+      [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never;
+    };
 const defaultOptions = {} as const;
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
-  ID: { input: string; output: string; }
-  String: { input: string; output: string; }
-  Boolean: { input: boolean; output: boolean; }
-  Int: { input: number; output: number; }
-  Float: { input: number; output: number; }
+  ID: { input: string; output: string };
+  String: { input: string; output: string };
+  Boolean: { input: boolean; output: boolean };
+  Int: { input: number; output: number };
+  Float: { input: number; output: number };
 };
 
 export type CareerBatting = {
@@ -140,6 +153,7 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
 };
 
@@ -178,31 +192,32 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   joinLeagueByCode?: Maybe<Team>;
   startDraft?: Maybe<League>;
+  updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
 };
-
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
 };
-
 
 export type MutationJoinLeagueByCodeArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
 };
 
-
 export type MutationStartDraftArgs = {
   draftType?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationUpdateLeagueScoringProfileArgs = {
+  leagueId: Scalars['Int']['input'];
+  updates: Array<UpdateLeagueScoringMultiplierInput>;
+};
 
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
@@ -231,9 +246,11 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  defaultScoringProfile?: Maybe<ScoringConfig>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
+  leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
@@ -244,6 +261,7 @@ export type Query = {
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
+  scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
@@ -259,7 +277,6 @@ export type Query = {
   version?: Maybe<VersionInfo>;
 };
 
-
 export type QueryCareerBattingStatsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -272,7 +289,6 @@ export type QueryCareerBattingStatsArgs = {
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryCareerFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -280,7 +296,6 @@ export type QueryCareerFieldingStatsArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
-
 
 export type QueryCareerPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -292,64 +307,56 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 export type QueryLeaguePositionsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueScoringProfileArgs = {
+  leagueId: Scalars['Int']['input'];
+};
 
 export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerByBrefIdArgs = {
   brefId: Scalars['String']['input'];
 };
 
-
 export type QueryPlayerCareerBattingArgs = {
   playerId: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerCareerFieldingArgs = {
   playerId: Scalars['Int']['input'];
 };
 
-
 export type QueryPlayerCareerPitchingArgs = {
   playerId: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerSeasonBattingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
 
-
 export type QueryPlayerSeasonFieldingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
 
-
 export type QueryPlayerSeasonPitchingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
-
 
 export type QueryPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -358,18 +365,15 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
 
-
 export type QuerySearchUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
-
 
 export type QuerySeasonBattingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -384,7 +388,6 @@ export type QuerySeasonBattingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QuerySeasonFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -395,7 +398,6 @@ export type QuerySeasonFieldingStatsArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
 };
-
 
 export type QuerySeasonPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -410,26 +412,21 @@ export type QuerySeasonPitchingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryTeamMembersArgs = {
   teamId: Scalars['Int']['input'];
 };
-
 
 export type QueryUserArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
 };
 
-
 export type QueryUserTeamIdArgs = {
   leagueId: Scalars['Int']['input'];
 };
-
 
 export type QueryUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -437,6 +434,78 @@ export type QueryUsersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type ScoringConfig = {
+  __typename?: 'ScoringConfig';
+  definitions?: Maybe<Array<ScoringStatDefinition>>;
+  entries?: Maybe<Array<ScoringConfigEntry>>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  multiplierGroups?: Maybe<Array<ScoringRuleGroup>>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  profileName?: Maybe<Scalars['String']['output']>;
+  stats?: Maybe<Array<ScoringRule>>;
+};
+
+export type ScoringConfigEntry = {
+  __typename?: 'ScoringConfigEntry';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  multiplier?: Maybe<Scalars['Float']['output']>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  statDefinitionId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringMultiplierEntry = {
+  __typename?: 'ScoringMultiplierEntry';
+  multiplier?: Maybe<Scalars['Float']['output']>;
+  sourceColumn?: Maybe<Scalars['String']['output']>;
+  statKey?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringRule = {
+  __typename?: 'ScoringRule';
+  defaultMultiplier?: Maybe<Scalars['Float']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  isOverride?: Maybe<Scalars['Boolean']['output']>;
+  multiplier?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ScoringRuleGroup = {
+  __typename?: 'ScoringRuleGroup';
+  group?: Maybe<ScoringStatGroup>;
+  values?: Maybe<Array<ScoringMultiplierEntry>>;
+};
+
+export type ScoringStatDefinition = {
+  __typename?: 'ScoringStatDefinition';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  defaultMultiplier?: Maybe<Scalars['Float']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  displayName?: Maybe<Scalars['String']['output']>;
+  enforceNegative?: Maybe<Scalars['Boolean']['output']>;
+  enforcePositive?: Maybe<Scalars['Boolean']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isRequired?: Maybe<Scalars['Boolean']['output']>;
+  maxMultiplier?: Maybe<Scalars['Float']['output']>;
+  minMultiplier?: Maybe<Scalars['Float']['output']>;
+  sourceColumn?: Maybe<Scalars['String']['output']>;
+  sourceTable?: Maybe<Scalars['String']['output']>;
+  statGroup?: Maybe<ScoringStatGroup>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  stepSize?: Maybe<Scalars['Float']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Grouping for fantasy scoring statistics */
+export enum ScoringStatGroup {
+  Batting = 'batting',
+  Fielding = 'fielding',
+  Pitching = 'pitching',
+}
 
 export type SeasonBatting = {
   __typename?: 'SeasonBatting';
@@ -561,6 +630,12 @@ export type TeamMember = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type UpdateLeagueScoringMultiplierInput = {
+  isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  multiplier?: InputMaybe<Scalars['Float']['input']>;
+  statDefinitionId: Scalars['Int']['input'];
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
@@ -582,176 +657,514 @@ export type VersionInfo = {
   version?: Maybe<Scalars['String']['output']>;
 };
 
-export type LeagueFragment = { __typename?: 'League', id?: number | null, name?: string | null, owner?: number | null, maxRosterSize?: number | null, currentMatchup?: number | null, draftStatus?: string | null, inviteCode?: string | null, userMembership?: { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null } | null };
+export type LeagueFragment = {
+  __typename?: 'League';
+  id?: number | null;
+  name?: string | null;
+  owner?: number | null;
+  maxRosterSize?: number | null;
+  currentMatchup?: number | null;
+  draftStatus?: string | null;
+  inviteCode?: string | null;
+  userMembership?: {
+    __typename?: 'LeagueMember';
+    leagueId?: number | null;
+    userId?: number | null;
+    teamId?: number | null;
+    permissionLevel?: string | null;
+  } | null;
+};
 
-export type LeagueMemberFragment = { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null };
+export type LeagueMemberFragment = {
+  __typename?: 'LeagueMember';
+  leagueId?: number | null;
+  userId?: number | null;
+  teamId?: number | null;
+  permissionLevel?: string | null;
+};
 
-export type LeaguePositionFragment = { __typename?: 'LeaguePosition', id?: number | null, leagueId?: number | null, positionType?: string | null };
+export type LeaguePositionFragment = {
+  __typename?: 'LeaguePosition';
+  id?: number | null;
+  leagueId?: number | null;
+  positionType?: string | null;
+};
 
 export type GetLeagueByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
 
-
-export type GetLeagueByIdQuery = { __typename?: 'Query', league?: { __typename?: 'League', id?: number | null, name?: string | null, owner?: number | null, maxRosterSize?: number | null, currentMatchup?: number | null, draftStatus?: string | null, inviteCode?: string | null, userMembership?: { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null } | null } | null };
+export type GetLeagueByIdQuery = {
+  __typename?: 'Query';
+  league?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    draftStatus?: string | null;
+    inviteCode?: string | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+    } | null;
+  } | null;
+};
 
 export type CreateLeagueAndTeamsMutationVariables = Exact<{
   input: CreateLeagueAndTeamsInput;
 }>;
 
+export type CreateLeagueAndTeamsMutation = {
+  __typename?: 'Mutation';
+  createLeagueAndTeams?: {
+    __typename?: 'CreateLeagueAndTeamsPayload';
+    league?: {
+      __typename?: 'League';
+      id?: number | null;
+      name?: string | null;
+      owner?: number | null;
+      maxRosterSize?: number | null;
+      currentMatchup?: number | null;
+      draftStatus?: string | null;
+      inviteCode?: string | null;
+      userMembership?: {
+        __typename?: 'LeagueMember';
+        leagueId?: number | null;
+        userId?: number | null;
+        teamId?: number | null;
+        permissionLevel?: string | null;
+      } | null;
+    } | null;
+  } | null;
+};
 
-export type CreateLeagueAndTeamsMutation = { __typename?: 'Mutation', createLeagueAndTeams?: { __typename?: 'CreateLeagueAndTeamsPayload', league?: { __typename?: 'League', id?: number | null, name?: string | null, owner?: number | null, maxRosterSize?: number | null, currentMatchup?: number | null, draftStatus?: string | null, inviteCode?: string | null, userMembership?: { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null } | null } | null } | null };
+export type GetUserLeaguesQueryVariables = Exact<{ [key: string]: never }>;
 
-export type GetUserLeaguesQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetUserLeaguesQuery = { __typename?: 'Query', userLeagues: Array<{ __typename?: 'League', id?: number | null, name?: string | null, owner?: number | null, maxRosterSize?: number | null, currentMatchup?: number | null, draftStatus?: string | null, inviteCode?: string | null, userMembership?: { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null } | null }> };
+export type GetUserLeaguesQuery = {
+  __typename?: 'Query';
+  userLeagues: Array<{
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    draftStatus?: string | null;
+    inviteCode?: string | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+    } | null;
+  }>;
+};
 
 export type GetPositionsForLeagueQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
 
+export type GetPositionsForLeagueQuery = {
+  __typename?: 'Query';
+  leaguePositions?: Array<{
+    __typename?: 'LeaguePosition';
+    id?: number | null;
+    leagueId?: number | null;
+    positionType?: string | null;
+  }> | null;
+};
 
-export type GetPositionsForLeagueQuery = { __typename?: 'Query', leaguePositions?: Array<{ __typename?: 'LeaguePosition', id?: number | null, leagueId?: number | null, positionType?: string | null }> | null };
+export type DeleteAllLeaguesMutationVariables = Exact<{ [key: string]: never }>;
 
-export type DeleteAllLeaguesMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type DeleteAllLeaguesMutation = { __typename?: 'Mutation', deleteAllLeagues?: string | null };
+export type DeleteAllLeaguesMutation = {
+  __typename?: 'Mutation';
+  deleteAllLeagues?: string | null;
+};
 
 export type StartDraftMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   draftType?: InputMaybe<Scalars['String']['input']>;
 }>;
 
-
-export type StartDraftMutation = { __typename?: 'Mutation', startDraft?: { __typename?: 'League', id?: number | null, name?: string | null, owner?: number | null, maxRosterSize?: number | null, currentMatchup?: number | null, draftStatus?: string | null, inviteCode?: string | null, userMembership?: { __typename?: 'LeagueMember', leagueId?: number | null, userId?: number | null, teamId?: number | null, permissionLevel?: string | null } | null } | null };
+export type StartDraftMutation = {
+  __typename?: 'Mutation';
+  startDraft?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    draftStatus?: string | null;
+    inviteCode?: string | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+    } | null;
+  } | null;
+};
 
 export type JoinLeagueByCodeMutationVariables = Exact<{
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
 }>;
 
-
-export type JoinLeagueByCodeMutation = { __typename?: 'Mutation', joinLeagueByCode?: { __typename?: 'Team', id?: number | null, name?: string | null, leagueId?: number | null } | null };
+export type JoinLeagueByCodeMutation = {
+  __typename?: 'Mutation';
+  joinLeagueByCode?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+  } | null;
+};
 
 export type GetLeagueTeamsQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
 
-
-export type GetLeagueTeamsQuery = { __typename?: 'Query', leagueTeams?: Array<{ __typename?: 'Team', id?: number | null, name?: string | null, leagueId?: number | null }> | null };
+export type GetLeagueTeamsQuery = {
+  __typename?: 'Query';
+  leagueTeams?: Array<{
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+  }> | null;
+};
 
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
 
+export type GetUserTeamIdQuery = {
+  __typename?: 'Query';
+  userTeamId?: number | null;
+};
 
-export type GetUserTeamIdQuery = { __typename?: 'Query', userTeamId?: number | null };
+export type MatchupFragment = {
+  __typename?: 'Matchup';
+  id?: string | null;
+  weekNumber?: number | null;
+  leagueId?: number | null;
+  numberOfGames?: number | null;
+};
 
-export type MatchupFragment = { __typename?: 'Matchup', id?: string | null, weekNumber?: number | null, leagueId?: number | null, numberOfGames?: number | null };
+export type GetLeagueScoringProfileQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
 
-export type TeamFragment = { __typename?: 'Team', id?: number | null, leagueId?: number | null, name?: string | null };
+export type GetLeagueScoringProfileQuery = {
+  __typename?: 'Query';
+  leagueScoringProfile?: {
+    __typename?: 'ScoringConfig';
+    profileId?: number | null;
+    profileName?: string | null;
+    stats?: Array<{
+      __typename?: 'ScoringRule';
+      multiplier?: number | null;
+      defaultMultiplier?: number | null;
+      isOverride?: boolean | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        description?: string | null;
+        sourceColumn?: string | null;
+        defaultMultiplier?: number | null;
+        minMultiplier?: number | null;
+        maxMultiplier?: number | null;
+        stepSize?: number | null;
+        isRequired?: boolean | null;
+        enforcePositive?: boolean | null;
+        enforceNegative?: boolean | null;
+      } | null;
+    }> | null;
+    multiplierGroups?: Array<{
+      __typename?: 'ScoringRuleGroup';
+      group?: ScoringStatGroup | null;
+      values?: Array<{
+        __typename?: 'ScoringMultiplierEntry';
+        statKey?: string | null;
+        sourceColumn?: string | null;
+        multiplier?: number | null;
+      }> | null;
+    }> | null;
+  } | null;
+};
 
-export type TeamMemberFragment = { __typename?: 'TeamMember', id?: number | null, playerId?: number | null, positionId?: number | null, teamId?: number | null, leagueId?: number | null, player?: { __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null } | null };
+export type GetDefaultScoringProfileQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetDefaultScoringProfileQuery = {
+  __typename?: 'Query';
+  defaultScoringProfile?: {
+    __typename?: 'ScoringConfig';
+    profileName?: string | null;
+    stats?: Array<{
+      __typename?: 'ScoringRule';
+      multiplier?: number | null;
+      defaultMultiplier?: number | null;
+      isOverride?: boolean | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        description?: string | null;
+        sourceColumn?: string | null;
+        defaultMultiplier?: number | null;
+        minMultiplier?: number | null;
+        maxMultiplier?: number | null;
+        stepSize?: number | null;
+        isRequired?: boolean | null;
+        enforcePositive?: boolean | null;
+        enforceNegative?: boolean | null;
+      } | null;
+    }> | null;
+    multiplierGroups?: Array<{
+      __typename?: 'ScoringRuleGroup';
+      group?: ScoringStatGroup | null;
+      values?: Array<{
+        __typename?: 'ScoringMultiplierEntry';
+        statKey?: string | null;
+        sourceColumn?: string | null;
+        multiplier?: number | null;
+      }> | null;
+    }> | null;
+  } | null;
+};
+
+export type UpdateLeagueScoringProfileMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  updates:
+    | Array<UpdateLeagueScoringMultiplierInput>
+    | UpdateLeagueScoringMultiplierInput;
+}>;
+
+export type UpdateLeagueScoringProfileMutation = {
+  __typename?: 'Mutation';
+  updateLeagueScoringProfile?: {
+    __typename?: 'ScoringConfig';
+    profileId?: number | null;
+    profileName?: string | null;
+    stats?: Array<{
+      __typename?: 'ScoringRule';
+      multiplier?: number | null;
+      defaultMultiplier?: number | null;
+      isOverride?: boolean | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        description?: string | null;
+        sourceColumn?: string | null;
+        defaultMultiplier?: number | null;
+        minMultiplier?: number | null;
+        maxMultiplier?: number | null;
+        stepSize?: number | null;
+        isRequired?: boolean | null;
+        enforcePositive?: boolean | null;
+        enforceNegative?: boolean | null;
+      } | null;
+    }> | null;
+    multiplierGroups?: Array<{
+      __typename?: 'ScoringRuleGroup';
+      group?: ScoringStatGroup | null;
+      values?: Array<{
+        __typename?: 'ScoringMultiplierEntry';
+        statKey?: string | null;
+        sourceColumn?: string | null;
+        multiplier?: number | null;
+      }> | null;
+    }> | null;
+  } | null;
+};
+
+export type TeamFragment = {
+  __typename?: 'Team';
+  id?: number | null;
+  leagueId?: number | null;
+  name?: string | null;
+};
+
+export type TeamMemberFragment = {
+  __typename?: 'TeamMember';
+  id?: number | null;
+  playerId?: number | null;
+  positionId?: number | null;
+  teamId?: number | null;
+  leagueId?: number | null;
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+  } | null;
+};
 
 export type GetTeamMembersQueryVariables = Exact<{
   teamId: Scalars['Int']['input'];
 }>;
 
-
-export type GetTeamMembersQuery = { __typename?: 'Query', teamMembers?: Array<{ __typename?: 'TeamMember', id?: number | null, playerId?: number | null, positionId?: number | null, teamId?: number | null, leagueId?: number | null, player?: { __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null } | null }> | null };
+export type GetTeamMembersQuery = {
+  __typename?: 'Query';
+  teamMembers?: Array<{
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+    } | null;
+  }> | null;
+};
 
 export type UpdateTeamMemberPositionMutationVariables = Exact<{
   teamMemberId: Scalars['Int']['input'];
   positionId?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
+export type UpdateTeamMemberPositionMutation = {
+  __typename?: 'Mutation';
+  updateTeamMemberPosition?: {
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+    } | null;
+  } | null;
+};
 
-export type UpdateTeamMemberPositionMutation = { __typename?: 'Mutation', updateTeamMemberPosition?: { __typename?: 'TeamMember', id?: number | null, playerId?: number | null, positionId?: number | null, teamId?: number | null, leagueId?: number | null, player?: { __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null } | null } | null };
-
-export type UserFragment = { __typename?: 'User', id?: number | null, email?: string | null, username?: string | null };
+export type UserFragment = {
+  __typename?: 'User';
+  id?: number | null;
+  email?: string | null;
+  username?: string | null;
+};
 
 export type GetUserByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
 
-
-export type GetUserByIdQuery = { __typename?: 'Query', user?: { __typename?: 'User', id?: number | null, email?: string | null, username?: string | null } | null };
+export type GetUserByIdQuery = {
+  __typename?: 'Query';
+  user?: {
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+  } | null;
+};
 
 export const LeagueMemberFragmentDoc = gql`
-    fragment LeagueMember on LeagueMember {
-  leagueId
-  userId
-  teamId
-  permissionLevel
-}
-    `;
+  fragment LeagueMember on LeagueMember {
+    leagueId
+    userId
+    teamId
+    permissionLevel
+  }
+`;
 export const LeagueFragmentDoc = gql`
-    fragment League on League {
-  id
-  name
-  owner
-  maxRosterSize
-  currentMatchup
-  draftStatus
-  inviteCode
-  userMembership {
-    ...LeagueMember
-  }
-}
-    ${LeagueMemberFragmentDoc}`;
-export const LeaguePositionFragmentDoc = gql`
-    fragment LeaguePosition on LeaguePosition {
-  id
-  leagueId
-  positionType
-}
-    `;
-export const MatchupFragmentDoc = gql`
-    fragment Matchup on Matchup {
-  id
-  weekNumber
-  leagueId
-  numberOfGames
-}
-    `;
-export const TeamFragmentDoc = gql`
-    fragment Team on Team {
-  id
-  leagueId
-  name
-}
-    `;
-export const TeamMemberFragmentDoc = gql`
-    fragment TeamMember on TeamMember {
-  id
-  playerId
-  positionId
-  teamId
-  leagueId
-  player {
+  fragment League on League {
     id
-    firstName
-    lastName
-    brefId
+    name
+    owner
+    maxRosterSize
+    currentMatchup
+    draftStatus
+    inviteCode
+    userMembership {
+      ...LeagueMember
+    }
   }
-}
-    `;
+  ${LeagueMemberFragmentDoc}
+`;
+export const LeaguePositionFragmentDoc = gql`
+  fragment LeaguePosition on LeaguePosition {
+    id
+    leagueId
+    positionType
+  }
+`;
+export const MatchupFragmentDoc = gql`
+  fragment Matchup on Matchup {
+    id
+    weekNumber
+    leagueId
+    numberOfGames
+  }
+`;
+export const TeamFragmentDoc = gql`
+  fragment Team on Team {
+    id
+    leagueId
+    name
+  }
+`;
+export const TeamMemberFragmentDoc = gql`
+  fragment TeamMember on TeamMember {
+    id
+    playerId
+    positionId
+    teamId
+    leagueId
+    player {
+      id
+      firstName
+      lastName
+      brefId
+    }
+  }
+`;
 export const UserFragmentDoc = gql`
-    fragment User on User {
-  id
-  email
-  username
-}
-    `;
-export const GetLeagueById = gql`
-    query GetLeagueById($id: Int!) {
-  league(id: $id) {
-    ...League
+  fragment User on User {
+    id
+    email
+    username
   }
-}
-    ${LeagueFragmentDoc}`;
+`;
+export const GetLeagueById = gql`
+  query GetLeagueById($id: Int!) {
+    league(id: $id) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
 
 /**
  * __useGetLeagueByIdQuery__
@@ -769,32 +1182,78 @@ export const GetLeagueById = gql`
  *   },
  * });
  */
-export function useGetLeagueByIdQuery(baseOptions: Apollo.QueryHookOptions<GetLeagueByIdQuery, GetLeagueByIdQueryVariables> & ({ variables: GetLeagueByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>(GetLeagueById, options);
-      }
-export function useGetLeagueByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>(GetLeagueById, options);
-        }
-export function useGetLeagueByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>(GetLeagueById, options);
-        }
-export type GetLeagueByIdQueryHookResult = ReturnType<typeof useGetLeagueByIdQuery>;
-export type GetLeagueByIdLazyQueryHookResult = ReturnType<typeof useGetLeagueByIdLazyQuery>;
-export type GetLeagueByIdSuspenseQueryHookResult = ReturnType<typeof useGetLeagueByIdSuspenseQuery>;
-export type GetLeagueByIdQueryResult = Apollo.QueryResult<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>;
+export function useGetLeagueByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueByIdQuery,
+    GetLeagueByIdQueryVariables
+  > &
+    (
+      | { variables: GetLeagueByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>(
+    GetLeagueById,
+    options,
+  );
+}
+export function useGetLeagueByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueByIdQuery,
+    GetLeagueByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetLeagueByIdQuery, GetLeagueByIdQueryVariables>(
+    GetLeagueById,
+    options,
+  );
+}
+export function useGetLeagueByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueByIdQuery,
+        GetLeagueByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueByIdQuery,
+    GetLeagueByIdQueryVariables
+  >(GetLeagueById, options);
+}
+export type GetLeagueByIdQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdQuery
+>;
+export type GetLeagueByIdLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdLazyQuery
+>;
+export type GetLeagueByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueByIdSuspenseQuery
+>;
+export type GetLeagueByIdQueryResult = Apollo.QueryResult<
+  GetLeagueByIdQuery,
+  GetLeagueByIdQueryVariables
+>;
 export const CreateLeagueAndTeams = gql`
-    mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
-  createLeagueAndTeams(input: $input) {
-    league {
-      ...League
+  mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
+    createLeagueAndTeams(input: $input) {
+      league {
+        ...League
+      }
     }
   }
-}
-    ${LeagueFragmentDoc}`;
-export type CreateLeagueAndTeamsMutationFn = Apollo.MutationFunction<CreateLeagueAndTeamsMutation, CreateLeagueAndTeamsMutationVariables>;
+  ${LeagueFragmentDoc}
+`;
+export type CreateLeagueAndTeamsMutationFn = Apollo.MutationFunction<
+  CreateLeagueAndTeamsMutation,
+  CreateLeagueAndTeamsMutationVariables
+>;
 
 /**
  * __useCreateLeagueAndTeamsMutation__
@@ -813,20 +1272,35 @@ export type CreateLeagueAndTeamsMutationFn = Apollo.MutationFunction<CreateLeagu
  *   },
  * });
  */
-export function useCreateLeagueAndTeamsMutation(baseOptions?: Apollo.MutationHookOptions<CreateLeagueAndTeamsMutation, CreateLeagueAndTeamsMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<CreateLeagueAndTeamsMutation, CreateLeagueAndTeamsMutationVariables>(CreateLeagueAndTeams, options);
-      }
-export type CreateLeagueAndTeamsMutationHookResult = ReturnType<typeof useCreateLeagueAndTeamsMutation>;
-export type CreateLeagueAndTeamsMutationResult = Apollo.MutationResult<CreateLeagueAndTeamsMutation>;
-export type CreateLeagueAndTeamsMutationOptions = Apollo.BaseMutationOptions<CreateLeagueAndTeamsMutation, CreateLeagueAndTeamsMutationVariables>;
-export const GetUserLeagues = gql`
-    query GetUserLeagues {
-  userLeagues {
-    ...League
-  }
+export function useCreateLeagueAndTeamsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateLeagueAndTeamsMutation,
+    CreateLeagueAndTeamsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateLeagueAndTeamsMutation,
+    CreateLeagueAndTeamsMutationVariables
+  >(CreateLeagueAndTeams, options);
 }
-    ${LeagueFragmentDoc}`;
+export type CreateLeagueAndTeamsMutationHookResult = ReturnType<
+  typeof useCreateLeagueAndTeamsMutation
+>;
+export type CreateLeagueAndTeamsMutationResult =
+  Apollo.MutationResult<CreateLeagueAndTeamsMutation>;
+export type CreateLeagueAndTeamsMutationOptions = Apollo.BaseMutationOptions<
+  CreateLeagueAndTeamsMutation,
+  CreateLeagueAndTeamsMutationVariables
+>;
+export const GetUserLeagues = gql`
+  query GetUserLeagues {
+    userLeagues {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
 
 /**
  * __useGetUserLeaguesQuery__
@@ -843,29 +1317,68 @@ export const GetUserLeagues = gql`
  *   },
  * });
  */
-export function useGetUserLeaguesQuery(baseOptions?: Apollo.QueryHookOptions<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>(GetUserLeagues, options);
-      }
-export function useGetUserLeaguesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>(GetUserLeagues, options);
-        }
-export function useGetUserLeaguesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>(GetUserLeagues, options);
-        }
-export type GetUserLeaguesQueryHookResult = ReturnType<typeof useGetUserLeaguesQuery>;
-export type GetUserLeaguesLazyQueryHookResult = ReturnType<typeof useGetUserLeaguesLazyQuery>;
-export type GetUserLeaguesSuspenseQueryHookResult = ReturnType<typeof useGetUserLeaguesSuspenseQuery>;
-export type GetUserLeaguesQueryResult = Apollo.QueryResult<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>;
-export const GetPositionsForLeague = gql`
-    query GetPositionsForLeague($leagueId: Int!) {
-  leaguePositions(leagueId: $leagueId) {
-    ...LeaguePosition
-  }
+export function useGetUserLeaguesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetUserLeaguesQuery,
+    GetUserLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>(
+    GetUserLeagues,
+    options,
+  );
 }
-    ${LeaguePositionFragmentDoc}`;
+export function useGetUserLeaguesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserLeaguesQuery,
+    GetUserLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetUserLeaguesQuery, GetUserLeaguesQueryVariables>(
+    GetUserLeagues,
+    options,
+  );
+}
+export function useGetUserLeaguesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserLeaguesQuery,
+        GetUserLeaguesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUserLeaguesQuery,
+    GetUserLeaguesQueryVariables
+  >(GetUserLeagues, options);
+}
+export type GetUserLeaguesQueryHookResult = ReturnType<
+  typeof useGetUserLeaguesQuery
+>;
+export type GetUserLeaguesLazyQueryHookResult = ReturnType<
+  typeof useGetUserLeaguesLazyQuery
+>;
+export type GetUserLeaguesSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserLeaguesSuspenseQuery
+>;
+export type GetUserLeaguesQueryResult = Apollo.QueryResult<
+  GetUserLeaguesQuery,
+  GetUserLeaguesQueryVariables
+>;
+export const GetPositionsForLeague = gql`
+  query GetPositionsForLeague($leagueId: Int!) {
+    leaguePositions(leagueId: $leagueId) {
+      ...LeaguePosition
+    }
+  }
+  ${LeaguePositionFragmentDoc}
+`;
 
 /**
  * __useGetPositionsForLeagueQuery__
@@ -883,28 +1396,73 @@ export const GetPositionsForLeague = gql`
  *   },
  * });
  */
-export function useGetPositionsForLeagueQuery(baseOptions: Apollo.QueryHookOptions<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables> & ({ variables: GetPositionsForLeagueQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>(GetPositionsForLeague, options);
-      }
-export function useGetPositionsForLeagueLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>(GetPositionsForLeague, options);
-        }
-export function useGetPositionsForLeagueSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>(GetPositionsForLeague, options);
-        }
-export type GetPositionsForLeagueQueryHookResult = ReturnType<typeof useGetPositionsForLeagueQuery>;
-export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<typeof useGetPositionsForLeagueLazyQuery>;
-export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<typeof useGetPositionsForLeagueSuspenseQuery>;
-export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<GetPositionsForLeagueQuery, GetPositionsForLeagueQueryVariables>;
-export const DeleteAllLeagues = gql`
-    mutation DeleteAllLeagues {
-  deleteAllLeagues
+export function useGetPositionsForLeagueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  > &
+    (
+      | { variables: GetPositionsForLeagueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GetPositionsForLeague, options);
 }
-    `;
-export type DeleteAllLeaguesMutationFn = Apollo.MutationFunction<DeleteAllLeaguesMutation, DeleteAllLeaguesMutationVariables>;
+export function useGetPositionsForLeagueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GetPositionsForLeague, options);
+}
+export function useGetPositionsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPositionsForLeagueQuery,
+        GetPositionsForLeagueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GetPositionsForLeague, options);
+}
+export type GetPositionsForLeagueQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueQuery
+>;
+export type GetPositionsForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueLazyQuery
+>;
+export type GetPositionsForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetPositionsForLeagueSuspenseQuery
+>;
+export type GetPositionsForLeagueQueryResult = Apollo.QueryResult<
+  GetPositionsForLeagueQuery,
+  GetPositionsForLeagueQueryVariables
+>;
+export const DeleteAllLeagues = gql`
+  mutation DeleteAllLeagues {
+    deleteAllLeagues
+  }
+`;
+export type DeleteAllLeaguesMutationFn = Apollo.MutationFunction<
+  DeleteAllLeaguesMutation,
+  DeleteAllLeaguesMutationVariables
+>;
 
 /**
  * __useDeleteAllLeaguesMutation__
@@ -922,21 +1480,39 @@ export type DeleteAllLeaguesMutationFn = Apollo.MutationFunction<DeleteAllLeague
  *   },
  * });
  */
-export function useDeleteAllLeaguesMutation(baseOptions?: Apollo.MutationHookOptions<DeleteAllLeaguesMutation, DeleteAllLeaguesMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<DeleteAllLeaguesMutation, DeleteAllLeaguesMutationVariables>(DeleteAllLeagues, options);
-      }
-export type DeleteAllLeaguesMutationHookResult = ReturnType<typeof useDeleteAllLeaguesMutation>;
-export type DeleteAllLeaguesMutationResult = Apollo.MutationResult<DeleteAllLeaguesMutation>;
-export type DeleteAllLeaguesMutationOptions = Apollo.BaseMutationOptions<DeleteAllLeaguesMutation, DeleteAllLeaguesMutationVariables>;
-export const StartDraft = gql`
-    mutation StartDraft($leagueId: Int!, $draftType: String) {
-  startDraft(leagueId: $leagueId, draftType: $draftType) {
-    ...League
-  }
+export function useDeleteAllLeaguesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteAllLeaguesMutation,
+    DeleteAllLeaguesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteAllLeaguesMutation,
+    DeleteAllLeaguesMutationVariables
+  >(DeleteAllLeagues, options);
 }
-    ${LeagueFragmentDoc}`;
-export type StartDraftMutationFn = Apollo.MutationFunction<StartDraftMutation, StartDraftMutationVariables>;
+export type DeleteAllLeaguesMutationHookResult = ReturnType<
+  typeof useDeleteAllLeaguesMutation
+>;
+export type DeleteAllLeaguesMutationResult =
+  Apollo.MutationResult<DeleteAllLeaguesMutation>;
+export type DeleteAllLeaguesMutationOptions = Apollo.BaseMutationOptions<
+  DeleteAllLeaguesMutation,
+  DeleteAllLeaguesMutationVariables
+>;
+export const StartDraft = gql`
+  mutation StartDraft($leagueId: Int!, $draftType: String) {
+    startDraft(leagueId: $leagueId, draftType: $draftType) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type StartDraftMutationFn = Apollo.MutationFunction<
+  StartDraftMutation,
+  StartDraftMutationVariables
+>;
 
 /**
  * __useStartDraftMutation__
@@ -956,23 +1532,40 @@ export type StartDraftMutationFn = Apollo.MutationFunction<StartDraftMutation, S
  *   },
  * });
  */
-export function useStartDraftMutation(baseOptions?: Apollo.MutationHookOptions<StartDraftMutation, StartDraftMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<StartDraftMutation, StartDraftMutationVariables>(StartDraft, options);
-      }
-export type StartDraftMutationHookResult = ReturnType<typeof useStartDraftMutation>;
-export type StartDraftMutationResult = Apollo.MutationResult<StartDraftMutation>;
-export type StartDraftMutationOptions = Apollo.BaseMutationOptions<StartDraftMutation, StartDraftMutationVariables>;
-export const JoinLeagueByCode = gql`
-    mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
-  joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
-    id
-    name
-    leagueId
-  }
+export function useStartDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    StartDraftMutation,
+    StartDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<StartDraftMutation, StartDraftMutationVariables>(
+    StartDraft,
+    options,
+  );
 }
-    `;
-export type JoinLeagueByCodeMutationFn = Apollo.MutationFunction<JoinLeagueByCodeMutation, JoinLeagueByCodeMutationVariables>;
+export type StartDraftMutationHookResult = ReturnType<
+  typeof useStartDraftMutation
+>;
+export type StartDraftMutationResult =
+  Apollo.MutationResult<StartDraftMutation>;
+export type StartDraftMutationOptions = Apollo.BaseMutationOptions<
+  StartDraftMutation,
+  StartDraftMutationVariables
+>;
+export const JoinLeagueByCode = gql`
+  mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
+    joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
+      id
+      name
+      leagueId
+    }
+  }
+`;
+export type JoinLeagueByCodeMutationFn = Apollo.MutationFunction<
+  JoinLeagueByCodeMutation,
+  JoinLeagueByCodeMutationVariables
+>;
 
 /**
  * __useJoinLeagueByCodeMutation__
@@ -992,22 +1585,36 @@ export type JoinLeagueByCodeMutationFn = Apollo.MutationFunction<JoinLeagueByCod
  *   },
  * });
  */
-export function useJoinLeagueByCodeMutation(baseOptions?: Apollo.MutationHookOptions<JoinLeagueByCodeMutation, JoinLeagueByCodeMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<JoinLeagueByCodeMutation, JoinLeagueByCodeMutationVariables>(JoinLeagueByCode, options);
-      }
-export type JoinLeagueByCodeMutationHookResult = ReturnType<typeof useJoinLeagueByCodeMutation>;
-export type JoinLeagueByCodeMutationResult = Apollo.MutationResult<JoinLeagueByCodeMutation>;
-export type JoinLeagueByCodeMutationOptions = Apollo.BaseMutationOptions<JoinLeagueByCodeMutation, JoinLeagueByCodeMutationVariables>;
-export const GetLeagueTeams = gql`
-    query GetLeagueTeams($leagueId: Int!) {
-  leagueTeams(leagueId: $leagueId) {
-    id
-    name
-    leagueId
-  }
+export function useJoinLeagueByCodeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    JoinLeagueByCodeMutation,
+    JoinLeagueByCodeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    JoinLeagueByCodeMutation,
+    JoinLeagueByCodeMutationVariables
+  >(JoinLeagueByCode, options);
 }
-    `;
+export type JoinLeagueByCodeMutationHookResult = ReturnType<
+  typeof useJoinLeagueByCodeMutation
+>;
+export type JoinLeagueByCodeMutationResult =
+  Apollo.MutationResult<JoinLeagueByCodeMutation>;
+export type JoinLeagueByCodeMutationOptions = Apollo.BaseMutationOptions<
+  JoinLeagueByCodeMutation,
+  JoinLeagueByCodeMutationVariables
+>;
+export const GetLeagueTeams = gql`
+  query GetLeagueTeams($leagueId: Int!) {
+    leagueTeams(leagueId: $leagueId) {
+      id
+      name
+      leagueId
+    }
+  }
+`;
 
 /**
  * __useGetLeagueTeamsQuery__
@@ -1025,27 +1632,69 @@ export const GetLeagueTeams = gql`
  *   },
  * });
  */
-export function useGetLeagueTeamsQuery(baseOptions: Apollo.QueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables> & ({ variables: GetLeagueTeamsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
-      }
-export function useGetLeagueTeamsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
-        }
-export function useGetLeagueTeamsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(GetLeagueTeams, options);
-        }
-export type GetLeagueTeamsQueryHookResult = ReturnType<typeof useGetLeagueTeamsQuery>;
-export type GetLeagueTeamsLazyQueryHookResult = ReturnType<typeof useGetLeagueTeamsLazyQuery>;
-export type GetLeagueTeamsSuspenseQueryHookResult = ReturnType<typeof useGetLeagueTeamsSuspenseQuery>;
-export type GetLeagueTeamsQueryResult = Apollo.QueryResult<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>;
-export const GetUserTeamId = gql`
-    query GetUserTeamId($leagueId: Int!) {
-  userTeamId(leagueId: $leagueId)
+export function useGetLeagueTeamsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueTeamsQuery,
+    GetLeagueTeamsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueTeamsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(
+    GetLeagueTeams,
+    options,
+  );
 }
-    `;
+export function useGetLeagueTeamsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueTeamsQuery,
+    GetLeagueTeamsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetLeagueTeamsQuery, GetLeagueTeamsQueryVariables>(
+    GetLeagueTeams,
+    options,
+  );
+}
+export function useGetLeagueTeamsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueTeamsQuery,
+        GetLeagueTeamsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueTeamsQuery,
+    GetLeagueTeamsQueryVariables
+  >(GetLeagueTeams, options);
+}
+export type GetLeagueTeamsQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsQuery
+>;
+export type GetLeagueTeamsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsLazyQuery
+>;
+export type GetLeagueTeamsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueTeamsSuspenseQuery
+>;
+export type GetLeagueTeamsQueryResult = Apollo.QueryResult<
+  GetLeagueTeamsQuery,
+  GetLeagueTeamsQueryVariables
+>;
+export const GetUserTeamId = gql`
+  query GetUserTeamId($leagueId: Int!) {
+    userTeamId(leagueId: $leagueId)
+  }
+`;
 
 /**
  * __useGetUserTeamIdQuery__
@@ -1063,29 +1712,375 @@ export const GetUserTeamId = gql`
  *   },
  * });
  */
-export function useGetUserTeamIdQuery(baseOptions: Apollo.QueryHookOptions<GetUserTeamIdQuery, GetUserTeamIdQueryVariables> & ({ variables: GetUserTeamIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>(GetUserTeamId, options);
-      }
-export function useGetUserTeamIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>(GetUserTeamId, options);
-        }
-export function useGetUserTeamIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>(GetUserTeamId, options);
-        }
-export type GetUserTeamIdQueryHookResult = ReturnType<typeof useGetUserTeamIdQuery>;
-export type GetUserTeamIdLazyQueryHookResult = ReturnType<typeof useGetUserTeamIdLazyQuery>;
-export type GetUserTeamIdSuspenseQueryHookResult = ReturnType<typeof useGetUserTeamIdSuspenseQuery>;
-export type GetUserTeamIdQueryResult = Apollo.QueryResult<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>;
-export const GetTeamMembers = gql`
-    query GetTeamMembers($teamId: Int!) {
-  teamMembers(teamId: $teamId) {
-    ...TeamMember
-  }
+export function useGetUserTeamIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetUserTeamIdQuery,
+    GetUserTeamIdQueryVariables
+  > &
+    (
+      | { variables: GetUserTeamIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>(
+    GetUserTeamId,
+    options,
+  );
 }
-    ${TeamMemberFragmentDoc}`;
+export function useGetUserTeamIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserTeamIdQuery,
+    GetUserTeamIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetUserTeamIdQuery, GetUserTeamIdQueryVariables>(
+    GetUserTeamId,
+    options,
+  );
+}
+export function useGetUserTeamIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserTeamIdQuery,
+        GetUserTeamIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUserTeamIdQuery,
+    GetUserTeamIdQueryVariables
+  >(GetUserTeamId, options);
+}
+export type GetUserTeamIdQueryHookResult = ReturnType<
+  typeof useGetUserTeamIdQuery
+>;
+export type GetUserTeamIdLazyQueryHookResult = ReturnType<
+  typeof useGetUserTeamIdLazyQuery
+>;
+export type GetUserTeamIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserTeamIdSuspenseQuery
+>;
+export type GetUserTeamIdQueryResult = Apollo.QueryResult<
+  GetUserTeamIdQuery,
+  GetUserTeamIdQueryVariables
+>;
+export const GetLeagueScoringProfile = gql`
+  query GetLeagueScoringProfile($leagueId: Int!) {
+    leagueScoringProfile(leagueId: $leagueId) {
+      profileId
+      profileName
+      stats {
+        multiplier
+        defaultMultiplier
+        isOverride
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          description
+          sourceColumn
+          defaultMultiplier
+          minMultiplier
+          maxMultiplier
+          stepSize
+          isRequired
+          enforcePositive
+          enforceNegative
+        }
+      }
+      multiplierGroups {
+        group
+        values {
+          statKey
+          sourceColumn
+          multiplier
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueScoringProfileQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueScoringProfileQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueScoringProfileQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueScoringProfileQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueScoringProfileQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  > &
+    (
+      | { variables: GetLeagueScoringProfileQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  >(GetLeagueScoringProfile, options);
+}
+export function useGetLeagueScoringProfileLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  >(GetLeagueScoringProfile, options);
+}
+export function useGetLeagueScoringProfileSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueScoringProfileQuery,
+        GetLeagueScoringProfileQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  >(GetLeagueScoringProfile, options);
+}
+export type GetLeagueScoringProfileQueryHookResult = ReturnType<
+  typeof useGetLeagueScoringProfileQuery
+>;
+export type GetLeagueScoringProfileLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueScoringProfileLazyQuery
+>;
+export type GetLeagueScoringProfileSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueScoringProfileSuspenseQuery
+>;
+export type GetLeagueScoringProfileQueryResult = Apollo.QueryResult<
+  GetLeagueScoringProfileQuery,
+  GetLeagueScoringProfileQueryVariables
+>;
+export const GetDefaultScoringProfile = gql`
+  query GetDefaultScoringProfile {
+    defaultScoringProfile {
+      profileName
+      stats {
+        multiplier
+        defaultMultiplier
+        isOverride
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          description
+          sourceColumn
+          defaultMultiplier
+          minMultiplier
+          maxMultiplier
+          stepSize
+          isRequired
+          enforcePositive
+          enforceNegative
+        }
+      }
+      multiplierGroups {
+        group
+        values {
+          statKey
+          sourceColumn
+          multiplier
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetDefaultScoringProfileQuery__
+ *
+ * To run a query within a React component, call `useGetDefaultScoringProfileQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDefaultScoringProfileQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDefaultScoringProfileQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetDefaultScoringProfileQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >(GetDefaultScoringProfile, options);
+}
+export function useGetDefaultScoringProfileLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >(GetDefaultScoringProfile, options);
+}
+export function useGetDefaultScoringProfileSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDefaultScoringProfileQuery,
+        GetDefaultScoringProfileQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >(GetDefaultScoringProfile, options);
+}
+export type GetDefaultScoringProfileQueryHookResult = ReturnType<
+  typeof useGetDefaultScoringProfileQuery
+>;
+export type GetDefaultScoringProfileLazyQueryHookResult = ReturnType<
+  typeof useGetDefaultScoringProfileLazyQuery
+>;
+export type GetDefaultScoringProfileSuspenseQueryHookResult = ReturnType<
+  typeof useGetDefaultScoringProfileSuspenseQuery
+>;
+export type GetDefaultScoringProfileQueryResult = Apollo.QueryResult<
+  GetDefaultScoringProfileQuery,
+  GetDefaultScoringProfileQueryVariables
+>;
+export const UpdateLeagueScoringProfile = gql`
+  mutation UpdateLeagueScoringProfile(
+    $leagueId: Int!
+    $updates: [UpdateLeagueScoringMultiplierInput!]!
+  ) {
+    updateLeagueScoringProfile(leagueId: $leagueId, updates: $updates) {
+      profileId
+      profileName
+      stats {
+        multiplier
+        defaultMultiplier
+        isOverride
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          description
+          sourceColumn
+          defaultMultiplier
+          minMultiplier
+          maxMultiplier
+          stepSize
+          isRequired
+          enforcePositive
+          enforceNegative
+        }
+      }
+      multiplierGroups {
+        group
+        values {
+          statKey
+          sourceColumn
+          multiplier
+        }
+      }
+    }
+  }
+`;
+export type UpdateLeagueScoringProfileMutationFn = Apollo.MutationFunction<
+  UpdateLeagueScoringProfileMutation,
+  UpdateLeagueScoringProfileMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueScoringProfileMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueScoringProfileMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueScoringProfileMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateLeagueScoringProfileMutation, { data, loading, error }] = useUpdateLeagueScoringProfileMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      updates: // value for 'updates'
+ *   },
+ * });
+ */
+export function useUpdateLeagueScoringProfileMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueScoringProfileMutation,
+    UpdateLeagueScoringProfileMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateLeagueScoringProfileMutation,
+    UpdateLeagueScoringProfileMutationVariables
+  >(UpdateLeagueScoringProfile, options);
+}
+export type UpdateLeagueScoringProfileMutationHookResult = ReturnType<
+  typeof useUpdateLeagueScoringProfileMutation
+>;
+export type UpdateLeagueScoringProfileMutationResult =
+  Apollo.MutationResult<UpdateLeagueScoringProfileMutation>;
+export type UpdateLeagueScoringProfileMutationOptions =
+  Apollo.BaseMutationOptions<
+    UpdateLeagueScoringProfileMutation,
+    UpdateLeagueScoringProfileMutationVariables
+  >;
+export const GetTeamMembers = gql`
+  query GetTeamMembers($teamId: Int!) {
+    teamMembers(teamId: $teamId) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
 
 /**
  * __useGetTeamMembersQuery__
@@ -1103,30 +2098,79 @@ export const GetTeamMembers = gql`
  *   },
  * });
  */
-export function useGetTeamMembersQuery(baseOptions: Apollo.QueryHookOptions<GetTeamMembersQuery, GetTeamMembersQueryVariables> & ({ variables: GetTeamMembersQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(GetTeamMembers, options);
-      }
-export function useGetTeamMembersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetTeamMembersQuery, GetTeamMembersQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(GetTeamMembers, options);
-        }
-export function useGetTeamMembersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTeamMembersQuery, GetTeamMembersQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(GetTeamMembers, options);
-        }
-export type GetTeamMembersQueryHookResult = ReturnType<typeof useGetTeamMembersQuery>;
-export type GetTeamMembersLazyQueryHookResult = ReturnType<typeof useGetTeamMembersLazyQuery>;
-export type GetTeamMembersSuspenseQueryHookResult = ReturnType<typeof useGetTeamMembersSuspenseQuery>;
-export type GetTeamMembersQueryResult = Apollo.QueryResult<GetTeamMembersQuery, GetTeamMembersQueryVariables>;
-export const UpdateTeamMemberPosition = gql`
-    mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
-  updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
-    ...TeamMember
-  }
+export function useGetTeamMembersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  > &
+    (
+      | { variables: GetTeamMembersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
+    GetTeamMembers,
+    options,
+  );
 }
-    ${TeamMemberFragmentDoc}`;
-export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<UpdateTeamMemberPositionMutation, UpdateTeamMemberPositionMutationVariables>;
+export function useGetTeamMembersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
+    GetTeamMembers,
+    options,
+  );
+}
+export function useGetTeamMembersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamMembersQuery,
+        GetTeamMembersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  >(GetTeamMembers, options);
+}
+export type GetTeamMembersQueryHookResult = ReturnType<
+  typeof useGetTeamMembersQuery
+>;
+export type GetTeamMembersLazyQueryHookResult = ReturnType<
+  typeof useGetTeamMembersLazyQuery
+>;
+export type GetTeamMembersSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamMembersSuspenseQuery
+>;
+export type GetTeamMembersQueryResult = Apollo.QueryResult<
+  GetTeamMembersQuery,
+  GetTeamMembersQueryVariables
+>;
+export const UpdateTeamMemberPosition = gql`
+  mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+    updateTeamMemberPosition(
+      teamMemberId: $teamMemberId
+      positionId: $positionId
+    ) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<
+  UpdateTeamMemberPositionMutation,
+  UpdateTeamMemberPositionMutationVariables
+>;
 
 /**
  * __useUpdateTeamMemberPositionMutation__
@@ -1146,20 +2190,36 @@ export type UpdateTeamMemberPositionMutationFn = Apollo.MutationFunction<UpdateT
  *   },
  * });
  */
-export function useUpdateTeamMemberPositionMutation(baseOptions?: Apollo.MutationHookOptions<UpdateTeamMemberPositionMutation, UpdateTeamMemberPositionMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<UpdateTeamMemberPositionMutation, UpdateTeamMemberPositionMutationVariables>(UpdateTeamMemberPosition, options);
-      }
-export type UpdateTeamMemberPositionMutationHookResult = ReturnType<typeof useUpdateTeamMemberPositionMutation>;
-export type UpdateTeamMemberPositionMutationResult = Apollo.MutationResult<UpdateTeamMemberPositionMutation>;
-export type UpdateTeamMemberPositionMutationOptions = Apollo.BaseMutationOptions<UpdateTeamMemberPositionMutation, UpdateTeamMemberPositionMutationVariables>;
-export const GetUserById = gql`
-    query GetUserById($id: Int!) {
-  user(id: $id) {
-    ...User
-  }
+export function useUpdateTeamMemberPositionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateTeamMemberPositionMutation,
+    UpdateTeamMemberPositionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateTeamMemberPositionMutation,
+    UpdateTeamMemberPositionMutationVariables
+  >(UpdateTeamMemberPosition, options);
 }
-    ${UserFragmentDoc}`;
+export type UpdateTeamMemberPositionMutationHookResult = ReturnType<
+  typeof useUpdateTeamMemberPositionMutation
+>;
+export type UpdateTeamMemberPositionMutationResult =
+  Apollo.MutationResult<UpdateTeamMemberPositionMutation>;
+export type UpdateTeamMemberPositionMutationOptions =
+  Apollo.BaseMutationOptions<
+    UpdateTeamMemberPositionMutation,
+    UpdateTeamMemberPositionMutationVariables
+  >;
+export const GetUserById = gql`
+  query GetUserById($id: Int!) {
+    user(id: $id) {
+      ...User
+    }
+  }
+  ${UserFragmentDoc}
+`;
 
 /**
  * __useGetUserByIdQuery__
@@ -1177,19 +2237,59 @@ export const GetUserById = gql`
  *   },
  * });
  */
-export function useGetUserByIdQuery(baseOptions: Apollo.QueryHookOptions<GetUserByIdQuery, GetUserByIdQueryVariables> & ({ variables: GetUserByIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(GetUserById, options);
-      }
-export function useGetUserByIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetUserByIdQuery, GetUserByIdQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(GetUserById, options);
-        }
-export function useGetUserByIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUserByIdQuery, GetUserByIdQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(GetUserById, options);
-        }
+export function useGetUserByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetUserByIdQuery,
+    GetUserByIdQueryVariables
+  > &
+    (
+      | { variables: GetUserByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(
+    GetUserById,
+    options,
+  );
+}
+export function useGetUserByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserByIdQuery,
+    GetUserByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(
+    GetUserById,
+    options,
+  );
+}
+export function useGetUserByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserByIdQuery,
+        GetUserByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetUserByIdQuery, GetUserByIdQueryVariables>(
+    GetUserById,
+    options,
+  );
+}
 export type GetUserByIdQueryHookResult = ReturnType<typeof useGetUserByIdQuery>;
-export type GetUserByIdLazyQueryHookResult = ReturnType<typeof useGetUserByIdLazyQuery>;
-export type GetUserByIdSuspenseQueryHookResult = ReturnType<typeof useGetUserByIdSuspenseQuery>;
-export type GetUserByIdQueryResult = Apollo.QueryResult<GetUserByIdQuery, GetUserByIdQueryVariables>;
+export type GetUserByIdLazyQueryHookResult = ReturnType<
+  typeof useGetUserByIdLazyQuery
+>;
+export type GetUserByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserByIdSuspenseQuery
+>;
+export type GetUserByIdQueryResult = Apollo.QueryResult<
+  GetUserByIdQuery,
+  GetUserByIdQueryVariables
+>;

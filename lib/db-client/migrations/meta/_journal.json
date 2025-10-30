@@ -64,6 +64,13 @@
       "when": 1760025000000,
       "tag": "0008_add_invite_code_to_leagues",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1760793600000,
+      "tag": "0009_create_league_scoring_tables",
+      "breakpoints": true
     }
   ]
 }

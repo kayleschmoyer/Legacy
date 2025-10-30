@@ -22,6 +22,10 @@ export interface PlayersGridProps {
   showSearch?: boolean;
   showSorting?: boolean;
   title?: string;
+  /** Map of player ID to projected fantasy points per game (optional) */
+  projectedPoints?: Map<number, number>;
+  /** Whether to show projections on player cards */
+  showProjections?: boolean;
 }
 
 const SORT_OPTIONS = [
@@ -37,6 +41,8 @@ function PlayersGrid({
   showSearch = true,
   showSorting = true,
   title = 'Players',
+  projectedPoints,
+  showProjections = false,
 }: PlayersGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<string>('NAME_ASC');
@@ -186,11 +192,22 @@ function PlayersGrid({
       ) : (
         <ScrollView>
           <YStack flexDirection="row" flexWrap="wrap" gap="$3" jc="flex-start">
-            {filteredPlayers.map((player) => (
-              <YStack key={player.id} width={200} minW={280} maxW={400}>
-                <PlayerCard player={player} onPlayerClick={onPlayerSelect} />
-              </YStack>
-            ))}
+            {filteredPlayers.map((player) => {
+              const projection = player.id
+                ? projectedPoints?.get(player.id)
+                : undefined;
+
+              return (
+                <YStack key={player.id} width={200} minW={280} maxW={400}>
+                  <PlayerCard
+                    player={player}
+                    onPlayerClick={onPlayerSelect}
+                    projectedPoints={projection}
+                    showProjection={showProjections}
+                  />
+                </YStack>
+              );
+            })}
           </YStack>
         </ScrollView>
       )}

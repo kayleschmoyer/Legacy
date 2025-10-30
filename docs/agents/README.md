@@ -61,6 +61,13 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 3. **Search by Pattern**: Use `Pattern_Concept` for specific implementation patterns
 4. **Reference Examples**: Use `Code_Example` and `File_Path` columns for implementation guidance
 
+### ✅ Jira Hygiene (New!)
+
+- Update the Jira ticket status the moment you start work, open a PR, or finish a merge.
+- Begin and end every session by verifying the ticket status matches reality; correct it immediately if it does not.
+- Capture session notes, manual interventions, and validation results in a Jira comment so the next agent has the full state without digging through git history.
+- When an epic’s child work is delivered, transition those stories before changing the epic’s state and leave a comment if anything remains blocked.
+
 ### **🔧 Quick Troubleshooting Workflow:**
 
 When encountering errors, follow this systematic approach:

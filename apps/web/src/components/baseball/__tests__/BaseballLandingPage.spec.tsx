@@ -8,19 +8,60 @@ import { MemoryRouter } from 'react-router-dom';
 import { BaseballLandingPage } from '../BaseballLandingPage';
 
 // Mock shared-components to lightweight HTML equivalents
+const filterDomProps = (props: unknown = {}) => {
+  if (!props || typeof props !== 'object') {
+    return {} as Record<string, unknown>;
+  }
+
+  const allowed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props as Record<string, unknown>)) {
+    if (
+      key.startsWith('aria-') ||
+      key === 'role' ||
+      key === 'id' ||
+      key === 'className' ||
+      key === 'style' ||
+      key === 'onClick' ||
+      key === 'type' ||
+      key === 'value' ||
+      key === 'placeholder' ||
+      key === 'htmlFor'
+    ) {
+      allowed[key] = value;
+    }
+  }
+  return allowed;
+};
+
 jest.mock('@legacy-sports/shared-components', () => ({
   Button: ({ children, onPress, ...rest }: any) => (
-    <button onClick={onPress} {...rest}>
+    <button onClick={onPress} {...filterDomProps(rest)}>
       {children}
     </button>
   ),
-  H1: ({ children, ...rest }: any) => <h1 {...rest}>{children}</h1>,
-  H2: ({ children, ...rest }: any) => <h2 {...rest}>{children}</h2>,
-  Paragraph: ({ children, ...rest }: any) => <p {...rest}>{children}</p>,
-  XStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
-  YStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
+  H1: ({ children, ...rest }: any) => (
+    <h1 {...filterDomProps(rest)}>{children}</h1>
+  ),
+  H2: ({ children, ...rest }: any) => (
+    <h2 {...filterDomProps(rest)}>{children}</h2>
+  ),
+  H3: ({ children, ...rest }: any) => (
+    <h3 {...filterDomProps(rest)}>{children}</h3>
+  ),
+  Paragraph: ({ children, ...rest }: any) => (
+    <p {...filterDomProps(rest)}>{children}</p>
+  ),
+  Text: ({ children, ...rest }: any) => (
+    <span {...filterDomProps(rest)}>{children}</span>
+  ),
+  XStack: ({ children, ...rest }: any) => (
+    <div {...filterDomProps(rest)}>{children}</div>
+  ),
+  YStack: ({ children, ...rest }: any) => (
+    <div {...filterDomProps(rest)}>{children}</div>
+  ),
   HolographicCard: ({ children, ...rest }: any) => (
-    <div {...rest}>{children}</div>
+    <div {...filterDomProps(rest)}>{children}</div>
   ),
   useAuth: () => ({
     isAuthenticated: true,
@@ -104,9 +145,9 @@ describe('BaseballLandingPage', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/No Leagues Yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No leagues yet/i)).toBeInTheDocument();
     expect(
-      screen.getAllByText(/Create Your First League/i).length,
+      screen.getAllByText(/Create your first league/i).length,
     ).toBeGreaterThanOrEqual(1);
   });
 

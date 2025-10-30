@@ -219,6 +219,53 @@ query GetLeague($leagueId: ID!) {
 }
 ```
 
+### Scoring Queries
+
+```graphql
+# Fetch full scoring profile for a league
+query GetLeagueScoringProfile($leagueId: Int!) {
+  leagueScoringProfile(leagueId: $leagueId) {
+    profileId
+    profileName
+    stats {
+      definition {
+        statKey
+        statGroup
+        displayName
+      }
+      multiplier
+      defaultMultiplier
+      isOverride
+    }
+  }
+}
+
+# Read global default scoring configuration
+query GetDefaultScoringProfile {
+  defaultScoringProfile {
+    profileName
+    multiplierGroups {
+      group
+      values {
+        statKey
+        multiplier
+      }
+    }
+  }
+}
+
+# Load catalog of scoring stat definitions for UI/editor tooling
+query GetScoringDefinitions {
+  scoringDefinitions {
+    id
+    statKey
+    statGroup
+    displayName
+    defaultMultiplier
+  }
+}
+```
+
 ### Player & Draft Queries
 
 ```graphql
@@ -277,6 +324,34 @@ mutation UpdateProfile($input: UpdateUserInput!) {
     id
     name
     profilePicture
+  }
+}
+```
+
+### Scoring
+
+```graphql
+# Update league scoring multipliers
+mutation UpdateLeagueScoringProfile(
+  $leagueId: Int!
+  $updates: [UpdateLeagueScoringMultiplierInput!]!
+) {
+  updateLeagueScoringProfile(leagueId: $leagueId, updates: $updates) {
+    profileId
+    profileName
+    stats {
+      definition {
+        id
+        displayName
+        statKey
+        statGroup
+        sourceColumn
+      }
+      multiplier
+      defaultMultiplier
+      isOverride
+      isEnabled
+    }
   }
 }
 ```

@@ -5,6 +5,7 @@ import {
   getCareerFieldingStatsForPlayer,
   getCareerPitchingStatsForPlayer,
   getPlayerByBrefId,
+  getScoringMultipliersForLeague,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import {
@@ -21,6 +22,10 @@ export const computeScoringCommandBuilder = (argv: Argv) =>
     .usage('computeScoring')
     .option('player', {
       type: 'string',
+    })
+    .option('league', {
+      type: 'number',
+      describe: 'League ID used to resolve custom scoring multipliers',
     })
     .demandOption('player');
 
@@ -44,25 +49,41 @@ export async function handleComputeScoring(
 
     LOGGER.info(`Computing player ${player.id}`);
 
+    const multipliers = await getScoringMultipliersForLeague(
+      db,
+      typeof args.league === 'number' ? args.league : null,
+    );
+
     const battingStats = await getCareerBattingStatsForPlayer(db, player.id);
     const fieldingStats = await getCareerFieldingStatsForPlayer(db, player.id);
     const pitchingStats = await getCareerPitchingStatsForPlayer(db, player.id);
 
-    const battingScore = computeScoring(battingStats, DEFAULT_BATTING_SCORING);
-    
+    const battingSettings =
+      Object.keys(multipliers.batting).length > 0
+        ? multipliers.batting
+        : DEFAULT_BATTING_SCORING;
+    const fieldingSettings =
+      Object.keys(multipliers.fielding).length > 0
+        ? multipliers.fielding
+        : DEFAULT_FIELDING_SCORING;
+    const pitchingSettings =
+      Object.keys(multipliers.pitching).length > 0
+        ? multipliers.pitching
+        : DEFAULT_PITCHING_SCORING;
+
+    const battingScore = computeScoring(battingStats, battingSettings);
+
     // Exclude positionsPlayed field from fielding stats as it's not used in scoring
-    const fieldingStatsForScoring = fieldingStats ? 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      (({ positionsPlayed: _, ...rest }) => rest)(fieldingStats) : fieldingStats;
-    
+    const fieldingStatsForScoring = fieldingStats
+      ? // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        (({ positionsPlayed: _ignored, ...rest }) => rest)(fieldingStats)
+      : fieldingStats;
+
     const fieldingScore = computeScoring(
       fieldingStatsForScoring,
-      DEFAULT_FIELDING_SCORING,
+      fieldingSettings,
     );
-    const pitchingScore = computeScoring(
-      pitchingStats,
-      DEFAULT_PITCHING_SCORING,
-    );
+    const pitchingScore = computeScoring(pitchingStats, pitchingSettings);
 
     const battingScorePerGame =
       battingStats === null ? 0 : battingScore / (battingStats.g || 1);

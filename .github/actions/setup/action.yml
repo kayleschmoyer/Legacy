@@ -62,7 +62,6 @@ runs:
           echo "➕ Adding pnpm home (${PNPM_HOME_DIR}) to PATH"
           echo "$PNPM_HOME_DIR" >> "$GITHUB_PATH"
         fi
-
         if ! command -v pnpm >/dev/null 2>&1; then
           echo "❌ pnpm still unavailable after bootstrap"
           exit 1
@@ -205,6 +204,25 @@ runs:
         echo "Node version: $(node --version)"
         echo "NPM version: $(npm --version)"
 
+        # Check if node_modules already exists and is valid (from cache restore-key)
+        if [ -d "node_modules" ] && [ -d "node_modules/nx" ]; then
+          echo "✅ node_modules already present from cache (restored via restore-key)"
+          echo "📦 Verifying critical packages..."
+
+          # Quick validation that key packages exist
+          if [ -d "node_modules/@nx" ] || [ -d "node_modules/nx" ]; then
+            echo "✅ Nx packages found - skipping install to save time"
+            echo "⚡ Saved ~15 minutes by reusing cached dependencies"
+            exit 0
+          fi
+        fi
+
+        # Check package-lock.json integrity first
+        if [ ! -f "package-lock.json" ]; then
+          echo "❌ package-lock.json not found"
+          exit 1
+        fi
+
         if [ -n "${{ steps.cached-dependencies.outputs.cache-matched-key }}" ] && [ "${{ steps.cached-dependencies.outputs.cache-matched-key }}" != "${{ steps.cached-dependencies.outputs.cache-primary-key }}" ]; then
           echo "📦 Partial cache restored - updating dependencies incrementally..."
           echo "Restored: ${{ steps.cached-dependencies.outputs.cache-matched-key }}"
@@ -220,12 +238,88 @@ runs:
           fi
         else
           echo "📦 No cache available - full install required (10-15 min)..."
-          # npm ci for clean install when no cache exists
+
+          NPM_CI_CMD=(npm ci --prefer-offline --no-audit --no-fund --loglevel verbose)
+          NPM_CI_DRY_RUN_CMD=(npm ci --dry-run)
+          NPM_INSTALL_CMD=(npm install --no-audit --no-fund --loglevel verbose)
+
           if [ "${{ inputs.include-optional-deps }}" == "false" ]; then
             echo "⚡ Skipping optional dependencies (Storybook, Appium) for faster CI..."
-            npm ci --prefer-offline --no-audit --no-fund --omit=optional --loglevel verbose
+            NPM_CI_CMD+=(--omit=optional)
+            NPM_CI_DRY_RUN_CMD+=(--omit=optional)
+            NPM_INSTALL_CMD+=(--omit=optional)
+          fi
+
+          # Allow up to 15 minutes for dependency installation to accommodate cold caches on CI
+          if command -v timeout >/dev/null 2>&1; then
+            TIMEOUT_CMD="timeout 900s"
+          elif command -v gtimeout >/dev/null 2>&1; then
+            TIMEOUT_CMD="gtimeout 900s"
           else
-            npm ci --prefer-offline --no-audit --no-fund --loglevel verbose
+            echo "⚠️  No timeout command available, proceeding without timeout..."
+            TIMEOUT_CMD=""
+          fi
+
+          echo "🔧 Installing dependencies (node_modules not found or incomplete)..."
+
+          if $TIMEOUT_CMD "${NPM_CI_CMD[@]}"; then
+            echo "✅ Dependencies installed successfully!"
+          else
+            echo "⚠️  Primary npm ci failed, analyzing error..."
+
+            # Check if this is a lock file sync issue (common with Sharp/platform-specific deps)
+            if "${NPM_CI_DRY_RUN_CMD[@]}" 2>&1 | grep -q "package.json and package-lock.json.*are in sync"; then
+              echo "🔧 Detected lock file sync issue - regenerating with npm install..."
+
+              if command -v timeout >/dev/null 2>&1; then
+                INSTALL_TIMEOUT_CMD="timeout 900s"
+              elif command -v gtimeout >/dev/null 2>&1; then
+                INSTALL_TIMEOUT_CMD="gtimeout 900s"
+              else
+                INSTALL_TIMEOUT_CMD=""
+              fi
+
+              if $INSTALL_TIMEOUT_CMD "${NPM_INSTALL_CMD[@]}"; then
+                echo "✅ Dependencies synchronized successfully with npm install!"
+              else
+                echo "❌ npm install also failed - trying cache reset..."
+                npm cache clean --force
+
+                if $INSTALL_TIMEOUT_CMD "${NPM_INSTALL_CMD[@]}"; then
+                  echo "✅ Dependencies installed after cache reset!"
+                else
+                  echo "❌ All installation methods failed"
+                  echo "Debug info:"
+                  echo "  - npm version: $(npm --version)"
+                  echo "  - node version: $(node --version)"
+                  echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
+                  echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
+                  exit 1
+                fi
+              fi
+            else
+              echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
+              npm cache clean --force
+
+              if command -v timeout >/dev/null 2>&1; then
+                RETRY_TIMEOUT_CMD="timeout 900s"
+              elif command -v gtimeout >/dev/null 2>&1; then
+                RETRY_TIMEOUT_CMD="gtimeout 900s"
+              else
+                RETRY_TIMEOUT_CMD=""
+              fi
+
+              if $RETRY_TIMEOUT_CMD "${NPM_CI_CMD[@]}"; then
+                echo "✅ Dependencies installed on retry!"
+              else
+                echo "❌ npm ci retry also failed"
+                echo "Debug info:"
+                echo "  - npm version: $(npm --version)"
+                echo "  - node version: $(node --version)"
+                echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
+                echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
+                exit 1
+              fi
           fi
         fi
 

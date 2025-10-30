@@ -10,16 +10,19 @@ import {
   createStatisticsService,
   StatisticsService,
 } from './StatisticsService';
+import { createScoringService, ScoringService } from './ScoringService';
 
 export class DatabaseService {
   public readonly users: UserService;
   public readonly players: PlayerService;
   public readonly statistics: StatisticsService;
+  public readonly scoring: ScoringService;
 
   constructor(private options: DbOptions) {
     this.users = createUserService(options);
     this.players = createPlayerService(options);
     this.statistics = createStatisticsService(options);
+    this.scoring = createScoringService(options);
   }
 
   /**
@@ -44,6 +47,7 @@ export {
   StatisticsService,
   createStatisticsService,
 } from './StatisticsService';
+export { ScoringService, createScoringService } from './ScoringService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
@@ -52,3 +56,4 @@ export type {
   StatisticsFilters,
   StatisticsQueryOptions,
 } from './StatisticsService';
+export type { LeagueScoringMultiplierUpdate } from './ScoringService';

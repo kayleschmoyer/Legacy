@@ -3,19 +3,32 @@ import { gql } from '@apollo/client';
 import * as Apollo from '@apollo/client';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
-export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+export type Exact<T extends { [key: string]: unknown }> = {
+  [K in keyof T]: T[K];
+};
+export type MakeOptional<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]?: Maybe<T[SubKey]>;
+};
+export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & {
+  [SubKey in K]: Maybe<T[SubKey]>;
+};
+export type MakeEmpty<
+  T extends { [key: string]: unknown },
+  K extends keyof T,
+> = { [_ in K]?: never };
+export type Incremental<T> =
+  | T
+  | {
+      [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never;
+    };
 const defaultOptions = {} as const;
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
-  ID: { input: string; output: string; }
-  String: { input: string; output: string; }
-  Boolean: { input: boolean; output: boolean; }
-  Int: { input: number; output: number; }
-  Float: { input: number; output: number; }
+  ID: { input: string; output: string };
+  String: { input: string; output: string };
+  Boolean: { input: boolean; output: boolean };
+  Int: { input: number; output: number };
+  Float: { input: number; output: number };
 };
 
 export type CareerBatting = {
@@ -140,6 +153,7 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
 };
 
@@ -178,31 +192,32 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   joinLeagueByCode?: Maybe<Team>;
   startDraft?: Maybe<League>;
+  updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
 };
-
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
 };
-
 
 export type MutationJoinLeagueByCodeArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
 };
 
-
 export type MutationStartDraftArgs = {
   draftType?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationUpdateLeagueScoringProfileArgs = {
+  leagueId: Scalars['Int']['input'];
+  updates: Array<UpdateLeagueScoringMultiplierInput>;
+};
 
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
@@ -231,9 +246,11 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  defaultScoringProfile?: Maybe<ScoringConfig>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
+  leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
@@ -244,6 +261,7 @@ export type Query = {
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
+  scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
@@ -259,7 +277,6 @@ export type Query = {
   version?: Maybe<VersionInfo>;
 };
 
-
 export type QueryCareerBattingStatsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -272,7 +289,6 @@ export type QueryCareerBattingStatsArgs = {
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryCareerFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -280,7 +296,6 @@ export type QueryCareerFieldingStatsArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
-
 
 export type QueryCareerPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -292,64 +307,56 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 export type QueryLeaguePositionsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueScoringProfileArgs = {
+  leagueId: Scalars['Int']['input'];
+};
 
 export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerByBrefIdArgs = {
   brefId: Scalars['String']['input'];
 };
 
-
 export type QueryPlayerCareerBattingArgs = {
   playerId: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerCareerFieldingArgs = {
   playerId: Scalars['Int']['input'];
 };
 
-
 export type QueryPlayerCareerPitchingArgs = {
   playerId: Scalars['Int']['input'];
 };
-
 
 export type QueryPlayerSeasonBattingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
 
-
 export type QueryPlayerSeasonFieldingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
 
-
 export type QueryPlayerSeasonPitchingArgs = {
   playerId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
 };
-
 
 export type QueryPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -358,18 +365,15 @@ export type QueryPlayersArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QuerySearchPlayersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
 
-
 export type QuerySearchUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   searchTerm: Scalars['String']['input'];
 };
-
 
 export type QuerySeasonBattingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -384,7 +388,6 @@ export type QuerySeasonBattingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QuerySeasonFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -395,7 +398,6 @@ export type QuerySeasonFieldingStatsArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
 };
-
 
 export type QuerySeasonPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -410,26 +412,21 @@ export type QuerySeasonPitchingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
-
 export type QueryTeamMembersArgs = {
   teamId: Scalars['Int']['input'];
 };
-
 
 export type QueryUserArgs = {
   id: Scalars['Int']['input'];
 };
 
-
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
 };
 
-
 export type QueryUserTeamIdArgs = {
   leagueId: Scalars['Int']['input'];
 };
-
 
 export type QueryUsersArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -437,6 +434,78 @@ export type QueryUsersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type ScoringConfig = {
+  __typename?: 'ScoringConfig';
+  definitions?: Maybe<Array<ScoringStatDefinition>>;
+  entries?: Maybe<Array<ScoringConfigEntry>>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  multiplierGroups?: Maybe<Array<ScoringRuleGroup>>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  profileName?: Maybe<Scalars['String']['output']>;
+  stats?: Maybe<Array<ScoringRule>>;
+};
+
+export type ScoringConfigEntry = {
+  __typename?: 'ScoringConfigEntry';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  multiplier?: Maybe<Scalars['Float']['output']>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  statDefinitionId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringMultiplierEntry = {
+  __typename?: 'ScoringMultiplierEntry';
+  multiplier?: Maybe<Scalars['Float']['output']>;
+  sourceColumn?: Maybe<Scalars['String']['output']>;
+  statKey?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringRule = {
+  __typename?: 'ScoringRule';
+  defaultMultiplier?: Maybe<Scalars['Float']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  isOverride?: Maybe<Scalars['Boolean']['output']>;
+  multiplier?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ScoringRuleGroup = {
+  __typename?: 'ScoringRuleGroup';
+  group?: Maybe<ScoringStatGroup>;
+  values?: Maybe<Array<ScoringMultiplierEntry>>;
+};
+
+export type ScoringStatDefinition = {
+  __typename?: 'ScoringStatDefinition';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  defaultMultiplier?: Maybe<Scalars['Float']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  displayName?: Maybe<Scalars['String']['output']>;
+  enforceNegative?: Maybe<Scalars['Boolean']['output']>;
+  enforcePositive?: Maybe<Scalars['Boolean']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isRequired?: Maybe<Scalars['Boolean']['output']>;
+  maxMultiplier?: Maybe<Scalars['Float']['output']>;
+  minMultiplier?: Maybe<Scalars['Float']['output']>;
+  sourceColumn?: Maybe<Scalars['String']['output']>;
+  sourceTable?: Maybe<Scalars['String']['output']>;
+  statGroup?: Maybe<ScoringStatGroup>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  stepSize?: Maybe<Scalars['Float']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Grouping for fantasy scoring statistics */
+export enum ScoringStatGroup {
+  Batting = 'batting',
+  Fielding = 'fielding',
+  Pitching = 'pitching',
+}
 
 export type SeasonBatting = {
   __typename?: 'SeasonBatting';
@@ -561,6 +630,12 @@ export type TeamMember = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type UpdateLeagueScoringMultiplierInput = {
+  isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  multiplier?: InputMaybe<Scalars['Float']['input']>;
+  statDefinitionId: Scalars['Int']['input'];
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
@@ -582,31 +657,45 @@ export type VersionInfo = {
   version?: Maybe<Scalars['String']['output']>;
 };
 
-export type PlayerFragment = { __typename?: 'Player', brefId?: string | null, id?: number | null, firstName?: string | null, lastName?: string | null };
+export type PlayerFragment = {
+  __typename?: 'Player';
+  brefId?: string | null;
+  id?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
 
-export type GetAllPlayersQueryVariables = Exact<{ [key: string]: never; }>;
+export type GetAllPlayersQueryVariables = Exact<{ [key: string]: never }>;
 
-
-export type GetAllPlayersQuery = { __typename?: 'Query', players?: Array<{ __typename?: 'Player', id?: number | null, firstName?: string | null, lastName?: string | null, brefId?: string | null }> | null };
+export type GetAllPlayersQuery = {
+  __typename?: 'Query';
+  players?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+  }> | null;
+};
 
 export const PlayerFragmentDoc = gql`
-    fragment Player on Player {
-  brefId
-  id
-  firstName
-  lastName
-}
-    `;
-export const GetAllPlayers = gql`
-    query GetAllPlayers {
-  players {
+  fragment Player on Player {
+    brefId
     id
     firstName
     lastName
-    brefId
   }
-}
-    `;
+`;
+export const GetAllPlayers = gql`
+  query GetAllPlayers {
+    players {
+      id
+      firstName
+      lastName
+      brefId
+    }
+  }
+`;
 
 /**
  * __useGetAllPlayersQuery__
@@ -623,19 +712,57 @@ export const GetAllPlayers = gql`
  *   },
  * });
  */
-export function useGetAllPlayersQuery(baseOptions?: Apollo.QueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
-      }
-export function useGetAllPlayersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
-        }
-export function useGetAllPlayersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAllPlayersQuery, GetAllPlayersQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(GetAllPlayers, options);
-        }
-export type GetAllPlayersQueryHookResult = ReturnType<typeof useGetAllPlayersQuery>;
-export type GetAllPlayersLazyQueryHookResult = ReturnType<typeof useGetAllPlayersLazyQuery>;
-export type GetAllPlayersSuspenseQueryHookResult = ReturnType<typeof useGetAllPlayersSuspenseQuery>;
-export type GetAllPlayersQueryResult = Apollo.QueryResult<GetAllPlayersQuery, GetAllPlayersQueryVariables>;
+export function useGetAllPlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(
+    GetAllPlayers,
+    options,
+  );
+}
+export function useGetAllPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetAllPlayersQuery, GetAllPlayersQueryVariables>(
+    GetAllPlayers,
+    options,
+  );
+}
+export function useGetAllPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllPlayersQuery,
+        GetAllPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >(GetAllPlayers, options);
+}
+export type GetAllPlayersQueryHookResult = ReturnType<
+  typeof useGetAllPlayersQuery
+>;
+export type GetAllPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetAllPlayersLazyQuery
+>;
+export type GetAllPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllPlayersSuspenseQuery
+>;
+export type GetAllPlayersQueryResult = Apollo.QueryResult<
+  GetAllPlayersQuery,
+  GetAllPlayersQueryVariables
+>;

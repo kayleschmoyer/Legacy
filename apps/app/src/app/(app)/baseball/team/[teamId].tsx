@@ -18,7 +18,14 @@ import {
 } from '../../../../api/db/teams/Teams.generated';
 import { LoadingPanel } from '../../../../common/components/LoadingPanel';
 import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
-import { useGetUserTeamIdQuery } from '../../../../api/db/graphql.generated';
+import {
+  LeaguePositionFragment,
+  MatchupFragment,
+  ScoringStatGroup,
+  TeamMemberFragment,
+  useGetLeagueScoringProfileQuery,
+  useGetUserTeamIdQuery,
+} from '../../../../api/db/graphql.generated';
 import {
   isBatter,
   isBattingSlot,
@@ -26,11 +33,6 @@ import {
   isPitchingSlot,
 } from '../../../../common/temporary_models/Models';
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
-import {
-  LeaguePositionFragment,
-  MatchupFragment,
-  TeamMemberFragment,
-} from '../../../../api/db/graphql.generated';
 import { PositionSlot } from '../../../../common/temporary_models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 
@@ -51,6 +53,9 @@ interface TabContentProps {
   onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly (TeamMemberFragment | null)[];
   isOwner: boolean;
+  battingSettings: Partial<Record<string, number>>;
+  fieldingSettings: Partial<Record<string, number>>;
+  pitchingSettings: Partial<Record<string, number>>;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -63,6 +68,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     selectedTab,
     rosterSlots,
     isOwner,
+    battingSettings,
+    fieldingSettings,
+    pitchingSettings,
   } = props;
 
   const { data: stats, loading: loadingStats } = useGetMatchupStatsQuery({
@@ -108,13 +116,20 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       const fieldingStats = proj?.aggregateSeasonFieldingByPlayerIdAndSeason;
 
       const value =
-        computeAverageScoring(battingStats, DEFAULT_BATTING_SCORING) +
-        computeAverageScoring(fieldingStats, DEFAULT_FIELDING_SCORING);
+        computeAverageScoring(battingStats, battingSettings) +
+        computeAverageScoring(fieldingStats, fieldingSettings);
 
       result[hitter.playerId] = value * (matchup?.numberOfGames || 1);
     }
     return result;
-  }, [stats, hitters, loadingStats, matchup]);
+  }, [
+    stats,
+    hitters,
+    loadingStats,
+    matchup,
+    battingSettings,
+    fieldingSettings,
+  ]);
 
   const pitcherProjections = useMemo(() => {
     const result: Record<number, number> = {};
@@ -134,13 +149,13 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
       const value = computeAverageScoring(
         proj?.aggregateSeasonPitchingByPlayerIdAndSeason,
-        DEFAULT_PITCHING_SCORING,
+        pitchingSettings,
       );
 
       result[pitcher.playerId] = value;
     }
     return result;
-  }, [stats, pitchers, loadingStats]);
+  }, [stats, pitchers, loadingStats, pitchingSettings]);
 
   const hittersActual = useMemo(() => {
     const result: Record<number, number> = {};
@@ -158,17 +173,24 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         (n: any) => n?.playerId === hitter.playerId,
       );
 
-      let sum = computeScoring(mp?.matchupBatting, DEFAULT_BATTING_SCORING);
+      let sum = computeScoring(mp?.matchupBatting, battingSettings);
 
       const position = lineupSlots.find((l) => l?.id === hitter.positionId);
       if (position?.positionType !== PositionSlot.Dh) {
-        sum += computeScoring(mp?.matchupFielding, DEFAULT_FIELDING_SCORING);
+        sum += computeScoring(mp?.matchupFielding, fieldingSettings);
       }
 
       result[hitter.playerId] = sum;
     }
     return result;
-  }, [stats, hitters, loadingStats, lineupSlots]);
+  }, [
+    stats,
+    hitters,
+    loadingStats,
+    lineupSlots,
+    battingSettings,
+    fieldingSettings,
+  ]);
 
   const pitchersActual = useMemo(() => {
     const result: Record<number, number> = {};
@@ -188,15 +210,14 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
       result[pitcher.playerId] = computeScoring(
         mp?.matchupPitching,
-        DEFAULT_PITCHING_SCORING,
+        pitchingSettings,
       );
     }
     return result;
-  }, [stats, pitchers, loadingStats]);
+  }, [stats, pitchers, loadingStats, pitchingSettings]);
 
-  const noOp = () => {
-    // Placeholder function for future implementation
-  };
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const noOp = () => {};
 
   switch (selectedTab) {
     case 'Lineup':
@@ -257,6 +278,14 @@ export default function Team(): React.JSX.Element {
     },
   });
 
+  const { data: scoringProfileData, loading: loadingScoringProfile } =
+    useGetLeagueScoringProfileQuery({
+      skip: team?.team?.leagueId === undefined,
+      variables: {
+        leagueId: team?.team?.leagueId || -1,
+      },
+    });
+
   const isOwner = userTeamData?.userTeamId === numTeamId;
 
   // League data query removed as matchup feature not currently used
@@ -269,6 +298,59 @@ export default function Team(): React.JSX.Element {
         leagueId: team?.team?.leagueId || -1,
       },
     });
+
+  const scoringSettings = useMemo(() => {
+    const base = {
+      batting: { ...DEFAULT_BATTING_SCORING },
+      fielding: { ...DEFAULT_FIELDING_SCORING },
+      pitching: { ...DEFAULT_PITCHING_SCORING },
+    } as {
+      batting: Partial<Record<string, number>>;
+      fielding: Partial<Record<string, number>>;
+      pitching: Partial<Record<string, number>>;
+    };
+
+    const groups =
+      scoringProfileData?.leagueScoringProfile?.multiplierGroups ?? [];
+
+    for (const group of groups) {
+      if (!group?.group || !group.values) {
+        continue;
+      }
+
+      let target: Partial<Record<string, number>>;
+
+      switch (group.group) {
+        case ScoringStatGroup.Batting:
+          target = base.batting;
+          break;
+        case ScoringStatGroup.Fielding:
+          target = base.fielding;
+          break;
+        case ScoringStatGroup.Pitching:
+          target = base.pitching;
+          break;
+        default:
+          continue;
+      }
+
+      for (const entry of group.values) {
+        if (
+          entry?.sourceColumn &&
+          typeof entry.multiplier === 'number' &&
+          Number.isFinite(entry.multiplier)
+        ) {
+          target[entry.sourceColumn] = entry.multiplier;
+        }
+      }
+    }
+
+    return base;
+  }, [scoringProfileData]);
+
+  const battingSettings = scoringSettings.batting;
+  const fieldingSettings = scoringSettings.fielding;
+  const pitchingSettings = scoringSettings.pitching;
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -341,7 +423,12 @@ export default function Team(): React.JSX.Element {
     }).catch(handleError);
   };
 
-  if (loadingTeam || loadingPositions || loadingLeague) {
+  if (
+    loadingTeam ||
+    loadingPositions ||
+    loadingLeague ||
+    loadingScoringProfile
+  ) {
     return <LoadingPanel />;
   }
 
@@ -384,6 +471,9 @@ export default function Team(): React.JSX.Element {
           selectedTab={TABS[selectedTabIdx]}
           rosterSlots={positions?.leaguePositions || []}
           isOwner={isOwner}
+          battingSettings={battingSettings}
+          fieldingSettings={fieldingSettings}
+          pitchingSettings={pitchingSettings}
         />
       </YStack>
     </ScrollView>

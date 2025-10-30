@@ -11,6 +11,8 @@ common_pitfalls,platform_testing,CRITICAL,build_assumptions,Always test changes 
 common_pitfalls,platform_components,CRITICAL,magic_string_confusion,Understanding how __PLATFORM_COMPONENTS__ works is essential,"Build-time resolution via Vite alias","vite.config.mts"
 common_pitfalls,error_handling,CRITICAL,error_suppression,Never catch and hide errors instead of fixing root causes,"try { } catch { console.log('ignoring...') } // ❌",""
 common_pitfalls,development_philosophy,CRITICAL,workaround_mentality,Never work around problems instead of solving them properly,"Fix root causes not symptoms",""
+common_pitfalls,workflow,CRITICAL,editing_on_main,Do not start implementing changes on main; confirm you have switched to the ticket branch before modifying files,"git status; git branch; twig switch LS-1234",""
+common_pitfalls,workflow,CRITICAL,stale_jira_statuses,Leaving Jira statuses stale breaks handoffs; transition tickets at the beginning and end of every session,"acli jira workitem transition --key LS-1234 --status ""In Progress""",""
 common_pitfalls,security,SECURITY_CRITICAL,committing_credentials,Never commit real OAuth URLs API keys or secrets to git,"Check .gitignore exclusions","apps/web/.env.example"
 common_pitfalls,environment,CRITICAL,environment_file_confusion,Never commit .env.local instead of .env.example,".env.local contains real credentials",""
 common_pitfalls,authentication,CRITICAL,hardcoded_values,Never use production URLs directly in code,"Use import.meta.env.VITE_OAUTH_PROXY_URL","apps/web/"

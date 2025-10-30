@@ -5,6 +5,7 @@
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
+WORKSPACE_PATH := $(abspath .)
 ifeq ($(OS),Windows_NT)
 	DETECTED_OS := Windows
 	SHELL := cmd
@@ -17,6 +18,8 @@ ifeq ($(OS),Windows_NT)
 	KILL_VSCODE := taskkill /f /im Code.exe $(NULL_REDIRECT) || echo VS Code not running
 	CHECK_POETRY := where poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
 	PATH_SEP := \\
+	WORKSPACE_PATH_WIN := $(subst /,\,$(WORKSPACE_PATH))
+	KILL_WORKSPACE_PROCS := powershell -NoProfile -Command "$$workspace = '$(WORKSPACE_PATH_WIN)'; $$escaped = [regex]::Escape($$workspace); $$currentPid = $$PID; $$currentProc = Get-CimInstance Win32_Process -Filter \"ProcessId = $$currentPid\"; $$parentPid = if ($$currentProc) { $$currentProc.ParentProcessId } else { $null }; $$procs = Get-CimInstance Win32_Process | Where-Object { $$_.CommandLine -and $$_.CommandLine -match $$escaped -and $$_.ProcessId -ne $$currentPid -and $$_.ProcessId -ne $$parentPid }; if ($$procs) { $$procs | ForEach-Object { Write-Host ('Stopping {0} ({1})' -f $$_.Name, $$_.ProcessId); Stop-Process -Id $$_.ProcessId -Force } } else { Write-Host 'No workspace processes running'; }"
 else
 	DETECTED_OS := $(shell uname -s)
 	SHELL := /bin/bash
@@ -29,6 +32,7 @@ else
 	KILL_VSCODE := pkill -f code $(NULL_REDIRECT) || echo VS Code not running
 	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
 	PATH_SEP := /
+	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; self=$$BASHPID; parent=$$PPID; pids=$$(pgrep -f "$$workspace" | grep -v -E "^($$self|$$parent)$$" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
 endif
 
 # Cross-platform echo with colors
@@ -104,6 +108,9 @@ clean-safe: ## Safely clean build artifacts and cache
 
 clean: ## Clean all build artifacts and dependencies
 	@$(call echo_blue,Cleaning workspace...)
+	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
+	@$(call echo_blue,Stopping workspace-affiliated processes...)
+	@$(KILL_WORKSPACE_PROCS)
 	@$(call echo_blue,Stopping Nx daemon if running...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -Command "$$job = Start-Job { pnpm exec nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
@@ -118,6 +125,8 @@ ifeq ($(DETECTED_OS),Windows)
 else
 	@$(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
 endif
+	pnpm exec nx reset
+	@$(call echo_yellow,Note: If npkill errors occur, run 'make install-tools' first)
 	@$(call echo_green,Clean completed)
 
 clean-node: ## Clean Node.js dependencies

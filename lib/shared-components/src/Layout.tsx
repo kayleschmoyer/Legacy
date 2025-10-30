@@ -8,6 +8,7 @@ import {
   H3 as TamaguiH3,
   Paragraph as TamaguiParagraph,
   Separator as TamaguiSeparator,
+  Text as TamaguiText,
   XStack as TamaguiXStack,
   YStack as TamaguiYStack,
 } from 'tamagui';
@@ -17,6 +18,7 @@ export type H1Props = React.ComponentProps<typeof TamaguiH1>;
 export type H2Props = React.ComponentProps<typeof TamaguiH2>;
 export type H3Props = React.ComponentProps<typeof TamaguiH3>;
 export type ParagraphProps = React.ComponentProps<typeof TamaguiParagraph>;
+export type TextProps = React.ComponentProps<typeof TamaguiText>;
 export type SeparatorProps = React.ComponentProps<typeof TamaguiSeparator>;
 
 export interface CardProps extends TamaguiCardProps {
@@ -75,6 +77,10 @@ export const H3: React.FC<H3Props> = (props: H3Props) => (
 
 export const Paragraph: React.FC<ParagraphProps> = (props: ParagraphProps) => (
   <TamaguiParagraph {...props} />
+);
+
+export const Text: React.FC<TextProps> = (props: TextProps) => (
+  <TamaguiText {...props} />
 );
 
 export const Separator: React.FC<SeparatorProps> = (props: SeparatorProps) => (

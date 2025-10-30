@@ -9,18 +9,17 @@
  * - Handles cross-schema dependencies in correct order
  */
 
-// Load environment variables from root .env file
 import { config } from 'dotenv';
-import { resolve } from 'path';
-config({ path: resolve(__dirname, '../../../../.env') });
-
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { getDatabaseConfig } from '../config/database';
+
+// Load environment variables from root .env file
+config({ path: resolve(__dirname, '../../../../.env') });
 
 async function runMigrations() {
   try {

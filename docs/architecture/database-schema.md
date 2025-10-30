@@ -398,6 +398,114 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 - View into internal authentication system
 - Access level controls: `none`, `admin`
 
+---
+
+## League Scoring Extensions
+
+### 22. **Scoring Stat Definitions** (`scoring_stat_definitions`)
+
+**Purpose**: Canonical catalog of stats that can be scored with allowable multiplier bounds.
+
+| Column               | Type                     | Description                                        |
+| -------------------- | ------------------------ | -------------------------------------------------- |
+| `id`                 | SERIAL (PK)              | Unique stat definition identifier                  |
+| `stat_key`           | VARCHAR(64) (UNIQUE)     | Machine key (e.g., `batting_hr`)                   |
+| `group`              | ENUM                     | `batting`, `pitching`, or `fielding`               |
+| `source_table`       | VARCHAR(48)              | Origin table (`season_batting`, `season_pitching`) |
+| `source_column`      | VARCHAR(48)              | Column name containing the stat                    |
+| `display_name`       | VARCHAR(80)              | Friendly label for UI                              |
+| `description`        | TEXT                     | Additional context or tooltip text                 |
+| `default_multiplier` | NUMERIC(6,3)             | System default multiplier                          |
+| `min_multiplier`     | NUMERIC(6,3)             | Lower bound enforced via trigger                   |
+| `max_multiplier`     | NUMERIC(6,3)             | Upper bound enforced via trigger                   |
+| `step_size`          | NUMERIC(4,3)             | Preferred UI increment (default 0.5)               |
+| `is_required`        | BOOLEAN                  | Prevents disabling critical stats                  |
+| `enforce_positive`   | BOOLEAN                  | True if multiplier must remain >= 0                |
+| `enforce_negative`   | BOOLEAN                  | True if multiplier must remain <= 0                |
+| `created_at`         | TIMESTAMP WITH TIME ZONE | Creation timestamp                                 |
+| `updated_at`         | TIMESTAMP WITH TIME ZONE | Auto-updated on change                             |
+
+**Key Features**:
+
+- Backing table for scoring UI and validation logic
+- Stores per-stat multiplier bounds and requirements
+- Indexed by `stat_key` and `group` for quick lookups
+
+### 23. **League Scoring Profiles** (`league_scoring_profiles`)
+
+**Purpose**: Versionable scoring configuration per league (supports default and draft profiles).
+
+| Column                   | Type                     | Description                                           |
+| ------------------------ | ------------------------ | ----------------------------------------------------- |
+| `id`                     | SERIAL (PK)              | Profile identifier                                    |
+| `league_id`              | INTEGER (FK)             | References `leagues.id`                               |
+| `profile_name`           | VARCHAR(64)              | Display name (`Default`, `2026 Regular Season`, etc.) |
+| `season_year`            | SMALLINT                 | Optional season association                           |
+| `status`                 | ENUM                     | `draft`, `active`, `archived`                         |
+| `is_default`             | BOOLEAN                  | Marks the active profile in use                       |
+| `copied_from_profile_id` | INTEGER (FK self)        | Tracks cloning lineage                                |
+| `created_at`             | TIMESTAMP WITH TIME ZONE | Creation timestamp                                    |
+| `updated_at`             | TIMESTAMP WITH TIME ZONE | Auto-updated on change                                |
+| `activated_at`           | TIMESTAMP WITH TIME ZONE | Set when status first becomes `active`                |
+
+**Key Features**:
+
+- Unique partial index ensures one default profile per league
+- Supports draft editing by toggling `status`
+- Self-referencing FK retains history when cloning profiles
+
+### 24. **League Scoring Profile Entries** (`league_scoring_profile_entries`)
+
+**Purpose**: Stores multipliers per stat within a given league profile.
+
+| Column               | Type                     | Description                                 |
+| -------------------- | ------------------------ | ------------------------------------------- |
+| `id`                 | SERIAL (PK)              | Entry identifier                            |
+| `profile_id`         | INTEGER (FK)             | References `league_scoring_profiles.id`     |
+| `stat_definition_id` | INTEGER (FK)             | References `scoring_stat_definitions.id`    |
+| `multiplier`         | NUMERIC(6,3)             | Custom multiplier value                     |
+| `is_enabled`         | BOOLEAN                  | Allows toggling a stat off without deletion |
+| `created_at`         | TIMESTAMP WITH TIME ZONE | Creation timestamp                          |
+| `updated_at`         | TIMESTAMP WITH TIME ZONE | Auto-updated on change                      |
+
+**Key Features**:
+
+- Unique constraint on `(profile_id, stat_definition_id)`
+- Trigger-enforced bounds derive from definition table
+- `is_enabled` allows optional stats without dropping entries
+
+### 25. **League Scoring Change Log** (`league_scoring_change_log`)
+
+**Purpose**: Audit trail for multiplier changes to support commissioner oversight and rollback.
+
+| Column                | Type                     | Description                                        |
+| --------------------- | ------------------------ | -------------------------------------------------- |
+| `id`                  | BIGSERIAL (PK)           | Change log entry                                   |
+| `profile_id`          | INTEGER (FK)             | References `league_scoring_profiles.id`            |
+| `stat_definition_id`  | INTEGER (FK)             | References `scoring_stat_definitions.id`           |
+| `previous_multiplier` | NUMERIC(6,3)             | Multiplier before change (null on insert)          |
+| `new_multiplier`      | NUMERIC(6,3)             | Multiplier after change                            |
+| `changed_by`          | INTEGER (FK)             | References `users.id` (optional commissioner link) |
+| `changed_at`          | TIMESTAMP WITH TIME ZONE | Timestamp of change                                |
+| `change_reason`       | VARCHAR(120)             | Optional human-readable reason                     |
+| `action`              | ENUM                     | `created`, `updated`, or `disabled`                |
+
+**Key Features**:
+
+- Populated via `AFTER` triggers on profile entries
+- Enables auditing and approval workflows
+- Supports rollback tooling by retaining previous value
+
+#### Scoring Relationships Diagram
+
+```mermaid
+erDiagram
+	leagues ||--o{ league_scoring_profiles : "has"
+	league_scoring_profiles ||--o{ league_scoring_profile_entries : "includes"
+	scoring_stat_definitions ||--o{ league_scoring_profile_entries : "defines"
+	league_scoring_profile_entries ||--o{ league_scoring_change_log : "audits"
+```
+
 ### 22. **League Positions** (`league_positions`)
 
 **Purpose**: Position slots configuration per league

@@ -47,6 +47,20 @@
           "reportCompressedSize": true
         }
       }
+    },
+    "codegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/web"
+      }
+    },
+    "codegen:db": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
+        "cwd": "apps/web"
+      }
     }
   }
 }

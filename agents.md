@@ -89,15 +89,15 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Jira ticket management
-acli issue view LS-1234                          # View ticket
-acli issue transition LS-1234 "In Progress"      # Start work
-acli issue transition LS-1234 "In Review"        # PR created
-acli issue transition LS-1234 "Done"             # PR merged
+acli jira workitem view LS-1234                          # View ticket
+acli jira workitem transition --key LS-1234 --status "In Progress"      # Start work
+acli jira workitem transition --key LS-1234 --status "In Review"        # PR created
+acli jira workitem transition --key LS-1234 --status "Done"             # PR merged
 
 # Branch creation
 git checkout main; git pull                      # For new ticket
-twig github new-branch LS-1234                   # Create branch from main
-twig switch LS-1234 -p                          # Create branch from current
+twig switch LS-1234                              # Create branch from main
+twig switch LS-1234 -p current                   # Create branch from current
 
 # Verify branch tree structure
 twig tree                                        # Check branch dependencies
@@ -123,6 +123,7 @@ twig github pr create-pr
 - Use **Nx commands** (`pnpm exec nx affected -t test`) not direct npm commands
 - Use **pnpm exec nx** prefix for all Nx commands (not just `nx`)
 - Use **PowerShell syntax** (`;` for chaining, `$env:` for variables)
+- Add every **new ticket to the current sprint** before you start coding (move it on the Jira board)
 - Update **Jira ticket status** at each workflow stage
 - Run validation checks **in order**: typecheck → lint → test → build
 - Follow **conventional commit** format: `type(scope): message`
@@ -153,7 +154,7 @@ twig github pr create-pr
 
 ### For Every Contribution
 
-- [ ] **Plan**: Verify/create Jira ticket → Update to "In Progress"
+- [ ] **Plan**: Verify/create Jira ticket → Add to current sprint → Update to "In Progress"
 - [ ] **Branch**: Create branch with twig (from main or current)
 - [ ] **Implement**: Write code using Nx commands
 - [ ] **Validate**: Run typecheck → lint → test → build (all must pass)
