@@ -127,7 +127,7 @@
     "@tamagui/core": "1.132.23",
     "@tamagui/font-inter": "1.132.23",
     "@tamagui/lucide-icons": "1.132.23",
-    "@tamagui/shorthands": "1.132.23",
+    "@tamagui/shorthands": "1.135.4",
     "@tamagui/theme-base": "1.132.23",
     "axios": "1.12.2",
     "bcryptjs": "^3.0.2",
