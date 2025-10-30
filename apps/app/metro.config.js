@@ -11,11 +11,6 @@ const path = require('path');
  */
 const defaultConfig = getDefaultConfig(__dirname);
 
-// Get exclusionList from the default config (Expo provides this)
-const {
-  resolver: { blockList: exclusionList },
-} = defaultConfig;
-
 const customConfig = {
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
@@ -34,7 +29,6 @@ const customConfig = {
       'native.ts',
       'native.tsx',
     ],
-    blockList: exclusionList([/^.*\.test\.tsx?$/]),
     nodeModulesPaths: [
       path.resolve(__dirname, '../../node_modules'),
       path.resolve(__dirname, './node_modules'),

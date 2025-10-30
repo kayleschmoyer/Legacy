@@ -42,24 +42,24 @@ runs:
       shell: bash
       run: |
         echo "::group::📊 Collecting CI Results and Metrics"
-        
+
         # Parse input step results
         STEP_RESULTS='${{ inputs.step-results }}'
         FAILURE_THRESHOLD="${{ inputs.failure-threshold }}"
         INCLUDE_PERF="${{ inputs.include-performance-metrics }}"
-        
+
         echo "📋 Processing step results..."
-        
+
         # Validate and enhance step results
         if ! echo "$STEP_RESULTS" | jq . >/dev/null 2>&1; then
           echo "::error::Invalid JSON in step-results input"
           exit 1
         fi
-        
+
         # Determine overall status based on failure threshold
         OVERALL_STATUS="success"
         FAILED_STEPS=()
-        
+
         # Check each step against failure threshold
         IFS=',' read -ra CRITICAL_STEPS <<< "$FAILURE_THRESHOLD"
         for step in "${CRITICAL_STEPS[@]}"; do
@@ -76,11 +76,11 @@ runs:
             echo "❓ Critical step '$step' status: $STEP_RESULT"
           fi
         done
-        
+
         # Calculate workflow duration
         WORKFLOW_DURATION="unknown"
         WORKFLOW_START="${{ inputs.workflow-start-time }}"
-        
+
         if [ -n "$WORKFLOW_START" ]; then
           echo "⏱️ Calculating workflow duration..."
           START_SECONDS=$(date -d "$WORKFLOW_START" +%s 2>/dev/null || date +%s)
@@ -88,7 +88,7 @@ runs:
           WORKFLOW_DURATION=$((CURRENT_SECONDS - START_SECONDS))
           echo "Duration: ${WORKFLOW_DURATION}s ($(($WORKFLOW_DURATION / 60))m $(($WORKFLOW_DURATION % 60))s)"
         fi
-        
+
         # Generate performance summary if enabled
         PERFORMANCE_SUMMARY="{}"
         if [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then
@@ -117,33 +117,39 @@ runs:
             }
           }' "$WORKFLOW_DURATION" "$PERFORMANCE_CATEGORY" "$PERFORMANCE_RATING" "$WORKFLOW_DURATION")
         fi
-        
+
         # Create enhanced step results with metadata
-        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$WORKFLOW_DURATION" --arg status "$OVERALL_STATUS" '. + {"metadata": {"overall_status": $status, "workflow_duration": $duration, "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")), "total_steps": (. | length)}}')
-        
+        if [[ "$WORKFLOW_DURATION" =~ ^[0-9]+$ ]]; then
+          JQ_DURATION_ARG="$WORKFLOW_DURATION"
+        else
+          JQ_DURATION_ARG="null"
+        fi
+
+        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$JQ_DURATION_ARG" --arg status "$OVERALL_STATUS" '. + {"metadata": {"overall_status": $status, "workflow_duration": $duration, "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")), "total_steps": (. | length)}}')
+
         # Set outputs
         echo "step-results=$(echo "$ENHANCED_RESULTS" | jq -c .)" >> $GITHUB_OUTPUT
         echo "overall-status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
         echo "workflow-duration=$WORKFLOW_DURATION" >> $GITHUB_OUTPUT
         echo "failed-steps=$(printf '%s,' "${FAILED_STEPS[@]}" | sed 's/,$//')" >> $GITHUB_OUTPUT
         echo "performance-summary=$(echo "$PERFORMANCE_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
-        
+
         # Create step summary
         echo "## 📊 CI Results Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Overall Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "✅ Success" || echo "❌ Failed" )" >> $GITHUB_STEP_SUMMARY
         echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY
         echo "- **Failed Steps**: $( [ ${#FAILED_STEPS[@]} -eq 0 ] && echo "None" || printf '%s, ' "${FAILED_STEPS[@]}" | sed 's/, $//' )" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then
           PERF_RATING=$(echo "$PERFORMANCE_SUMMARY" | jq -r '.rating')
           echo "- **Performance**: $PERF_RATING" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "### Step Details" >> $GITHUB_STEP_SUMMARY
         echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "$STEP_RESULTS" | jq -r 'to_entries[] | "| " + .key + " | " + (if .value == "success" then "✅ " + .value elif .value == "failure" then "❌ " + .value else "❓ " + .value end) + " |"' >> $GITHUB_STEP_SUMMARY
-        
+
         echo "📊 Results collection completed: $OVERALL_STATUS"
         echo "::endgroup::"
