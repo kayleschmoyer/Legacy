@@ -259,7 +259,7 @@ git branch -m branch-name-clean branch-name
 
 # Method 2: Use rebase with --skip for duplicates
 git checkout branch-name
-git rebase parent-branch
+git rebase --no-edit parent-branch
 # When conflicts occur on duplicate commits:
 git rebase --skip  # Skip the duplicate
 # Continue until only unique commits remain

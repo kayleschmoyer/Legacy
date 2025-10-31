@@ -215,7 +215,7 @@ Best when duplicates are at the beginning of the branch.
 ```powershell
 # 1. Start rebase
 git checkout current-branch
-git rebase parent-branch
+git rebase --no-edit parent-branch
 
 # 2. When conflicts occur on duplicate commits
 # Git will show:
@@ -230,7 +230,7 @@ git rebase --skip
 
 # 5. If you hit a real commit with conflicts, resolve them
 git add .
-git rebase --continue
+git rebase --no-edit --continue
 ```
 
 ### Option 3: Rebase with --onto
@@ -239,10 +239,10 @@ Best for complex situations where you need to rebase onto a different parent.
 
 ```powershell
 # Rebase current branch onto new parent, starting from old parent
-git rebase --onto new-parent old-parent current-branch
+git rebase --no-edit --onto new-parent old-parent current-branch
 
 # Example: Move LS-20 from LS-18 to LS-19
-git rebase --onto LS-19/build-graphql-resolvers LS-18/extend-matchup-schema LS-20/implement-scheduling
+git rebase --no-edit --onto LS-19/build-graphql-resolvers LS-18/extend-matchup-schema LS-20/implement-scheduling
 ```
 
 ---
@@ -404,7 +404,7 @@ git merge parent-branch
 
 # ✅ CORRECT: Rebase child onto parent
 git checkout child-branch
-git rebase parent-branch
+git rebase --no-edit parent-branch
 # Maintains linear history
 ```
 

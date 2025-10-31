@@ -7,7 +7,7 @@ development_workflow,branch_management,CRITICAL,check_commit_count,Verify commit
 development_workflow,branch_management,PRIORITY,clean_branch_indicators,Monitor twig tree commit counts for anomalies,"[+1] is clean, [+25] likely has duplicates",""
 development_workflow,branch_management,PROCESS,create_dependent_branch,Create child branch from specific parent,"git checkout parent; twig switch LS-1234 -p current",""
 development_workflow,branch_management,RECOVERY,fix_duplicate_commits,Clean up branches with duplicate commits,"git checkout -b clean parent; git cherry-pick unique-commit; git branch -D old",""
-development_workflow,branch_management,RECOVERY,skip_duplicate_rebase,Skip duplicate commits during rebase,"git rebase parent; git rebase --skip for duplicates",""
+development_workflow,branch_management,RECOVERY,skip_duplicate_rebase,Skip duplicate commits during rebase,"git rebase --no-edit parent; git rebase --skip for duplicates",""
 development_workflow,branch_management,AUTOMATION,cascade_rebase,Rebase entire dependent branch chain,"git checkout parent; twig cascade --show-graph --autostash",""
 development_workflow,branch_management,BEST_PRACTICE,plan_tree_structure,Plan multi-branch dependency tree before creating,"Document parent-child relationships in ticket",""
 development_workflow,branch_management,BEST_PRACTICE,frequent_tree_checks,Check twig tree frequently during multi-branch work,"twig tree after each branch creation",""

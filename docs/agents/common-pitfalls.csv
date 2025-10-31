@@ -3,7 +3,7 @@ common_pitfalls,branch_management,CRITICAL,duplicate_commits,Never create depend
 common_pitfalls,branch_management,CRITICAL,ignoring_tree_structure,Never ignore high commit counts in twig tree,"[+25] likely means duplicates, investigate immediately",""
 common_pitfalls,branch_management,CRITICAL,force_push_without_verification,Never force-push without verifying tree is clean,"Check twig tree and commit counts first",""
 common_pitfalls,branch_management,PRIORITY,skip_tree_verification,Never create multiple dependent branches without checking tree,"Run twig tree after each branch creation",""
-common_pitfalls,branch_management,RECOVERY,merge_instead_of_rebase,Using merge instead of rebase pollutes history with merge commits,"Use git rebase or twig cascade",""
+common_pitfalls,branch_management,RECOVERY,merge_instead_of_rebase,Using merge instead of rebase pollutes history with merge commits,"Use git rebase --no-edit or twig cascade",""
 common_pitfalls,platform_abstraction,CRITICAL,breaking_platform_abstraction,Never import platform-specific files directly,"import from './web/ReactNativeEquivalents' // ❌",""
 common_pitfalls,type_safety,CRITICAL,type_shortcuts,Never use any instead of proper interfaces,"const data: any = response; // ❌",""
 common_pitfalls,code_quality,CRITICAL,eslint_avoidance,Never disable ESLint rules instead of fixing root causes,"// eslint-disable-next-line // ❌",""
