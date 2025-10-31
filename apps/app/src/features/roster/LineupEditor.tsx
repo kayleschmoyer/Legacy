@@ -1,12 +1,71 @@
 import { useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
 import { Button, Separator, Text, YStack } from 'tamagui';
-import { ListRenderItem, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
+import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
+
+type MaybeNumber = number | null | undefined;
+
+const getPlayerName = (teamMember: TeamMemberFragment | undefined): string => {
+  if (!teamMember?.player) {
+    return 'Empty';
+  }
+
+  const { firstName, lastName } = teamMember.player;
+  const combined = `${firstName ?? ''} ${lastName ?? ''}`.trim();
+
+  return combined.length > 0 ? combined : 'Unknown Player';
+};
+
+const computeScoreColor = (
+  actualValue: MaybeNumber,
+  projectedValue: MaybeNumber,
+): string => {
+  if (!Number.isFinite(actualValue ?? NaN) || actualValue === null) {
+    return '$color';
+  }
+
+  if (!Number.isFinite(projectedValue ?? NaN) || projectedValue === null) {
+    return '$color';
+  }
+
+  const actual = Number(actualValue);
+  const projected = Number(projectedValue);
+
+  if (Math.abs(actual - projected) < 0.005) {
+    return '$blue10';
+  }
+
+  return actual > projected ? '$green10' : '$red10';
+};
+
+const formatScoreDisplay = (
+  actualValue: MaybeNumber,
+  projectedValue: MaybeNumber,
+): string => {
+  const hasActual = Number.isFinite(actualValue ?? NaN) && actualValue !== null;
+  const hasProjection =
+    Number.isFinite(projectedValue ?? NaN) && projectedValue !== null;
+
+  if (hasActual && hasProjection) {
+    return `${Number(actualValue).toFixed(2)} (${Number(projectedValue).toFixed(2)})`;
+  }
+
+  if (hasActual) {
+    return Number(actualValue).toFixed(2);
+  }
+
+  if (hasProjection) {
+    return `Projected: ${Number(projectedValue).toFixed(2)} pts`;
+  }
+
+  return '';
+};
 
 export interface LineupEditorProps {
   availableRosterSlots: readonly LeaguePositionFragment[];
@@ -56,13 +115,13 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     BenchPlayerData | StarterData | undefined
   >(undefined);
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-
   const selectedPositionMapping = useMemo(() => {
     switch (selectedPlayerData?.type) {
       case 'starter-data':
         return availableRosterSlots.find(
-          (r) => r.id === selectedPlayerData.positionMappingId,
+          (r) =>
+            normalizeNumericIdentifier(r.id) ===
+            selectedPlayerData.positionMappingId,
         );
       case 'bench-player-data':
       default:
@@ -74,10 +133,16 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     switch (selectedPlayerData?.type) {
       case 'starter-data':
         return team.find(
-          (t) => t.positionId === selectedPlayerData.positionMappingId,
+          (t) =>
+            normalizeNumericIdentifier(t.positionId) ===
+            selectedPlayerData.positionMappingId,
         );
       case 'bench-player-data':
-        return team.find((t) => t.playerId === selectedPlayerData.playerId);
+        return team.find(
+          (t) =>
+            normalizeNumericIdentifier(t.playerId) ===
+            selectedPlayerData.playerId,
+        );
       default:
         return undefined;
     }
@@ -85,21 +150,27 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
 
   const onBenchPlayerClicked = useCallback(
     (benchPlayer: TeamMemberFragment) => {
-      // If no player is selected, return
+      const benchPlayerId = normalizeNumericIdentifier(benchPlayer.playerId);
+
+      if (benchPlayerId === undefined) {
+        return;
+      }
+
       if (selectedPlayerData === undefined) {
         setSelectedPlayerData({
-          playerId: benchPlayer.playerId,
+          playerId: benchPlayerId,
           type: 'bench-player-data',
         });
         return;
       }
 
-      if (selectedPlayer === benchPlayer) {
+      if (
+        normalizeNumericIdentifier(selectedPlayer?.playerId) === benchPlayerId
+      ) {
         setSelectedPlayerData(undefined);
         return;
       }
 
-      // If a rostered player is selected, insert this player and remove the other player
       if (!selectedPositionMapping) {
         return;
       }
@@ -122,32 +193,41 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   );
 
   const onRosterSlotClicked = useCallback(
-    (positionId: number, playerId: number | undefined) => {
+    (
+      positionId: number | null | undefined,
+      playerId: number | null | undefined,
+    ) => {
+      const normalizedPositionId = normalizeNumericIdentifier(positionId);
+      const normalizedPlayerId = normalizeNumericIdentifier(playerId);
+
+      if (normalizedPositionId === undefined) {
+        setSelectedPlayerData(undefined);
+        return;
+      }
+
       if (selectedPlayerData === undefined) {
         setSelectedPlayerData({
-          playerId: playerId,
-          positionMappingId: positionId,
+          playerId: normalizedPlayerId,
+          positionMappingId: normalizedPositionId,
           type: 'starter-data',
         });
         return;
       }
 
-      const thisPlayer = team.find((t) => t.playerId === playerId);
+      const thisPlayer = team.find(
+        (t) => normalizeNumericIdentifier(t.playerId) === normalizedPlayerId,
+      );
       const thisPositionMapping = availableRosterSlots.find(
-        (s) => s.id === positionId,
+        (s) => normalizeNumericIdentifier(s.id) === normalizedPositionId,
       );
 
-      // Swap with the existing player
       if (selectedPlayer !== undefined && thisPlayer !== undefined) {
         onPlayerMoved(selectedPlayer, thisPlayer);
       } else if (selectedPlayer && thisPositionMapping) {
-        // Move a player to this empty spot
         onPlayerAdded(selectedPlayer, thisPositionMapping);
       } else if (thisPlayer && selectedPositionMapping) {
-        // Move this player to an already selected empty spot
         onPlayerAdded(thisPlayer, selectedPositionMapping);
       }
-      // Otherwise, neither some piece of data was missing, so skip
 
       setSelectedPlayerData(undefined);
     },
@@ -166,11 +246,19 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     const result: Array<StarterData | BenchPlayerData | EmptySlotData> = [];
 
     for (const rosterSlot of availableRosterSlots) {
-      const teamMember = team.find((t) => t.positionId === rosterSlot.id);
+      const mappingId = normalizeNumericIdentifier(rosterSlot?.id);
+
+      if (mappingId === undefined) {
+        continue;
+      }
+
+      const teamMember = team.find(
+        (t) => normalizeNumericIdentifier(t.positionId) === mappingId,
+      );
 
       result.push({
-        playerId: teamMember?.playerId,
-        positionMappingId: rosterSlot.id,
+        playerId: normalizeNumericIdentifier(teamMember?.playerId),
+        positionMappingId: mappingId,
         type: 'starter-data',
       });
     }
@@ -180,8 +268,14 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
         continue;
       }
 
+      const benchPlayerId = normalizeNumericIdentifier(teamMember.playerId);
+
+      if (benchPlayerId === undefined) {
+        continue;
+      }
+
       result.push({
-        playerId: teamMember.playerId,
+        playerId: benchPlayerId,
         type: 'bench-player-data',
       });
     }
@@ -196,23 +290,36 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
   }, [team, availableRosterSlots, selectedPlayer, selectedPositionMapping]);
 
   const onClick = useCallback(
-    (item: StarterData | BenchPlayerData | EmptySlotData) => {
+    (item: PlayerData) => {
       let mapping: LeaguePositionFragment | undefined;
       let teamMember: TeamMemberFragment | undefined;
 
       switch (item.type) {
         case 'starter-data':
           mapping = availableRosterSlots.find(
-            (m) => m.id === item.positionMappingId,
+            (m) => normalizeNumericIdentifier(m.id) === item.positionMappingId,
           );
-          teamMember = team.find((t) => t.positionId === mapping?.id);
+          teamMember = team.find(
+            (t) =>
+              normalizeNumericIdentifier(t.positionId) ===
+              item.positionMappingId,
+          );
 
           if (mapping) {
-            onRosterSlotClicked(mapping?.id, teamMember?.playerId);
+            const mappingId = normalizeNumericIdentifier(mapping?.id);
+            const playerId = normalizeNumericIdentifier(teamMember?.playerId);
+
+            if (mappingId === undefined) {
+              break;
+            }
+
+            onRosterSlotClicked(mappingId, playerId);
           }
           break;
         case 'bench-player-data':
-          teamMember = team.find((t) => t.playerId === item.playerId);
+          teamMember = team.find(
+            (t) => normalizeNumericIdentifier(t.playerId) === item.playerId,
+          );
 
           if (teamMember) {
             onBenchPlayerClicked(teamMember);
@@ -236,21 +343,30 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     ],
   );
 
-  const onRenderItem = useCallback<ListRenderItem<PlayerData>>(
-    ({ item }) => {
+  const renderPlayerRow = useCallback(
+    (item: PlayerData) => {
       const positionSlot = availableRosterSlots.find(
         (s) => item.type === 'starter-data' && s.id === item.positionMappingId,
       );
-      const teamMember = team.find(
-        (t) =>
-          (item.type === 'bench-player-data' || item.type === 'starter-data') &&
-          t.playerId === item.playerId,
-      );
+      const normalizedItemPlayerId =
+        item.type === 'bench-player-data' || item.type === 'starter-data'
+          ? item.playerId
+          : undefined;
+      const teamMember = team.find((t) => {
+        const candidateId = normalizeNumericIdentifier(t.playerId);
+        return (
+          candidateId !== undefined && candidateId === normalizedItemPlayerId
+        );
+      });
 
-      const projValue = teamMember
-        ? projections[teamMember.playerId]
-        : undefined;
-      const actualValue = teamMember ? actual[teamMember.playerId] : undefined;
+      const playerId = normalizeNumericIdentifier(teamMember?.playerId);
+
+      const projValue =
+        playerId === undefined ? undefined : projections[playerId];
+      const actualValue = playerId === undefined ? undefined : actual[playerId];
+
+      const scoreColor = computeScoreColor(actualValue, projValue);
+      const scoreDisplay = formatScoreDisplay(actualValue, projValue);
 
       return (
         <YStack
@@ -268,7 +384,6 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
             disabled={
               !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
               !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
-              // This prevents bench players from being assigned to one another
               (selectedPositionMapping === undefined &&
                 positionSlot === undefined &&
                 selectedPlayer !== undefined &&
@@ -284,26 +399,10 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
           </Button>
 
           <Text flex={1} textAlign="center">
-            {teamMember?.player?.name || 'Empty'}
+            {getPlayerName(teamMember)}
           </Text>
 
-          <Text
-            color={
-              actualValue === undefined
-                ? '$color'
-                : actualValue === projValue
-                  ? '$blue10'
-                  : actualValue > (projValue || 0)
-                    ? '$green10'
-                    : '$red10'
-            }
-          >
-            {actualValue
-              ? `${actualValue.toFixed(2)} (${projValue?.toFixed(2)})`
-              : projValue
-                ? projValue.toFixed(2)
-                : ''}
-          </Text>
+          <Text color={scoreColor}>{scoreDisplay}</Text>
         </YStack>
       );
     },
@@ -328,7 +427,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       >
         {rosterSlots.map((item, index) => (
           <YStack key={index}>
-            {onRenderItem({ item, index })}
+            {renderPlayerRow(item)}
             {index < rosterSlots.length - 1 && <Separator />}
           </YStack>
         ))}

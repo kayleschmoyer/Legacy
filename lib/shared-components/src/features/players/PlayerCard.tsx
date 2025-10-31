@@ -2,14 +2,7 @@ import React from 'react';
 import { Card, H4, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { TrendingUp } from '@tamagui/lucide-icons';
 import { PlayerFragment } from './PlayersApi';
-
-const formatProjectionValue = (value?: number | null): string => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value.toFixed(1);
-  }
-
-  return '—';
-};
+import { formatProjection } from './usePlayerProjections';
 
 export interface PlayerCardProps {
   player: PlayerFragment;
@@ -75,7 +68,7 @@ function PlayerCard({
                 </Text>
               </XStack>
               <Text fontSize="$3" color="$blue11" fontWeight="700">
-                {formatProjectionValue(projectedPoints)} pts/g
+                {formatProjection(projectedPoints)} pts/g
               </Text>
             </XStack>
           )}

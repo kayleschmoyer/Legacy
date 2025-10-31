@@ -49,6 +49,7 @@ export function LeagueScoringSummary(
   const { loading, error, profileName, settings } = props;
 
   const defaults = useMemo(() => createDefaultScoringSettings(), []);
+  const errorText = error?.message ?? null;
 
   return (
     <Card
@@ -75,13 +76,13 @@ export function LeagueScoringSummary(
           </Text>
         )}
 
-        {error && !loading && (
+        {errorText && !loading && (
           <Text fontSize="$3" color="$red10" role="alert">
-            Failed to load scoring data: {error.message}
+            Failed to load scoring data: {errorText}
           </Text>
         )}
 
-        {!loading && !error && (
+        {!loading && !errorText && (
           <XStack gap="$4" flexWrap="wrap">
             {GROUP_CONFIG.map((group) => {
               const groupSettings = settings[group.key] ?? {};

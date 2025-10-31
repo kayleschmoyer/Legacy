@@ -182,6 +182,62 @@ input UpdateLeagueScoringMultiplierInput {
 
 ````
 
+### Scoring Types
+
+```graphql
+type LeagueScoringProfile {
+  profileId: Int
+  leagueId: Int
+  profileName: String
+  definitions: [ScoringStatDefinition!]!
+  entries: [LeagueScoringProfileEntry!]!
+  stats: [LeagueScoringStatValue!]!
+  multiplierGroups: [LeagueScoringMultiplierGroup!]!
+}
+
+type ScoringStatDefinition {
+  id: Int!
+  statKey: String!
+  statGroup: ScoringStatGroup!
+  sourceTable: String!
+  sourceColumn: String!
+  displayName: String!
+  description: String
+  defaultMultiplier: Float!
+  minMultiplier: Float!
+  maxMultiplier: Float!
+  stepSize: Float!
+  isRequired: Boolean!
+  enforcePositive: Boolean!
+  enforceNegative: Boolean!
+}
+
+type LeagueScoringStatValue {
+  definition: ScoringStatDefinition!
+  multiplier: Float!
+  defaultMultiplier: Float!
+  isOverride: Boolean!
+  isEnabled: Boolean!
+}
+
+type LeagueScoringMultiplierGroup {
+  group: ScoringStatGroup!
+  values: [ScoringMultiplierEntry!]!
+}
+
+type ScoringMultiplierEntry {
+  statKey: String!
+  sourceColumn: String!
+  multiplier: Float!
+}
+
+input UpdateLeagueScoringMultiplierInput {
+  statDefinitionId: Int!
+  multiplier: Float
+  isEnabled: Boolean
+}
+```
+
 ## Query Operations
 
 ### Authentication Queries
@@ -243,6 +299,7 @@ query GetLeague($leagueId: ID!) {
     description
     season
     status
+    maxTeams
     settings {
       rosterSize
       startingLineup {
@@ -253,6 +310,10 @@ query GetLeague($leagueId: ID!) {
         k
         def
         bench
+      }
+      scoring {
+        profileId
+        profileName
       }
     }
     teams {

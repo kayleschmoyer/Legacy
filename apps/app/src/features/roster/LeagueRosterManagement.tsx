@@ -15,13 +15,17 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
+import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
+import { useTeamMemberProjections } from '../scoring';
 
 // Helper function to get player name from TeamMember's player field
 // Get player name from TeamMember's player field
-const getPlayerName = (teamMember: TeamMemberFragment | null | undefined): string => {
+const getPlayerName = (
+  teamMember: TeamMemberFragment | null | undefined,
+): string => {
   if (!teamMember?.player) return 'Unknown Player';
-  
+
   const { firstName, lastName } = teamMember.player;
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
 };
@@ -31,10 +35,15 @@ interface RosterSlotProps {
   assignedPlayer?: TeamMemberFragment | null;
   availablePlayers: readonly TeamMemberFragment[];
   selectedPlayer?: TeamMemberFragment | null;
-  onPlayerAssign: (player: TeamMemberFragment, position: LeaguePositionFragment) => void;
+  onPlayerAssign: (
+    player: TeamMemberFragment,
+    position: LeaguePositionFragment,
+  ) => void;
   onPlayerRemove: (position: LeaguePositionFragment) => void;
   onPlayerSelect: (player: TeamMemberFragment | null) => void;
   isSelected?: boolean;
+  projectionValue?: number;
+  isProjectionLoading?: boolean;
 }
 
 function RosterSlot({
@@ -46,11 +55,13 @@ function RosterSlot({
   onPlayerRemove,
   onPlayerSelect,
   isSelected = false,
+  projectionValue,
+  isProjectionLoading = false,
 }: RosterSlotProps): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const eligiblePlayers = useMemo(() => {
-    return availablePlayers.filter(player => 
-      player && canPlayerPlayPosition(player, position)
+    return availablePlayers.filter(
+      (player) => player && canPlayerPlayPosition(player, position),
     );
   }, [availablePlayers, position]);
 
@@ -58,12 +69,21 @@ function RosterSlot({
     if (assignedPlayer) {
       // If there's an assigned player, select it
       onPlayerSelect(assignedPlayer);
-    } else if (selectedPlayer && canPlayerPlayPosition(selectedPlayer, position)) {
+    } else if (
+      selectedPlayer &&
+      canPlayerPlayPosition(selectedPlayer, position)
+    ) {
       // If we have a selected player and they can play this position, assign them
       onPlayerAssign(selectedPlayer, position);
       onPlayerSelect(null);
     }
-  }, [assignedPlayer, selectedPlayer, position, onPlayerAssign, onPlayerSelect]);
+  }, [
+    assignedPlayer,
+    selectedPlayer,
+    position,
+    onPlayerAssign,
+    onPlayerSelect,
+  ]);
 
   const handleRemovePlayer = useCallback(() => {
     if (assignedPlayer) {
@@ -74,14 +94,14 @@ function RosterSlot({
   const getPositionDisplayName = (positionType: string) => {
     const displayNames: Record<string, string> = {
       SP: 'SP',
-      RP: 'RP', 
+      RP: 'RP',
       C: 'C',
       '1B': '1B',
       '2B': '2B',
       '3B': '3B',
       SS: 'SS',
       LF: 'LF',
-      CF: 'CF', 
+      CF: 'CF',
       RF: 'RF',
       OF: 'OF',
       IF: 'IF',
@@ -91,34 +111,35 @@ function RosterSlot({
     return displayNames[positionType] || positionType;
   };
 
-  const canAcceptSelectedPlayer = selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
+  const canAcceptSelectedPlayer =
+    selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
 
   return (
-    <Card 
+    <Card
       padding="$3"
       margin="$1"
       borderWidth={1}
       borderColor={
-        isSelected 
-          ? "$blue8" 
-          : canAcceptSelectedPlayer 
-            ? "$green8"
-            : assignedPlayer 
-              ? "$gray6" 
-              : "$gray4"
+        isSelected
+          ? '$blue8'
+          : canAcceptSelectedPlayer
+            ? '$green8'
+            : assignedPlayer
+              ? '$gray6'
+              : '$gray4'
       }
       backgroundColor={
-        isSelected 
-          ? "$blue2" 
-          : canAcceptSelectedPlayer 
-            ? "$green2"
-            : assignedPlayer 
-              ? "$gray2" 
-              : "$gray1"
+        isSelected
+          ? '$blue2'
+          : canAcceptSelectedPlayer
+            ? '$green2'
+            : assignedPlayer
+              ? '$gray2'
+              : '$gray1'
       }
       pressStyle={{
         scale: 0.98,
-        borderColor: "$blue10"
+        borderColor: '$blue10',
       }}
       onPress={handleSlotPress}
     >
@@ -127,22 +148,28 @@ function RosterSlot({
           <Text fontSize="$3" fontWeight="600" color="$gray12">
             {getPositionDisplayName(position.positionType || '')}
           </Text>
-          <Text fontSize="$4" color={assignedPlayer ? "$gray12" : "$gray8"}>
-            {assignedPlayer
-              ? getPlayerName(assignedPlayer)
-              : 'Empty'
-            }
+          <Text fontSize="$4" color={assignedPlayer ? '$gray12' : '$gray8'}>
+            {assignedPlayer ? getPlayerName(assignedPlayer) : 'Empty'}
           </Text>
           {assignedPlayer && (
             <Text fontSize="$2" color="$gray10">
               Team Member ID: {assignedPlayer.id}
             </Text>
           )}
+          {assignedPlayer && (
+            <Text fontSize="$2" color="$gray10">
+              {isProjectionLoading
+                ? 'Calculating projection...'
+                : projectionValue !== undefined
+                  ? `Projected: ${projectionValue.toFixed(2)} pts`
+                  : 'Projected: N/A'}
+            </Text>
+          )}
         </YStack>
-        
+
         {assignedPlayer && (
-          <Button 
-            size="$2" 
+          <Button
+            size="$2"
             theme="red"
             onPress={handleRemovePlayer}
             marginLeft="$2"
@@ -159,15 +186,19 @@ interface AvailablePlayerListProps {
   players: readonly TeamMemberFragment[];
   selectedPlayer?: TeamMemberFragment | null;
   onPlayerSelect: (player: TeamMemberFragment | null) => void;
+  projections: Record<number, number>;
+  isLoading: boolean;
 }
 
-function AvailablePlayerList({ 
-  players, 
-  selectedPlayer, 
-  onPlayerSelect 
+function AvailablePlayerList({
+  players,
+  selectedPlayer,
+  onPlayerSelect,
+  projections,
+  isLoading,
 }: AvailablePlayerListProps): React.JSX.Element {
   const unassignedPlayers = useMemo(() => {
-    return players.filter(player => !player.positionId);
+    return players.filter((player) => !player.positionId);
   }, [players]);
 
   return (
@@ -178,36 +209,55 @@ function AvailablePlayerList({
           No unassigned players
         </Text>
       ) : (
-        unassignedPlayers.map((player) => (
-          <Card
-            key={player.id}
-            padding="$3"
-            borderWidth={1}
-            borderColor={selectedPlayer?.id === player.id ? "$blue8" : "$gray4"}
-            backgroundColor={selectedPlayer?.id === player.id ? "$blue2" : "$background"}
-            pressStyle={{
-              scale: 0.98,
-              borderColor: "$blue10"
-            }}
-            onPress={() => onPlayerSelect(selectedPlayer?.id === player.id ? null : player)}
-          >
-            <XStack justifyContent="space-between" alignItems="center">
-              <YStack>
-                <Text fontSize="$4" fontWeight="500">
-                  {getPlayerName(player)}
-                </Text>
-                <Text fontSize="$3" color="$gray10">
-                  Team Member ID: {player.id}
-                </Text>
-              </YStack>
-              {selectedPlayer?.id === player.id && (
-                <Text color="$blue10" fontSize="$3" fontWeight="600">
-                  Selected
-                </Text>
-              )}
-            </XStack>
-          </Card>
-        ))
+        unassignedPlayers.map((player) => {
+          const playerId = normalizeNumericIdentifier(player.playerId);
+          const projection =
+            playerId === undefined ? undefined : projections[playerId];
+
+          return (
+            <Card
+              key={player.id}
+              padding="$3"
+              borderWidth={1}
+              borderColor={
+                selectedPlayer?.id === player.id ? '$blue8' : '$gray4'
+              }
+              backgroundColor={
+                selectedPlayer?.id === player.id ? '$blue2' : '$background'
+              }
+              pressStyle={{
+                scale: 0.98,
+                borderColor: '$blue10',
+              }}
+              onPress={() =>
+                onPlayerSelect(selectedPlayer?.id === player.id ? null : player)
+              }
+            >
+              <XStack justifyContent="space-between" alignItems="center">
+                <YStack>
+                  <Text fontSize="$4" fontWeight="500">
+                    {getPlayerName(player)}
+                  </Text>
+                  <Text fontSize="$3" color="$gray10">
+                    Team Member ID: {player.id}
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    {isLoading
+                      ? 'Calculating projection...'
+                      : projection !== undefined
+                        ? `Projected: ${projection.toFixed(2)} pts`
+                        : 'Projected: N/A'}
+                  </Text>
+                </YStack>
+                {selectedPlayer?.id === player.id && (
+                  <Text color="$blue10" fontSize="$3" fontWeight="600">
+                    Selected
+                  </Text>
+                )}
+              </XStack>
+            </Card>
+          );
+        })
       )}
     </YStack>
   );
@@ -216,9 +266,13 @@ function AvailablePlayerList({
 export interface LeagueRosterManagementProps {
   positions: readonly LeaguePositionFragment[];
   teamPlayers: readonly TeamMemberFragment[];
-  onPlayerAssign: (player: TeamMemberFragment, position: LeaguePositionFragment) => void;
+  onPlayerAssign: (
+    player: TeamMemberFragment,
+    position: LeaguePositionFragment,
+  ) => void;
   onPlayerRemove: (position: LeaguePositionFragment) => void;
   loading?: boolean;
+  leagueId?: number | null;
 }
 
 export function LeagueRosterManagement({
@@ -227,19 +281,43 @@ export function LeagueRosterManagement({
   onPlayerAssign,
   onPlayerRemove,
   loading = false,
+  leagueId,
 }: LeagueRosterManagementProps): React.JSX.Element {
-  const [selectedPlayer, setSelectedPlayer] = useState<TeamMemberFragment | null>(null);
+  const [selectedPlayer, setSelectedPlayer] =
+    useState<TeamMemberFragment | null>(null);
+
+  const {
+    projections,
+    loading: loadingProjections,
+    error: projectionError,
+  } = useTeamMemberProjections(
+    teamPlayers,
+    leagueId ?? teamPlayers[0]?.leagueId ?? null,
+  );
+
+  const getProjectionForPlayer = useCallback(
+    (player: TeamMemberFragment | null | undefined) => {
+      const playerId = normalizeNumericIdentifier(player?.playerId);
+      if (playerId === undefined) {
+        return undefined;
+      }
+
+      return projections[playerId];
+    },
+    [projections],
+  );
 
   // Group positions by type for better organization
   const groupedPositions = useMemo(() => {
-    const pitchingPositions = positions.filter(p => 
-      p.positionType === 'SP' || p.positionType === 'RP'
+    const pitchingPositions = positions.filter(
+      (p) => p.positionType === 'SP' || p.positionType === 'RP',
     );
-    const battingPositions = positions.filter(p => 
-      p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType)
+    const battingPositions = positions.filter(
+      (p) =>
+        p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType),
     );
-    const utilityPositions = positions.filter(p => 
-      p.positionType === 'IF' || p.positionType === 'XDH'
+    const utilityPositions = positions.filter(
+      (p) => p.positionType === 'IF' || p.positionType === 'XDH',
     );
 
     return {
@@ -250,20 +328,29 @@ export function LeagueRosterManagement({
   }, [positions]);
 
   // Get assigned players for each position
-  const getAssignedPlayer = useCallback((position: LeaguePositionFragment) => {
-    return teamPlayers.find(player => player.positionId === position.id);
-  }, [teamPlayers]);
+  const getAssignedPlayer = useCallback(
+    (position: LeaguePositionFragment) => {
+      return teamPlayers.find((player) => player.positionId === position.id);
+    },
+    [teamPlayers],
+  );
 
-  const handlePlayerAssign = useCallback((player: TeamMemberFragment, position: LeaguePositionFragment) => {
-    onPlayerAssign(player, position);
-    setSelectedPlayer(null);
-  }, [onPlayerAssign]);
+  const handlePlayerAssign = useCallback(
+    (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+      onPlayerAssign(player, position);
+      setSelectedPlayer(null);
+    },
+    [onPlayerAssign],
+  );
 
-  const handlePlayerRemove = useCallback((position: LeaguePositionFragment) => {
-    onPlayerRemove(position);
-  }, [onPlayerRemove]);
+  const handlePlayerRemove = useCallback(
+    (position: LeaguePositionFragment) => {
+      onPlayerRemove(position);
+    },
+    [onPlayerRemove],
+  );
 
-  if (loading) {
+  if (loading || loadingProjections) {
     return (
       <YStack padding="$4" alignItems="center">
         <Text>Loading roster...</Text>
@@ -275,9 +362,27 @@ export function LeagueRosterManagement({
     <ScrollView>
       <YStack padding="$4" space="$4">
         <H4>Roster Management</H4>
-        
+
+        {projectionError && (
+          <Card
+            padding="$3"
+            backgroundColor="$red2"
+            borderColor="$red8"
+            borderWidth={1}
+          >
+            <Text fontSize="$3" color="$red11">
+              Unable to calculate projections: {projectionError.message}
+            </Text>
+          </Card>
+        )}
+
         {selectedPlayer && (
-          <Card padding="$3" backgroundColor="$blue2" borderColor="$blue8" borderWidth={1}>
+          <Card
+            padding="$3"
+            backgroundColor="$blue2"
+            borderColor="$blue8"
+            borderWidth={1}
+          >
             <Text fontSize="$4" fontWeight="600" color="$blue12">
               Selected: {getPlayerName(selectedPlayer)}
             </Text>
@@ -291,19 +396,24 @@ export function LeagueRosterManagement({
         <YStack space="$2">
           <H5>Pitchers</H5>
           <XStack flexWrap="wrap" justifyContent="space-between">
-            {groupedPositions.pitching.map((position) => (
-              <RosterSlot
-                key={position.id}
-                position={position}
-                assignedPlayer={getAssignedPlayer(position)}
-                availablePlayers={teamPlayers}
-                selectedPlayer={selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerRemove={handlePlayerRemove}
-                onPlayerSelect={setSelectedPlayer}
-                isSelected={getAssignedPlayer(position)?.id === selectedPlayer?.id}
-              />
-            ))}
+            {groupedPositions.pitching.map((position) => {
+              const assigned = getAssignedPlayer(position);
+              return (
+                <RosterSlot
+                  key={position.id}
+                  position={position}
+                  assignedPlayer={assigned}
+                  availablePlayers={teamPlayers}
+                  selectedPlayer={selectedPlayer}
+                  onPlayerAssign={handlePlayerAssign}
+                  onPlayerRemove={handlePlayerRemove}
+                  onPlayerSelect={setSelectedPlayer}
+                  isSelected={assigned?.id === selectedPlayer?.id}
+                  projectionValue={getProjectionForPlayer(assigned)}
+                  isProjectionLoading={loadingProjections}
+                />
+              );
+            })}
           </XStack>
         </YStack>
 
@@ -313,19 +423,24 @@ export function LeagueRosterManagement({
         <YStack space="$2">
           <H5>Position Players</H5>
           <XStack flexWrap="wrap" justifyContent="space-between">
-            {groupedPositions.batting.map((position) => (
-              <RosterSlot
-                key={position.id}
-                position={position}
-                assignedPlayer={getAssignedPlayer(position)}
-                availablePlayers={teamPlayers}
-                selectedPlayer={selectedPlayer}
-                onPlayerAssign={handlePlayerAssign}
-                onPlayerRemove={handlePlayerRemove}
-                onPlayerSelect={setSelectedPlayer}
-                isSelected={getAssignedPlayer(position)?.id === selectedPlayer?.id}
-              />
-            ))}
+            {groupedPositions.batting.map((position) => {
+              const assigned = getAssignedPlayer(position);
+              return (
+                <RosterSlot
+                  key={position.id}
+                  position={position}
+                  assignedPlayer={assigned}
+                  availablePlayers={teamPlayers}
+                  selectedPlayer={selectedPlayer}
+                  onPlayerAssign={handlePlayerAssign}
+                  onPlayerRemove={handlePlayerRemove}
+                  onPlayerSelect={setSelectedPlayer}
+                  isSelected={assigned?.id === selectedPlayer?.id}
+                  projectionValue={getProjectionForPlayer(assigned)}
+                  isProjectionLoading={loadingProjections}
+                />
+              );
+            })}
           </XStack>
         </YStack>
 
@@ -336,19 +451,24 @@ export function LeagueRosterManagement({
           <YStack space="$2">
             <H5>Utility</H5>
             <XStack flexWrap="wrap" justifyContent="space-between">
-              {groupedPositions.utility.map((position) => (
-                <RosterSlot
-                  key={position.id}
-                  position={position}
-                  assignedPlayer={getAssignedPlayer(position)}
-                  availablePlayers={teamPlayers}
-                  selectedPlayer={selectedPlayer}
-                  onPlayerAssign={handlePlayerAssign}
-                  onPlayerRemove={handlePlayerRemove}
-                  onPlayerSelect={setSelectedPlayer}
-                  isSelected={getAssignedPlayer(position)?.id === selectedPlayer?.id}
-                />
-              ))}
+              {groupedPositions.utility.map((position) => {
+                const assigned = getAssignedPlayer(position);
+                return (
+                  <RosterSlot
+                    key={position.id}
+                    position={position}
+                    assignedPlayer={assigned}
+                    availablePlayers={teamPlayers}
+                    selectedPlayer={selectedPlayer}
+                    onPlayerAssign={handlePlayerAssign}
+                    onPlayerRemove={handlePlayerRemove}
+                    onPlayerSelect={setSelectedPlayer}
+                    isSelected={assigned?.id === selectedPlayer?.id}
+                    projectionValue={getProjectionForPlayer(assigned)}
+                    isProjectionLoading={loadingProjections}
+                  />
+                );
+              })}
             </XStack>
           </YStack>
         )}
@@ -358,6 +478,8 @@ export function LeagueRosterManagement({
         {/* Available Players */}
         <AvailablePlayerList
           players={teamPlayers}
+          projections={projections}
+          isLoading={loadingProjections}
           selectedPlayer={selectedPlayer}
           onPlayerSelect={setSelectedPlayer}
         />

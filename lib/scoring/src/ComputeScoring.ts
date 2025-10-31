@@ -29,7 +29,7 @@ export function computeScoring<
   for (const key of Object.keys(statsRecord)) {
     const multiplier = scoringSettings[key];
 
-    if (multiplier === undefined || multiplier === null) {
+    if (!multiplier) {
       continue;
     }
 

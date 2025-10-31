@@ -3,9 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "type": "commonjs",
-  "main": "./dist/web/index.cjs.js",
-  "module": "./dist/web/index.es.js",
-  "types": "./dist/web/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "build": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
     "build:declarations": "tsc --emitDeclarationOnly --declaration --outDir dist/web",

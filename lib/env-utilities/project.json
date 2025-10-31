@@ -3,22 +3,27 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/env-utilities/src",
   "projectType": "library",
-  "tags": [
-    "platform:shared",
-    "scope:lib",
-    "type:config"
-  ],
+  "tags": ["platform:shared", "scope:lib", "type:config"],
   "targets": {
-    "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+    "typecheck": {
+      "executor": "nx:run-commands",
       "options": {
-        "outputPath": "dist/lib/env-utilities",
-        "main": "lib/env-utilities/src/index.ts",
-        "tsConfig": "lib/env-utilities/tsconfig.lib.json",
-        "assets": []
+        "command": "tsc --noEmit -p tsconfig.lib.json",
+        "cwd": "lib/env-utilities"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "lib/env-utilities/jest.config.json",
+        "passWithNoTests": true
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "coverageReporters": ["text"]
+        }
       }
     }
   }

@@ -22,6 +22,7 @@ import {
   User,
 } from '@tamagui/lucide-icons';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+import { formatProjection } from './usePlayerProjections';
 // TODO: Import PlayersCareerStatsTable when it's available
 // import { PlayersCareerStatsTable } from './PlayersCareerStatsTable';
 
@@ -60,14 +61,6 @@ const SORT_OPTIONS: SortOption[] = [
   { label: 'Bref ID (A-Z)', orderBy: 'brefId', orderDirection: 'asc' },
   { label: 'Bref ID (Z-A)', orderBy: 'brefId', orderDirection: 'desc' },
 ];
-
-const formatProjectionValue = (value?: number | null): string => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value.toFixed(1);
-  }
-
-  return '—';
-};
 
 export function PlayersTable({
   onPlayerSelect,
@@ -374,7 +367,7 @@ export function PlayersTable({
                           color="$blue11"
                           fontWeight="600"
                         >
-                          {formatProjectionValue(projection)}
+                          {formatProjection(projection)}
                         </Text>
                       </XStack>
                     )}

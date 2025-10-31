@@ -24,6 +24,14 @@ export type {
 } from './PlayerStatsTypes';
 
 // Projections
+export {
+  usePlayerProjections,
+  formatProjection,
+  type BaseballScoringSettings,
+  type PlayerCareerStats,
+  type ScoringStatRecord,
+  type PlayerProjectionsResult,
+} from './usePlayerProjections';
 
 // API exports
 export * from './PlayersApi';

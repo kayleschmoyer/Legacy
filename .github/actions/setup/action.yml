@@ -525,13 +525,25 @@ runs:
         NX_COMMAND=""
         echo "🔍 Attempting Nx CLI detection..."
 
-        # Method 1: pnpm exec nx
-        echo "  Testing Method 1: pnpm exec nx"
-        if pnpm exec nx --version >/dev/null 2>&1; then
-          NX_COMMAND="pnpm exec nx"
-          echo "  ✅ Nx accessible via: pnpm exec nx"
-        else
-          echo "  ❌ pnpm exec nx failed"
+        # Method 1: use the detected package manager's exec helper
+        if [ -z "$NX_COMMAND" ]; then
+          if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
+            echo "  Testing Method 1: pnpm exec nx"
+            if pnpm exec nx --version >/dev/null 2>&1; then
+              NX_COMMAND="pnpm exec nx"
+              echo "  ✅ Nx accessible via: pnpm exec nx"
+            else
+              echo "  ❌ pnpm exec nx failed"
+            fi
+          else
+            echo "  Testing Method 1: npx nx"
+            if npx nx --version >/dev/null 2>&1; then
+              NX_COMMAND="npx nx"
+              echo "  ✅ Nx accessible via: npx nx"
+            else
+              echo "  ❌ npx nx failed"
+            fi
+          fi
         fi
 
         # Method 2: Direct path to nx binary  
@@ -549,14 +561,14 @@ runs:
           fi
         fi
 
-        # Method 3: pnpm exec (when available)
+        # Method 3: pnpm exec with explicit separator (when available)
         if [ -z "$NX_COMMAND" ] && [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-          echo "  Testing Method 3: pnpm exec nx"
+          echo "  Testing Method 3: pnpm exec nx --"
           if pnpm exec nx -- --version >/dev/null 2>&1; then
             NX_COMMAND="pnpm exec nx --"
             echo "  ✅ Nx accessible via: pnpm exec nx --"
           else
-            echo "  ❌ pnpm exec nx failed"
+            echo "  ❌ pnpm exec nx -- failed"
           fi
         fi
 

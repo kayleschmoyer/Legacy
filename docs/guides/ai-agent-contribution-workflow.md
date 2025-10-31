@@ -40,11 +40,27 @@ acli jira workitem transition --key LS-1234 --status "Done"           # PR merge
 # Create branch (new ticket from main)
 git checkout main
 git pull
-twig switch ticket-1234
+twig switch LS-1234
 
 # Create branch (continuation from current)
-twig switch ticket-1234 -p
+twig switch LS-1234 -p current
+
+# Run affected commands
+pnpm exec nx affected -t typecheck
+pnpm exec nx affected -t lint --fix
+pnpm exec nx affected -t test
+pnpm exec nx affected -t build
+
+# Create pull request
+twig github pr create-pr
+
+# Check CI status and logs (after PR)
+gh run list --branch feature/branch --limit 5
+gh run view RUN_ID --log-failed
+gh run rerun RUN_ID --failed
 ```
+
+### Common Scenarios
 
 #### Scenario 1: Type Errors
 
@@ -56,27 +72,8 @@ twig switch ticket-1234 -p
 pnpm exec nx affected -t typecheck
 ```
 
-#### Validation Commands
-
-```powershell
-pnpm exec nx affected -t test
-pnpm exec nx affected -t lint --fix
-pnpm exec nx affected -t build
-```
-
-#### Pull Request and CI
-
-```powershell
-twig github pr create-pr
-gh run list --branch feature/branch --limit 5
-gh run view RUN_ID --log-failed
-gh run rerun RUN_ID --failed
-```
-
 ### Pre-Commit Checklist
 
-- [ ] All affected tests pass
-- [ ] Type checking passes
 - [ ] Linting passes (no errors)
 - [ ] Build succeeds
 - [ ] Pre-commit hooks pass
@@ -173,7 +170,7 @@ Use this when the ticket is a continuation or depends on your current branch wor
 
 ```powershell
 # Create a child branch off current branch
-twig switch LS-1234 -p
+twig switch LS-1234 -p current
 
 # The -p flag means "parent" - it creates the new branch from your current branch
 # Useful for sequential work or tickets that build on each other
