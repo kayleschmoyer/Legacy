@@ -402,6 +402,20 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 ## League Scoring Extensions
 
+### Storage Overview
+
+- **Canonical definitions** live in `scoring_stat_definitions`. Each row locks down the stat group, source column, default multiplier, and range enforcement used across every league.
+- **Per-league overrides** are stored in `league_scoring_profiles` and `league_scoring_profile_entries`. A league always has a single `is_default = true` profile that is cloned when commissioners stage draft changes.
+- **Historical auditing** flows through `league_scoring_change_log`, which is populated by triggers whenever a multiplier or enabled flag changes. The log powers commissioner rollbacks and reporting.
+- **Default multipliers** ship via migration seeds so brand-new leagues immediately inherit MLB-standard scoring without manual setup.
+
+### Access Patterns
+
+1. The database client exposes a typed `ScoringService` (`lib/db-client/src/lib/services/ScoringService.ts`) that composes the four tables above into a single graph of definitions, overrides, and audit rows.
+2. The GraphQL layer (`lambdas/db/src/schema/scoring.ts`) calls that service to implement the `leagueScoringProfile`, `defaultScoringProfile`, and `updateLeagueScoringProfile` operations. Authorization checks ensure only league members (or commissioners for mutations) can reach the data.
+3. `LeagueScoringProvider` on the client caches the GraphQL response per league and exposes normalized `BaseballScoringSettings` to hooks such as `useTeamMemberProjections`, so projections and UI editors never query tables directly.
+4. Automation flows (CLI scoring calculators, background jobs) re-use the service layer to guarantee identical multiplier math between backend scoring and UI previews.
+
 ### 22. **Scoring Stat Definitions** (`scoring_stat_definitions`)
 
 **Purpose**: Canonical catalog of stats that can be scored with allowable multiplier bounds.

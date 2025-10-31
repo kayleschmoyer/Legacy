@@ -41,6 +41,7 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 | **AWS Infrastructure**      | [`docs/agents/aws-infrastructure.csv`](./docs/agents/aws-infrastructure.csv)           | Lambda architecture, Terraform management, cost optimization       |
 | **Repository Architecture** | [`docs/agents/repository-architecture.csv`](./docs/agents/repository-architecture.csv) | Nx monorepo structure, build system, file conventions              |
 | **Build System**            | [`docs/agents/build-system.csv`](./docs/agents/build-system.csv)                       | Nx workspace management, dependency resolution, build optimization |
+| **Scoring Workflows**       | [`docs/agents/scoring-workflows.csv`](./docs/agents/scoring-workflows.csv)             | Data access, GraphQL, caching, and troubleshooting for scoring     |
 
 ### **Quality Assurance & Operations**
 

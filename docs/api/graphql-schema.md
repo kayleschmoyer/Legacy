@@ -82,7 +82,7 @@ type LeagueSettings {
 
 ### Player & Team Data
 
-```graphql
+````graphql
 type Player {
   id: ID!
   name: String!
@@ -123,7 +123,64 @@ type Team {
   pointsFor: Float!
   pointsAgainst: Float!
 }
-```
+
+### Scoring Types
+
+```graphql
+type LeagueScoringProfile {
+  profileId: Int
+  leagueId: Int
+  profileName: String
+  definitions: [ScoringStatDefinition!]!
+  entries: [LeagueScoringProfileEntry!]!
+  stats: [LeagueScoringStatValue!]!
+  multiplierGroups: [LeagueScoringMultiplierGroup!]!
+}
+
+type ScoringStatDefinition {
+  id: Int!
+  statKey: String!
+  statGroup: ScoringStatGroup!
+  sourceTable: String!
+  sourceColumn: String!
+  displayName: String!
+  description: String
+  defaultMultiplier: Float!
+  minMultiplier: Float!
+  maxMultiplier: Float!
+  stepSize: Float!
+  isRequired: Boolean!
+  enforcePositive: Boolean!
+  enforceNegative: Boolean!
+}
+
+type LeagueScoringStatValue {
+  definition: ScoringStatDefinition!
+  multiplier: Float!
+  defaultMultiplier: Float!
+  isOverride: Boolean!
+  isEnabled: Boolean!
+}
+
+type LeagueScoringMultiplierGroup {
+  group: ScoringStatGroup!
+  values: [ScoringMultiplierEntry!]!
+}
+
+type ScoringMultiplierEntry {
+  statKey: String!
+  sourceColumn: String!
+  multiplier: Float!
+}
+
+input UpdateLeagueScoringMultiplierInput {
+  statDefinitionId: Int!
+  multiplier: Float
+  isEnabled: Boolean
+}
+````
+
+````
 
 ## Query Operations
 
@@ -152,7 +209,7 @@ query VerifyAuth {
     email
   }
 }
-```
+````
 
 ### League Queries
 
@@ -220,6 +277,10 @@ query GetLeague($leagueId: ID!) {
 ```
 
 ### Scoring Queries
+
+- `leagueScoringProfile` requires an authenticated league member and returns the merged default + override multipliers, grouped for UI editors.
+- `defaultScoringProfile` is available without authentication so clients can seed forms before a league is selected.
+- `scoringDefinitions` exposes the canonical catalog of stats and bounds used to validate multiplier edits.
 
 ```graphql
 # Fetch full scoring profile for a league
@@ -329,6 +390,10 @@ mutation UpdateProfile($input: UpdateUserInput!) {
 ```
 
 ### Scoring
+
+- `updateLeagueScoringProfile` enforces commissioner-or-higher permissions (unless the caller is an admin) and requires each update to include at least one of `multiplier` or `isEnabled`.
+- Input values are validated against the bounds defined on `scoringDefinitions`; violations surface as GraphQL errors.
+- Successful mutations return the refreshed profile so clients can update caches without a follow-up query.
 
 ```graphql
 # Update league scoring multipliers

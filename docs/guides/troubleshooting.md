@@ -81,6 +81,16 @@ cat apps/web/vite.config.mts
 - Check platform-specific OAuth configuration
 - Review token storage mechanisms
 
+### Scoring Issues
+
+**UI shows `Unable to load scoring data`:**
+
+- Ensure the signed-in user belongs to the league. `leagueScoringProfile` rejects non-members.
+- In GraphQL Playground, run `query { leagueScoringProfile(leagueId: 1) { profileId } }` with the same token to confirm access.
+- Run `npx nx run lambdas-db:migrate` to reseed default scoring profiles if tables were truncated.
+- Inspect the GraphQL terminal for resolver errors referencing `scoring` or `LeagueScoringService`.
+- Call `refetch()` on `useLeagueScoringSettings` or clear local storage to reset the cached provider state.
+
 ### Build System Issues
 
 **Wrong build order:**
