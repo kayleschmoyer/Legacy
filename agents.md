@@ -88,22 +88,36 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 # Refresh PATH if acli not found
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
-# Jira ticket management
+# Smart branch creation (automated workflow)
+.\scripts\branch-create.ps1 -TicketKey LS-1234           # Create from main + update Jira
+.\scripts\branch-create.ps1 -TicketKey LS-1234 -FromCurrent  # Create from current
+
+# Manual Jira ticket management
 acli jira workitem view LS-1234                          # View ticket
 acli jira workitem transition --key LS-1234 --status "In Progress"      # Start work
 acli jira workitem transition --key LS-1234 --status "In Review"        # PR created
 acli jira workitem transition --key LS-1234 --status "Done"             # PR merged
 
-# Branch creation
+# Branch management
 git checkout main; git pull                      # For new ticket
 twig switch LS-1234                              # Create branch from main
 twig switch LS-1234 -p current                   # Create branch from current
+make branch-tree                                 # View branch tree structure
 
 # Verify branch tree structure
 twig tree                                        # Check branch dependencies
 git log --oneline parent-branch..current-branch  # Verify unique commits only
 
-# Pre-commit validation (run in this order)
+# Rebase workflows
+make rebase-tree                                 # Interactive rebase with auto-conflict resolution
+make rebase-tree-auto                            # Auto-rebase entire tree (no prompts)
+.\scripts\resolve-generated-conflicts.ps1        # Manually resolve generated file conflicts
+
+# Pre-commit validation (shorthand with make)
+make quick-check                                 # Fast: typecheck + lint only
+make pre-commit                                  # Full: typecheck + lint + test + build
+
+# Pre-commit validation (manual/detailed)
 pnpm exec nx affected -t typecheck                        # 1. Type checking
 pnpm exec nx affected -t lint --fix                       # 2. Linting with auto-fix
 pnpm exec nx affected -t test                             # 3. Testing

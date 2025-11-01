@@ -398,3 +398,51 @@ diagnose: ## Diagnose common issues
 	@$(call echo_plain,Nx version:)
 	@pnpm exec nx --version
 	@$(call echo_green,Diagnosis completed!)
+
+# Branch management helpers
+.PHONY: branch-tree rebase-tree resolve-conflicts pre-commit
+
+branch-tree: ## Show current branch tree structure
+	@twig tree
+
+rebase-tree: ## Rebase entire branch tree with auto-conflict resolution
+	@$(call echo_blue,Rebasing branch tree...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1"
+else
+	@./scripts/rebase-branch-tree.sh
+endif
+
+rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts)
+	@$(call echo_blue,Auto-rebasing branch tree...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue
+else
+	@./scripts/rebase-branch-tree.sh --auto-continue
+endif
+
+resolve-conflicts: ## Resolve conflicts in generated files
+	@$(call echo_blue,Resolving conflicts in generated files...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\resolve-generated-conflicts.ps1"
+else
+	@./scripts/resolve-generated-conflicts.sh
+endif
+
+pre-commit: ## Run all pre-commit validation checks
+	@$(call echo_blue,Running pre-commit validation...)
+	@$(call echo_plain,1/4 Type checking...)
+	@pnpm exec nx affected -t typecheck
+	@$(call echo_plain,2/4 Linting...)
+	@pnpm exec nx affected -t lint --fix
+	@$(call echo_plain,3/4 Testing...)
+	@pnpm exec nx affected -t test
+	@$(call echo_plain,4/4 Building...)
+	@pnpm exec nx affected -t build
+	@$(call echo_green,✓ All pre-commit checks passed!)
+
+quick-check: ## Quick validation (typecheck + lint only)
+	@$(call echo_blue,Running quick checks...)
+	@pnpm exec nx affected -t typecheck
+	@pnpm exec nx affected -t lint --fix
+	@$(call echo_green,✓ Quick checks passed!)
