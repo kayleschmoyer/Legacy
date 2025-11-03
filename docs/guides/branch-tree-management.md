@@ -11,6 +11,7 @@ This guide covers best practices for maintaining clean branch dependency trees i
 ## 🤖 For AI Agents
 
 **Twig MCP Server Available**: This repository includes a Twig MCP (Model Context Protocol) server configuration. AI agents with MCP support should use the twig MCP server for all twig operations instead of running terminal commands. This provides:
+
 - Structured responses that are easier to parse
 - Better error handling
 - Direct access to twig functionality
@@ -33,6 +34,7 @@ When working on large projects that span multiple tickets, it's common to create
 ### The Solution
 
 Use Twig's branch tree management features to:
+
 - Visualize branch dependencies
 - Verify unique commits per branch
 - Cascade rebases across dependent branches
@@ -72,12 +74,12 @@ main
 
 ### Interpreting Commit Counts
 
-| Pattern | Meaning | Action |
-|---------|---------|--------|
-| `[+1]` | One unique commit | ✅ **Perfect** - clean branch |
-| `[+2]` | Two unique commits | ✅ **Good** - verify both are yours |
-| `[+25]` | Twenty-five commits | ⚠️ **Warning** - likely has duplicates |
-| `[+23/-24]` | Many adds/deletes | 🚨 **Problem** - definitely has duplicates |
+| Pattern     | Meaning             | Action                                     |
+| ----------- | ------------------- | ------------------------------------------ |
+| `[+1]`      | One unique commit   | ✅ **Perfect** - clean branch              |
+| `[+2]`      | Two unique commits  | ✅ **Good** - verify both are yours        |
+| `[+25]`     | Twenty-five commits | ⚠️ **Warning** - likely has duplicates     |
+| `[+23/-24]` | Many adds/deletes   | 🚨 **Problem** - definitely has duplicates |
 
 ---
 
@@ -161,7 +163,7 @@ git log --oneline parent-branch..current-branch
 # - "feat(scoring): expose league scoring profiles"  ← From LS-7
 # - "docs(scoring): add rollout plan"                ← From LS-7
 # - "feat(matchup): extend schema"                   ← Your work
-# 
+#
 # You have duplicates from LS-7!
 ```
 
@@ -251,6 +253,85 @@ git rebase --no-edit --onto LS-19/build-graphql-resolvers LS-18/extend-matchup-s
 
 When you need to rebase an entire chain of dependent branches:
 
+### ⭐ Recommended: Cascade After Squashing
+
+**The best practice when squashing branches with children is to use `--skip-commits` to avoid conflicts entirely.**
+
+#### Why This Works
+
+When you squash a branch (e.g., LS-23), the old commit hashes disappear but child branches still reference them. Using `--skip-commits` tells git to ignore those removed commits, preventing conflicts.
+
+#### The Workflow
+
+```powershell
+# 1. Squash the parent branch
+git checkout LS-23/branch-name
+git rebase -i parent-branch  # Squash to 1 commit
+# New commit: abc123f
+
+# 2. Identify removed commits that children still have
+git checkout LS-24/child-branch
+git log --oneline LS-23/branch-name..HEAD
+
+# Output shows commits unique to LS-24:
+# def5678 (LS-24) Add web UI
+# 1111111 (OLD LS-23) Mobile fixes   ← Removed during squash
+# 2222222 (OLD LS-23) Type safety    ← Removed during squash
+
+# 3. Create skip-commits file
+@"
+1111111  # Old LS-23 commit removed during squash
+2222222  # Old LS-23 commit removed during squash
+"@ | Out-File skip-commits.txt
+
+# 4. Rebase children with automated script
+.\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
+
+# OR manually rebase each branch:
+git checkout LS-24/child-branch
+twig rebase --skip-commits skip-commits.txt
+
+git checkout LS-25/grandchild-branch
+twig rebase --skip-commits skip-commits.txt
+
+# 5. Verify clean history
+twig tree
+# LS-23/branch-name      [+1]  ✓
+# └─ LS-24/child-branch  [+1]  ✓
+#    └─ LS-25/...        [+1]  ✓
+```
+
+#### Benefits Over Traditional Cascade
+
+✅ **No conflicts** - removed commits are skipped, not merged  
+✅ **Clean history** - branches stay at [+1] commit each  
+✅ **No re-squashing needed** - history stays clean throughout  
+✅ **More predictable** - no conflict resolution decisions needed  
+✅ **Faster** - automated scripts can handle entire tree
+
+#### When to Use This Pattern
+
+- ✅ After squashing branches with children
+- ✅ After resolving conflicts with `--theirs`/`--ours`
+- ✅ After interactive rebase that rewrites history
+- ✅ After cherry-picking fixes backward in the tree
+- ⚠️ NOT needed for simple forward development
+
+#### Automated Script Support
+
+Use the `rebase-branch-tree.ps1` script with skip-commits:
+
+```powershell
+# Rebase entire tree, skipping specified commits
+.\scripts\rebase-branch-tree.ps1 -SkipCommits "1111111,2222222"
+
+# Or use a skip-commits file (recommended)
+.\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
+
+# Via Makefile
+make rebase-tree SKIP_COMMITS="1111111,2222222"
+```
+
 ### Using Twig Cascade
 
 ```powershell
@@ -265,6 +346,7 @@ twig cascade --show-graph --autostash
 # --autostash: Automatically stash uncommitted changes
 # --force: Force rebase even if branches are up-to-date
 # --force-push: Force push after successful rebase (⚠️ use carefully)
+# --skip-commits: Exclude specific commits (see below)
 ```
 
 ### What Cascade Does
@@ -274,6 +356,90 @@ twig cascade --show-graph --autostash
 3. Rebases each child onto its parent
 4. Works down the tree recursively
 5. Handles conflicts interactively
+
+### Skipping Problematic Commits (New Feature)
+
+When you have duplicate or problematic commits that should be excluded during rebases:
+
+```powershell
+# Skip specific commits by hash (comma-separated)
+twig rebase --skip-commits abc1234,def5678,ghi9012
+
+# Skip commits listed in a file
+twig rebase --skip-commits /path/to/skip-commits.txt
+
+# Works with cascade too
+twig cascade --skip-commits abc1234,def5678
+```
+
+**Create a skip-commits file**:
+
+```txt
+# skip-commits.txt
+abc1234  # Duplicate commit from LS-23
+def5678  # Fix already applied in parent
+
+# Another duplicate
+ghi9012
+```
+
+**How it works**:
+
+- **Rebase**: Fully excludes specified commits from the rebased branch using `git cherry-pick`
+- **Cascade**: ⚠️ Limited support - only applies to the initial branch, downstream branches use standard rebase
+
+**When to use**:
+
+- ✅ Removing duplicate commits from parent branches
+- ✅ Excluding broken commits during history cleanup
+- ✅ Skipping already-applied fixes
+- ⚠️ **Cascade limitation**: Skipped commits may reappear in child branches
+
+**Practical Example**:
+
+```powershell
+# Scenario: LS-23 has duplicate LS-7 commits (abc1234, def5678)
+# that were accidentally included
+
+# 1. Identify duplicate commit hashes
+git log --oneline LS-23/build-mobile-matchup-ui | grep "LS-7"
+# abc1234 feat(scoring): expose league scoring profiles
+# def5678 docs(scoring): add rollout plan
+
+# 2. Create skip file
+echo "abc1234  # Duplicate from LS-7" > skip-commits.txt
+echo "def5678  # Duplicate from LS-7" >> skip-commits.txt
+
+# 3. Rebase LS-23 excluding duplicates
+git checkout LS-23/build-mobile-matchup-ui
+twig rebase --skip-commits skip-commits.txt
+
+# 4. Cascade to child branches (LS-24+)
+# Note: Children will use standard rebase
+twig cascade --show-graph
+
+# 5. Verify clean tree
+twig tree
+# LS-23 [+1]  ← Now only unique commit!
+# LS-24 [+1]
+# LS-25 [+1]
+```
+
+**Alternative for Cascade**: Instead of using `--skip-commits` with cascade (which has limitations), consider:
+
+```powershell
+# Manual cascade with skip-commits on each branch
+for branch in LS-23 LS-24 LS-25 LS-26; do
+  git checkout $branch
+  twig rebase --skip-commits skip-commits.txt
+done
+```
+
+**Validation**:
+
+- Commit hashes must be 7-64 hexadecimal characters
+- Invalid hashes will fail with clear error messages
+- File paths validated before processing
 
 ### Handling Conflicts During Cascade
 
@@ -304,6 +470,7 @@ twig cascade --show-graph --autostash
 **Problem**: Created 14 dependent branches (LS-17 through LS-31), all have duplicate commits from LS-7.
 
 **Detection**:
+
 ```powershell
 twig tree
 # Shows:

@@ -146,6 +146,15 @@ jobs:
                 };
               }
               
+              // Check if any checks are still in progress
+              if (checksResult.inProgress) {
+                return {
+                  canMerge: false,
+                  reason: "Waiting for status checks to complete: " + checksResult.pendingChecks.join(', '),
+                  isPending: true
+                };
+              }
+              
               return { canMerge: true };
             }
 
@@ -165,15 +174,21 @@ jobs:
               });
               
               const failingChecks = [];
+              const pendingChecks = [];
               
               // Validate check runs
               for (const check of checks.data.check_runs) {
-                if (check.status !== 'completed' || check.conclusion !== 'success') {
+                // Only consider it failing if it's completed with a non-success conclusion
+                if (check.status === 'completed' && check.conclusion !== 'success') {
+                  // Explicitly failed checks
                   if (check.conclusion === 'failure' || check.conclusion === 'cancelled' || check.conclusion === 'timed_out') {
                     failingChecks.push(check.name + " (" + check.conclusion + ")");
-                  } else if (check.status !== 'completed') {
-                    failingChecks.push(check.name + " (" + check.status + ")");
                   }
+                  // Skipped checks are not considered failures - they're optional
+                  // 'action_required' and 'neutral' are also not considered failures
+                } else if (check.status !== 'completed') {
+                  // Track pending checks (in_progress, queued, etc.)
+                  pendingChecks.push(check.name + " (" + check.status + ")");
                 }
               }
               
@@ -187,31 +202,41 @@ jobs:
               }
               
               for (const [context, status] of Object.entries(statusesByContext)) {
-                if (status.state !== 'success') {
+                // Only consider it failing if it's explicitly failed, not pending
+                if (status.state === 'failure' || status.state === 'error') {
                   failingChecks.push(context + " (" + status.state + ")");
+                } else if (status.state === 'pending') {
+                  // Track pending statuses
+                  pendingChecks.push(context + " (pending)");
                 }
               }
               
               return {
                 allPassing: failingChecks.length === 0,
-                failingChecks
+                failingChecks,
+                inProgress: pendingChecks.length > 0,
+                pendingChecks
               };
             }
 
             async function findOrCreateComment(pr, commentBody, commentType = 'merge-queue') {
-              // Find existing merge queue comments
+              const commentMarker = "<!-- MERGE-QUEUE-STATUS -->";
+              
+              // Ensure comment body includes the marker at the start
+              if (!commentBody.includes(commentMarker)) {
+                commentBody = commentMarker + "\n" + commentBody;
+              }
+              
+              // Find existing merge queue comments by marker
               const comments = await github.rest.issues.listComments({
                 owner,
                 repo,
                 issue_number: pr.number
               });
               
-              // Look for existing merge queue comment by checking for signature
+              // Look for existing merge queue comment by unified marker
               const existingComment = comments.data.find(comment => 
-                comment.body.includes('*Automated message from merge queue system*') ||
-                comment.body.includes('## 🚫 Merge Queue: Cannot Merge') ||
-                comment.body.includes('## 🎉 Successfully Merged!') ||
-                comment.body.includes('## ⚠️ Merge Queue Processing Error')
+                comment.body && comment.body.includes(commentMarker)
               );
               
               if (existingComment) {
@@ -280,6 +305,12 @@ jobs:
             }
 
             async function reportMergeBlocker(pr, validation) {
+              // Don't report a blocker comment if checks are just pending
+              if (validation.isPending) {
+                console.log(`⏳ Checks still in progress for PR #${pr.number}, will retry in next cycle`);
+                return; // Silently wait - no comment needed
+              }
+              
               let comment = "## 🚫 Merge Queue: Cannot Merge\n\n" +
                            "**Reason:** " + validation.reason + "\n\n" +
                            "### 🛠️ How to Fix:";

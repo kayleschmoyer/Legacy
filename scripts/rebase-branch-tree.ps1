@@ -9,20 +9,56 @@
     Optional: Start from this branch instead of current branch
 .PARAMETER AutoContinue
     If set, automatically continues through conflicts without prompting
+.PARAMETER SkipCommits
+    Comma-separated list of commit hashes to skip during rebase
+.PARAMETER SkipCommitsFile
+    Path to file containing commit hashes to skip (one per line, # for comments)
 .EXAMPLE
     .\scripts\rebase-branch-tree.ps1
 .EXAMPLE
     .\scripts\rebase-branch-tree.ps1 -StartBranch LS-24 -AutoContinue
+.EXAMPLE
+    .\scripts\rebase-branch-tree.ps1 -SkipCommits "abc1234,def5678"
+.EXAMPLE
+    .\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
 #>
 
 param(
     [string]$StartBranch,
-    [switch]$AutoContinue
+    [switch]$AutoContinue,
+    [string]$SkipCommits,
+    [string]$SkipCommitsFile
 )
 
 $ErrorActionPreference = "Continue"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $resolveConflictsScript = Join-Path $scriptDir "resolve-generated-conflicts.ps1"
+
+# Parse skip-commits
+$skipCommitList = @()
+if ($SkipCommits) {
+    $skipCommitList = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    Write-Host "→ Will skip commits: $($skipCommitList -join ', ')" -ForegroundColor Yellow
+}
+if ($SkipCommitsFile) {
+    if (Test-Path $SkipCommitsFile) {
+        $fileCommits = Get-Content $SkipCommitsFile | ForEach-Object {
+            $line = $_.Trim()
+            # Skip empty lines and comments
+            if ($line -and -not $line.StartsWith('#')) {
+                # Extract commit hash (before any comment)
+                if ($line -match '^([0-9a-f]{7,64})') {
+                    $matches[1]
+                }
+            }
+        } | Where-Object { $_ }
+        $skipCommitList += $fileCommits
+        Write-Host "→ Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
+    } else {
+        Write-Host "✗ Skip-commits file not found: $SkipCommitsFile" -ForegroundColor Red
+        exit 1
+    }
+}
 
 # Get current branch if not specified
 if (-not $StartBranch) {
@@ -59,8 +95,16 @@ function Rebase-Branch {
         return $false
     }
     
+    # Build twig rebase command with skip-commits if provided
+    $rebaseCmd = "twig rebase"
+    if ($skipCommitList.Count -gt 0) {
+        $skipCommitsArg = $skipCommitList -join ','
+        $rebaseCmd = "twig rebase --skip-commits `"$skipCommitsArg`""
+        Write-Host "→ Using skip-commits: $skipCommitsArg" -ForegroundColor Cyan
+    }
+    
     # Start rebase
-    $rebaseOutput = twig rebase 2>&1
+    $rebaseOutput = Invoke-Expression "$rebaseCmd 2>&1"
     
     # Check if already up to date
     if ($rebaseOutput -match "up to date") {

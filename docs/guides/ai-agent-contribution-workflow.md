@@ -266,6 +266,43 @@ git rebase --skip  # Skip the duplicate
 
 When rebasing a chain of dependent branches:
 
+**⭐ RECOMMENDED: After Squashing or Conflict Resolution**
+
+When you've squashed a branch or resolved conflicts with `--theirs`/`--ours`, use `--skip-commits` to cascade cleanly:
+
+```powershell
+# 1. After squashing parent branch, identify removed commits
+git checkout LS-24/child-branch
+git log --oneline LS-23/parent-branch..HEAD
+# Look for old LS-23 commits that were squashed away
+
+# 2. Create skip-commits file
+@"
+abc1234  # Old LS-23 commit removed during squash
+def5678  # Another old LS-23 commit removed during squash
+"@ | Out-File skip-commits.txt
+
+# 3. Use automated script (BEST)
+.\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
+
+# OR manually rebase each branch
+git checkout LS-24/child-branch; twig rebase --skip-commits skip-commits.txt
+git checkout LS-25/grandchild; twig rebase --skip-commits skip-commits.txt
+git checkout LS-26/next-branch; twig rebase --skip-commits skip-commits.txt
+
+# 4. Verify clean history (all should be [+1])
+twig tree
+```
+
+**Why this works**:
+
+- ✅ No conflicts - removed commits are skipped
+- ✅ Branches stay at [+1] commit each
+- ✅ No re-squashing needed
+- ✅ Automated and predictable
+
+**For simple forward changes (no history rewriting)**:
+
 ```powershell
 # Use twig's cascade command to rebase children automatically
 git checkout parent-branch
@@ -273,6 +310,70 @@ twig cascade --show-graph --autostash
 
 # This rebases all child branches on their parents
 # Handles the dependency tree automatically
+```
+
+##### Skipping Problematic Commits During Rebase (New Feature)
+
+Twig now supports excluding specific commits during rebase operations with `--skip-commits`:
+
+```powershell
+# Skip specific commits by hash
+twig rebase --skip-commits abc1234,def5678
+
+# Skip commits listed in a file
+twig rebase --skip-commits skip-commits.txt
+
+# Also works with cascade (limited support)
+twig cascade --skip-commits abc1234,def5678
+```
+
+**Use cases for `--skip-commits`**:
+
+1. **Removing duplicate commits** inherited from parent branches
+2. **Excluding broken commits** during history cleanup
+3. **Skipping already-applied fixes** from parent branches
+
+**Example: Fixing duplicate commits across branch tree**:
+
+```powershell
+# Scenario: LS-23 accidentally included parent commits abc1234, def5678
+
+# 1. Create skip file
+@"
+abc1234  # Duplicate from parent
+def5678  # Already in LS-22
+"@ | Out-File skip-commits.txt
+
+# 2. Rebase LS-23 excluding duplicates
+git checkout LS-23/build-mobile-matchup-ui
+twig rebase --skip-commits skip-commits.txt
+
+# 3. Verify clean commit
+git log --oneline -3
+# Should show only LS-23's unique work
+
+# 4. Cascade to propagate (note: --skip-commits has limited cascade support)
+twig cascade --show-graph
+```
+
+**⚠️ Cascade Limitation**: When using `--skip-commits` with `twig cascade`:
+
+- Commits are skipped on the **initial branch only**
+- Child branches use **standard git rebase** (skipped commits may reappear)
+- For complex scenarios, manually rebase each branch with `--skip-commits`
+
+**Manual cascade alternative**:
+
+```powershell
+# When you need skip-commits on multiple branches
+$branches = @('LS-23', 'LS-24', 'LS-25', 'LS-26')
+foreach ($branch in $branches) {
+  git checkout "$branch/branch-name"
+  twig rebase --skip-commits skip-commits.txt
+}
+
+# Verify all branches are clean
+twig tree
 ```
 
 **Best Practices**:

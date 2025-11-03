@@ -52,6 +52,7 @@ function installGitHooks() {
   console.log('• Safe placeholder values only');
   console.log('• Valid YAML syntax in all .yml and .yaml files');
   console.log('• Valid JSON syntax in all .json files');
+  console.log('• @legacy-sports packages use workspace protocol (not npm)');
 }
 
 // Run installation

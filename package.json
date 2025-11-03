@@ -38,6 +38,8 @@
     "db:migrate": "cd lib/db-client && pnpm run db:migrate",
     "security:validate": "node scripts/validate-secrets.js",
     "security:install-hooks": "node scripts/install-git-hooks.js",
+    "workspace:validate-deps": "node scripts/validate-workspace-deps.js",
+    "workspace:validate-packages": "node scripts/validate-legacy-sports-packages.js",
     "terraform:unlock": "node scripts/terraform-unlock.js",
     "terraform:check-lock": "node scripts/terraform-unlock.js --check",
     "android:validate-versions": "node scripts/validate-android-versions.js",

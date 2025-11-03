@@ -41,10 +41,10 @@ try {
         yamlFiles.forEach(file => console.log(`  • ${file}`));
         console.log('');
         
-        // Run yaml-lint on each file
+        // Run yamllint on each file
         for (const file of yamlFiles) {
           try {
-            execSync(`pnpm exec yaml-lint "${file}"`, { stdio: 'inherit' });
+            execSync(`pnpm exec yamllint "${file}"`, { stdio: 'inherit' });
           } catch (error) {
             console.error(`\n❌ YAML validation failed for: ${file}`);
             console.error('Please fix the YAML syntax errors before committing.\n');
@@ -109,6 +109,40 @@ try {
   } catch (error) {
     console.error('\n❌ JSON validation failed!');
     console.error(error.message);
+    process.exit(1);
+  }
+  
+  // Run @legacy-sports package validation on staged package.json files
+  console.log('📦 Running @legacy-sports package validation...\n');
+  
+  try {
+    // Get staged package.json files
+    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
+      encoding: 'utf8' 
+    }).trim();
+    
+    if (stagedFiles) {
+      const packageJsonFiles = stagedFiles
+        .split('\n')
+        .filter(file => file.endsWith('package.json'));
+      
+      if (packageJsonFiles.length > 0) {
+        console.log(`Found ${packageJsonFiles.length} package.json file(s) to validate:`);
+        packageJsonFiles.forEach(file => console.log(`  • ${file}`));
+        console.log('');
+        
+        // Run validation script
+        const validationScript = path.join(__dirname, '../../scripts/validate-legacy-sports-packages.js');
+        execSync(`node "${validationScript}"`, { stdio: 'inherit' });
+        
+        console.log('✅ @legacy-sports package validation passed!\n');
+      } else {
+        console.log('No package.json files staged for commit.\n');
+      }
+    }
+  } catch (error) {
+    console.error('\n❌ @legacy-sports package validation failed!');
+    console.error('Commit blocked to prevent npm installation of workspace packages.\n');
     process.exit(1);
   }
   

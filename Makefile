@@ -1,7 +1,7 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas
+.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas pc pre-commit
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -358,19 +358,13 @@ ci-force: clean-safe install-force lint typecheck test build ## CI pipeline with
 ci-full: clean install lint typecheck test build ## Complete CI pipeline with full clean
 	@$(call echo_green,Full CI pipeline completed successfully!)
 
-pre-commit: lint-fix format typecheck ## Run pre-commit checks
-	@$(call echo_green,Pre-commit checks completed!)
-
 release: clean install build-all test-all ## Prepare for release
 	@$(call echo_green,Release preparation completed!)
 
-full-deploy: build-all deploy-lambdas deploy-infrastructure ## Complete deployment
+full-deploy: clean install build-all deploy-lambdas deploy-infrastructure ## Complete deployment
 	@$(call echo_green,Full deployment completed!)
 
 # Development workflow shortcuts
-quick-check: lint typecheck ## Quick code quality check
-	@$(call echo_green,Quick checks completed!)
-
 full-check: lint typecheck test ## Comprehensive code quality check
 	@$(call echo_green,Full checks completed!)
 
@@ -400,7 +394,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree resolve-conflicts pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
@@ -421,6 +415,14 @@ else
 	@./scripts/rebase-branch-tree.sh --auto-continue
 endif
 
+rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
+	@$(call echo_blue,Rebasing branch tree with skip-commits...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -Command "$$params = @{}; if ('$(SKIP_COMMITS)') { $$params['SkipCommits'] = '$(SKIP_COMMITS)' }; if ('$(SKIP_COMMITS_FILE)') { $$params['SkipCommitsFile'] = '$(SKIP_COMMITS_FILE)' }; & '.\scripts\rebase-branch-tree.ps1' @params"
+else
+	@./scripts/rebase-branch-tree.sh $(if $(SKIP_COMMITS),--skip-commits $(SKIP_COMMITS),) $(if $(SKIP_COMMITS_FILE),--skip-commits-file $(SKIP_COMMITS_FILE),)
+endif
+
 resolve-conflicts: ## Resolve conflicts in generated files
 	@$(call echo_blue,Resolving conflicts in generated files...)
 ifeq ($(OS),Windows_NT)
@@ -431,18 +433,22 @@ endif
 
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
-	@$(call echo_plain,1/4 Type checking...)
-	@pnpm exec nx affected -t typecheck
-	@$(call echo_plain,2/4 Linting...)
-	@pnpm exec nx affected -t lint --fix
-	@$(call echo_plain,3/4 Testing...)
-	@pnpm exec nx affected -t test
-	@$(call echo_plain,4/4 Building...)
-	@pnpm exec nx affected -t build
+	@$(call echo_plain,1/5 Type checking...)
+	@pnpm exec nx affected -t typecheck --base=main
+	@$(call echo_plain,2/5 Formatting...)
+	@pnpm exec nx format:write
+	@$(call echo_plain,3/5 Linting...)
+	@pnpm exec nx affected -t lint --fix --base=main
+	@$(call echo_plain,4/5 Testing...)
+	@pnpm exec nx affected -t test --base=main
+	@$(call echo_plain,5/5 Building...)
+	@pnpm exec nx affected -t build --base=main
 	@$(call echo_green,✓ All pre-commit checks passed!)
+
+pc: pre-commit ## Alias for pre-commit
 
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
-	@pnpm exec nx affected -t typecheck
-	@pnpm exec nx affected -t lint --fix
+	@pnpm exec nx affected -t typecheck --base=main
+	@pnpm exec nx affected -t lint --fix --base=main
 	@$(call echo_green,✓ Quick checks passed!)

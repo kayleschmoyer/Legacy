@@ -113,6 +113,21 @@ make rebase-tree                                 # Interactive rebase with auto-
 make rebase-tree-auto                            # Auto-rebase entire tree (no prompts)
 .\scripts\resolve-generated-conflicts.ps1        # Manually resolve generated file conflicts
 
+# Cascade after squashing (RECOMMENDED PATTERN)
+# 1. After squashing parent, identify removed commits
+git log --oneline parent-branch..current-branch
+
+# 2. Create skip-commits file with old commit hashes
+@"
+abc1234  # Old commit removed during squash
+def5678  # Another removed commit
+"@ | Out-File skip-commits.txt
+
+# 3. Rebase tree skipping those commits (no conflicts!)
+make rebase-tree-skip SKIP_COMMITS_FILE="skip-commits.txt"
+# OR: make rebase-tree-skip SKIP_COMMITS="abc1234,def5678"
+# OR: .\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
+
 # Pre-commit validation (shorthand with make)
 make quick-check                                 # Fast: typecheck + lint only
 make pre-commit                                  # Full: typecheck + lint + test + build
@@ -143,6 +158,7 @@ twig github pr create-pr
 - Follow **conventional commit** format: `type(scope): message`
 - **Verify branch tree with `twig tree`** before and after creating dependent branches
 - **Check commit counts** match expected work (e.g., `[+1]` for single commit branches)
+- **Use skip-commits after squashing** to cascade cleanly without conflicts
 
 #### ❌ Never Do
 
@@ -153,6 +169,7 @@ twig github pr create-pr
 - Don't create PRs without updating Jira status
 - **Don't create dependent branches without verifying unique commits only**
 - **Don't ignore duplicate commits** in branch tree (shown by high `[+N]` counts)
+- **Don't cascade after squashing without using skip-commits** (causes conflicts + re-squashing)
 
 #### 🔧 Environment Context
 
