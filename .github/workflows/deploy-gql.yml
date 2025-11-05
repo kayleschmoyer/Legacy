@@ -51,13 +51,13 @@ jobs:
       - name: Validate Deployment Readiness
         uses: ./.github/actions/deployment-gate
         with:
-          artifacts-ready: 'true'
-          quality-passed: 'true'
-          required-components: ''
-          environment: 'production'
+          artifacts-ready: "true"
+          quality-passed: "true"
+          required-components: ""
+          environment: "production"
 
       - name: "☁️ Configure AWS Credentials"
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           role-session-name: GitHubActions-DeployGraphQL
