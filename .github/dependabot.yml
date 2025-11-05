@@ -199,7 +199,7 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-      day: "first-monday"
+      day: "monday"
       time: "09:00"
     commit-message:
       prefix: "docker"

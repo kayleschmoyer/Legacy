@@ -30,12 +30,12 @@ function Write-Success { param($msg) Write-Host $msg -ForegroundColor Green }
 function Write-Warning { param($msg) Write-Host $msg -ForegroundColor Yellow }
 function Write-Error { param($msg) Write-Host $msg -ForegroundColor Red }
 
-Write-Info "🌳 Squashing branch commits..."
+Write-Info "Squashing branch commits..."
 
 # Get current branch
 $currentBranch = git branch --show-current
 if (!$currentBranch) {
-    Write-Error "❌ Not on a branch"
+    Write-Error "ERROR: Not on a branch"
     exit 1
 }
 
@@ -46,33 +46,40 @@ $ticket = if ($currentBranch -match '^([A-Z]+-\d+)') { $matches[1] } else { "" }
 
 # Get parent branch from twig
 Write-Info "Getting parent branch from twig..."
-$twigOutput = twig tree 2>&1 | Out-String
+$twigOutput = twig tree --no-color 2>&1 | Out-String
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Failed to get twig tree"
+    Write-Error "ERROR: Failed to get twig tree"
     exit 1
 }
 
 # Parse twig tree output to find parent
-# Example format: "  ├─ LS-34/feature [+10]"
+# The output uses box-drawing characters and indentation to show hierarchy
 $parentBranch = ""
 $lines = $twigOutput -split "`n"
 $foundCurrent = $false
+
 for ($i = 0; $i -lt $lines.Length; $i++) {
     $line = $lines[$i]
     if ($line -match [regex]::Escape($currentBranch)) {
         $foundCurrent = $true
-        # Find the parent by looking backwards for a line with less indentation
-        $currentIndent = ($line -replace '[^\s].*', '').Length
+        # Calculate indent level by removing branch name and everything after it
+        # This leaves us with just the tree structure characters
+        $lineWithoutBranch = $line -replace "$currentBranch.*`$", ''
+        $currentIndent = $lineWithoutBranch.Length
+        
+        # Look backwards for parent (line with less indentation)
         for ($j = $i - 1; $j -ge 0; $j--) {
             $prevLine = $lines[$j]
-            if ($prevLine -match '(LS-\d+/[\w-]+|main)') {
-                $prevIndent = ($prevLine -replace '[^\s].*', '').Length
+            # Extract just the branch name from this line
+            # Branch names are word chars, possibly with slashes and hyphens
+            if ($prevLine -match '([\w-]+(?:/[\w-]+)?)') {
+                $candidateBranch = $matches[1]
+                $prevLineWithoutBranch = $prevLine -replace "$candidateBranch.*`$", ''
+                $prevIndent = $prevLineWithoutBranch.Length
+                
                 if ($prevIndent -lt $currentIndent) {
-                    # Extract branch name from twig output
-                    if ($prevLine -match '(LS-\d+/[\w-]+|main)') {
-                        $parentBranch = $matches[1] -replace '\s*\[.*\].*$', ''
-                        break
-                    }
+                    $parentBranch = $candidateBranch
+                    break
                 }
             }
         }
@@ -83,7 +90,7 @@ for ($i = 0; $i -lt $lines.Length; $i++) {
 if (!$parentBranch) {
     # Fallback to main if no parent found
     $parentBranch = "main"
-    Write-Warning "⚠️  Could not determine parent from twig tree, using 'main'"
+    Write-Warning "WARNING: Could not determine parent from twig tree, using 'main'"
 } else {
     Write-Success "Parent branch: $parentBranch"
 }
@@ -91,12 +98,12 @@ if (!$parentBranch) {
 # Count commits on current branch from parent
 $commitCount = git rev-list --count "$parentBranch..HEAD" 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Failed to count commits"
+    Write-Error "ERROR: Failed to count commits"
     exit 1
 }
 
 if ([int]$commitCount -le 1) {
-    Write-Warning "⚠️  Only $commitCount commit(s) on branch, nothing to squash"
+    Write-Warning "WARNING: Only $commitCount commit(s) on branch, nothing to squash"
     exit 0
 }
 
@@ -166,7 +173,7 @@ if ($ticket) {
     $Message = "$Message ($ticket)"
 }
 
-Write-Info "`n📝 Squashing with commit message:"
+Write-Info "`nSquashing with commit message:"
 Write-Host "  $Message" -ForegroundColor Green
 if ($body) {
     Write-Host "$body" -ForegroundColor DarkGray
@@ -176,34 +183,39 @@ if ($body) {
 Write-Host ""
 $confirm = Read-Host "Continue with squash? (y/N)"
 if ($confirm -ne 'y' -and $confirm -ne 'Y') {
-    Write-Warning "❌ Squash cancelled"
+    Write-Warning "Squash cancelled"
     exit 0
 }
 
 # Perform the squash using reset
-Write-Info "`n🔄 Performing squash..."
+Write-Info "`nPerforming squash..."
 $commitsToDrop = [int]$commitCount
 
 # Soft reset to parent branch
 git reset --soft "$parentBranch" 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Failed to reset to parent branch"
+    Write-Error "ERROR: Failed to reset to parent branch"
     exit 1
 }
 
 # Create new commit with formatted message
 $fullMessage = $Message + $body
-$commitResult = git commit -m $fullMessage 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Failed to create squashed commit: $commitResult"
+try {
+    git commit -m $fullMessage
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ERROR: Failed to create squashed commit"
+        exit 1
+    }
+} catch {
+    Write-Error "ERROR: Failed to create squashed commit: $_"
     exit 1
 }
 
-Write-Success "`n✅ Successfully squashed $commitsToDrop commits into 1!"
+Write-Success "`nSuccessfully squashed $commitsToDrop commits into 1!"
 Write-Info "`nNew commit:"
 git log -1 --oneline
 
-Write-Info "`n💡 Next steps:"
+Write-Info "`nNext steps:"
 Write-Host "  1. Review the squashed commit: git log -1 --stat" -ForegroundColor Yellow
 Write-Host "  2. Force push to remote: git push origin HEAD --force-with-lease" -ForegroundColor Yellow
 Write-Host "  3. Rebase child branches: make rebase-tree" -ForegroundColor Yellow

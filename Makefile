@@ -1,7 +1,7 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas pc pre-commit
+.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas pc pre-commit reset
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -109,24 +109,29 @@ clean-safe: ## Safely clean build artifacts and cache
 clean: ## Clean all build artifacts and dependencies
 	@$(call echo_blue,Cleaning workspace...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
-	@$(call echo_blue,Stopping workspace-affiliated processes...)
-	@$(KILL_WORKSPACE_PROCS)
+	@$(call echo_blue,Clearing Nx cache...)
+	pnpm exec nx reset $(NULL_REDIRECT) || echo Nx reset skipped
 	@$(call echo_blue,Stopping Nx daemon if running...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -Command "$$job = Start-Job { pnpm exec nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 else
 	@timeout 5 pnpm exec nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 endif
+	@$(call echo_blue,Stopping workspace-affiliated processes...)
+	@$(KILL_WORKSPACE_PROCS)
+ifeq ($(DETECTED_OS),Windows)
+	@$(call echo_blue,Waiting for file handles to release...)
+	@powershell -Command "Start-Sleep -Seconds 3"
+endif
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
-	@$(call echo_blue,Clearing Nx cache...)
+	@$(call echo_blue,Removing Nx cache directory...)
 ifeq ($(DETECTED_OS),Windows)
 	@if exist .nx $(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
 else
 	@$(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
 endif
-	pnpm exec nx reset
-	@$(call echo_yellow,Note: If npkill errors occur, run 'make install-tools' first)
+	@$(call echo_yellow,Note: If file lock errors occur during install, use 'make install-force')
 	@$(call echo_green,Clean completed)
 
 clean-node: ## Clean Node.js dependencies
@@ -139,6 +144,10 @@ clean-python: ## Clean Python dependencies only
 
 clean-cache: ## Clear Nx cache
 	@$(call echo_blue,Clearing Nx cache...)
+	pnpm exec nx reset
+
+reset: ## Reset Nx cache (alias for clean-cache)
+	@$(call echo_blue,Resetting Nx cache...)
 	pnpm exec nx reset
 
 # Code Quality
