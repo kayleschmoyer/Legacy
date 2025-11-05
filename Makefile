@@ -394,10 +394,18 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
+
+squash-branch: ## Squash all commits on current branch from parent (optional: MESSAGE="commit message")
+	@$(call echo_blue,Squashing branch commits...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -Command "$$params = @{}; if ('$(MESSAGE)') { $$params['Message'] = '$(MESSAGE)' }; & '.\scripts\squash-branch.ps1' @params"
+else
+	@./scripts/squash-branch.sh $(if $(MESSAGE),-m "$(MESSAGE)",)
+endif
 
 rebase-tree: ## Rebase entire branch tree with auto-conflict resolution
 	@$(call echo_blue,Rebasing branch tree...)
