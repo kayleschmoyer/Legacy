@@ -208,7 +208,7 @@ jobs:
 
       - name: Upload IPA as GitHub Artifact (Release)
         if: steps.version.outputs.build_config == 'Release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: |
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload App Bundle as GitHub Artifact (Debug)
         if: steps.version.outputs.build_config == 'Debug'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: ${{ steps.artifacts.outputs.app_zip_path }}

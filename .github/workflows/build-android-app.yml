@@ -327,7 +327,7 @@ jobs:
           du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Not found"
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: android-apk-${{ needs.setup.outputs.build_type }}
           path: apps/app/android/${{ steps.build.outputs.apk_path }}

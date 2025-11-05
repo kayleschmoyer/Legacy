@@ -508,7 +508,7 @@ jobs:
       - name: "📤 Upload CodeQL Results"
         # Skip on PRs since CodeQL is not run
         if: github.event_name != 'pull_request' && steps.process-codeql-results.outputs.sarif-generated == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: codeql-sarif-results
           path: sarif-results/
