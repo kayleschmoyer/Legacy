@@ -82,6 +82,11 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 - Structured responses for better parsing
 - Automatic error handling and retry logic
 
+### Key Points
+
+- Lean on the VS Code MCP Playwright tool for UI validation so regressions are caught with consistent, reproducible runs.
+- Prefer the MCP integrations for GitHub, Sentry, Atlassian, and GitKraken rather than bouncing between web UIs or ad-hoc CLI commands.
+
 ### Essential Commands
 
 ```powershell
