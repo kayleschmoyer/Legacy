@@ -137,7 +137,7 @@ importers:
         version: 16.4.7
       drizzle-orm:
         specifier: ^0.44.6
-        version: 0.44.6(@types/pg@8.15.5)(pg@8.16.3)
+        version: 0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7)
       expo:
         specifier: ^53.0.22
         version: 53.0.23(@babel/core@7.28.4)(@expo/metro-runtime@5.0.5(react-native@0.79.6(@babel/core@7.28.4)(@react-native-community/cli@18.0.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5))(@types/react@19.2.2)(bufferutil@4.0.9)(react@19.2.0)(utf-8-validate@6.0.5)))(bufferutil@4.0.9)(graphql@16.11.0)(react-native@0.79.6(@babel/core@7.28.4)(@react-native-community/cli@18.0.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@6.0.5))(@types/react@19.2.2)(bufferutil@4.0.9)(react@19.2.0)(utf-8-validate@6.0.5))(react@19.2.0)(utf-8-validate@6.0.5)
@@ -773,7 +773,7 @@ importers:
         version: 1.0.7
       drizzle-orm:
         specifier: '*'
-        version: 0.44.6(@types/pg@8.15.5)(pg@8.16.3)
+        version: 0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7)
     devDependencies:
       '@types/aws-lambda':
         specifier: ^8.10.157
@@ -966,9 +966,15 @@ importers:
 
   lib/db-client:
     dependencies:
+      '@drepkovsky/drizzle-migrations':
+        specifier: ^0.6.0
+        version: 0.6.0(drizzle-kit@0.31.5)(drizzle-orm@0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7))
       dotenv:
         specifier: '*'
         version: 17.2.3
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.7
 
   lib/env-utilities:
     dependencies:
@@ -2191,6 +2197,13 @@ packages:
     peerDependenciesMeta:
       pg:
         optional: true
+
+  '@drepkovsky/drizzle-migrations@0.6.0':
+    resolution: {integrity: sha512-A6btYI/1y+mwG9o4xbqxst9Y7r7X2v4zVrSRFWgtkyXLo4Mw6dKjQR6FhvHPLkEbPr35NTIN9VjnAr8xbfNcEw==}
+    hasBin: true
+    peerDependencies:
+      drizzle-kit: ^0.31.1
+      drizzle-orm: ^0.44.2
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -8700,6 +8713,9 @@ packages:
   console-control-strings@1.1.0:
     resolution: {integrity: sha512-ty/fTekppD2fIwRvnZAVdeOiGd1c7YXEixbgJTNzqcxJWKQnjJ/V1bNEEE6hygpM3WjwHFUVK6HTjWSzV4a8sQ==}
 
+  console-table-printer@2.15.0:
+    resolution: {integrity: sha512-SrhBq4hYVjLCkBVOWaTzceJalvn5K1Zq5aQA6wXC/cYjI3frKWNPEMK3sZsJfNNQApvCQmgBcc13ZKmFj8qExw==}
+
   constant-case@3.0.4:
     resolution: {integrity: sha512-I2hSBi7Vvs7BEuJDr5dDHfzb/Ruj3FyvFyh7KLilAjNQw3Be+xgqUBA2W6scVEcL0hL1dwPRtIqEPVUCKkSsyQ==}
 
@@ -12159,6 +12175,9 @@ packages:
   lodash.isstring@4.0.1:
     resolution: {integrity: sha512-0wJxfxH1wgO3GrbuP+dTTk7op+6L41QCXbGINEmD+ny/G/eCqGzxyCsh7159S+mgDDcoarnBw6PC1PS5+wUGgw==}
 
+  lodash.kebabcase@4.1.1:
+    resolution: {integrity: sha512-N8XRTIMMqqDgSy4VLKPnJ/+hpGZN+PHQiJnSenYqPaVV/NCqEogTnAdZLQiGKhxX+JCs8waWq2t1XHWKOmlY8g==}
+
   lodash.memoize@4.1.2:
     resolution: {integrity: sha512-t7j+NzmgnQzTAYXcsHYLgimltOV1MXHtlOWf6GjL9Kj8GK5FInw5JotxvbOs+IvV1/Dzo04/fCGfLVs7aXb4Ag==}
 
@@ -12170,6 +12189,9 @@ packages:
 
   lodash.pickby@4.6.0:
     resolution: {integrity: sha512-AZV+GsS/6ckvPOVQPXSiFFacKvKB4kOQu6ynt9wz0F3LO4R9Ij4K1ddYsIytDpSgLz88JHd9P+oaLeej5/Sl7Q==}
+
+  lodash.snakecase@4.1.1:
+    resolution: {integrity: sha512-QZ1d4xoBHYUeuouhEq3lk3Uq7ldgyFXGBhg04+oRLnIz8o9T65Eh+8YdroUwn846zchkA9yDsDl5CVVaV2nqYw==}
 
   lodash.sortby@4.7.0:
     resolution: {integrity: sha512-HDWXG8isMntAyRF5vZ7xKuEvOhT4AhlRt/3czTSjvGUxjYCBVRQY48ViDHyfYz9VIoBkW4TMGQNapx+l3RUwdA==}
@@ -13639,6 +13661,10 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
+  postgres@3.4.7:
+    resolution: {integrity: sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw==}
+    engines: {node: '>=12'}
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -14556,6 +14582,9 @@ packages:
   simple-update-notifier@2.0.0:
     resolution: {integrity: sha512-a2B9Y0KlNXl9u/vsW6sTIu9vGEpfKu2wRV6l1H3XEas/0gUIzGzBoP/IouTcUQbm9JWZLH3COxyn03TYlFax6w==}
     engines: {node: '>=10'}
+
+  simple-wcswidth@1.1.2:
+    resolution: {integrity: sha512-j7piyCjAeTDSjzTSQ7DokZtMNwNlEAyxqSZeCS+CXH7fJ4jx3FuJ/mTW3mE+6JLs4VJBbcll0Kjn+KXI5t21Iw==}
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
@@ -18011,6 +18040,18 @@ snapshots:
       pg: 8.16.3
     transitivePeerDependencies:
       - supports-color
+
+  '@drepkovsky/drizzle-migrations@0.6.0(drizzle-kit@0.31.5)(drizzle-orm@0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7))':
+    dependencies:
+      commander: 12.1.0
+      console-table-printer: 2.15.0
+      drizzle-kit: 0.31.5
+      drizzle-orm: 0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7)
+      lodash.camelcase: 4.3.0
+      lodash.kebabcase: 4.1.1
+      lodash.snakecase: 4.1.1
+      prompts: 2.4.2
+      tsx: 4.20.6
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -27821,6 +27862,10 @@ snapshots:
 
   console-control-strings@1.1.0: {}
 
+  console-table-printer@2.15.0:
+    dependencies:
+      simple-wcswidth: 1.1.2
+
   constant-case@3.0.4:
     dependencies:
       no-case: 3.0.4
@@ -28444,10 +28489,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.6(@types/pg@8.15.5)(pg@8.16.3):
+  drizzle-orm@0.44.6(@types/pg@8.15.5)(pg@8.16.3)(postgres@3.4.7):
     optionalDependencies:
       '@types/pg': 8.15.5
       pg: 8.16.3
+      postgres: 3.4.7
 
   dset@3.1.4: {}
 
@@ -32346,6 +32392,8 @@ snapshots:
 
   lodash.isstring@4.0.1: {}
 
+  lodash.kebabcase@4.1.1: {}
+
   lodash.memoize@4.1.2: {}
 
   lodash.merge@4.6.2: {}
@@ -32353,6 +32401,8 @@ snapshots:
   lodash.once@4.1.1: {}
 
   lodash.pickby@4.6.0: {}
+
+  lodash.snakecase@4.1.1: {}
 
   lodash.sortby@4.7.0: {}
 
@@ -34277,6 +34327,8 @@ snapshots:
 
   postgres-range@1.1.4: {}
 
+  postgres@3.4.7: {}
+
   prelude-ls@1.2.1: {}
 
   prettier@3.6.2: {}
@@ -35453,6 +35505,8 @@ snapshots:
   simple-update-notifier@2.0.0:
     dependencies:
       semver: 7.7.3
+
+  simple-wcswidth@1.1.2: {}
 
   sisteransi@1.0.5: {}
 

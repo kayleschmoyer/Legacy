@@ -1,1 +1,0 @@
-ALTER TYPE "draft_type" ADD VALUE 'random-draft';

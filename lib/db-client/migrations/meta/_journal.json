@@ -5,71 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1759075584090,
-      "tag": "0000_vengeful_xorn",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1759078997543,
-      "tag": "0001_add-career-statistics-views",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1759773113140,
-      "tag": "0002_deep_wild_pack",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1759938600000,
-      "tag": "0003_add_positions_played_to_career_fielding",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1759867906734,
-      "tag": "0004_early_lyja",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1759872826490,
-      "tag": "0005_familiar_maestro",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1759880906778,
-      "tag": "0006_oval_mac_gargan",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1760024758403,
-      "tag": "0007_add_stats_last_fetched_at_to_players",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1760025000000,
-      "tag": "0008_add_invite_code_to_leagues",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1760793600000,
-      "tag": "0009_create_league_scoring_tables",
+      "when": 1762627381875,
+      "tag": "0000_initial_schema",
       "breakpoints": true
     }
   ]

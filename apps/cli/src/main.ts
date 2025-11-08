@@ -39,6 +39,10 @@ import {
   inspectDatabase,
   inspectDatabaseCommandBuilder,
 } from './commands/inspectDatabase';
+import {
+  handleResetDatabase,
+  resetDatabaseCommandBuilder,
+} from './commands/resetDatabase';
 
 import {
   fixUsersTable,
@@ -63,18 +67,9 @@ import {
   handleSetUserType,
   setUserTypeCommandBuilder,
 } from './commands/setUserType';
-import {
-  handleListUsers,
-  listUsersCommandBuilder,
-} from './commands/listUsers';
-import {
-  addUserCommandBuilder,
-  handleAddUser,
-} from './commands/addUser';
-import {
-  authCommandBuilder,
-  handleAuth,
-} from './commands/auth';
+import { handleListUsers, listUsersCommandBuilder } from './commands/listUsers';
+import { addUserCommandBuilder, handleAddUser } from './commands/addUser';
+import { authCommandBuilder, handleAuth } from './commands/auth';
 import {
   authenticatedListUsersCommandBuilder,
   handleAuthenticatedListUsers,
@@ -152,6 +147,12 @@ async function run(): Promise<void> {
       'Inspect current database state and migration status',
       inspectDatabaseCommandBuilder,
       inspectDatabase,
+    )
+    .command(
+      'reset-database',
+      'Reset database by dropping all tables and schemas (DESTRUCTIVE)',
+      resetDatabaseCommandBuilder,
+      handleResetDatabase,
     )
     .command(
       'create-matchup',

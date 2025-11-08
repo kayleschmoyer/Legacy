@@ -20,13 +20,21 @@
     "db:verify": "tsx src/scripts/verify-schema.ts",
     "db:manual-migration": "tsx src/scripts/manual-migration.ts",
     "db:test-draft": "tsx src/scripts/test-draft-status.ts",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-migrations generate",
+    "db:up": "tsx src/scripts/rollback-migrations.ts up",
+    "db:down": "tsx src/scripts/rollback-migrations.ts down",
+    "db:status": "tsx src/scripts/rollback-migrations.ts status",
+    "db:fresh": "tsx src/scripts/rollback-migrations.ts fresh",
+    "db:refresh": "tsx src/scripts/rollback-migrations.ts refresh",
+    "db:generate:legacy": "drizzle-kit generate",
     "db:migrate": "tsx src/scripts/run-drizzle-migrations.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx src/scripts/reset-database.ts"
   },
   "dependencies": {
-    "dotenv": "*"
+    "@drepkovsky/drizzle-migrations": "^0.6.0",
+    "dotenv": "*",
+    "postgres": "^3.4.7"
   }
 }

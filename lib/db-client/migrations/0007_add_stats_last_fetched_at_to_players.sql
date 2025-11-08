@@ -1,1 +1,0 @@
-ALTER TABLE "players" ADD COLUMN "stats_last_fetched_at" timestamp;

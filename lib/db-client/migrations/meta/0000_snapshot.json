@@ -1,5 +1,5 @@
 {
-  "id": "1f3cabe7-ff64-4058-911a-3826190e8030",
+  "id": "a6557b29-5eff-42fa-9d91-a9a547f0b5b2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -66,7 +66,10 @@
           "nullsNotDistinct": false,
           "columns": ["draft_id", "draft_order"]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.drafts": {
       "name": "drafts",
@@ -119,7 +122,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.league_members": {
       "name": "league_members",
@@ -169,7 +175,10 @@
           "columns": ["league_id", "user_id"]
         }
       },
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.league_messages": {
       "name": "league_messages",
@@ -257,7 +266,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.league_positions": {
       "name": "league_positions",
@@ -296,7 +308,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.leagues": {
       "name": "leagues",
@@ -332,12 +347,51 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "draft_status": {
+          "name": "draft_status",
+          "type": "draft_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not-started'"
+        },
+        "invite_code": {
+          "name": "invite_code",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "leagues_invite_code_idx": {
+          "name": "leagues_invite_code_idx",
+          "columns": [
+            {
+              "expression": "invite_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {
+        "leagues_invite_code_unique": {
+          "name": "leagues_invite_code_unique",
+          "nullsNotDistinct": false,
+          "columns": ["invite_code"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.team_members": {
       "name": "team_members",
@@ -414,7 +468,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {
+        "team_members_uk_team_position": {
+          "name": "team_members_uk_team_position",
+          "nullsNotDistinct": false,
+          "columns": ["team_id", "position_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.teams": {
       "name": "teams",
@@ -458,7 +521,10 @@
           "nullsNotDistinct": false,
           "columns": ["id", "league_id"]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.matchup_player_games": {
       "name": "matchup_player_games",
@@ -520,7 +586,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.matchup_players": {
       "name": "matchup_players",
@@ -573,7 +642,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.matchups": {
       "name": "matchups",
@@ -617,7 +689,10 @@
           "nullsNotDistinct": false,
           "columns": ["league_id", "week_number"]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.players": {
       "name": "players",
@@ -646,6 +721,12 @@
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
+        },
+        "stats_last_fetched_at": {
+          "name": "stats_last_fetched_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -657,7 +738,10 @@
           "nullsNotDistinct": false,
           "columns": ["bref_id"]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.game_batting": {
       "name": "game_batting",
@@ -683,7 +767,7 @@
         },
         "game_identifier": {
           "name": "game_identifier",
-          "type": "char(12)",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
@@ -793,7 +877,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.game_fielding": {
       "name": "game_fielding",
@@ -819,7 +906,7 @@
         },
         "game_identifier": {
           "name": "game_identifier",
-          "type": "char(12)",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
@@ -863,7 +950,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.game_pitching": {
       "name": "game_pitching",
@@ -889,7 +979,7 @@
         },
         "game_identifier": {
           "name": "game_identifier",
-          "type": "char(12)",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1009,7 +1099,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.season_batting": {
       "name": "season_batting",
@@ -1161,7 +1254,7 @@
         },
         "sf": {
           "name": "sf",
-          "type": "varchar(10)",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1173,7 +1266,7 @@
         },
         "pos_season": {
           "name": "pos_season",
-          "type": "varchar(50)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1185,19 +1278,19 @@
         },
         "lg_id": {
           "name": "lg_id",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
         "team": {
           "name": "team",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
         "row_id": {
           "name": "row_id",
-          "type": "varchar(10)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         }
@@ -1251,7 +1344,10 @@
           "columns": ["player_id", "season", "team", "row_id"]
         }
       },
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.season_fielding": {
       "name": "season_fielding",
@@ -1271,13 +1367,13 @@
         },
         "pos": {
           "name": "pos",
-          "type": "varchar(10)",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
         },
         "lg_id": {
           "name": "lg_id",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1421,13 +1517,13 @@
         },
         "team": {
           "name": "team",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
         "row_id": {
           "name": "row_id",
-          "type": "varchar(10)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         }
@@ -1502,7 +1598,10 @@
           "columns": ["player_id", "season", "pos", "team", "row_id"]
         }
       },
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.season_pitching": {
       "name": "season_pitching",
@@ -1648,7 +1747,7 @@
         },
         "row_id": {
           "name": "row_id",
-          "type": "varchar(10)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1714,13 +1813,13 @@
         },
         "team": {
           "name": "team",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
         "lg_id": {
           "name": "lg_id",
-          "type": "varchar(20)",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1784,7 +1883,520 @@
           "columns": ["player_id", "season", "team", "row_id"]
         }
       },
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.league_scoring_change_log": {
+      "name": "league_scoring_change_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stat_definition_id": {
+          "name": "stat_definition_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previous_multiplier": {
+          "name": "previous_multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "new_multiplier": {
+          "name": "new_multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_by": {
+          "name": "changed_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "change_reason": {
+          "name": "change_reason",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "scoring_change_action",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "league_scoring_change_log_profile_idx": {
+          "name": "league_scoring_change_log_profile_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "league_scoring_change_log_stat_idx": {
+          "name": "league_scoring_change_log_stat_idx",
+          "columns": [
+            {
+              "expression": "stat_definition_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "league_scoring_change_log_action_idx": {
+          "name": "league_scoring_change_log_action_idx",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "league_scoring_change_log_profile_fk": {
+          "name": "league_scoring_change_log_profile_fk",
+          "tableFrom": "league_scoring_change_log",
+          "tableTo": "league_scoring_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "league_scoring_change_log_stat_fk": {
+          "name": "league_scoring_change_log_stat_fk",
+          "tableFrom": "league_scoring_change_log",
+          "tableTo": "scoring_stat_definitions",
+          "columnsFrom": ["stat_definition_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.league_scoring_profile_entries": {
+      "name": "league_scoring_profile_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stat_definition_id": {
+          "name": "stat_definition_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "multiplier": {
+          "name": "multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_enabled": {
+          "name": "is_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "league_scoring_profile_entries_unique": {
+          "name": "league_scoring_profile_entries_unique",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stat_definition_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "league_scoring_profile_entries_profile_fk": {
+          "name": "league_scoring_profile_entries_profile_fk",
+          "tableFrom": "league_scoring_profile_entries",
+          "tableTo": "league_scoring_profiles",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "league_scoring_profile_entries_stat_fk": {
+          "name": "league_scoring_profile_entries_stat_fk",
+          "tableFrom": "league_scoring_profile_entries",
+          "tableTo": "scoring_stat_definitions",
+          "columnsFrom": ["stat_definition_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.league_scoring_profiles": {
+      "name": "league_scoring_profiles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "league_id": {
+          "name": "league_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profile_name": {
+          "name": "profile_name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Default'"
+        },
+        "season_year": {
+          "name": "season_year",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "scoring_profile_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "copied_from_profile_id": {
+          "name": "copied_from_profile_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "league_scoring_profiles_league_idx": {
+          "name": "league_scoring_profiles_league_idx",
+          "columns": [
+            {
+              "expression": "league_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "league_scoring_profiles_unique_default": {
+          "name": "league_scoring_profiles_unique_default",
+          "columns": [
+            {
+              "expression": "league_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"league_scoring_profiles\".\"is_default\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "league_scoring_profiles_league_fk": {
+          "name": "league_scoring_profiles_league_fk",
+          "tableFrom": "league_scoring_profiles",
+          "tableTo": "leagues",
+          "columnsFrom": ["league_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "league_scoring_profiles_copied_from_fk": {
+          "name": "league_scoring_profiles_copied_from_fk",
+          "tableFrom": "league_scoring_profiles",
+          "tableTo": "league_scoring_profiles",
+          "columnsFrom": ["copied_from_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scoring_stat_definitions": {
+      "name": "scoring_stat_definitions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "stat_key": {
+          "name": "stat_key",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stat_group": {
+          "name": "stat_group",
+          "type": "scoring_stat_group",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_table": {
+          "name": "source_table",
+          "type": "varchar(48)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_column": {
+          "name": "source_column",
+          "type": "varchar(48)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_multiplier": {
+          "name": "default_multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_multiplier": {
+          "name": "min_multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_multiplier": {
+          "name": "max_multiplier",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "step_size": {
+          "name": "step_size",
+          "type": "numeric(4, 3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.5'"
+        },
+        "is_required": {
+          "name": "is_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "enforce_positive": {
+          "name": "enforce_positive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "enforce_negative": {
+          "name": "enforce_negative",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "scoring_stat_definitions_stat_key_unique": {
+          "name": "scoring_stat_definitions_stat_key_unique",
+          "columns": [
+            {
+              "expression": "stat_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "scoring_stat_definitions_group_idx": {
+          "name": "scoring_stat_definitions_group_idx",
+          "columns": [
+            {
+              "expression": "stat_group",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "app_internal.users": {
       "name": "users",
@@ -1868,7 +2480,10 @@
           "nullsNotDistinct": false,
           "columns": ["email"]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -1882,10 +2497,15 @@
       "schema": "public",
       "values": ["snake", "normal"]
     },
+    "public.draft_status": {
+      "name": "draft_status",
+      "schema": "public",
+      "values": ["not-started", "queued", "in-progress", "completed"]
+    },
     "public.draft_type": {
       "name": "draft_type",
       "schema": "public",
-      "values": ["blind", "normal", "legacy"]
+      "values": ["blind", "normal", "legacy", "random-draft"]
     },
     "public.league_permission_level": {
       "name": "league_permission_level",
@@ -1929,6 +2549,21 @@
         "IF"
       ]
     },
+    "public.scoring_change_action": {
+      "name": "scoring_change_action",
+      "schema": "public",
+      "values": ["created", "updated", "disabled"]
+    },
+    "public.scoring_profile_status": {
+      "name": "scoring_profile_status",
+      "schema": "public",
+      "values": ["draft", "active", "archived"]
+    },
+    "public.scoring_stat_group": {
+      "name": "scoring_stat_group",
+      "schema": "public",
+      "values": ["batting", "pitching", "fielding"]
+    },
     "app_internal.access_level": {
       "name": "access_level",
       "schema": "app_internal",
@@ -1939,6 +2574,1020 @@
     "app_internal": "app_internal"
   },
   "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {
+    "public.player_eligible_positions": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "player_position",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "\nSELECT player_id,\n       pos AS position\nFROM career_fielding_by_position\nWHERE g > 50\n  AND POS != 'P'\nUNION\nSELECT player_id,\n       'SP' AS position\nFROM career_pitching\nWHERE gs > 50\nUNION\nSELECT player_id,\n       'RP' AS position\nFROM career_pitching\nWHERE g - gs > 50;\n",
+      "name": "player_eligible_positions",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.aggregate_season_batting": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "g": {
+          "name": "g",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pa": {
+          "name": "pa",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ab": {
+          "name": "ab",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "r": {
+          "name": "r",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "h": {
+          "name": "h",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doubles": {
+          "name": "doubles",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triples": {
+          "name": "triples",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hr": {
+          "name": "hr",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rbi": {
+          "name": "rbi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bb": {
+          "name": "bb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "so": {
+          "name": "so",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tb": {
+          "name": "tb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gidp": {
+          "name": "gidp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hbp": {
+          "name": "hbp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sh": {
+          "name": "sh",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sf": {
+          "name": "sf",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ibb": {
+          "name": "ibb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "",
+      "name": "aggregate_season_batting",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.aggregate_season_fielding": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "g": {
+          "name": "g",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inn_def": {
+          "name": "inn_def",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chances": {
+          "name": "chances",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po": {
+          "name": "po",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a": {
+          "name": "a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "e_def": {
+          "name": "e_def",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dp_def": {
+          "name": "dp_def",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickoffs": {
+          "name": "pickoffs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "",
+      "name": "aggregate_season_fielding",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.aggregate_season_fielding_by_pos": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pos": {
+          "name": "pos",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "g": {
+          "name": "g",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inn_def": {
+          "name": "inn_def",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chances": {
+          "name": "chances",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po": {
+          "name": "po",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a": {
+          "name": "a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "e_def": {
+          "name": "e_def",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dp_def": {
+          "name": "dp_def",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickoffs": {
+          "name": "pickoffs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "",
+      "name": "aggregate_season_fielding_by_pos",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.aggregate_season_pitching": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "w": {
+          "name": "w",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l": {
+          "name": "l",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g": {
+          "name": "g",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gf": {
+          "name": "gf",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sho": {
+          "name": "sho",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sv": {
+          "name": "sv",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "h": {
+          "name": "h",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "r": {
+          "name": "r",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "er": {
+          "name": "er",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hr": {
+          "name": "hr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bb": {
+          "name": "bb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ibb": {
+          "name": "ibb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "so": {
+          "name": "so",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hbp": {
+          "name": "hbp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bk": {
+          "name": "bk",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batters_faced": {
+          "name": "batters_faced",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outs_recorded": {
+          "name": "outs_recorded",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "",
+      "name": "aggregate_season_pitching",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.career_batting": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g": {
+          "name": "g",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pa": {
+          "name": "pa",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ab": {
+          "name": "ab",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "r": {
+          "name": "r",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "h": {
+          "name": "h",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doubles": {
+          "name": "doubles",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triples": {
+          "name": "triples",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hr": {
+          "name": "hr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rbi": {
+          "name": "rbi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bb": {
+          "name": "bb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "so": {
+          "name": "so",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tb": {
+          "name": "tb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gidp": {
+          "name": "gidp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hbp": {
+          "name": "hbp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sh": {
+          "name": "sh",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ibb": {
+          "name": "ibb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT player_id,\n       sum(g)       AS g,\n       sum(pa)      AS pa,\n       sum(ab)      AS ab,\n       sum(r)       AS r,\n       sum(h)       AS h,\n       sum(doubles) AS doubles,\n       sum(triples) AS triples,\n       sum(hr)      AS hr,\n       sum(rbi)     AS rbi,\n       sum(sb)      AS sb,\n       sum(cs)      AS cs,\n       sum(bb)      AS bb,\n       sum(so)      AS so,\n       sum(tb)      AS tb,\n       sum(gidp)    AS gidp,\n       sum(hbp)     AS hbp,\n       sum(sh)      AS sh,\n       sum(ibb)     AS ibb\nFROM season_batting\nWHERE ((SELECT count(1) AS count\n        FROM regexp_split_to_table(season_batting.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)\n        WHERE\n            season_batting.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) >\n      0\nGROUP BY player_id",
+      "name": "career_batting",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.career_fielding": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g": {
+          "name": "g",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inn_def": {
+          "name": "inn_def",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chances": {
+          "name": "chances",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po": {
+          "name": "po",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a": {
+          "name": "a",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "e_def": {
+          "name": "e_def",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dp_def": {
+          "name": "dp_def",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickoffs": {
+          "name": "pickoffs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pos": {
+          "name": "pos",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "positions_played": {
+          "name": "positions_played",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT \n    cf.player_id,\n    cf.g,\n    cf.gs,\n    cf.cg,\n    cf.inn_def,\n    cf.chances,\n    cf.po,\n    cf.a,\n    cf.e_def,\n    cf.dp_def,\n    cf.sb,\n    cf.cs,\n    cf.pickoffs,\n    cf.wp,\n    NULL::text AS pos,\n    COALESCE(\n        jsonb_object_agg(\n            pos_agg.pos, \n            jsonb_build_object(\n                'games', pos_agg.g, \n                'gamesStarted', pos_agg.gs,\n                'position', pos_agg.pos\n            )\n        ) FILTER (WHERE pos_agg.pos IS NOT NULL),\n        '{}'::jsonb\n    ) AS positions_played\nFROM (\n    SELECT player_id,\n        sum(g) AS g,\n        sum(gs) AS gs,\n        sum(cg) AS cg,\n        sum(inn_def) AS inn_def,\n        sum(chances) AS chances,\n        sum(po) AS po,\n        sum(a) AS a,\n        sum(e_def) AS e_def,\n        sum(dp_def) AS dp_def,\n        sum(sb) AS sb,\n        sum(cs) AS cs,\n        sum(pickoffs) AS pickoffs,\n        sum(wp) AS wp\n    FROM season_fielding\n    WHERE ((SELECT count(1) AS count\n            FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)\n            WHERE season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0\n    GROUP BY player_id\n) cf\nLEFT JOIN (\n    SELECT player_id,\n        pos,\n        sum(g) AS g,\n        sum(gs) AS gs\n    FROM season_fielding\n    WHERE ((SELECT count(1) AS count\n            FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)\n            WHERE season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0\n    GROUP BY player_id, pos\n) pos_agg ON cf.player_id = pos_agg.player_id\nGROUP BY cf.player_id, cf.g, cf.gs, cf.cg, cf.inn_def, cf.chances, cf.po, cf.a, cf.e_def, cf.dp_def, cf.sb, cf.cs, cf.pickoffs, cf.wp",
+      "name": "career_fielding",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.career_fielding_by_position": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pos": {
+          "name": "pos",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g": {
+          "name": "g",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inn_def": {
+          "name": "inn_def",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chances": {
+          "name": "chances",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po": {
+          "name": "po",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a": {
+          "name": "a",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "e_def": {
+          "name": "e_def",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dp_def": {
+          "name": "dp_def",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sb": {
+          "name": "sb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cs": {
+          "name": "cs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickoffs": {
+          "name": "pickoffs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT player_id,\n       pos,\n       sum(g)        AS g,\n       sum(gs)       AS gs,\n       sum(cg)       AS cg,\n       sum(inn_def)  AS inn_def,\n       sum(chances)  AS chances,\n       sum(po)       AS po,\n       sum(a)        AS a,\n       sum(e_def)    AS e_def,\n       sum(dp_def)   AS dp_def,\n       sum(sb)       AS sb,\n       sum(cs)       AS cs,\n       sum(pickoffs) AS pickoffs,\n       sum(wp)       AS wp\nFROM season_fielding\nWHERE ((SELECT count(1) AS count\n        FROM regexp_split_to_table(season_fielding.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)\n        WHERE\n            season_fielding.lg_id::text = ANY (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) >\n      0\nGROUP BY player_id, pos",
+      "name": "career_fielding_by_position",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.career_pitching": {
+      "columns": {
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "w": {
+          "name": "w",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l": {
+          "name": "l",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "g": {
+          "name": "g",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gs": {
+          "name": "gs",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gf": {
+          "name": "gf",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cg": {
+          "name": "cg",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sho": {
+          "name": "sho",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sv": {
+          "name": "sv",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "h": {
+          "name": "h",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "r": {
+          "name": "r",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "er": {
+          "name": "er",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hr": {
+          "name": "hr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bb": {
+          "name": "bb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ibb": {
+          "name": "ibb",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "so": {
+          "name": "so",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hbp": {
+          "name": "hbp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bk": {
+          "name": "bk",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wp": {
+          "name": "wp",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batters_faced": {
+          "name": "batters_faced",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outs_recorded": {
+          "name": "outs_recorded",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "out_rate": {
+          "name": "out_rate",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "era": {
+          "name": "era",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT player_id,\n       w,\n       l,\n       g,\n       gs,\n       gf,\n       cg,\n       sho,\n       sv,\n       h,\n       r,\n       er,\n       hr,\n       bb,\n       ibb,\n       so,\n       hbp,\n       bk,\n       wp,\n       batters_faced,\n       outs_recorded,\n       out_rate,\n       era\nFROM (SELECT season_pitching.player_id,\n             sum(season_pitching.w)             AS w,\n             sum(season_pitching.l)             AS l,\n             sum(season_pitching.g)             AS g,\n             sum(season_pitching.gs)            AS gs,\n             sum(season_pitching.gf)            AS gf,\n             sum(season_pitching.cg)            AS cg,\n             sum(season_pitching.sho)           AS sho,\n             sum(season_pitching.sv)            AS sv,\n             sum(season_pitching.h)             AS h,\n             sum(season_pitching.r)             AS r,\n             sum(season_pitching.er)            AS er,\n             sum(season_pitching.hr)            AS hr,\n             sum(season_pitching.bb)            AS bb,\n             sum(season_pitching.ibb)           AS ibb,\n             sum(season_pitching.so)            AS so,\n             sum(season_pitching.hbp)           AS hbp,\n             sum(season_pitching.bk)            AS bk,\n             sum(season_pitching.wp)            AS wp,\n             sum(season_pitching.batters_faced) AS batters_faced,\n             sum(season_pitching.outs_recorded) AS outs_recorded,\n             sum(season_pitching.outs_recorded) /\n             CASE sum(season_pitching.batters_faced)\n                 WHEN 0 THEN 1::bigint\n                 ELSE sum(season_pitching.batters_faced)\n                 END                            AS out_rate,\n             sum(season_pitching.er)::numeric /\n             CASE sum(season_pitching.outs_recorded)\n                 WHEN 0 THEN 1::bigint::numeric\n                 ELSE sum(season_pitching.outs_recorded)::numeric / 27.0\n                 END                            AS era\n      FROM season_pitching\n      WHERE ((SELECT count(1) AS count\n              FROM regexp_split_to_table(season_pitching.lg_id::text, ','::text) regexp_split_to_table(regexp_split_to_table)\n              WHERE season_pitching.lg_id::text = ANY\n                    (ARRAY ['AL'::character varying::text, 'NL'::character varying::text]))) > 0\n      GROUP BY season_pitching.player_id) unnamed_subquery;",
+      "name": "career_pitching",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    },
+    "public.users": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_level": {
+          "name": "access_level",
+          "type": "access_level",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT id,\n       email,\n       username,\n       access_level::character varying::access_level AS access_level\nFROM app_internal.users",
+      "name": "users",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    }
+  },
   "_meta": {
     "columns": {},
     "schemas": {},

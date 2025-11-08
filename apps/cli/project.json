@@ -82,6 +82,13 @@
         "cwd": "apps/cli"
       }
     },
+    "reset-database": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts reset-database",
+        "cwd": "apps/cli"
+      }
+    },
     "test-connection": {
       "executor": "nx:run-commands",
       "options": {
