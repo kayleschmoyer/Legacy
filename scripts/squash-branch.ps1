@@ -46,7 +46,11 @@ $ticket = if ($currentBranch -match '^([A-Z]+-\d+)') { $matches[1] } else { "" }
 
 # Get parent branch from twig
 Write-Info "Getting parent branch from twig..."
+# Set output encoding to UTF-8 to handle box-drawing characters
+$originalOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $twigOutput = twig tree --no-color 2>&1 | Out-String
+[Console]::OutputEncoding = $originalOutputEncoding
 if ($LASTEXITCODE -ne 0) {
     Write-Error "ERROR: Failed to get twig tree"
     exit 1
