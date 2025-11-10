@@ -411,7 +411,11 @@ branch-tree: ## Show current branch tree structure
 squash-branch: ## Squash all commits on current branch from parent (optional: MESSAGE="commit message")
 	@$(call echo_blue,Squashing branch commits...)
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -Command "$$params = @{}; if ('$(MESSAGE)') { $$params['Message'] = '$(MESSAGE)' }; & '.\scripts\squash-branch.ps1' @params"
+ifdef MESSAGE
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\squash-branch.ps1" -Message "$(MESSAGE)"
+else
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\squash-branch.ps1"
+endif
 else
 	@./scripts/squash-branch.sh $(if $(MESSAGE),-m "$(MESSAGE)",)
 endif
@@ -435,7 +439,14 @@ endif
 rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
 	@$(call echo_blue,Rebasing branch tree with skip-commits...)
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -Command "$$params = @{}; if ('$(SKIP_COMMITS)') { $$params['SkipCommits'] = '$(SKIP_COMMITS)' }; if ('$(SKIP_COMMITS_FILE)') { $$params['SkipCommitsFile'] = '$(SKIP_COMMITS_FILE)' }; & '.\scripts\rebase-branch-tree.ps1' @params"
+ifdef SKIP_COMMITS
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommits "$(SKIP_COMMITS)"
+else ifdef SKIP_COMMITS_FILE
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommitsFile "$(SKIP_COMMITS_FILE)"
+else
+	@$(call echo_red,Error: Must provide either SKIP_COMMITS or SKIP_COMMITS_FILE)
+	@exit 1
+endif
 else
 	@./scripts/rebase-branch-tree.sh $(if $(SKIP_COMMITS),--skip-commits $(SKIP_COMMITS),) $(if $(SKIP_COMMITS_FILE),--skip-commits-file $(SKIP_COMMITS_FILE),)
 endif
