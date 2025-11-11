@@ -207,7 +207,7 @@
     "@storybook/react": "^8.6.14",
     "@storybook/react-vite": "^8.6.14",
     "@storybook/test": "^8.6.14",
-    "@storybook/test-runner": "^0.23.0",
+    "@storybook/test-runner": "^0.24.1",
     "storybook": "^8.6.14",
     "@wdio/appium-service": "^9.19.2",
     "appium": "^3.1.0",
