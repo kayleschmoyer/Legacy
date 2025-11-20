@@ -11,7 +11,6 @@ This guide covers best practices for maintaining clean branch dependency trees i
 ## 🤖 For AI Agents
 
 **Twig MCP Server Available**: This repository includes a Twig MCP (Model Context Protocol) server configuration. AI agents with MCP support should use the twig MCP server for all twig operations instead of running terminal commands. This provides:
-
 - Structured responses that are easier to parse
 - Better error handling
 - Direct access to twig functionality
@@ -34,7 +33,6 @@ When working on large projects that span multiple tickets, it's common to create
 ### The Solution
 
 Use Twig's branch tree management features to:
-
 - Visualize branch dependencies
 - Verify unique commits per branch
 - Cascade rebases across dependent branches
@@ -74,12 +72,12 @@ main
 
 ### Interpreting Commit Counts
 
-| Pattern     | Meaning             | Action                                     |
-| ----------- | ------------------- | ------------------------------------------ |
-| `[+1]`      | One unique commit   | ✅ **Perfect** - clean branch              |
-| `[+2]`      | Two unique commits  | ✅ **Good** - verify both are yours        |
-| `[+25]`     | Twenty-five commits | ⚠️ **Warning** - likely has duplicates     |
-| `[+23/-24]` | Many adds/deletes   | 🚨 **Problem** - definitely has duplicates |
+| Pattern | Meaning | Action |
+|---------|---------|--------|
+| `[+1]` | One unique commit | ✅ **Perfect** - clean branch |
+| `[+2]` | Two unique commits | ✅ **Good** - verify both are yours |
+| `[+25]` | Twenty-five commits | ⚠️ **Warning** - likely has duplicates |
+| `[+23/-24]` | Many adds/deletes | 🚨 **Problem** - definitely has duplicates |
 
 ---
 
@@ -163,7 +161,7 @@ git log --oneline parent-branch..current-branch
 # - "feat(scoring): expose league scoring profiles"  ← From LS-7
 # - "docs(scoring): add rollout plan"                ← From LS-7
 # - "feat(matchup): extend schema"                   ← Your work
-#
+# 
 # You have duplicates from LS-7!
 ```
 
@@ -307,7 +305,7 @@ twig tree
 ✅ **Clean history** - branches stay at [+1] commit each  
 ✅ **No re-squashing needed** - history stays clean throughout  
 ✅ **More predictable** - no conflict resolution decisions needed  
-✅ **Faster** - automated scripts can handle entire tree
+✅ **Faster** - automated scripts can handle entire tree  
 
 #### When to Use This Pattern
 
@@ -384,12 +382,10 @@ ghi9012
 ```
 
 **How it works**:
-
 - **Rebase**: Fully excludes specified commits from the rebased branch using `git cherry-pick`
 - **Cascade**: ⚠️ Limited support - only applies to the initial branch, downstream branches use standard rebase
 
 **When to use**:
-
 - ✅ Removing duplicate commits from parent branches
 - ✅ Excluding broken commits during history cleanup
 - ✅ Skipping already-applied fixes
@@ -436,7 +432,6 @@ done
 ```
 
 **Validation**:
-
 - Commit hashes must be 7-64 hexadecimal characters
 - Invalid hashes will fail with clear error messages
 - File paths validated before processing
@@ -470,7 +465,6 @@ done
 **Problem**: Created 14 dependent branches (LS-17 through LS-31), all have duplicate commits from LS-7.
 
 **Detection**:
-
 ```powershell
 twig tree
 # Shows:
@@ -624,6 +618,26 @@ git merge-base parent current
 5. **Fix duplicates immediately** - don't wait until you have 14 dirty branches
 6. **Use cascade for bulk rebases** - it handles the tree structure automatically
 7. **Verify before force-pushing** - check `twig tree` and commit logs first
+
+---
+
+## 📼 Non-Interactive Rebase Demo (Nov 20, 2025)
+
+The Matchup branch tree (LS-17 → LS-53) was taken through a full, non-interactive cascade to validate the scripted workflow. Each command below was executed from `D:\code\legacy-sports` and produced the noted outcome:
+
+| Step | Command | Result | Notes |
+| --- | --- | --- | --- |
+| Cascade rebase | `make rebase-tree-skip SKIP_COMMITS_FILE=skip-commits.txt` | ✅ PASS | Used the 9 known skip hashes; LS-27 rebased without prompts. |
+| Typecheck | `pnpm exec nx affected -t typecheck` | ✅ PASS | Confirms regenerated GraphQL types compile everywhere. |
+| Mobile lint | `pnpm exec nx run app:lint` | ✅ PASS | Previously unsafe scoring hooks are now fully typed. |
+| Skip detection | `make detect-skip-commits` | ⚠️ FOLLOW-UP | Script still reports LS-28–LS-34 and LS-49–LS-53 containing the rewritten commits. |
+
+**Next steps highlighted by the demo**
+
+- Add or confirm the flagged hashes in `skip-commits.txt`, then rerun `make rebase-tree-skip` starting at LS-28 to cascade through LS-53.
+- Repeat `make detect-skip-commits` until every branch prints `[OK]`, capturing the final green transcript for this guide.
+- **Commit the fixes immediately after validation.** Once typecheck/lint/test/build pass, checkpoint the tooling/doc updates and regenerated artifacts so the cascade leaves the repo clean for the next branch.
+- Keep the validation order (typecheck → lint → test/build) after every cascade so regressions surface immediately.
 
 ---
 

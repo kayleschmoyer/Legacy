@@ -403,7 +403,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip detect-skip-commits resolve-conflicts squash-branch pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
@@ -449,6 +449,14 @@ else
 endif
 else
 	@./scripts/rebase-branch-tree.sh $(if $(SKIP_COMMITS),--skip-commits $(SKIP_COMMITS),) $(if $(SKIP_COMMITS_FILE),--skip-commits-file $(SKIP_COMMITS_FILE),)
+endif
+
+detect-skip-commits: ## Scan branches for rewritten commits that should have been dropped
+	@$(call echo_blue,Scanning branches for stale commits...)
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\detect-skip-commits.ps1" $(if $(BRANCHES),-Branches "$(BRANCHES)",) $(if $(BRANCH_PATTERN),-BranchPattern "$(BRANCH_PATTERN)",) $(if $(SKIP_COMMITS),-SkipCommits "$(SKIP_COMMITS)",) $(if $(SKIP_COMMITS_FILE),-SkipCommitsFile "$(SKIP_COMMITS_FILE)",) $(if $(IGNORE_DEFAULT_SKIP_FILE),-IgnoreDefaultSkipFile,)
+else
+	@pwsh -File "./scripts/detect-skip-commits.ps1" $(if $(BRANCHES),-Branches "$(BRANCHES)",) $(if $(BRANCH_PATTERN),-BranchPattern "$(BRANCH_PATTERN)",) $(if $(SKIP_COMMITS),-SkipCommits "$(SKIP_COMMITS)",) $(if $(SKIP_COMMITS_FILE),-SkipCommitsFile "$(SKIP_COMMITS_FILE)",) $(if $(IGNORE_DEFAULT_SKIP_FILE),-IgnoreDefaultSkipFile,)
 endif
 
 resolve-conflicts: ## Resolve conflicts in generated files

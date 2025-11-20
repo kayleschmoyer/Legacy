@@ -27,7 +27,8 @@ param(
     [string]$StartBranch,
     [switch]$AutoContinue,
     [string]$SkipCommits,
-    [string]$SkipCommitsFile
+    [string]$SkipCommitsFile,
+    [switch]$IgnoreDefaultSkipFile
 )
 
 $ErrorActionPreference = "Continue"
@@ -35,30 +36,56 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $resolveConflictsScript = Join-Path $scriptDir "resolve-generated-conflicts.ps1"
 
 # Parse skip-commits
+function Get-CommitHashesFromFile {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return @()
+    }
+
+    return Get-Content $Path | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith('#')) {
+            if ($line -match '^([0-9a-f]{7,64})') {
+                $matches[1]
+            }
+        }
+    } | Where-Object { $_ }
+}
+
 $skipCommitList = @()
 if ($SkipCommits) {
     $skipCommitList = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    Write-Host "[->] Will skip commits: $($skipCommitList -join ', ')" -ForegroundColor Yellow
+    if ($skipCommitList.Count -gt 0) {
+        Write-Host "[->] Will skip commits (CLI): $($skipCommitList -join ', ')" -ForegroundColor Yellow
+    }
 }
+
 if ($SkipCommitsFile) {
-    if (Test-Path $SkipCommitsFile) {
-        $fileCommits = Get-Content $SkipCommitsFile | ForEach-Object {
-            $line = $_.Trim()
-            # Skip empty lines and comments
-            if ($line -and -not $line.StartsWith('#')) {
-                # Extract commit hash (before any comment)
-                if ($line -match '^([0-9a-f]{7,64})') {
-                    $matches[1]
-                }
-            }
-        } | Where-Object { $_ }
-        $skipCommitList += $fileCommits
-        Write-Host "[->] Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
-    } else {
+    if (-not (Test-Path $SkipCommitsFile)) {
         Write-Host "[X] Skip-commits file not found: $SkipCommitsFile" -ForegroundColor Red
         exit 1
     }
+
+    $fileCommits = Get-CommitHashesFromFile -Path $SkipCommitsFile
+    if ($fileCommits.Count -gt 0) {
+        Write-Host "[->] Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
+        $skipCommitList += $fileCommits
+    }
 }
+elseif (-not $IgnoreDefaultSkipFile) {
+    $repoRoot = Split-Path $scriptDir -Parent
+    $defaultSkipFile = Join-Path $repoRoot "skip-commits.txt"
+    if (Test-Path $defaultSkipFile) {
+        $defaultCommits = Get-CommitHashesFromFile -Path $defaultSkipFile
+        if ($defaultCommits.Count -gt 0) {
+            Write-Host "[->] Auto-loaded skip-commits from repo default: $($defaultCommits -join ', ')" -ForegroundColor Yellow
+            $skipCommitList += $defaultCommits
+        }
+    }
+}
+
+$skipCommitList = $skipCommitList | Select-Object -Unique
 
 # Get current branch if not specified
 if (-not $StartBranch) {
@@ -137,28 +164,30 @@ function Rebase-Branch {
             $resolveExitCode = $LASTEXITCODE
             
             if ($resolveExitCode -ne 0) {
-                Write-Host "`n[X] Failed to resolve conflicts automatically" -ForegroundColor Red
-                
-                if (-not $AutoContinue) {
-                    $response = Read-Host "Continue manually? (y/n/abort)"
-                    if ($response -eq 'abort') {
-                        git rebase --abort
-                        return $false
-                    }
-                    if ($response -ne 'y') {
-                        return $false
-                    }
-                    Read-Host "Press Enter after manually resolving conflicts"
-                } else {
-                    Write-Host "[X] Aborting rebase of $branch" -ForegroundColor Red
-                    git rebase --abort
-                    return $false
-                }
+                Write-Host "`n[X] Auto-resolution script reported an error. Aborting rebase." -ForegroundColor Red
+                git rebase --abort | Out-Null
+                return $false
             }
             
             # Continue rebase
             Write-Host "[->] Continuing rebase..." -ForegroundColor Cyan
             $continueOutput = git rebase --continue 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                if ($AutoContinue) {
+                    Write-Host "[!] git rebase --continue failed, attempting --skip" -ForegroundColor Yellow
+                    git rebase --skip 2>&1 | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "[X] Unable to skip conflicting commit automatically" -ForegroundColor Red
+                        git rebase --abort | Out-Null
+                        return $false
+                    }
+                    continue
+                } else {
+                    Write-Host "[X] git rebase --continue failed. Aborting for safety." -ForegroundColor Red
+                    git rebase --abort | Out-Null
+                    return $false
+                }
+            }
             
             # Check if rebase completed
             if ($continueOutput -match "Successfully rebased") {
