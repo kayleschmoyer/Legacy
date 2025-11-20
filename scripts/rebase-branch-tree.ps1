@@ -28,14 +28,27 @@ param(
     [switch]$AutoContinue,
     [string]$SkipCommits,
     [string]$SkipCommitsFile,
-    [switch]$IgnoreDefaultSkipFile
+    [switch]$IgnoreDefaultSkipFile,
+    [switch]$PrependInitialSkips,
+    [switch]$KeepSkipFile,
+    [switch]$DisableAutoSkipTracking,
+    [switch]$AutoCascade,
+    [switch]$SkipCascade
 )
 
 $ErrorActionPreference = "Continue"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $resolveConflictsScript = Join-Path $scriptDir "resolve-generated-conflicts.ps1"
 
-# Parse skip-commits
+$skipCommitList = [System.Collections.Generic.List[string]]::new()
+$skipCommitSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+$autoSkipCommits = [System.Collections.Generic.List[string]]::new()
+$initialCliSkips = @()
+$skipFileOriginalContent = $null
+$skipFileExisted = $false
+$skipFileModified = $false
+$autoTrackSkipCommits = -not $DisableAutoSkipTracking
+
 function Get-CommitHashesFromFile {
     param([string]$Path)
 
@@ -53,39 +66,136 @@ function Get-CommitHashesFromFile {
     } | Where-Object { $_ }
 }
 
-$skipCommitList = @()
-if ($SkipCommits) {
-    $skipCommitList = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    if ($skipCommitList.Count -gt 0) {
-        Write-Host "[->] Will skip commits (CLI): $($skipCommitList -join ', ')" -ForegroundColor Yellow
+function Write-SkipFileEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Commit,
+        [string]$Source,
+        [switch]$PrependLine
+    )
+
+    if (-not $SkipCommitsFile) {
+        return
+    }
+
+    $line = $Commit
+    $commentParts = @()
+    if ($Source) {
+        $commentParts += $Source
+    }
+    $commentParts += "added $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    if ($commentParts.Count -gt 0) {
+        $line += "  # " + ($commentParts -join ' | ')
+    }
+
+    if ($PrependLine) {
+        $existing = ""
+        if (Test-Path $SkipCommitsFile) {
+            $existing = (Get-Content -Path $SkipCommitsFile -Raw).TrimEnd("`r", "`n")
+        }
+
+        if ([string]::IsNullOrWhiteSpace($existing)) {
+            Set-Content -Path $SkipCommitsFile -Value $line
+        } else {
+            Set-Content -Path $SkipCommitsFile -Value ($line + [Environment]::NewLine + $existing)
+        }
+    } else {
+        Add-Content -Path $SkipCommitsFile -Value $line
+    }
+
+    $script:skipFileModified = $true
+}
+
+function Add-SkipCommit {
+    param(
+        [Parameter(Mandatory = $true)][string]$Commit,
+        [string]$Source = "manual",
+        [switch]$Prepend,
+        [switch]$WriteToFile,
+        [switch]$TrackAsAuto
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Commit)) {
+        return
+    }
+
+    if ($skipCommitSet.Contains($Commit)) {
+        return
+    }
+
+    if ($Prepend) {
+        $skipCommitList.Insert(0, $Commit)
+    } else {
+        $skipCommitList.Add($Commit)
+    }
+
+    [void]$skipCommitSet.Add($Commit)
+
+    if ($TrackAsAuto) {
+        $autoSkipCommits.Add($Commit)
+    }
+
+    Write-Host "[SKIP] Tracking commit $Commit ($Source)" -ForegroundColor Magenta
+
+    if ($WriteToFile -and $SkipCommitsFile) {
+        Write-SkipFileEntry -Commit $Commit -Source $Source -PrependLine:$Prepend
     }
 }
 
+function Get-SkipCommitsArg {
+    if ($skipCommitList.Count -eq 0) {
+        return $null
+    }
+
+    return ($skipCommitList.ToArray() -join ',')
+}
+
+# Parse skip-commits
+if ($SkipCommits) {
+    $initialCliSkips = $SkipCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+}
+
 if ($SkipCommitsFile) {
-    if (-not (Test-Path $SkipCommitsFile)) {
-        Write-Host "[X] Skip-commits file not found: $SkipCommitsFile" -ForegroundColor Red
-        exit 1
+    if (Test-Path $SkipCommitsFile) {
+        $skipFileOriginalContent = Get-Content -Path $SkipCommitsFile -Raw
+        $skipFileExisted = $true
+    } else {
+        $skipFileOriginalContent = ""
+        $skipFileExisted = $false
+        New-Item -ItemType File -Path $SkipCommitsFile -Force | Out-Null
     }
 
     $fileCommits = Get-CommitHashesFromFile -Path $SkipCommitsFile
     if ($fileCommits.Count -gt 0) {
+        foreach ($commit in $fileCommits) {
+            Add-SkipCommit -Commit $commit -Source "file"
+        }
         Write-Host "[->] Loaded skip-commits from file: $($fileCommits -join ', ')" -ForegroundColor Yellow
-        $skipCommitList += $fileCommits
     }
-}
-elseif (-not $IgnoreDefaultSkipFile) {
+} elseif (-not $IgnoreDefaultSkipFile) {
     $repoRoot = Split-Path $scriptDir -Parent
     $defaultSkipFile = Join-Path $repoRoot "skip-commits.txt"
     if (Test-Path $defaultSkipFile) {
         $defaultCommits = Get-CommitHashesFromFile -Path $defaultSkipFile
         if ($defaultCommits.Count -gt 0) {
+            foreach ($commit in $defaultCommits) {
+                Add-SkipCommit -Commit $commit -Source "default-file"
+            }
             Write-Host "[->] Auto-loaded skip-commits from repo default: $($defaultCommits -join ', ')" -ForegroundColor Yellow
-            $skipCommitList += $defaultCommits
         }
     }
+} elseif ($PrependInitialSkips) {
+    Write-Host "[!] --PrependInitialSkips ignored because no skip-commits file was provided" -ForegroundColor Yellow
 }
 
-$skipCommitList = $skipCommitList | Select-Object -Unique
+if ($initialCliSkips.Count -gt 0) {
+    $writeCliToFile = $SkipCommitsFile -and $PrependInitialSkips
+    foreach ($commit in $initialCliSkips) {
+        Add-SkipCommit -Commit $commit -Source "parameter" -Prepend:$PrependInitialSkips -WriteToFile:$writeCliToFile
+    }
+    Write-Host "[->] Will skip commits: $($initialCliSkips -join ', ')" -ForegroundColor Yellow
+}
+
+try {
 
 # Get current branch if not specified
 if (-not $StartBranch) {
@@ -107,94 +217,99 @@ Write-Host $treeOutput
 $currentBranch = $StartBranch
 $rebasedCount = 0
 $failedBranches = @()
-
 function Rebase-Branch {
     param([string]$branch)
-    
+
     Write-Host "`n============================================================" -ForegroundColor Cyan
     Write-Host "[->] Rebasing: $branch" -ForegroundColor Yellow
     Write-Host "============================================================`n" -ForegroundColor Cyan
-    
+
     # Checkout the branch
     git checkout $branch 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[X] Failed to checkout $branch" -ForegroundColor Red
         return $false
     }
-    
+
     # Build twig rebase command with skip-commits if provided
     $rebaseCmd = "twig rebase"
-    if ($skipCommitList.Count -gt 0) {
-        $skipCommitsArg = $skipCommitList -join ','
+    $skipCommitsArg = Get-SkipCommitsArg
+    if ($skipCommitsArg) {
         $rebaseCmd = "twig rebase --skip-commits `"$skipCommitsArg`""
         Write-Host "[->] Using skip-commits: $skipCommitsArg" -ForegroundColor Cyan
     }
-    
+
     # Start rebase
     $rebaseOutput = Invoke-Expression "$rebaseCmd 2>&1"
-    
+
     # Check if already up to date
     if ($rebaseOutput -match "up to date") {
         Write-Host "[OK] $branch is already up to date" -ForegroundColor Green
         return $true
     }
-    
+
     # Handle conflicts in a loop
     $maxAttempts = 50  # Prevent infinite loops
     $attempt = 0
-    
+
     while ($attempt -lt $maxAttempts) {
         $attempt++
-        
+
         # Check for conflicts
         $conflicts = git diff --name-only --diff-filter=U 2>&1
-        
+
         if ($conflicts) {
             Write-Host "`n[!] Conflicts detected (attempt $attempt):" -ForegroundColor Yellow
             $conflicts | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
-            
+
+            if ($autoTrackSkipCommits) {
+                $rebaseHeadOutput = git rev-parse --verify REBASE_HEAD 2>&1
+                if ($LASTEXITCODE -eq 0 -and $rebaseHeadOutput) {
+                    $conflictCommit = $rebaseHeadOutput.Trim()
+                    Add-SkipCommit -Commit $conflictCommit -Source "auto-conflict: $branch" -Prepend -WriteToFile:([bool]$SkipCommitsFile) -TrackAsAuto
+                }
+            }
+
             if ($AutoContinue) {
                 Write-Host "`n[->] Auto-resolving conflicts..." -ForegroundColor Cyan
             } else {
                 Write-Host "`n[->] Resolving conflicts..." -ForegroundColor Cyan
             }
-            
+
             # Run conflict resolution script
             & $resolveConflictsScript
             $resolveExitCode = $LASTEXITCODE
-            
+
             if ($resolveExitCode -ne 0) {
-                Write-Host "`n[X] Auto-resolution script reported an error. Aborting rebase." -ForegroundColor Red
-                git rebase --abort | Out-Null
-                return $false
-            }
-            
-            # Continue rebase
-            Write-Host "[->] Continuing rebase..." -ForegroundColor Cyan
-            $continueOutput = git rebase --continue 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                if ($AutoContinue) {
-                    Write-Host "[!] git rebase --continue failed, attempting --skip" -ForegroundColor Yellow
-                    git rebase --skip 2>&1 | Out-Null
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Host "[X] Unable to skip conflicting commit automatically" -ForegroundColor Red
-                        git rebase --abort | Out-Null
+                Write-Host "`n[X] Failed to resolve conflicts automatically" -ForegroundColor Red
+
+                if (-not $AutoContinue) {
+                    $response = Read-Host "Continue manually? (y/n/abort)"
+                    if ($response -eq 'abort') {
+                        git rebase --abort
                         return $false
                     }
-                    continue
+                    if ($response -ne 'y') {
+                        return $false
+                    }
+                    Read-Host "Press Enter after manually resolving conflicts"
                 } else {
-                    Write-Host "[X] git rebase --continue failed. Aborting for safety." -ForegroundColor Red
-                    git rebase --abort | Out-Null
+                    Write-Host "[X] Aborting rebase of $branch" -ForegroundColor Red
+                    git rebase --abort
                     return $false
                 }
             }
-            
+
+            # Continue rebase
+            Write-Host "[->] Continuing rebase..." -ForegroundColor Cyan
+            $continueOutput = git rebase --continue 2>&1
+
             # Check if rebase completed
             if ($continueOutput -match "Successfully rebased") {
                 Write-Host "`n[OK] Successfully rebased $branch" -ForegroundColor Green
                 return $true
             }
-            
+
             # Check if there are more conflicts
             $newConflicts = git diff --name-only --diff-filter=U 2>&1
             if (-not $newConflicts) {
@@ -211,7 +326,7 @@ function Rebase-Branch {
             if ($rebaseStatus -match "rebase in progress") {
                 # Try to continue
                 git rebase --continue 2>&1 | Out-Null
-                
+
                 # Check again
                 $stillInProgress = git status 2>&1 | Out-String
                 if ($stillInProgress -notmatch "rebase in progress") {
@@ -224,7 +339,7 @@ function Rebase-Branch {
             }
         }
     }
-    
+
     Write-Host "`n[X] Max attempts reached for $branch" -ForegroundColor Red
     git rebase --abort
     return $false
@@ -240,6 +355,40 @@ if ($success) {
 } else {
     Write-Host "`n[X] Failed to rebase $currentBranch" -ForegroundColor Red
     exit 1
+}
+
+$skipCommitsArgForCascade = Get-SkipCommitsArg
+
+if (-not $SkipCascade) {
+    if ($AutoCascade) {
+        Write-Host "`n[->] Cascading child branches with twig cascade..." -ForegroundColor Cyan
+        git checkout $currentBranch 2>&1 | Out-Null
+        $cascadeCmd = "twig cascade"
+        if ($skipCommitsArgForCascade) {
+            $cascadeCmd += " --skip-commits `"$skipCommitsArgForCascade`""
+        }
+
+        $cascadeOutput = Invoke-Expression "$cascadeCmd 2>&1"
+        Write-Host $cascadeOutput
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[X] Twig cascade failed" -ForegroundColor Red
+            throw "Cascade failed"
+        }
+
+        Write-Host "[OK] Twig cascade completed" -ForegroundColor Green
+    } else {
+        Write-Host "`n[NEXT] Run twig cascade from $currentBranch to propagate the skip list." -ForegroundColor Yellow
+        if ($SkipCommitsFile) {
+            Write-Host "  Skip file: $SkipCommitsFile" -ForegroundColor Gray
+        }
+        if ($skipCommitsArgForCascade) {
+            Write-Host "  Example: twig cascade --skip-commits $skipCommitsArgForCascade" -ForegroundColor Gray
+        } else {
+            Write-Host "  Example: twig cascade --show-graph" -ForegroundColor Gray
+        }
+        [void](Read-Host "Press Enter after cascade completes")
+    }
 }
 
 Write-Host "`n[->] Running validation checks..." -ForegroundColor Yellow
@@ -274,3 +423,28 @@ if ($validationFailed) {
 }
 
 Write-Host "`n[DONE] All done! Your branch tree is rebased and validated." -ForegroundColor Green
+
+}
+finally {
+    if ($SkipCommitsFile) {
+        if ($KeepSkipFile) {
+            if ($skipFileModified) {
+                Write-Host "[SKIP] Keeping skip-commits file updates at $SkipCommitsFile" -ForegroundColor Yellow
+            }
+        } else {
+            if ($skipFileExisted) {
+                if ($skipFileOriginalContent -ne $null) {
+                    Set-Content -Path $SkipCommitsFile -Value $skipFileOriginalContent
+                } else {
+                    Clear-Content -Path $SkipCommitsFile -ErrorAction SilentlyContinue
+                }
+            } else {
+                Remove-Item $SkipCommitsFile -ErrorAction SilentlyContinue
+            }
+
+            if ($skipFileModified) {
+                Write-Host "[SKIP] Restored skip-commits file to its original state" -ForegroundColor Cyan
+            }
+        }
+    }
+}
