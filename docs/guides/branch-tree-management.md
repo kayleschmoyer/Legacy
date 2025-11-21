@@ -33,15 +33,20 @@ When working on large projects that span multiple tickets, it's common to create
 ### The Solution
 
 Use Twig's branch tree management features to:
-- Visualize branch dependencies
-- Verify unique commits per branch
-- Cascade rebases across dependent branches
-- Detect and fix duplicate commits early
 
----
+- ✅ Rewritten commits that already landed upstream (record old → new after resolving conflicts)
 
-## 🌳 Understanding the Branch Tree
+### Conflict-Aware Skip Workflow (New)
 
+When a rebase rewrites a commit because you resolved conflicts, you must capture the old hash before adding it to any skip list. This keeps downstream cascades safe and prevents accidental data loss.
+
+1. **Let Git tell you the offender** – during `git rebase`, note the SHA shown in the “could not apply <sha> …” line.
+2. **Resolve the conflicts normally** – edit files, run `git add`, then `git rebase --continue`.
+3. **Record the replacement** – immediately run `git log -1 --oneline` (or `git rev-parse HEAD`) to grab the new SHA for the rewritten commit.
+4. **Update the skip list** – append a line like `abc1234 # replaced by def5678 on LS-25 after conflict resolution` to `skip-migration-commits-all.txt` (or the skip file you’re using). Only add the *old* hash after the new commit exists.
+5. **Reuse the list downstream** – pass that skip file (or hash set) to `twig rebase --skip-commits` / cascade scripts so child branches automatically skip the redundant commit.
+
+> **Never pre-populate skip lists with hashes that haven’t actually been rewritten upstream.** If you skip too aggressively you will drop real work, as we saw when the LS-17 tree temporarily lost feature commits.
 ### Viewing Your Tree
 
 ```powershell
