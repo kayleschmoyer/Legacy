@@ -10,8 +10,8 @@ import {
 import { H1, H2, Spinner, Text } from 'tamagui';
 import { Check, Copy } from '@tamagui/lucide-icons';
 import { gql, useLazyQuery } from '@apollo/client';
-import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
+import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { env } from '../../config/environment';
 import {
   LeaguePositionFragment,

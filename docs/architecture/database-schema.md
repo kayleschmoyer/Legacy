@@ -259,13 +259,23 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Fantasy league configuration
 
-| Column            | Type        | Description                            |
-| ----------------- | ----------- | -------------------------------------- |
-| `id`              | SERIAL (PK) | League ID                              |
-| `name`            | VARCHAR     | League name                            |
-| `owner`           | INTEGER     | League owner user ID                   |
-| `max_roster_size` | INTEGER     | Maximum players per team (default: 25) |
-| `current_matchup` | INTEGER     | Current active matchup                 |
+| Column                 | Type         | Description                                                 |
+| ---------------------- | ------------ | ----------------------------------------------------------- |
+| `id`                   | SERIAL (PK)  | League ID                                                   |
+| `name`                 | VARCHAR      | League name                                                 |
+| `owner`                | INTEGER      | League owner user ID                                        |
+| `max_roster_size`      | INTEGER      | Maximum players per team (default: 25)                      |
+| `current_matchup`      | INTEGER      | Current active matchup                                      |
+| `draft_status`         | draft_status | Status of the league draft (default: 'not-started')         |
+| `invite_code`          | VARCHAR(8)   | Unique 8-character code for inviting users                  |
+| `min_games_per_season` | INTEGER      | Minimum games required for season eligibility (default: 10) |
+| `games_per_matchup`    | INTEGER      | Default number of games per player per matchup (default: 5) |
+
+**Key Features**:
+
+- `min_games_per_season`: Controls which seasons are eligible for selection in matchups (players must have played this many games)
+- `games_per_matchup`: Default configuration for how many games to select per player in each matchup
+- Unique constraint on `invite_code` for secure league joining
 
 ### 13. **Teams** (`teams`)
 
@@ -343,17 +353,32 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 ### 18. **Matchups** (`matchups`)
 
-**Purpose**: Weekly fantasy matchups
+**Purpose**: Weekly fantasy matchups with team pairings and scoring
 
-| Column        | Type         | Description             |
-| ------------- | ------------ | ----------------------- |
-| `id`          | SERIAL (PK)  | Matchup ID              |
-| `league_id`   | INTEGER (FK) | References `leagues.id` |
-| `week_number` | INTEGER      | Week in season          |
+| Column              | Type           | Description                               |
+| ------------------- | -------------- | ----------------------------------------- |
+| `id`                | SERIAL (PK)    | Matchup ID                                |
+| `league_id`         | INTEGER (FK)   | References `leagues.id`                   |
+| `week_number`       | INTEGER        | Week in season                            |
+| `team1_id`          | INTEGER (FK)   | References `teams.id` (first team)        |
+| `team2_id`          | INTEGER (FK)   | References `teams.id` (second team)       |
+| `team1_score`       | NUMERIC(10, 2) | Score for team 1 after matchup completion |
+| `team2_score`       | NUMERIC(10, 2) | Score for team 2 after matchup completion |
+| `status`            | matchup_status | Current status of the matchup             |
+| `selected_season`   | INTEGER        | The single season used for all players    |
+| `games_per_matchup` | INTEGER        | Number of games to select per player      |
+| `start_time`        | TIMESTAMP      | When the matchup period begins            |
+| `end_time`          | TIMESTAMP      | When the matchup period ends              |
+
+**Matchup Status Enum**: `scheduled`, `in_progress`, `completed`, `cancelled`
 
 **Key Features**:
 
 - Unique constraint: `(league_id, week_number)`
+- Foreign keys to `leagues`, `teams` (team1_id and team2_id)
+- Supports head-to-head competition between two teams
+- Tracks scoring and matchup lifecycle
+- Single season selection for consistent player performance comparison
 
 ### 19. **Matchup Players** (`matchup_players`)
 

@@ -64,8 +64,8 @@ function transformCareerStats(
     return undefined;
   };
 
-  const batting: ScoringStatRecord = data.batting
-    ? {
+  const batting = data.batting
+    ? ({
         g: data.batting.games ?? 0,
         pa: data.batting.plateAppearances ?? undefined,
         ab: data.batting.atBats ?? undefined,
@@ -87,11 +87,11 @@ function transformCareerStats(
         avg: toNumber(data.batting.battingAverage),
         obp: toNumber(data.batting.onBasePercentage),
         slg: toNumber(data.batting.sluggingPercentage),
-      }
+      } satisfies ScoringStatRecord)
     : { g: 0 };
 
-  const fielding: ScoringStatRecord = data.fielding
-    ? {
+  const fielding = data.fielding
+    ? ({
         g: data.fielding.games ?? 0,
         po: data.fielding.putouts ?? undefined,
         a: data.fielding.assists ?? undefined,
@@ -100,11 +100,11 @@ function transformCareerStats(
         cs: data.fielding.caughtStealing ?? undefined,
         inn: data.fielding.inningsDefended ?? undefined,
         pct: toNumber(data.fielding.fieldingPercentage),
-      }
+      } satisfies ScoringStatRecord)
     : { g: 0 };
 
-  const pitching: ScoringStatRecord = data.pitching
-    ? {
+  const pitching = data.pitching
+    ? ({
         g: data.pitching.games ?? 0,
         outsRecorded: data.pitching.outsRecorded ?? undefined,
         so: data.pitching.strikeouts ?? undefined,
@@ -115,9 +115,13 @@ function transformCareerStats(
         l: data.pitching.losses ?? undefined,
         sv: data.pitching.saves ?? undefined,
         battersFaced: data.pitching.battersFaced ?? undefined,
-        era: toNumber(data.pitching.era),
-        whip: toNumber(data.pitching.outRate),
-      }
+        era:
+          data.pitching.era != null ? toNumber(data.pitching.era) : undefined,
+        whip:
+          data.pitching.outRate != null
+            ? toNumber(data.pitching.outRate)
+            : undefined,
+      } satisfies ScoringStatRecord)
     : { g: 0 };
 
   return { batting, fielding, pitching };

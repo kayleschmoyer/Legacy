@@ -31,6 +31,8 @@ export const leagues = pgTable(
     currentMatchup: integer('current_matchup'),
     draftStatus: draftStatus('draft_status').notNull().default('not-started'),
     inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
+    minGamesPerSeason: integer('min_games_per_season').default(10),
+    gamesPerMatchup: integer('games_per_matchup').default(5),
   },
   (table) => {
     return {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration: Add matchup performance indexes
  * Created: 2025-11-08
  * Ticket: LS-36

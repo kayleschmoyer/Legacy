@@ -1,14 +1,13 @@
 import React from 'react';
-import type { GestureResponderEvent } from 'react-native';
 import {
   Button,
   H3,
   HolographicCard,
   Paragraph,
-  Text,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { Text } from 'tamagui';
 
 function formatDraftStatus(status?: string | null): string {
   if (!status) return 'Unknown';
@@ -114,20 +113,11 @@ export function LeagueCard({
   onViewLeague,
   animationDelay = 0,
 }: LeagueCardProps) {
-  const handleViewLeague = React.useCallback(() => {
+  const handleViewLeague = () => {
     if (league.id) {
       onViewLeague?.(league.id);
     }
-  }, [league.id, onViewLeague]);
-
-  const handleCtaPress = React.useCallback(
-    (event?: GestureResponderEvent) => {
-      event?.stopPropagation?.();
-      event?.preventDefault?.();
-      handleViewLeague();
-    },
-    [handleViewLeague],
-  );
+  };
 
   const statusStyles = getDraftStatusStyles(league.draftStatus);
   const statusDescription = getStatusDescription(league.draftStatus);
@@ -268,7 +258,7 @@ export function LeagueCard({
             </Paragraph>
 
             <Button
-              onPress={handleCtaPress}
+              onPress={handleViewLeague}
               size="$4"
               borderRadius="$6"
               paddingHorizontal="$5"

@@ -2,7 +2,12 @@ import React from 'react';
 import { Card, H4, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { TrendingUp } from '@tamagui/lucide-icons';
 import { PlayerFragment } from './PlayersApi';
-import { formatProjection } from './usePlayerProjections';
+
+// TODO: Move to proper location when usePlayerProjections is created
+const formatProjection = (value: number | null | undefined): string => {
+  if (value == null) return '--';
+  return value.toFixed(1);
+};
 
 export interface PlayerCardProps {
   player: PlayerFragment;

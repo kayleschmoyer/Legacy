@@ -32,7 +32,7 @@ else
 	KILL_VSCODE := pkill -f code $(NULL_REDIRECT) || echo VS Code not running
 	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
 	PATH_SEP := /
-	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; self=$$BASHPID; parent=$$PPID; pids=$$(pgrep -f "$$workspace" | grep -v -E "^($$self|$$parent)$$" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
+	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; pids=$$(pgrep -f "$$workspace" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
 endif
 
 # Cross-platform echo with colors
@@ -216,6 +216,10 @@ build-libs: ## Build all libraries
 	pnpm exec nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
 
 # Development
+start: ## Start the dev server
+	@$(call echo_blue,Starting dev server...)
+	pnpm start
+
 dev: ## Start all development services
 	@$(call echo_blue,Starting development services...)
 	pnpm run dev:lambdas

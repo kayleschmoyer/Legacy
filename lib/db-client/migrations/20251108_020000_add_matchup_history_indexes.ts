@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration: Add matchup history indexes
  * Created: 2025-11-08
  * Ticket: LS-22

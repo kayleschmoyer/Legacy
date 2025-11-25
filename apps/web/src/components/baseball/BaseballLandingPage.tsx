@@ -6,12 +6,11 @@ import {
   H2,
   H3,
   Paragraph,
-  Text,
   useAuth,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { Dialog, Input, Separator, styled } from 'tamagui';
+import { Dialog, Input, Separator, styled, Text } from 'tamagui';
 import { League, LeagueCard } from './LeagueCard';
 import {
   GetUserLeagues,

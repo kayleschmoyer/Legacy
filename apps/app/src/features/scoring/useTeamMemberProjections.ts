@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import type { PlayerFragment } from '@legacy-sports/shared-components';
+import type {
+  PlayerFragment,
+  PlayerProjectionsResult,
+} from '@legacy-sports/shared-components';
 import { usePlayerProjections } from '@legacy-sports/shared-components';
 import { useCareerAverageStats } from './careerAverages';
 import type { TeamMemberFragment } from '../../api/db/graphql.generated';
@@ -78,17 +81,16 @@ export function useTeamMemberProjections(
     error: scoringError,
   } = useLeagueScoringSettings(numericLeagueId);
 
-  const {
-    projections,
-    loading: projectionsLoading,
-    error: projectionError,
-  } = usePlayerProjections(
+  const result: PlayerProjectionsResult = usePlayerProjections(
     players,
     careerStats,
     scoringSettings,
     statsLoading || scoringLoading,
     statsError ?? scoringError,
   );
+  const projections = result.projections;
+  const projectionsLoading = result.loading;
+  const projectionError = result.error;
 
   const projectionRecord = useMemo(
     () => mapProjectionsToRecord(projections),

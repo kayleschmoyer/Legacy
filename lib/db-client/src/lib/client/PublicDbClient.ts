@@ -566,6 +566,7 @@ export async function updateLeagueScoringProfileEntries(
       .where(eq(Schema.leagueScoringProfileEntries.profileId, profileId));
   });
 }
+
 export async function getScoringMultipliersForLeague(
   db: PublicDb,
   leagueId?: number | null,

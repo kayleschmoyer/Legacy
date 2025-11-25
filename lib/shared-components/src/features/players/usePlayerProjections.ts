@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents */
 import { useMemo } from 'react';
 import {
   type BaseballScoringSettings,
-  createDefaultScoringSettings,
+  mergeScoringOverrides,
   type ScoringDictionary,
 } from '@legacy-sports/scoring';
 import type { PlayerFragment } from './PlayersApi';
@@ -34,8 +33,6 @@ interface ProjectionDependencies {
   readonly settings: BaseballScoringSettings;
 }
 
-const DEFAULT_SETTINGS = createDefaultScoringSettings();
-
 function resolveNumericIdentifier(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -54,19 +51,7 @@ function resolveNumericIdentifier(value: unknown): number | undefined {
 function ensureSettings(
   overrides?: Partial<BaseballScoringSettings>,
 ): BaseballScoringSettings {
-  if (!overrides) {
-    return {
-      batting: { ...DEFAULT_SETTINGS.batting },
-      fielding: { ...DEFAULT_SETTINGS.fielding },
-      pitching: { ...DEFAULT_SETTINGS.pitching },
-    };
-  }
-
-  return {
-    batting: { ...DEFAULT_SETTINGS.batting, ...overrides.batting },
-    fielding: { ...DEFAULT_SETTINGS.fielding, ...overrides.fielding },
-    pitching: { ...DEFAULT_SETTINGS.pitching, ...overrides.pitching },
-  };
+  return mergeScoringOverrides(overrides);
 }
 
 function sumWithMultipliers(
@@ -79,7 +64,11 @@ function sumWithMultipliers(
 
   let total = 0;
 
-  for (const [statKey, multiplier] of Object.entries(multipliers)) {
+  const entries = Object.entries(multipliers) as Array<
+    [string, number | undefined]
+  >;
+
+  for (const [statKey, multiplier] of entries) {
     if (typeof multiplier !== 'number' || !Number.isFinite(multiplier)) {
       continue;
     }

@@ -15,6 +15,15 @@ export { PlayerStatsPage } from './PlayerStatsPage';
 // Career statistics services and types
 export * from './services/CareerStatsService';
 
+// Player projections
+export { usePlayerProjections } from './usePlayerProjections';
+export type {
+  PlayerProjectionsResult,
+  PlayerCareerStats,
+  ScoringStatRecord,
+  ProjectionMap,
+} from './usePlayerProjections';
+
 // Player statistics types and utilities
 export type {
   PlayerStatsColumn,
@@ -22,16 +31,6 @@ export type {
   PlayerStatsFilters,
   PlayerWithStats,
 } from './PlayerStatsTypes';
-
-// Projections
-export {
-  usePlayerProjections,
-  formatProjection,
-  type BaseballScoringSettings,
-  type PlayerCareerStats,
-  type ScoringStatRecord,
-  type PlayerProjectionsResult,
-} from './usePlayerProjections';
 
 // API exports
 export * from './PlayersApi';

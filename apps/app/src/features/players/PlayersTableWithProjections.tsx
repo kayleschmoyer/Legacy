@@ -1,5 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
-import type { PlayerFragment } from '@legacy-sports/shared-components';
+import type {
+  PlayerFragment,
+  PlayerProjectionsResult,
+} from '@legacy-sports/shared-components';
 import {
   PlayersTable,
   usePlayerProjections,
@@ -101,13 +104,14 @@ export function PlayersTableWithProjections({
   }, [playerIds]);
 
   // Calculate projections
-  const { projections } = usePlayerProjections(
+  const result: PlayerProjectionsResult = usePlayerProjections(
     players,
     careerStats,
     scoringSettings,
     statsLoading || scoringLoading,
     statsError ?? scoringError,
   );
+  const projections = result.projections;
 
   // Determine if we should show projections
   const shouldShowProjections = showProjections && projections.size > 0;

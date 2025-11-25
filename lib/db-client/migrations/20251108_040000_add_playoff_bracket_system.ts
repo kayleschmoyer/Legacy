@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration: Add playoff bracket system
  * Created: 2025-11-08
  * Ticket: LS-28

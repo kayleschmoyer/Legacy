@@ -406,7 +406,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [currentPick, draftedPlayers, isMyPick]);
+  }, [draftedPlayers, isMyPick, currentPick]);
 
   // Announce when it's user's turn or waiting
   React.useEffect(() => {

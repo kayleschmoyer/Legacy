@@ -18,6 +18,7 @@ import {
 } from '../../types/ScoringTypes';
 
 export type LeagueScoringMultiplierUpdate = LeagueScoringMultiplierUpdateInput;
+
 export interface LeagueScoringProfileDetails
   extends LeagueScoringProfileSummary {
   entries: LeagueScoringProfileEntry[];

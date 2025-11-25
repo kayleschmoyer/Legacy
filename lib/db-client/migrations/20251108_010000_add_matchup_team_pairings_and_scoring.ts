@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration: Add matchup team pairings and scoring
  * Created: 2025-11-08
  * Ticket: LS-18

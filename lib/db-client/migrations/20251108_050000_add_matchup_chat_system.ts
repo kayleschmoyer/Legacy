@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Migration: Add matchup chat system
  * Created: 2025-11-08
  * Ticket: LS-31
