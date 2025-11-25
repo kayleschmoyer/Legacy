@@ -35,7 +35,7 @@ jobs:
       statuses: read
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Using GITHUB_TOKEN with proper permissions configured in repository settings
           token: ${{ secrets.GITHUB_TOKEN }}
