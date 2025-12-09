@@ -132,8 +132,8 @@ League.implement({
   }),
 });
 
-// Team type
-const Team = builder.objectRef<DbTeam>('Team');
+// Team type - exported for use in other schemas (e.g., matchups)
+export const Team = builder.objectRef<DbTeam>('Team');
 
 Team.implement({
   description: 'A team in a league',

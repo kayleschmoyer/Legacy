@@ -361,6 +361,138 @@ export function getMatchup(
     .then(TakeUniqueOrNull);
 }
 
+// Matchup query functions
+export async function getMatchupById(
+  db: PublicDb,
+  matchupId: number,
+): Promise<Matchup | null> {
+  return await db
+    .select()
+    .from(Schema.matchups)
+    .where(eq(Schema.matchups.id, matchupId))
+    .then(TakeUniqueOrNull);
+}
+
+export async function getMatchupsForLeague(
+  db: PublicDb,
+  leagueId: number,
+  weekNumber?: number,
+): Promise<Matchup[]> {
+  const conditions = [eq(Schema.matchups.leagueId, leagueId)];
+
+  if (weekNumber !== undefined) {
+    conditions.push(eq(Schema.matchups.weekNumber, weekNumber));
+  }
+
+  return await db
+    .select()
+    .from(Schema.matchups)
+    .where(and(...conditions));
+}
+
+export async function getCurrentMatchupForLeague(
+  db: PublicDb,
+  leagueId: number,
+): Promise<Matchup | null> {
+  // Get the current matchup ID from the league
+  const leagueResults = await db
+    .select({ currentMatchup: Schema.leagues.currentMatchup })
+    .from(Schema.leagues)
+    .where(eq(Schema.leagues.id, leagueId))
+    .limit(1);
+
+  if (!leagueResults[0]?.currentMatchup) {
+    return null;
+  }
+
+  return await db
+    .select()
+    .from(Schema.matchups)
+    .where(eq(Schema.matchups.id, leagueResults[0].currentMatchup))
+    .then(TakeUniqueOrNull);
+}
+
+export async function createMatchup(
+  db: PublicDb,
+  input: {
+    leagueId: number;
+    weekNumber: number;
+    team1Id?: number | null;
+    team2Id?: number | null;
+    selectedSeason?: number | null;
+    gamesPerMatchup?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
+  },
+): Promise<Matchup> {
+  const results = await db
+    .insert(Schema.matchups)
+    .values({
+      leagueId: input.leagueId,
+      weekNumber: input.weekNumber,
+      team1Id: input.team1Id ?? null,
+      team2Id: input.team2Id ?? null,
+      selectedSeason: input.selectedSeason ?? null,
+      gamesPerMatchup: input.gamesPerMatchup ?? null,
+      startTime: input.startTime ?? null,
+      endTime: input.endTime ?? null,
+      status: 'scheduled',
+    })
+    .returning();
+
+  if (!results[0]) {
+    throw new Error('Failed to create matchup');
+  }
+
+  return results[0];
+}
+
+export async function updateMatchupScore(
+  db: PublicDb,
+  matchupId: number,
+  team1Score?: number | null,
+  team2Score?: number | null,
+): Promise<Matchup> {
+  const updateData: { team1Score?: string; team2Score?: string } = {};
+
+  if (team1Score !== null && team1Score !== undefined) {
+    updateData.team1Score = team1Score.toString();
+  }
+  if (team2Score !== null && team2Score !== undefined) {
+    updateData.team2Score = team2Score.toString();
+  }
+
+  const results = await db
+    .update(Schema.matchups)
+    .set(updateData)
+    .where(eq(Schema.matchups.id, matchupId))
+    .returning();
+
+  if (!results[0]) {
+    throw new Error('Matchup not found');
+  }
+
+  return results[0];
+}
+
+export async function updateMatchupStatus(
+  db: PublicDb,
+  matchupId: number,
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+): Promise<Matchup> {
+  const results = await db
+    .update(Schema.matchups)
+    .set({ status })
+    .where(eq(Schema.matchups.id, matchupId))
+    .returning();
+
+  if (!results[0]) {
+    throw new Error('Matchup not found');
+  }
+
+  return results[0];
+}
+
 // Re-export player stats utilities
 export {
   getPlayersWithoutStats,
