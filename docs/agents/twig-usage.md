@@ -36,6 +36,15 @@ Both commands rely on Twig's explicit dependency graph (stored in `.twig/state.j
 ## Complex Feature Playbook
 The `BRANCH_TREE_STRUCTURE.md` file describes an idealized tree where foundational work flows into CLI, tidy, and cascade enhancements. The following playbook shows how an agent can drive that structure end-to-end.
 
+### Reading Twig Tree Status Badges
+`twig tree` annotates each branch with commit distance from its configured parent:
+- `[+N]` indicates the branch is `N` commits ahead of its parent and needs to cascade downstream.
+- `[-M]` means the branch is `M` commits behind and should rebase upward before shipping.
+- `[+N/-M]` shows both ahead/behind counts when history diverged in both directions.
+- `[up-to-date]` appears when both counts are zero—the branch tip matches its parent exactly and no action is required.
+
+Use these badges to decide whether to run `twig rebase`, `twig cascade`, or both before touching a stack.
+
 ### 1. Map the Work
 ```bash
 twig tree
