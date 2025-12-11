@@ -407,7 +407,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip detect-skip-commits resolve-conflicts squash-branch pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto detect-skip-commits resolve-conflicts squash-branch pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
@@ -424,7 +424,7 @@ else
 	@./scripts/squash-branch.sh $(if $(MESSAGE),-m "$(MESSAGE)",)
 endif
 
-rebase-tree: ## Rebase entire branch tree with auto-conflict resolution
+rebase-tree: ## Rebase branch tree (interactive, use 'rebase-tree-auto' for automation)
 	@$(call echo_blue,Rebasing branch tree...)
 ifeq ($(OS),Windows_NT)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1"
@@ -438,21 +438,6 @@ ifeq ($(OS),Windows_NT)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue -SkipCommitsFile "skip-commits.txt"
 else
 	@./scripts/rebase-branch-tree.sh --auto-continue --skip-commits-file skip-commits.txt
-endif
-
-rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
-	@$(call echo_blue,Rebasing branch tree with skip-commits...)
-ifeq ($(OS),Windows_NT)
-ifdef SKIP_COMMITS
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommits "$(SKIP_COMMITS)"
-else ifdef SKIP_COMMITS_FILE
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommitsFile "$(SKIP_COMMITS_FILE)"
-else
-	@$(call echo_red,Error: Must provide either SKIP_COMMITS or SKIP_COMMITS_FILE)
-	@exit 1
-endif
-else
-	@./scripts/rebase-branch-tree.sh $(if $(SKIP_COMMITS),--skip-commits $(SKIP_COMMITS),) $(if $(SKIP_COMMITS_FILE),--skip-commits-file $(SKIP_COMMITS_FILE),)
 endif
 
 detect-skip-commits: ## Scan branches for rewritten commits that should have been dropped

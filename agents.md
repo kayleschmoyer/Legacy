@@ -115,16 +115,8 @@ twig tree                                        # Check branch dependencies
 git log --oneline parent-branch..current-branch  # Verify unique commits only
 
 # Rebase workflows
-make rebase-tree                                 # Interactive rebase with auto-conflict resolution
 make rebase-tree-auto                            # Auto-rebase entire tree (no prompts, uses skip-commits.txt)
-make rebase-tree-skip SKIP_COMMITS_FILE="skip-commits.txt"  # Rebase with skip file
-.\scripts\resolve-generated-conflicts.ps1        # Manually resolve generated file conflicts
-
-# Rebase entire tree after moving branches
-# RECOMMENDED: Use skip-commits.txt for clean rebases after restructuring
-# 1. Keep skip-commits.txt updated with commits from old branch history
-# 2. Run rebase (automatically uses skip-commits.txt)
-make rebase-tree-auto                            # Fully automated, no prompts
+.\scripts\resolve-generated-conflicts.ps1        # Manually resolve generated file conflicts (rarely needed)
 
 # Cascade after squashing (RECOMMENDED PATTERN)
 # 1. After squashing parent, identify removed commits
@@ -134,14 +126,12 @@ git log --oneline parent-branch..current-branch
 abc1234
 def5678
 
-# 3. Rebase tree skipping those commits (no conflicts!)
+# 3. Rebase tree with updated skip list (no conflicts!)
 make rebase-tree-auto                            # Uses skip-commits.txt automatically
-# OR: make rebase-tree-skip SKIP_COMMITS_FILE="skip-commits.txt"
-# OR: .\scripts\rebase-branch-tree.ps1 -SkipCommitsFile "skip-commits.txt"
 
-# Manually rebase single branches with skip list
+# Alternative: Manually rebase single branches
 git checkout LS-XX/branch-name
-twig rebase --skip-commits skip-commits.txt      # Use twig's native skip feature
+twig rebase --skip-commits skip-commits.txt
 
 # Pre-commit validation (shorthand with make)
 make quick-check                                 # Fast: typecheck + lint only
