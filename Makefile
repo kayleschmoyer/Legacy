@@ -432,12 +432,12 @@ else
 	@./scripts/rebase-branch-tree.sh
 endif
 
-rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts)
+rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts, uses skip-commits.txt if present)
 	@$(call echo_blue,Auto-rebasing branch tree...)
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue -SkipCommitsFile "skip-commits.txt"
 else
-	@./scripts/rebase-branch-tree.sh --auto-continue
+	@./scripts/rebase-branch-tree.sh --auto-continue --skip-commits-file skip-commits.txt
 endif
 
 rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
