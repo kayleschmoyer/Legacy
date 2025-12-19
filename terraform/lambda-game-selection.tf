@@ -23,8 +23,11 @@ resource "aws_iam_role_policy_attachment" "game_selection_lambda_basic" {
   role       = aws_iam_role.game_selection_lambda.name
 }
 
-# VPC access policy removed - Game Selection Lambda now runs outside VPC for external API access
-# VPC execution role no longer needed for external Baseball Reference scraping
+# IAM policy for VPC access
+resource "aws_iam_role_policy_attachment" "game_selection_lambda_vpc" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  role       = aws_iam_role.game_selection_lambda.name
+}
 
 # Custom policy for Game Selection Lambda
 resource "aws_iam_policy" "game_selection_lambda_secrets" {
@@ -109,8 +112,10 @@ resource "aws_lambda_function" "game_selection" {
 
   source_code_hash = data.aws_ssm_parameter.game_selection_lambda_version.value
 
-  # VPC config removed - Lambda now runs outside VPC for direct external API access
-  # This allows Baseball Reference scraping without NAT Gateway requirements
+  vpc_config {
+    subnet_ids         = aws_subnet.private_lambda[*].id
+    security_group_ids = [aws_security_group.lambda.id]
+  }
 
   environment {
     variables = {
@@ -134,7 +139,7 @@ resource "aws_lambda_function" "game_selection" {
 
   depends_on = [
     aws_iam_role_policy_attachment.game_selection_lambda_basic,
-    # VPC dependency removed - Lambda now runs outside VPC
+    aws_iam_role_policy_attachment.game_selection_lambda_vpc,
     aws_iam_role_policy_attachment.game_selection_lambda_secrets,
     aws_iam_role_policy_attachment.game_selection_lambda_rds,
     aws_cloudwatch_log_group.game_selection_lambda

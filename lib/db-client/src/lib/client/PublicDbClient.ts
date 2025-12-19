@@ -493,6 +493,243 @@ export async function updateMatchupStatus(
   return results[0];
 }
 
+/**
+ * Get game-level stats for players in a matchup
+ * Used for calculating matchup scores based on selected games
+ */
+export async function getMatchupPlayerGameStats(
+  db: PublicDb,
+  matchupId: number,
+): Promise<{
+  playerId: number;
+  teamId: number | null;
+  season: number;
+  gameNum: number;
+  battingStats: typeof Schema.gameBatting.$inferSelect | null;
+  pitchingStats: typeof Schema.gamePitching.$inferSelect | null;
+  fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
+}[]> {
+  // Get matchup players and their selected games
+  const matchupPlayersResult = await db
+    .select({
+      matchupPlayerId: Schema.matchupPlayers.id,
+      playerId: Schema.matchupPlayers.playerId,
+      season: Schema.matchupPlayers.season,
+      matchupId: Schema.matchupPlayers.matchupId,
+    })
+    .from(Schema.matchupPlayers)
+    .where(eq(Schema.matchupPlayers.matchupId, matchupId));
+
+  if (matchupPlayersResult.length === 0) {
+    return [];
+  }
+
+  const matchupPlayerIds = matchupPlayersResult.map(mp => mp.matchupPlayerId);
+
+  // Get selected games for these players
+  const gamesResult = await db
+    .select()
+    .from(Schema.matchupPlayerGames)
+    .where(inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds));
+
+  // Build map of player -> games
+  const playerGamesMap = new Map<number, { season: number; games: number[] }>();
+  const matchupPlayerMap = new Map<number, { playerId: number; season: number }>();
+
+  for (const mp of matchupPlayersResult) {
+    matchupPlayerMap.set(mp.matchupPlayerId, { 
+      playerId: mp.playerId, 
+      season: mp.season 
+    });
+  }
+
+  for (const game of gamesResult) {
+    const mpInfo = matchupPlayerMap.get(game.matchupPlayerId);
+    if (!mpInfo) continue;
+
+    const battingGameNum = game.battingGameNum;
+    const pitchingGameNum = game.pitchingGameNum;
+    const fieldingGameNum = game.fieldingGameNum;
+
+    // Add all game numbers to the list
+    const gameNums = [battingGameNum, pitchingGameNum, fieldingGameNum].filter(
+      (num): num is number => num !== null && num !== undefined
+    );
+
+    if (!playerGamesMap.has(mpInfo.playerId)) {
+      playerGamesMap.set(mpInfo.playerId, { season: mpInfo.season, games: [] });
+    }
+    const playerGames = playerGamesMap.get(mpInfo.playerId);
+    if (playerGames) {
+      playerGames.games.push(...gameNums);
+    }
+  }
+
+  // Get team membership for players
+  const matchup = await db
+    .select()
+    .from(Schema.matchups)
+    .where(eq(Schema.matchups.id, matchupId))
+    .then(TakeUniqueOrNull);
+
+  if (!matchup) {
+    throw new Error('Matchup not found');
+  }
+
+  const teamIds = [matchup.team1Id, matchup.team2Id].filter(
+    (id): id is number => id !== null
+  );
+
+  const teamMembersResult = await db
+    .select()
+    .from(Schema.teamMembers)
+    .where(
+      and(
+        inArray(Schema.teamMembers.teamId, teamIds),
+        eq(Schema.teamMembers.leagueId, matchup.leagueId)
+      )
+    );
+
+  const playerTeamMap = new Map<number, number>();
+  for (const tm of teamMembersResult) {
+    if (tm.teamId) {
+      playerTeamMap.set(tm.playerId, tm.teamId);
+    }
+  }
+
+  // Fetch game stats for all player/season/game combinations
+  const results: {
+    playerId: number;
+    teamId: number | null;
+    season: number;
+    gameNum: number;
+    battingStats: typeof Schema.gameBatting.$inferSelect | null;
+    pitchingStats: typeof Schema.gamePitching.$inferSelect | null;
+    fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
+  }[] = [];
+
+  for (const [playerId, { season, games }] of playerGamesMap) {
+    const uniqueGames = [...new Set(games)];
+    
+    for (const gameNum of uniqueGames) {
+      const batting = await db
+        .select()
+        .from(Schema.gameBatting)
+        .where(
+          and(
+            eq(Schema.gameBatting.playerId, playerId),
+            eq(Schema.gameBatting.season, season),
+            eq(Schema.gameBatting.gameNum, gameNum)
+          )
+        )
+        .then(TakeUniqueOrNull);
+
+      const pitching = await db
+        .select()
+        .from(Schema.gamePitching)
+        .where(
+          and(
+            eq(Schema.gamePitching.playerId, playerId),
+            eq(Schema.gamePitching.season, season),
+            eq(Schema.gamePitching.gameNum, gameNum)
+          )
+        )
+        .then(TakeUniqueOrNull);
+
+      const fielding = await db
+        .select()
+        .from(Schema.gameFielding)
+        .where(
+          and(
+            eq(Schema.gameFielding.playerId, playerId),
+            eq(Schema.gameFielding.season, season),
+            eq(Schema.gameFielding.gameNum, gameNum)
+          )
+        )
+        .then(TakeUniqueOrNull);
+
+      results.push({
+        playerId,
+        teamId: playerTeamMap.get(playerId) ?? null,
+        season,
+        gameNum,
+        battingStats: batting,
+        pitchingStats: pitching,
+        fieldingStats: fielding,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Get season-level aggregate stats for a player
+ * Used for calculating matchup projections
+ */
+export async function getSeasonStats(
+  db: PublicDb,
+  playerId: number,
+  season: number,
+): Promise<{
+  batting: SeasonBatting | null;
+  pitching: SeasonPitching | null;
+  fielding: SeasonFielding | null;
+}> {
+  const batting = await db
+    .select()
+    .from(Schema.seasonBatting)
+    .where(
+      and(
+        eq(Schema.seasonBatting.playerId, playerId),
+        eq(Schema.seasonBatting.season, season)
+      )
+    )
+    .then(TakeUniqueOrNull);
+
+  const pitching = await db
+    .select()
+    .from(Schema.seasonPitching)
+    .where(
+      and(
+        eq(Schema.seasonPitching.playerId, playerId),
+        eq(Schema.seasonPitching.season, season)
+      )
+    )
+    .then(TakeUniqueOrNull);
+
+  const fielding = await db
+    .select()
+    .from(Schema.seasonFielding)
+    .where(
+      and(
+        eq(Schema.seasonFielding.playerId, playerId),
+        eq(Schema.seasonFielding.season, season)
+      )
+    )
+    .then(TakeUniqueOrNull);
+
+  return { batting, pitching, fielding };
+}
+
+/**
+ * Get career stats for a player (for career projections)
+ */
+export async function getCareerStats(
+  db: PublicDb,
+  playerId: number,
+): Promise<{
+  batting: CareerBatting | null;
+  pitching: CareerPitching | null;
+  fielding: CareerFielding | null;
+}> {
+  const batting = await getCareerBattingStatsForPlayer(db, playerId);
+  const pitching = await getCareerPitchingStatsForPlayer(db, playerId);
+  const fielding = await getCareerFieldingStatsForPlayer(db, playerId);
+
+  return { batting, pitching, fielding };
+}
+
 // Re-export player stats utilities
 export {
   getPlayersWithoutStats,

@@ -3,6 +3,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import axios from 'axios';
 import { ArgsType } from './ArgsType';
+import { AuthMiddleware } from '../services/AuthMiddleware';
 
 export const createMatchupCommandBuilder = (argv: Argv) =>
   argv
@@ -26,9 +27,18 @@ export async function handleCreateMatchup(
   const { league, week } = args;
 
   const host = getEnvVarRequired('GAME_SELECTION_LAMBDA_HOST');
+  
+  // Get authentication headers
+  const authMiddleware = new AuthMiddleware();
+  const headers = await authMiddleware.getAuthHeaders();
 
-  await axios.post(`${host}/create-matchup`, {
+  const response = await axios.post(`${host}/games/create-matchup`, {
     league: league,
     week: week,
-  });
+  }, { headers });
+  
+  LOGGER.info(`✅ Matchup created successfully!`);
+  LOGGER.info(`   Matchup ID: ${response.data.matchupId}`);
+  LOGGER.info(`   Players added: ${response.data.playersAdded}`);
+  LOGGER.info(`   League: ${response.data.league}, Week: ${response.data.week}`);
 }

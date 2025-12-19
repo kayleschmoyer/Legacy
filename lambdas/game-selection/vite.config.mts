@@ -22,8 +22,8 @@ export default defineConfig(({ mode }) => {
     build: {
       emptyOutDir: true,
       lib: {
-        entry: 'src/dev.ts',
-        fileName: 'dev',
+        entry: 'src/index.ts',
+        fileName: 'index',
         formats: ['cjs'],
       },
       outDir: 'dist',

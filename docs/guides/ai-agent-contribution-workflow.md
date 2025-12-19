@@ -295,7 +295,6 @@ twig tree
 ```
 
 **Why this works**:
-
 - ✅ No conflicts - removed commits are skipped
 - ✅ Branches stay at [+1] commit each
 - ✅ No re-squashing needed
@@ -357,7 +356,6 @@ twig cascade --show-graph
 ```
 
 **⚠️ Cascade Limitation**: When using `--skip-commits` with `twig cascade`:
-
 - Commits are skipped on the **initial branch only**
 - Child branches use **standard git rebase** (skipped commits may reappear)
 - For complex scenarios, manually rebase each branch with `--skip-commits`

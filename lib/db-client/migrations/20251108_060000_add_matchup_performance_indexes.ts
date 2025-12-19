@@ -94,7 +94,9 @@ export const up = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const down = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
   // Drop all indexes (in reverse order)
-  await db.execute(`DROP INDEX IF EXISTS team_members_player_id_idx;`);
+  await db.execute(
+    `DROP INDEX IF EXISTS team_members_player_id_idx;`,
+  );
   await db.execute(`DROP INDEX IF EXISTS team_members_team_id_idx;`);
   await db.execute(`DROP INDEX IF EXISTS team_members_league_id_idx;`);
   await db.execute(
@@ -103,14 +105,22 @@ export const down = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
   await db.execute(
     `DROP INDEX IF EXISTS matchup_player_games_matchup_player_game_idx;`,
   );
-  await db.execute(`DROP INDEX IF EXISTS matchup_player_games_game_num_idx;`);
+  await db.execute(
+    `DROP INDEX IF EXISTS matchup_player_games_game_num_idx;`,
+  );
   await db.execute(
     `DROP INDEX IF EXISTS matchup_player_games_matchup_player_id_idx;`,
   );
-  await db.execute(`DROP INDEX IF EXISTS matchup_players_matchup_player_idx;`);
+  await db.execute(
+    `DROP INDEX IF EXISTS matchup_players_matchup_player_idx;`,
+  );
   await db.execute(`DROP INDEX IF EXISTS matchup_players_season_idx;`);
   await db.execute(`DROP INDEX IF EXISTS matchup_players_player_id_idx;`);
-  await db.execute(`DROP INDEX IF EXISTS matchup_players_matchup_id_idx;`);
-  await db.execute(`DROP INDEX IF EXISTS matchups_league_id_week_number_idx;`);
+  await db.execute(
+    `DROP INDEX IF EXISTS matchup_players_matchup_id_idx;`,
+  );
+  await db.execute(
+    `DROP INDEX IF EXISTS matchups_league_id_week_number_idx;`,
+  );
   await db.execute(`DROP INDEX IF EXISTS matchups_league_id_idx;`);
 };

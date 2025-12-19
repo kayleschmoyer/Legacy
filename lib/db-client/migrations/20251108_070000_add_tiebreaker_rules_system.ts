@@ -100,8 +100,12 @@ export const up = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const down = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
   // Drop indexes
-  await db.execute(`DROP INDEX IF EXISTS tiebreaker_history_resolved_at_idx;`);
-  await db.execute(`DROP INDEX IF EXISTS tiebreaker_history_matchup_idx;`);
+  await db.execute(
+    `DROP INDEX IF EXISTS tiebreaker_history_resolved_at_idx;`,
+  );
+  await db.execute(
+    `DROP INDEX IF EXISTS tiebreaker_history_matchup_idx;`,
+  );
   await db.execute(`DROP INDEX IF EXISTS tiebreaker_rules_league_idx;`);
 
   // Drop tables (constraints will be dropped automatically)
