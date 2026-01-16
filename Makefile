@@ -407,7 +407,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto detect-skip-commits resolve-conflicts squash-branch pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto post-merge-rebase detect-skip-commits resolve-conflicts squash-branch pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
@@ -438,6 +438,23 @@ ifeq ($(OS),Windows_NT)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue -SkipCommitsFile "skip-commits.txt"
 else
 	@./scripts/rebase-branch-tree.sh --auto-continue --skip-commits-file skip-commits.txt
+endif
+
+post-merge-rebase: ## Automate rebase after PR merged with squash (usage: make post-merge-rebase BRANCH=LS-1/feature)
+	@$(call echo_blue,Post-merge rebase automation...)
+ifeq ($(OS),Windows_NT)
+ifndef BRANCH
+	@echo Error: BRANCH parameter required. Usage: make post-merge-rebase BRANCH=LS-1/feature
+	@exit /b 1
+endif
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\post-merge-rebase.ps1" -MergedBranch "$(BRANCH)"
+else
+ifndef BRANCH
+	@echo "Error: BRANCH parameter required. Usage: make post-merge-rebase BRANCH=LS-1/feature"
+	@exit 1
+endif
+	@echo "Not yet implemented for $(DETECTED_OS)"
+	@exit 1
 endif
 
 detect-skip-commits: ## Scan branches for rewritten commits that should have been dropped
