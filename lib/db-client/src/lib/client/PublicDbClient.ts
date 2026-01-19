@@ -379,7 +379,7 @@ export async function getMatchupsForLeague(
   weekNumber?: number,
 ): Promise<Matchup[]> {
   const conditions = [eq(Schema.matchups.leagueId, leagueId)];
-
+  
   if (weekNumber !== undefined) {
     conditions.push(eq(Schema.matchups.weekNumber, weekNumber));
   }
@@ -454,7 +454,7 @@ export async function updateMatchupScore(
   team2Score?: number | null,
 ): Promise<Matchup> {
   const updateData: { team1Score?: string; team2Score?: string } = {};
-
+  
   if (team1Score !== null && team1Score !== undefined) {
     updateData.team1Score = team1Score.toString();
   }
@@ -921,12 +921,10 @@ export async function updateLeagueScoringProfileEntries(
           Schema.leagueScoringProfileEntries.profileId,
           Schema.leagueScoringProfileEntries.statDefinitionId,
         ],
-        set: conflictUpdateAllExcept(Schema.leagueScoringProfileEntries, [
-          'id',
-          'profileId',
-          'statDefinitionId',
-          'createdAt',
-        ]),
+        set: conflictUpdateAllExcept(
+          Schema.leagueScoringProfileEntries,
+          ['id', 'profileId', 'statDefinitionId', 'createdAt'],
+        ),
       });
 
     return tx
@@ -949,7 +947,10 @@ export async function getScoringMultipliersForLeague(
     const profile = await getActiveScoringProfileForLeague(db, leagueId);
 
     if (profile) {
-      const entries = await getScoringProfileEntriesForProfile(db, profile.id);
+      const entries = await getScoringProfileEntriesForProfile(
+        db,
+        profile.id,
+      );
       entryByDefinitionId = new Map(
         entries.map((entry) => [entry.statDefinitionId, entry]),
       );
@@ -979,3 +980,22 @@ export async function getScoringMultipliersForLeague(
 
   return multipliers;
 }
+
+// Re-export matchup history utilities
+export {
+  queryHistoricalMatchups,
+  getHeadToHeadRecord,
+  calculateStandings,
+  getSeasonResults,
+  getPlayoffQualifications,
+  getRecentMatchupsForTeam,
+  getMatchupStatusCounts,
+} from './matchup-history';
+export type {
+  HeadToHeadRecord,
+  TeamStanding,
+  SeasonResults,
+  MatchupHistoryFilters,
+  PlayoffQualification,
+  MatchupStatusCounts,
+} from './matchup-history';

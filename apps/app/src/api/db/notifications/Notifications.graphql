@@ -1,0 +1,89 @@
+# Notification Types
+fragment NotificationPreference on NotificationPreference {
+  id
+  userId
+  matchupStartedEnabled
+  matchupEndedEnabled
+  matchupCloseGameEnabled
+  matchupReminderEnabled
+  pushEnabled
+  emailEnabled
+  closeGameThreshold
+  createdAt
+  updatedAt
+}
+
+fragment DeviceToken on DeviceToken {
+  id
+  userId
+  deviceToken
+  platform
+  endpointArn
+  enabled
+  createdAt
+  updatedAt
+}
+
+fragment NotificationHistoryItem on NotificationHistoryItem {
+  id
+  userId
+  notificationType
+  channel
+  matchupId
+  leagueId
+  title
+  message
+  metadata
+  read
+  sentAt
+  readAt
+  createdAt
+}
+
+# Queries
+query GetUserNotificationPreferences($userId: Int!) {
+  getUserNotificationPreferences(userId: $userId) {
+    ...NotificationPreference
+  }
+}
+
+query GetNotificationHistory($userId: Int!, $limit: Int) {
+  getNotificationHistory(userId: $userId, limit: $limit) {
+    ...NotificationHistoryItem
+  }
+}
+
+query GetUnreadNotificationCount($userId: Int!) {
+  getUnreadNotificationCount(userId: $userId)
+}
+
+query GetUserDeviceTokens($userId: Int!) {
+  getUserDeviceTokens(userId: $userId) {
+    ...DeviceToken
+  }
+}
+
+# Mutations
+mutation UpdateNotificationPreferences($userId: Int!, $input: NotificationPreferenceInput!) {
+  updateNotificationPreferences(userId: $userId, input: $input) {
+    ...NotificationPreference
+  }
+}
+
+mutation RegisterDeviceToken($input: DeviceTokenInput!) {
+  registerDeviceToken(input: $input) {
+    ...DeviceToken
+  }
+}
+
+mutation DisableDeviceToken($deviceToken: String!) {
+  disableDeviceToken(deviceToken: $deviceToken)
+}
+
+mutation MarkNotificationAsRead($notificationId: Int!) {
+  markNotificationAsRead(notificationId: $notificationId)
+}
+
+mutation MarkAllNotificationsAsRead($userId: Int!) {
+  markAllNotificationsAsRead(userId: $userId)
+}

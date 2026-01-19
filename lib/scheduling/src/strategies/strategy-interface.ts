@@ -1,6 +1,6 @@
 /**
  * Scheduling strategy interface
- *
+ * 
  * Each strategy implements different logic for pairing teams
  */
 
@@ -38,13 +38,13 @@ export function pairingExists(
   pairings: MatchupPairing[],
   team1Id: number,
   team2Id: number,
-  weekNumber: number,
+  weekNumber: number
 ): boolean {
   return pairings.some(
     (p) =>
       p.weekNumber === weekNumber &&
       ((p.team1Id === team1Id && p.team2Id === team2Id) ||
-        (p.team1Id === team2Id && p.team2Id === team1Id)),
+        (p.team1Id === team2Id && p.team2Id === team1Id))
   );
 }
 
@@ -54,11 +54,11 @@ export function pairingExists(
 export function teamIsPairedInWeek(
   pairings: MatchupPairing[],
   teamId: number,
-  weekNumber: number,
+  weekNumber: number
 ): boolean {
   return pairings.some(
     (p) =>
       p.weekNumber === weekNumber &&
-      (p.team1Id === teamId || p.team2Id === teamId),
+      (p.team1Id === teamId || p.team2Id === teamId)
   );
 }

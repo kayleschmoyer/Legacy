@@ -107,8 +107,7 @@ export function useLeagueScoringSettings(
   const numericLeagueId = Number.isFinite(leagueId ?? NaN)
     ? Number(leagueId)
     : undefined;
-  const shouldSkip =
-    !Number.isFinite(numericLeagueId) || (numericLeagueId ?? 0) <= 0;
+  const shouldSkip = !Number.isFinite(numericLeagueId) || (numericLeagueId ?? 0) <= 0;
 
   const query = useGetLeagueScoringProfileQuery({
     variables: { leagueId: numericLeagueId || 0 },
@@ -118,7 +117,9 @@ export function useLeagueScoringSettings(
 
   const settings = useMemo(
     () =>
-      applyMultiplierGroups(query.data?.leagueScoringProfile?.multiplierGroups),
+      applyMultiplierGroups(
+        query.data?.leagueScoringProfile?.multiplierGroups,
+      ),
     [query.data?.leagueScoringProfile?.multiplierGroups],
   );
 

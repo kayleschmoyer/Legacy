@@ -96,7 +96,7 @@ describe('RandomStrategy', () => {
     const counts = Array.from(homeCount.values());
     const min = Math.min(...counts);
     const max = Math.max(...counts);
-
+    
     // With 10 weeks and 4 teams, each team plays 10 games
     // Home games should be roughly 5 each, within a reasonable range
     expect(max - min).toBeLessThanOrEqual(3);

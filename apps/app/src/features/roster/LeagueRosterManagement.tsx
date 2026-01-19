@@ -21,11 +21,9 @@ import { useTeamMemberProjections } from '../scoring';
 
 // Helper function to get player name from TeamMember's player field
 // Get player name from TeamMember's player field
-const getPlayerName = (
-  teamMember: TeamMemberFragment | null | undefined,
-): string => {
+const getPlayerName = (teamMember: TeamMemberFragment | null | undefined): string => {
   if (!teamMember?.player) return 'Unknown Player';
-
+  
   const { firstName, lastName } = teamMember.player;
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
 };
@@ -60,8 +58,8 @@ function RosterSlot({
 }: RosterSlotProps): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const eligiblePlayers = useMemo(() => {
-    return availablePlayers.filter(
-      (player) => player && canPlayerPlayPosition(player, position),
+    return availablePlayers.filter(player => 
+      player && canPlayerPlayPosition(player, position)
     );
   }, [availablePlayers, position]);
 
@@ -77,13 +75,7 @@ function RosterSlot({
       onPlayerAssign(selectedPlayer, position);
       onPlayerSelect(null);
     }
-  }, [
-    assignedPlayer,
-    selectedPlayer,
-    position,
-    onPlayerAssign,
-    onPlayerSelect,
-  ]);
+  }, [assignedPlayer, selectedPlayer, position, onPlayerAssign, onPlayerSelect]);
 
   const handleRemovePlayer = useCallback(() => {
     if (assignedPlayer) {
@@ -94,14 +86,14 @@ function RosterSlot({
   const getPositionDisplayName = (positionType: string) => {
     const displayNames: Record<string, string> = {
       SP: 'SP',
-      RP: 'RP',
+      RP: 'RP', 
       C: 'C',
       '1B': '1B',
       '2B': '2B',
       '3B': '3B',
       SS: 'SS',
       LF: 'LF',
-      CF: 'CF',
+      CF: 'CF', 
       RF: 'RF',
       OF: 'OF',
       IF: 'IF',
@@ -111,35 +103,34 @@ function RosterSlot({
     return displayNames[positionType] || positionType;
   };
 
-  const canAcceptSelectedPlayer =
-    selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
+  const canAcceptSelectedPlayer = selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
 
   return (
-    <Card
+    <Card 
       padding="$3"
       margin="$1"
       borderWidth={1}
       borderColor={
-        isSelected
-          ? '$blue8'
-          : canAcceptSelectedPlayer
-            ? '$green8'
-            : assignedPlayer
-              ? '$gray6'
-              : '$gray4'
+        isSelected 
+          ? "$blue8" 
+          : canAcceptSelectedPlayer 
+            ? "$green8"
+            : assignedPlayer 
+              ? "$gray6" 
+              : "$gray4"
       }
       backgroundColor={
-        isSelected
-          ? '$blue2'
-          : canAcceptSelectedPlayer
-            ? '$green2'
-            : assignedPlayer
-              ? '$gray2'
-              : '$gray1'
+        isSelected 
+          ? "$blue2" 
+          : canAcceptSelectedPlayer 
+            ? "$green2"
+            : assignedPlayer 
+              ? "$gray2" 
+              : "$gray1"
       }
       pressStyle={{
         scale: 0.98,
-        borderColor: '$blue10',
+        borderColor: "$blue10"
       }}
       onPress={handleSlotPress}
     >
@@ -148,8 +139,11 @@ function RosterSlot({
           <Text fontSize="$3" fontWeight="600" color="$gray12">
             {getPositionDisplayName(position.positionType || '')}
           </Text>
-          <Text fontSize="$4" color={assignedPlayer ? '$gray12' : '$gray8'}>
-            {assignedPlayer ? getPlayerName(assignedPlayer) : 'Empty'}
+          <Text fontSize="$4" color={assignedPlayer ? "$gray12" : "$gray8"}>
+            {assignedPlayer
+              ? getPlayerName(assignedPlayer)
+              : 'Empty'
+            }
           </Text>
           {assignedPlayer && (
             <Text fontSize="$2" color="$gray10">
@@ -166,10 +160,10 @@ function RosterSlot({
             </Text>
           )}
         </YStack>
-
+        
         {assignedPlayer && (
-          <Button
-            size="$2"
+          <Button 
+            size="$2" 
             theme="red"
             onPress={handleRemovePlayer}
             marginLeft="$2"
@@ -198,7 +192,7 @@ function AvailablePlayerList({
   isLoading,
 }: AvailablePlayerListProps): React.JSX.Element {
   const unassignedPlayers = useMemo(() => {
-    return players.filter((player) => !player.positionId);
+    return players.filter(player => !player.positionId);
   }, [players]);
 
   return (
@@ -230,7 +224,9 @@ function AvailablePlayerList({
                 borderColor: '$blue10',
               }}
               onPress={() =>
-                onPlayerSelect(selectedPlayer?.id === player.id ? null : player)
+                onPlayerSelect(
+                  selectedPlayer?.id === player.id ? null : player,
+                )
               }
             >
               <XStack justifyContent="space-between" alignItems="center">
@@ -283,8 +279,7 @@ export function LeagueRosterManagement({
   loading = false,
   leagueId,
 }: LeagueRosterManagementProps): React.JSX.Element {
-  const [selectedPlayer, setSelectedPlayer] =
-    useState<TeamMemberFragment | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<TeamMemberFragment | null>(null);
 
   const {
     projections,
@@ -309,15 +304,14 @@ export function LeagueRosterManagement({
 
   // Group positions by type for better organization
   const groupedPositions = useMemo(() => {
-    const pitchingPositions = positions.filter(
-      (p) => p.positionType === 'SP' || p.positionType === 'RP',
+    const pitchingPositions = positions.filter(p => 
+      p.positionType === 'SP' || p.positionType === 'RP'
     );
-    const battingPositions = positions.filter(
-      (p) =>
-        p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType),
+    const battingPositions = positions.filter(p => 
+      p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType)
     );
-    const utilityPositions = positions.filter(
-      (p) => p.positionType === 'IF' || p.positionType === 'XDH',
+    const utilityPositions = positions.filter(p => 
+      p.positionType === 'IF' || p.positionType === 'XDH'
     );
 
     return {
@@ -328,27 +322,18 @@ export function LeagueRosterManagement({
   }, [positions]);
 
   // Get assigned players for each position
-  const getAssignedPlayer = useCallback(
-    (position: LeaguePositionFragment) => {
-      return teamPlayers.find((player) => player.positionId === position.id);
-    },
-    [teamPlayers],
-  );
+  const getAssignedPlayer = useCallback((position: LeaguePositionFragment) => {
+    return teamPlayers.find(player => player.positionId === position.id);
+  }, [teamPlayers]);
 
-  const handlePlayerAssign = useCallback(
-    (player: TeamMemberFragment, position: LeaguePositionFragment) => {
-      onPlayerAssign(player, position);
-      setSelectedPlayer(null);
-    },
-    [onPlayerAssign],
-  );
+  const handlePlayerAssign = useCallback((player: TeamMemberFragment, position: LeaguePositionFragment) => {
+    onPlayerAssign(player, position);
+    setSelectedPlayer(null);
+  }, [onPlayerAssign]);
 
-  const handlePlayerRemove = useCallback(
-    (position: LeaguePositionFragment) => {
-      onPlayerRemove(position);
-    },
-    [onPlayerRemove],
-  );
+  const handlePlayerRemove = useCallback((position: LeaguePositionFragment) => {
+    onPlayerRemove(position);
+  }, [onPlayerRemove]);
 
   if (loading || loadingProjections) {
     return (
@@ -375,14 +360,9 @@ export function LeagueRosterManagement({
             </Text>
           </Card>
         )}
-
+        
         {selectedPlayer && (
-          <Card
-            padding="$3"
-            backgroundColor="$blue2"
-            borderColor="$blue8"
-            borderWidth={1}
-          >
+          <Card padding="$3" backgroundColor="$blue2" borderColor="$blue8" borderWidth={1}>
             <Text fontSize="$4" fontWeight="600" color="$blue12">
               Selected: {getPlayerName(selectedPlayer)}
             </Text>

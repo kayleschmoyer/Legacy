@@ -12,9 +12,8 @@ This directory contains step-by-step guides for setting up and working with the 
 
 ### Workflow & Contribution
 
-⚠️ **AI Agent workflows have moved to [Claude Skills](../skills/README.md)**
-
-- **[Branch Management](BRANCH_MANAGEMENT.md)** - Redirect to new skills system
+- **[AI Agent Contribution Workflow](ai-agent-contribution-workflow.md)** - Complete contribution process for AI agents
+- **[Agent Commands](agent-commands.md)** - AI assistant commands reference
 
 ### Reference
 

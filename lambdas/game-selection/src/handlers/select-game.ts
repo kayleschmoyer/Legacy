@@ -1,11 +1,4 @@
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent } from 'aws-lambda';
-import {
-  getSeasonBattingStatsForPlayerSeason,
-  getSeasonFieldingStatsForPlayerSeason,
-  getSeasonPitchingStatsForPlayerSeason,
-  PublicDb,
-  PublicSchema,
-} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
@@ -14,8 +7,8 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
-import { and, eq, exists, not } from 'drizzle-orm';
 import { getDb } from '../utils/db';
+import { selectGamesForMatchup } from '../services/season-game-selector';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -28,93 +21,11 @@ interface SelectGameEvent {
   game: number;
 }
 
-function selectGameNumber(stats: { g: number | null } | null): number | null {
-  if (!stats?.g) {
-    return null;
-  }
-
-  // 1-indexed
-  return Math.floor(Math.random() * stats.g) + 1;
-}
-
-async function selectGamesForMatchup(
-  db: PublicDb,
-  matchupId: number,
-  gameNumber: number,
-): Promise<void> {
-  const result = await db
-    .select()
-    .from(PublicSchema.matchupPlayers)
-    .where(
-      and(
-        eq(PublicSchema.matchupPlayers.matchupId, matchupId),
-        not(
-          exists(
-            db
-              .select()
-              .from(PublicSchema.matchupPlayerGames)
-              .where(
-                and(
-                  eq(
-                    PublicSchema.matchupPlayerGames.matchupPlayerId,
-                    PublicSchema.matchupPlayers.id,
-                  ),
-                  eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
-                ),
-              ),
-          ),
-        ),
-      ),
-    );
-
-  LOGGER.debug(`Fetching ${result.length} matchup records`);
-
-  for (const matchupPlayer of result) {
-    const battingStats = await getSeasonBattingStatsForPlayerSeason(
-      db,
-      matchupPlayer.playerId,
-      matchupPlayer.season,
-    );
-    const pitchingStats = await getSeasonPitchingStatsForPlayerSeason(
-      db,
-      matchupPlayer.playerId,
-      matchupPlayer.season,
-    );
-
-    // Fielding stats are segmented by position
-    const fieldingStatsArray = await getSeasonFieldingStatsForPlayerSeason(
-      db,
-      matchupPlayer.playerId,
-      matchupPlayer.season,
-    );
-
-    const fieldingStats =
-      fieldingStatsArray[Math.floor(Math.random() * fieldingStatsArray.length)];
-
-    const battingGameNum = selectGameNumber(battingStats);
-    const fieldingGameNum = selectGameNumber(fieldingStats);
-    let pitchingGameNum: number | null = null;
-
-    // Pitchers can only throw one game per week
-    if (gameNumber === 1) {
-      pitchingGameNum = selectGameNumber(pitchingStats);
-    }
-
-    LOGGER.debug(
-      `Selected Games ${battingGameNum} ${pitchingGameNum} ${fieldingGameNum}`,
-    );
-
-    await db.insert(PublicSchema.matchupPlayerGames).values({
-      battingGameNum: battingGameNum,
-      fieldingGameNum: fieldingGameNum,
-      fieldingGamePos: fieldingStats?.pos,
-      gameNum: gameNumber,
-      matchupPlayerId: matchupPlayer.id,
-      pitchingGameNum: pitchingGameNum,
-    });
-  }
-}
-
+/**
+ * Handler for selecting games for matchups
+ * Triggered by SQS messages containing matchupId and game number
+ * Uses the matchup's selected_season to determine which season to select games from
+ */
 const baseSelectGameHandler = async (
   event: SQSEvent,
 ): Promise<SQSBatchResponse> => {
@@ -122,7 +33,9 @@ const baseSelectGameHandler = async (
     recordCount: event.Records.length,
   });
 
-  LOGGER.debug('Processing SQS event', { event });
+  LOGGER.info('Processing SQS event', {
+    recordCount: event.Records.length,
+  });
 
   const db = await getDb();
 
@@ -139,11 +52,24 @@ const baseSelectGameHandler = async (
           game: matchup.game,
         });
 
+        LOGGER.info('Selecting games for matchup', {
+          matchupId: matchup.matchupId,
+          gameNumber: matchup.game,
+        });
+
+        // Use the new season-game-selector service which automatically
+        // uses the matchup's selected_season field
         await selectGamesForMatchup(db.db, matchup.matchupId, matchup.game);
+
+        LOGGER.info('Successfully selected games for matchup', {
+          matchupId: matchup.matchupId,
+          gameNumber: matchup.game,
+        });
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
         LOGGER.error('Error processing record', {
           error: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
         });
 
         captureError(err instanceof Error ? err : new Error(String(err)), {

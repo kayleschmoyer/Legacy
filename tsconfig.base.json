@@ -16,6 +16,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@legacy-sports/analytics": ["lib/analytics/src/index.ts"],
       "@legacy-sports/api": ["lib/api/src/index.ts"],
       "@legacy-sports/aws-utils": ["lib/aws-utils/src/index.ts"],
       "@legacy-sports/bref-client": ["lib/bref-client/src/index.ts"],

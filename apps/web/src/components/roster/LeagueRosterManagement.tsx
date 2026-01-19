@@ -283,7 +283,7 @@ function RosterSlot({
       cursor="pointer"
       width="100%"
       onPress={handleSlotPress}
-      role="button"
+  role="button"
       tabIndex={0}
       aria-pressed={Boolean(isSelected)}
       aria-label={
@@ -506,7 +506,7 @@ const BenchList = ({
           </Text>
         </YStack>
       ) : (
-        <YStack space="$2">
+  <YStack space="$2">
           {players.map((player) => {
             const isActive = selectedPlayer?.id === player.id;
 

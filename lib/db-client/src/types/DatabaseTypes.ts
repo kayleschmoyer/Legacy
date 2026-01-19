@@ -67,7 +67,8 @@ export type ScoringStatDefinition = typeof scoringStatDefinitions.$inferSelect;
 export type LeagueScoringProfile = typeof leagueScoringProfiles.$inferSelect;
 export type LeagueScoringProfileEntry =
   typeof leagueScoringProfileEntries.$inferSelect;
-export type LeagueScoringChangeLog = typeof leagueScoringChangeLog.$inferSelect;
+export type LeagueScoringChangeLog =
+  typeof leagueScoringChangeLog.$inferSelect;
 
 export type CreatePlayerInput = typeof players.$inferInsert;
 export type CreateMatchupPlayer = typeof matchupPlayers.$inferInsert;

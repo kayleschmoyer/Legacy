@@ -8,7 +8,6 @@
 ## 🎯 Key Design Principles
 
 ### Season-Based Game Selection
-
 - Each matchup uses a **single historical season** for all players
 - Seasons must meet league's **min_games_per_season** threshold
 - Selected season is stored in the matchup record
@@ -16,7 +15,6 @@
 - Games are selected one at a time from the chosen season
 
 ### Dual Projection System
-
 - **Career Projection:** Average stats across all career seasons
 - **Matchup Projection:** Average stats from matchup's selected season
 - Both displayed side-by-side on roster views
@@ -24,7 +22,6 @@
 - Updates in real-time as games are selected
 
 ### Game Tracking
-
 - Track games selected vs games_per_matchup (configured per league)
 - Display accumulated stats for all selected games
 - Show games remaining counter
@@ -34,53 +31,49 @@
 
 ## 📋 All Tickets Created
 
-| Ticket    | Title                                                 | Type  | Priority | Dependencies               |
-| --------- | ----------------------------------------------------- | ----- | -------- | -------------------------- |
-| LS-17     | Set up matchup system for fantasy leagues             | Epic  | -        | -                          |
-| LS-18     | Extend matchup database schema + season selection     | Story | Highest  | None                       |
-| LS-19     | Build GraphQL schema and resolvers                    | Story | Highest  | LS-18                      |
-| LS-20     | Implement matchup scheduling + season selector        | Story | High     | LS-18, LS-19               |
-| LS-21     | Build matchup score calculation engine                | Story | High     | LS-7, LS-18                |
-| LS-22     | Create matchup history and results tracking           | Story | High     | LS-18, LS-19, LS-21        |
-| LS-23     | Build mobile matchup UI components                    | Story | High     | LS-19                      |
-| LS-24     | Build web matchup UI + commissioner controls          | Story | High     | LS-19                      |
-| LS-25     | Implement matchup notification system                 | Story | Medium   | LS-18, LS-19, LS-21        |
-| LS-26     | Update game selection Lambda (commissioner-triggered) | Story | Medium   | LS-18, LS-19, LS-20, LS-21 |
-| LS-27     | Add matchup analytics and statistics                  | Story | Medium   | LS-22                      |
-| LS-28     | Implement playoffs and championship system            | Story | Medium   | LS-22                      |
-| LS-29     | Add trade deadline and roster lock features           | Story | Medium   | LS-18, LS-26               |
-| LS-30     | Build matchup preview and predictions                 | Story | Medium   | LS-19, LS-21, LS-7         |
-| LS-31     | Add matchup chat and trash talk feature               | Story | Low      | LS-18, LS-19               |
-| LS-32     | Implement tiebreaker rules system                     | Story | Low      | LS-18, LS-21               |
-| LS-33     | Add E2E tests for matchup system                      | Story | High     | All stories                |
-| LS-34     | Performance optimization                              | Story | Medium   | LS-18-22                   |
-| LS-35     | Create comprehensive documentation                    | Story | Medium   | Ongoing                    |
-| **LS-36** | **Implement dual projection system (NEW)**            | Story | **High** | LS-7, LS-18, LS-19         |
+| Ticket | Title | Type | Priority | Dependencies |
+|--------|-------|------|----------|--------------|
+| LS-17 | Set up matchup system for fantasy leagues | Epic | - | - |
+| LS-18 | Extend matchup database schema + season selection | Story | Highest | None |
+| LS-19 | Build GraphQL schema and resolvers | Story | Highest | LS-18 |
+| LS-20 | Implement matchup scheduling + season selector | Story | High | LS-18, LS-19 |
+| LS-21 | Build matchup score calculation engine | Story | High | LS-7, LS-18 |
+| LS-22 | Create matchup history and results tracking | Story | High | LS-18, LS-19, LS-21 |
+| LS-23 | Build mobile matchup UI components | Story | High | LS-19 |
+| LS-24 | Build web matchup UI + commissioner controls | Story | High | LS-19 |
+| LS-25 | Implement matchup notification system | Story | Medium | LS-18, LS-19, LS-21 |
+| LS-26 | Update game selection Lambda (commissioner-triggered) | Story | Medium | LS-18, LS-19, LS-20, LS-21 |
+| LS-27 | Add matchup analytics and statistics | Story | Medium | LS-22 |
+| LS-28 | Implement playoffs and championship system | Story | Medium | LS-22 |
+| LS-29 | Add trade deadline and roster lock features | Story | Medium | LS-18, LS-26 |
+| LS-30 | Build matchup preview and predictions | Story | Medium | LS-19, LS-21, LS-7 |
+| LS-31 | Add matchup chat and trash talk feature | Story | Low | LS-18, LS-19 |
+| LS-32 | Implement tiebreaker rules system | Story | Low | LS-18, LS-21 |
+| LS-33 | Add E2E tests for matchup system | Story | High | All stories |
+| LS-34 | Performance optimization | Story | Medium | LS-18-22 |
+| LS-35 | Create comprehensive documentation | Story | Medium | Ongoing |
+| **LS-36** | **Implement dual projection system (NEW)** | Story | **High** | LS-7, LS-18, LS-19 |
 
 ---
 
 ## 🎯 Recommended Implementation Order
 
 ### Phase 1: Foundation (Start Here)
-
 1. **LS-18** - Database schema ⭐ START HERE
 2. **LS-19** - GraphQL API
 3. **LS-20** - Scheduling algorithm
 
 ### Phase 2: Core Features
-
 4. **LS-21** - Score calculation
 5. **LS-22** - History tracking
 6. **LS-23** - Mobile UI
 7. **LS-24** - Web UI
 
 ### Phase 3: Automation
-
 8. **LS-25** - Notifications
 9. **LS-26** - Automated progression
 
 ### Phase 4: Advanced Features (Can be done in parallel)
-
 10. **LS-27** - Analytics
 11. **LS-28** - Playoffs
 12. **LS-29** - Roster lock
@@ -89,7 +82,6 @@
 15. **LS-32** - Tiebreakers (optional)
 
 ### Phase 5: Quality & Performance
-
 16. **LS-33** - E2E tests
 17. **LS-34** - Performance optimization
 18. **LS-35** - Documentation (ongoing)
@@ -142,41 +134,34 @@ acli jira workitem transition --key LS-XX --status "In Review"
 ## 📁 Key Files by Ticket
 
 ### LS-18 (Database Schema)
-
 - `lib/db-client/src/drizzle/public/models/Matchups.ts`
 - `lib/db-client/src/drizzle/public/relations.ts`
 - `lambdas/db/migrations/` (create new migration)
 
 ### LS-19 (GraphQL API)
-
 - `lambdas/db/src/schema/matchups.ts`
 - `lib/db-client/src/lib/client/PublicDbClient.ts`
 - All `graphql.generated.ts` files (regenerate via codegen)
 
 ### LS-20 (Scheduling)
-
 - `lib/scheduling/` (new library - create from scratch)
 - `lib/scheduling/src/matchup-scheduler.ts`
 - `lib/scheduling/src/strategies/`
 
 ### LS-21 (Score Calculation)
-
 - `lib/scoring/src/matchup-scoring.ts`
 - `lambdas/stats-lambda/src/handlers/calculate-matchup-scores.ts`
 
 ### LS-22 (History)
-
 - `lib/db-client/src/lib/client/matchup-history.ts`
 - `lambdas/db/src/services/standings-service.ts`
 
 ### LS-23 (Mobile UI)
-
 - `apps/app/src/components/matchup/`
 - `apps/app/src/screens/MatchupDetailScreen.tsx`
 - `apps/app/src/hooks/useMatchup.ts`
 
 ### LS-24 (Web UI)
-
 - `apps/web/src/components/matchup/`
 - `apps/web/src/pages/leagues/[leagueId]/matchups/`
 - `apps/web/src/hooks/useMatchup.ts`
@@ -186,7 +171,6 @@ acli jira workitem transition --key LS-XX --status "In Review"
 ## 🔗 Database Schema (LS-18)
 
 ### Existing Matchups Table
-
 ```typescript
 matchups {
   id: serial (PK)
@@ -196,26 +180,25 @@ matchups {
 ```
 
 ### What Needs to Be Added
-
 ```typescript
 matchups {
   // Existing fields...
-
+  
   // NEW: Team pairings
   team1_id: integer (FK → teams.id) NOT NULL
   team2_id: integer (FK → teams.id) NOT NULL
-
+  
   // NEW: Scoring
   team1_score: decimal(10, 3) NULL
   team2_score: decimal(10, 3) NULL
-
+  
   // NEW: Season selection (KEY FEATURE)
   selected_season: integer NOT NULL
   games_per_matchup: integer NOT NULL
-
+  
   // NEW: Status tracking
   status: enum('scheduled', 'in_progress', 'completed', 'cancelled')
-
+  
   // NEW: Timestamps
   start_time: timestamp NULL
   end_time: timestamp NULL
@@ -223,7 +206,7 @@ matchups {
 
 leagues {
   // Existing fields...
-
+  
   // NEW: Season eligibility config
   min_games_per_season: integer DEFAULT 50
   games_per_matchup: integer DEFAULT 5
@@ -235,14 +218,13 @@ leagues {
 ## 🔌 GraphQL API (LS-19)
 
 ### New Queries to Add
-
 ```graphql
 type Query {
   getMatchupById(id: Int!): Matchup
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]!
   getCurrentMatchupForLeague(leagueId: Int!): Matchup
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]!
-
+  
   # NEW: Season and projection queries
   getMatchupPlayerStats(matchupId: Int!, playerId: Int!): MatchupPlayerStats!
   getMatchupProjections(matchupId: Int!, playerId: Int!): PlayerProjections!
@@ -250,43 +232,37 @@ type Query {
 ```
 
 ### New Mutations to Add
-
 ```graphql
 type Mutation {
   createMatchup(input: CreateMatchupInput!): Matchup!
-  updateMatchupScore(
-    matchupId: Int!
-    team1Score: Float
-    team2Score: Float
-  ): Matchup!
+  updateMatchupScore(matchupId: Int!, team1Score: Float, team2Score: Float): Matchup!
   updateMatchupStatus(matchupId: Int!, status: MatchupStatus!): Matchup!
-
+  
   # NEW: Commissioner game selection
   triggerGameSelection(matchupId: Int!, gameNumber: Int!): GameSelectionResult!
 }
 ```
 
 ### Extended Matchup Type
-
 ```graphql
 type Matchup {
   id: ID!
   leagueId: Int!
   weekNumber: Int!
   numberOfGames: Int!
-
+  
   # Team pairings
   team1: Team!
   team2: Team!
   team1Score: Float
   team2Score: Float
-
+  
   # NEW: Season selection fields
   selectedSeason: Int!
   gamesPerMatchup: Int!
   gamesSelected: Int!
   gamesRemaining: Int!
-
+  
   # Status tracking
   status: MatchupStatus!
   startTime: String
@@ -336,23 +312,20 @@ LS-19 (GraphQL API)
 ## ⚠️ Common Pitfalls
 
 1. **Don't forget to regenerate GraphQL types** after schema changes
-
    ```powershell
    npx nx run-many -t codegen
    ```
 
 2. **Always add foreign keys** when creating relationships
-
    ```typescript
    foreignKey({
      columns: [table.team1Id],
      foreignColumns: [teams.id],
-     name: 'matchups_team1_fk',
-   });
+     name: 'matchups_team1_fk'
+   })
    ```
 
 3. **Update relations.ts** when adding new relationships
-
    ```typescript
    export const matchupsRelations = relations(matchups, ({ one }) => ({
      team1: one(teams, {
@@ -377,25 +350,21 @@ LS-19 (GraphQL API)
 ## 💡 Tips for Success
 
 ### Reference Existing Code
-
 - Look at **LS-7** scoring work for patterns
 - Check `lib/db-client/src/drizzle/public/models/Leagues.ts` for schema examples
 - Review `lambdas/db/src/schema/leagues.ts` for GraphQL patterns
 
 ### Testing
-
 - Write unit tests as you go
 - Test with real league data if possible
 - Consider edge cases (odd number of teams, byes, etc.)
 
 ### Performance
-
 - Use DataLoaders for N+1 query prevention
 - Add database indexes for frequently queried columns
 - Consider caching for standings/rankings
 
 ### Documentation
-
 - Update `docs/architecture/database-schema.md` with schema changes
 - Add inline code comments for complex logic
 - Create examples in documentation

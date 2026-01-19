@@ -113,9 +113,7 @@ export class ScoringService {
       const profile = await getActiveScoringProfileForLeague(db, leagueId);
 
       if (!profile) {
-        throw new Error(
-          `Active scoring profile not found for league ${leagueId}`,
-        );
+        throw new Error(`Active scoring profile not found for league ${leagueId}`);
       }
 
       const entries = await updateLeagueScoringProfileEntries(

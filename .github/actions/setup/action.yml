@@ -63,26 +63,28 @@ runs:
           echo "$PNPM_HOME_DIR" >> "$GITHUB_PATH"
         fi
 
+        echo "Preparing pnpm@${PNPM_VERSION} for immediate activation..."
+
     - name: Detect Package Manager
       id: detect-pm
       shell: bash
       run: |
         if [ -f "pnpm-lock.yaml" ]; then
           echo "manager=pnpm" >> "$GITHUB_OUTPUT"
-          echo "PACKAGE_MANAGER=pnpm" >> "$GITHUB_ENV"
-          echo "📦 Detected package manager: pnpm"
+          echo "✅ Detected pnpm (pnpm-lock.yaml found)"
+        elif [ -f "package-lock.json" ]; then
+          echo "manager=npm" >> "$GITHUB_OUTPUT"
+          echo "✅ Detected npm (package-lock.json found)"
         else
           echo "manager=npm" >> "$GITHUB_OUTPUT"
-          echo "PACKAGE_MANAGER=npm" >> "$GITHUB_ENV"
-          echo "📦 Detected package manager: npm"
+          echo "⚠️  No lockfile found, defaulting to npm"
         fi
 
-    - name: Setup Node.js with Package Manager Cache
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
         cache: ${{ steps.detect-pm.outputs.manager }}
-        cache-dependency-path: ${{ steps.detect-pm.outputs.manager == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
 
     - name: Cache pnpm Store
       if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'pnpm'
@@ -137,15 +139,15 @@ runs:
           echo "📦 Partial cache restored - updating dependencies incrementally..."
           echo "Restored: ${{ steps.cached-dependencies.outputs.cache-matched-key }}"
           echo "Target: ${{ steps.cached-dependencies.outputs.cache-primary-key }}"
-          echo "Using 'npm install' for incremental update (2-5 min)..."
-          
-          NPM_INSTALL_CMD=(npm install --no-audit --no-fund --loglevel verbose)
+          echo "Using 'pnpm install --frozen-lockfile' for incremental update (2-5 min)..."
+          # --frozen-lockfile: Respects package-lock.json exactly (like npm ci)
+          # But doesn't delete node_modules first, so can do incremental updates
           if [ "${{ inputs.include-optional-deps }}" == "false" ]; then
             echo "⚡ Skipping optional dependencies (Storybook, Appium) for faster CI..."
-            NPM_INSTALL_CMD+=(--omit=optional)
+            pnpm install --frozen-lockfile --prefer-offline --no-audit --no-fund --omit=optional --loglevel verbose
+          else
+            pnpm install --frozen-lockfile --prefer-offline --no-audit --no-fund --loglevel verbose
           fi
-          
-          "${NPM_INSTALL_CMD[@]}"
         else
           echo "📦 No cache available - full install required (10-15 min)..."
 
@@ -207,9 +209,10 @@ runs:
                   exit 1
                 fi
               fi
-            else
-              echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
-              npm cache clean --force
+            fi
+          else
+            echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
+            npm cache clean --force
 
               if command -v timeout >/dev/null 2>&1; then
                 RETRY_TIMEOUT_CMD="timeout 900s"
@@ -230,6 +233,7 @@ runs:
                 echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
                 exit 1
               fi
+            fi
           fi
         fi
 

@@ -65,21 +65,19 @@ export default function LeagueId(): React.JSX.Element {
   });
 
   // Fetch league positions
-  const { data: positionsData, loading: positionsLoading } =
-    useGetPositionsForLeagueQuery({
-      skip: isNaN(numLeagueId),
-      variables: {
-        leagueId: numLeagueId,
-      },
-    });
+  const { data: positionsData, loading: positionsLoading } = useGetPositionsForLeagueQuery({
+    skip: isNaN(numLeagueId),
+    variables: {
+      leagueId: numLeagueId,
+    },
+  });
 
   // Get current user info to determine their team in this league
   const currentUser = useAuthorizedUserInfo();
-
+  
   // Use the proper userTeamId GraphQL query to get the user's team in this league
-  const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID);
-
+  const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] = useLazyQuery(GET_USER_TEAM_ID);
+  
   // Effect to fetch user's team ID when league ID changes
   useEffect(() => {
     if (!isNaN(numLeagueId) && userInfo?.id) {
@@ -90,7 +88,7 @@ export default function LeagueId(): React.JSX.Element {
         },
         onError: (error) => {
           console.error('🚨 User team ID query error:', error);
-        },
+        }
       });
     }
   }, [numLeagueId, userInfo?.id, getUserTeamId]);
@@ -100,28 +98,24 @@ export default function LeagueId(): React.JSX.Element {
     leagueData: leagueData?.league,
     userTeamId,
     userInfo,
-    message: 'Using proper userTeamId GraphQL query',
+    message: 'Using proper userTeamId GraphQL query'
+  });
+  
+  const { data: teamMembersData, loading: teamMembersLoading } = useGetTeamMembersQuery({
+    skip: !userTeamId,
+    variables: {
+      teamId: userTeamId || 0,
+    },
+    onCompleted: (data) => {
+      console.log('🏀 Team members query completed:', data);
+    },
+    onError: (error) => {
+      console.error('🚨 Team members query error:', error);
+    }
   });
 
-  const { data: teamMembersData, loading: teamMembersLoading } =
-    useGetTeamMembersQuery({
-      skip: !userTeamId,
-      variables: {
-        teamId: userTeamId || 0,
-      },
-      onCompleted: (data) => {
-        console.log('🏀 Team members query completed:', data);
-      },
-      onError: (error) => {
-        console.error('🚨 Team members query error:', error);
-      },
-    });
-
   // Fetch league teams for standings
-  const [
-    getLeagueTeams,
-    { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+  const [getLeagueTeams, { data: leagueTeamsData, loading: leagueTeamsLoading }] = useLazyQuery(GET_LEAGUE_TEAMS);
 
   // Effect to fetch league teams when on standings tab
   useEffect(() => {
@@ -130,7 +124,7 @@ export default function LeagueId(): React.JSX.Element {
         variables: { leagueId: numLeagueId },
         onError: (error) => {
           console.error('🚨 Error fetching league teams:', error);
-        },
+        }
       });
     }
   }, [selectedTab, numLeagueId, getLeagueTeams]);
@@ -141,18 +135,10 @@ export default function LeagueId(): React.JSX.Element {
   const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
     onCompleted: (data: StartDraftMutation) => {
       console.log('✅ Draft mutation completed successfully:', data);
-      console.log(
-        '🎯 Returned League object with updated status:',
-        data.startDraft,
-      );
+      console.log('🎯 Returned League object with updated status:', data.startDraft);
       console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
-      console.log(
-        '🚀 Apollo Client cache automatically updated - no manual refetch needed!',
-      );
-      Alert.alert(
-        'Success',
-        'Draft has been started and queued for processing!',
-      );
+      console.log('🚀 Apollo Client cache automatically updated - no manual refetch needed!');
+      Alert.alert('Success', 'Draft has been started and queued for processing!');
     },
     onError: (error: any) => {
       console.error('Error starting draft:', error);
@@ -168,10 +154,7 @@ export default function LeagueId(): React.JSX.Element {
 
   const handleStartDraft = useCallback(() => {
     if (!isCommissioner) {
-      Alert.alert(
-        'Permission Denied',
-        'Only league commissioners can start drafts.',
-      );
+      Alert.alert('Permission Denied', 'Only league commissioners can start drafts.');
       return;
     }
 
@@ -187,58 +170,52 @@ export default function LeagueId(): React.JSX.Element {
             startDraft({
               variables: {
                 leagueId: numLeagueId,
-                draftType: 'random-draft',
-              },
+                draftType: 'random-draft'
+              }
             });
-          },
-        },
-      ],
+          }
+        }
+      ]
     );
   }, [startDraft, numLeagueId, isCommissioner]);
 
-  const handlePlayerAssign = useCallback(
-    async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
-      if (typeof player.id !== 'number') {
-        handleError(new Error('Missing team member identifier'));
-        return;
-      }
+  const handlePlayerAssign = useCallback(async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+    if (typeof player.id !== 'number') {
+      handleError(new Error('Missing team member identifier'));
+      return;
+    }
 
-      try {
+    try {
+      await updateTeamMemberPosition({
+        variables: {
+          teamMemberId: player.id,
+          positionId: position.id,
+        },
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  }, [updateTeamMemberPosition]);
+
+  const handlePlayerRemove = useCallback(async (position: LeaguePositionFragment) => {
+    try {
+      // Find the player assigned to this position
+      const assignedPlayer = teamMembersData?.teamMembers?.find(
+        member => member?.positionId === position.id
+      );
+      
+      if (typeof assignedPlayer?.id === 'number') {
         await updateTeamMemberPosition({
           variables: {
-            teamMemberId: player.id,
-            positionId: position.id,
+            teamMemberId: assignedPlayer.id,
+            positionId: null,
           },
         });
-      } catch (error) {
-        handleError(error);
       }
-    },
-    [updateTeamMemberPosition],
-  );
-
-  const handlePlayerRemove = useCallback(
-    async (position: LeaguePositionFragment) => {
-      try {
-        // Find the player assigned to this position
-        const assignedPlayer = teamMembersData?.teamMembers?.find(
-          (member) => member?.positionId === position.id,
-        );
-
-        if (typeof assignedPlayer?.id === 'number') {
-          await updateTeamMemberPosition({
-            variables: {
-              teamMemberId: assignedPlayer.id,
-              positionId: null,
-            },
-          });
-        }
-      } catch (error) {
-        handleError(error);
-      }
-    },
-    [updateTeamMemberPosition, teamMembersData],
-  );
+    } catch (error) {
+      handleError(error);
+    }
+  }, [updateTeamMemberPosition, teamMembersData]);
 
   if (leagueLoading) {
     return <Spinner />;
@@ -251,12 +228,7 @@ export default function LeagueId(): React.JSX.Element {
 
   return (
     <YStack flex={1}>
-      <Tabs
-        value={selectedTab}
-        onValueChange={setSelectedTab}
-        flexDirection="column"
-        flex={1}
-      >
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} flexDirection="column" flex={1}>
         <Tabs.List backgroundColor="$background" paddingHorizontal="$4">
           <Tabs.Tab value="roster" flex={1}>
             <Text>My Roster</Text>
@@ -274,11 +246,7 @@ export default function LeagueId(): React.JSX.Element {
         <Tabs.Content value="roster" flex={1}>
           <LeagueRosterManagement
             positions={positionsData?.leaguePositions || []}
-            teamPlayers={
-              (teamMembersData?.teamMembers?.filter(
-                (member) => member !== null,
-              ) as TeamMemberFragment[]) || []
-            }
+            teamPlayers={teamMembersData?.teamMembers?.filter(member => member !== null) as TeamMemberFragment[] || []}
             onPlayerAssign={handlePlayerAssign}
             onPlayerRemove={handlePlayerRemove}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
@@ -297,21 +265,18 @@ export default function LeagueId(): React.JSX.Element {
           <Tabs.Content value="commissioner" flex={1}>
             <YStack padding="$4" space="$4">
               <H3 marginBottom="$3">Commissioner Settings</H3>
-
+              
               <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
                 <YStack space="$3">
                   <Text fontSize="$5" fontWeight="600" color="$blue11">
                     Draft Management
                   </Text>
                   <Text color="$gray11" fontSize="$3">
-                    Start a random draft to automatically assign players to all
-                    teams in the league.
+                    Start a random draft to automatically assign players to all teams in the league.
                   </Text>
                   <XStack justifyContent="space-between" alignItems="center">
                     <YStack flex={1}>
-                      <Text fontSize="$4" fontWeight="500">
-                        Random Draft
-                      </Text>
+                      <Text fontSize="$4" fontWeight="500">Random Draft</Text>
                       <Text fontSize="$2" color="$gray10">
                         Randomly assigns players to roster positions
                       </Text>
@@ -330,18 +295,13 @@ export default function LeagueId(): React.JSX.Element {
                 </YStack>
               </Card>
 
-              <Card
-                backgroundColor="$yellow2"
-                borderColor="$yellow6"
-                padding="$4"
-              >
+              <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
                 <YStack space="$2">
                   <Text fontSize="$4" fontWeight="600" color="$yellow11">
                     ⚠️ Commissioner Features
                   </Text>
                   <Text color="$yellow11" fontSize="$3">
-                    Additional commissioner features like member management,
-                    league settings, and advanced draft options are coming soon.
+                    Additional commissioner features like member management, league settings, and advanced draft options are coming soon.
                   </Text>
                 </YStack>
               </Card>

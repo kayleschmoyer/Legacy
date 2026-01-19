@@ -236,6 +236,10 @@ dev-db: ## Start database development server
 	@$(call echo_blue,Starting database service...)
 	pnpm run dev:db
 
+dev-graphql: ## Start GraphQL service (alias for dev-db)
+	@$(call echo_blue,Starting GraphQL service on http://localhost:5000/graphql...)
+	pnpm exec nx run db:serve
+
 dev-storybook: ## Start Storybook for component development
 	@$(call echo_blue,Starting Storybook...)
 	pnpm run storybook
@@ -407,7 +411,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto post-merge-rebase detect-skip-commits resolve-conflicts squash-branch pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
@@ -424,7 +428,7 @@ else
 	@./scripts/squash-branch.sh $(if $(MESSAGE),-m "$(MESSAGE)",)
 endif
 
-rebase-tree: ## Rebase branch tree (interactive, use 'rebase-tree-auto' for automation)
+rebase-tree: ## Rebase entire branch tree with auto-conflict resolution
 	@$(call echo_blue,Rebasing branch tree...)
 ifeq ($(OS),Windows_NT)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1"
@@ -432,37 +436,27 @@ else
 	@./scripts/rebase-branch-tree.sh
 endif
 
-rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts, uses skip-commits.txt if present)
+rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts)
 	@$(call echo_blue,Auto-rebasing branch tree...)
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue -SkipCommitsFile "skip-commits.txt"
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue
 else
-	@./scripts/rebase-branch-tree.sh --auto-continue --skip-commits-file skip-commits.txt
+	@./scripts/rebase-branch-tree.sh --auto-continue
 endif
 
-post-merge-rebase: ## Automate rebase after PR merged with squash (usage: make post-merge-rebase BRANCH=LS-1/feature)
-	@$(call echo_blue,Post-merge rebase automation...)
+rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
+	@$(call echo_blue,Rebasing branch tree with skip-commits...)
 ifeq ($(OS),Windows_NT)
-ifndef BRANCH
-	@echo Error: BRANCH parameter required. Usage: make post-merge-rebase BRANCH=LS-1/feature
-	@exit /b 1
-endif
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\post-merge-rebase.ps1" -MergedBranch "$(BRANCH)"
+ifdef SKIP_COMMITS
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommits "$(SKIP_COMMITS)"
+else ifdef SKIP_COMMITS_FILE
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommitsFile "$(SKIP_COMMITS_FILE)"
 else
-ifndef BRANCH
-	@echo "Error: BRANCH parameter required. Usage: make post-merge-rebase BRANCH=LS-1/feature"
+	@$(call echo_red,Error: Must provide either SKIP_COMMITS or SKIP_COMMITS_FILE)
 	@exit 1
 endif
-	@echo "Not yet implemented for $(DETECTED_OS)"
-	@exit 1
-endif
-
-detect-skip-commits: ## Scan branches for rewritten commits that should have been dropped
-	@$(call echo_blue,Scanning branches for stale commits...)
-ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -File ".\scripts\detect-skip-commits.ps1" $(if $(BRANCHES),-Branches "$(BRANCHES)",) $(if $(BRANCH_PATTERN),-BranchPattern "$(BRANCH_PATTERN)",) $(if $(SKIP_COMMITS),-SkipCommits "$(SKIP_COMMITS)",) $(if $(SKIP_COMMITS_FILE),-SkipCommitsFile "$(SKIP_COMMITS_FILE)",) $(if $(IGNORE_DEFAULT_SKIP_FILE),-IgnoreDefaultSkipFile,)
 else
-	@pwsh -File "./scripts/detect-skip-commits.ps1" $(if $(BRANCHES),-Branches "$(BRANCHES)",) $(if $(BRANCH_PATTERN),-BranchPattern "$(BRANCH_PATTERN)",) $(if $(SKIP_COMMITS),-SkipCommits "$(SKIP_COMMITS)",) $(if $(SKIP_COMMITS_FILE),-SkipCommitsFile "$(SKIP_COMMITS_FILE)",) $(if $(IGNORE_DEFAULT_SKIP_FILE),-IgnoreDefaultSkipFile,)
+	@./scripts/rebase-branch-tree.sh $(if $(SKIP_COMMITS),--skip-commits $(SKIP_COMMITS),) $(if $(SKIP_COMMITS_FILE),--skip-commits-file $(SKIP_COMMITS_FILE),)
 endif
 
 resolve-conflicts: ## Resolve conflicts in generated files

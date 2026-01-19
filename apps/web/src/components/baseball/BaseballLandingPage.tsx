@@ -451,11 +451,11 @@ export function BaseballLandingPage() {
 
   if (error) {
     return (
-      <PageContainer
-        role="main"
-        aria-live="assertive"
-        style={pageBackgroundStyle}
-      >
+  <PageContainer
+    role="main"
+    aria-live="assertive"
+    style={pageBackgroundStyle}
+  >
         <ContentContainer>
           <YStack
             alignItems="center"

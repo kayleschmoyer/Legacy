@@ -297,12 +297,12 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       switch (item.type) {
         case 'starter-data':
           mapping = availableRosterSlots.find(
-            (m) => normalizeNumericIdentifier(m.id) === item.positionMappingId,
+            (m) =>
+              normalizeNumericIdentifier(m.id) === item.positionMappingId,
           );
           teamMember = team.find(
             (t) =>
-              normalizeNumericIdentifier(t.positionId) ===
-              item.positionMappingId,
+              normalizeNumericIdentifier(t.positionId) === item.positionMappingId,
           );
 
           if (mapping) {

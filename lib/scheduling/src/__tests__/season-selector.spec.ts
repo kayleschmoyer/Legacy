@@ -74,7 +74,9 @@ describe('determineEligibleSeasons', () => {
   });
 
   it('should return empty array when no seasons meet criteria', () => {
-    const teamRosters: TeamRoster[] = [{ teamId: 1, playerIds: [101, 102] }];
+    const teamRosters: TeamRoster[] = [
+      { teamId: 1, playerIds: [101, 102] },
+    ];
 
     const playerGameCounts: PlayerGameCount[] = [
       { playerId: 101, season: 2023, gamesPlayed: 50 },
@@ -93,7 +95,9 @@ describe('determineEligibleSeasons', () => {
   });
 
   it('should handle players with no game data', () => {
-    const teamRosters: TeamRoster[] = [{ teamId: 1, playerIds: [101, 102] }];
+    const teamRosters: TeamRoster[] = [
+      { teamId: 1, playerIds: [101, 102] },
+    ];
 
     const playerGameCounts: PlayerGameCount[] = [
       { playerId: 101, season: 2023, gamesPlayed: 150 },

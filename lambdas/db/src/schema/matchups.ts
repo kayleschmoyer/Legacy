@@ -2,7 +2,7 @@ import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
-import { Team } from './leagues'; // Import Team ref from leagues schema
+import { Team } from './leagues';
 
 // Matchup status enum
 const MatchupStatus = builder.enumType('MatchupStatus', {
@@ -33,15 +33,13 @@ builder.objectType(Matchup, {
     leagueId: t.exposeInt('leagueId'),
     team1Id: t.exposeInt('team1Id', { nullable: true }),
     team2Id: t.exposeInt('team2Id', { nullable: true }),
-    team1Score: t.float({
+    team1Score: t.float({ 
       nullable: true,
-      resolve: (matchup) =>
-        matchup.team1Score ? parseFloat(matchup.team1Score) : null,
+      resolve: (matchup) => matchup.team1Score ? parseFloat(matchup.team1Score) : null,
     }),
-    team2Score: t.float({
+    team2Score: t.float({ 
       nullable: true,
-      resolve: (matchup) =>
-        matchup.team2Score ? parseFloat(matchup.team2Score) : null,
+      resolve: (matchup) => matchup.team2Score ? parseFloat(matchup.team2Score) : null,
     }),
     status: t.field({
       type: MatchupStatus,
@@ -51,7 +49,7 @@ builder.objectType(Matchup, {
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
-    // Relational fields
+    // Relational fields - using Team type imported from leagues.ts
     team1: t.field({
       type: Team,
       nullable: true,
@@ -116,7 +114,7 @@ builder.queryField('getMatchupById', (t) =>
         return results[0] || null;
       });
     },
-  }),
+  })
 );
 
 // Query: getMatchupsForLeague
@@ -134,11 +132,9 @@ builder.queryField('getMatchupsForLeague', (t) =>
 
       return await runWithPublicClient(getDbOptions(), async (db) => {
         const conditions = [eq(PublicSchema.matchups.leagueId, args.leagueId)];
-
+        
         if (args.weekNumber !== null && args.weekNumber !== undefined) {
-          conditions.push(
-            eq(PublicSchema.matchups.weekNumber, args.weekNumber),
-          );
+          conditions.push(eq(PublicSchema.matchups.weekNumber, args.weekNumber));
         }
 
         return await db
@@ -147,7 +143,7 @@ builder.queryField('getMatchupsForLeague', (t) =>
           .where(and(...conditions));
       });
     },
-  }),
+  })
 );
 
 // Query: getCurrentMatchupForLeague
@@ -184,7 +180,7 @@ builder.queryField('getCurrentMatchupForLeague', (t) =>
         return matchupResults[0] || null;
       });
     },
-  }),
+  })
 );
 
 // Query: getMatchupsByWeek
@@ -207,12 +203,12 @@ builder.queryField('getMatchupsByWeek', (t) =>
           .where(
             and(
               eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.weekNumber, args.weekNumber),
-            ),
+              eq(PublicSchema.matchups.weekNumber, args.weekNumber)
+            )
           );
       });
     },
-  }),
+  })
 );
 
 // Input types for mutations
@@ -256,8 +252,7 @@ builder.mutationField('createMatchup', (t) =>
           throw new Error('League not found');
         }
 
-        const gamesPerMatchup =
-          args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
+        const gamesPerMatchup = args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
 
         // Insert the matchup
         const results = await db
@@ -278,7 +273,7 @@ builder.mutationField('createMatchup', (t) =>
         return results[0];
       });
     },
-  }),
+  })
 );
 
 // Mutation: updateMatchupScore
@@ -297,7 +292,7 @@ builder.mutationField('updateMatchupScore', (t) =>
 
       return await runWithPublicClient(getDbOptions(), async (db) => {
         const updateData: { team1Score?: string; team2Score?: string } = {};
-
+        
         if (args.team1Score !== null && args.team1Score !== undefined) {
           updateData.team1Score = args.team1Score.toString();
         }
@@ -318,7 +313,7 @@ builder.mutationField('updateMatchupScore', (t) =>
         return results[0];
       });
     },
-  }),
+  })
 );
 
 // Mutation: updateMatchupStatus
@@ -348,7 +343,7 @@ builder.mutationField('updateMatchupStatus', (t) =>
         return results[0];
       });
     },
-  }),
+  })
 );
 
 // Mutation: triggerGameSelection (placeholder for commissioner action)
@@ -381,5 +376,374 @@ builder.mutationField('triggerGameSelection', (t) =>
         return true;
       });
     },
+  })
+);
+
+// ============================================================================
+// HISTORY AND STANDINGS QUERIES (LS-22)
+// ============================================================================
+
+// TeamStanding type for standings queries
+const TeamStanding = builder.objectRef<{
+  teamId: number;
+  teamName: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  totalMatchups: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  winPercentage: number;
+  averagePointsFor: number;
+  averagePointsAgainst: number;
+  rank: number | undefined;
+}>('TeamStanding');
+
+builder.objectType(TeamStanding, {
+  description: 'Team standing information with wins, losses, and scoring stats',
+  fields: (t) => ({
+    teamId: t.exposeID('teamId'),
+    teamName: t.exposeString('teamName'),
+    wins: t.exposeInt('wins'),
+    losses: t.exposeInt('losses'),
+    ties: t.exposeInt('ties'),
+    totalMatchups: t.exposeInt('totalMatchups'),
+    pointsFor: t.exposeFloat('pointsFor'),
+    pointsAgainst: t.exposeFloat('pointsAgainst'),
+    winPercentage: t.exposeFloat('winPercentage'),
+    averagePointsFor: t.exposeFloat('averagePointsFor'),
+    averagePointsAgainst: t.exposeFloat('averagePointsAgainst'),
+    rank: t.exposeInt('rank'),
   }),
+});
+
+// HeadToHeadRecord type
+const HeadToHeadRecord = builder.objectRef<{
+  team1Id: number;
+  team2Id: number;
+  team1Wins: number;
+  team2Wins: number;
+  ties: number;
+  totalMatchups: number;
+  team1TotalPoints: number;
+  team2TotalPoints: number;
+  averageTeam1Score: number;
+  averageTeam2Score: number;
+}>('HeadToHeadRecord');
+
+builder.objectType(HeadToHeadRecord, {
+  description: 'Head-to-head record between two teams',
+  fields: (t) => ({
+    team1Id: t.exposeID('team1Id'),
+    team2Id: t.exposeID('team2Id'),
+    team1Wins: t.exposeInt('team1Wins'),
+    team2Wins: t.exposeInt('team2Wins'),
+    ties: t.exposeInt('ties'),
+    totalMatchups: t.exposeInt('totalMatchups'),
+    team1TotalPoints: t.exposeFloat('team1TotalPoints'),
+    team2TotalPoints: t.exposeFloat('team2TotalPoints'),
+    averageTeam1Score: t.exposeFloat('averageTeam1Score'),
+    averageTeam2Score: t.exposeFloat('averageTeam2Score'),
+  }),
+});
+
+// SeasonResults type
+const SeasonResults = builder.objectRef<{
+  leagueId: number;
+  season: number | null;
+  totalMatchups: number;
+  completedMatchups: number;
+  standings: Array<{
+    teamId: number;
+    teamName: string;
+    wins: number;
+    losses: number;
+    ties: number;
+    totalMatchups: number;
+    pointsFor: number;
+    pointsAgainst: number;
+    winPercentage: number;
+    averagePointsFor: number;
+    averagePointsAgainst: number;
+    rank: number | undefined;
+  }>;
+}>('SeasonResults');
+
+builder.objectType(SeasonResults, {
+  description: 'Complete season results with standings',
+  fields: (t) => ({
+    leagueId: t.exposeID('leagueId'),
+    season: t.exposeInt('season', { nullable: true }),
+    totalMatchups: t.exposeInt('totalMatchups'),
+    completedMatchups: t.exposeInt('completedMatchups'),
+    standings: t.field({
+      type: [TeamStanding],
+      resolve: (parent) => parent.standings,
+    }),
+  }),
+});
+
+// PlayoffQualification type
+const PlayoffQualification = builder.objectRef<{
+  teamId: number;
+  teamName: string;
+  isQualified: boolean;
+  seedNumber: number | null;
+  standing: {
+    teamId: number;
+    teamName: string;
+    wins: number;
+    losses: number;
+    ties: number;
+    totalMatchups: number;
+    pointsFor: number;
+    pointsAgainst: number;
+    winPercentage: number;
+    averagePointsFor: number;
+    averagePointsAgainst: number;
+    rank: number | undefined;
+  };
+}>('PlayoffQualification');
+
+builder.objectType(PlayoffQualification, {
+  description: 'Playoff qualification status for a team',
+  fields: (t) => ({
+    teamId: t.exposeID('teamId'),
+    teamName: t.exposeString('teamName'),
+    isQualified: t.exposeBoolean('isQualified'),
+    seedNumber: t.exposeInt('seedNumber', { nullable: true }),
+    standing: t.field({
+      type: TeamStanding,
+      resolve: (parent) => parent.standing,
+    }),
+  }),
+});
+
+// MatchupStatusCounts type
+const MatchupStatusCounts = builder.objectRef<{
+  scheduled: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  total: number;
+}>('MatchupStatusCounts');
+
+builder.objectType(MatchupStatusCounts, {
+  description: 'Count of matchups by status',
+  fields: (t) => ({
+    scheduled: t.exposeInt('scheduled'),
+    inProgress: t.exposeInt('inProgress'),
+    completed: t.exposeInt('completed'),
+    cancelled: t.exposeInt('cancelled'),
+    total: t.exposeInt('total'),
+  }),
+});
+
+// Query: getLeagueStandings
+builder.queryField('getLeagueStandings', (t) =>
+  t.field({
+    type: [TeamStanding],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      const standings = await StandingsService.getStandings({
+        leagueId: args.leagueId,
+        season: args.season,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- GraphQL builder type inference issue with optional rank field
+      return standings as any;
+    },
+  })
+);
+
+// Query: getHeadToHeadRecord
+builder.queryField('getHeadToHeadRecord', (t) =>
+  t.field({
+    type: HeadToHeadRecord,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      team1Id: t.arg.int({ required: true }),
+      team2Id: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      return await StandingsService.getHeadToHead({
+        leagueId: args.leagueId,
+        team1Id: args.team1Id,
+        team2Id: args.team2Id,
+      });
+    },
+  })
+);
+
+// Query: getSeasonResults
+builder.queryField('getSeasonResults', (t) =>
+  t.field({
+    type: SeasonResults,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      const results = await StandingsService.getSeasonSummary(
+        args.leagueId,
+        args.season ?? null
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- GraphQL builder type inference issue with optional rank field
+      return results as any;
+    },
+  })
+);
+
+// Query: getPlayoffRace
+builder.queryField('getPlayoffRace', (t) =>
+  t.field({
+    type: [PlayoffQualification],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+      playoffSpots: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      const qualifications = await StandingsService.getPlayoffRace({
+        leagueId: args.leagueId,
+        season: args.season ?? null,
+        playoffSpots: args.playoffSpots,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- GraphQL builder type inference issue with optional rank field
+      return qualifications as any;
+    },
+  })
+);
+
+// Query: getMatchupHistory
+builder.queryField('getMatchupHistory', (t) =>
+  t.field({
+    type: [Matchup],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+      teamId: t.arg.int({ required: false }),
+      status: t.arg({ type: MatchupStatus, required: false }),
+      limit: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      return await StandingsService.getMatchupHistory({
+        leagueId: args.leagueId,
+        season: args.season,
+        teamId: args.teamId,
+        status: args.status,
+        limit: args.limit ?? undefined,
+      });
+    },
+  })
+);
+
+// Query: getTeamRecentMatchups
+builder.queryField('getTeamRecentMatchups', (t) =>
+  t.field({
+    type: [Matchup],
+    args: {
+      teamId: t.arg.int({ required: true }),
+      limit: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      return await StandingsService.getTeamRecentMatchups(
+        args.teamId,
+        args.limit ?? 10
+      );
+    },
+  })
+);
+
+// Query: getMatchupStatusCounts
+builder.queryField('getMatchupStatusCounts', (t) =>
+  t.field({
+    type: MatchupStatusCounts,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      return await StandingsService.getMatchupStats(
+        args.leagueId,
+        args.season ?? undefined
+      );
+    },
+  })
+);
+
+// Query: getPowerRankings
+builder.queryField('getPowerRankings', (t) =>
+  t.field({
+    type: [TeamStanding],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { StandingsService } = await import('../services/standings-service');
+      
+      const powerRankings = await StandingsService.getPowerRankings(
+        args.leagueId,
+        args.season ?? undefined
+      );
+
+      // Return with powerRank as rank for consistency
+      return powerRankings.map(pr => ({
+        ...pr,
+        rank: pr.powerRank,
+      }));
+    },
+  })
 );

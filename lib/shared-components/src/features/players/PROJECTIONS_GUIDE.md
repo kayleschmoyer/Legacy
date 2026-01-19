@@ -4,12 +4,12 @@ The projection utilities combine historical statistics with configurable scoring
 
 ## Key Pieces
 
-| Export                    | Description                                                                            |
-| ------------------------- | -------------------------------------------------------------------------------------- |
-| `usePlayerProjections`    | React hook that builds a `Map<playerId, points>` of projected fantasy points per game. |
-| `formatProjection`        | Utility for displaying projection values with adaptive precision.                      |
-| `PlayerCareerStats`       | Normalized career data (batting, fielding, pitching) used by the projection algorithm. |
-| `BaseballScoringSettings` | Configuration for batting/fielding/pitching multipliers.                               |
+| Export | Description |
+| ------ | ----------- |
+| `usePlayerProjections` | React hook that builds a `Map<playerId, points>` of projected fantasy points per game. |
+| `formatProjection` | Utility for displaying projection values with adaptive precision. |
+| `PlayerCareerStats` | Normalized career data (batting, fielding, pitching) used by the projection algorithm. |
+| `BaseballScoringSettings` | Configuration for batting/fielding/pitching multipliers. |
 
 ## Computing Projections
 
@@ -18,13 +18,11 @@ The projection utilities combine historical statistics with configurable scoring
 3. Call `usePlayerProjections(players, careerStats, scoringOverrides)`:
 
 ```ts
-const { projections, loading, error } = usePlayerProjections(
-  players,
-  careerStats,
-  scoringSettings,
-  isLoading,
-  upstreamError,
-);
+const {
+  projections,
+  loading,
+  error,
+} = usePlayerProjections(players, careerStats, scoringSettings, isLoading, upstreamError);
 ```
 
 The hook safely handles partially loaded data and returns an empty map until all dependencies are ready.

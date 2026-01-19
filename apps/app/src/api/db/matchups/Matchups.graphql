@@ -2,38 +2,62 @@ fragment Matchup on Matchup {
   id
   weekNumber
   leagueId
-  numberOfGames
+  team1Id
+  team2Id
+  team1Score
+  team2Score
+  status
+  selectedSeason
+  gamesPerMatchup
+  startTime
+  endTime
 }
 
-# GetMatchupStats query not available - matchupPlayers query doesn't exist in schema
-# query GetMatchupStats(
-#   $matchupId: Int!
-#   $withMatchupStats: Boolean = false
-#   $withProjections: Boolean = false
-# ) {
-#   matchupPlayers(condition: { matchupId: $matchupId }) {
-#     nodes {
-#       playerId
-#       aggregateSeasonPitchingByPlayerIdAndSeason
-#         @include(if: $withProjections) {
-#         ...AggregateSeasonPitchingStats
-#       }
-#       aggregateSeasonFieldingByPlayerIdAndSeason
-#         @include(if: $withProjections) {
-#         ...AggregateSeasonFieldingStats
-#       }
-#       aggregateSeasonBattingByPlayerIdAndSeason @include(if: $withProjections) {
-#         ...AggregateSeasonBattingStats
-#       }
-#       matchupBatting @include(if: $withMatchupStats) {
-#         ...MatchupBattingStats
-#       }
-#       matchupFielding @include(if: $withMatchupStats) {
-#         ...MatchupFieldingStats
-#       }
-#       matchupPitching @include(if: $withMatchupStats) {
-#         ...MatchupPitchingStats
-#       }
-#     }
-#   }
-# }
+query GetMatchupById($id: Int!) {
+  getMatchupById(id: $id) {
+    ...Matchup
+  }
+}
+
+query GetMatchupsForLeague($leagueId: Int!, $weekNumber: Int) {
+  getMatchupsForLeague(leagueId: $leagueId, weekNumber: $weekNumber) {
+    ...Matchup
+  }
+}
+
+query GetCurrentMatchupForLeague($leagueId: Int!) {
+  getCurrentMatchupForLeague(leagueId: $leagueId) {
+    ...Matchup
+  }
+}
+
+query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {
+  getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
+    ...Matchup
+  }
+}
+
+query GetLeagueStandings($leagueId: Int!) {
+  getLeagueStandings(leagueId: $leagueId) {
+    teamId
+    teamName
+    wins
+    losses
+    ties
+    winPercentage
+    pointsFor
+    pointsAgainst
+  }
+}
+
+query GetMatchupHistory($leagueId: Int!, $season: Int, $teamId: Int, $status: MatchupStatus, $limit: Int) {
+  getMatchupHistory(
+    leagueId: $leagueId
+    season: $season
+    teamId: $teamId
+    status: $status
+    limit: $limit
+  ) {
+    ...Matchup
+  }
+}

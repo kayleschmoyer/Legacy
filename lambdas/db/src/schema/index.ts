@@ -6,6 +6,7 @@ import './players';
 import './statistics';
 import './leagues';
 import './matchups';
+import './notifications';
 import './version';
 import './scoring';
 

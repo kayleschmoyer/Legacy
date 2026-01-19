@@ -10,16 +10,17 @@
  */
 
 import { config } from 'dotenv';
+import { join, resolve } from 'path';
+config({ path: resolve(__dirname, '../../../../.env') });
+
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { existsSync } from 'fs';
 import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
-import { existsSync } from 'fs';
-import { join, resolve } from 'path';
 import { getDatabaseConfig } from '../config/database';
 
-// Load environment variables from root .env file
-config({ path: resolve(__dirname, '../../../../.env') });
+// Load environment variables from root .env file (already done above)
 
 async function runMigrations() {
   try {

@@ -5,12 +5,7 @@
 import { MatchupScheduler } from '../matchup-scheduler';
 import { RoundRobinStrategy } from '../strategies/round-robin-strategy';
 import { RandomStrategy } from '../strategies/random-strategy';
-import type {
-  LeagueConfig,
-  ScheduleParams,
-  SeasonInfo,
-  TeamInfo,
-} from '../types';
+import type { LeagueConfig, ScheduleParams, SeasonInfo, TeamInfo } from '../types';
 
 describe('MatchupScheduler', () => {
   const teams: TeamInfo[] = [
@@ -59,7 +54,7 @@ describe('MatchupScheduler', () => {
     expect(result.seasonUsage.size).toBeGreaterThan(0);
     const totalUsage = Array.from(result.seasonUsage.values()).reduce(
       (sum, count) => sum + count,
-      0,
+      0
     );
     expect(totalUsage).toBe(6);
   });
@@ -110,10 +105,10 @@ describe('MatchupScheduler', () => {
 
     // Some matchups should have seasons, some won't
     const matchupsWithSeasons = result.matchups.filter(
-      (m) => m.selectedSeason !== null,
+      (m) => m.selectedSeason !== null
     );
     const matchupsWithoutSeasons = result.matchups.filter(
-      (m) => m.selectedSeason === null,
+      (m) => m.selectedSeason === null
     );
 
     expect(matchupsWithSeasons.length).toBeGreaterThan(0);

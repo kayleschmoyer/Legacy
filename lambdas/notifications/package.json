@@ -1,0 +1,31 @@
+{
+  "name": "@legacy-sports/notifications-lambda",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "dev:no-watch": "tsx src/dev.ts",
+    "build": "vite build",
+    "test": "jest --onlyChanged",
+    "test:watch": "jest --watch --onlyChanged",
+    "test:all-files": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "*",
+    "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/env-utilities": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/sentry": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
+    "aws-lambda": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "tsx": "*",
+    "typescript": "*",
+    "vite": "*"
+  }
+}

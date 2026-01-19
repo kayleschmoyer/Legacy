@@ -29,6 +29,14 @@ interface CreateMatchupEvent {
   week: number;
 }
 
+/**
+ * Create matchup player records for a matchup
+ * Uses the matchup's selected_season if set, otherwise randomly selects a season
+ * Note: In the new matchup system with selected_season, all players in a matchup
+ * should use the same season (the matchup's selected_season).
+ * @param db - Database connection
+ * @param event - CreateMatchupEvent containing league and week information
+ */
 async function createMatchup(
   db: PublicDb,
   event: CreateMatchupEvent,
@@ -39,26 +47,60 @@ async function createMatchup(
     throw new Error('Matchup has not been created');
   }
 
+  // Get the matchup's selected season
+  const selectedSeason = matchup.selectedSeason;
+
+  if (!selectedSeason) {
+    LOGGER.warn(
+      `Matchup ${matchup.id} does not have a selected_season. Using random season selection for backward compatibility.`,
+    );
+  } else {
+    LOGGER.info(
+      `Creating matchup player records for matchup ${matchup.id} using selected season ${selectedSeason}`,
+    );
+  }
+
   const missingRecords = await getMissingMatchupRecords(db, matchup.id);
 
-  for (const player of missingRecords) {
-    const seasons = await getSeasonBattingStatsForPlayer(db, player.id);
-    const seasonIdx = Math.floor(Math.random() * seasons.length);
+  LOGGER.debug(
+    `Found ${missingRecords.length} players needing matchup records`,
+  );
 
-    const season = seasons[seasonIdx];
+  for (const player of missingRecords) {
+    let season: number;
+
+    if (selectedSeason) {
+      // Use the matchup's selected season for all players
+      season = selectedSeason;
+    } else {
+      // Fallback to random season selection (for backward compatibility)
+      const seasons = await getSeasonBattingStatsForPlayer(db, player.id);
+      if (seasons.length === 0) {
+        LOGGER.error(
+          `Player ${player.id} has no available seasons. Skipping.`,
+        );
+        continue;
+      }
+      const seasonIdx = Math.floor(Math.random() * seasons.length);
+      season = seasons[seasonIdx].season;
+    }
 
     const record: CreateMatchupPlayer = {
       matchupId: matchup.id,
       playerId: player.id,
-      season: season.season,
+      season: season,
     };
 
     LOGGER.debug(
-      `Creating matchup record: ${matchup.id}, ${player.id}, ${season.season}`,
+      `Creating matchup record: matchup=${matchup.id}, player=${player.id}, season=${season}`,
     );
 
     await createMatchupRecord(db, record);
   }
+
+  LOGGER.info(
+    `Successfully created ${missingRecords.length} matchup player records for matchup ${matchup.id}`,
+  );
 }
 
 const baseCreateMatchupHandler = async (

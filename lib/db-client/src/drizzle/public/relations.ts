@@ -167,27 +167,21 @@ export const matchupsRelations = relations(matchups, ({ one, many }) => ({
   matchupPlayers: many(matchupPlayers),
 }));
 
-export const matchupPlayersRelations = relations(
-  matchupPlayers,
-  ({ one, many }) => ({
-    matchup: one(matchups, {
-      fields: [matchupPlayers.matchupId],
-      references: [matchups.id],
-    }),
-    player: one(players, {
-      fields: [matchupPlayers.playerId],
-      references: [players.id],
-    }),
-    matchupPlayerGames: many(matchupPlayerGames),
+export const matchupPlayersRelations = relations(matchupPlayers, ({ one, many }) => ({
+  matchup: one(matchups, {
+    fields: [matchupPlayers.matchupId],
+    references: [matchups.id],
   }),
-);
+  player: one(players, {
+    fields: [matchupPlayers.playerId],
+    references: [players.id],
+  }),
+  matchupPlayerGames: many(matchupPlayerGames),
+}));
 
-export const matchupPlayerGamesRelations = relations(
-  matchupPlayerGames,
-  ({ one }) => ({
-    matchupPlayer: one(matchupPlayers, {
-      fields: [matchupPlayerGames.matchupPlayerId],
-      references: [matchupPlayers.id],
-    }),
+export const matchupPlayerGamesRelations = relations(matchupPlayerGames, ({ one }) => ({
+  matchupPlayer: one(matchupPlayers, {
+    fields: [matchupPlayerGames.matchupPlayerId],
+    references: [matchupPlayers.id],
   }),
-);
+}));

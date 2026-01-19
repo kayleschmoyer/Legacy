@@ -4,14 +4,26 @@ import { useMemo, useState } from 'react';
 import { Separator, Tabs, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useUpdateTeamMemberPositionMutation } from '../../../../api/db/teams/Teams.generated';
+import {
+  computeAverageScoring,
+  computeScoring,
+  DEFAULT_BATTING_SCORING,
+  DEFAULT_FIELDING_SCORING,
+  DEFAULT_PITCHING_SCORING,
+} from '@legacy-sports/scoring';
+import { useGetMatchupStatsQuery } from '../../../../api/db/matchups/Matchups.generated';
+import {
+  useGetTeamByIdQuery,
+  useUpdateTeamMemberPositionMutation,
+} from '../../../../api/db/teams/Teams.generated';
 import { LoadingPanel } from '../../../../common/components/LoadingPanel';
 import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
 import {
   LeaguePositionFragment,
+  MatchupFragment,
+  ScoringStatGroup,
   TeamMemberFragment,
-  useGetLeagueTeamsQuery,
-  useGetTeamMembersQuery,
+  useGetLeagueScoringProfileQuery,
   useGetUserTeamIdQuery,
 } from '../../../../api/db/graphql.generated';
 import {
@@ -21,27 +33,29 @@ import {
   isPitchingSlot,
 } from '../../../../common/temporary_models/Models';
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
+import { PositionSlot } from '../../../../common/temporary_models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
-import { useTeamMemberProjections } from '../../../../features/scoring/useTeamMemberProjections';
 
 const TABS = Object.freeze(['Lineup', 'Rotation']);
 
 interface TabContentProps {
-  readonly selectedTab: (typeof TABS)[number];
-  readonly rosterSlots: readonly (LeaguePositionFragment | null)[];
-  readonly onPlayerAdded: (
+  matchup: MatchupFragment | null | undefined;
+  selectedTab: (typeof TABS)[number];
+  rosterSlots: readonly (LeaguePositionFragment | null)[];
+  onPlayerAdded: (
     player: TeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
-  readonly onPlayerMoved: (
+  onPlayerMoved: (
     playerOne: TeamMemberFragment,
     playerTwo: TeamMemberFragment,
   ) => void;
-  readonly onPlayerRemoved: (position: LeaguePositionFragment) => void;
-  readonly team: readonly (TeamMemberFragment | null)[];
-  readonly isOwner: boolean;
-  readonly projections: Record<number, number>;
-  readonly actual: Record<number, number>;
+  onPlayerRemoved: (position: LeaguePositionFragment) => void;
+  team: readonly (TeamMemberFragment | null)[];
+  isOwner: boolean;
+  battingSettings: Partial<Record<string, number>>;
+  fieldingSettings: Partial<Record<string, number>>;
+  pitchingSettings: Partial<Record<string, number>>;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -49,13 +63,24 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     team,
     onPlayerAdded,
     onPlayerMoved,
+    matchup,
     onPlayerRemoved,
     selectedTab,
     rosterSlots,
     isOwner,
-    projections,
-    actual,
+    battingSettings,
+    fieldingSettings,
+    pitchingSettings,
   } = props;
+
+  const { data: stats, loading: loadingStats } = useGetMatchupStatsQuery({
+    skip: !matchup?.id,
+    variables: {
+      matchupId: matchup?.id || -1,
+      withMatchupStats: true,
+      withProjections: true,
+    },
+  });
 
   const pitchingSlots = useMemo(
     () => rosterSlots.filter(isPitchingSlot),
@@ -71,119 +96,128 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 
   const pitchers = useMemo(() => team.filter(isPitcher), [team]);
 
-  // TODO: Uncomment when projections are actually used in the UI
-  // const hitterProjections = useMemo(() => {
-  //   const result: Record<number, number> = {};
+  const hitterProjections = useMemo(() => {
+    const result: Record<number, number> = {};
 
-  //   if (loadingStats || !stats) {
-  //     return result;
-  //   }
+    if (loadingStats || !stats) {
+      return result;
+    }
 
-  //   for (const hitter of hitters) {
-  //     if (!hitter?.playerId) continue;
+    for (const hitter of hitters) {
+      if (!hitter?.playerId) continue;
 
-  //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //     const proj = (stats as any)?.matchupPlayers?.find(
-  //       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //       (n: any) => n?.playerId === hitter.playerId,
-  //     );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const proj = (stats as any)?.matchupPlayers?.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (n: any) => n?.playerId === hitter.playerId,
+      );
 
-  //     const battingStats = proj?.aggregateSeasonBattingByPlayerIdAndSeason;
-  //     const fieldingStats = proj?.aggregateSeasonFieldingByPlayerIdAndSeason;
+      const battingStats = proj?.aggregateSeasonBattingByPlayerIdAndSeason;
+      const fieldingStats = proj?.aggregateSeasonFieldingByPlayerIdAndSeason;
 
-  //     const value =
-  //       computeAverageScoring(battingStats, DEFAULT_BATTING_SCORING) +
-  //       computeAverageScoring(fieldingStats, DEFAULT_FIELDING_SCORING);
+      const value =
+        computeAverageScoring(battingStats, battingSettings) +
+        computeAverageScoring(fieldingStats, fieldingSettings);
 
-  //     result[hitter.playerId] = value * (matchup?.numberOfGames || 1);
-  //   }
-  //   return result;
-  // }, [stats, hitters, loadingStats, matchup]);
+      result[hitter.playerId] = value * (matchup?.numberOfGames || 1);
+    }
+    return result;
+  }, [
+    stats,
+    hitters,
+    loadingStats,
+    matchup,
+    battingSettings,
+    fieldingSettings,
+  ]);
 
-  // TODO: Uncomment when projections are actually used in the UI
-  // const pitcherProjections = useMemo(() => {
-  //   const result: Record<number, number> = {};
+  const pitcherProjections = useMemo(() => {
+    const result: Record<number, number> = {};
 
-  //   if (loadingStats) {
-  //     return result;
-  //   }
+    if (loadingStats) {
+      return result;
+    }
 
-  //   for (const pitcher of pitchers) {
-  //     if (!pitcher?.playerId) continue;
+    for (const pitcher of pitchers) {
+      if (!pitcher?.playerId) continue;
 
-  //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //     const proj = (stats as any)?.matchupPlayers?.find(
-  //       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //       (n: any) => n?.playerId === pitcher.playerId,
-  //     );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const proj = (stats as any)?.matchupPlayers?.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (n: any) => n?.playerId === pitcher.playerId,
+      );
 
-  //     const value = computeAverageScoring(
-  //       proj?.aggregateSeasonPitchingByPlayerIdAndSeason,
-  //       DEFAULT_PITCHING_SCORING,
-  //     );
+      const value = computeAverageScoring(
+        proj?.aggregateSeasonPitchingByPlayerIdAndSeason,
+        pitchingSettings,
+      );
 
-  //     result[pitcher.playerId] = value;
-  //   }
-  //   return result;
-  // }, [stats, pitchers, loadingStats]);
+      result[pitcher.playerId] = value;
+    }
+    return result;
+  }, [stats, pitchers, loadingStats, pitchingSettings]);
 
-  // TODO: Uncomment when actual stats are actually used in the UI
-  // const hittersActual = useMemo(() => {
-  //   const result: Record<number, number> = {};
+  const hittersActual = useMemo(() => {
+    const result: Record<number, number> = {};
 
-  //   if (loadingStats) {
-  //     return result;
-  //   }
+    if (loadingStats) {
+      return result;
+    }
 
-  //   for (const hitter of hitters) {
-  //     if (!hitter?.playerId) continue;
+    for (const hitter of hitters) {
+      if (!hitter?.playerId) continue;
 
-  //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //     const mp = (stats as any)?.matchupPlayers?.find(
-  //       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //       (n: any) => n?.playerId === hitter.playerId,
-  //     );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mp = (stats as any)?.matchupPlayers?.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (n: any) => n?.playerId === hitter.playerId,
+      );
 
-  //     let sum = computeScoring(mp?.matchupBatting, battingSettings);
+  let sum = computeScoring(mp?.matchupBatting, battingSettings);
 
-  //     const position = lineupSlots.find((l) => l?.id === hitter.positionId);
-  //     if (position?.positionType !== PositionSlot.Dh) {
-  //       sum += computeScoring(mp?.matchupFielding, fieldingSettings);
-  //     }
+      const position = lineupSlots.find((l) => l?.id === hitter.positionId);
+      if (position?.positionType !== PositionSlot.Dh) {
+  sum += computeScoring(mp?.matchupFielding, fieldingSettings);
+      }
 
-  //     result[hitter.playerId] = sum;
-  //   }
-  //   return result;
-  // }, [stats, hitters, loadingStats, lineupSlots]);
+      result[hitter.playerId] = sum;
+    }
+    return result;
+  }, [
+    stats,
+    hitters,
+    loadingStats,
+    lineupSlots,
+    battingSettings,
+    fieldingSettings,
+  ]);
 
-  // TODO: Uncomment when actual stats are actually used in the UI
-  // const pitchersActual = useMemo(() => {
-  //   const result: Record<number, number> = {};
+  const pitchersActual = useMemo(() => {
+    const result: Record<number, number> = {};
 
-  //   if (loadingStats) {
-  //     return result;
-  //   }
+    if (loadingStats) {
+      return result;
+    }
 
-  //   for (const pitcher of pitchers) {
-  //     if (!pitcher?.playerId) continue;
+    for (const pitcher of pitchers) {
+      if (!pitcher?.playerId) continue;
 
-  //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //     const mp = (stats as any)?.matchupPlayers?.find(
-  //       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //       (n: any) => n?.playerId === pitcher.playerId,
-  //     );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mp = (stats as any)?.matchupPlayers?.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (n: any) => n?.playerId === pitcher.playerId,
+      );
 
-  //     result[pitcher.playerId] = computeScoring(
-  //       mp?.matchupPitching,
-  //       DEFAULT_PITCHING_SCORING,
-  //     );
-  //   }
-  //   return result;
-  // }, [stats, pitchers, loadingStats]);
+      result[pitcher.playerId] = computeScoring(
+        mp?.matchupPitching,
+        pitchingSettings,
+      );
+    }
+    return result;
+  }, [stats, pitchers, loadingStats, pitchingSettings]);
 
-  const noOp = () => {
-    // Placeholder function for future implementation
-  };
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const noOp = () => {};
 
   switch (selectedTab) {
     case 'Lineup':
@@ -193,9 +227,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerAdded={isOwner ? onPlayerAdded : noOp}
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={projections}
+          projections={hitterProjections}
           team={hitters}
-          actual={actual}
+          actual={hittersActual}
         />
       );
     case 'Rotation':
@@ -205,9 +239,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerAdded={isOwner ? onPlayerAdded : noOp}
           onPlayerMoved={isOwner ? onPlayerMoved : noOp}
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={projections}
+          projections={pitcherProjections}
           team={pitchers}
-          actual={actual}
+          actual={pitchersActual}
         />
       );
     default:
@@ -228,35 +262,29 @@ export default function Team(): React.JSX.Element {
         : '';
   const numTeamId = parseInt(teamIdStr, 10);
 
-  const { loading: loadingMembers, data: teamMembersData } =
-    useGetTeamMembersQuery({
-      skip: isNaN(numTeamId),
-      variables: {
-        teamId: numTeamId,
-      },
-    });
-
-  const teamMembers = useMemo<TeamMemberFragment[]>(() => {
-    const members = teamMembersData?.teamMembers ?? [];
-    return members.filter(
-      (member): member is TeamMemberFragment => member !== null,
-    );
-  }, [teamMembersData]);
-
-  const leagueId = useMemo<number | null>(() => {
-    const memberLeagueId = teamMembers.find(
-      (member) => typeof member.leagueId === 'number',
-    )?.leagueId;
-    return typeof memberLeagueId === 'number' ? memberLeagueId : null;
-  }, [teamMembers]);
+  const { loading: loadingTeam, data: team } = useGetTeamByIdQuery({
+    skip: isNaN(numTeamId),
+    variables: {
+      teamId: numTeamId,
+      withPositions: true,
+    },
+  });
 
   // Get user's team in this league to check ownership
   const { data: userTeamData } = useGetUserTeamIdQuery({
-    skip: leagueId === null,
+    skip: team?.team?.leagueId === undefined,
     variables: {
-      leagueId: leagueId ?? -1,
+      leagueId: team?.team?.leagueId || -1,
     },
   });
+
+  const { data: scoringProfileData, loading: loadingScoringProfile } =
+    useGetLeagueScoringProfileQuery({
+      skip: team?.team?.leagueId === undefined,
+      variables: {
+        leagueId: team?.team?.leagueId || -1,
+      },
+    });
 
   const isOwner = userTeamData?.userTeamId === numTeamId;
 
@@ -265,19 +293,67 @@ export default function Team(): React.JSX.Element {
 
   const { loading: loadingPositions, data: positions } =
     useGetPositionsForLeagueQuery({
-      skip: leagueId === null,
+      skip: team?.team?.leagueId === undefined,
       variables: {
-        leagueId: leagueId ?? -1,
+        leagueId: team?.team?.leagueId || -1,
       },
     });
 
-  const {
-    projections,
-    loading: loadingProjections,
-    error: projectionsError,
-  } = useTeamMemberProjections(teamMembers, leagueId);
+  const scoringSettings = useMemo(
+    () => {
+      const base = {
+        batting: { ...DEFAULT_BATTING_SCORING },
+        fielding: { ...DEFAULT_FIELDING_SCORING },
+        pitching: { ...DEFAULT_PITCHING_SCORING },
+      } as {
+        batting: Partial<Record<string, number>>;
+        fielding: Partial<Record<string, number>>;
+        pitching: Partial<Record<string, number>>;
+      };
 
-  const actualScores = useMemo<Record<number, number>>(() => ({}), []);
+      const groups =
+        scoringProfileData?.leagueScoringProfile?.multiplierGroups ?? [];
+
+      for (const group of groups) {
+        if (!group?.group || !group.values) {
+          continue;
+        }
+
+        let target: Partial<Record<string, number>>;
+
+        switch (group.group) {
+          case ScoringStatGroup.Batting:
+            target = base.batting;
+            break;
+          case ScoringStatGroup.Fielding:
+            target = base.fielding;
+            break;
+          case ScoringStatGroup.Pitching:
+            target = base.pitching;
+            break;
+          default:
+            continue;
+        }
+
+        for (const entry of group.values) {
+          if (
+            entry?.sourceColumn &&
+            typeof entry.multiplier === 'number' &&
+            Number.isFinite(entry.multiplier)
+          ) {
+            target[entry.sourceColumn] = entry.multiplier;
+          }
+        }
+      }
+
+      return base;
+    },
+    [scoringProfileData],
+  );
+
+  const battingSettings = scoringSettings.batting;
+  const fieldingSettings = scoringSettings.fielding;
+  const pitchingSettings = scoringSettings.pitching;
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -287,11 +363,15 @@ export default function Team(): React.JSX.Element {
     player: TeamMemberFragment,
     positionSlot: LeaguePositionFragment,
   ) => {
-    const existing = teamMembers.find(
-      (member) => member.positionId === positionSlot.id,
-    );
-
-    if (existing) {
+    // The slot is taken, cannot add the player
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const teamMembers = (team as any)?.team?.teamMembers || [];
+    if (
+      teamMembers.some(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (t: any) => t?.positionId === positionSlot.id,
+      )
+    ) {
       return;
     }
 
@@ -306,16 +386,21 @@ export default function Team(): React.JSX.Element {
   };
 
   const onPlayerRemoved = (position: LeaguePositionFragment) => {
-    const member = teamMembers.find((t) => t.positionId === position.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const teamMembers = (team as any)?.team?.teamMembers || [];
+    const player = teamMembers.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (t: any) => t?.positionId === position.id,
+    );
 
-    if (!member?.id) {
+    if (!player?.id) {
       return;
     }
 
     updateTeamMemberPosition({
       variables: {
         positionId: null,
-        teamMemberId: member.id,
+        teamMemberId: player.id,
       },
     }).catch(handleError);
   };
@@ -341,25 +426,12 @@ export default function Team(): React.JSX.Element {
     }).catch(handleError);
   };
 
-  if (
-    loadingMembers ||
-    loadingPositions ||
-    loadingLeague ||
-    loadingProjections
-  ) {
+  if (loadingTeam || loadingPositions || loadingLeague || loadingScoringProfile) {
     return <LoadingPanel />;
   }
 
-  if (projectionsError) {
-    return (
-      <Text color="$red10">
-        Unable to load scoring data: {projectionsError.message}
-      </Text>
-    );
-  }
-
-  if (leagueId === null) {
-    return <Text color="$red10">Could not determine league for team</Text>;
+  if (!team?.team) {
+    return <Text color="$red10">Could not load team</Text>;
   }
 
   if (!positions?.leaguePositions) {
@@ -388,15 +460,18 @@ export default function Team(): React.JSX.Element {
 
         <Separator />
         <TabContent
-          team={teamMembers}
+          matchup={null}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          team={(team as any)?.team?.teamMembers || []}
           onPlayerAdded={onPlayerAdded}
           onPlayerMoved={onPlayerMoved}
           onPlayerRemoved={onPlayerRemoved}
           selectedTab={TABS[selectedTabIdx]}
           rosterSlots={positions?.leaguePositions || []}
           isOwner={isOwner}
-          projections={projections}
-          actual={actualScores}
+          battingSettings={battingSettings}
+          fieldingSettings={fieldingSettings}
+          pitchingSettings={pitchingSettings}
         />
       </YStack>
     </ScrollView>
@@ -416,25 +491,12 @@ export function TeamIdHeader(): React.JSX.Element {
         : '';
   const numTeamId = parseInt(teamIdStr, 10);
 
-  const { data: teamMembersData } = useGetTeamMembersQuery({
+  const { data: team } = useGetTeamByIdQuery({
     skip: isNaN(numTeamId),
     variables: {
       teamId: numTeamId,
     },
   });
 
-  const leagueId = teamMembersData?.teamMembers?.[0]?.leagueId ?? null;
-
-  const { data: leagueTeamsData } = useGetLeagueTeamsQuery({
-    skip: leagueId === null,
-    variables: {
-      leagueId: leagueId ?? -1,
-    },
-  });
-
-  const teamName = leagueTeamsData?.leagueTeams?.find(
-    (team) => team?.id === numTeamId,
-  )?.name;
-
-  return <Text>{teamName ?? `Team ${numTeamId}`}</Text>;
+  return <Text>{team?.team?.name}</Text>;
 }

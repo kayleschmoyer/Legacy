@@ -8,10 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { Text } from 'tamagui';
 import type { ApolloError } from '@apollo/client';
-import {
-  createDefaultScoringSettings,
-  type ScoringSettings,
-} from '../../lib/scoring';
+import { createDefaultScoringSettings, type ScoringSettings } from '../../lib/scoring';
 
 interface LeagueScoringSummaryProps {
   loading: boolean;

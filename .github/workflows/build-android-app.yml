@@ -63,7 +63,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Extract Version Info
         id: version
@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Setup Workspace
         uses: ./.github/actions/setup
@@ -127,7 +127,7 @@ jobs:
 
       # Android-specific caching for Gradle artifacts
       - name: Cache Gradle Dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/wrapper
@@ -367,7 +367,7 @@ jobs:
 
     steps:
       - name: Download APK Artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v6
         with:
           name: android-apk-${{ needs.setup.outputs.build_type }}
           path: ./artifacts

@@ -22,14 +22,9 @@ import {
   User,
 } from '@tamagui/lucide-icons';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+import { formatProjection } from './usePlayerProjections';
 // TODO: Import PlayersCareerStatsTable when it's available
 // import { PlayersCareerStatsTable } from './PlayersCareerStatsTable';
-
-// TODO: Move to proper location when usePlayerProjections is created
-const formatProjection = (value: number | null | undefined): string => {
-  if (value == null) return '--';
-  return value.toFixed(1);
-};
 
 export interface PlayersTableProps {
   onPlayerSelect?: (player: PlayerFragment) => void;

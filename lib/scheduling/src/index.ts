@@ -1,11 +1,22 @@
 /**
  * @legacy-sports/scheduling
- *
+ * 
  * Matchup scheduling for fantasy leagues
  */
 
 // Main scheduler
 export { MatchupScheduler } from './matchup-scheduler';
+
+// Playoff scheduler
+export {
+  generatePlayoffBracket,
+  advancePlayoffRound,
+  isRoundComplete,
+  type PlayoffTeam,
+  type PlayoffBracketConfig,
+  type PlayoffMatchup,
+  type PlayoffBracket,
+} from './playoff-scheduler';
 
 // Season selection
 export {

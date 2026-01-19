@@ -259,17 +259,17 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Fantasy league configuration
 
-| Column                 | Type         | Description                                                 |
-| ---------------------- | ------------ | ----------------------------------------------------------- |
-| `id`                   | SERIAL (PK)  | League ID                                                   |
-| `name`                 | VARCHAR      | League name                                                 |
-| `owner`                | INTEGER      | League owner user ID                                        |
-| `max_roster_size`      | INTEGER      | Maximum players per team (default: 25)                      |
-| `current_matchup`      | INTEGER      | Current active matchup                                      |
-| `draft_status`         | draft_status | Status of the league draft (default: 'not-started')         |
-| `invite_code`          | VARCHAR(8)   | Unique 8-character code for inviting users                  |
-| `min_games_per_season` | INTEGER      | Minimum games required for season eligibility (default: 10) |
-| `games_per_matchup`    | INTEGER      | Default number of games per player per matchup (default: 5) |
+| Column                 | Type        | Description                                               |
+| ---------------------- | ----------- | --------------------------------------------------------- |
+| `id`                   | SERIAL (PK) | League ID                                                 |
+| `name`                 | VARCHAR     | League name                                               |
+| `owner`                | INTEGER     | League owner user ID                                      |
+| `max_roster_size`      | INTEGER     | Maximum players per team (default: 25)                    |
+| `current_matchup`      | INTEGER     | Current active matchup                                    |
+| `draft_status`         | draft_status| Status of the league draft (default: 'not-started')       |
+| `invite_code`          | VARCHAR(8)  | Unique 8-character code for inviting users                |
+| `min_games_per_season` | INTEGER     | Minimum games required for season eligibility (default: 10)|
+| `games_per_matchup`    | INTEGER     | Default number of games per player per matchup (default: 5)|
 
 **Key Features**:
 
@@ -355,20 +355,20 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Weekly fantasy matchups with team pairings and scoring
 
-| Column              | Type           | Description                               |
-| ------------------- | -------------- | ----------------------------------------- |
-| `id`                | SERIAL (PK)    | Matchup ID                                |
-| `league_id`         | INTEGER (FK)   | References `leagues.id`                   |
-| `week_number`       | INTEGER        | Week in season                            |
-| `team1_id`          | INTEGER (FK)   | References `teams.id` (first team)        |
-| `team2_id`          | INTEGER (FK)   | References `teams.id` (second team)       |
-| `team1_score`       | NUMERIC(10, 2) | Score for team 1 after matchup completion |
-| `team2_score`       | NUMERIC(10, 2) | Score for team 2 after matchup completion |
-| `status`            | matchup_status | Current status of the matchup             |
-| `selected_season`   | INTEGER        | The single season used for all players    |
-| `games_per_matchup` | INTEGER        | Number of games to select per player      |
-| `start_time`        | TIMESTAMP      | When the matchup period begins            |
-| `end_time`          | TIMESTAMP      | When the matchup period ends              |
+| Column              | Type                    | Description                                        |
+| ------------------- | ----------------------- | -------------------------------------------------- |
+| `id`                | SERIAL (PK)             | Matchup ID                                         |
+| `league_id`         | INTEGER (FK)            | References `leagues.id`                            |
+| `week_number`       | INTEGER                 | Week in season                                     |
+| `team1_id`          | INTEGER (FK)            | References `teams.id` (first team)                 |
+| `team2_id`          | INTEGER (FK)            | References `teams.id` (second team)                |
+| `team1_score`       | NUMERIC(10, 2)          | Score for team 1 after matchup completion          |
+| `team2_score`       | NUMERIC(10, 2)          | Score for team 2 after matchup completion          |
+| `status`            | matchup_status          | Current status of the matchup                      |
+| `selected_season`   | INTEGER                 | The single season used for all players             |
+| `games_per_matchup` | INTEGER                 | Number of games to select per player               |
+| `start_time`        | TIMESTAMP               | When the matchup period begins                     |
+| `end_time`          | TIMESTAMP               | When the matchup period ends                       |
 
 **Matchup Status Enum**: `scheduled`, `in_progress`, `completed`, `cancelled`
 
@@ -445,24 +445,24 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Canonical catalog of stats that can be scored with allowable multiplier bounds.
 
-| Column               | Type                     | Description                                        |
-| -------------------- | ------------------------ | -------------------------------------------------- |
-| `id`                 | SERIAL (PK)              | Unique stat definition identifier                  |
-| `stat_key`           | VARCHAR(64) (UNIQUE)     | Machine key (e.g., `batting_hr`)                   |
-| `group`              | ENUM                     | `batting`, `pitching`, or `fielding`               |
-| `source_table`       | VARCHAR(48)              | Origin table (`season_batting`, `season_pitching`) |
-| `source_column`      | VARCHAR(48)              | Column name containing the stat                    |
-| `display_name`       | VARCHAR(80)              | Friendly label for UI                              |
-| `description`        | TEXT                     | Additional context or tooltip text                 |
-| `default_multiplier` | NUMERIC(6,3)             | System default multiplier                          |
-| `min_multiplier`     | NUMERIC(6,3)             | Lower bound enforced via trigger                   |
-| `max_multiplier`     | NUMERIC(6,3)             | Upper bound enforced via trigger                   |
-| `step_size`          | NUMERIC(4,3)             | Preferred UI increment (default 0.5)               |
-| `is_required`        | BOOLEAN                  | Prevents disabling critical stats                  |
-| `enforce_positive`   | BOOLEAN                  | True if multiplier must remain >= 0                |
-| `enforce_negative`   | BOOLEAN                  | True if multiplier must remain <= 0                |
-| `created_at`         | TIMESTAMP WITH TIME ZONE | Creation timestamp                                 |
-| `updated_at`         | TIMESTAMP WITH TIME ZONE | Auto-updated on change                             |
+| Column               | Type                       | Description                                         |
+| -------------------- | -------------------------- | --------------------------------------------------- |
+| `id`                  | SERIAL (PK)                | Unique stat definition identifier                   |
+| `stat_key`            | VARCHAR(64) (UNIQUE)       | Machine key (e.g., `batting_hr`)                    |
+| `group`               | ENUM                       | `batting`, `pitching`, or `fielding`                |
+| `source_table`        | VARCHAR(48)                | Origin table (`season_batting`, `season_pitching`)  |
+| `source_column`       | VARCHAR(48)                | Column name containing the stat                     |
+| `display_name`        | VARCHAR(80)                | Friendly label for UI                               |
+| `description`         | TEXT                       | Additional context or tooltip text                  |
+| `default_multiplier`  | NUMERIC(6,3)               | System default multiplier                           |
+| `min_multiplier`      | NUMERIC(6,3)               | Lower bound enforced via trigger                    |
+| `max_multiplier`      | NUMERIC(6,3)               | Upper bound enforced via trigger                    |
+| `step_size`           | NUMERIC(4,3)               | Preferred UI increment (default 0.5)                |
+| `is_required`         | BOOLEAN                    | Prevents disabling critical stats                   |
+| `enforce_positive`    | BOOLEAN                    | True if multiplier must remain >= 0                 |
+| `enforce_negative`    | BOOLEAN                    | True if multiplier must remain <= 0                 |
+| `created_at`          | TIMESTAMP WITH TIME ZONE   | Creation timestamp                                  |
+| `updated_at`          | TIMESTAMP WITH TIME ZONE   | Auto-updated on change                              |
 
 **Key Features**:
 
@@ -474,18 +474,18 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Versionable scoring configuration per league (supports default and draft profiles).
 
-| Column                   | Type                     | Description                                           |
-| ------------------------ | ------------------------ | ----------------------------------------------------- |
-| `id`                     | SERIAL (PK)              | Profile identifier                                    |
-| `league_id`              | INTEGER (FK)             | References `leagues.id`                               |
-| `profile_name`           | VARCHAR(64)              | Display name (`Default`, `2026 Regular Season`, etc.) |
-| `season_year`            | SMALLINT                 | Optional season association                           |
-| `status`                 | ENUM                     | `draft`, `active`, `archived`                         |
-| `is_default`             | BOOLEAN                  | Marks the active profile in use                       |
-| `copied_from_profile_id` | INTEGER (FK self)        | Tracks cloning lineage                                |
-| `created_at`             | TIMESTAMP WITH TIME ZONE | Creation timestamp                                    |
-| `updated_at`             | TIMESTAMP WITH TIME ZONE | Auto-updated on change                                |
-| `activated_at`           | TIMESTAMP WITH TIME ZONE | Set when status first becomes `active`                |
+| Column                   | Type                       | Description                                          |
+| ------------------------ | -------------------------- | ---------------------------------------------------- |
+| `id`                     | SERIAL (PK)                | Profile identifier                                   |
+| `league_id`              | INTEGER (FK)               | References `leagues.id`                              |
+| `profile_name`           | VARCHAR(64)                | Display name (`Default`, `2026 Regular Season`, etc.) |
+| `season_year`            | SMALLINT                   | Optional season association                          |
+| `status`                 | ENUM                       | `draft`, `active`, `archived`                        |
+| `is_default`             | BOOLEAN                    | Marks the active profile in use                      |
+| `copied_from_profile_id` | INTEGER (FK self)          | Tracks cloning lineage                               |
+| `created_at`             | TIMESTAMP WITH TIME ZONE   | Creation timestamp                                   |
+| `updated_at`             | TIMESTAMP WITH TIME ZONE   | Auto-updated on change                               |
+| `activated_at`           | TIMESTAMP WITH TIME ZONE   | Set when status first becomes `active`               |
 
 **Key Features**:
 
@@ -497,15 +497,15 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Stores multipliers per stat within a given league profile.
 
-| Column               | Type                     | Description                                 |
-| -------------------- | ------------------------ | ------------------------------------------- |
-| `id`                 | SERIAL (PK)              | Entry identifier                            |
-| `profile_id`         | INTEGER (FK)             | References `league_scoring_profiles.id`     |
-| `stat_definition_id` | INTEGER (FK)             | References `scoring_stat_definitions.id`    |
-| `multiplier`         | NUMERIC(6,3)             | Custom multiplier value                     |
-| `is_enabled`         | BOOLEAN                  | Allows toggling a stat off without deletion |
-| `created_at`         | TIMESTAMP WITH TIME ZONE | Creation timestamp                          |
-| `updated_at`         | TIMESTAMP WITH TIME ZONE | Auto-updated on change                      |
+| Column               | Type                       | Description                                      |
+| -------------------- | -------------------------- | ------------------------------------------------ |
+| `id`                 | SERIAL (PK)                | Entry identifier                                 |
+| `profile_id`         | INTEGER (FK)               | References `league_scoring_profiles.id`          |
+| `stat_definition_id` | INTEGER (FK)               | References `scoring_stat_definitions.id`         |
+| `multiplier`         | NUMERIC(6,3)               | Custom multiplier value                          |
+| `is_enabled`         | BOOLEAN                    | Allows toggling a stat off without deletion      |
+| `created_at`         | TIMESTAMP WITH TIME ZONE   | Creation timestamp                               |
+| `updated_at`         | TIMESTAMP WITH TIME ZONE   | Auto-updated on change                           |
 
 **Key Features**:
 
@@ -517,17 +517,17 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Audit trail for multiplier changes to support commissioner oversight and rollback.
 
-| Column                | Type                     | Description                                        |
-| --------------------- | ------------------------ | -------------------------------------------------- |
-| `id`                  | BIGSERIAL (PK)           | Change log entry                                   |
-| `profile_id`          | INTEGER (FK)             | References `league_scoring_profiles.id`            |
-| `stat_definition_id`  | INTEGER (FK)             | References `scoring_stat_definitions.id`           |
-| `previous_multiplier` | NUMERIC(6,3)             | Multiplier before change (null on insert)          |
-| `new_multiplier`      | NUMERIC(6,3)             | Multiplier after change                            |
-| `changed_by`          | INTEGER (FK)             | References `users.id` (optional commissioner link) |
-| `changed_at`          | TIMESTAMP WITH TIME ZONE | Timestamp of change                                |
-| `change_reason`       | VARCHAR(120)             | Optional human-readable reason                     |
-| `action`              | ENUM                     | `created`, `updated`, or `disabled`                |
+| Column               | Type                       | Description                                         |
+| -------------------- | -------------------------- | --------------------------------------------------- |
+| `id`                 | BIGSERIAL (PK)             | Change log entry                                    |
+| `profile_id`         | INTEGER (FK)               | References `league_scoring_profiles.id`             |
+| `stat_definition_id` | INTEGER (FK)               | References `scoring_stat_definitions.id`            |
+| `previous_multiplier`| NUMERIC(6,3)               | Multiplier before change (null on insert)           |
+| `new_multiplier`     | NUMERIC(6,3)               | Multiplier after change                             |
+| `changed_by`         | INTEGER (FK)               | References `users.id` (optional commissioner link)  |
+| `changed_at`         | TIMESTAMP WITH TIME ZONE   | Timestamp of change                                 |
+| `change_reason`      | VARCHAR(120)               | Optional human-readable reason                      |
+| `action`             | ENUM                       | `created`, `updated`, or `disabled`                 |
 
 **Key Features**:
 

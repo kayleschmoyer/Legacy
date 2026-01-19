@@ -21,7 +21,6 @@ The matchup system uses **season-based game selection** where each matchup opera
 ### 1. Season Selection (LS-18, LS-20)
 
 **When a matchup is created:**
-
 ```typescript
 // Matchup creation flow
 1. Commissioner creates matchup for Week N
@@ -33,22 +32,20 @@ The matchup system uses **season-based game selection** where each matchup opera
 ```
 
 **League Configuration:**
-
 ```typescript
 interface LeagueConfig {
-  min_games_per_season: number; // e.g., 50 games minimum
-  games_per_matchup: number; // e.g., 5 games per player
+  min_games_per_season: number;  // e.g., 50 games minimum
+  games_per_matchup: number;      // e.g., 5 games per player
 }
 ```
 
 **Database Changes:**
-
 ```sql
 -- Matchups table
 ALTER TABLE matchups ADD COLUMN selected_season INTEGER NOT NULL;
 ALTER TABLE matchups ADD COLUMN games_per_matchup INTEGER NOT NULL DEFAULT 5;
 
--- Leagues table
+-- Leagues table  
 ALTER TABLE leagues ADD COLUMN min_games_per_season INTEGER NOT NULL DEFAULT 50;
 ALTER TABLE leagues ADD COLUMN games_per_matchup INTEGER NOT NULL DEFAULT 5;
 ```
@@ -58,7 +55,6 @@ ALTER TABLE leagues ADD COLUMN games_per_matchup INTEGER NOT NULL DEFAULT 5;
 ### 2. Commissioner-Triggered Game Selection (LS-24, LS-26)
 
 **Commissioner UI Flow:**
-
 ```
 1. Commissioner navigates to league management page
 2. Sees current matchup with status:
@@ -75,10 +71,12 @@ ALTER TABLE leagues ADD COLUMN games_per_matchup INTEGER NOT NULL DEFAULT 5;
 ```
 
 **GraphQL Mutation:**
-
 ```graphql
 mutation TriggerGameSelection {
-  triggerGameSelection(matchupId: 123, gameNumber: 3) {
+  triggerGameSelection(
+    matchupId: 123,
+    gameNumber: 3
+  ) {
     success
     gamesSelected
     gamesRemaining
@@ -91,30 +89,32 @@ mutation TriggerGameSelection {
 ```
 
 **Lambda Logic:**
-
 ```typescript
 async function selectGamesForMatchup(
   matchupId: number,
-  gameNumber: number,
+  gameNumber: number
 ): Promise<void> {
   // 1. Get matchup with selected_season
   const matchup = await getMatchup(matchupId);
   const { selected_season } = matchup;
-
+  
   // 2. Get all rostered players for both teams
   const players = await getRosteredPlayers(matchup.team1_id, matchup.team2_id);
-
+  
   // 3. For each player, select a random game from selected_season
   for (const player of players) {
-    const seasonStats = await getSeasonStats(player.id, selected_season);
-
+    const seasonStats = await getSeasonStats(
+      player.id, 
+      selected_season
+    );
+    
     if (seasonStats.games < gameNumber) {
       // Handle player with insufficient games
       continue;
     }
-
+    
     const randomGameNum = selectRandomGame(seasonStats);
-
+    
     // 4. Store selected game
     await createMatchupPlayerGame({
       matchupPlayerId: player.matchupPlayerId,
@@ -123,10 +123,10 @@ async function selectGamesForMatchup(
       // ... other game selections
     });
   }
-
+  
   // 5. Calculate accumulated stats
   await calculateMatchupScores(matchupId);
-
+  
   // 6. Send notifications
   await notifyGameSelection(matchupId, gameNumber);
 }
@@ -137,7 +137,6 @@ async function selectGamesForMatchup(
 ### 3. Dual Projection System (LS-21, LS-36)
 
 **Career Projection (Existing from LS-7):**
-
 ```typescript
 function calculateCareerProjection(
   player: Player,
@@ -146,7 +145,7 @@ function calculateCareerProjection(
   // Average across all career seasons
   const careerStats = player.careerBatting;
   const avgGames = careerStats.games / careerStats.seasons;
-
+  
   return (
     (careerStats.hits / avgGames) * scoringSettings.hits +
     (careerStats.homeRuns / avgGames) * scoringSettings.homeRuns +
@@ -156,7 +155,6 @@ function calculateCareerProjection(
 ```
 
 **Matchup Projection (NEW):**
-
 ```typescript
 function calculateMatchupProjection(
   player: Player,
@@ -167,11 +165,11 @@ function calculateMatchupProjection(
   const seasonStats = player.seasonBatting.find(
     s => s.season === selectedSeason
   );
-
+  
   if (!seasonStats) {
     return 0; // Player didn't play this season
   }
-
+  
   return (
     (seasonStats.hits / seasonStats.games) * scoringSettings.hits +
     (seasonStats.homeRuns / seasonStats.games) * scoringSettings.homeRuns +
@@ -181,20 +179,18 @@ function calculateMatchupProjection(
 ```
 
 **GraphQL Query:**
-
 ```graphql
 query GetPlayerProjections($matchupId: Int!, $playerId: Int!) {
   getMatchupProjections(matchupId: $matchupId, playerId: $playerId) {
     playerId
-    careerProjection # e.g., 8.5 points/game
-    matchupProjection # e.g., 12.3 points/game (from 1998 season)
-    seasonUsed # 1998
+    careerProjection    # e.g., 8.5 points/game
+    matchupProjection   # e.g., 12.3 points/game (from 1998 season)
+    seasonUsed          # 1998
   }
 }
 ```
 
 **UI Display:**
-
 ```tsx
 <PlayerCard player={player}>
   <ProjectionDisplay>
@@ -213,18 +209,17 @@ query GetPlayerProjections($matchupId: Int!, $playerId: Int!) {
 ### 4. Accumulated Stats Display (LS-23, LS-24)
 
 **Real-Time Score Tracking:**
-
 ```tsx
 <MatchupScoreboard matchup={matchup}>
   <TeamScore team="1">
     <Score>{team1Score}</Score>
     <GamesSelected>2 of 5 games selected</GamesSelected>
   </TeamScore>
-
+  
   <Divider>
     <GamesRemaining>3 games remaining</GamesRemaining>
   </Divider>
-
+  
   <TeamScore team="2">
     <Score>{team2Score}</Score>
     <GamesSelected>2 of 5 games selected</GamesSelected>
@@ -235,17 +230,17 @@ query GetPlayerProjections($matchupId: Int!, $playerId: Int!) {
   {players.map(player => (
     <PlayerRow key={player.id}>
       <PlayerName>{player.name}</PlayerName>
-
+      
       {/* Accumulated stats from selected games */}
       <AccumulatedStats>
         <Stat>H: {player.accumulatedHits}</Stat>
         <Stat>HR: {player.accumulatedHRs}</Stat>
         <Stat>RBI: {player.accumulatedRBIs}</Stat>
       </AccumulatedStats>
-
+      
       {/* Current score from selected games */}
       <CurrentScore>{player.currentScore} pts</CurrentScore>
-
+      
       {/* Projections */}
       <Projections>
         <Career>Career: {player.careerProj}</Career>
@@ -257,7 +252,6 @@ query GetPlayerProjections($matchupId: Int!, $playerId: Int!) {
 ```
 
 **GraphQL Query:**
-
 ```graphql
 query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
   getMatchupPlayerStats(matchupId: $matchupId, playerId: $playerId) {
@@ -280,7 +274,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 ## 🔄 Complete User Flow
 
 ### Setup Phase
-
 1. **League Creation**
    - Commissioner sets `min_games_per_season = 50`
    - Commissioner sets `games_per_matchup = 5`
@@ -292,7 +285,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
    - Matchup status: `SCHEDULED`
 
 ### Game Selection Phase
-
 3. **Commissioner Triggers Game 1**
    - Commissioner clicks "Select Game #1"
    - Lambda selects random game #1 for each player from 1998 season
@@ -312,7 +304,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
    - Winner determined
 
 ### Player Experience
-
 - **Before Game Selection:**
   - See matchup projections based on 1998 season averages
   - See career projections for comparison
@@ -377,7 +368,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 ## 🛠️ Implementation Checklist
 
 ### Phase 1: Database & Core Logic
-
 - [ ] LS-18: Add `selected_season`, `games_per_matchup` to matchups table
 - [ ] LS-18: Add `min_games_per_season`, `games_per_matchup` to leagues table
 - [ ] LS-20: Implement season eligibility checker
@@ -385,7 +375,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 - [ ] LS-20: Store selected_season during matchup creation
 
 ### Phase 2: Game Selection
-
 - [ ] LS-26: Update game-selection Lambda
 - [ ] LS-26: Accept matchupId and gameNumber parameters
 - [ ] LS-26: Query stats from selected_season only
@@ -394,14 +383,12 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 - [ ] LS-26: Update matchup scores
 
 ### Phase 3: Dual Projections
-
 - [ ] LS-36: Build season-specific projection calculator
 - [ ] LS-36: Reuse career projection calculator from LS-7
 - [ ] LS-36: Create GraphQL query for both projections
 - [ ] LS-36: Build UI components for dual display
 
 ### Phase 4: UI Components
-
 - [ ] LS-24: Add "Select Game" button to commissioner page
 - [ ] LS-24: Build game selection confirmation dialog
 - [ ] LS-24: Show selected season in matchup header
@@ -410,7 +397,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 - [ ] LS-23/LS-24: Display dual projections side-by-side
 
 ### Phase 5: GraphQL API
-
 - [ ] LS-19: Add `triggerGameSelection` mutation
 - [ ] LS-19: Add `getMatchupPlayerStats` query
 - [ ] LS-19: Add `getMatchupProjections` query
@@ -495,7 +481,6 @@ query GetMatchupPlayerStats($matchupId: Int!, $playerId: Int!) {
 ---
 
 **Questions or concerns? Refer to:**
-
 - [Full Implementation Plan](./LS-17-matchup-system-implementation-plan.md)
 - [Quick Reference Guide](./LS-17-QUICK-REFERENCE.md)
 - [AI Agent Contribution Workflow](../guides/ai-agent-contribution-workflow.md)

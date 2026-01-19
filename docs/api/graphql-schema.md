@@ -7,12 +7,10 @@ The Legacy Sports GraphQL API provides a unified interface for all data operatio
 ## API Endpoints
 
 ### Development
-
 - **GraphQL Endpoint**: `http://localhost:5001/graphql`
 - **GraphQL Playground**: `http://localhost:5001/playground`
 
 ### Production
-
 - **GraphQL Endpoint**: `https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql`
 
 ## Core Types
@@ -27,7 +25,7 @@ type User {
   profilePicture: String
   createdAt: DateTime!
   updatedAt: DateTime!
-
+  
   # Relationships
   leagues: [League!]!
   teams: [Team!]!
@@ -58,7 +56,7 @@ type League {
   draftDate: DateTime
   status: LeagueStatus!
   settings: LeagueSettings!
-
+  
   # Relationships
   teams: [Team!]!
   draftPicks: [DraftPick!]!
@@ -90,7 +88,7 @@ type Player {
   team: String!
   jerseyNumber: Int
   stats: PlayerStats
-
+  
   # Career data
   birthDate: Date
   height: String
@@ -112,10 +110,10 @@ type Team {
   name: String!
   owner: User!
   league: League!
-
+  
   # Roster
   players: [RosterPlayer!]!
-
+  
   # Performance
   wins: Int!
   losses: Int!
@@ -181,62 +179,6 @@ input UpdateLeagueScoringMultiplierInput {
 ````
 
 ````
-
-### Scoring Types
-
-```graphql
-type LeagueScoringProfile {
-  profileId: Int
-  leagueId: Int
-  profileName: String
-  definitions: [ScoringStatDefinition!]!
-  entries: [LeagueScoringProfileEntry!]!
-  stats: [LeagueScoringStatValue!]!
-  multiplierGroups: [LeagueScoringMultiplierGroup!]!
-}
-
-type ScoringStatDefinition {
-  id: Int!
-  statKey: String!
-  statGroup: ScoringStatGroup!
-  sourceTable: String!
-  sourceColumn: String!
-  displayName: String!
-  description: String
-  defaultMultiplier: Float!
-  minMultiplier: Float!
-  maxMultiplier: Float!
-  stepSize: Float!
-  isRequired: Boolean!
-  enforcePositive: Boolean!
-  enforceNegative: Boolean!
-}
-
-type LeagueScoringStatValue {
-  definition: ScoringStatDefinition!
-  multiplier: Float!
-  defaultMultiplier: Float!
-  isOverride: Boolean!
-  isEnabled: Boolean!
-}
-
-type LeagueScoringMultiplierGroup {
-  group: ScoringStatGroup!
-  values: [ScoringMultiplierEntry!]!
-}
-
-type ScoringMultiplierEntry {
-  statKey: String!
-  sourceColumn: String!
-  multiplier: Float!
-}
-
-input UpdateLeagueScoringMultiplierInput {
-  statDefinitionId: Int!
-  multiplier: Float
-  isEnabled: Boolean
-}
-```
 
 ### Scoring Types
 
@@ -688,7 +630,7 @@ enum ErrorCode {
 ## Rate Limiting
 
 - **Queries**: 100 requests per minute per user
-- **Mutations**: 50 requests per minute per user
+- **Mutations**: 50 requests per minute per user  
 - **Subscriptions**: 10 concurrent connections per user
 
 ## Authentication
@@ -704,9 +646,7 @@ Tokens are obtained through the OAuth flow documented in the [Authentication Gui
 ## Development Tools
 
 ### GraphQL Playground
-
 Access the interactive GraphQL playground at:
-
 - Development: `http://localhost:5001/playground`
 - Production: Available via direct API endpoint
 
@@ -723,9 +663,9 @@ pnpm run graphql:schema
 ## Related Documentation
 
 - [Authentication Guide](../guides/authentication-guide.md) - OAuth setup and token management
-- [Database Schema](../architecture/database-schema.md) - Database design and relationships
+- [Database Schema](../architecture/database-schema.md) - Database design and relationships  
 - [GraphQL Integration](../architecture/graphql-integration.md) - Implementation details
 
 ---
 
-_This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/graphql/`._
+*This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/graphql/`.*

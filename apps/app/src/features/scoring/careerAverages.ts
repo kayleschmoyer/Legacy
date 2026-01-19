@@ -64,8 +64,8 @@ function transformCareerStats(
     return undefined;
   };
 
-  const batting = data.batting
-    ? ({
+  const batting: ScoringStatRecord = data.batting
+    ? {
         g: data.batting.games ?? 0,
         pa: data.batting.plateAppearances ?? undefined,
         ab: data.batting.atBats ?? undefined,
@@ -87,11 +87,11 @@ function transformCareerStats(
         avg: toNumber(data.batting.battingAverage),
         obp: toNumber(data.batting.onBasePercentage),
         slg: toNumber(data.batting.sluggingPercentage),
-      } satisfies ScoringStatRecord)
+      }
     : { g: 0 };
 
-  const fielding = data.fielding
-    ? ({
+  const fielding: ScoringStatRecord = data.fielding
+    ? {
         g: data.fielding.games ?? 0,
         po: data.fielding.putouts ?? undefined,
         a: data.fielding.assists ?? undefined,
@@ -100,11 +100,11 @@ function transformCareerStats(
         cs: data.fielding.caughtStealing ?? undefined,
         inn: data.fielding.inningsDefended ?? undefined,
         pct: toNumber(data.fielding.fieldingPercentage),
-      } satisfies ScoringStatRecord)
+      }
     : { g: 0 };
 
-  const pitching = data.pitching
-    ? ({
+  const pitching: ScoringStatRecord = data.pitching
+    ? {
         g: data.pitching.games ?? 0,
         outsRecorded: data.pitching.outsRecorded ?? undefined,
         so: data.pitching.strikeouts ?? undefined,
@@ -115,13 +115,9 @@ function transformCareerStats(
         l: data.pitching.losses ?? undefined,
         sv: data.pitching.saves ?? undefined,
         battersFaced: data.pitching.battersFaced ?? undefined,
-        era:
-          data.pitching.era != null ? toNumber(data.pitching.era) : undefined,
-        whip:
-          data.pitching.outRate != null
-            ? toNumber(data.pitching.outRate)
-            : undefined,
-      } satisfies ScoringStatRecord)
+        era: toNumber(data.pitching.era),
+        whip: toNumber(data.pitching.outRate),
+      }
     : { g: 0 };
 
   return { batting, fielding, pitching };
@@ -154,10 +150,7 @@ export function useCareerAverageStats(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
 
-  const normalizedIds = useMemo(
-    () => normalizePlayerIds(playerIds),
-    [playerIds],
-  );
+  const normalizedIds = useMemo(() => normalizePlayerIds(playerIds), [playerIds]);
 
   useEffect(() => {
     if (normalizedIds.length === 0) {
