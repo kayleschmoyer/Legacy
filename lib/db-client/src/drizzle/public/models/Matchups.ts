@@ -20,6 +20,13 @@ export const matchupStatus = pgEnum('matchup_status', [
   'cancelled',
 ]);
 
+export const statsLoadingStatus = pgEnum('stats_loading_status', [
+  'not_started',
+  'loading',
+  'completed',
+  'failed',
+]);
+
 export const matchups = pgTable(
   'matchups',
   {
@@ -31,6 +38,9 @@ export const matchups = pgTable(
     team1Score: decimal('team1_score', { precision: 10, scale: 2 }),
     team2Score: decimal('team2_score', { precision: 10, scale: 2 }),
     status: matchupStatus('status').notNull().default('scheduled'),
+    statsLoadingStatus: statsLoadingStatus('stats_loading_status')
+      .notNull()
+      .default('not_started'),
     selectedSeason: integer('selected_season'),
     gamesPerMatchup: integer('games_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
@@ -53,7 +63,8 @@ export const matchups = pgTable(
         foreignColumns: [teams.id],
         name: 'matchups_team2_fk',
       }),
-      matchupsWeekUk: unique().on(table.leagueId, table.weekNumber),
+      // Note: Removed unique constraint on (leagueId, weekNumber) as a league
+      // needs to support multiple matchups per week (one for each team pairing)
     };
   },
 );
@@ -64,7 +75,7 @@ export const matchupPlayers = pgTable(
     id: serial('id').primaryKey().notNull(),
     matchupId: integer('matchup_id').notNull(),
     playerId: integer('player_id').notNull(),
-    season: integer('season').notNull(),
+    teamId: integer('team_id').notNull(),
   },
   (table) => {
     return {
@@ -78,6 +89,40 @@ export const matchupPlayers = pgTable(
         foreignColumns: [players.id],
         name: 'matchup_players_player_fk',
       }),
+      matchupPlayersTeamFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'matchup_players_team_fk',
+      }),
+    };
+  },
+);
+
+export const leagueWeekPlayerSeasons = pgTable(
+  'league_week_player_seasons',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    weekNumber: integer('week_number').notNull(),
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      leagueWeekPlayerSeasonsLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'league_week_player_seasons_league_fk',
+      }),
+      leagueWeekPlayerSeasonsPlayerFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'league_week_player_seasons_player_fk',
+      }),
+      leagueWeekPlayerSeasonsUnique: unique(
+        'league_week_player_seasons_unique',
+      ).on(table.leagueId, table.weekNumber, table.playerId),
     };
   },
 );
@@ -92,10 +137,8 @@ export const matchupPlayerGames = pgTable(
     fieldingGameNum: integer('fielding_game_num'),
     pitchingGameNum: integer('pitching_game_num'),
     fieldingGamePos: char('fielding_game_pos', { length: 2 }).notNull(),
-    battingScore: numeric('batting_score', { precision: 10, scale: 3 }),
-    fieldingScore: numeric('fielding_score', { precision: 10, scale: 3 }),
-    pitchingScore: numeric('pitching_score', { precision: 10, scale: 3 }),
-    totalScore: numeric('total_score', { precision: 10, scale: 3 }),
+    // NOTE: Scores are NOT stored in DB - they are calculated on the frontend
+    // using the @legacy-sports/scoring package with league-specific settings
   },
   (table) => {
     return {

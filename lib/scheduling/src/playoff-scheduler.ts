@@ -1,6 +1,6 @@
 /**
  * Playoff Scheduler (LS-28)
- * 
+ *
  * Handles playoff bracket generation and tournament progression logic.
  * Integrates with the scheduling system for playoff matchup management.
  */
@@ -39,12 +39,14 @@ export interface PlayoffBracket {
 /**
  * Generate playoff bracket based on format and seeded teams
  */
-export function generatePlayoffBracket(config: PlayoffBracketConfig): PlayoffBracket {
+export function generatePlayoffBracket(
+  config: PlayoffBracketConfig,
+): PlayoffBracket {
   const { format, teams, startWeek, weeksPerRound } = config;
-  
+
   // Sort teams by seed number
   const sortedTeams = [...teams].sort((a, b) => a.seedNumber - b.seedNumber);
-  
+
   if (format === '4-team') {
     return generate4TeamBracket(sortedTeams, startWeek, weeksPerRound);
   } else if (format === '6-team') {
@@ -60,7 +62,7 @@ export function generatePlayoffBracket(config: PlayoffBracketConfig): PlayoffBra
 function generate4TeamBracket(
   teams: PlayoffTeam[],
   startWeek: number,
-  weeksPerRound: number
+  weeksPerRound: number,
 ): PlayoffBracket {
   const matchups: PlayoffMatchup[] = [
     // Semifinals
@@ -69,14 +71,14 @@ function generate4TeamBracket(
       matchupNumber: 1,
       weekNumber: startWeek,
       highSeedTeam: teams[0], // #1 seed
-      lowSeedTeam: teams[3],  // #4 seed
+      lowSeedTeam: teams[3], // #4 seed
     },
     {
       round: 'semifinals',
       matchupNumber: 2,
       weekNumber: startWeek,
       highSeedTeam: teams[1], // #2 seed
-      lowSeedTeam: teams[2],  // #3 seed
+      lowSeedTeam: teams[2], // #3 seed
     },
     // Finals (winners TBD)
     {
@@ -103,7 +105,7 @@ function generate4TeamBracket(
 function generate6TeamBracket(
   teams: PlayoffTeam[],
   startWeek: number,
-  weeksPerRound: number
+  weeksPerRound: number,
 ): PlayoffBracket {
   const matchups: PlayoffMatchup[] = [
     // Wildcard round
@@ -112,14 +114,14 @@ function generate6TeamBracket(
       matchupNumber: 1,
       weekNumber: startWeek,
       highSeedTeam: teams[2], // #3 seed
-      lowSeedTeam: teams[5],  // #6 seed
+      lowSeedTeam: teams[5], // #6 seed
     },
     {
       round: 'wildcard',
       matchupNumber: 2,
       weekNumber: startWeek,
       highSeedTeam: teams[3], // #4 seed
-      lowSeedTeam: teams[4],  // #5 seed
+      lowSeedTeam: teams[4], // #5 seed
     },
     // Semifinals (#1 and #2 get byes)
     {
@@ -127,14 +129,14 @@ function generate6TeamBracket(
       matchupNumber: 1,
       weekNumber: startWeek + weeksPerRound,
       highSeedTeam: teams[0], // #1 seed
-      lowSeedTeam: null,      // Wildcard winner TBD
+      lowSeedTeam: null, // Wildcard winner TBD
     },
     {
       round: 'semifinals',
       matchupNumber: 2,
       weekNumber: startWeek + weeksPerRound,
       highSeedTeam: teams[1], // #2 seed
-      lowSeedTeam: null,      // Wildcard winner TBD
+      lowSeedTeam: null, // Wildcard winner TBD
     },
     // Finals
     {
@@ -160,7 +162,7 @@ function generate6TeamBracket(
 function generate8TeamBracket(
   teams: PlayoffTeam[],
   startWeek: number,
-  weeksPerRound: number
+  weeksPerRound: number,
 ): PlayoffBracket {
   const matchups: PlayoffMatchup[] = [
     // Wildcard round (quarterfinals)
@@ -169,28 +171,28 @@ function generate8TeamBracket(
       matchupNumber: 1,
       weekNumber: startWeek,
       highSeedTeam: teams[0], // #1 seed
-      lowSeedTeam: teams[7],  // #8 seed
+      lowSeedTeam: teams[7], // #8 seed
     },
     {
       round: 'wildcard',
       matchupNumber: 2,
       weekNumber: startWeek,
       highSeedTeam: teams[1], // #2 seed
-      lowSeedTeam: teams[6],  // #7 seed
+      lowSeedTeam: teams[6], // #7 seed
     },
     {
       round: 'wildcard',
       matchupNumber: 3,
       weekNumber: startWeek,
       highSeedTeam: teams[2], // #3 seed
-      lowSeedTeam: teams[5],  // #6 seed
+      lowSeedTeam: teams[5], // #6 seed
     },
     {
       round: 'wildcard',
       matchupNumber: 4,
       weekNumber: startWeek,
       highSeedTeam: teams[3], // #4 seed
-      lowSeedTeam: teams[4],  // #5 seed
+      lowSeedTeam: teams[4], // #5 seed
     },
     // Semifinals
     {
@@ -198,14 +200,14 @@ function generate8TeamBracket(
       matchupNumber: 1,
       weekNumber: startWeek + weeksPerRound,
       highSeedTeam: null, // Wildcard winner TBD
-      lowSeedTeam: null,  // Wildcard winner TBD
+      lowSeedTeam: null, // Wildcard winner TBD
     },
     {
       round: 'semifinals',
       matchupNumber: 2,
       weekNumber: startWeek + weeksPerRound,
       highSeedTeam: null, // Wildcard winner TBD
-      lowSeedTeam: null,  // Wildcard winner TBD
+      lowSeedTeam: null, // Wildcard winner TBD
     },
     // Finals
     {
@@ -230,13 +232,13 @@ function generate8TeamBracket(
  */
 export function advancePlayoffRound(
   currentRound: 'wildcard' | 'semifinals',
-  winners: PlayoffTeam[]
+  winners: PlayoffTeam[],
 ): PlayoffMatchup[] {
   if (currentRound === 'wildcard') {
     // Advance winners to semifinals
     // Typically reseed so highest seed plays lowest remaining seed
     const reseeded = [...winners].sort((a, b) => a.seedNumber - b.seedNumber);
-    
+
     return [
       {
         round: 'semifinals',
@@ -272,10 +274,13 @@ export function advancePlayoffRound(
  */
 export function isRoundComplete(
   matchups: PlayoffMatchup[],
-  round: 'wildcard' | 'semifinals' | 'finals'
+  round: 'wildcard' | 'semifinals' | 'finals',
 ): boolean {
-  const roundMatchups = matchups.filter(m => m.round === round);
-  return roundMatchups.length > 0 && roundMatchups.every(m => 
-    m.highSeedTeam !== null && m.lowSeedTeam !== null
+  const roundMatchups = matchups.filter((m) => m.round === round);
+  return (
+    roundMatchups.length > 0 &&
+    roundMatchups.every(
+      (m) => m.highSeedTeam !== null && m.lowSeedTeam !== null,
+    )
   );
 }

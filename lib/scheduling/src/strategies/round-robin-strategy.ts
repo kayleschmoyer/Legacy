@@ -1,10 +1,10 @@
 /**
  * Round-robin scheduling strategy
- * 
+ *
  * Each team plays every other team exactly once.
  * Handles both even and odd number of teams (bye weeks for odd).
  * Ensures home/away balance over the season.
- * 
+ *
  * Algorithm: Circle method for round-robin scheduling
  * See: https://en.wikipedia.org/wiki/Round-robin_tournament#Scheduling_algorithm
  */
@@ -17,10 +17,7 @@ export class RoundRobinStrategy implements SchedulingStrategy {
     return 'round-robin';
   }
 
-  generatePairings(
-    teams: TeamInfo[],
-    numberOfWeeks: number
-  ): MatchupPairing[] {
+  generatePairings(teams: TeamInfo[], numberOfWeeks: number): MatchupPairing[] {
     if (teams.length < 2) {
       return []; // Need at least 2 teams
     }
@@ -40,7 +37,11 @@ export class RoundRobinStrategy implements SchedulingStrategy {
     // Use circle method: fix one team, rotate others
     let currentWeek = 1;
 
-    for (let round = 0; round < totalRounds && currentWeek <= numberOfWeeks; round++) {
+    for (
+      let round = 0;
+      round < totalRounds && currentWeek <= numberOfWeeks;
+      round++
+    ) {
       // Generate pairings for this round
       for (let match = 0; match < matchesPerRound; match++) {
         let home: TeamInfo | null;
@@ -88,7 +89,7 @@ export class RoundRobinStrategy implements SchedulingStrategy {
       for (let week = 0; week < remainingWeeks; week++) {
         const sourceWeek = (week % baseSchedule.length) + 1;
         const sourcePairings = baseSchedule.filter(
-          (p) => p.weekNumber === sourceWeek
+          (p) => p.weekNumber === sourceWeek,
         );
 
         for (const pairing of sourcePairings) {

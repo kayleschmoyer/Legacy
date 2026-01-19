@@ -1,6 +1,6 @@
 /**
  * Standings Service
- * 
+ *
  * Business logic layer for standings, history, and head-to-head operations.
  * Provides high-level operations for tracking matchup results and league standings.
  */
@@ -58,9 +58,14 @@ export class StandingsService {
    * Supports custom sorting and filtering
    */
   static async getStandings(
-    params: GetStandingsParams
+    params: GetStandingsParams,
   ): Promise<TeamStanding[]> {
-    const { leagueId, season, sortBy = 'winPercentage', ascending = false } = params;
+    const {
+      leagueId,
+      season,
+      sortBy = 'winPercentage',
+      ascending = false,
+    } = params;
 
     return await runWithPublicClient(getDbOptions(), async (db) => {
       const standings = await calculateStandings(db, leagueId, season);
@@ -92,7 +97,7 @@ export class StandingsService {
    * Get head-to-head record between two teams
    */
   static async getHeadToHead(
-    params: GetHeadToHeadParams
+    params: GetHeadToHeadParams,
   ): Promise<HeadToHeadRecord> {
     const { leagueId, team1Id, team2Id } = params;
 
@@ -106,7 +111,7 @@ export class StandingsService {
    */
   static async getSeasonSummary(
     leagueId: number,
-    season: number | null
+    season: number | null,
   ): Promise<SeasonResults> {
     return await runWithPublicClient(getDbOptions(), async (db) => {
       return await getSeasonResults(db, leagueId, season);
@@ -117,7 +122,7 @@ export class StandingsService {
    * Get playoff qualification status for all teams
    */
   static async getPlayoffRace(
-    params: GetPlayoffRaceParams
+    params: GetPlayoffRaceParams,
   ): Promise<PlayoffQualification[]> {
     const { leagueId, season, playoffSpots } = params;
 
@@ -129,10 +134,7 @@ export class StandingsService {
   /**
    * Get recent matchups for a team (used for team profile pages)
    */
-  static async getTeamRecentMatchups(
-    teamId: number,
-    limit = 10
-  ) {
+  static async getTeamRecentMatchups(teamId: number, limit = 10) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
       return await getRecentMatchupsForTeam(db, teamId, limit);
     });
@@ -142,15 +144,8 @@ export class StandingsService {
    * Get historical matchups with flexible filtering
    */
   static async getMatchupHistory(params: MatchupHistoryParams) {
-    const {
-      leagueId,
-      season,
-      teamId,
-      status,
-      startDate,
-      endDate,
-      limit,
-    } = params;
+    const { leagueId, season, teamId, status, startDate, endDate, limit } =
+      params;
 
     return await runWithPublicClient(getDbOptions(), async (db) => {
       const filters: MatchupHistoryFilters = {
@@ -174,7 +169,7 @@ export class StandingsService {
    */
   static async getMatchupStats(
     leagueId: number,
-    season?: number | null
+    season?: number | null,
   ): Promise<MatchupStatusCounts> {
     return await runWithPublicClient(getDbOptions(), async (db) => {
       return await getMatchupStatusCounts(db, leagueId, season);
@@ -234,7 +229,7 @@ export class StandingsService {
    */
   static async getPowerRankings(
     leagueId: number,
-    season?: number | null
+    season?: number | null,
   ): Promise<
     Array<
       TeamStanding & {
@@ -254,7 +249,9 @@ export class StandingsService {
       }));
 
       // Sort by points differential (best first)
-      withDifferentials.sort((a, b) => b.pointsDifferential - a.pointsDifferential);
+      withDifferentials.sort(
+        (a, b) => b.pointsDifferential - a.pointsDifferential,
+      );
 
       // Assign power ranks
       withDifferentials.forEach((standing, index) => {
@@ -271,7 +268,7 @@ export class StandingsService {
   static async getClosestMatchups(
     leagueId: number,
     season?: number | null,
-    limit = 10
+    limit = 10,
   ) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
       const filters: MatchupHistoryFilters = {
@@ -287,9 +284,7 @@ export class StandingsService {
         .filter((m) => m.team1Score && m.team2Score)
         .map((m) => ({
           matchup: m,
-          margin: Math.abs(
-            parseFloat(m.team1Score) - parseFloat(m.team2Score)
-          ),
+          margin: Math.abs(parseFloat(m.team1Score) - parseFloat(m.team2Score)),
         }))
         .sort((a, b) => a.margin - b.margin)
         .slice(0, limit);
@@ -304,7 +299,7 @@ export class StandingsService {
   static async getBlowoutMatchups(
     leagueId: number,
     season?: number | null,
-    limit = 10
+    limit = 10,
   ) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
       const filters: MatchupHistoryFilters = {
@@ -320,9 +315,7 @@ export class StandingsService {
         .filter((m) => m.team1Score && m.team2Score)
         .map((m) => ({
           matchup: m,
-          margin: Math.abs(
-            parseFloat(m.team1Score) - parseFloat(m.team2Score)
-          ),
+          margin: Math.abs(parseFloat(m.team1Score) - parseFloat(m.team2Score)),
         }))
         .sort((a, b) => b.margin - a.margin)
         .slice(0, limit);

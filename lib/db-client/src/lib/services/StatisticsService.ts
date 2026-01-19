@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, sql, SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { DbOptions } from '@legacy-sports/utils';
+import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 import {
@@ -11,10 +12,10 @@ import {
   SeasonFielding,
   SeasonPitching,
 } from '../../types/DatabaseTypes';
-import { 
+import {
   CareerBattingQueryBuilder,
   QueryOptions,
-  StatisticsQueryFilters
+  StatisticsQueryFilters,
 } from '../query-builders/TypeSafeQueryBuilder';
 
 // Type-safe column access helpers with proper Drizzle types
@@ -23,19 +24,25 @@ import {
 type TableColumns<T> = T extends { [K: string]: AnyPgColumn } ? T : never;
 
 function getBattingColumn(columnName: string): AnyPgColumn | undefined {
-  const columns = PublicSchema.seasonBatting as TableColumns<typeof PublicSchema.seasonBatting>;
+  const columns = PublicSchema.seasonBatting as TableColumns<
+    typeof PublicSchema.seasonBatting
+  >;
   const column = columns[columnName as keyof typeof columns];
   return column;
 }
 
 function getPitchingColumn(columnName: string): AnyPgColumn | undefined {
-  const columns = PublicSchema.seasonPitching as TableColumns<typeof PublicSchema.seasonPitching>;
+  const columns = PublicSchema.seasonPitching as TableColumns<
+    typeof PublicSchema.seasonPitching
+  >;
   const column = columns[columnName as keyof typeof columns];
   return column;
 }
 
 function getFieldingColumn(columnName: string): AnyPgColumn | undefined {
-  const columns = PublicSchema.seasonFielding as TableColumns<typeof PublicSchema.seasonFielding>;
+  const columns = PublicSchema.seasonFielding as TableColumns<
+    typeof PublicSchema.seasonFielding
+  >;
   const column = columns[columnName as keyof typeof columns];
   return column;
 }
@@ -103,7 +110,11 @@ export class StatisticsService {
     };
 
     const options: QueryOptions = {
-      orderBy: queryOptions.orderBy as 'games' | 'homeRuns' | 'wins' | 'strikeouts',
+      orderBy: queryOptions.orderBy as
+        | 'games'
+        | 'homeRuns'
+        | 'wins'
+        | 'strikeouts',
       orderDirection: queryOptions.orderDirection || 'desc',
       limit: queryOptions.limit,
       offset: queryOptions.offset,
@@ -119,29 +130,37 @@ export class StatisticsService {
   async getCareerBattingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerBatting[]> {
-    return runWithPublicClient(this.options, async (db): Promise<CareerBatting[]> => {
-      // Convert legacy options to TypeSafe format
-      const { filters, options } = this.convertToTypeSafeOptions(queryOptions);
-      
-      // Use the TypeSafe query builder - eliminates all 'any' type assertions
-      const queryBuilder = new CareerBattingQueryBuilder(db);
-      const results = await queryBuilder.executeQuery(filters, options);
-      
-      // Transform joined results to match expected CareerBatting format
-      // Drizzle returns results from joins as { tableName: data } structure
-      return results.map(result => {
-        // Check if this is a joined result (has career_batting property)
-        if (result && typeof result === 'object' && 'career_batting' in result) {
-          // Extract the career_batting data from the joined result
-          return (result as { career_batting: CareerBatting }).career_batting;
-        }
-        // For non-joined queries, the result is already in the correct format
-        return result as CareerBatting;
-      });
-    });
+    return runWithPublicClient(
+      this.options,
+      async (db): Promise<CareerBatting[]> => {
+        // Convert legacy options to TypeSafe format
+        const { filters, options } =
+          this.convertToTypeSafeOptions(queryOptions);
+
+        // Use the TypeSafe query builder - eliminates all 'any' type assertions
+        const queryBuilder = new CareerBattingQueryBuilder(db);
+        const results = await queryBuilder.executeQuery(filters, options);
+
+        // Transform joined results to match expected CareerBatting format
+        // Drizzle returns results from joins as { tableName: data } structure
+        return results.map((result) => {
+          // Check if this is a joined result (has career_batting property)
+          if (
+            result &&
+            typeof result === 'object' &&
+            'career_batting' in result
+          ) {
+            // Extract the career_batting data from the joined result
+            return (result as { career_batting: CareerBatting }).career_batting;
+          }
+          // For non-joined queries, the result is already in the correct format
+          return result as CareerBatting;
+        });
+      },
+    );
   }
 
-    /**
+  /**
    * Get the total count of career batting statistics records matching the given filters.
    * Uses the same filters as getCareerBattingStats but returns only the count
    */
@@ -150,10 +169,10 @@ export class StatisticsService {
   ): Promise<number> {
     return runWithPublicClient(this.options, async (db): Promise<number> => {
       const queryBuilder = new CareerBattingQueryBuilder(db);
-      
+
       // Use the same type-safe filters as getCareerBattingStats
       const typeSafeOptions = this.convertToTypeSafeOptions(queryOptions);
-      
+
       // Check if we need to join with players table for search term
       if (typeSafeOptions.filters?.searchTerm) {
         const result = await queryBuilder.countWithPlayerJoin(typeSafeOptions);
@@ -171,66 +190,76 @@ export class StatisticsService {
   async getCareerPitchingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerPitching[]> {
-    return runWithPublicClient(this.options, async (db): Promise<CareerPitching[]> => {
-      const queryBuilder = db.select().from(PublicSchema.careerPitching);
+    return runWithPublicClient(
+      this.options,
+      async (db): Promise<CareerPitching[]> => {
+        const queryBuilder = db.select().from(PublicSchema.careerPitching);
 
-      // Build WHERE clause
-      const conditions = queryOptions.filters
-        ? this.buildPitchingFilters(queryOptions.filters)
-        : [];
+        // Build WHERE clause
+        const conditions = queryOptions.filters
+          ? this.buildPitchingFilters(queryOptions.filters)
+          : [];
 
-      const orderDirection = queryOptions.orderDirection || 'desc';
+        const orderDirection = queryOptions.orderDirection || 'desc';
 
-      // Execute query with all conditions
-      let finalQuery = queryBuilder;
+        // Execute query with all conditions
+        let finalQuery = queryBuilder;
 
-      if (conditions.length > 0) {
-        // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-        if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        if (conditions.length > 0) {
+          // Filter out any undefined conditions before passing to and()
+          const validConditions = conditions.filter(
+            (condition): condition is SQL => condition !== undefined,
+          );
+          if (validConditions.length > 0) {
+            const whereClause =
+              validConditions.length === 1
+                ? validConditions[0]
+                : and(...validConditions);
+            finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+          }
         }
-      }
 
-      // Default ordering by wins descending for interesting results
-      if (queryOptions.orderBy === 'wins') {
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                desc(PublicSchema.careerPitching.w),
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                asc(PublicSchema.careerPitching.w),
-              ) as typeof finalQuery);
-      } else if (queryOptions.orderBy === 'strikeouts') {
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                desc(PublicSchema.careerPitching.so),
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                asc(PublicSchema.careerPitching.so),
-              ) as typeof finalQuery);
-      } else {
-        // Default to wins descending
-        finalQuery = finalQuery.orderBy(
-          desc(PublicSchema.careerPitching.w),
-        ) as typeof finalQuery;
-      }
+        // Default ordering by wins descending for interesting results
+        if (queryOptions.orderBy === 'wins') {
+          finalQuery =
+            orderDirection === 'desc'
+              ? (finalQuery.orderBy(
+                  desc(PublicSchema.careerPitching.w),
+                ) as typeof finalQuery)
+              : (finalQuery.orderBy(
+                  asc(PublicSchema.careerPitching.w),
+                ) as typeof finalQuery);
+        } else if (queryOptions.orderBy === 'strikeouts') {
+          finalQuery =
+            orderDirection === 'desc'
+              ? (finalQuery.orderBy(
+                  desc(PublicSchema.careerPitching.so),
+                ) as typeof finalQuery)
+              : (finalQuery.orderBy(
+                  asc(PublicSchema.careerPitching.so),
+                ) as typeof finalQuery);
+        } else {
+          // Default to wins descending
+          finalQuery = finalQuery.orderBy(
+            desc(PublicSchema.careerPitching.w),
+          ) as typeof finalQuery;
+        }
 
-      if (queryOptions.limit) {
-        finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
-      }
+        if (queryOptions.limit) {
+          finalQuery = finalQuery.limit(
+            queryOptions.limit,
+          ) as typeof finalQuery;
+        }
 
-      if (queryOptions.offset) {
-        finalQuery = finalQuery.offset(
-          queryOptions.offset,
-        ) as typeof finalQuery;
-      }
+        if (queryOptions.offset) {
+          finalQuery = finalQuery.offset(
+            queryOptions.offset,
+          ) as typeof finalQuery;
+        }
 
-      return finalQuery.execute();
-    });
+        return finalQuery.execute();
+      },
+    );
   }
 
   /**
@@ -273,57 +302,67 @@ export class StatisticsService {
   async getCareerFieldingStats(
     queryOptions: StatisticsQueryOptions = {},
   ): Promise<CareerFielding[]> {
-    return runWithPublicClient(this.options, async (db): Promise<CareerFielding[]> => {
-      const queryBuilder = db.select().from(PublicSchema.careerFielding);
+    return runWithPublicClient(
+      this.options,
+      async (db): Promise<CareerFielding[]> => {
+        const queryBuilder = db.select().from(PublicSchema.careerFielding);
 
-      // Build WHERE clause
-      const conditions = queryOptions.filters
-        ? this.buildFieldingFilters(queryOptions.filters)
-        : [];
+        // Build WHERE clause
+        const conditions = queryOptions.filters
+          ? this.buildFieldingFilters(queryOptions.filters)
+          : [];
 
-      const orderDirection = queryOptions.orderDirection || 'desc';
+        const orderDirection = queryOptions.orderDirection || 'desc';
 
-      // Execute query with all conditions
-      let finalQuery = queryBuilder;
+        // Execute query with all conditions
+        let finalQuery = queryBuilder;
 
-      if (conditions.length > 0) {
-        // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
-        if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
-          finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+        if (conditions.length > 0) {
+          // Filter out any undefined conditions before passing to and()
+          const validConditions = conditions.filter(
+            (condition): condition is SQL => condition !== undefined,
+          );
+          if (validConditions.length > 0) {
+            const whereClause =
+              validConditions.length === 1
+                ? validConditions[0]
+                : and(...validConditions);
+            finalQuery = finalQuery.where(whereClause) as typeof finalQuery;
+          }
         }
-      }
 
-      // Default ordering by games descending
-      if (queryOptions.orderBy === 'games') {
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                desc(PublicSchema.careerFielding.g),
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                asc(PublicSchema.careerFielding.g),
-              ) as typeof finalQuery);
-      } else {
-        // Default to games descending
-        finalQuery = finalQuery.orderBy(
-          desc(PublicSchema.careerFielding.g),
-        ) as typeof finalQuery;
-      }
+        // Default ordering by games descending
+        if (queryOptions.orderBy === 'games') {
+          finalQuery =
+            orderDirection === 'desc'
+              ? (finalQuery.orderBy(
+                  desc(PublicSchema.careerFielding.g),
+                ) as typeof finalQuery)
+              : (finalQuery.orderBy(
+                  asc(PublicSchema.careerFielding.g),
+                ) as typeof finalQuery);
+        } else {
+          // Default to games descending
+          finalQuery = finalQuery.orderBy(
+            desc(PublicSchema.careerFielding.g),
+          ) as typeof finalQuery;
+        }
 
-      if (queryOptions.limit) {
-        finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
-      }
+        if (queryOptions.limit) {
+          finalQuery = finalQuery.limit(
+            queryOptions.limit,
+          ) as typeof finalQuery;
+        }
 
-      if (queryOptions.offset) {
-        finalQuery = finalQuery.offset(
-          queryOptions.offset,
-        ) as typeof finalQuery;
-      }
+        if (queryOptions.offset) {
+          finalQuery = finalQuery.offset(
+            queryOptions.offset,
+          ) as typeof finalQuery;
+        }
 
-      return finalQuery.execute();
-    });
+        return finalQuery.execute();
+      },
+    );
   }
 
   /**
@@ -347,6 +386,10 @@ export class StatisticsService {
   async getSeasonBattingStats(
     queryOptions: SeasonStatisticsQueryOptions = {},
   ): Promise<SeasonBatting[]> {
+    LOGGER.debug(
+      '[StatisticsService.getSeasonBattingStats] queryOptions:',
+      queryOptions,
+    );
     return runWithPublicClient(this.options, async (db) => {
       const queryBuilder = db.select().from(PublicSchema.seasonBatting);
 
@@ -355,14 +398,28 @@ export class StatisticsService {
         ? this.buildSeasonBattingFilters(queryOptions.filters)
         : [];
 
+      LOGGER.debug(
+        '[StatisticsService.getSeasonBattingStats] conditions count:',
+        conditions.length,
+      );
+
       // Build final query parts
       const orderDirection = queryOptions.orderDirection || 'desc';
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
+        LOGGER.debug(
+          '[StatisticsService.getSeasonBattingStats] validConditions count:',
+          validConditions.length,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder.where(whereClause);
         }
       }
@@ -384,7 +441,22 @@ export class StatisticsService {
         queryBuilder.offset(queryOptions.offset);
       }
 
-      return queryBuilder;
+      // Log the SQL query being generated
+      const querySQL = queryBuilder.toSQL();
+      LOGGER.debug('[StatisticsService.getSeasonBattingStats] SQL:', querySQL);
+
+      const results = await queryBuilder;
+      LOGGER.debug(
+        '[StatisticsService.getSeasonBattingStats] results count:',
+        results.length,
+      );
+      if (results.length > 0) {
+        LOGGER.debug(
+          '[StatisticsService.getSeasonBattingStats] first result:',
+          results[0],
+        );
+      }
+      return results;
     });
   }
 
@@ -407,9 +479,14 @@ export class StatisticsService {
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder.where(whereClause);
         }
       }
@@ -454,9 +531,14 @@ export class StatisticsService {
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder.where(whereClause);
         }
       }
@@ -534,9 +616,14 @@ export class StatisticsService {
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
         }
       }
@@ -559,9 +646,14 @@ export class StatisticsService {
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
         }
       }
@@ -584,9 +676,14 @@ export class StatisticsService {
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()
-        const validConditions = conditions.filter((condition): condition is SQL => condition !== undefined);
+        const validConditions = conditions.filter(
+          (condition): condition is SQL => condition !== undefined,
+        );
         if (validConditions.length > 0) {
-          const whereClause = validConditions.length === 1 ? validConditions[0] : and(...validConditions);
+          const whereClause =
+            validConditions.length === 1
+              ? validConditions[0]
+              : and(...validConditions);
           queryBuilder = queryBuilder.where(whereClause) as typeof queryBuilder;
         }
       }

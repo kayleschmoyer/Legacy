@@ -86,7 +86,7 @@ export async function queryHistoricalMatchups(
       or(
         eq(Schema.matchups.team1Id, filters.teamId),
         eq(Schema.matchups.team2Id, filters.teamId),
-      ) as any // eslint-disable-line @typescript-eslint/no-explicit-any
+      ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     );
   }
 
@@ -101,8 +101,8 @@ export async function queryHistoricalMatchups(
     conditions.push(sql`${Schema.matchups.startTime} >= ${filters.startDate}`);
   }
   if (filters.endDate) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- sql template literal typing
-    conditions.push(sql`${Schema.matchups.endTime} <= ${filters.endDate}` as any);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal typing
+    conditions.push(sql`${Schema.matchups.endTime} <= ${filters.endDate}`);
   }
 
   return await db
@@ -139,8 +139,8 @@ export async function getHeadToHeadRecord(
             eq(Schema.matchups.team1Id, team2Id),
             eq(Schema.matchups.team2Id, team1Id),
           ),
-        ) as any // eslint-disable-line @typescript-eslint/no-explicit-any
-      )
+        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      ),
     );
 
   let team1Wins = 0;
@@ -215,8 +215,8 @@ export async function calculateStandings(
 
   if (season !== undefined) {
     if (season === null) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
-      matchupConditions.push(sql`${Schema.matchups.selectedSeason} IS NULL` as any);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
+      matchupConditions.push(sql`${Schema.matchups.selectedSeason} IS NULL`);
     } else {
       matchupConditions.push(eq(Schema.matchups.selectedSeason, season));
     }
@@ -283,7 +283,7 @@ export async function calculateStandings(
   // Calculate derived stats and convert to array
   const standings = Array.from(standingsMap.values()).map((standing) => {
     const totalGames = standing.wins + standing.losses + standing.ties;
-    
+
     return {
       ...standing,
       winPercentage:
@@ -397,7 +397,7 @@ export async function getRecentMatchupsForTeam(
           eq(Schema.matchups.team2Id, teamId),
         ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         eq(Schema.matchups.status, 'completed'),
-      )
+      ),
     )
     .orderBy(desc(Schema.matchups.endTime))
     .limit(limit);

@@ -54,6 +54,8 @@ export default defineConfig(({ mode }) => {
           '@aws-sdk/client-rds-data',
           // Externalize pg-native to prevent bundling issues
           'pg-native',
+          // Externalize problematic dependencies
+          '@yaacovcr/transform',
         ],
       },
       target: 'node18',

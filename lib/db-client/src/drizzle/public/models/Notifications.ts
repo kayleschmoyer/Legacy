@@ -41,7 +41,9 @@ export const notificationPreferences = pgTable(
     matchupStartedEnabled: boolean('matchup_started_enabled')
       .default(true)
       .notNull(),
-    matchupEndedEnabled: boolean('matchup_ended_enabled').default(true).notNull(),
+    matchupEndedEnabled: boolean('matchup_ended_enabled')
+      .default(true)
+      .notNull(),
     matchupCloseGameEnabled: boolean('matchup_close_game_enabled')
       .default(true)
       .notNull(),
@@ -63,9 +65,9 @@ export const notificationPreferences = pgTable(
   },
   (table) => {
     return {
-      notificationPreferencesUserUk: unique('notification_preferences_user_uk').on(
-        table.userId
-      ),
+      notificationPreferencesUserUk: unique(
+        'notification_preferences_user_uk',
+      ).on(table.userId),
       notificationPreferencesUserFk: foreignKey({
         columns: [table.userId],
         foreignColumns: [usersInAppInternal.id],
@@ -74,7 +76,7 @@ export const notificationPreferences = pgTable(
         .onDelete('cascade')
         .onUpdate('cascade'),
     };
-  }
+  },
 );
 
 // Device Tokens Table
@@ -96,9 +98,13 @@ export const deviceTokens = pgTable(
   },
   (table) => {
     return {
-      deviceTokensTokenUk: unique('device_tokens_token_uk').on(table.deviceToken),
+      deviceTokensTokenUk: unique('device_tokens_token_uk').on(
+        table.deviceToken,
+      ),
       deviceTokensUserIdx: index('device_tokens_user_idx').on(table.userId),
-      deviceTokensEnabledIdx: index('device_tokens_enabled_idx').on(table.enabled),
+      deviceTokensEnabledIdx: index('device_tokens_enabled_idx').on(
+        table.enabled,
+      ),
       deviceTokensUserFk: foreignKey({
         columns: [table.userId],
         foreignColumns: [usersInAppInternal.id],
@@ -107,7 +113,7 @@ export const deviceTokens = pgTable(
         .onDelete('cascade')
         .onUpdate('cascade'),
     };
-  }
+  },
 );
 
 // Notification History Table
@@ -124,7 +130,9 @@ export const notificationHistory = pgTable(
     message: text('message').notNull(),
     metadata: jsonb('metadata'),
     read: boolean('read').default(false).notNull(),
-    sentAt: timestamp('sent_at', { mode: 'string' }).default(sql`now()`).notNull(),
+    sentAt: timestamp('sent_at', { mode: 'string' })
+      .default(sql`now()`)
+      .notNull(),
     readAt: timestamp('read_at', { mode: 'string' }),
     createdAt: timestamp('created_at', { mode: 'string' })
       .default(sql`now()`)
@@ -133,20 +141,20 @@ export const notificationHistory = pgTable(
   (table) => {
     return {
       notificationHistoryUserIdx: index('notification_history_user_idx').on(
-        table.userId
+        table.userId,
       ),
-      notificationHistoryMatchupIdx: index('notification_history_matchup_idx').on(
-        table.matchupId
-      ),
+      notificationHistoryMatchupIdx: index(
+        'notification_history_matchup_idx',
+      ).on(table.matchupId),
       notificationHistoryLeagueIdx: index('notification_history_league_idx').on(
-        table.leagueId
+        table.leagueId,
       ),
       notificationHistoryReadIdx: index('notification_history_read_idx').on(
-        table.read
+        table.read,
       ),
-      notificationHistorySentAtIdx: index('notification_history_sent_at_idx').on(
-        table.sentAt
-      ),
+      notificationHistorySentAtIdx: index(
+        'notification_history_sent_at_idx',
+      ).on(table.sentAt),
       notificationHistoryUserFk: foreignKey({
         columns: [table.userId],
         foreignColumns: [usersInAppInternal.id],
@@ -169,5 +177,5 @@ export const notificationHistory = pgTable(
         .onDelete('set null')
         .onUpdate('cascade'),
     };
-  }
+  },
 );

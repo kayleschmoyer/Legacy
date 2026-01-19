@@ -4,6 +4,7 @@ export * from './lib/client/PublicDbClient';
 export * from './lib/client/Helpers';
 export * from './lib/client/abstract/PgDbConnection';
 export * from './lib/client/abstract/DbClient';
+export * from './lib/client/abstract/BaseDbClient';
 export * from './lib/client/matchup-history';
 export * from './lib/client/notifications';
 

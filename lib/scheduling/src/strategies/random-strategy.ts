@@ -1,6 +1,6 @@
 /**
  * Random scheduling strategy
- * 
+ *
  * Generates random matchups each week while ensuring:
  * - No duplicate pairings within the same week
  * - Each team plays only once per week
@@ -16,10 +16,7 @@ export class RandomStrategy implements SchedulingStrategy {
     return 'random';
   }
 
-  generatePairings(
-    teams: TeamInfo[],
-    numberOfWeeks: number
-  ): MatchupPairing[] {
+  generatePairings(teams: TeamInfo[], numberOfWeeks: number): MatchupPairing[] {
     if (teams.length < 2) {
       return [];
     }

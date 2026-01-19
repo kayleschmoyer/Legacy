@@ -2,10 +2,7 @@ import { EventBridgeEvent } from 'aws-lambda';
 import memoizeOne from 'memoize-one';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
-import {
-  getDbConnection,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { getDbConnection, PublicSchema } from '@legacy-sports/db-client';
 import {
   type MatchupNotificationContext,
   sendCloseGameNotifications,

@@ -1,7 +1,10 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
-import { SqsDraftMessage, DraftProcessingResult } from '@legacy-sports/aws-utils';
+import {
+  SqsDraftMessage,
+  DraftProcessingResult,
+} from '@legacy-sports/aws-utils';
 import {
   getSentryConfigFromEnv,
   initSentry,
@@ -17,7 +20,7 @@ import {
   updateLeagueDraftStatus,
   validateDraftType,
 } from '@legacy-sports/db-client';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -50,6 +53,7 @@ interface PlayerWithPositions {
   firstName: string;
   lastName: string;
   brefId: string;
+  statsLastFetchedAt: Date | null; // Used to prioritize players with stats in draft
   eligiblePositions: string[];
   isPitcher: boolean;
   positionDetails?: Record<
@@ -126,7 +130,10 @@ async function loadAllPlayersWithPositions(
     // Parse positions_played JSONB data (same format as GraphQL API)
     if (record.positionsPlayed && typeof record.positionsPlayed === 'object') {
       try {
-        const positions = record.positionsPlayed as Record<string, { games: number; gamesStarted: number; position: string }>;
+        const positions = record.positionsPlayed as Record<
+          string,
+          { games: number; gamesStarted: number; position: string }
+        >;
         positionDetails = positions;
 
         // Extract eligible positions based on game thresholds
@@ -225,6 +232,7 @@ async function loadAllPlayersWithPositions(
       firstName: '', // Will be filled from main player query
       lastName: '',
       brefId: '',
+      statsLastFetchedAt: null, // Will be filled from main player query
       eligiblePositions,
       isPitcher,
       positionDetails,
@@ -242,6 +250,7 @@ async function loadAllPlayersWithPositions(
         firstName: '',
         lastName: '',
         brefId: '',
+        statsLastFetchedAt: null, // Will be filled from main player query
         eligiblePositions: ['DH'], // Most flexible position
         isPitcher: false,
         positionDetails: {},
@@ -314,11 +323,16 @@ const ALLOWED_POSITIONS = Object.freeze({
 } as const);
 
 const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP', 'P']));
+const BATTING_POSITIONS = Object.freeze(
+  new Set(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']),
+);
 
 /**
  * ENHANCED: Check if a player can play a specific position with detailed game experience
  * Uses the same ALLOWED_POSITIONS logic as GraphQL API but adds smart weighting
  * based on actual games played at each position for better draft decisions
+ *
+ * CRITICAL: Prevents pitchers from being assigned to batting slots and vice versa
  */
 function canPlayerPlayPosition(
   playerEligiblePositions: string[],
@@ -334,6 +348,38 @@ function canPlayerPlayPosition(
     ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
 
   if (!allowedPositions) {
+    return false;
+  }
+
+  // Determine if this is a pitching or batting slot
+  const isPitchingSlot = PITCHING_POSITIONS.has(requiredPosition);
+  const isBattingSlot =
+    BATTING_POSITIONS.has(requiredPosition) ||
+    requiredPosition === 'IF' ||
+    requiredPosition === 'OF' ||
+    requiredPosition === 'XDH';
+
+  // Check if player is a pitcher (has any pitching positions)
+  const isPitcher = playerEligiblePositions.some((pos) =>
+    PITCHING_POSITIONS.has(pos),
+  );
+
+  // Check if player is a batter (has any batting positions)
+  const isBatter = playerEligiblePositions.some((pos) =>
+    BATTING_POSITIONS.has(pos),
+  );
+
+  // CRITICAL VALIDATION: Prevent position type mismatches
+  // - Pitchers can only play pitching slots (SP, RP)
+  // - Batters can only play batting slots (C, 1B, 2B, 3B, SS, OF, IF, DH, etc.)
+  // - Exception: Two-way players (rare) have both pitching AND batting positions
+  if (isPitchingSlot && !isPitcher) {
+    // Trying to assign a non-pitcher to a pitching slot
+    return false;
+  }
+
+  if (isBattingSlot && isPitcher && !isBatter) {
+    // Trying to assign a pure pitcher to a batting slot
     return false;
   }
 
@@ -442,14 +488,27 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
 
       // Calculate players needed and fetch with appropriate buffer
       const estimatedPlayersNeeded = teams.length * leaguePositions.length * 2; // 2x buffer
+
+      // Prioritize players with loaded season stats for better projections
+      // Query explanation:
+      // 1. ORDER BY statsLastFetchedAt to prioritize players WITH stats
+      // 2. Most recently fetched stats appear first
+      // 3. Players with no stats (NULL) appear last
+      // 4. Secondary sort by player ID for consistent ordering
       const players = await tx
         .select({
           id: PublicSchema.players.id,
           firstName: PublicSchema.players.firstName,
           lastName: PublicSchema.players.lastName,
           brefId: PublicSchema.players.brefId,
+          statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
         })
         .from(PublicSchema.players)
+        .orderBy(
+          sql`CASE WHEN ${PublicSchema.players.statsLastFetchedAt} IS NOT NULL THEN 0 ELSE 1 END`, // Players with stats first
+          sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`, // Most recently fetched stats first
+          PublicSchema.players.id, // Consistent tiebreaker
+        )
         .limit(Math.max(estimatedPlayersNeeded, 1500)); // Minimum 1500 players
 
       if (teams.length === 0) {
@@ -464,13 +523,26 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         throw new Error('No players available for draft');
       }
 
+      // Log stats about player stats availability
+      const playersWithStats = players.filter(
+        (p) => p.statsLastFetchedAt !== null,
+      ).length;
+      const statsPercentage = Math.round(
+        (playersWithStats / players.length) * 100,
+      );
+
       LOGGER.info(
         `Draft data loaded: ${teams.length} teams, ${leaguePositions.length} positions, ${players.length} players`,
+      );
+      LOGGER.info(
+        `Player stats availability: ${playersWithStats}/${players.length} players (${statsPercentage}%) have loaded stats`,
       );
       addBreadcrumb('Basic draft data loaded', {
         teamCount: teams.length,
         positionCount: leaguePositions.length,
         playerCount: players.length,
+        playersWithStats: playersWithStats,
+        statsPercentage: `${statsPercentage}%`,
       });
 
       // Step 2: Batch load all player positions and stats (eliminates N+1 queries)
@@ -532,11 +604,15 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           })
           .map((player) => ({
             ...player,
-            positionScore: getPositionScore(
-              player.eligiblePositions,
-              position.positionType,
-              player.positionDetails,
-            ),
+            // Combine position score with stats availability
+            // Players without stats get -1, ensuring they always sort last
+            positionScore: player.statsLastFetchedAt
+              ? getPositionScore(
+                  player.eligiblePositions,
+                  position.positionType,
+                  player.positionDetails,
+                )
+              : -1, // Players without stats always go to the end
           }))
           // Sort by position score (best fits first) then shuffle within similar score ranges
           .sort((a, b) => b.positionScore - a.positionScore);

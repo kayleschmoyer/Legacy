@@ -25,10 +25,13 @@ const schedule = scheduler.generateSchedule({
 ## Strategies
 
 ### Round Robin
+
 Each team plays every other team exactly once during the season.
 
-### Divisional  
+### Divisional
+
 Teams play division opponents more frequently than non-division opponents.
 
 ### Random
+
 Random matchups each week (avoiding duplicate matchups in same week).

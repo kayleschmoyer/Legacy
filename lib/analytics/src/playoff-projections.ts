@@ -1,7 +1,4 @@
-import {
-  PlayoffProjection,
-  TeamStats,
-} from './types';
+import { PlayoffProjection, TeamStats } from './types';
 
 /**
  * Calculate playoff projections for all teams in a league
@@ -12,7 +9,7 @@ export function calculatePlayoffProjections(
     playoffTeams?: number;
     remainingWeeks?: number;
     simulationCount?: number;
-  } = {}
+  } = {},
 ): PlayoffProjection[] {
   const {
     playoffTeams = Math.ceil(teamStats.length / 2),
@@ -28,7 +25,7 @@ export function calculatePlayoffProjections(
       stats,
       teamStats,
       remainingWeeks,
-      simulationCount
+      simulationCount,
     );
 
     // Calculate playoff probability based on simulations
@@ -48,7 +45,7 @@ export function calculatePlayoffProjections(
       stats,
       teamStats,
       playoffTeams,
-      remainingWeeks
+      remainingWeeks,
     );
 
     // Calculate elimination number (losses before being eliminated)
@@ -56,7 +53,7 @@ export function calculatePlayoffProjections(
       stats,
       teamStats,
       playoffTeams,
-      remainingWeeks
+      remainingWeeks,
     );
 
     projections.push({
@@ -74,7 +71,9 @@ export function calculatePlayoffProjections(
   });
 
   // Sort by playoff probability (highest first)
-  return projections.sort((a, b) => b.playoffProbability - a.playoffProbability);
+  return projections.sort(
+    (a, b) => b.playoffProbability - a.playoffProbability,
+  );
 }
 
 /**
@@ -84,7 +83,7 @@ function runPlayoffSimulations(
   team: TeamStats,
   allTeams: TeamStats[],
   remainingWeeks: number,
-  simulationCount: number
+  simulationCount: number,
 ): {
   playoffAppearances: number;
   totalWins: number;
@@ -107,7 +106,7 @@ function runPlayoffSimulations(
       const randomFactor = (Math.random() - 0.5) * 0.2; // ±10% variance
       const winProbability = Math.max(
         0.1,
-        Math.min(0.9, baseWinProbability + randomFactor)
+        Math.min(0.9, baseWinProbability + randomFactor),
       );
 
       if (Math.random() < winProbability) {
@@ -123,7 +122,10 @@ function runPlayoffSimulations(
     // Determine if team made playoffs in this simulation
     // Simplified: check if in top half by projected win percentage
     const finalWinPct = simWins / (simWins + simLosses);
-    const playoffThreshold = calculatePlayoffThreshold(allTeams, remainingWeeks);
+    const playoffThreshold = calculatePlayoffThreshold(
+      allTeams,
+      remainingWeeks,
+    );
 
     if (finalWinPct >= playoffThreshold) {
       playoffAppearances += 1;
@@ -142,11 +144,13 @@ function runPlayoffSimulations(
  */
 function calculatePlayoffThreshold(
   teams: TeamStats[],
-  remainingWeeks: number
+  remainingWeeks: number,
 ): number {
   // Estimate based on current standings
   // Assume playoff teams need to be in top 50% or better
-  const sortedByWinPct = [...teams].sort((a, b) => b.winPercentage - a.winPercentage);
+  const sortedByWinPct = [...teams].sort(
+    (a, b) => b.winPercentage - a.winPercentage,
+  );
   const medianIndex = Math.floor(sortedByWinPct.length / 2);
   const medianWinPct = sortedByWinPct[medianIndex]?.winPercentage || 0.5;
 
@@ -160,7 +164,7 @@ function calculatePlayoffThreshold(
  */
 function calculateStrengthOfSchedule(
   _team: TeamStats,
-  allTeams: TeamStats[]
+  allTeams: TeamStats[],
 ): number {
   // Simplified: average win percentage of all opponents
   // In a real implementation, would look at actual matchup history
@@ -178,7 +182,7 @@ function calculateMagicNumber(
   team: TeamStats,
   allTeams: TeamStats[],
   playoffTeams: number,
-  remainingWeeks: number
+  remainingWeeks: number,
 ): number | null {
   // Sort teams by wins (descending)
   const sortedTeams = [...allTeams].sort((a, b) => b.wins - a.wins);
@@ -188,11 +192,15 @@ function calculateMagicNumber(
   if (!cutoffTeam) return null;
 
   // If team is currently in playoff position
-  const currentPosition = sortedTeams.findIndex((t) => t.teamId === team.teamId);
+  const currentPosition = sortedTeams.findIndex(
+    (t) => t.teamId === team.teamId,
+  );
   if (currentPosition < playoffTeams) {
     // Already in playoffs, calculate wins to clinch
     const teamsBelow = sortedTeams.slice(playoffTeams);
-    const maxWinsBelow = Math.max(...teamsBelow.map((t) => t.wins + remainingWeeks));
+    const maxWinsBelow = Math.max(
+      ...teamsBelow.map((t) => t.wins + remainingWeeks),
+    );
     const winsNeeded = maxWinsBelow - team.wins + 1;
     return Math.max(0, winsNeeded);
   }
@@ -213,14 +221,14 @@ function calculateEliminationNumber(
   team: TeamStats,
   allTeams: TeamStats[],
   _playoffTeams: number,
-  remainingWeeks: number
+  remainingWeeks: number,
 ): number | null {
   // Sort teams by wins (descending)
   const sortedTeams = [...allTeams].sort((a, b) => b.wins - a.wins);
 
   // Find teams that could still pass this team
   const teamsBelow = sortedTeams.filter(
-    (t) => t.teamId !== team.teamId && t.wins <= team.wins
+    (t) => t.teamId !== team.teamId && t.wins <= team.wins,
   );
 
   if (teamsBelow.length === 0) {
@@ -250,18 +258,23 @@ export function calculateScenarios(
   team: TeamStats,
   allTeams: TeamStats[],
   playoffTeams: number,
-  remainingWeeks: number
+  remainingWeeks: number,
 ): {
   hasClinched: boolean;
   isEliminated: boolean;
   scenariosText: string[];
 } {
-  const magicNumber = calculateMagicNumber(team, allTeams, playoffTeams, remainingWeeks);
+  const magicNumber = calculateMagicNumber(
+    team,
+    allTeams,
+    playoffTeams,
+    remainingWeeks,
+  );
   const eliminationNumber = calculateEliminationNumber(
     team,
     allTeams,
     playoffTeams,
-    remainingWeeks
+    remainingWeeks,
   );
 
   const scenarios: string[] = [];
@@ -280,7 +293,7 @@ export function calculateScenarios(
     }
     if (eliminationNumber !== null && eliminationNumber > 0) {
       scenarios.push(
-        `Will be eliminated with ${eliminationNumber} more loss(es)`
+        `Will be eliminated with ${eliminationNumber} more loss(es)`,
       );
     }
   }
@@ -297,7 +310,7 @@ export function calculateScenarios(
  */
 export function generatePlayoffRaceSummary(
   projections: PlayoffProjection[],
-  playoffTeams: number
+  playoffTeams: number,
 ): {
   inPlayoffPosition: PlayoffProjection[];
   onTheBubble: PlayoffProjection[];

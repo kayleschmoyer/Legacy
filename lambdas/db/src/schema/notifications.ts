@@ -19,7 +19,12 @@ import { builder } from './builder';
 
 // Enums
 const NotificationType = builder.enumType('NotificationType', {
-  values: ['matchup_started', 'matchup_ended', 'matchup_close_game', 'matchup_reminder'] as const,
+  values: [
+    'matchup_started',
+    'matchup_ended',
+    'matchup_close_game',
+    'matchup_reminder',
+  ] as const,
 });
 
 const NotificationChannel = builder.enumType('NotificationChannel', {
@@ -54,7 +59,8 @@ builder.objectType(NotificationPreference, {
     emailEnabled: t.exposeBoolean('emailEnabled'),
     closeGameThreshold: t.float({
       nullable: true,
-      resolve: (pref) => pref.closeGameThreshold ? parseFloat(pref.closeGameThreshold) : null,
+      resolve: (pref) =>
+        pref.closeGameThreshold ? parseFloat(pref.closeGameThreshold) : null,
     }),
     createdAt: t.exposeString('createdAt'),
     updatedAt: t.exposeString('updatedAt'),
@@ -91,7 +97,11 @@ builder.objectType(DeviceToken, {
 const NotificationHistoryItem = builder.objectRef<{
   id: number;
   userId: number;
-  notificationType: 'matchup_started' | 'matchup_ended' | 'matchup_close_game' | 'matchup_reminder';
+  notificationType:
+    | 'matchup_started'
+    | 'matchup_ended'
+    | 'matchup_close_game'
+    | 'matchup_reminder';
   channel: 'in_app' | 'push' | 'email';
   matchupId: number | null;
   leagueId: number | null;
@@ -123,7 +133,7 @@ builder.objectType(NotificationHistoryItem, {
     message: t.exposeString('message'),
     metadata: t.string({
       nullable: true,
-      resolve: (item) => item.metadata ? JSON.stringify(item.metadata) : null,
+      resolve: (item) => (item.metadata ? JSON.stringify(item.metadata) : null),
     }),
     read: t.exposeBoolean('read'),
     sentAt: t.exposeString('sentAt'),
@@ -133,17 +143,20 @@ builder.objectType(NotificationHistoryItem, {
 });
 
 // Input Types
-const NotificationPreferenceInput = builder.inputType('NotificationPreferenceInput', {
-  fields: (t) => ({
-    matchupStartedEnabled: t.boolean(),
-    matchupEndedEnabled: t.boolean(),
-    matchupCloseGameEnabled: t.boolean(),
-    matchupReminderEnabled: t.boolean(),
-    pushEnabled: t.boolean(),
-    emailEnabled: t.boolean(),
-    closeGameThreshold: t.float(),
-  }),
-});
+const NotificationPreferenceInput = builder.inputType(
+  'NotificationPreferenceInput',
+  {
+    fields: (t) => ({
+      matchupStartedEnabled: t.boolean(),
+      matchupEndedEnabled: t.boolean(),
+      matchupCloseGameEnabled: t.boolean(),
+      matchupReminderEnabled: t.boolean(),
+      pushEnabled: t.boolean(),
+      emailEnabled: t.boolean(),
+      closeGameThreshold: t.float(),
+    }),
+  },
+);
 
 const DeviceTokenInput = builder.inputType('DeviceTokenInput', {
   fields: (t) => ({
@@ -166,7 +179,7 @@ builder.queryField('getUserNotificationPreferences', (t) =>
         return await getUserNotificationPreferences(db, args.userId);
       });
     },
-  })
+  }),
 );
 
 builder.queryField('getNotificationHistory', (t) =>
@@ -181,7 +194,7 @@ builder.queryField('getNotificationHistory', (t) =>
         return await getUserNotificationHistory(db, args.userId, args.limit);
       });
     },
-  })
+  }),
 );
 
 builder.queryField('getUnreadNotificationCount', (t) =>
@@ -194,7 +207,7 @@ builder.queryField('getUnreadNotificationCount', (t) =>
         return await getUnreadNotificationCount(db, args.userId);
       });
     },
-  })
+  }),
 );
 
 builder.queryField('getUserDeviceTokens', (t) =>
@@ -208,7 +221,7 @@ builder.queryField('getUserDeviceTokens', (t) =>
         return await getUserDeviceTokens(db, args.userId);
       });
     },
-  })
+  }),
 );
 
 // Mutations
@@ -233,7 +246,7 @@ builder.mutationField('updateNotificationPreferences', (t) =>
         return await updateNotificationPreferences(db, args.userId, input);
       });
     },
-  })
+  }),
 );
 
 builder.mutationField('registerDeviceToken', (t) =>
@@ -253,7 +266,7 @@ builder.mutationField('registerDeviceToken', (t) =>
         return await registerDeviceToken(db, input);
       });
     },
-  })
+  }),
 );
 
 builder.mutationField('disableDeviceToken', (t) =>
@@ -267,7 +280,7 @@ builder.mutationField('disableDeviceToken', (t) =>
       });
       return true;
     },
-  })
+  }),
 );
 
 builder.mutationField('markNotificationAsRead', (t) =>
@@ -281,7 +294,7 @@ builder.mutationField('markNotificationAsRead', (t) =>
       });
       return true;
     },
-  })
+  }),
 );
 
 builder.mutationField('markAllNotificationsAsRead', (t) =>
@@ -295,5 +308,5 @@ builder.mutationField('markAllNotificationsAsRead', (t) =>
       });
       return true;
     },
-  })
+  }),
 );

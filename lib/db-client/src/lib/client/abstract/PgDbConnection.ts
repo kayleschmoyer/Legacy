@@ -37,6 +37,15 @@ export class PgDbConnection<
       password: dbConfig.password,
       port: 5432,
       user: dbConfig.user,
+
+      // Connection pool limits to prevent exhaustion
+      // In Lambda: Each instance should use minimal connections
+      // db.t3.micro has ~87 max_connections, AWS reserves ~10
+      // With 10 concurrent Lambdas, each can safely use 3-4 connections
+      max: 3, // Maximum connections per Lambda instance
+      min: 0, // Don't keep idle connections (Lambda is ephemeral)
+      idleTimeoutMillis: 30000, // Release idle connections after 30s
+      connectionTimeoutMillis: 5000, // Fail fast if pool is exhausted
     };
 
     // Use SSL configuration from database config
@@ -62,21 +71,43 @@ export class PgDbConnection<
 
     const pgPool = new Pool(options);
 
-    const client = await pgPool.connect();
+    // Log connection pool events for monitoring
+    pgPool.on('connect', () => {
+      console.log(
+        `[DB Pool] Connection established. Active: ${pgPool.totalCount}, Idle: ${pgPool.idleCount}, Waiting: ${pgPool.waitingCount}`,
+      );
+    });
 
-    const db = drizzlePg(client, {
+    pgPool.on('error', (err) => {
+      console.error('[DB Pool] Unexpected error on idle client', err);
+    });
+
+    pgPool.on('remove', () => {
+      console.log(
+        `[DB Pool] Connection removed. Active: ${pgPool.totalCount}, Idle: ${pgPool.idleCount}`,
+      );
+    });
+
+    // IMPORTANT: Pass the Pool directly to drizzle, not a single client
+    // This allows drizzle to get fresh clients from the pool for each query
+    // and properly handle connection lifecycle in Lambda environments
+    const db = drizzlePg(pgPool, {
       schema: this.schema,
     });
 
+    // Get one client to verify connection works
+    const testClient = await pgPool.connect();
+    testClient.release();
+
     return {
-      client: client,
+      client: testClient, // Kept for backwards compatibility, but not used
       db: db,
       pool: pgPool,
     };
   }
 
   async close(): Promise<void> {
-    this.client.release();
+    // Only close the pool, don't try to release a specific client
     await this.pool.end();
   }
 }

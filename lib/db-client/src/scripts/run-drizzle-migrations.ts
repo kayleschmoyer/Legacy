@@ -10,15 +10,15 @@
  */
 
 import { config } from 'dotenv';
-import { join, resolve } from 'path';
-config({ path: resolve(__dirname, '../../../../.env') });
-
+import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { existsSync } from 'fs';
-import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDatabaseConfig } from '../config/database';
+import { join, resolve } from 'path';
+import { existsSync } from 'fs';
+
+config({ path: resolve(__dirname, '../../../../.env') });
+import { getMigrationDatabaseConfig } from '../config/database';
 
 // Load environment variables from root .env file (already done above)
 
@@ -27,10 +27,10 @@ async function runMigrations() {
     LOGGER.info('🔧 Legacy Sports Database Migration (Drizzle)');
     LOGGER.info('===========================================');
 
-    LOGGER.info('🔍 Resolving database credentials...');
+    LOGGER.info('🔍 Resolving migration database credentials...');
 
-    // Get database configuration
-    const dbConfig = await getDatabaseConfig();
+    // Get database configuration with migration user credentials
+    const dbConfig = await getMigrationDatabaseConfig();
 
     LOGGER.info(
       `� Connected to database: ${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}`,

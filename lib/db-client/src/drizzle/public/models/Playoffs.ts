@@ -13,7 +13,7 @@ import { leagues, teams } from './Leagues';
 
 /**
  * Playoff System Database Tables (LS-28)
- * 
+ *
  * Implements playoff bracket management with automatic seeding,
  * tournament progression, and championship determination.
  */
@@ -53,7 +53,9 @@ export const playoffBrackets = pgTable(
     endWeek: integer('end_week').notNull(),
     championTeamId: integer('champion_team_id'),
     status: playoffMatchupStatus('status').notNull().default('scheduled'),
-    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .defaultNow()
+      .notNull(),
   },
   (table) => {
     return {
@@ -67,12 +69,11 @@ export const playoffBrackets = pgTable(
         foreignColumns: [teams.id],
         name: 'playoff_brackets_champion_fk',
       }),
-      playoffBracketsLeagueSeasonUk: unique('playoff_brackets_league_season_uk').on(
-        table.leagueId,
-        table.season
-      ),
+      playoffBracketsLeagueSeasonUk: unique(
+        'playoff_brackets_league_season_uk',
+      ).on(table.leagueId, table.season),
     };
-  }
+  },
 );
 
 /**
@@ -117,7 +118,7 @@ export const playoffMatchups = pgTable(
         name: 'playoff_matchups_winner_fk',
       }),
     };
-  }
+  },
 );
 
 /**
@@ -148,10 +149,10 @@ export const playoffSeeds = pgTable(
       }),
       playoffSeedsBracketTeamUk: unique('playoff_seeds_bracket_team_uk').on(
         table.bracketId,
-        table.teamId
+        table.teamId,
       ),
     };
-  }
+  },
 );
 
 /**
@@ -168,7 +169,9 @@ export const championTrophies = pgTable(
     finalScore: decimal('final_score', { precision: 10, scale: 2 }).notNull(),
     runnerUpTeamId: integer('runner_up_team_id'),
     runnerUpScore: decimal('runner_up_score', { precision: 10, scale: 2 }),
-    awardedAt: timestamp('awarded_at', { mode: 'string' }).defaultNow().notNull(),
+    awardedAt: timestamp('awarded_at', { mode: 'string' })
+      .defaultNow()
+      .notNull(),
   },
   (table) => {
     return {
@@ -187,10 +190,9 @@ export const championTrophies = pgTable(
         foreignColumns: [teams.id],
         name: 'champion_trophies_runner_up_fk',
       }),
-      championTrophiesLeagueSeasonUk: unique('champion_trophies_league_season_uk').on(
-        table.leagueId,
-        table.season
-      ),
+      championTrophiesLeagueSeasonUk: unique(
+        'champion_trophies_league_season_uk',
+      ).on(table.leagueId, table.season),
     };
-  }
+  },
 );

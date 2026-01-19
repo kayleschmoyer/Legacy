@@ -173,7 +173,9 @@ describe('Matchup Scoring Engine', () => {
     });
 
     it('should throw error for empty game stats array', () => {
-      expect(() => aggregatePlayerStats([])).toThrow('No game stats provided for aggregation');
+      expect(() => aggregatePlayerStats([])).toThrow(
+        'No game stats provided for aggregation',
+      );
     });
   });
 
@@ -259,12 +261,30 @@ describe('Matchup Scoring Engine', () => {
   describe('calculateTeamScore', () => {
     it('should calculate total team score from multiple players', () => {
       const playerGameStats = new Map<number, PlayerGameStats[]>([
-        [1, [{ playerId: 1, season: 2023, gameNum: 1, batting: { h: 3, hr: 1 } }]],
-        [2, [{ playerId: 2, season: 2023, gameNum: 1, pitching: { w: 1, so: 10 } }]],
+        [
+          1,
+          [{ playerId: 1, season: 2023, gameNum: 1, batting: { h: 3, hr: 1 } }],
+        ],
+        [
+          2,
+          [
+            {
+              playerId: 2,
+              season: 2023,
+              gameNum: 1,
+              pitching: { w: 1, so: 10 },
+            },
+          ],
+        ],
         [3, [{ playerId: 3, season: 2023, gameNum: 1, fielding: { eDef: 1 } }]],
       ]);
 
-      const result = calculateTeamScore(100, playerGameStats, 5, mockScoringSettings);
+      const result = calculateTeamScore(
+        100,
+        playerGameStats,
+        5,
+        mockScoringSettings,
+      );
 
       expect(result.teamId).toBe(100);
       expect(result.playerScores).toHaveLength(3);
@@ -280,7 +300,12 @@ describe('Matchup Scoring Engine', () => {
     it('should handle team with no player stats', () => {
       const playerGameStats = new Map<number, PlayerGameStats[]>();
 
-      const result = calculateTeamScore(100, playerGameStats, 5, mockScoringSettings);
+      const result = calculateTeamScore(
+        100,
+        playerGameStats,
+        5,
+        mockScoringSettings,
+      );
 
       expect(result.teamId).toBe(100);
       expect(result.playerScores).toHaveLength(0);
@@ -291,17 +316,23 @@ describe('Matchup Scoring Engine', () => {
 
     it('should correctly track games remaining', () => {
       const playerGameStats = new Map<number, PlayerGameStats[]>([
-        [1, [
-          { playerId: 1, season: 2023, gameNum: 1, batting: { h: 2 } },
-          { playerId: 1, season: 2023, gameNum: 2, batting: { h: 1 } },
-          { playerId: 1, season: 2023, gameNum: 3, batting: { h: 3 } },
-        ]],
-        [2, [
-          { playerId: 2, season: 2023, gameNum: 1, batting: { h: 1 } },
-        ]],
+        [
+          1,
+          [
+            { playerId: 1, season: 2023, gameNum: 1, batting: { h: 2 } },
+            { playerId: 1, season: 2023, gameNum: 2, batting: { h: 1 } },
+            { playerId: 1, season: 2023, gameNum: 3, batting: { h: 3 } },
+          ],
+        ],
+        [2, [{ playerId: 2, season: 2023, gameNum: 1, batting: { h: 1 } }]],
       ]);
 
-      const result = calculateTeamScore(100, playerGameStats, 10, mockScoringSettings);
+      const result = calculateTeamScore(
+        100,
+        playerGameStats,
+        10,
+        mockScoringSettings,
+      );
 
       expect(result.gamesSelected).toBe(4); // 3 + 1
       expect(result.gamesRemaining).toBe(6); // 10 - 4
@@ -309,7 +340,7 @@ describe('Matchup Scoring Engine', () => {
 
     it('should handle large rosters efficiently', () => {
       const playerGameStats = new Map<number, PlayerGameStats[]>();
-      
+
       // Create 25 players with 5 games each
       for (let i = 1; i <= 25; i++) {
         const games: PlayerGameStats[] = [];
@@ -325,7 +356,12 @@ describe('Matchup Scoring Engine', () => {
       }
 
       const startTime = Date.now();
-      const result = calculateTeamScore(100, playerGameStats, 125, mockScoringSettings);
+      const result = calculateTeamScore(
+        100,
+        playerGameStats,
+        125,
+        mockScoringSettings,
+      );
       const endTime = Date.now();
 
       expect(result.playerScores).toHaveLength(25);
@@ -338,11 +374,17 @@ describe('Matchup Scoring Engine', () => {
   describe('calculateMatchupScore', () => {
     it('should calculate scores for both teams', () => {
       const team1Stats = new Map<number, PlayerGameStats[]>([
-        [1, [{ playerId: 1, season: 2023, gameNum: 1, batting: { h: 3, hr: 1 } }]],
+        [
+          1,
+          [{ playerId: 1, season: 2023, gameNum: 1, batting: { h: 3, hr: 1 } }],
+        ],
       ]);
 
       const team2Stats = new Map<number, PlayerGameStats[]>([
-        [2, [{ playerId: 2, season: 2023, gameNum: 1, batting: { h: 2, hr: 2 } }]],
+        [
+          2,
+          [{ playerId: 2, season: 2023, gameNum: 1, batting: { h: 2, hr: 2 } }],
+        ],
       ]);
 
       const result = calculateMatchupScore(
@@ -352,7 +394,7 @@ describe('Matchup Scoring Engine', () => {
         team1Stats,
         team2Stats,
         5,
-        mockScoringSettings
+        mockScoringSettings,
       );
 
       expect(result.matchupId).toBe(999);
@@ -373,7 +415,7 @@ describe('Matchup Scoring Engine', () => {
         emptyStats,
         emptyStats,
         5,
-        mockScoringSettings
+        mockScoringSettings,
       );
 
       expect(result.team1Score).toBeNull();
@@ -391,7 +433,7 @@ describe('Matchup Scoring Engine', () => {
         200,
         team1Stats,
         new Map(),
-        5
+        5,
       );
 
       expect(result.team1Score).not.toBeNull();

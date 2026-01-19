@@ -1,6 +1,6 @@
 /**
  * @legacy-sports/scheduling
- * 
+ *
  * Matchup scheduling for fantasy leagues
  */
 

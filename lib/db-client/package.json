@@ -27,7 +27,7 @@
     "db:fresh": "tsx src/scripts/rollback-migrations.ts fresh",
     "db:refresh": "tsx src/scripts/rollback-migrations.ts refresh",
     "db:generate:legacy": "drizzle-kit generate",
-    "db:migrate": "tsx src/scripts/run-drizzle-migrations.ts",
+    "db:migrate": "tsx src/scripts/rollback-migrations.ts up",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx src/scripts/reset-database.ts"

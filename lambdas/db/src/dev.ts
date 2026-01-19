@@ -1,12 +1,12 @@
 // Load environment variables first
 import './env';
-
 import { LOGGER } from '@legacy-sports/logging';
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { schema } from './schema';
+import { createLoaders } from './schema/dataloaders';
 
 interface JWTPayload {
   id: number;
@@ -58,6 +58,20 @@ async function startServer() {
   const server = new ApolloServer({
     schema,
     introspection: true,
+    formatError: (formattedError, error) => {
+      // Log all errors with full context
+      console.error('GraphQL Error:', {
+        message: formattedError.message,
+        path: formattedError.path,
+        extensions: formattedError.extensions,
+        locations: formattedError.locations,
+        originalError: error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Return the formatted error to the client
+      return formattedError;
+    },
   });
 
   // Log available queries for debugging
@@ -79,14 +93,17 @@ async function startServer() {
       if (authorization && authorization.startsWith('Bearer ')) {
         try {
           const token = authorization.substring(7); // Remove 'Bearer ' prefix
-          
+
           // Decode JWT payload (simple base64 decode - no signature verification for dev)
           const parts = token.split('.');
           if (parts.length === 3) {
             const payload = JSON.parse(
-              Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+              Buffer.from(
+                parts[1].replace(/-/g, '+').replace(/_/g, '/'),
+                'base64',
+              ).toString(),
             ) as JWTPayload;
-            
+
             user = {
               id: payload.id,
               email: payload.email,
@@ -112,7 +129,10 @@ async function startServer() {
 
       // Make this actually async to satisfy linter
       await Promise.resolve();
-      return { user };
+      return {
+        user,
+        loaders: createLoaders(), // Create fresh loaders for each request
+      };
     },
   });
 

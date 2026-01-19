@@ -1,17 +1,13 @@
 /**
  * Main matchup scheduler
- * 
+ *
  * Orchestrates the scheduling process:
  * 1. Generate team pairings using selected strategy
  * 2. Select eligible seasons for each matchup
  * 3. Build complete schedule with all metadata
  */
 
-import type {
-  ScheduledMatchup,
-  ScheduleParams,
-  ScheduleResult,
-} from './types';
+import type { ScheduledMatchup, ScheduleParams, ScheduleResult } from './types';
 import type { SchedulingStrategy } from './strategies/strategy-interface';
 import { selectRandomSeason } from './season-selector';
 
@@ -48,7 +44,7 @@ export class MatchupScheduler {
 
     if (eligibleSeasons.length === 0) {
       warnings.push(
-        'No eligible seasons available. Check league min_games_per_season configuration and player game counts.'
+        'No eligible seasons available. Check league min_games_per_season configuration and player game counts.',
       );
     }
 
@@ -69,7 +65,7 @@ export class MatchupScheduler {
 
       if (selectedSeason === null) {
         warnings.push(
-          `No eligible season found for matchup: Team ${pairing.team1Id} vs Team ${pairing.team2Id} (Week ${pairing.weekNumber})`
+          `No eligible season found for matchup: Team ${pairing.team1Id} vs Team ${pairing.team2Id} (Week ${pairing.weekNumber})`,
         );
       }
 
@@ -77,7 +73,7 @@ export class MatchupScheduler {
       if (selectedSeason !== null) {
         seasonUsage.set(
           selectedSeason,
-          (seasonUsage.get(selectedSeason) ?? 0) + 1
+          (seasonUsage.get(selectedSeason) ?? 0) + 1,
         );
       }
 
@@ -88,7 +84,8 @@ export class MatchupScheduler {
         team1Id: pairing.team1Id,
         team2Id: pairing.team2Id,
         selectedSeason: selectedSeason,
-        gamesPerMatchup: selectedSeason !== null ? leagueConfig.gamesPerMatchup : null,
+        gamesPerMatchup:
+          selectedSeason !== null ? leagueConfig.gamesPerMatchup : null,
         status: 'scheduled',
       });
     }

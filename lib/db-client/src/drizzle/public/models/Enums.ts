@@ -2,8 +2,18 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const accessLevel = pgEnum('access_level', ['none', 'admin']);
 export const draftOrder = pgEnum('draft_order', ['snake', 'normal']);
-export const draftType = pgEnum('draft_type', ['blind', 'normal', 'legacy', 'random-draft']);
-export const draftStatus = pgEnum('draft_status', ['not-started', 'queued', 'in-progress', 'completed']);
+export const draftType = pgEnum('draft_type', [
+  'blind',
+  'normal',
+  'legacy',
+  'random-draft',
+]);
+export const draftStatus = pgEnum('draft_status', [
+  'not-started',
+  'queued',
+  'in-progress',
+  'completed',
+]);
 export const leaguePermissionLevel = pgEnum('league_permission_level', [
   'owner',
   'commissioner',
@@ -70,4 +80,10 @@ export const rosterLockTiming = pgEnum('roster_lock_timing', [
   'day_before',
   'week_before',
   'custom',
+]);
+
+export const schedulingStrategy = pgEnum('scheduling_strategy', [
+  'round-robin',
+  'divisional',
+  'random',
 ]);

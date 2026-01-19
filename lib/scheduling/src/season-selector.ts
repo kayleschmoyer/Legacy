@@ -1,6 +1,6 @@
 /**
  * Season selection logic for matchups
- * 
+ *
  * Selects eligible seasons based on:
  * - League's min_games_per_season configuration
  * - All rostered players must have sufficient games in the season
@@ -26,7 +26,7 @@ export interface SeasonSelectionParams {
  * A season is eligible if ALL players on ALL teams have >= minGamesPerSeason
  */
 export function determineEligibleSeasons(
-  params: SeasonEligibilityParams
+  params: SeasonEligibilityParams,
 ): SeasonInfo[] {
   const { teamRosters, playerGameCounts, minGamesPerSeason } = params;
 
@@ -58,8 +58,7 @@ export function determineEligibleSeasons(
 
       // Check each player on the team
       for (const playerId of roster.playerIds) {
-        const gamesInSeason =
-          playerSeasonGames.get(playerId)?.get(season) ?? 0;
+        const gamesInSeason = playerSeasonGames.get(playerId)?.get(season) ?? 0;
 
         if (gamesInSeason < minGamesPerSeason) {
           isTeamEligible = false;
@@ -98,7 +97,7 @@ export function determineEligibleSeasons(
  * Considers usage counts to balance season selection over time
  */
 export function selectRandomSeason(
-  params: SeasonSelectionParams
+  params: SeasonSelectionParams,
 ): number | null {
   const { eligibleSeasons, teamIds, usedSeasonCounts } = params;
 
@@ -108,7 +107,7 @@ export function selectRandomSeason(
 
   // Filter to seasons where all involved teams are eligible
   const validSeasons = eligibleSeasons.filter((seasonInfo) =>
-    teamIds.every((teamId) => seasonInfo.eligibleTeamIds.includes(teamId))
+    teamIds.every((teamId) => seasonInfo.eligibleTeamIds.includes(teamId)),
   );
 
   if (validSeasons.length === 0) {
@@ -119,12 +118,12 @@ export function selectRandomSeason(
   if (usedSeasonCounts && usedSeasonCounts.size > 0) {
     // Find minimum usage count
     const minUsage = Math.min(
-      ...validSeasons.map((s) => usedSeasonCounts.get(s.season) ?? 0)
+      ...validSeasons.map((s) => usedSeasonCounts.get(s.season) ?? 0),
     );
 
     // Filter to seasons with minimum usage
     const leastUsedSeasons = validSeasons.filter(
-      (s) => (usedSeasonCounts.get(s.season) ?? 0) === minUsage
+      (s) => (usedSeasonCounts.get(s.season) ?? 0) === minUsage,
     );
 
     // Random selection from least-used seasons
@@ -143,14 +142,12 @@ export function selectRandomSeason(
 export function validateSeasonForMatchup(
   season: number,
   teamIds: number[],
-  eligibleSeasons: SeasonInfo[]
+  eligibleSeasons: SeasonInfo[],
 ): boolean {
   const seasonInfo = eligibleSeasons.find((s) => s.season === season);
   if (!seasonInfo) {
     return false;
   }
 
-  return teamIds.every((teamId) =>
-    seasonInfo.eligibleTeamIds.includes(teamId)
-  );
+  return teamIds.every((teamId) => seasonInfo.eligibleTeamIds.includes(teamId));
 }

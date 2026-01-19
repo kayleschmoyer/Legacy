@@ -4,6 +4,7 @@ import DataloaderPlugin from '@pothos/plugin-dataloader';
 import ValidationPlugin from '@pothos/plugin-validation';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
+import { type Loaders } from './dataloaders';
 
 // Initialize database service
 createDatabaseService(getDbOptions());
@@ -16,6 +17,7 @@ export interface Context {
     username?: string | null;
     isAdmin?: boolean;
   } | null;
+  loaders: Loaders; // DataLoaders for batching queries
 }
 
 // Define the schema builder with comprehensive types

@@ -62,7 +62,11 @@ export interface DeviceTokenInput {
 export interface NotificationHistoryRecord {
   id: number;
   userId: number;
-  notificationType: 'matchup_started' | 'matchup_ended' | 'matchup_close_game' | 'matchup_reminder';
+  notificationType:
+    | 'matchup_started'
+    | 'matchup_ended'
+    | 'matchup_close_game'
+    | 'matchup_reminder';
   channel: 'in_app' | 'push' | 'email';
   matchupId: number | null;
   leagueId: number | null;
@@ -80,7 +84,11 @@ export interface NotificationHistoryRecord {
  */
 export interface CreateNotificationInput {
   userId: number;
-  notificationType: 'matchup_started' | 'matchup_ended' | 'matchup_close_game' | 'matchup_reminder';
+  notificationType:
+    | 'matchup_started'
+    | 'matchup_ended'
+    | 'matchup_close_game'
+    | 'matchup_reminder';
   channel: 'in_app' | 'push' | 'email';
   matchupId?: number;
   leagueId?: number;
@@ -212,8 +220,8 @@ export async function getUserDeviceTokens(
     .where(
       and(
         eq(Schema.deviceTokens.userId, userId),
-        eq(Schema.deviceTokens.enabled, true)
-      )
+        eq(Schema.deviceTokens.enabled, true),
+      ),
     );
 }
 
@@ -289,8 +297,8 @@ export async function getUnreadNotificationCount(
     .where(
       and(
         eq(Schema.notificationHistory.userId, userId),
-        eq(Schema.notificationHistory.read, false)
-      )
+        eq(Schema.notificationHistory.read, false),
+      ),
     );
 
   return result[0]?.count || 0;
@@ -328,8 +336,8 @@ export async function markAllNotificationsAsRead(
     .where(
       and(
         eq(Schema.notificationHistory.userId, userId),
-        eq(Schema.notificationHistory.read, false)
-      )
+        eq(Schema.notificationHistory.read, false),
+      ),
     );
 }
 
@@ -360,7 +368,7 @@ export async function deleteOldNotificationHistory(
     .delete(Schema.notificationHistory)
     .where(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- SQL template for date comparison requires any type
-      sql`${Schema.notificationHistory.sentAt} < now() - interval '${sql.raw(daysToKeep.toString())} days'` as any
+      sql`${Schema.notificationHistory.sentAt} < now() - interval '${sql.raw(daysToKeep.toString())} days'` as any,
     )
     .returning({ id: Schema.notificationHistory.id });
 

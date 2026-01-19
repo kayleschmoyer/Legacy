@@ -116,7 +116,8 @@ describe('League scoring GraphQL resolvers', () => {
     if (
       !isValidNumberOrNull(candidate.profileId) ||
       !isValidNumberOrNull(candidate.leagueId) ||
-      (candidate.profileName !== null && typeof candidate.profileName !== 'string') ||
+      (candidate.profileName !== null &&
+        typeof candidate.profileName !== 'string') ||
       !Array.isArray(candidate.stats)
     ) {
       throw new Error('Unexpected scoring config structure');
@@ -139,7 +140,9 @@ describe('League scoring GraphQL resolvers', () => {
         throw new Error('Invalid scoring rule definition');
       }
 
-      const definition = scoringRule.definition as Partial<ResolvedScoringRule['definition']>;
+      const definition = scoringRule.definition as Partial<
+        ResolvedScoringRule['definition']
+      >;
 
       if (
         typeof definition.id !== 'number' ||
@@ -189,9 +192,9 @@ describe('League scoring GraphQL resolvers', () => {
     assertIsScoringConfig(result);
 
     expect(runWithPublicClientMock).toHaveBeenCalled();
-    expect(databaseServiceMock.scoring.getActiveProfileDetails).toHaveBeenCalledWith(
-      leagueId,
-    );
+    expect(
+      databaseServiceMock.scoring.getActiveProfileDetails,
+    ).toHaveBeenCalledWith(leagueId);
     expect(result).toMatchObject({
       profileId: profileDetails.profileId,
       leagueId: profileDetails.leagueId,
@@ -320,7 +323,11 @@ describe('League scoring GraphQL resolvers', () => {
     select: (...args: unknown[]) => {
       from: (...args: unknown[]) => {
         where: (...args: unknown[]) => {
-          limit: (...args: unknown[]) => Promise<Array<{ leagueId: number; userId: number; permissionLevel: string }>>;
+          limit: (
+            ...args: unknown[]
+          ) => Promise<
+            Array<{ leagueId: number; userId: number; permissionLevel: string }>
+          >;
         };
       };
     };

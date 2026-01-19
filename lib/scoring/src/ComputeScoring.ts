@@ -37,7 +37,7 @@ export function computeScoring<
       throw new Error(`Cannot compute with non-finite multiplier: ${key}`);
     }
 
-  const value = statsRecord[key];
+    const value = statsRecord[key];
 
     if (value === null) {
       continue;

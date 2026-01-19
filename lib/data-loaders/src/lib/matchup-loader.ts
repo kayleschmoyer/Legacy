@@ -2,37 +2,39 @@ import DataLoader from 'dataloader';
 import {
   Matchup,
   MatchupPlayer,
-  MatchupPlayerGame,
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { inArray } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 
+// Type for matchup_player_games
+type MatchupPlayerGame = typeof PublicSchema.matchupPlayerGames.$inferSelect;
+
 /**
  * DataLoader for matchups by ID
  * Prevents N+1 queries when loading multiple matchups
  */
-export function createMatchupLoader(db: PublicDb): DataLoader<number, Matchup | null> {
-  return new DataLoader<number, Matchup | null>(
-    async (matchupIds) => {
-      LOGGER.debug(`Batch loading ${matchupIds.length} matchups`);
-      
-      const matchups = await db
-        .select()
-        .from(PublicSchema.matchups)
-        .where(inArray(PublicSchema.matchups.id, matchupIds as number[]));
+export function createMatchupLoader(
+  db: PublicDb,
+): DataLoader<number, Matchup | null> {
+  return new DataLoader<number, Matchup | null>(async (matchupIds) => {
+    LOGGER.debug(`Batch loading ${matchupIds.length} matchups`);
 
-      // Create a map for O(1) lookups
-      const matchupMap = new Map<number, Matchup>();
-      matchups.forEach((matchup) => {
-        matchupMap.set(matchup.id, matchup);
-      });
+    const matchups = await db
+      .select()
+      .from(PublicSchema.matchups)
+      .where(inArray(PublicSchema.matchups.id, matchupIds as number[]));
 
-      // Return results in the same order as requested IDs
-      return matchupIds.map((id) => matchupMap.get(id) || null);
-    }
-  );
+    // Create a map for O(1) lookups
+    const matchupMap = new Map<number, Matchup>();
+    matchups.forEach((matchup) => {
+      matchupMap.set(matchup.id, matchup);
+    });
+
+    // Return results in the same order as requested IDs
+    return matchupIds.map((id) => matchupMap.get(id) || null);
+  });
 }
 
 /**
@@ -40,29 +42,27 @@ export function createMatchupLoader(db: PublicDb): DataLoader<number, Matchup | 
  * Efficiently loads all matchups for a league
  */
 export function createMatchupsByLeagueLoader(
-  db: PublicDb
+  db: PublicDb,
 ): DataLoader<number, Matchup[]> {
-  return new DataLoader<number, Matchup[]>(
-    async (leagueIds) => {
-      LOGGER.debug(`Batch loading matchups for ${leagueIds.length} leagues`);
-      
-      const matchups = await db
-        .select()
-        .from(PublicSchema.matchups)
-        .where(inArray(PublicSchema.matchups.leagueId, leagueIds as number[]));
+  return new DataLoader<number, Matchup[]>(async (leagueIds) => {
+    LOGGER.debug(`Batch loading matchups for ${leagueIds.length} leagues`);
 
-      // Group matchups by league ID
-      const matchupsByLeague = new Map<number, Matchup[]>();
-      matchups.forEach((matchup) => {
-        const existing = matchupsByLeague.get(matchup.leagueId) || [];
-        existing.push(matchup);
-        matchupsByLeague.set(matchup.leagueId, existing);
-      });
+    const matchups = await db
+      .select()
+      .from(PublicSchema.matchups)
+      .where(inArray(PublicSchema.matchups.leagueId, leagueIds as number[]));
 
-      // Return results in the same order as requested league IDs
-      return leagueIds.map((leagueId) => matchupsByLeague.get(leagueId) || []);
-    }
-  );
+    // Group matchups by league ID
+    const matchupsByLeague = new Map<number, Matchup[]>();
+    matchups.forEach((matchup) => {
+      const existing = matchupsByLeague.get(matchup.leagueId) || [];
+      existing.push(matchup);
+      matchupsByLeague.set(matchup.leagueId, existing);
+    });
+
+    // Return results in the same order as requested league IDs
+    return leagueIds.map((leagueId) => matchupsByLeague.get(leagueId) || []);
+  });
 }
 
 /**
@@ -70,29 +70,31 @@ export function createMatchupsByLeagueLoader(
  * Prevents N+1 queries when loading players for multiple matchups
  */
 export function createMatchupPlayersLoader(
-  db: PublicDb
+  db: PublicDb,
 ): DataLoader<number, MatchupPlayer[]> {
-  return new DataLoader<number, MatchupPlayer[]>(
-    async (matchupIds) => {
-      LOGGER.debug(`Batch loading matchup players for ${matchupIds.length} matchups`);
-      
-      const matchupPlayers = await db
-        .select()
-        .from(PublicSchema.matchupPlayers)
-        .where(inArray(PublicSchema.matchupPlayers.matchupId, matchupIds as number[]));
+  return new DataLoader<number, MatchupPlayer[]>(async (matchupIds) => {
+    LOGGER.debug(
+      `Batch loading matchup players for ${matchupIds.length} matchups`,
+    );
 
-      // Group matchup players by matchup ID
-      const playersByMatchup = new Map<number, MatchupPlayer[]>();
-      matchupPlayers.forEach((matchupPlayer) => {
-        const existing = playersByMatchup.get(matchupPlayer.matchupId) || [];
-        existing.push(matchupPlayer);
-        playersByMatchup.set(matchupPlayer.matchupId, existing);
-      });
+    const matchupPlayers = await db
+      .select()
+      .from(PublicSchema.matchupPlayers)
+      .where(
+        inArray(PublicSchema.matchupPlayers.matchupId, matchupIds as number[]),
+      );
 
-      // Return results in the same order as requested matchup IDs
-      return matchupIds.map((matchupId) => playersByMatchup.get(matchupId) || []);
-    }
-  );
+    // Group matchup players by matchup ID
+    const playersByMatchup = new Map<number, MatchupPlayer[]>();
+    matchupPlayers.forEach((matchupPlayer) => {
+      const existing = playersByMatchup.get(matchupPlayer.matchupId) || [];
+      existing.push(matchupPlayer);
+      playersByMatchup.set(matchupPlayer.matchupId, existing);
+    });
+
+    // Return results in the same order as requested matchup IDs
+    return matchupIds.map((matchupId) => playersByMatchup.get(matchupId) || []);
+  });
 }
 
 /**
@@ -100,22 +102,22 @@ export function createMatchupPlayersLoader(
  * Prevents N+1 queries when loading games for multiple matchup players
  */
 export function createMatchupPlayerGamesLoader(
-  db: PublicDb
+  db: PublicDb,
 ): DataLoader<number, MatchupPlayerGame[]> {
   return new DataLoader<number, MatchupPlayerGame[]>(
     async (matchupPlayerIds) => {
       LOGGER.debug(
-        `Batch loading matchup player games for ${matchupPlayerIds.length} matchup players`
+        `Batch loading matchup player games for ${matchupPlayerIds.length} matchup players`,
       );
-      
+
       const matchupPlayerGames = await db
         .select()
         .from(PublicSchema.matchupPlayerGames)
         .where(
           inArray(
             PublicSchema.matchupPlayerGames.matchupPlayerId,
-            matchupPlayerIds as number[]
-          )
+            matchupPlayerIds as number[],
+          ),
         );
 
       // Group matchup player games by matchup player ID
@@ -128,9 +130,10 @@ export function createMatchupPlayerGamesLoader(
 
       // Return results in the same order as requested matchup player IDs
       return matchupPlayerIds.map(
-        (matchupPlayerId): MatchupPlayerGame[] => gamesByMatchupPlayer.get(matchupPlayerId) || []
+        (matchupPlayerId): MatchupPlayerGame[] =>
+          gamesByMatchupPlayer.get(matchupPlayerId) || [],
       );
-    }
+    },
   );
 }
 
@@ -139,16 +142,20 @@ export function createMatchupPlayerGamesLoader(
  * Useful for direct ID lookups
  */
 export function createMatchupPlayerLoader(
-  db: PublicDb
+  db: PublicDb,
 ): DataLoader<number, MatchupPlayer | null> {
   return new DataLoader<number, MatchupPlayer | null>(
     async (matchupPlayerIds) => {
-      LOGGER.debug(`Batch loading ${matchupPlayerIds.length} matchup players by ID`);
-      
+      LOGGER.debug(
+        `Batch loading ${matchupPlayerIds.length} matchup players by ID`,
+      );
+
       const matchupPlayers = await db
         .select()
         .from(PublicSchema.matchupPlayers)
-        .where(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds as number[]));
+        .where(
+          inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds as number[]),
+        );
 
       // Create a map for O(1) lookups
       const matchupPlayerMap = new Map<number, MatchupPlayer>();
@@ -158,7 +165,7 @@ export function createMatchupPlayerLoader(
 
       // Return results in the same order as requested IDs
       return matchupPlayerIds.map((id) => matchupPlayerMap.get(id) || null);
-    }
+    },
   );
 }
 
@@ -177,7 +184,7 @@ export interface MatchupLoaderContext {
 /**
  * Creates all matchup-related DataLoaders
  * Call this when creating your GraphQL context
- * 
+ *
  * @example
  * ```typescript
  * const context = {

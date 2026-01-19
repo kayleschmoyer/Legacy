@@ -138,9 +138,9 @@ const LeagueAnalytics = builder.objectRef<{
   currentWeek: number;
   totalTeams: number;
   averagePointsPerMatchup: number;
-  teamStats: typeof TeamStatistics.$inferType[];
-  powerRankings: typeof PowerRanking.$inferType[];
-  playoffProjections: typeof PlayoffProjection.$inferType[];
+  teamStats: (typeof TeamStatistics.$inferType)[];
+  powerRankings: (typeof PowerRanking.$inferType)[];
+  playoffProjections: (typeof PlayoffProjection.$inferType)[];
 }>('LeagueAnalytics');
 
 builder.objectType(LeagueAnalytics, {
@@ -199,10 +199,14 @@ builder.queryField('getTeamStatistics', (t) =>
         ];
 
         if (args.startWeek !== null && args.startWeek !== undefined) {
-          matchupConditions.push(gte(PublicSchema.matchups.weekNumber, args.startWeek));
+          matchupConditions.push(
+            gte(PublicSchema.matchups.weekNumber, args.startWeek),
+          );
         }
         if (args.endWeek !== null && args.endWeek !== undefined) {
-          matchupConditions.push(lte(PublicSchema.matchups.weekNumber, args.endWeek));
+          matchupConditions.push(
+            lte(PublicSchema.matchups.weekNumber, args.endWeek),
+          );
         }
 
         const matchups = await db
@@ -219,7 +223,7 @@ builder.queryField('getTeamStatistics', (t) =>
         });
       });
     },
-  })
+  }),
 );
 
 /**
@@ -242,12 +246,18 @@ builder.queryField('getHeadToHeadRecord', (t) =>
         // Get team names
         const [team1, team2] = await Promise.all([
           db
-            .select({ id: PublicSchema.teams.id, name: PublicSchema.teams.name })
+            .select({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+            })
             .from(PublicSchema.teams)
             .where(eq(PublicSchema.teams.id, args.team1Id))
             .limit(1),
           db
-            .select({ id: PublicSchema.teams.id, name: PublicSchema.teams.name })
+            .select({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+            })
             .from(PublicSchema.teams)
             .where(eq(PublicSchema.teams.id, args.team2Id))
             .limit(1),
@@ -269,17 +279,19 @@ builder.queryField('getHeadToHeadRecord', (t) =>
                 (${PublicSchema.matchups.team1Id} = ${args.team1Id} AND ${PublicSchema.matchups.team2Id} = ${args.team2Id})
                 OR
                 (${PublicSchema.matchups.team1Id} = ${args.team2Id} AND ${PublicSchema.matchups.team2Id} = ${args.team1Id})
-              )`
-            )
+              )`,
+            ),
           )
           .orderBy(desc(PublicSchema.matchups.weekNumber));
 
         // Calculate head-to-head using the analytics library
-        const { calculateHeadToHead } = await import('@legacy-sports/analytics');
+        const { calculateHeadToHead } = await import(
+          '@legacy-sports/analytics'
+        );
         return calculateHeadToHead(matchups, team1[0], team2[0]);
       });
     },
-  })
+  }),
 );
 
 /**
@@ -313,24 +325,21 @@ builder.queryField('getPowerRankings', (t) =>
           .where(
             and(
               eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed')
-            )
+              eq(PublicSchema.matchups.status, 'completed'),
+            ),
           )
           .orderBy(PublicSchema.matchups.weekNumber);
 
         // Calculate power rankings using the analytics library
-        const {
-          calculateTeamStats,
-          calculateTrends,
-          calculatePowerRankings,
-        } = await import('@legacy-sports/analytics');
+        const { calculateTeamStats, calculateTrends, calculatePowerRankings } =
+          await import('@legacy-sports/analytics');
 
         const teamStats = calculateTeamStats(matchups, teams);
         const trends = calculateTrends(matchups, teams);
         return calculatePowerRankings(teamStats, trends);
       });
     },
-  })
+  }),
 );
 
 /**
@@ -366,16 +375,14 @@ builder.queryField('getPlayoffProjections', (t) =>
           .where(
             and(
               eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed')
-            )
+              eq(PublicSchema.matchups.status, 'completed'),
+            ),
           )
           .orderBy(PublicSchema.matchups.weekNumber);
 
         // Calculate playoff projections using the analytics library
-        const {
-          calculateTeamStats,
-          calculatePlayoffProjections,
-        } = await import('@legacy-sports/analytics');
+        const { calculateTeamStats, calculatePlayoffProjections } =
+          await import('@legacy-sports/analytics');
 
         const teamStats = calculateTeamStats(matchups, teams);
         return calculatePlayoffProjections(teamStats, {
@@ -384,7 +391,7 @@ builder.queryField('getPlayoffProjections', (t) =>
         });
       });
     },
-  })
+  }),
 );
 
 /**
@@ -448,8 +455,8 @@ builder.queryField('getLeagueAnalytics', (t) =>
           .where(
             and(
               eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed')
-            )
+              eq(PublicSchema.matchups.status, 'completed'),
+            ),
           )
           .orderBy(PublicSchema.matchups.weekNumber);
 
@@ -465,7 +472,7 @@ builder.queryField('getLeagueAnalytics', (t) =>
           league.name || 'Unknown League',
           currentWeek,
           matchups,
-          teams
+          teams,
         );
 
         // Add playoff projections
@@ -475,7 +482,13 @@ builder.queryField('getLeagueAnalytics', (t) =>
         return analytics;
       });
     },
-  })
+  }),
 );
 
-export { TeamStatistics, HeadToHeadRecord, PowerRanking, PlayoffProjection, LeagueAnalytics };
+export {
+  TeamStatistics,
+  HeadToHeadRecord,
+  PowerRanking,
+  PlayoffProjection,
+  LeagueAnalytics,
+};

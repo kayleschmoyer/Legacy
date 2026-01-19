@@ -11,7 +11,7 @@ interface User {
 }
 
 // In-memory storage for device authorization flows
-// In production, this should use Redis or DynamoDB for persistence across Lambda instances
+// In production, this should use DynamoDB for persistence across Lambda instances
 interface DeviceAuthFlow {
   deviceCode: string;
   userCode: string;
@@ -26,21 +26,24 @@ interface DeviceAuthFlow {
   };
 }
 
-// Simple in-memory storage (would use Redis/DynamoDB in production)
+// Simple in-memory storage (would use DynamoDB in production)
 const deviceFlows = new Map<string, DeviceAuthFlow>();
 const userCodeToDeviceCode = new Map<string, string>();
 
 // Clean up expired flows periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [deviceCode, flow] of deviceFlows.entries()) {
-    if (now > flow.expiresAt) {
-      deviceFlows.delete(deviceCode);
-      userCodeToDeviceCode.delete(flow.userCode);
-      LOGGER.debug(`Cleaned up expired device flow: ${deviceCode}`);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [deviceCode, flow] of deviceFlows.entries()) {
+      if (now > flow.expiresAt) {
+        deviceFlows.delete(deviceCode);
+        userCodeToDeviceCode.delete(flow.userCode);
+        LOGGER.debug(`Cleaned up expired device flow: ${deviceCode}`);
+      }
     }
-  }
-}, 5 * 60 * 1000); // Clean up every 5 minutes
+  },
+  5 * 60 * 1000,
+); // Clean up every 5 minutes
 
 interface DeviceAuthRequest {
   client_type: string;
@@ -95,7 +98,7 @@ export const handleDeviceAuthorize = (
     // Generate codes
     const deviceCode = generateDeviceCode();
     const userCode = generateUserCode();
-    
+
     // Store the authorization flow
     const expiresIn = 10 * 60; // 10 minutes
     const flow: DeviceAuthFlow = {
@@ -103,7 +106,7 @@ export const handleDeviceAuthorize = (
       userCode,
       clientType: body.client_type,
       deviceName: body.device_name || 'CLI',
-      expiresAt: Date.now() + (expiresIn * 1000),
+      expiresAt: Date.now() + expiresIn * 1000,
       completed: false,
     };
 
@@ -130,9 +133,11 @@ export const handleDeviceAuthorize = (
         interval: 5, // Poll every 5 seconds
       }),
     };
-
   } catch (error) {
-    LOGGER.error('Device authorization error:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      'Device authorization error:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -191,7 +196,7 @@ export const handleDeviceToken = (
 
     // Authorization complete - return tokens
     LOGGER.info(`Device token granted for: ${flow.tokenResponse.user.email}`);
-    
+
     // Clean up the flow
     deviceFlows.delete(body.device_code);
     userCodeToDeviceCode.delete(flow.userCode);
@@ -203,9 +208,11 @@ export const handleDeviceToken = (
       },
       body: JSON.stringify(flow.tokenResponse),
     };
-
   } catch (error) {
-    LOGGER.error('Device token error:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      'Device token error:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -225,7 +232,7 @@ export const handleDeviceVerify = (
   LOGGER.info('Device verification page requested');
 
   const userCode = event.queryStringParameters?.user_code;
-  
+
   if (!userCode) {
     // Show page with user code input
     return {
@@ -256,7 +263,9 @@ export const handleDeviceVerify = (
       headers: {
         'Content-Type': 'text/html',
       },
-      body: getVerificationHtml('Code has expired. Please restart authentication in your CLI.'),
+      body: getVerificationHtml(
+        'Code has expired. Please restart authentication in your CLI.',
+      ),
     };
   }
 
@@ -284,7 +293,10 @@ interface TokenResponse {
   refreshToken?: string;
 }
 
-export const completeDeviceFlow = (deviceCode: string, tokenResponse: TokenResponse): void => {
+export const completeDeviceFlow = (
+  deviceCode: string,
+  tokenResponse: TokenResponse,
+): void => {
   const flow = deviceFlows.get(deviceCode);
   if (flow && !flow.completed && Date.now() <= flow.expiresAt) {
     flow.completed = true;

@@ -1,6 +1,6 @@
 /**
  * Matchup Scoring Engine
- * 
+ *
  * Calculates team scores for fantasy matchups by aggregating individual player
  * performances across selected games from the matchup's chosen season.
  */
@@ -215,9 +215,18 @@ export function calculateTeamScore(
 
   // Sum up all player scores
   const totalScore = playerScores.reduce((sum, ps) => sum + ps.totalScore, 0);
-  const battingScore = playerScores.reduce((sum, ps) => sum + ps.battingScore, 0);
-  const pitchingScore = playerScores.reduce((sum, ps) => sum + ps.pitchingScore, 0);
-  const fieldingScore = playerScores.reduce((sum, ps) => sum + ps.fieldingScore, 0);
+  const battingScore = playerScores.reduce(
+    (sum, ps) => sum + ps.battingScore,
+    0,
+  );
+  const pitchingScore = playerScores.reduce(
+    (sum, ps) => sum + ps.pitchingScore,
+    0,
+  );
+  const fieldingScore = playerScores.reduce(
+    (sum, ps) => sum + ps.fieldingScore,
+    0,
+  );
 
   return {
     teamId,
@@ -248,11 +257,21 @@ export function calculateMatchupScore(
   },
 ): MatchupScore {
   const team1Score = team1Id
-    ? calculateTeamScore(team1Id, team1PlayerGameStats, gamesPerMatchup, scoringSettings)
+    ? calculateTeamScore(
+        team1Id,
+        team1PlayerGameStats,
+        gamesPerMatchup,
+        scoringSettings,
+      )
     : null;
 
   const team2Score = team2Id
-    ? calculateTeamScore(team2Id, team2PlayerGameStats, gamesPerMatchup, scoringSettings)
+    ? calculateTeamScore(
+        team2Id,
+        team2PlayerGameStats,
+        gamesPerMatchup,
+        scoringSettings,
+      )
     : null;
 
   return {

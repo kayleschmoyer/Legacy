@@ -18,7 +18,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { LOGGER } from '@legacy-sports/logging';
 import { readdirSync } from 'fs';
-import { getDatabaseConfig } from '../config/database';
+import { getMigrationDatabaseConfig } from '../config/database';
 
 interface MigrationFile {
   filename: string;
@@ -116,8 +116,8 @@ async function runRollbackCommand(
     );
     LOGGER.info('='.repeat(50));
 
-    LOGGER.info('🔍 Resolving database credentials...');
-    const dbConfig = await getDatabaseConfig();
+    LOGGER.info('🔍 Resolving migration database credentials...');
+    const dbConfig = await getMigrationDatabaseConfig();
 
     LOGGER.info(
       `📡 Connected to database: ${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}`,

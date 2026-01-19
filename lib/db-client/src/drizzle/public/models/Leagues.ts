@@ -10,6 +10,7 @@ import {
   index,
   timestamp,
   primaryKey,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import {
   draftOrder,
@@ -17,6 +18,9 @@ import {
   draftStatus,
   leaguePermissionLevel,
   positionSlot,
+  rosterLockTiming,
+  emergencySubRule,
+  schedulingStrategy,
 } from './Enums';
 import { players } from './Players';
 
@@ -33,6 +37,13 @@ export const leagues = pgTable(
     inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
     minGamesPerSeason: integer('min_games_per_season').default(10),
     gamesPerMatchup: integer('games_per_matchup').default(5),
+    tradeDeadlineWeek: integer('trade_deadline_week'),
+    rosterLockTiming: rosterLockTiming('roster_lock_timing')
+      .notNull()
+      .default('matchup_start'),
+    schedulingStrategy: schedulingStrategy('scheduling_strategy')
+      .notNull()
+      .default('round-robin'),
   },
   (table) => {
     return {
@@ -218,6 +229,37 @@ export const teamMembers = pgTable(
       teamMembersUkTeamPosition: unique('team_members_uk_team_position').on(
         table.teamId,
         table.positionId,
+      ),
+    };
+  },
+);
+
+export const rosterLockRules = pgTable(
+  'roster_lock_rules',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    allowEmergencySubs: boolean('allow_emergency_subs')
+      .notNull()
+      .default(false),
+    emergencySubRule: emergencySubRule('emergency_sub_rule')
+      .notNull()
+      .default('none'),
+    customLockTime: timestamp('custom_lock_time', { mode: 'string' }),
+    lockHoursBeforeMatchup: integer('lock_hours_before_matchup').default(0),
+    commissionerCanOverride: boolean('commissioner_can_override')
+      .notNull()
+      .default(true),
+  },
+  (table) => {
+    return {
+      rosterLockRulesLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'roster_lock_rules_league_fk',
+      }),
+      rosterLockRulesLeagueUk: unique('roster_lock_rules_league_uk').on(
+        table.leagueId,
       ),
     };
   },

@@ -1,12 +1,12 @@
 /**
  * Calculate Matchup Scores Lambda Handler
- * 
+ *
  * Orchestrates real-time matchup score calculation.
  * Triggered when:
  * - Games are selected for a matchup
  * - Lineup changes occur
  * - Matchup status updates are needed
- * 
+ *
  * Integrates with MatchupService and scoring libraries to:
  * 1. Fetch player game stats from database
  * 2. Calculate team scores using scoring settings
@@ -102,7 +102,8 @@ export async function calculateAndUpdateMatchupScores(
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  const { team1Id, team2Id, gamesPerMatchup, team1Score, team2Score } = matchupResult;
+  const { team1Id, team2Id, gamesPerMatchup, team1Score, team2Score } =
+    matchupResult;
 
   // Skip if scores already calculated and not forcing recalculation
   if (!forceRecalculation && team1Score && team2Score) {
@@ -129,53 +130,59 @@ export async function calculateAndUpdateMatchupScores(
       playerId: stat.playerId,
       season: stat.season,
       gameNum: stat.gameNum,
-      batting: stat.battingStats ? {
-        pa: stat.battingStats.pa,
-        ab: stat.battingStats.ab,
-        r: stat.battingStats.r,
-        h: stat.battingStats.h,
-        doubles: stat.battingStats.doubles,
-        triples: stat.battingStats.triples,
-        hr: stat.battingStats.hr,
-        rbi: stat.battingStats.rbi,
-        sb: stat.battingStats.sb,
-        cs: stat.battingStats.cs,
-        bb: stat.battingStats.bb,
-        so: stat.battingStats.so,
-        gidp: stat.battingStats.gidp,
-        hbp: stat.battingStats.hbp,
-        sh: stat.battingStats.sh,
-        sf: stat.battingStats.sf,
-        ibb: stat.battingStats.ibb,
-      } : undefined,
-      pitching: stat.pitchingStats ? {
-        w: stat.pitchingStats.w,
-        l: stat.pitchingStats.l,
-        gs: stat.pitchingStats.gs,
-        gf: stat.pitchingStats.gf,
-        cg: stat.pitchingStats.cg,
-        sho: stat.pitchingStats.sho,
-        sv: stat.pitchingStats.sv,
-        ip: stat.pitchingStats.ip,
-        h: stat.pitchingStats.h,
-        r: stat.pitchingStats.r,
-        er: stat.pitchingStats.er,
-        hr: stat.pitchingStats.hr,
-        bb: stat.pitchingStats.bb,
-        ibb: stat.pitchingStats.ibb,
-        so: stat.pitchingStats.so,
-        hbp: stat.pitchingStats.hbp,
-        battersFaced: stat.pitchingStats.battersFaced,
-        outsRecorded: stat.pitchingStats.outsRecorded,
-      } : undefined,
-      fielding: stat.fieldingStats ? {
-        innDef: stat.fieldingStats.innDef,
-        chances: stat.fieldingStats.chances,
-        po: stat.fieldingStats.po,
-        a: stat.fieldingStats.a,
-        eDef: stat.fieldingStats.eDef,
-        dpDef: stat.fieldingStats.dpDef,
-      } : undefined,
+      batting: stat.battingStats
+        ? {
+            pa: stat.battingStats.pa,
+            ab: stat.battingStats.ab,
+            r: stat.battingStats.r,
+            h: stat.battingStats.h,
+            doubles: stat.battingStats.doubles,
+            triples: stat.battingStats.triples,
+            hr: stat.battingStats.hr,
+            rbi: stat.battingStats.rbi,
+            sb: stat.battingStats.sb,
+            cs: stat.battingStats.cs,
+            bb: stat.battingStats.bb,
+            so: stat.battingStats.so,
+            gidp: stat.battingStats.gidp,
+            hbp: stat.battingStats.hbp,
+            sh: stat.battingStats.sh,
+            sf: stat.battingStats.sf,
+            ibb: stat.battingStats.ibb,
+          }
+        : undefined,
+      pitching: stat.pitchingStats
+        ? {
+            w: stat.pitchingStats.w,
+            l: stat.pitchingStats.l,
+            gs: stat.pitchingStats.gs,
+            gf: stat.pitchingStats.gf,
+            cg: stat.pitchingStats.cg,
+            sho: stat.pitchingStats.sho,
+            sv: stat.pitchingStats.sv,
+            ip: stat.pitchingStats.ip,
+            h: stat.pitchingStats.h,
+            r: stat.pitchingStats.r,
+            er: stat.pitchingStats.er,
+            hr: stat.pitchingStats.hr,
+            bb: stat.pitchingStats.bb,
+            ibb: stat.pitchingStats.ibb,
+            so: stat.pitchingStats.so,
+            hbp: stat.pitchingStats.hbp,
+            battersFaced: stat.pitchingStats.battersFaced,
+            outsRecorded: stat.pitchingStats.outsRecorded,
+          }
+        : undefined,
+      fielding: stat.fieldingStats
+        ? {
+            innDef: stat.fieldingStats.innDef,
+            chances: stat.fieldingStats.chances,
+            po: stat.fieldingStats.po,
+            a: stat.fieldingStats.a,
+            eDef: stat.fieldingStats.eDef,
+            dpDef: stat.fieldingStats.dpDef,
+          }
+        : undefined,
     };
 
     if (stat.teamId === team1Id) {
@@ -185,6 +192,9 @@ export async function calculateAndUpdateMatchupScores(
       } else {
         team1PlayerStats.set(stat.playerId, [playerGameStat]);
       }
+      // Non-null assertion is safe because we just set the value if it didn't exist
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-type-assertion
+      team1PlayerStats.get(stat.playerId)!.push(playerGameStat);
     } else if (stat.teamId === team2Id) {
       const playerStats = team2PlayerStats.get(stat.playerId);
       if (playerStats) {
@@ -192,6 +202,9 @@ export async function calculateAndUpdateMatchupScores(
       } else {
         team2PlayerStats.set(stat.playerId, [playerGameStat]);
       }
+      // Non-null assertion is safe because we just set the value if it didn't exist
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-type-assertion
+      team2PlayerStats.get(stat.playerId)!.push(playerGameStat);
     }
   }
 
@@ -217,8 +230,12 @@ export async function calculateAndUpdateMatchupScores(
 
   return {
     matchupId,
-    team1Score: updatedMatchup.team1Score ? parseFloat(updatedMatchup.team1Score) : null,
-    team2Score: updatedMatchup.team2Score ? parseFloat(updatedMatchup.team2Score) : null,
+    team1Score: updatedMatchup.team1Score
+      ? parseFloat(updatedMatchup.team1Score)
+      : null,
+    team2Score: updatedMatchup.team2Score
+      ? parseFloat(updatedMatchup.team2Score)
+      : null,
     team1GamesSelected: matchupScore.team1Score?.gamesSelected ?? 0,
     team2GamesSelected: matchupScore.team2Score?.gamesSelected ?? 0,
     gamesPerMatchup: matchupScore.gamesPerMatchup,
@@ -245,7 +262,10 @@ export async function batchCalculateMatchupScores(
       });
       results.push(result);
     } catch (error) {
-      console.error(`Error calculating scores for matchup ${matchupId}:`, error);
+      console.error(
+        `Error calculating scores for matchup ${matchupId}:`,
+        error,
+      );
       results.push({
         matchupId,
         team1Score: null,

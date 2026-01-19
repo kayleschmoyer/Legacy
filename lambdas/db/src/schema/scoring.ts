@@ -14,11 +14,7 @@ import { builder } from './builder';
 
 const dbService = createDatabaseService(getDbOptions());
 
-const SCORING_GROUPS: ScoringStatGroup[] = [
-  'batting',
-  'pitching',
-  'fielding',
-];
+const SCORING_GROUPS: ScoringStatGroup[] = ['batting', 'pitching', 'fielding'];
 
 const ScoringStatGroupEnum = builder.enumType('ScoringStatGroup', {
   description: 'Grouping for fantasy scoring statistics',
@@ -40,8 +36,7 @@ const UpdateLeagueScoringMultiplierInput = builder.inputType(
   },
 );
 
-interface ScoringConfigEntryWithDefinition
-  extends LeagueScoringProfileEntry {
+interface ScoringConfigEntryWithDefinition extends LeagueScoringProfileEntry {
   definition: ScoringStatDefinition | null;
   numericMultiplier: number | null;
 }
@@ -92,9 +87,7 @@ function parseNumeric(value: unknown): number | null {
   return null;
 }
 
-function buildMultiplierGroups(
-  stats: ScoringRule[],
-): ScoringRuleGroup[] {
+function buildMultiplierGroups(stats: ScoringRule[]): ScoringRuleGroup[] {
   return SCORING_GROUPS.map((group) => ({
     group,
     values: stats
@@ -248,7 +241,7 @@ async function loadDefaultScoringConfig(): Promise<ScoringConfigGraph> {
       defaultMultiplier,
       isOverride: override !== null && override !== defaultMultiplier,
       isEnabled: true,
-  } satisfies ScoringRule;
+    } satisfies ScoringRule;
   });
 
   return {
@@ -282,8 +275,7 @@ ScoringStatDefinitionRef.implement({
       resolve: (definition) => definition.description ?? null,
     }),
     defaultMultiplier: t.float({
-      resolve: (definition) =>
-        parseNumeric(definition.defaultMultiplier) ?? 0,
+      resolve: (definition) => parseNumeric(definition.defaultMultiplier) ?? 0,
     }),
     minMultiplier: t.float({
       resolve: (definition) => parseNumeric(definition.minMultiplier) ?? 0,
@@ -316,9 +308,8 @@ ScoringMultiplierEntryRef.implement({
   }),
 });
 
-const ScoringRuleGroupRef = builder.objectRef<ScoringRuleGroup>(
-  'ScoringRuleGroup',
-);
+const ScoringRuleGroupRef =
+  builder.objectRef<ScoringRuleGroup>('ScoringRuleGroup');
 
 ScoringRuleGroupRef.implement({
   fields: (t) => ({
@@ -378,9 +369,7 @@ ScoringConfigEntryRef.implement({
   }),
 });
 
-const ScoringConfigRef = builder.objectRef<ScoringConfigGraph>(
-  'ScoringConfig',
-);
+const ScoringConfigRef = builder.objectRef<ScoringConfigGraph>('ScoringConfig');
 
 ScoringConfigRef.implement({
   fields: (t) => ({

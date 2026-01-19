@@ -77,6 +77,39 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
 }
 
 /**
+ * Get database configuration for migrations (uses privileged migration user)
+ * This user has full schema modification privileges (CREATE, ALTER, DROP)
+ */
+export async function getMigrationDatabaseConfig(): Promise<DatabaseConfig> {
+  console.log('Resolving migration database credentials');
+
+  // First, get the base config using standard credential resolution
+  const baseConfig = await getDatabaseConfig();
+
+  // Override with migration user credentials if available
+  const migrationUser = getEnvVarOptional('DB_MIGRATION_USER');
+  const migrationPassword = getEnvVarOptional('DB_MIGRATION_PASSWORD');
+
+  if (migrationUser && migrationPassword) {
+    console.log(`Using migration user: ${migrationUser}`);
+    return {
+      ...baseConfig,
+      user: migrationUser,
+      password: migrationPassword,
+    };
+  }
+
+  // Fallback to regular user (for backwards compatibility)
+  console.warn(
+    '⚠️  No DB_MIGRATION_USER configured - using default user for migrations',
+  );
+  console.warn(
+    '⚠️  This is not recommended in production - schema changes should use a separate privileged user',
+  );
+  return baseConfig;
+}
+
+/**
  * Get database configuration synchronously from environment variables only
  * Used for build-time operations like Drizzle schema generation
  */

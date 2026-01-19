@@ -2,7 +2,7 @@
  * Optimized query functions for matchup operations
  * These functions leverage database indexes and efficient query patterns
  * to improve performance at scale.
- * 
+ *
  * Issue: LS-34
  */
 
@@ -20,7 +20,7 @@ export type PublicDb = GenericDatabase<typeof PublicSchema>;
  */
 export async function getMatchupWithPlayers(
   db: PublicDb,
-  matchupId: number
+  matchupId: number,
 ): Promise<{
   matchup: Matchup | null;
   players: MatchupPlayer[];
@@ -52,7 +52,7 @@ export async function getMatchupWithPlayers(
  */
 export async function getLeagueMatchupsWithStats(
   db: PublicDb,
-  leagueId: number
+  leagueId: number,
 ): Promise<
   Array<{
     id: number;
@@ -73,10 +73,14 @@ export async function getLeagueMatchupsWithStats(
     .from(PublicSchema.matchups)
     .leftJoin(
       PublicSchema.matchupPlayers,
-      eq(PublicSchema.matchups.id, PublicSchema.matchupPlayers.matchupId)
+      eq(PublicSchema.matchups.id, PublicSchema.matchupPlayers.matchupId),
     )
     .where(eq(PublicSchema.matchups.leagueId, leagueId))
-    .groupBy(PublicSchema.matchups.id, PublicSchema.matchups.weekNumber, PublicSchema.matchups.leagueId);
+    .groupBy(
+      PublicSchema.matchups.id,
+      PublicSchema.matchups.weekNumber,
+      PublicSchema.matchups.leagueId,
+    );
 
   return result;
 }
@@ -87,7 +91,7 @@ export async function getLeagueMatchupsWithStats(
  */
 export async function getMatchupsByIds(
   db: PublicDb,
-  matchupIds: number[]
+  matchupIds: number[],
 ): Promise<Matchup[]> {
   if (matchupIds.length === 0) {
     return [];
@@ -107,7 +111,7 @@ export async function getMatchupsByIds(
  */
 export async function getMatchupPlayersWithDetails(
   db: PublicDb,
-  matchupId: number
+  matchupId: number,
 ): Promise<
   Array<{
     matchupPlayer: MatchupPlayer;
@@ -128,7 +132,7 @@ export async function getMatchupPlayersWithDetails(
     .from(PublicSchema.matchupPlayers)
     .innerJoin(
       PublicSchema.players,
-      eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id)
+      eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id),
     )
     .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
 
@@ -141,7 +145,7 @@ export async function getMatchupPlayersWithDetails(
  */
 export async function getMatchupSummary(
   db: PublicDb,
-  matchupId: number
+  matchupId: number,
 ): Promise<{
   matchupId: number;
   totalPlayers: number;
@@ -158,11 +162,14 @@ export async function getMatchupSummary(
     .from(PublicSchema.matchups)
     .leftJoin(
       PublicSchema.matchupPlayers,
-      eq(PublicSchema.matchups.id, PublicSchema.matchupPlayers.matchupId)
+      eq(PublicSchema.matchups.id, PublicSchema.matchupPlayers.matchupId),
     )
     .leftJoin(
       PublicSchema.matchupPlayerGames,
-      eq(PublicSchema.matchupPlayers.id, PublicSchema.matchupPlayerGames.matchupPlayerId)
+      eq(
+        PublicSchema.matchupPlayers.id,
+        PublicSchema.matchupPlayerGames.matchupPlayerId,
+      ),
     )
     .where(eq(PublicSchema.matchups.id, matchupId))
     .groupBy(PublicSchema.matchups.id);
@@ -188,7 +195,7 @@ export async function getMatchupsPaginated(
     offset?: number;
     orderBy?: 'weekNumber' | 'id';
     orderDirection?: 'asc' | 'desc';
-  } = {}
+  } = {},
 ): Promise<Matchup[]> {
   const {
     limit = 20,
@@ -198,7 +205,7 @@ export async function getMatchupsPaginated(
   } = options;
 
   LOGGER.debug(
-    `Loading paginated matchups for league ${leagueId}: limit=${limit}, offset=${offset}`
+    `Loading paginated matchups for league ${leagueId}: limit=${limit}, offset=${offset}`,
   );
 
   const query = db
@@ -209,10 +216,11 @@ export async function getMatchupsPaginated(
     .offset(offset);
 
   // Apply ordering
-  const orderColumn = orderBy === 'weekNumber' 
-    ? PublicSchema.matchups.weekNumber 
-    : PublicSchema.matchups.id;
-  
+  const orderColumn =
+    orderBy === 'weekNumber'
+      ? PublicSchema.matchups.weekNumber
+      : PublicSchema.matchups.id;
+
   if (orderDirection === 'asc') {
     query.orderBy(orderColumn);
   } else {
@@ -225,14 +233,15 @@ export async function getMatchupsPaginated(
 /**
  * Batch insert matchup players
  * More efficient than individual inserts
+ * Note: Season selection is now handled via league_week_player_seasons table
  */
 export async function batchInsertMatchupPlayers(
   db: PublicDb,
   matchupPlayers: Array<{
     matchupId: number;
     playerId: number;
-    season: number;
-  }>
+    teamId: number;
+  }>,
 ): Promise<MatchupPlayer[]> {
   if (matchupPlayers.length === 0) {
     return [];

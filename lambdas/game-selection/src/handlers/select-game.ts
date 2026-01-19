@@ -7,7 +7,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
-import { getDb } from '../utils/db';
+import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
 // Initialize Sentry
@@ -37,60 +37,62 @@ const baseSelectGameHandler = async (
     recordCount: event.Records.length,
   });
 
-  const db = await getDb();
+  return await withDb(async (db) => {
+    const failures: SQSBatchItemFailure[] = [];
 
-  const failures: SQSBatchItemFailure[] = [];
+    try {
+      for (const record of event.Records) {
+        try {
+          const matchup = JSON.parse(record.body) as SelectGameEvent;
 
-  try {
-    for (const record of event.Records) {
-      try {
-        const matchup = JSON.parse(record.body) as SelectGameEvent;
-
-        addBreadcrumb('Processing select game message', {
-          messageId: record.messageId,
-          matchupId: matchup.matchupId,
-          game: matchup.game,
-        });
-
-        LOGGER.info('Selecting games for matchup', {
-          matchupId: matchup.matchupId,
-          gameNumber: matchup.game,
-        });
-
-        // Use the new season-game-selector service which automatically
-        // uses the matchup's selected_season field
-        await selectGamesForMatchup(db.db, matchup.matchupId, matchup.game);
-
-        LOGGER.info('Successfully selected games for matchup', {
-          matchupId: matchup.matchupId,
-          gameNumber: matchup.game,
-        });
-      } catch (err) {
-        failures.push({ itemIdentifier: record.messageId });
-        LOGGER.error('Error processing record', {
-          error: err instanceof Error ? err.message : String(err),
-          stack: err instanceof Error ? err.stack : undefined,
-        });
-
-        captureError(err instanceof Error ? err : new Error(String(err)), {
-          tags: {
-            lambda: 'game-selection-select-game',
-            operation: 'selectGamesForMatchup',
-          },
-          extra: {
+          addBreadcrumb('Processing select game message', {
             messageId: record.messageId,
-            recordBody: record.body,
-          },
-        });
-      }
-    }
-  } finally {
-    await db.close();
-  }
+            matchupId: matchup.matchupId,
+            game: matchup.game,
+          });
 
-  return {
-    batchItemFailures: failures,
-  };
+          LOGGER.info('Selecting games for matchup', {
+            matchupId: matchup.matchupId,
+            gameNumber: matchup.game,
+          });
+
+          // Use the new season-game-selector service which automatically
+          // uses the matchup's selected_season field
+          await selectGamesForMatchup(db, matchup.matchupId, matchup.game);
+
+          LOGGER.info('Successfully selected games for matchup', {
+            matchupId: matchup.matchupId,
+            gameNumber: matchup.game,
+          });
+        } catch (err) {
+          failures.push({ itemIdentifier: record.messageId });
+          LOGGER.error('Error processing record', {
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+          });
+
+          captureError(err instanceof Error ? err : new Error(String(err)), {
+            tags: {
+              lambda: 'game-selection-select-game',
+              operation: 'selectGamesForMatchup',
+            },
+            extra: {
+              messageId: record.messageId,
+              recordBody: record.body,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      LOGGER.error('Error in select game handler', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return {
+      batchItemFailures: failures,
+    };
+  });
 };
 
 // Export the Sentry-wrapped handler with explicit Promise wrapper

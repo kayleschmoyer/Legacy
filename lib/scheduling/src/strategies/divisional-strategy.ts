@@ -1,9 +1,9 @@
 /**
  * Divisional scheduling strategy
- * 
+ *
  * Teams play division opponents more frequently than non-division opponents.
  * Typical split: 60% divisional games, 40% inter-divisional games.
- * 
+ *
  * Assumes teams have a `divisionId` field.
  */
 
@@ -26,10 +26,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
     return 'divisional';
   }
 
-  generatePairings(
-    teams: TeamInfo[],
-    numberOfWeeks: number
-  ): MatchupPairing[] {
+  generatePairings(teams: TeamInfo[], numberOfWeeks: number): MatchupPairing[] {
     if (teams.length < 2) {
       return [];
     }
@@ -52,7 +49,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
     const pairings: MatchupPairing[] = [];
     const totalGames = Math.floor((teams.length / 2) * numberOfWeeks);
     const divisionalGames = Math.floor(
-      totalGames * this.config.divisionalGamePercentage
+      totalGames * this.config.divisionalGamePercentage,
     );
     const interDivisionalGames = totalGames - divisionalGames;
 
@@ -73,7 +70,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
           if (divTeams.length < 2) continue;
 
           const availableInDiv = divTeams.filter((t) =>
-            teamsAvailableThisWeek.has(t.id)
+            teamsAvailableThisWeek.has(t.id),
           );
 
           if (availableInDiv.length >= 2) {
@@ -101,9 +98,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
       // Schedule inter-divisional games
       if (interDivisionalGamesScheduled < interDivisionalGames) {
-        const available = teams.filter((t) =>
-          teamsAvailableThisWeek.has(t.id)
-        );
+        const available = teams.filter((t) => teamsAvailableThisWeek.has(t.id));
 
         if (available.length >= 2) {
           // Pair teams from different divisions
@@ -142,7 +137,7 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
   private generateRoundRobinFallback(
     teams: TeamInfo[],
-    numberOfWeeks: number
+    numberOfWeeks: number,
   ): MatchupPairing[] {
     const pairings: MatchupPairing[] = [];
     let week = 1;

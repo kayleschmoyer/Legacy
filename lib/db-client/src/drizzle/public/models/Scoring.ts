@@ -30,22 +30,37 @@ export const scoringStatDefinitions = pgTable(
     sourceTable: varchar('source_table', { length: 48 }).notNull(),
     sourceColumn: varchar('source_column', { length: 48 }).notNull(),
     displayName: varchar('display_name', { length: 80 }).notNull(),
-  description: text('description'),
-    defaultMultiplier: numeric('default_multiplier', { precision: 6, scale: 3 }).notNull(),
-    minMultiplier: numeric('min_multiplier', { precision: 6, scale: 3 }).notNull(),
-    maxMultiplier: numeric('max_multiplier', { precision: 6, scale: 3 }).notNull(),
-    stepSize: numeric('step_size', { precision: 4, scale: 3 }).notNull().default('0.5'),
+    description: text('description'),
+    defaultMultiplier: numeric('default_multiplier', {
+      precision: 6,
+      scale: 3,
+    }).notNull(),
+    minMultiplier: numeric('min_multiplier', {
+      precision: 6,
+      scale: 3,
+    }).notNull(),
+    maxMultiplier: numeric('max_multiplier', {
+      precision: 6,
+      scale: 3,
+    }).notNull(),
+    stepSize: numeric('step_size', { precision: 4, scale: 3 })
+      .notNull()
+      .default('0.5'),
     isRequired: boolean('is_required').notNull().default(false),
     enforcePositive: boolean('enforce_positive').notNull().default(false),
     enforceNegative: boolean('enforce_negative').notNull().default(false),
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp('updated_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
   },
   (table) => {
     return {
@@ -64,7 +79,9 @@ export const leagueScoringProfiles = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     leagueId: integer('league_id').notNull(),
-    profileName: varchar('profile_name', { length: 64 }).notNull().default('Default'),
+    profileName: varchar('profile_name', { length: 64 })
+      .notNull()
+      .default('Default'),
     seasonYear: smallint('season_year'),
     status: scoringProfileStatus('status').notNull().default('active'),
     isDefault: boolean('is_default').notNull().default(false),
@@ -72,11 +89,15 @@ export const leagueScoringProfiles = pgTable(
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp('updated_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
     activatedAt: timestamp('activated_at', {
       withTimezone: true,
       mode: 'string',
@@ -113,11 +134,15 @@ export const leagueScoringProfileEntries = pgTable(
     createdAt: timestamp('created_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp('updated_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
   },
   (table) => {
     return {
@@ -131,10 +156,9 @@ export const leagueScoringProfileEntries = pgTable(
         foreignColumns: [scoringStatDefinitions.id],
         name: 'league_scoring_profile_entries_stat_fk',
       }),
-      profileStatUnique: uniqueIndex('league_scoring_profile_entries_unique').on(
-        table.profileId,
-        table.statDefinitionId,
-      ),
+      profileStatUnique: uniqueIndex(
+        'league_scoring_profile_entries_unique',
+      ).on(table.profileId, table.statDefinitionId),
     };
   },
 );
@@ -154,7 +178,9 @@ export const leagueScoringChangeLog = pgTable(
     changedAt: timestamp('changed_at', {
       withTimezone: true,
       mode: 'string',
-    }).defaultNow().notNull(),
+    })
+      .defaultNow()
+      .notNull(),
     changeReason: varchar('change_reason', { length: 120 }),
     action: scoringChangeAction('action').notNull(),
   },

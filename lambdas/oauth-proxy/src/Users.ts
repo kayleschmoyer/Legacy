@@ -4,10 +4,9 @@ import { compare, genSalt, hash } from 'bcryptjs';
 import {
   createUser,
   getUserByEmail,
-  InternalSchema,
+  InternalDb,
   InternalUser,
 } from '@legacy-sports/db-client';
-import { BaseDbConnection } from 'lib/db-client/src/lib/client/abstract/BaseDbClient';
 
 const SALT_ROUNDS = 10;
 
@@ -22,16 +21,16 @@ interface GoogleJwtContents {
 }
 
 export async function getUserFromGoogleJwt(
-  dbClient: BaseDbConnection<typeof InternalSchema>,
+  db: InternalDb,
   googleToken: string,
 ): Promise<InternalUser> {
   const googleJwt = jwtDecode<GoogleJwtContents>(googleToken);
-  let user = await getUserByEmail(dbClient.db, googleJwt.email);
+  let user = await getUserByEmail(db, googleJwt.email);
 
   // No user exists, let's create one
   if (user === null) {
     LOGGER.info(`Creating user ${googleJwt.email}`);
-    user = await createUser(dbClient.db, googleJwt.email);
+    user = await createUser(db, googleJwt.email);
   }
 
   if (!user) {

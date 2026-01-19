@@ -5,7 +5,7 @@ import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
-import { getDbClient } from '../util/db';
+import { withDbClient } from '../util/db';
 
 interface LoginRequest {
   email: string;
@@ -22,39 +22,39 @@ export const handleLogin = async (event: APIGatewayEvent) => {
   const { email, password } = parseEventBody<LoginRequest>(event);
 
   LOGGER.debug('Initialize database.');
-  const dbClient = await getDbClient();
+  return await withDbClient(async (db) => {
+    const user = await getUserByEmail(db, email);
 
-  const user = await getUserByEmail(dbClient.db, email);
+    if (!user?.passwordHash) {
+      throw new Error('User has not set a local password!');
+    }
 
-  if (!user?.passwordHash) {
-    throw new Error('User has not set a local password!');
-  }
+    const isCorrect = await testPassword(password, user.passwordHash);
 
-  const isCorrect = await testPassword(password, user.passwordHash);
+    if (!isCorrect) {
+      throw new Error('Incorrect user/password combination!');
+    }
 
-  if (!isCorrect) {
-    throw new Error('Incorrect user/password combination!');
-  }
+    const internalJwt = await createJwt(user);
 
-  const internalJwt = await createJwt(user);
+    const cookies = {
+      [JWT_COOKIE_NAME]: internalJwt,
+    };
 
-  const cookies = {
-    [JWT_COOKIE_NAME]: internalJwt,
-  };
+    const cookieHeader = await encryptCookies(cookies);
 
-  const cookieHeader = await encryptCookies(cookies);
+    const result: APIGatewayProxyResult = {
+      body: JSON.stringify({
+        jwt: internalJwt,
+      }),
+      headers: {
+        'Set-Cookie': cookieHeader,
+      },
+      statusCode: 200,
+    };
 
-  const result: APIGatewayProxyResult = {
-    body: JSON.stringify({
-      jwt: internalJwt,
-    }),
-    headers: {
-      'Set-Cookie': cookieHeader,
-    },
-    statusCode: 200,
-  };
-
-  return result;
+    return result;
+  });
 };
 
 export const handleRegister = async (event: APIGatewayEvent) => {
@@ -66,40 +66,40 @@ export const handleRegister = async (event: APIGatewayEvent) => {
   }
 
   LOGGER.debug('Initialize database.');
-  const dbClient = await getDbClient();
+  return await withDbClient(async (db) => {
+    const internalJwt = await db.transaction(async () => {
+      LOGGER.debug('Get User');
+      let user = await getUserByEmail(db, email);
+      if (user !== null) {
+        throw new Error(`User already registered for email ${email}`);
+      }
 
-  const internalJwt = await dbClient.db.transaction(async () => {
-    LOGGER.debug('Get User');
-    let user = await getUserByEmail(dbClient.db, email);
-    if (user !== null) {
-      throw new Error(`User already registered for email ${email}`);
-    }
+      const hashedPassword = await hashPassword(password);
+      user = await createUser(db, email, hashedPassword);
 
-    const hashedPassword = await hashPassword(password);
-    user = await createUser(dbClient.db, email, hashedPassword);
+      if (user === null) {
+        throw new Error('Failed to create user.');
+      }
 
-    if (user === null) {
-      throw new Error('Failed to create user.');
-    }
+      return await createJwt(user);
+    });
 
-    return await createJwt(user);
+    const cookies = {
+      [JWT_COOKIE_NAME]: internalJwt,
+    };
+
+    const cookieHeader = await encryptCookies(cookies);
+
+    const result: APIGatewayProxyResult = {
+      body: JSON.stringify({
+        jwt: internalJwt,
+      }),
+      headers: {
+        'Set-Cookie': cookieHeader,
+      },
+      statusCode: 200,
+    };
+
+    return result;
   });
-
-  const cookies = {
-    [JWT_COOKIE_NAME]: internalJwt,
-  };
-
-  const cookieHeader = await encryptCookies(cookies);
-
-  const result: APIGatewayProxyResult = {
-    body: JSON.stringify({
-      jwt: internalJwt,
-    }),
-    headers: {
-      'Set-Cookie': cookieHeader,
-    },
-    statusCode: 200,
-  };
-
-  return result;
 };

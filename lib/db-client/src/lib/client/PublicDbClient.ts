@@ -379,7 +379,7 @@ export async function getMatchupsForLeague(
   weekNumber?: number,
 ): Promise<Matchup[]> {
   const conditions = [eq(Schema.matchups.leagueId, leagueId)];
-  
+
   if (weekNumber !== undefined) {
     conditions.push(eq(Schema.matchups.weekNumber, weekNumber));
   }
@@ -454,7 +454,7 @@ export async function updateMatchupScore(
   team2Score?: number | null,
 ): Promise<Matchup> {
   const updateData: { team1Score?: string; team2Score?: string } = {};
-  
+
   if (team1Score !== null && team1Score !== undefined) {
     updateData.team1Score = team1Score.toString();
   }
@@ -500,46 +500,81 @@ export async function updateMatchupStatus(
 export async function getMatchupPlayerGameStats(
   db: PublicDb,
   matchupId: number,
-): Promise<{
-  playerId: number;
-  teamId: number | null;
-  season: number;
-  gameNum: number;
-  battingStats: typeof Schema.gameBatting.$inferSelect | null;
-  pitchingStats: typeof Schema.gamePitching.$inferSelect | null;
-  fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
-}[]> {
+): Promise<
+  {
+    playerId: number;
+    teamId: number | null;
+    season: number;
+    gameNum: number;
+    battingStats: typeof Schema.gameBatting.$inferSelect | null;
+    pitchingStats: typeof Schema.gamePitching.$inferSelect | null;
+    fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
+  }[]
+> {
+  // First get matchup info to lookup league/week
+  const matchupInfo = await db
+    .select({
+      leagueId: Schema.matchups.leagueId,
+      weekNumber: Schema.matchups.weekNumber,
+    })
+    .from(Schema.matchups)
+    .where(eq(Schema.matchups.id, matchupId))
+    .limit(1);
+
+  if (matchupInfo.length === 0) {
+    return [];
+  }
+
+  const { leagueId, weekNumber } = matchupInfo[0];
+
   // Get matchup players and their selected games
   const matchupPlayersResult = await db
     .select({
       matchupPlayerId: Schema.matchupPlayers.id,
       playerId: Schema.matchupPlayers.playerId,
-      season: Schema.matchupPlayers.season,
+      season: Schema.leagueWeekPlayerSeasons.season,
       matchupId: Schema.matchupPlayers.matchupId,
     })
     .from(Schema.matchupPlayers)
+    .leftJoin(
+      Schema.leagueWeekPlayerSeasons,
+      and(
+        eq(Schema.leagueWeekPlayerSeasons.leagueId, leagueId),
+        eq(Schema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+        eq(
+          Schema.leagueWeekPlayerSeasons.playerId,
+          Schema.matchupPlayers.playerId,
+        ),
+      ),
+    )
     .where(eq(Schema.matchupPlayers.matchupId, matchupId));
 
   if (matchupPlayersResult.length === 0) {
     return [];
   }
 
-  const matchupPlayerIds = matchupPlayersResult.map(mp => mp.matchupPlayerId);
+  const matchupPlayerIds = matchupPlayersResult.map((mp) => mp.matchupPlayerId);
 
   // Get selected games for these players
   const gamesResult = await db
     .select()
     .from(Schema.matchupPlayerGames)
-    .where(inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds));
+    .where(
+      inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds),
+    );
 
   // Build map of player -> games
   const playerGamesMap = new Map<number, { season: number; games: number[] }>();
-  const matchupPlayerMap = new Map<number, { playerId: number; season: number }>();
+  const matchupPlayerMap = new Map<
+    number,
+    { playerId: number; season: number }
+  >();
 
   for (const mp of matchupPlayersResult) {
-    matchupPlayerMap.set(mp.matchupPlayerId, { 
-      playerId: mp.playerId, 
-      season: mp.season 
+    if (mp.season === null) continue; // Skip if no season selected
+    matchupPlayerMap.set(mp.matchupPlayerId, {
+      playerId: mp.playerId,
+      season: mp.season,
     });
   }
 
@@ -553,7 +588,7 @@ export async function getMatchupPlayerGameStats(
 
     // Add all game numbers to the list
     const gameNums = [battingGameNum, pitchingGameNum, fieldingGameNum].filter(
-      (num): num is number => num !== null && num !== undefined
+      (num): num is number => num !== null && num !== undefined,
     );
 
     if (!playerGamesMap.has(mpInfo.playerId)) {
@@ -577,7 +612,7 @@ export async function getMatchupPlayerGameStats(
   }
 
   const teamIds = [matchup.team1Id, matchup.team2Id].filter(
-    (id): id is number => id !== null
+    (id): id is number => id !== null,
   );
 
   const teamMembersResult = await db
@@ -586,8 +621,8 @@ export async function getMatchupPlayerGameStats(
     .where(
       and(
         inArray(Schema.teamMembers.teamId, teamIds),
-        eq(Schema.teamMembers.leagueId, matchup.leagueId)
-      )
+        eq(Schema.teamMembers.leagueId, matchup.leagueId),
+      ),
     );
 
   const playerTeamMap = new Map<number, number>();
@@ -610,7 +645,7 @@ export async function getMatchupPlayerGameStats(
 
   for (const [playerId, { season, games }] of playerGamesMap) {
     const uniqueGames = [...new Set(games)];
-    
+
     for (const gameNum of uniqueGames) {
       const batting = await db
         .select()
@@ -619,8 +654,8 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gameBatting.playerId, playerId),
             eq(Schema.gameBatting.season, season),
-            eq(Schema.gameBatting.gameNum, gameNum)
-          )
+            eq(Schema.gameBatting.gameNum, gameNum),
+          ),
         )
         .then(TakeUniqueOrNull);
 
@@ -631,8 +666,8 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gamePitching.playerId, playerId),
             eq(Schema.gamePitching.season, season),
-            eq(Schema.gamePitching.gameNum, gameNum)
-          )
+            eq(Schema.gamePitching.gameNum, gameNum),
+          ),
         )
         .then(TakeUniqueOrNull);
 
@@ -643,8 +678,8 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gameFielding.playerId, playerId),
             eq(Schema.gameFielding.season, season),
-            eq(Schema.gameFielding.gameNum, gameNum)
-          )
+            eq(Schema.gameFielding.gameNum, gameNum),
+          ),
         )
         .then(TakeUniqueOrNull);
 
@@ -682,8 +717,8 @@ export async function getSeasonStats(
     .where(
       and(
         eq(Schema.seasonBatting.playerId, playerId),
-        eq(Schema.seasonBatting.season, season)
-      )
+        eq(Schema.seasonBatting.season, season),
+      ),
     )
     .then(TakeUniqueOrNull);
 
@@ -693,8 +728,8 @@ export async function getSeasonStats(
     .where(
       and(
         eq(Schema.seasonPitching.playerId, playerId),
-        eq(Schema.seasonPitching.season, season)
-      )
+        eq(Schema.seasonPitching.season, season),
+      ),
     )
     .then(TakeUniqueOrNull);
 
@@ -704,8 +739,8 @@ export async function getSeasonStats(
     .where(
       and(
         eq(Schema.seasonFielding.playerId, playerId),
-        eq(Schema.seasonFielding.season, season)
-      )
+        eq(Schema.seasonFielding.season, season),
+      ),
     )
     .then(TakeUniqueOrNull);
 
@@ -728,6 +763,210 @@ export async function getCareerStats(
   const fielding = await getCareerFieldingStatsForPlayer(db, playerId);
 
   return { batting, pitching, fielding };
+}
+
+/**
+ * Get roster lock rules for a league
+ */
+export async function getRosterLockRules(db: PublicDb, leagueId: number) {
+  return await db
+    .select()
+    .from(Schema.rosterLockRules)
+    .where(eq(Schema.rosterLockRules.leagueId, leagueId))
+    .then(TakeUniqueOrNull);
+}
+
+/**
+ * Check if roster is currently locked for a team in a matchup
+ */
+export async function isRosterLocked(
+  db: PublicDb,
+  leagueId: number,
+  weekNumber: number,
+): Promise<{
+  isLocked: boolean;
+  reason?: string;
+  lockTime?: Date;
+}> {
+  const league = await db
+    .select()
+    .from(Schema.leagues)
+    .where(eq(Schema.leagues.id, leagueId))
+    .then(TakeUniqueOrNull);
+
+  if (!league) {
+    throw new Error(`League ${leagueId} not found`);
+  }
+
+  // Check trade deadline
+  if (league.tradeDeadlineWeek && weekNumber >= league.tradeDeadlineWeek) {
+    return {
+      isLocked: true,
+      reason: 'Trade deadline has passed',
+    };
+  }
+
+  // Get matchup for the week
+  const matchup = await db
+    .select()
+    .from(Schema.matchups)
+    .where(
+      and(
+        eq(Schema.matchups.leagueId, leagueId),
+        eq(Schema.matchups.weekNumber, weekNumber),
+      ),
+    )
+    .then(TakeUniqueOrNull);
+
+  if (!matchup) {
+    return { isLocked: false };
+  }
+
+  // Check if matchup is in progress or completed
+  if (matchup.status === 'in_progress' || matchup.status === 'completed') {
+    return {
+      isLocked: true,
+      reason: `Matchup is ${matchup.status}`,
+    };
+  }
+
+  const lockRules = await getRosterLockRules(db, leagueId);
+  const now = new Date();
+
+  // Check custom lock time
+  if (lockRules?.customLockTime) {
+    const customLock = new Date(lockRules.customLockTime);
+    if (now >= customLock) {
+      return {
+        isLocked: true,
+        reason: 'Custom lock time reached',
+        lockTime: customLock,
+      };
+    }
+  }
+
+  // Check matchup start time with lock timing rules
+  if (matchup.startTime && league.rosterLockTiming) {
+    const matchupStart = new Date(matchup.startTime);
+    let lockTime = matchupStart;
+
+    switch (league.rosterLockTiming) {
+      case 'day_before':
+        lockTime = new Date(matchupStart.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week_before':
+        lockTime = new Date(matchupStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'custom':
+        if (lockRules?.lockHoursBeforeMatchup) {
+          lockTime = new Date(
+            matchupStart.getTime() -
+              lockRules.lockHoursBeforeMatchup * 60 * 60 * 1000,
+          );
+        }
+        break;
+      case 'matchup_start':
+      default:
+        lockTime = matchupStart;
+    }
+
+    if (now >= lockTime) {
+      return {
+        isLocked: true,
+        reason: 'Roster lock time reached',
+        lockTime,
+      };
+    }
+  }
+
+  return { isLocked: false };
+}
+
+/**
+ * Check if a roster move is allowed (considering locks and emergency subs)
+ */
+export async function canMakeRosterMove(
+  db: PublicDb,
+  leagueId: number,
+  weekNumber: number,
+  userId: number,
+  isEmergencySubstitution = false,
+): Promise<{
+  allowed: boolean;
+  reason?: string;
+}> {
+  const lockStatus = await isRosterLocked(db, leagueId, weekNumber);
+
+  if (!lockStatus.isLocked) {
+    return { allowed: true };
+  }
+
+  // Check if user is commissioner
+  const member = await db
+    .select()
+    .from(Schema.leagueMembers)
+    .where(
+      and(
+        eq(Schema.leagueMembers.leagueId, leagueId),
+        eq(Schema.leagueMembers.userId, userId),
+      ),
+    )
+    .then(TakeUniqueOrNull);
+
+  const lockRules = await getRosterLockRules(db, leagueId);
+
+  // Commissioner override
+  if (
+    member?.permissionLevel === 'commissioner' ||
+    member?.permissionLevel === 'owner'
+  ) {
+    if (lockRules?.commissionerCanOverride) {
+      return { allowed: true };
+    }
+  }
+
+  // Emergency substitution rules
+  if (isEmergencySubstitution && lockRules?.allowEmergencySubs) {
+    if (lockRules.emergencySubRule !== 'none') {
+      return { allowed: true };
+    }
+  }
+
+  return {
+    allowed: false,
+    reason: lockStatus.reason || 'Roster is locked',
+  };
+}
+
+/**
+ * Create or update roster lock rules for a league
+ */
+export async function upsertRosterLockRules(
+  db: PublicDb,
+  leagueId: number,
+  rules: {
+    allowEmergencySubs?: boolean;
+    emergencySubRule?:
+      | 'none'
+      | 'injury_only'
+      | 'injury_or_rest'
+      | 'commissioner_approval';
+    customLockTime?: string;
+    lockHoursBeforeMatchup?: number;
+    commissionerCanOverride?: boolean;
+  },
+) {
+  return await db
+    .insert(Schema.rosterLockRules)
+    .values({
+      leagueId,
+      ...rules,
+    })
+    .onConflictDoUpdate({
+      target: Schema.rosterLockRules.leagueId,
+      set: rules,
+    })
+    .returning();
 }
 
 // Re-export player stats utilities
@@ -921,10 +1160,12 @@ export async function updateLeagueScoringProfileEntries(
           Schema.leagueScoringProfileEntries.profileId,
           Schema.leagueScoringProfileEntries.statDefinitionId,
         ],
-        set: conflictUpdateAllExcept(
-          Schema.leagueScoringProfileEntries,
-          ['id', 'profileId', 'statDefinitionId', 'createdAt'],
-        ),
+        set: conflictUpdateAllExcept(Schema.leagueScoringProfileEntries, [
+          'id',
+          'profileId',
+          'statDefinitionId',
+          'createdAt',
+        ]),
       });
 
     return tx
@@ -947,10 +1188,7 @@ export async function getScoringMultipliersForLeague(
     const profile = await getActiveScoringProfileForLeague(db, leagueId);
 
     if (profile) {
-      const entries = await getScoringProfileEntriesForProfile(
-        db,
-        profile.id,
-      );
+      const entries = await getScoringProfileEntriesForProfile(db, profile.id);
       entryByDefinitionId = new Map(
         entries.map((entry) => [entry.statDefinitionId, entry]),
       );

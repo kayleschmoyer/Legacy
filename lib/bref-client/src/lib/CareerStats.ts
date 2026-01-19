@@ -15,6 +15,19 @@ import {
 } from './BRefSession';
 import { getTable, getTableBody, RowParser } from './HtmlParser';
 
+// Custom error type for detailed debugging information
+interface ErrorWithDetails extends Error {
+  details?: {
+    brefId: string;
+    season?: number;
+    gameNumber?: number;
+    url: string;
+    tableIds: (string | undefined)[];
+    htmlPreview: string;
+    htmlLength: number;
+  };
+}
+
 const GAME_IDENTIFIER_GROUP = 'gameIdentifier';
 const GAME_IDENTIFIER_REGEX = new RegExp(
   `^\\/boxes\\/\\w{3}\\/(?<${GAME_IDENTIFIER_GROUP}>\\w{12}).shtml$`,
@@ -303,19 +316,21 @@ function getFieldingStats(
   const allStats = parseTable<SeasonFielding>(fieldingStats, (r) =>
     parseRow(r, playerId),
   );
-  
+
   // Filter out records where pos is null, undefined, or empty (e.g., "Did not play" records)
-  return allStats.filter(stat => {
-    return stat.pos != null && 
-           stat.pos !== undefined && 
-           stat.pos !== '' && 
-           stat.pos.trim() !== '' &&
-           stat.team != null &&
-           stat.team !== undefined &&
-           stat.team.trim() !== '' &&
-           stat.rowId != null &&
-           stat.rowId !== undefined &&
-           stat.rowId.trim() !== '';
+  return allStats.filter((stat) => {
+    return (
+      stat.pos != null &&
+      stat.pos !== undefined &&
+      stat.pos !== '' &&
+      stat.pos.trim() !== '' &&
+      stat.team != null &&
+      stat.team !== undefined &&
+      stat.team.trim() !== '' &&
+      stat.rowId != null &&
+      stat.rowId !== undefined &&
+      stat.rowId.trim() !== ''
+    );
   });
 }
 
@@ -354,10 +369,28 @@ export async function getGameBattingStats(
   const data = await getGameStats(player.brefId, 'b', season);
   const root = htmlParser(data);
 
-  const table = getTable(root, 'batting_gamelogs');
+  // Baseball Reference changed table ID from 'batting_gamelogs' to 'players_standard_batting'
+  const table = getTable(root, 'players_standard_batting');
 
   if (table === null) {
-    throw new Error('Could not find Game Batting Stats table');
+    // Log details about what we got back to help debug
+    const allTables = root
+      .getElementsByTagName('table')
+      .map((t) => t.getAttribute('id'));
+    const bodyPreview = data.substring(0, 500);
+    const error: ErrorWithDetails = new Error(
+      'Could not find Game Batting Stats table',
+    );
+    error.details = {
+      brefId: player.brefId,
+      season,
+      gameNumber,
+      url: `https://www.baseball-reference.com/players/gl.fcgi?id=${player.brefId}&t=b&year=${season}`,
+      tableIds: allTables,
+      htmlPreview: bodyPreview,
+      htmlLength: data.length,
+    };
+    throw error;
   }
 
   const gameRow = table.getElementsByTagName('tr').find((row) => {
@@ -369,7 +402,11 @@ export async function getGameBattingStats(
   });
 
   if (!gameRow) {
-    throw new Error('Could not find game record');
+    // Player may not have played this specific game (injury, rest, etc.)
+    LOGGER.debug(
+      `No game record found for player ${player.brefId} game ${gameNumber} in ${season}`,
+    );
+    return null;
   }
 
   const result = parseRow<GameBatting>(gameRow, player.id);
@@ -397,6 +434,210 @@ export async function getGameBattingStats(
   return result;
 }
 
+/**
+ * Get ALL game fielding stats for a player in a season at a specific position.
+ * Parses every row in the game log table for that position.
+ * Returns empty array if player has no fielding stats at that position.
+ */
+export async function getAllGameFieldingStats(
+  player: Player,
+  season: number,
+  pos: string,
+): Promise<GameFielding[]> {
+  const data = await getGameStats(player.brefId, 'f', season);
+
+  const root = htmlParser(data, { comment: true });
+
+  let tableId: string;
+
+  switch (pos.trim()) {
+    case 'P':
+      tableId = '_1';
+      break;
+    case 'C':
+      tableId = '_2';
+      break;
+    case '1B':
+      tableId = '_3';
+      break;
+    case '2B':
+      tableId = '_4';
+      break;
+    case '3B':
+      tableId = '_5';
+      break;
+    case 'SS':
+      tableId = '_6';
+      break;
+    case 'LF':
+      tableId = '_7';
+      break;
+    case 'CF':
+      tableId = '_8';
+      break;
+    case 'RF':
+      tableId = '_9';
+      break;
+    case 'DH':
+    case 'XX':
+    case 'OF':
+    case 'PH':
+    case 'PR':
+      // DH (Designated Hitter), XX (Unknown), OF (Outfield), PH (Pinch Hitter), PR (Pinch Runner)
+      // These positions don't have separate fielding tables on Baseball Reference
+      LOGGER.debug(
+        `Position ${pos} does not have fielding stats tables on Baseball Reference`,
+      );
+      return [];
+    default:
+      // Log warning but don't throw - return empty array gracefully
+      LOGGER.warn(
+        `Unknown position: ${pos} for player ${player.brefId} - returning empty array for fielding stats`,
+      );
+      return [];
+  }
+
+  const table = getTable(root, tableId);
+
+  if (table === null) {
+    // Player may not have fielding stats at this position for this season
+    LOGGER.debug(
+      `No fielding stats table found for player ${player.brefId} at position ${pos} in ${season}`,
+    );
+    return [];
+  }
+
+  const allRows = table.getElementsByTagName('tr');
+  const results: GameFielding[] = [];
+
+  for (const gameRow of allRows) {
+    // Skip header rows and rows without game number
+    const rankerCell = gameRow
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    const gameNumberText = rankerCell?.text;
+    if (!gameNumberText || gameNumberText === 'Rk') {
+      continue;
+    }
+
+    const gameNumber = parseInt(gameNumberText, 10);
+    if (isNaN(gameNumber)) {
+      continue;
+    }
+
+    const result = parseRow<GameFielding>(gameRow, player.id);
+    if (result === null) {
+      continue;
+    }
+
+    const identifierCell = gameRow
+      .getElementsByTagName('td')
+      .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+
+    const link = identifierCell
+      ?.getElementsByTagName('a')[0]
+      ?.getAttribute('href');
+
+    const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+    result.gameIdentifier = match?.groups
+      ? match.groups[GAME_IDENTIFIER_GROUP]
+      : '';
+    result.season = season;
+    result.gameNum = gameNumber;
+
+    results.push(result);
+  }
+
+  LOGGER.info(
+    `Loaded ${results.length} fielding games for player ${player.brefId} season ${season} position ${pos}`,
+  );
+  return results;
+}
+
+/**
+ * Get ALL game batting stats for a player in a season.
+ * Parses every row in the game log table, returning an array of all games.
+ * This is much more efficient than calling getGameBattingStats() 162 times.
+ */
+export async function getAllGameBattingStats(
+  player: Player,
+  season: number,
+): Promise<GameBatting[]> {
+  const data = await getGameStats(player.brefId, 'b', season);
+  const root = htmlParser(data);
+
+  const table = getTable(root, 'players_standard_batting');
+
+  if (table === null) {
+    const allTables = root
+      .getElementsByTagName('table')
+      .map((t) => t.getAttribute('id'));
+    const bodyPreview = data.substring(0, 500);
+    const error: ErrorWithDetails = new Error(
+      'Could not find Game Batting Stats table',
+    );
+    error.details = {
+      brefId: player.brefId,
+      season,
+      url: `https://www.baseball-reference.com/players/gl.fcgi?id=${player.brefId}&t=b&year=${season}`,
+      tableIds: allTables,
+      htmlPreview: bodyPreview,
+      htmlLength: data.length,
+    };
+    throw error;
+  }
+
+  const allRows = table.getElementsByTagName('tr');
+  const results: GameBatting[] = [];
+
+  for (const gameRow of allRows) {
+    // Skip header rows and rows without game number
+    const rankerCell = gameRow
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    const gameNumberText = rankerCell?.text;
+    if (!gameNumberText || gameNumberText === 'Rk') {
+      continue;
+    }
+
+    const gameNumber = parseInt(gameNumberText, 10);
+    if (isNaN(gameNumber)) {
+      continue;
+    }
+
+    const result = parseRow<GameBatting>(gameRow, player.id);
+    if (result === null) {
+      continue;
+    }
+
+    const identifierCell = gameRow
+      .getElementsByTagName('td')
+      .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+
+    const link = identifierCell
+      ?.getElementsByTagName('a')[0]
+      ?.getAttribute('href');
+
+    const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+    result.gameIdentifier = match?.groups
+      ? match.groups[GAME_IDENTIFIER_GROUP]
+      : '';
+    result.season = season;
+    result.gameNum = gameNumber;
+
+    results.push(result);
+  }
+
+  LOGGER.info(
+    `Loaded ${results.length} batting games for player ${player.brefId} season ${season}`,
+  );
+  return results;
+}
+
 export async function getGamePitchingStats(
   player: Player,
   season: number,
@@ -405,10 +646,15 @@ export async function getGamePitchingStats(
   const data = await getGameStats(player.brefId, 'p', season);
   const root = htmlParser(data);
 
-  const table = getTable(root, 'pitching_gamelogs');
+  // Baseball Reference changed table ID from 'pitching_gamelogs' to 'players_standard_pitching'
+  const table = getTable(root, 'players_standard_pitching');
 
   if (table === null) {
-    throw new Error('Could not find Game Pitching Stats table');
+    // Position players don't have pitching stats - this is expected, not an error
+    LOGGER.debug(
+      `No pitching stats table found for player ${player.brefId} in ${season} - likely a position player`,
+    );
+    return null;
   }
 
   const gameRow = table.getElementsByTagName('tr').find((row) => {
@@ -420,7 +666,11 @@ export async function getGamePitchingStats(
   });
 
   if (!gameRow) {
-    throw new Error('Could not find game record');
+    // Pitcher may not have pitched in this specific game
+    LOGGER.debug(
+      `No game record found for pitcher ${player.brefId} game ${gameNumber} in ${season}`,
+    );
+    return null;
   }
 
   const result = parseRow<GamePitching>(gameRow, player.id);
@@ -487,6 +737,117 @@ export async function getGamePitchingStats(
   return result;
 }
 
+/**
+ * Get ALL game pitching stats for a player in a season.
+ * Parses every row in the game log table, returning an array of all games.
+ * Returns empty array if player has no pitching stats (position player).
+ */
+export async function getAllGamePitchingStats(
+  player: Player,
+  season: number,
+): Promise<GamePitching[]> {
+  const data = await getGameStats(player.brefId, 'p', season);
+  const root = htmlParser(data);
+
+  const table = getTable(root, 'players_standard_pitching');
+
+  if (table === null) {
+    // Position players don't have pitching stats - this is expected
+    LOGGER.debug(
+      `No pitching stats table found for player ${player.brefId} in ${season} - likely a position player`,
+    );
+    return [];
+  }
+
+  const allRows = table.getElementsByTagName('tr');
+  const results: GamePitching[] = [];
+
+  for (const gameRow of allRows) {
+    // Skip header rows and rows without game number
+    const rankerCell = gameRow
+      .getElementsByTagName('th')
+      .find((c) => c.getAttribute('data-stat') === 'ranker');
+
+    const gameNumberText = rankerCell?.text;
+    if (!gameNumberText || gameNumberText === 'Rk') {
+      continue;
+    }
+
+    const gameNumber = parseInt(gameNumberText, 10);
+    if (isNaN(gameNumber)) {
+      continue;
+    }
+
+    const result = parseRow<GamePitching>(gameRow, player.id);
+    if (result === null) {
+      continue;
+    }
+
+    const cells = gameRow.getElementsByTagName('td');
+
+    const identifierCell = cells.find(
+      (cell) => cell.getAttribute('data-stat') === 'date_game',
+    );
+
+    const link = identifierCell
+      ?.getElementsByTagName('a')[0]
+      ?.getAttribute('href');
+
+    const match = link?.match(GAME_IDENTIFIER_REGEX);
+
+    result.gameIdentifier = match?.groups
+      ? match.groups[GAME_IDENTIFIER_GROUP]
+      : '';
+    result.season = season;
+    result.gameNum = gameNumber;
+
+    // Pitching specific stat parsing
+    const decision =
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'player_game_result',
+      )?.text || '';
+
+    if (decision.includes('BW') || decision.startsWith('W')) {
+      result.w = 1;
+    }
+
+    if (decision.includes('BL') || decision.startsWith('L')) {
+      result.l = 1;
+    }
+
+    if (decision.startsWith('S')) {
+      result.sv = 1;
+    }
+
+    const gameSpan =
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'player_game_span',
+      )?.text || '';
+
+    if (gameSpan.includes('GS')) {
+      result.gs = 1;
+    } else if (gameSpan.includes('GF')) {
+      result.gf = 1;
+    } else if (gameSpan.includes('CG')) {
+      result.gs = 1;
+      result.gf = 1;
+      result.cg = 1;
+    } else if (gameSpan.includes('SHO')) {
+      result.gs = 1;
+      result.gf = 1;
+      result.cg = 1;
+      result.sho = 1;
+    }
+
+    results.push(result);
+  }
+
+  LOGGER.info(
+    `Loaded ${results.length} pitching games for player ${player.brefId} season ${season}`,
+  );
+  return results;
+}
+
 export async function getGameFieldingStats(
   player: Player,
   season: number,
@@ -527,14 +888,34 @@ export async function getGameFieldingStats(
     case 'RF':
       tableId = '_9';
       break;
+    case 'DH':
+    case 'XX':
+    case 'OF':
+    case 'PH':
+    case 'PR':
+      // DH (Designated Hitter), XX (Unknown), OF (Outfield), PH (Pinch Hitter), PR (Pinch Runner)
+      // These positions don't have separate fielding tables on Baseball Reference
+      LOGGER.debug(
+        `Position ${pos} does not have fielding stats tables on Baseball Reference`,
+      );
+      return null;
     default:
-      throw new Error(`Invalid position: ${pos}`);
+      // Log warning but don't throw - return null gracefully
+      LOGGER.warn(
+        `Unknown position: ${pos} for player ${player.brefId} - returning null for fielding stats`,
+      );
+      return null;
   }
 
   const table = getTable(root, tableId);
 
   if (table === null) {
-    throw new Error('Could not find Game Fielding Stats table');
+    // Player may not have fielding stats at this position for this season
+    // Baseball Reference may have also changed their table structure
+    LOGGER.debug(
+      `No fielding stats table found for player ${player.brefId} at position ${pos} in ${season}`,
+    );
+    return null;
   }
 
   const gameRow = table.getElementsByTagName('tr').find((row) => {
@@ -546,7 +927,11 @@ export async function getGameFieldingStats(
   });
 
   if (!gameRow) {
-    throw new Error('Could not find game record');
+    // Player may not have fielded at this position in this specific game
+    LOGGER.debug(
+      `No fielding record found for player ${player.brefId} game ${gameNumber} in ${season}`,
+    );
+    return null;
   }
 
   const result = parseRow<GameFielding>(gameRow, player.id);

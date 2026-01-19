@@ -50,7 +50,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Per 100 games: h: 100*1 = 100, hr: 20*3 = 60, r: 50*1 = 50, rbi: 60*1 = 60, sb: 10*1 = 10, cs: 5*-1 = -5
       // Total: 100 + 60 + 50 + 60 + 10 - 5 = 275
@@ -75,7 +78,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Per 50 games: w: 15*2 = 30, l: 10*-2 = -20, sv: 5*3 = 15, so: 200*1 = 200, outsRecorded: 450*1 = 450
       // Total: 30 - 20 + 15 + 200 + 450 = 675
@@ -96,7 +102,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Per 150 games: eDef: 10*-1 = -10
       // Per game: -10 / 150 = -0.0666...
@@ -120,7 +129,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Batting: 100*1 / 100 = 1.0
       // Fielding: 5*-1 / 100 = -0.05
@@ -138,7 +150,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       expect(result.totalPerGame).toBe(0);
       expect(result.gamesPlayed).toBe(0);
@@ -154,7 +169,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Only hr counts: 20*3 / 100 = 0.6
       expect(result.totalPerGame).toBe(0.6);
@@ -177,7 +195,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateCareerProjection(careerStats, mockScoringSettings);
+      const result = calculateCareerProjection(
+        careerStats,
+        mockScoringSettings,
+      );
 
       // Should use maximum games (120 from fielding)
       expect(result.gamesPlayed).toBe(120);
@@ -198,7 +219,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateMatchupProjection(seasonStats, mockScoringSettings);
+      const result = calculateMatchupProjection(
+        seasonStats,
+        mockScoringSettings,
+      );
 
       // Per 50 games: h: 60*1 = 60, hr: 15*3 = 45, r: 30*1 = 30, rbi: 40*1 = 40
       // Total: 60 + 45 + 30 + 40 = 175
@@ -219,7 +243,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateMatchupProjection(seasonStats, mockScoringSettings);
+      const result = calculateMatchupProjection(
+        seasonStats,
+        mockScoringSettings,
+      );
 
       // Per 30 games: w: 10*2 = 20, l: 5*-2 = -10, so: 150*1 = 150
       // Total: 20 - 10 + 150 = 160
@@ -238,7 +265,10 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculateMatchupProjection(seasonStats, mockScoringSettings);
+      const result = calculateMatchupProjection(
+        seasonStats,
+        mockScoringSettings,
+      );
 
       expect(result.totalPerGame).toBe(0);
       expect(result.gamesPlayed).toBe(0);
@@ -266,16 +296,20 @@ describe('Matchup Projections Engine', () => {
         },
       };
 
-      const result = calculatePlayerProjections(careerStats, seasonStats, mockScoringSettings);
+      const result = calculatePlayerProjections(
+        careerStats,
+        seasonStats,
+        mockScoringSettings,
+      );
 
       expect(result.playerId).toBe(1);
       expect(result.careerProjection).toBeDefined();
       expect(result.matchupProjection).not.toBeNull();
       expect(result.selectedSeason).toBe(2023);
-      
+
       // Career: (100*1 + 20*3) / 100 = 1.6
       expect(result.careerProjection.totalPerGame).toBe(1.6);
-      
+
       // Season: (60*1 + 15*3) / 50 = 2.1
       expect(result.matchupProjection.totalPerGame).toBe(2.1);
     });

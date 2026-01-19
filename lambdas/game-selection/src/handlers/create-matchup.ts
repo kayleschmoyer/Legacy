@@ -1,12 +1,13 @@
 import {
-  CreateMatchupPlayer,
   createMatchupRecord,
   getMatchup,
   getMissingMatchupRecords,
   getPublicDbConnection,
   getSeasonBattingStatsForPlayer,
   PublicDb,
+  PublicSchema,
 } from '@legacy-sports/db-client';
+import { and, eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -31,9 +32,8 @@ interface CreateMatchupEvent {
 
 /**
  * Create matchup player records for a matchup
- * Uses the matchup's selected_season if set, otherwise randomly selects a season
- * Note: In the new matchup system with selected_season, all players in a matchup
- * should use the same season (the matchup's selected_season).
+ * Season selection is now managed in league_week_player_seasons table at the league-week level
+ * This allows free agents to have projections and ensures consistent seasons across matchups
  * @param db - Database connection
  * @param event - CreateMatchupEvent containing league and week information
  */
@@ -66,6 +66,12 @@ async function createMatchup(
     `Found ${missingRecords.length} players needing matchup records`,
   );
 
+  // Get matchup league and week for season selection
+  if (!matchup.leagueId || !matchup.weekNumber) {
+    LOGGER.error(`Matchup ${matchup.id} missing leagueId or weekNumber`);
+    return;
+  }
+
   for (const player of missingRecords) {
     let season: number;
 
@@ -73,22 +79,54 @@ async function createMatchup(
       // Use the matchup's selected season for all players
       season = selectedSeason;
     } else {
-      // Fallback to random season selection (for backward compatibility)
-      const seasons = await getSeasonBattingStatsForPlayer(db, player.id);
-      if (seasons.length === 0) {
-        LOGGER.error(
-          `Player ${player.id} has no available seasons. Skipping.`,
-        );
-        continue;
+      // Check if season already selected for this league/week/player
+      const existingSeason = await db
+        .select()
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              matchup.weekNumber,
+            ),
+            eq(PublicSchema.leagueWeekPlayerSeasons.playerId, player.id),
+          ),
+        )
+        .limit(1);
+
+      if (existingSeason.length > 0) {
+        season = existingSeason[0].season;
+      } else {
+        // Select a random season from available seasons
+        const seasons = await getSeasonBattingStatsForPlayer(db, player.id);
+        if (seasons.length === 0) {
+          LOGGER.error(
+            `Player ${player.id} has no available seasons. Skipping.`,
+          );
+          continue;
+        }
+        const seasonIdx = Math.floor(Math.random() * seasons.length);
+        season = seasons[seasonIdx].season;
+
+        // Insert season selection into league_week_player_seasons
+        await db
+          .insert(PublicSchema.leagueWeekPlayerSeasons)
+          .values({
+            leagueId: matchup.leagueId,
+            weekNumber: matchup.weekNumber,
+            playerId: player.id,
+            season: season,
+          })
+          .onConflictDoNothing();
       }
-      const seasonIdx = Math.floor(Math.random() * seasons.length);
-      season = seasons[seasonIdx].season;
     }
 
-    const record: CreateMatchupPlayer = {
+    // Create matchup player record (without season - that's in league_week_player_seasons now)
+    const record = {
       matchupId: matchup.id,
       playerId: player.id,
-      season: season,
+      teamId: 0, // TODO: Get actual teamId from team_members or matchup context
     };
 
     LOGGER.debug(

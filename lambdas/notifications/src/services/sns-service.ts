@@ -1,7 +1,9 @@
 import {
   CreatePlatformEndpointCommand,
+  type CreatePlatformEndpointCommandOutput,
   DeleteEndpointCommand,
   PublishCommand,
+  type PublishCommandOutput,
   SetEndpointAttributesCommand,
   SNSClient,
 } from '@aws-sdk/client-sns';
@@ -53,7 +55,8 @@ export async function createPlatformEndpoint(
       CustomUserData: input.customUserData,
     });
 
-    const response = await snsClient.send(command);
+    const response: CreatePlatformEndpointCommandOutput =
+      await snsClient.send(command);
 
     if (!response.EndpointArn) {
       throw new Error('Failed to create platform endpoint - no ARN returned');
@@ -122,7 +125,7 @@ export async function sendPushNotification(
       MessageStructure: 'json',
     });
 
-    const response = await snsClient.send(command);
+    const response: PublishCommandOutput = await snsClient.send(command);
 
     logger.info('Push notification sent successfully', {
       endpointArn: input.endpointArn,

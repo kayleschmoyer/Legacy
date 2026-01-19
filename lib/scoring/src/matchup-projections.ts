@@ -1,10 +1,10 @@
 /**
  * Matchup Projections Engine
- * 
+ *
  * Calculates two types of fantasy score projections:
  * 1. Career Projection: Based on career averages (all-time performance)
  * 2. Matchup Projection: Based on selected season averages (season-specific performance)
- * 
+ *
  * These projections help users make informed decisions about player selection
  * and game selection strategies.
  */
@@ -228,8 +228,11 @@ export function calculatePlayerProjections(
   seasonStats: SeasonStats | null,
   scoringSettings?: ScoringSettings,
 ): PlayerProjection {
-  const careerProjection = calculateCareerProjection(careerStats, scoringSettings);
-  
+  const careerProjection = calculateCareerProjection(
+    careerStats,
+    scoringSettings,
+  );
+
   const matchupProjection = seasonStats
     ? calculateMatchupProjection(seasonStats, scoringSettings)
     : null;
@@ -262,7 +265,8 @@ export function compareProjections(
   matchupProjection: ProjectionScore,
 ): number {
   if (careerProjection.totalPerGame === 0) return 0;
-  
-  const difference = matchupProjection.totalPerGame - careerProjection.totalPerGame;
+
+  const difference =
+    matchupProjection.totalPerGame - careerProjection.totalPerGame;
   return (difference / careerProjection.totalPerGame) * 100;
 }

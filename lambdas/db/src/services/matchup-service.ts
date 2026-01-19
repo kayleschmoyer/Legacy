@@ -1,6 +1,6 @@
 /**
  * Matchup Service
- * 
+ *
  * Business logic layer for matchup operations.
  * Integrates scheduling algorithms with database operations.
  */
@@ -44,7 +44,7 @@ export class MatchupService {
    * Generate a complete schedule for a league
    */
   static async generateSchedule(
-    params: GenerateScheduleParams
+    params: GenerateScheduleParams,
   ): Promise<ScheduleResult> {
     const { leagueId, numberOfWeeks, strategyType } = params;
 
@@ -106,8 +106,8 @@ export class MatchupService {
         .where(
           and(
             inArray(PublicSchema.teamMembers.teamId, teamIds),
-            eq(PublicSchema.teamMembers.leagueId, leagueId)
-          )
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+          ),
         );
 
       const teamRosters: TeamRoster[] = [];
@@ -130,14 +130,16 @@ export class MatchupService {
 
       // 4. Fetch player game counts across all seasons
       const allPlayerIds = Array.from(
-        new Set(teamMembersResult.map((tm) => tm.playerId))
+        new Set(teamMembersResult.map((tm) => tm.playerId)),
       );
 
       if (allPlayerIds.length === 0) {
         return {
           matchups: [],
           seasonUsage: new Map(),
-          warnings: ['No players found on teams. Cannot determine eligible seasons.'],
+          warnings: [
+            'No players found on teams. Cannot determine eligible seasons.',
+          ],
         };
       }
 
@@ -163,7 +165,7 @@ export class MatchupService {
 
       // Aggregate game counts per player per season (take max from batting/fielding)
       const gameCountMap = new Map<string, number>(); // key: "playerId-season"
-      
+
       for (const stat of battingStats) {
         const key = `${stat.playerId}-${stat.season}`;
         const games = stat.g ?? 0;
@@ -214,7 +216,7 @@ export class MatchupService {
    */
   static async saveSchedule(
     leagueId: number,
-    scheduleResult: ScheduleResult
+    scheduleResult: ScheduleResult,
   ): Promise<void> {
     await runWithPublicClient(getDbOptions(), async (db) => {
       // Delete existing matchups for this league (if regenerating)
@@ -245,7 +247,7 @@ export class MatchupService {
    * Generate and save schedule in one operation
    */
   static async generateAndSaveSchedule(
-    params: GenerateScheduleParams
+    params: GenerateScheduleParams,
   ): Promise<ScheduleResult> {
     const scheduleResult = await this.generateSchedule(params);
     await this.saveSchedule(params.leagueId, scheduleResult);
@@ -301,8 +303,8 @@ export class MatchupService {
         .where(
           and(
             eq(PublicSchema.matchups.leagueId, leagueId),
-            eq(PublicSchema.matchups.weekNumber, weekNumber)
-          )
+            eq(PublicSchema.matchups.weekNumber, weekNumber),
+          ),
         );
     });
   }
@@ -311,7 +313,7 @@ export class MatchupService {
    * Factory method for creating strategies
    */
   private static createStrategy(
-    strategyType: 'round-robin' | 'divisional' | 'random'
+    strategyType: 'round-robin' | 'divisional' | 'random',
   ): SchedulingStrategy {
     switch (strategyType) {
       case 'round-robin':

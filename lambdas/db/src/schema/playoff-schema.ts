@@ -6,7 +6,7 @@ import { Team } from './leagues';
 
 /**
  * Playoff System Schema (LS-28)
- * 
+ *
  * Implements playoff bracket management with automatic seeding,
  * tournament progression, and championship determination.
  */
@@ -98,7 +98,7 @@ builder.objectType(PlayoffBracket, {
             .where(eq(PublicSchema.playoffMatchups.bracketId, bracket.id))
             .orderBy(
               asc(PublicSchema.playoffMatchups.round),
-              asc(PublicSchema.playoffMatchups.matchupNumber)
+              asc(PublicSchema.playoffMatchups.matchupNumber),
             );
           return results;
         });
@@ -363,8 +363,8 @@ builder.queryField('getPlayoffBracket', (t) =>
             .where(
               and(
                 eq(PublicSchema.playoffBrackets.leagueId, args.leagueId),
-                eq(PublicSchema.playoffBrackets.season, args.season)
-              )
+                eq(PublicSchema.playoffBrackets.season, args.season),
+              ),
             )
             .orderBy(desc(PublicSchema.playoffBrackets.season))
             .limit(1);
@@ -378,7 +378,7 @@ builder.queryField('getPlayoffBracket', (t) =>
         return results[0] || null;
       });
     },
-  })
+  }),
 );
 
 /**
@@ -400,7 +400,7 @@ builder.queryField('getPlayoffSeeds', (t) =>
         return results;
       });
     },
-  })
+  }),
 );
 
 /**
@@ -422,7 +422,7 @@ builder.queryField('getChampionshipTrophies', (t) =>
         return results;
       });
     },
-  })
+  }),
 );
 
 // ============================================================================
@@ -453,7 +453,7 @@ builder.mutationField('createPlayoffBracket', (t) =>
       });
       return bracket;
     },
-  })
+  }),
 );
 
 /**
@@ -470,7 +470,7 @@ builder.mutationField('advancePlayoffBracket', (t) =>
       const bracket = await PlayoffService.advanceBracket(args.bracketId);
       return bracket;
     },
-  })
+  }),
 );
 
 /**
@@ -505,7 +505,10 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
         }
 
         // Determine winner if both scores provided
-        if (args.highSeedScore !== undefined && args.lowSeedScore !== undefined) {
+        if (
+          args.highSeedScore !== undefined &&
+          args.lowSeedScore !== undefined
+        ) {
           const matchup = await db
             .select()
             .from(PublicSchema.playoffMatchups)
@@ -531,7 +534,7 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
         return results[0];
       });
     },
-  })
+  }),
 );
 
 /**
@@ -548,5 +551,5 @@ builder.mutationField('awardChampionship', (t) =>
       const trophy = await PlayoffService.awardChampionship(args.bracketId);
       return trophy;
     },
-  })
+  }),
 );

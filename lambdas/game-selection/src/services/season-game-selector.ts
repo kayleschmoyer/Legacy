@@ -66,7 +66,9 @@ export async function selectGamesForMatchupPlayer(
 
   const fieldingStats =
     fieldingStatsArray.length > 0
-      ? fieldingStatsArray[Math.floor(Math.random() * fieldingStatsArray.length)]
+      ? fieldingStatsArray[
+          Math.floor(Math.random() * fieldingStatsArray.length)
+        ]
       : null;
 
   const battingGameNum = selectGameNumber(battingStats);
@@ -142,10 +144,7 @@ export async function selectGamesForMatchup(
       .from(PublicSchema.matchupPlayerGames)
       .where(
         and(
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            matchupPlayer.id,
-          ),
+          eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayer.id),
           eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
         ),
       );

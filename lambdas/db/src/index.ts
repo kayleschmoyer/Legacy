@@ -17,6 +17,7 @@ import {
 } from '@legacy-sports/sentry';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { schema } from './schema';
+import { createLoaders } from './schema/dataloaders';
 
 interface JWTPayload {
   id: number;
@@ -157,6 +158,20 @@ const server = new ApolloServer({
         })
       : ApolloServerPluginLandingPageLocalDefault({ footer: false }),
   ],
+  formatError: (formattedError, error) => {
+    // Log all errors with full context
+    console.error('GraphQL Error:', {
+      message: formattedError.message,
+      path: formattedError.path,
+      extensions: formattedError.extensions,
+      locations: formattedError.locations,
+      originalError: error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    // Return the formatted error to the client
+    return formattedError;
+  },
 });
 
 // Create base handler with authentication context
@@ -198,7 +213,10 @@ const baseHandler = startServerAndCreateLambdaHandler(
 
       // Make this actually async to satisfy linter
       await Promise.resolve();
-      return { user };
+      return {
+        user,
+        loaders: createLoaders(), // Create fresh loaders for each request
+      };
     },
   },
 );

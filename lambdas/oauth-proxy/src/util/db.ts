@@ -1,7 +1,5 @@
-import memoizeOne from 'memoize-one';
-import { getDbConnection, InternalSchema } from '@legacy-sports/db-client';
+import { InternalDb, runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-import { BaseDbConnection } from 'lib/db-client/src/lib/client/abstract/BaseDbClient';
 
 export interface DbCredentials {
   dbUser: string;
@@ -9,13 +7,15 @@ export interface DbCredentials {
   dbHost: string;
 }
 
-export const getDbClient = memoizeOne(
-  async (): Promise<BaseDbConnection<typeof InternalSchema>> => {
-    const options = getDbOptions();
-    const connection = getDbConnection(options, InternalSchema);
-
-    await connection.initialize();
-
-    return connection;
-  },
-);
+/**
+ * Execute database operations with automatic connection management.
+ * Replaces the previous memoizeOne pattern for consistent architecture.
+ *
+ * @param callback - Function that receives the database client
+ * @returns Result of the callback function
+ */
+export async function withDbClient<T>(
+  callback: (db: InternalDb) => Promise<T>,
+): Promise<T> {
+  return await runWithInternalClient(getDbOptions(), callback);
+}

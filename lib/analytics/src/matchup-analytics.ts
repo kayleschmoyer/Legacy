@@ -22,7 +22,7 @@ export function calculateTeamStats(
     status: string;
   }>,
   teams: Array<{ id: number; name: string }>,
-  options?: { startWeek?: number; endWeek?: number }
+  options?: { startWeek?: number; endWeek?: number },
 ): TeamStats[] {
   const teamStatsMap = new Map<number, TeamStats>();
 
@@ -47,17 +47,25 @@ export function calculateTeamStats(
 
   // Filter matchups by week range if specified
   const filteredMatchups = matchups.filter((matchup) => {
-    if (options?.startWeek && matchup.weekNumber < options.startWeek) return false;
+    if (options?.startWeek && matchup.weekNumber < options.startWeek)
+      return false;
     if (options?.endWeek && matchup.weekNumber > options.endWeek) return false;
     return matchup.status === 'completed';
   });
 
   // Sort matchups by week number for streak calculation
-  const sortedMatchups = [...filteredMatchups].sort((a, b) => a.weekNumber - b.weekNumber);
+  const sortedMatchups = [...filteredMatchups].sort(
+    (a, b) => a.weekNumber - b.weekNumber,
+  );
 
   // Calculate stats for each matchup
   sortedMatchups.forEach((matchup) => {
-    if (!matchup.team1Id || !matchup.team2Id || !matchup.team1Score || !matchup.team2Score) {
+    if (
+      !matchup.team1Id ||
+      !matchup.team2Id ||
+      !matchup.team1Score ||
+      !matchup.team2Score
+    ) {
       return;
     }
 
@@ -103,7 +111,9 @@ export function calculateTeamStats(
     }
   });
 
-  return Array.from(teamStatsMap.values()).sort((a, b) => b.winPercentage - a.winPercentage);
+  return Array.from(teamStatsMap.values()).sort(
+    (a, b) => b.winPercentage - a.winPercentage,
+  );
 }
 
 /**
@@ -142,7 +152,7 @@ export function calculateHeadToHead(
   }>,
   team1: { id: number; name: string },
   team2: { id: number; name: string },
-  limit = 5
+  limit = 5,
 ): HeadToHeadRecord {
   const h2hMatchups = matchups
     .filter((m) => {
@@ -209,8 +219,10 @@ export function calculateHeadToHead(
     team2Wins,
     ties,
     totalMatchups,
-    team1AveragePoints: totalMatchups > 0 ? team1TotalPoints / totalMatchups : 0,
-    team2AveragePoints: totalMatchups > 0 ? team2TotalPoints / totalMatchups : 0,
+    team1AveragePoints:
+      totalMatchups > 0 ? team1TotalPoints / totalMatchups : 0,
+    team2AveragePoints:
+      totalMatchups > 0 ? team2TotalPoints / totalMatchups : 0,
     lastFiveResults,
   };
 }
@@ -219,7 +231,9 @@ export function calculateHeadToHead(
  * Calculate category performance breakdown
  * Note: This is a placeholder - actual implementation would need category-specific scoring data
  */
-export function calculateCategoryBreakdown(teamStats: TeamStats[]): CategoryBreakdown[] {
+export function calculateCategoryBreakdown(
+  teamStats: TeamStats[],
+): CategoryBreakdown[] {
   // For now, return estimated breakdowns based on total points
   // In a real implementation, this would query actual category scores
   return teamStats.map((stats, index) => ({
@@ -260,7 +274,7 @@ export function calculateTrends(
     startTime: string | null;
   }>,
   teams: Array<{ id: number; name: string }>,
-  weeks = 10
+  weeks = 10,
 ): TeamTrend[] {
   const teamTrends: TeamTrend[] = [];
 
@@ -317,7 +331,7 @@ export function calculateTrends(
  */
 export function calculatePowerRankings(
   teamStats: TeamStats[],
-  trends: TeamTrend[]
+  trends: TeamTrend[],
 ): PowerRanking[] {
   const rankings: PowerRanking[] = [];
 
@@ -328,7 +342,8 @@ export function calculatePowerRankings(
     const recentMatchups = teamTrend?.trends.slice(-3) || [];
     const recentFormScore =
       recentMatchups.length > 0
-        ? recentMatchups.reduce((sum, t) => sum + t.points, 0) / recentMatchups.length
+        ? recentMatchups.reduce((sum, t) => sum + t.points, 0) /
+          recentMatchups.length
         : stats.averagePoints;
 
     // Calculate strength of schedule (placeholder - would need opponent data)
@@ -388,7 +403,7 @@ export function generateLeagueAnalytics(
     status: string;
     startTime: string | null;
   }>,
-  teams: Array<{ id: number; name: string }>
+  teams: Array<{ id: number; name: string }>,
 ): LeagueAnalytics {
   const teamStats = calculateTeamStats(matchups, teams);
   const trends = calculateTrends(matchups, teams);

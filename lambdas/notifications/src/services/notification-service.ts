@@ -42,22 +42,19 @@ export async function sendMatchupStartedNotifications(
     });
 
     for (const userId of userIds) {
-      await sendNotificationToUser(
-        db,
-        {
-          userId,
-          notificationType: 'matchup_started',
-          channel: 'push',
+      await sendNotificationToUser(db, {
+        userId,
+        notificationType: 'matchup_started',
+        channel: 'push',
+        matchupId: context.matchupId,
+        leagueId: context.leagueId,
+        title: 'Matchup Started',
+        message: `Your week ${context.weekNumber} matchup has begun!`,
+        metadata: {
           matchupId: context.matchupId,
-          leagueId: context.leagueId,
-          title: 'Matchup Started',
-          message: `Your week ${context.weekNumber} matchup has begun!`,
-          metadata: {
-            matchupId: context.matchupId,
-            weekNumber: context.weekNumber,
-          },
+          weekNumber: context.weekNumber,
         },
-      );
+      });
     }
   } catch (error: unknown) {
     logger.error('Error sending matchup started notifications', { error });
@@ -102,26 +99,23 @@ export async function sendMatchupEndedNotifications(
         message = `Your week ${context.weekNumber} matchup has ended. Final score: ${context.team1Score} - ${context.team2Score}`;
       }
 
-      await sendNotificationToUser(
-        db,
-        {
-          userId,
-          notificationType: 'matchup_ended',
-          channel: 'push',
+      await sendNotificationToUser(db, {
+        userId,
+        notificationType: 'matchup_ended',
+        channel: 'push',
+        matchupId: context.matchupId,
+        leagueId: context.leagueId,
+        title: 'Matchup Complete',
+        message,
+        metadata: {
           matchupId: context.matchupId,
-          leagueId: context.leagueId,
-          title: 'Matchup Complete',
-          message,
-          metadata: {
-            matchupId: context.matchupId,
-            weekNumber: context.weekNumber,
-            team1Score: context.team1Score,
-            team2Score: context.team2Score,
-            isWinner,
-            isTie,
-          },
+          weekNumber: context.weekNumber,
+          team1Score: context.team1Score,
+          team2Score: context.team2Score,
+          isWinner,
+          isTie,
         },
-      );
+      });
     }
   } catch (error: unknown) {
     logger.error('Error sending matchup ended notifications', { error });
@@ -164,25 +158,22 @@ export async function sendCloseGameNotifications(
         continue;
       }
 
-      await sendNotificationToUser(
-        db,
-        {
-          userId,
-          notificationType: 'matchup_close_game',
-          channel: 'push',
+      await sendNotificationToUser(db, {
+        userId,
+        notificationType: 'matchup_close_game',
+        channel: 'push',
+        matchupId: context.matchupId,
+        leagueId: context.leagueId,
+        title: 'Close Matchup!',
+        message: `Your week ${context.weekNumber} matchup is close! Current score: ${context.team1Score} - ${context.team2Score}`,
+        metadata: {
           matchupId: context.matchupId,
-          leagueId: context.leagueId,
-          title: 'Close Matchup!',
-          message: `Your week ${context.weekNumber} matchup is close! Current score: ${context.team1Score} - ${context.team2Score}`,
-          metadata: {
-            matchupId: context.matchupId,
-            weekNumber: context.weekNumber,
-            team1Score: context.team1Score,
-            team2Score: context.team2Score,
-            scoreDiff,
-          },
+          weekNumber: context.weekNumber,
+          team1Score: context.team1Score,
+          team2Score: context.team2Score,
+          scoreDiff,
         },
-      );
+      });
     }
   } catch (error: unknown) {
     logger.error('Error sending close game notifications', { error });

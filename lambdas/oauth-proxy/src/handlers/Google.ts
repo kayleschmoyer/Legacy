@@ -4,10 +4,10 @@ import {
   OAuth2Client,
   UserRefreshClient,
 } from 'google-auth-library';
-import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
+import memoizeOne from 'memoize-one';
 import { InternalUser } from '@legacy-sports/db-client';
 import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
@@ -16,7 +16,7 @@ import { getUserFromGoogleJwt } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
-import { getDbClient } from '../util/db';
+import { withDbClient } from '../util/db';
 
 // Extended API Gateway Event with cached OAuth data to prevent duplicate processing
 interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
@@ -72,11 +72,11 @@ export const handleGoogleAuthorize = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Google OAuth authorization request');
-  
+
   try {
     const { clientId } = await getGoogleAuthSettings();
     const state = event.queryStringParameters?.state || '';
-    
+
     // Build Google OAuth URL
     const params = new URLSearchParams({
       client_id: clientId,
@@ -87,11 +87,11 @@ export const handleGoogleAuthorize = async (
       prompt: 'consent',
       state: state,
     });
-    
+
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/auth?${params.toString()}`;
-    
+
     LOGGER.debug(`Redirecting to Google OAuth: ${googleAuthUrl}`);
-    
+
     return {
       statusCode: 302,
       headers: {
@@ -99,9 +99,11 @@ export const handleGoogleAuthorize = async (
       },
       body: '',
     };
-    
   } catch (error) {
-    LOGGER.error('Google authorize error:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      'Google authorize error:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -120,12 +122,12 @@ export const handleGoogleCallback = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Google OAuth callback received');
-  
+
   try {
     const code = event.queryStringParameters?.code;
     const state = event.queryStringParameters?.state;
     const error = event.queryStringParameters?.error;
-    
+
     if (error) {
       LOGGER.error(`OAuth error from Google: ${error}`);
       return {
@@ -146,7 +148,7 @@ export const handleGoogleCallback = async (
         `,
       };
     }
-    
+
     if (!code) {
       return {
         statusCode: 400,
@@ -156,7 +158,7 @@ export const handleGoogleCallback = async (
         }),
       };
     }
-    
+
     // Create a synthetic event for the existing Google auth handler
     const syntheticEvent: APIGatewayEvent = {
       ...event,
@@ -164,12 +166,14 @@ export const handleGoogleCallback = async (
       body: JSON.stringify({ code }),
       queryStringParameters: { ...event.queryStringParameters, state },
     };
-    
+
     // Use existing secure Google auth handler
     return await handleSecureGoogleAuth(syntheticEvent);
-    
   } catch (error) {
-    LOGGER.error('Google callback error:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      'Google callback error:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       statusCode: 500,
       headers: {
@@ -263,7 +267,10 @@ export const handleSecureGoogleAuth = async (
       const oauthClient = getOAuthClient(clientId, clientSecret);
 
       try {
-        const { tokens } = await oauthClient.getToken(body.code);
+        const { tokens } = await oauthClient.getToken({
+          code: body.code,
+          redirect_uri: getRedirectUri(event),
+        });
         if (!tokens.id_token) {
           throw new Error(
             'No ID token received from authorization code exchange',
@@ -311,9 +318,7 @@ export const handleSecureGoogleAuth = async (
 
     const user = await getOrCreateUser(userEmail);
 
-    LOGGER.info(
-      `User ready for authentication: ${userEmail} (ID: ${user.id})`,
-    );
+    LOGGER.info(`User ready for authentication: ${userEmail} (ID: ${user.id})`);
 
     // Step 3: NOW do full OAuth validation since user exists
     LOGGER.debug(
@@ -457,23 +462,28 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     // Try database access
     LOGGER.debug('Attempting to connect to database...');
 
-    const dbClient = await getDbClient();
+    const result = await withDbClient(async (db) => {
+      LOGGER.debug('Database connection successful, getting user from JWT...');
 
-    LOGGER.debug('Database connection successful, getting user from JWT...');
+      const user = await getUserFromGoogleJwt(db, idToken);
 
-    userInfo = await getUserFromGoogleJwt(dbClient, idToken);
+      LOGGER.debug('User retrieved from database, creating internal JWT...');
 
-    LOGGER.debug('User retrieved from database, creating internal JWT...');
+      // Extract picture from Google JWT for inclusion in our internal JWT
+      const { jwtDecode } = await import('jwt-decode');
+      const googlePayload = jwtDecode<{ picture?: string }>(idToken);
 
-    // Extract picture from Google JWT for inclusion in our internal JWT
-    const { jwtDecode } = await import('jwt-decode');
-    const googlePayload = jwtDecode<{ picture?: string }>(idToken);
+      const jwt = await createJwt(user, {
+        picture: googlePayload.picture,
+      });
 
-    internalJwt = await createJwt(userInfo, {
-      picture: googlePayload.picture,
+      LOGGER.debug('Internal JWT created successfully');
+
+      return { user, jwt };
     });
 
-    LOGGER.debug('Internal JWT created successfully');
+    userInfo = result.user;
+    internalJwt = result.jwt;
   } catch (dbError) {
     LOGGER.warn(
       'Database access failed, creating temporary user from JWT:',
@@ -526,7 +536,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   const state = event.queryStringParameters?.state;
   if (state) {
     LOGGER.debug(`Checking for device flow completion with state: ${state}`);
-    
+
     // Try to complete device flow
     try {
       const deviceTokenResponse = {
@@ -538,10 +548,10 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
           accessLevel: userInfo.accessLevel || 'none',
         },
       };
-      
+
       completeDeviceFlow(state, deviceTokenResponse);
       LOGGER.info(`Device flow completed for state: ${state}`);
-      
+
       // For device flow, show success page instead of returning JWT directly
       return {
         statusCode: 200,
@@ -568,7 +578,10 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         `,
       };
     } catch (error) {
-      LOGGER.warn('Failed to complete device flow:', error instanceof Error ? error.message : String(error));
+      LOGGER.warn(
+        'Failed to complete device flow:',
+        error instanceof Error ? error.message : String(error),
+      );
       // Continue with normal flow if device flow completion fails
     }
   }
@@ -590,8 +603,6 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
 
 export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
   LOGGER.debug('Initialize database.');
-  const dbClient = await getDbClient();
-
   const { clientId, clientSecret } = await getGoogleAuthSettings();
 
   const cookieHeader = event.headers['Cookie'] || '';
@@ -612,22 +623,26 @@ export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
     throw new Error('Invalid token returned from google!');
   }
 
-  const userInfo = await getUserFromGoogleJwt(dbClient, credentials.id_token);
+  const idToken = credentials.id_token;
 
-  // Extract picture from Google JWT for inclusion in our internal JWT
-  const { jwtDecode } = await import('jwt-decode');
-  const googlePayload = jwtDecode<{ picture?: string }>(credentials.id_token);
+  return await withDbClient(async (db) => {
+    const userInfo = await getUserFromGoogleJwt(db, idToken);
 
-  const internalJwt = await createJwt(userInfo, {
-    picture: googlePayload.picture,
+    // Extract picture from Google JWT for inclusion in our internal JWT
+    const { jwtDecode } = await import('jwt-decode');
+    const googlePayload = jwtDecode<{ picture?: string }>(idToken);
+
+    const internalJwt = await createJwt(userInfo, {
+      picture: googlePayload.picture,
+    });
+
+    const result: APIGatewayProxyResult = {
+      body: JSON.stringify({
+        jwt: internalJwt,
+      }),
+      statusCode: 200,
+    };
+
+    return result;
   });
-
-  const result: APIGatewayProxyResult = {
-    body: JSON.stringify({
-      jwt: internalJwt,
-    }),
-    statusCode: 200,
-  };
-
-  return result;
 };

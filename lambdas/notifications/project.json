@@ -3,12 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/notifications",
   "projectType": "application",
-  "tags": [
-    "lambda",
-    "platform:node",
-    "scope:lambda",
-    "type:api"
-  ],
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:api"],
   "targets": {
     "build": {
       "extends": "build:lambda",
@@ -27,9 +22,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "jestConfig": "lambdas/notifications/jest.config.ts",
         "passWithNoTests": true
