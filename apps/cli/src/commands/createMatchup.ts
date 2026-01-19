@@ -19,6 +19,13 @@ type HandleCreateMatchupArgs = ArgsType<
   ReturnType<typeof createMatchupCommandBuilder>
 >;
 
+interface CreateMatchupResponse {
+  matchupId: string | number;
+  playersAdded: number;
+  league: number;
+  week: number;
+}
+
 export async function handleCreateMatchup(
   args: HandleCreateMatchupArgs,
 ): Promise<void> {
@@ -32,7 +39,7 @@ export async function handleCreateMatchup(
   const authMiddleware = new AuthMiddleware();
   const headers = await authMiddleware.getAuthHeaders();
 
-  const response = await axios.post(`${host}/games/create-matchup`, {
+  const response = await axios.post<CreateMatchupResponse>(`${host}/games/create-matchup`, {
     league: league,
     week: week,
   }, { headers });

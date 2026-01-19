@@ -179,15 +179,19 @@ export async function calculateAndUpdateMatchupScores(
     };
 
     if (stat.teamId === team1Id) {
-      if (!team1PlayerStats.has(stat.playerId)) {
-        team1PlayerStats.set(stat.playerId, []);
+      const playerStats = team1PlayerStats.get(stat.playerId);
+      if (playerStats) {
+        playerStats.push(playerGameStat);
+      } else {
+        team1PlayerStats.set(stat.playerId, [playerGameStat]);
       }
-      team1PlayerStats.get(stat.playerId).push(playerGameStat);
     } else if (stat.teamId === team2Id) {
-      if (!team2PlayerStats.has(stat.playerId)) {
-        team2PlayerStats.set(stat.playerId, []);
+      const playerStats = team2PlayerStats.get(stat.playerId);
+      if (playerStats) {
+        playerStats.push(playerGameStat);
+      } else {
+        team2PlayerStats.set(stat.playerId, [playerGameStat]);
       }
-      team2PlayerStats.get(stat.playerId).push(playerGameStat);
     }
   }
 
