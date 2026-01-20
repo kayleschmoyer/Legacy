@@ -233,7 +233,6 @@ export async function getMatchupsPaginated(
 /**
  * Batch insert matchup players
  * More efficient than individual inserts
- * Note: Season selection is now handled via league_week_player_seasons table
  */
 export async function batchInsertMatchupPlayers(
   db: PublicDb,

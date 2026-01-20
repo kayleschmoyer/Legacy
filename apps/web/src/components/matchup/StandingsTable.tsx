@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
 import { type GetLeagueStandingsQuery } from '../../api/db/graphql.generated';
 
-type StandingRecord = NonNullable<GetLeagueStandingsQuery['getLeagueStandings']>[0];
+type StandingRecord = NonNullable<
+  GetLeagueStandingsQuery['getLeagueStandings']
+>[0];
 
 export interface StandingsTableProps {
   standings: StandingRecord[];
@@ -10,7 +12,13 @@ export interface StandingsTableProps {
   error?: Error | null;
 }
 
-type SortKey = 'team' | 'wins' | 'losses' | 'winPct' | 'pointsFor' | 'pointsAgainst';
+type SortKey =
+  | 'team'
+  | 'wins'
+  | 'losses'
+  | 'winPct'
+  | 'pointsFor'
+  | 'pointsAgainst';
 type SortDirection = 'asc' | 'desc';
 
 /**
@@ -96,7 +104,13 @@ export function StandingsTable({
     );
   }
 
-  const SortButton = ({ label, sortKeyValue }: { label: string; sortKeyValue: SortKey }) => (
+  const SortButton = ({
+    label,
+    sortKeyValue,
+  }: {
+    label: string;
+    sortKeyValue: SortKey;
+  }) => (
     <Text
       fontSize="$3"
       fontWeight="bold"
@@ -105,7 +119,8 @@ export function StandingsTable({
       onPress={() => handleSort(sortKeyValue)}
       userSelect="none"
     >
-      {label} {sortKey === sortKeyValue && (sortDirection === 'asc' ? '↑' : '↓')}
+      {label}{' '}
+      {sortKey === sortKeyValue && (sortDirection === 'asc' ? '↑' : '↓')}
     </Text>
   );
 
@@ -115,8 +130,8 @@ export function StandingsTable({
       <Separator marginBottom="$3" />
 
       {/* Header row */}
-      <XStack 
-        paddingVertical="$2" 
+      <XStack
+        paddingVertical="$2"
         paddingHorizontal="$3"
         borderBottomWidth={1}
         borderBottomColor="$gray6"
@@ -131,13 +146,28 @@ export function StandingsTable({
         <YStack width={50} alignItems="center">
           <SortButton label="L" sortKeyValue="losses" />
         </YStack>
-        <YStack width={60} alignItems="center" display="none" $gtSm={{ display: 'flex' }}>
+        <YStack
+          width={60}
+          alignItems="center"
+          display="none"
+          $gtSm={{ display: 'flex' }}
+        >
           <SortButton label="Win%" sortKeyValue="winPct" />
         </YStack>
-        <YStack width={80} alignItems="center" display="none" $gtMd={{ display: 'flex' }}>
+        <YStack
+          width={80}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
           <SortButton label="PF" sortKeyValue="pointsFor" />
         </YStack>
-        <YStack width={80} alignItems="center" display="none" $gtMd={{ display: 'flex' }}>
+        <YStack
+          width={80}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
           <SortButton label="PA" sortKeyValue="pointsAgainst" />
         </YStack>
       </XStack>
@@ -167,17 +197,30 @@ export function StandingsTable({
                 {standing.losses ?? 0}
               </Text>
             </YStack>
-            <YStack width={60} alignItems="center" display="none" $gtSm={{ display: 'flex' }}>
+            <YStack
+              width={60}
+              alignItems="center"
+              display="none"
+              $gtSm={{ display: 'flex' }}
+            >
               <Text fontSize="$3">
                 {((standing.winPercentage ?? 0) * 100).toFixed(1)}%
               </Text>
             </YStack>
-            <YStack width={80} alignItems="center" display="none" $gtMd={{ display: 'flex' }}>
-              <Text fontSize="$3">
-                {(standing.pointsFor ?? 0).toFixed(2)}
-              </Text>
+            <YStack
+              width={80}
+              alignItems="center"
+              display="none"
+              $gtMd={{ display: 'flex' }}
+            >
+              <Text fontSize="$3">{(standing.pointsFor ?? 0).toFixed(2)}</Text>
             </YStack>
-            <YStack width={80} alignItems="center" display="none" $gtMd={{ display: 'flex' }}>
+            <YStack
+              width={80}
+              alignItems="center"
+              display="none"
+              $gtMd={{ display: 'flex' }}
+            >
               <Text fontSize="$3">
                 {(standing.pointsAgainst ?? 0).toFixed(2)}
               </Text>

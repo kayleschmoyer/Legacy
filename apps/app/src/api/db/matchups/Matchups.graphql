@@ -50,7 +50,13 @@ query GetLeagueStandings($leagueId: Int!) {
   }
 }
 
-query GetMatchupHistory($leagueId: Int!, $season: Int, $teamId: Int, $status: MatchupStatus, $limit: Int) {
+query GetMatchupHistory(
+  $leagueId: Int!
+  $season: Int
+  $teamId: Int
+  $status: MatchupStatus
+  $limit: Int
+) {
   getMatchupHistory(
     leagueId: $leagueId
     season: $season

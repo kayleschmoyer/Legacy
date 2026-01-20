@@ -192,9 +192,6 @@ export async function calculateAndUpdateMatchupScores(
       } else {
         team1PlayerStats.set(stat.playerId, [playerGameStat]);
       }
-      // Non-null assertion is safe because we just set the value if it didn't exist
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-type-assertion
-      team1PlayerStats.get(stat.playerId)!.push(playerGameStat);
     } else if (stat.teamId === team2Id) {
       const playerStats = team2PlayerStats.get(stat.playerId);
       if (playerStats) {
@@ -202,9 +199,6 @@ export async function calculateAndUpdateMatchupScores(
       } else {
         team2PlayerStats.set(stat.playerId, [playerGameStat]);
       }
-      // Non-null assertion is safe because we just set the value if it didn't exist
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-type-assertion
-      team2PlayerStats.get(stat.playerId)!.push(playerGameStat);
     }
   }
 

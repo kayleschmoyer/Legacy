@@ -1,6 +1,10 @@
 import React from 'react';
 import { Card, H3, H5, Separator, Text, XStack, YStack } from 'tamagui';
-import { type MatchupFragment, MatchupStatus } from '../../api/db/graphql.generated';
+import { StatsLoadingIndicator } from './StatsLoadingIndicator';
+import {
+  type MatchupFragment,
+  MatchupStatus,
+} from '../../api/db/graphql.generated';
 
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
@@ -25,7 +29,14 @@ export function MatchupScoreboard({
     );
   }
 
-  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } = matchup;
+  const {
+    weekNumber,
+    team1Score,
+    team2Score,
+    status,
+    statsLoadingStatus,
+    gamesPerMatchup,
+  } = matchup;
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);
@@ -38,18 +49,23 @@ export function MatchupScoreboard({
   };
 
   return (
-    <Card 
-      elevate 
-      size="$5" 
-      bordered 
-      margin="$2" 
+    <Card
+      elevate
+      size="$5"
+      bordered
+      margin="$2"
       backgroundColor="$background"
       maxWidth={800}
       width="100%"
     >
       {/* Header with Week and Status */}
       <Card.Header padded>
-        <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$2">
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap="$2"
+        >
           <H5 color="$gray11">Week {weekNumber}</H5>
           <XStack space="$2" alignItems="center" flexWrap="wrap">
             {status === MatchupStatus.InProgress && gamesRemaining > 0 && (
@@ -66,13 +82,22 @@ export function MatchupScoreboard({
               backgroundColor="$backgroundPress"
               borderRadius="$2"
             >
-              {status === MatchupStatus.InProgress ? 'LIVE' : status?.toUpperCase()}
+              {status === MatchupStatus.InProgress
+                ? 'LIVE'
+                : status?.toUpperCase()}
             </Text>
           </XStack>
         </XStack>
       </Card.Header>
 
       <Separator />
+
+      {/* Stats Loading Indicator */}
+      {statsLoadingStatus && (
+        <YStack padding="$4" paddingBottom="$2">
+          <StatsLoadingIndicator status={statsLoadingStatus} compact />
+        </YStack>
+      )}
 
       {/* Scoreboard */}
       <YStack padding="$4" space="$3">
@@ -147,7 +172,8 @@ export function MatchupScoreboard({
         {gamesPerMatchup && (
           <Text fontSize="$2" color="$gray11" textAlign="center">
             {gamesPerMatchup} game matchup
-            {gamesRemaining > 0 && ` • ${gamesPerMatchup - gamesRemaining} games completed`}
+            {gamesRemaining > 0 &&
+              ` • ${gamesPerMatchup - gamesRemaining} games completed`}
           </Text>
         )}
       </YStack>

@@ -29,7 +29,7 @@ export function useMatchupById(matchupId: number | null | undefined) {
  */
 export function useMatchupsForLeague(
   leagueId: number | null | undefined,
-  weekNumber?: number
+  weekNumber?: number,
 ) {
   const { data, loading, error, refetch } = useGetMatchupsForLeagueQuery({
     variables: {
@@ -69,7 +69,7 @@ export function useCurrentMatchup(leagueId: number | null | undefined) {
  */
 export function useMatchupsByWeek(
   leagueId: number | null | undefined,
-  weekNumber: number | null | undefined
+  weekNumber: number | null | undefined,
 ) {
   const { data, loading, error, refetch } = useGetMatchupsByWeekQuery({
     variables: {
@@ -97,7 +97,7 @@ export function useMatchupHistory(
     teamId?: number;
     status?: MatchupStatus;
     limit?: number;
-  }
+  },
 ) {
   const { data, loading, error, refetch } = useGetMatchupHistoryQuery({
     variables: {

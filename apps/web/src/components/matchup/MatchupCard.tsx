@@ -1,6 +1,10 @@
 import React from 'react';
 import { Card, H4, Text, XStack, YStack } from 'tamagui';
-import { type MatchupFragment, MatchupStatus } from '../../api/db/graphql.generated';
+import { StatsLoadingIndicator } from './StatsLoadingIndicator';
+import {
+  type MatchupFragment,
+  MatchupStatus,
+} from '../../api/db/graphql.generated';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;
@@ -21,7 +25,14 @@ export function MatchupCard({
     return null;
   }
 
-  const { weekNumber, team1Score, team2Score, status, selectedSeason } = matchup;
+  const {
+    weekNumber,
+    team1Score,
+    team2Score,
+    status,
+    statsLoadingStatus,
+    selectedSeason,
+  } = matchup;
 
   const getStatusColor = () => {
     switch (status) {
@@ -83,6 +94,11 @@ export function MatchupCard({
       </Card.Header>
 
       <YStack padding="$3" space="$2">
+        {/* Stats Loading Indicator */}
+        {statsLoadingStatus && (
+          <StatsLoadingIndicator status={statsLoadingStatus} compact />
+        )}
+
         {/* Team 1 */}
         <XStack justifyContent="space-between" alignItems="center">
           <H4 flex={1}>Team 1</H4>
@@ -102,7 +118,9 @@ export function MatchupCard({
         {/* Winner indicator */}
         {status === MatchupStatus.Completed && team1Score !== team2Score && (
           <Text fontSize="$2" color="$green10" textAlign="center">
-            {(team1Score ?? 0) > (team2Score ?? 0) ? 'Team 1 Wins' : 'Team 2 Wins'}
+            {(team1Score ?? 0) > (team2Score ?? 0)
+              ? 'Team 1 Wins'
+              : 'Team 2 Wins'}
           </Text>
         )}
       </YStack>

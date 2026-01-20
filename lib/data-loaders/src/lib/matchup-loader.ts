@@ -8,7 +8,6 @@ import {
 import { inArray } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 
-// Type for matchup_player_games
 type MatchupPlayerGame = typeof PublicSchema.matchupPlayerGames.$inferSelect;
 
 /**

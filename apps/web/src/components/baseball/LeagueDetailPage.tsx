@@ -25,6 +25,13 @@ import {
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
 import { LeagueStandings } from '../roster/LeagueStandings';
 import { useLeagueScoringSettings } from '../../lib/scoring';
+import { MatchupControl } from '../commissioner/MatchupControl';
+import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
+import { GameSelectionControl } from '../commissioner/GameSelectionControl';
+import { useCurrentMatchup } from '../../hooks/useMatchup';
+import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
+import { GamesRemaining } from '../matchup/GamesRemaining';
+import { MatchupRosterComparison } from '../matchup/MatchupRosterComparison';
 
 // Manual GraphQL query for getting user's team ID in a league
 const GET_USER_TEAM_ID = gql`
@@ -134,7 +141,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const leagueId = parseInt(id || '0', 10);
   const [activeTab, setActiveTab] = useState<
-    'info' | 'roster' | 'commissioner' | 'standings'
+    'info' | 'roster' | 'commissioner' | 'standings' | 'matchup'
   >('info');
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
@@ -212,11 +219,39 @@ export function LeagueDetailPage(): React.JSX.Element {
     refetch: refetchScoringProfile,
   } = useLeagueScoringSettings(leagueId);
 
+  // Fetch current matchup for commissioner tools
+  const {
+    matchup: currentMatchup,
+    loading: matchupLoading,
+    error: matchupError,
+    refetch: refetchMatchup,
+  } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
+
   // Check if user is league owner/commissioner
   const isCommissioner = useMemo(() => {
     if (!data?.league || !user) return false;
     return data.league.owner === user.id || user.accessLevel === 'admin';
   }, [data?.league, user]);
+
+  // State for matchup operation messages
+  const [matchupSuccessMessage, setMatchupSuccessMessage] = useState<
+    string | null
+  >(null);
+  const [matchupErrorMessage, setMatchupErrorMessage] = useState<string | null>(
+    null,
+  );
+
+  const handleMatchupSuccess = useCallback(() => {
+    setMatchupSuccessMessage('Matchup updated successfully!');
+    setMatchupErrorMessage(null);
+    void refetchMatchup();
+    setTimeout(() => setMatchupSuccessMessage(null), 5000);
+  }, [refetchMatchup]);
+
+  const handleMatchupError = useCallback((err: Error) => {
+    setMatchupErrorMessage(err.message);
+    setMatchupSuccessMessage(null);
+  }, []);
 
   const handleStartDraft = useCallback(() => {
     if (!isCommissioner) {
@@ -628,6 +663,69 @@ export function LeagueDetailPage(): React.JSX.Element {
       id="panel-commissioner"
       aria-labelledby="tab-commissioner"
     >
+      {/* Success/Error Messages */}
+      {matchupSuccessMessage && (
+        <Card backgroundColor="$green3" borderColor="$green8" padding="$3">
+          <Text color="$green11" fontWeight="bold">
+            {matchupSuccessMessage}
+          </Text>
+        </Card>
+      )}
+
+      {matchupErrorMessage && (
+        <Card backgroundColor="$red3" borderColor="$red8" padding="$3">
+          <Text color="$red11" fontWeight="bold">
+            Error: {matchupErrorMessage}
+          </Text>
+        </Card>
+      )}
+
+      {/* Matchup Management */}
+      {matchupLoading ? (
+        <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+          <YStack space="$3" alignItems="center">
+            <Spinner size="large" />
+            <Text color="$gray11">Loading matchup data...</Text>
+          </YStack>
+        </Card>
+      ) : matchupError ? (
+        <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
+          <Text color="$red11">
+            Error loading matchup: {matchupError.message}
+          </Text>
+        </Card>
+      ) : (
+        <MatchupControl
+          leagueId={leagueId}
+          currentMatchup={currentMatchup}
+          onSuccess={handleMatchupSuccess}
+          onError={handleMatchupError}
+        />
+      )}
+
+      {/* Game Selection */}
+      {currentMatchup && currentMatchup.id && currentMatchup.weekNumber ? (
+        <GameSelectionControl
+          leagueId={leagueId}
+          matchupId={
+            typeof currentMatchup.id === 'string'
+              ? parseInt(currentMatchup.id, 10)
+              : currentMatchup.id
+          }
+          weekNumber={currentMatchup.weekNumber}
+          gamesPerMatchup={currentMatchup.gamesPerMatchup ?? 1}
+          onSuccess={() => {
+            setMatchupSuccessMessage('Game selection triggered successfully!');
+            setMatchupErrorMessage(null);
+            setTimeout(() => setMatchupSuccessMessage(null), 5000);
+          }}
+          onError={(error) => {
+            setMatchupErrorMessage(error.message);
+            setMatchupSuccessMessage(null);
+          }}
+        />
+      ) : null}
+
       <LeagueScoringEditor
         leagueId={leagueId}
         profile={scoringProfile}
@@ -688,6 +786,18 @@ export function LeagueDetailPage(): React.JSX.Element {
           </XStack>
         </YStack>
       </Card>
+
+      <DeleteLeagueControl
+        leagueId={leagueId}
+        leagueName={league.name ?? 'Unknown League'}
+        onSuccess={() => {
+          // Success message and redirect handled by DeleteLeagueControl
+        }}
+        onError={(error) => {
+          console.error('Delete league error:', error);
+          alert(`Error deleting league: ${error.message}`);
+        }}
+      />
 
       <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
         <YStack space="$3">
@@ -782,6 +892,19 @@ export function LeagueDetailPage(): React.JSX.Element {
         >
           Standings
         </Button>
+        <Button
+          size="$4"
+          variant={activeTab === 'matchup' ? 'primary' : 'secondary'}
+          backgroundColor={activeTab === 'matchup' ? '$blue9' : '$gray6'}
+          color={activeTab === 'matchup' ? 'white' : '$gray12'}
+          onPress={() => setActiveTab('matchup')}
+          role="tab"
+          id="tab-matchup"
+          aria-selected={activeTab === 'matchup'}
+          aria-controls="panel-matchup"
+        >
+          Current Matchup
+        </Button>
         {isCommissioner && (
           <Button
             size="$4"
@@ -817,6 +940,80 @@ export function LeagueDetailPage(): React.JSX.Element {
             loading={leagueTeamsLoading}
             userTeamId={userTeamId}
           />
+        </YStack>
+      )}
+      {activeTab === 'matchup' && (
+        <YStack
+          role="tabpanel"
+          id="panel-matchup"
+          aria-labelledby="tab-matchup"
+          space="$4"
+        >
+          {matchupLoading ? (
+            <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+              <YStack space="$3" alignItems="center">
+                <Spinner size="large" />
+                <Text color="$gray11">Loading matchup...</Text>
+              </YStack>
+            </Card>
+          ) : matchupError ? (
+            <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
+              <Text color="$red11">
+                Error loading matchup: {matchupError.message}
+              </Text>
+            </Card>
+          ) : currentMatchup ? (
+            <>
+              <MatchupScoreboard
+                matchup={currentMatchup}
+                gamesRemaining={(currentMatchup.gamesPerMatchup ?? 0) - 0}
+              />
+
+              <MatchupRosterComparison matchup={currentMatchup} />
+
+              {currentMatchup.gamesPerMatchup && (
+                <GamesRemaining
+                  gamesRemaining={(currentMatchup.gamesPerMatchup ?? 0) - 0}
+                  totalGames={currentMatchup.gamesPerMatchup}
+                />
+              )}
+              <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+                <YStack space="$2">
+                  <Text fontSize="$4" fontWeight="bold" color="$blue11">
+                    Matchup Information
+                  </Text>
+                  <YStack space="$1">
+                    <Text fontSize="$3" color="$gray11">
+                      Week: {currentMatchup.weekNumber}
+                    </Text>
+                    {currentMatchup.selectedSeason && (
+                      <Text fontSize="$3" color="$gray11">
+                        Season: {currentMatchup.selectedSeason}
+                      </Text>
+                    )}
+                    {currentMatchup.startTime && (
+                      <Text fontSize="$3" color="$gray11">
+                        Start:{' '}
+                        {new Date(currentMatchup.startTime).toLocaleString()}
+                      </Text>
+                    )}
+                    {currentMatchup.endTime && (
+                      <Text fontSize="$3" color="$gray11">
+                        End: {new Date(currentMatchup.endTime).toLocaleString()}
+                      </Text>
+                    )}
+                  </YStack>
+                </YStack>
+              </Card>
+            </>
+          ) : (
+            <Card backgroundColor="$gray2" borderColor="$gray6" padding="$4">
+              <Text color="$gray11" fontSize="$4">
+                No active matchup found. Commissioner can create one in the
+                Commissioner tab.
+              </Text>
+            </Card>
+          )}
         </YStack>
       )}
       {activeTab === 'commissioner' &&

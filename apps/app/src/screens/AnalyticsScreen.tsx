@@ -68,7 +68,11 @@ const GET_LEAGUE_ANALYTICS = gql`
 
 const GET_HEAD_TO_HEAD = gql`
   query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
-    getHeadToHeadRecord(leagueId: $leagueId, team1Id: $team1Id, team2Id: $team2Id) {
+    getHeadToHeadRecord(
+      leagueId: $leagueId
+      team1Id: $team1Id
+      team2Id: $team2Id
+    ) {
       team1Id
       team1Name
       team2Id
@@ -94,9 +98,9 @@ export default function AnalyticsScreen() {
   const route = useRoute();
   const { leagueId } = route.params as RouteParams;
 
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'power' | 'playoff' | 'h2h'>(
-    'overview'
-  );
+  const [selectedTab, setSelectedTab] = useState<
+    'overview' | 'power' | 'playoff' | 'h2h'
+  >('overview');
   const [team1Id] = useState<number | null>(null);
   const [team2Id] = useState<number | null>(null);
 
@@ -147,7 +151,9 @@ export default function AnalyticsScreen() {
 
   return (
     <ScrollView
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refetch()} />}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={() => void refetch()} />
+      }
     >
       <YStack flex={1} padding="$4" space="$4">
         {/* Header */}
@@ -245,11 +251,14 @@ export default function AnalyticsScreen() {
                       currentStreak: string;
                       currentStreakCount: number;
                     },
-                    index: number
+                    index: number,
                   ) => (
                     <React.Fragment key={team.teamId}>
                       <YStack padding="$2" space="$1">
-                        <XStack justifyContent="space-between" alignItems="center">
+                        <XStack
+                          justifyContent="space-between"
+                          alignItems="center"
+                        >
                           <Text fontWeight="600" flex={1}>
                             {index + 1}. {team.teamName}
                           </Text>
@@ -284,7 +293,7 @@ export default function AnalyticsScreen() {
                       </YStack>
                       {index < analytics.teamStats.length - 1 && <Separator />}
                     </React.Fragment>
-                  )
+                  ),
                 )}
               </YStack>
             </Card>
@@ -309,11 +318,16 @@ export default function AnalyticsScreen() {
                       recentFormScore: number;
                       pointDifferential: number;
                     },
-                    index: number
+                    index: number,
                   ) => (
                     <React.Fragment key={index}>
                       <XStack padding="$2" alignItems="center" space="$3">
-                        <Text fontSize="$6" fontWeight="bold" minWidth={40} color="$blue10">
+                        <Text
+                          fontSize="$6"
+                          fontWeight="bold"
+                          minWidth={40}
+                          color="$blue10"
+                        >
                           #{team.rank}
                         </Text>
                         <YStack flex={1} space="$1">
@@ -332,9 +346,11 @@ export default function AnalyticsScreen() {
                           </XStack>
                         </YStack>
                       </XStack>
-                      {index < analytics.powerRankings.length - 1 && <Separator />}
+                      {index < analytics.powerRankings.length - 1 && (
+                        <Separator />
+                      )}
                     </React.Fragment>
-                  )
+                  ),
                 )}
               </YStack>
             </Card>
@@ -361,11 +377,14 @@ export default function AnalyticsScreen() {
                       magicNumber: number | null;
                       eliminationNumber: number | null;
                     },
-                    index: number
+                    index: number,
                   ) => (
                     <React.Fragment key={index}>
                       <YStack padding="$2" space="$1">
-                        <XStack justifyContent="space-between" alignItems="center">
+                        <XStack
+                          justifyContent="space-between"
+                          alignItems="center"
+                        >
                           <Text fontWeight="600" flex={1}>
                             {proj.teamName}
                           </Text>
@@ -388,7 +407,8 @@ export default function AnalyticsScreen() {
                             Current: {proj.currentRecord}
                           </Text>
                           <Text fontSize="$2" color="$gray11">
-                            Proj: {proj.projectedWins.toFixed(1)}-{proj.projectedLosses.toFixed(1)}
+                            Proj: {proj.projectedWins.toFixed(1)}-
+                            {proj.projectedLosses.toFixed(1)}
                           </Text>
                         </XStack>
                         {proj.magicNumber !== null && (
@@ -402,9 +422,11 @@ export default function AnalyticsScreen() {
                           </Text>
                         )}
                       </YStack>
-                      {index < analytics.playoffProjections.length - 1 && <Separator />}
+                      {index < analytics.playoffProjections.length - 1 && (
+                        <Separator />
+                      )}
                     </React.Fragment>
-                  )
+                  ),
                 )}
               </YStack>
             </Card>
@@ -456,7 +478,12 @@ export default function AnalyticsScreen() {
                       {h2hRecord.team1Name} vs {h2hRecord.team2Name}
                     </H4>
                     <XStack space="$2" flexWrap="wrap">
-                      <Card flex={1} minWidth={100} padding="$3" backgroundColor="$blue2">
+                      <Card
+                        flex={1}
+                        minWidth={100}
+                        padding="$3"
+                        backgroundColor="$blue2"
+                      >
                         <Text fontSize="$1" color="$gray11">
                           Matchups
                         </Text>
@@ -464,7 +491,12 @@ export default function AnalyticsScreen() {
                           {h2hRecord.totalMatchups}
                         </Text>
                       </Card>
-                      <Card flex={1} minWidth={100} padding="$3" backgroundColor="$green2">
+                      <Card
+                        flex={1}
+                        minWidth={100}
+                        padding="$3"
+                        backgroundColor="$green2"
+                      >
                         <Text fontSize="$1" color="$gray11" numberOfLines={1}>
                           {h2hRecord.team1Name}
                         </Text>
@@ -472,7 +504,12 @@ export default function AnalyticsScreen() {
                           {h2hRecord.team1Wins}W
                         </Text>
                       </Card>
-                      <Card flex={1} minWidth={100} padding="$3" backgroundColor="$red2">
+                      <Card
+                        flex={1}
+                        minWidth={100}
+                        padding="$3"
+                        backgroundColor="$red2"
+                      >
                         <Text fontSize="$1" color="$gray11" numberOfLines={1}>
                           {h2hRecord.team2Name}
                         </Text>

@@ -66,8 +66,8 @@ export function PlayerProjections({
         <Separator />
 
         {/* Header Row */}
-        <XStack 
-          paddingVertical="$2" 
+        <XStack
+          paddingVertical="$2"
           paddingHorizontal="$2"
           borderBottomWidth={1}
           borderBottomColor="$gray6"
@@ -88,7 +88,12 @@ export function PlayerProjections({
               Career
             </Text>
           </YStack>
-          <YStack width={60} alignItems="center" display="none" $gtSm={{ display: 'flex' }}>
+          <YStack
+            width={60}
+            alignItems="center"
+            display="none"
+            $gtSm={{ display: 'flex' }}
+          >
             <Text fontSize="$2" fontWeight="bold" color="$gray11">
               Games
             </Text>
@@ -121,7 +126,12 @@ export function PlayerProjections({
                   {player.careerProjection.toFixed(2)}
                 </Text>
               </YStack>
-              <YStack width={60} alignItems="center" display="none" $gtSm={{ display: 'flex' }}>
+              <YStack
+                width={60}
+                alignItems="center"
+                display="none"
+                $gtSm={{ display: 'flex' }}
+              >
                 <Text fontSize="$3" color="$gray10">
                   {player.selectedGamesCount}
                 </Text>
@@ -131,15 +141,30 @@ export function PlayerProjections({
         </YStack>
 
         {/* Legend */}
-        <XStack space="$4" justifyContent="center" paddingTop="$2" flexWrap="wrap">
+        <XStack
+          space="$4"
+          justifyContent="center"
+          paddingTop="$2"
+          flexWrap="wrap"
+        >
           <XStack space="$1" alignItems="center">
-            <YStack width={12} height={12} backgroundColor="$blue10" borderRadius="$2" />
+            <YStack
+              width={12}
+              height={12}
+              backgroundColor="$blue10"
+              borderRadius="$2"
+            />
             <Text fontSize="$2" color="$gray11">
               Matchup Projection (selected season)
             </Text>
           </XStack>
           <XStack space="$1" alignItems="center">
-            <YStack width={12} height={12} backgroundColor="$gray10" borderRadius="$2" />
+            <YStack
+              width={12}
+              height={12}
+              backgroundColor="$gray10"
+              borderRadius="$2"
+            />
             <Text fontSize="$2" color="$gray11">
               Career Average
             </Text>
@@ -147,7 +172,12 @@ export function PlayerProjections({
         </XStack>
 
         {/* Real-time update note */}
-        <Text fontSize="$2" color="$gray10" textAlign="center" fontStyle="italic">
+        <Text
+          fontSize="$2"
+          color="$gray10"
+          textAlign="center"
+          fontStyle="italic"
+        >
           Updates in real-time as games are selected
         </Text>
       </YStack>

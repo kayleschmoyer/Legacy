@@ -64,7 +64,10 @@ query GetUserDeviceTokens($userId: Int!) {
 }
 
 # Mutations
-mutation UpdateNotificationPreferences($userId: Int!, $input: NotificationPreferenceInput!) {
+mutation UpdateNotificationPreferences(
+  $userId: Int!
+  $input: NotificationPreferenceInput!
+) {
   updateNotificationPreferences(userId: $userId, input: $input) {
     ...NotificationPreference
   }

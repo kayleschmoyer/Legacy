@@ -19,13 +19,6 @@ type HandleCreateMatchupArgs = ArgsType<
   ReturnType<typeof createMatchupCommandBuilder>
 >;
 
-interface CreateMatchupResponse {
-  matchupId: string | number;
-  playersAdded: number;
-  league: number;
-  week: number;
-}
-
 export async function handleCreateMatchup(
   args: HandleCreateMatchupArgs,
 ): Promise<void> {
@@ -34,18 +27,29 @@ export async function handleCreateMatchup(
   const { league, week } = args;
 
   const host = getEnvVarRequired('GAME_SELECTION_LAMBDA_HOST');
-  
+
   // Get authentication headers
   const authMiddleware = new AuthMiddleware();
   const headers = await authMiddleware.getAuthHeaders();
 
-  const response = await axios.post<CreateMatchupResponse>(`${host}/games/create-matchup`, {
-    league: league,
-    week: week,
-  }, { headers });
-  
+  const response = await axios.post<{
+    matchupId: number;
+    playersAdded: number;
+    league: number;
+    week: number;
+  }>(
+    `${host}/games/create-matchup`,
+    {
+      league: league,
+      week: week,
+    },
+    { headers },
+  );
+
   LOGGER.info(`✅ Matchup created successfully!`);
   LOGGER.info(`   Matchup ID: ${response.data.matchupId}`);
   LOGGER.info(`   Players added: ${response.data.playersAdded}`);
-  LOGGER.info(`   League: ${response.data.league}, Week: ${response.data.week}`);
+  LOGGER.info(
+    `   League: ${response.data.league}, Week: ${response.data.week}`,
+  );
 }

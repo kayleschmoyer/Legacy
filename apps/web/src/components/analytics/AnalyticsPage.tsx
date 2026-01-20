@@ -65,7 +65,11 @@ const GET_LEAGUE_ANALYTICS = gql`
 
 const GET_HEAD_TO_HEAD = gql`
   query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
-    getHeadToHeadRecord(leagueId: $leagueId, team1Id: $team1Id, team2Id: $team2Id) {
+    getHeadToHeadRecord(
+      leagueId: $leagueId
+      team1Id: $team1Id
+      team2Id: $team2Id
+    ) {
       team1Id
       team1Name
       team2Id
@@ -86,9 +90,9 @@ const GET_HEAD_TO_HEAD = gql`
 export function AnalyticsPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'power' | 'playoff' | 'h2h'>(
-    'overview'
-  );
+  const [selectedTab, setSelectedTab] = useState<
+    'overview' | 'power' | 'playoff' | 'h2h'
+  >('overview');
   const [team1Id, setTeam1Id] = useState<number | null>(null);
   const [team2Id, setTeam2Id] = useState<number | null>(null);
 
@@ -115,7 +119,12 @@ export function AnalyticsPage() {
 
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Spinner size="large" color="$blue10" />
         <Text marginTop="$2" color="$gray11">
           Loading analytics...
@@ -126,7 +135,12 @@ export function AnalyticsPage() {
 
   if (error || !analytics) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Text color="$red10" fontSize="$5" fontWeight="bold">
           Error loading analytics
         </Text>
@@ -142,9 +156,20 @@ export function AnalyticsPage() {
 
   return (
     <ScrollView>
-      <YStack width="100%" maxWidth={1400} alignSelf="center" padding="$4" space="$4">
+      <YStack
+        width="100%"
+        maxWidth={1400}
+        alignSelf="center"
+        padding="$4"
+        space="$4"
+      >
         {/* Header */}
-        <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$2">
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap="$2"
+        >
           <YStack>
             <H2>{analytics.leagueName} Analytics</H2>
             <Text color="$gray11">
@@ -158,7 +183,10 @@ export function AnalyticsPage() {
             <Button theme="alt2" onPress={() => window.print()}>
               Export
             </Button>
-            <Button theme="blue" onPress={() => navigate(`/baseball/league/${leagueId}`)}>
+            <Button
+              theme="blue"
+              onPress={() => navigate(`/baseball/league/${leagueId}`)}
+            >
               Back to League
             </Button>
           </XStack>
@@ -264,7 +292,7 @@ export function AnalyticsPage() {
                         currentStreak: string;
                         currentStreakCount: number;
                       },
-                      index: number
+                      index: number,
                     ) => (
                       <React.Fragment key={team.teamId}>
                         <XStack padding="$2" alignItems="center">
@@ -298,9 +326,11 @@ export function AnalyticsPage() {
                             {team.currentStreakCount}
                           </Text>
                         </XStack>
-                        {index < analytics.teamStats.length - 1 && <Separator />}
+                        {index < analytics.teamStats.length - 1 && (
+                          <Separator />
+                        )}
                       </React.Fragment>
-                    )
+                    ),
                   )}
                 </YStack>
               </ScrollView>
@@ -330,7 +360,7 @@ export function AnalyticsPage() {
                       recentFormScore: number;
                       pointDifferential: number;
                     },
-                    index: number
+                    index: number,
                   ) => (
                     <React.Fragment key={index}>
                       <XStack padding="$3" alignItems="center" space="$3">
@@ -347,9 +377,11 @@ export function AnalyticsPage() {
                           </Text>
                         </YStack>
                       </XStack>
-                      {index < analytics.powerRankings.length - 1 && <Separator />}
+                      {index < analytics.powerRankings.length - 1 && (
+                        <Separator />
+                      )}
                     </React.Fragment>
-                  )
+                  ),
                 )}
               </YStack>
             </Card>
@@ -376,15 +408,16 @@ export function AnalyticsPage() {
                       magicNumber: number | null;
                       eliminationNumber: number | null;
                     },
-                    index: number
+                    index: number,
                   ) => (
                     <React.Fragment key={index}>
                       <XStack padding="$3" space="$3" alignItems="center">
                         <YStack flex={1}>
                           <Text fontWeight="600">{proj.teamName}</Text>
                           <Text fontSize="$2" color="$gray11">
-                            Current: {proj.currentRecord} • Projected: {proj.projectedWins.toFixed(1)}
-                            -{proj.projectedLosses.toFixed(1)}
+                            Current: {proj.currentRecord} • Projected:{' '}
+                            {proj.projectedWins.toFixed(1)}-
+                            {proj.projectedLosses.toFixed(1)}
                           </Text>
                           {proj.magicNumber !== null && (
                             <Text fontSize="$2" color="$green10">
@@ -416,9 +449,11 @@ export function AnalyticsPage() {
                           </Text>
                         </YStack>
                       </XStack>
-                      {index < analytics.playoffProjections.length - 1 && <Separator />}
+                      {index < analytics.playoffProjections.length - 1 && (
+                        <Separator />
+                      )}
                     </React.Fragment>
-                  )
+                  ),
                 )}
               </YStack>
             </Card>
@@ -444,11 +479,13 @@ export function AnalyticsPage() {
                       value={team1Id || ''}
                     >
                       <option value="">Select Team 1</option>
-                      {analytics.teamStats.map((team: { teamId: number; teamName: string }) => (
-                        <option key={team.teamId} value={team.teamId}>
-                          {team.teamName}
-                        </option>
-                      ))}
+                      {analytics.teamStats.map(
+                        (team: { teamId: number; teamName: string }) => (
+                          <option key={team.teamId} value={team.teamId}>
+                            {team.teamName}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </YStack>
                   <YStack flex={1} minWidth={200}>
@@ -463,11 +500,13 @@ export function AnalyticsPage() {
                       value={team2Id || ''}
                     >
                       <option value="">Select Team 2</option>
-                      {analytics.teamStats.map((team: { teamId: number; teamName: string }) => (
-                        <option key={team.teamId} value={team.teamId}>
-                          {team.teamName}
-                        </option>
-                      ))}
+                      {analytics.teamStats.map(
+                        (team: { teamId: number; teamName: string }) => (
+                          <option key={team.teamId} value={team.teamId}>
+                            {team.teamName}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </YStack>
                 </XStack>
@@ -479,7 +518,9 @@ export function AnalyticsPage() {
                 )}
 
                 {h2hError && (
-                  <Text color="$red10">Error loading head-to-head data: {h2hError.message}</Text>
+                  <Text color="$red10">
+                    Error loading head-to-head data: {h2hError.message}
+                  </Text>
                 )}
 
                 {h2hRecord && (
@@ -488,26 +529,46 @@ export function AnalyticsPage() {
                       {h2hRecord.team1Name} vs {h2hRecord.team2Name}
                     </H4>
                     <XStack space="$4" flexWrap="wrap">
-                      <Card flex={1} minWidth={150} padding="$3" backgroundColor="$blue2">
+                      <Card
+                        flex={1}
+                        minWidth={150}
+                        padding="$3"
+                        backgroundColor="$blue2"
+                      >
                         <Text color="$gray11">Total Matchups</Text>
                         <Text fontSize="$7" fontWeight="bold">
                           {h2hRecord.totalMatchups}
                         </Text>
                       </Card>
-                      <Card flex={1} minWidth={150} padding="$3" backgroundColor="$green2">
+                      <Card
+                        flex={1}
+                        minWidth={150}
+                        padding="$3"
+                        backgroundColor="$green2"
+                      >
                         <Text color="$gray11">{h2hRecord.team1Name} Wins</Text>
                         <Text fontSize="$7" fontWeight="bold">
                           {h2hRecord.team1Wins}
                         </Text>
                       </Card>
-                      <Card flex={1} minWidth={150} padding="$3" backgroundColor="$red2">
+                      <Card
+                        flex={1}
+                        minWidth={150}
+                        padding="$3"
+                        backgroundColor="$red2"
+                      >
                         <Text color="$gray11">{h2hRecord.team2Name} Wins</Text>
                         <Text fontSize="$7" fontWeight="bold">
                           {h2hRecord.team2Wins}
                         </Text>
                       </Card>
                       {h2hRecord.ties > 0 && (
-                        <Card flex={1} minWidth={150} padding="$3" backgroundColor="$gray2">
+                        <Card
+                          flex={1}
+                          minWidth={150}
+                          padding="$3"
+                          backgroundColor="$gray2"
+                        >
                           <Text color="$gray11">Ties</Text>
                           <Text fontSize="$7" fontWeight="bold">
                             {h2hRecord.ties}

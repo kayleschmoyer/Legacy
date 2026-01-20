@@ -29,12 +29,7 @@ export function GamesRemaining({
   }
 
   return (
-    <Card 
-      size="$3" 
-      bordered 
-      padding="$3"
-      backgroundColor="$background"
-    >
+    <Card size="$3" bordered padding="$3" backgroundColor="$background">
       <YStack space="$2">
         <XStack justifyContent="space-between" alignItems="center">
           <Text fontSize="$3" fontWeight="bold">

@@ -2,7 +2,16 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import React from 'react';
-import { Card, H5, Label, Separator, Switch, Text, XStack, YStack } from 'tamagui';
+import {
+  Card,
+  H5,
+  Label,
+  Separator,
+  Switch,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Settings } from '@tamagui/lucide-icons';
 import { type NotificationPreference } from '../../../api/db/graphql.generated';
 
@@ -15,7 +24,7 @@ export interface NotificationSettingsProps {
 /**
  * NotificationSettings - Component for managing notification preferences
  * Allows users to enable/disable different notification types and channels
- * 
+ *
  * Note: GraphQL fragments are type-safe but ESLint detects them as error types
  * in some contexts. Suppressing with eslint-disable where appropriate.
  */
@@ -24,7 +33,10 @@ export function NotificationSettings({
   onUpdate,
   loading = false,
 }: NotificationSettingsProps) {
-  const handleToggle = async (key: keyof NotificationPreference, value: boolean) => {
+  const handleToggle = async (
+    key: keyof NotificationPreference,
+    value: boolean,
+  ) => {
     await onUpdate({ [key]: value });
   };
 
@@ -43,8 +55,12 @@ export function NotificationSettings({
           <Text fontSize="$3" fontWeight="600" color="$gray11">
             Notification Types
           </Text>
-          
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="matchup-started" flex={1}>
               <Text>Matchup Started</Text>
               <Text fontSize="$2" color="$gray11">
@@ -54,12 +70,18 @@ export function NotificationSettings({
             <Switch
               id="matchup-started"
               checked={preferences.matchupStartedEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('matchupStartedEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('matchupStartedEnabled', checked)
+              }
               disabled={loading}
             />
           </XStack>
 
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="matchup-ended" flex={1}>
               <Text>Matchup Completed</Text>
               <Text fontSize="$2" color="$gray11">
@@ -69,12 +91,18 @@ export function NotificationSettings({
             <Switch
               id="matchup-ended"
               checked={preferences.matchupEndedEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('matchupEndedEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('matchupEndedEnabled', checked)
+              }
               disabled={loading}
             />
           </XStack>
 
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="close-game" flex={1}>
               <Text>Close Game Alerts</Text>
               <Text fontSize="$2" color="$gray11">
@@ -84,12 +112,18 @@ export function NotificationSettings({
             <Switch
               id="close-game"
               checked={preferences.matchupCloseGameEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('matchupCloseGameEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('matchupCloseGameEnabled', checked)
+              }
               disabled={loading}
             />
           </XStack>
 
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="reminders" flex={1}>
               <Text>Matchup Reminders</Text>
               <Text fontSize="$2" color="$gray11">
@@ -99,7 +133,9 @@ export function NotificationSettings({
             <Switch
               id="reminders"
               checked={preferences.matchupReminderEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('matchupReminderEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('matchupReminderEnabled', checked)
+              }
               disabled={loading}
             />
           </XStack>
@@ -113,7 +149,11 @@ export function NotificationSettings({
             Notification Channels
           </Text>
 
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="push-enabled" flex={1}>
               <Text>Push Notifications</Text>
               <Text fontSize="$2" color="$gray11">
@@ -123,12 +163,18 @@ export function NotificationSettings({
             <Switch
               id="push-enabled"
               checked={preferences.pushEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('pushEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('pushEnabled', checked)
+              }
               disabled={loading}
             />
           </XStack>
 
-          <XStack justifyContent="space-between" alignItems="center" paddingVertical="$2">
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
             <Label htmlFor="email-enabled" flex={1}>
               <Text>Email Notifications</Text>
               <Text fontSize="$2" color="$gray11">
@@ -138,7 +184,9 @@ export function NotificationSettings({
             <Switch
               id="email-enabled"
               checked={preferences.emailEnabled ?? false}
-              onCheckedChange={(checked) => handleToggle('emailEnabled', checked)}
+              onCheckedChange={(checked) =>
+                handleToggle('emailEnabled', checked)
+              }
               disabled={true} // Keep disabled for now
             />
           </XStack>

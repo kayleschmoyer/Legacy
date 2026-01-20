@@ -10,9 +10,9 @@ import {
 } from '@legacy-sports/sentry';
 import {
   getMissingMatchupRecords,
-  PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
+import type { PublicDb } from '@legacy-sports/db-client';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 // Initialize Sentry
@@ -51,6 +51,11 @@ function handleOptions(): APIGatewayProxyResult {
     },
     body: '',
   };
+}
+
+interface CreateMatchupRequestBody {
+  league?: number;
+  week?: number;
 }
 
 /**
@@ -675,7 +680,9 @@ const baseGameSelectionHandler = async (
       case '/create-matchup':
         if (event.httpMethod === 'POST') {
           // Parse request body
-          const body: unknown = event.body ? JSON.parse(event.body) : {};
+          const body: CreateMatchupRequestBody = event.body
+            ? (JSON.parse(event.body) as CreateMatchupRequestBody)
+            : {};
 
           // Type guard for request body
           if (

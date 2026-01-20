@@ -66,14 +66,22 @@ function Navigation() {
   const location = useLocation();
   const inBaseball = location.pathname.startsWith('/baseball');
   const inFootball = location.pathname === '/football';
-  const accentBg = inBaseball ? '$sportBaseballPrimary' : inFootball ? '$sportFootballPrimary' : undefined;
+  const accentBg = inBaseball
+    ? '$sportBaseballPrimary'
+    : inFootball
+      ? '$sportFootballPrimary'
+      : undefined;
 
   return (
     <NavContainer role="banner">
       <NavContent>
         {/* Logo/Brand Section */}
         <XStack alignItems="center" space="$4">
-          <Link to="/" aria-label="Legacy Sports home" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/"
+            aria-label="Legacy Sports home"
+            style={{ textDecoration: 'none' }}
+          >
             <H1
               color="$color"
               size="$6"
@@ -110,9 +118,21 @@ function Navigation() {
             }
           >
             <Button
-              variant={location.pathname === '/management' && !accentBg ? 'primary' : 'secondary'}
-              backgroundColor={location.pathname === '/management' && accentBg ? accentBg : undefined}
-              color={location.pathname === '/management' && accentBg ? 'white' : undefined}
+              variant={
+                location.pathname === '/management' && !accentBg
+                  ? 'primary'
+                  : 'secondary'
+              }
+              backgroundColor={
+                location.pathname === '/management' && accentBg
+                  ? accentBg
+                  : undefined
+              }
+              color={
+                location.pathname === '/management' && accentBg
+                  ? 'white'
+                  : undefined
+              }
               size="$2"
             >
               <span role="img" aria-label="management">
@@ -127,9 +147,19 @@ function Navigation() {
             aria-current={location.pathname === '/about' ? 'page' : undefined}
           >
             <Button
-              variant={location.pathname === '/about' && !accentBg ? 'primary' : 'secondary'}
-              backgroundColor={location.pathname === '/about' && accentBg ? accentBg : undefined}
-              color={location.pathname === '/about' && accentBg ? 'white' : undefined}
+              variant={
+                location.pathname === '/about' && !accentBg
+                  ? 'primary'
+                  : 'secondary'
+              }
+              backgroundColor={
+                location.pathname === '/about' && accentBg
+                  ? accentBg
+                  : undefined
+              }
+              color={
+                location.pathname === '/about' && accentBg ? 'white' : undefined
+              }
               size="$2"
             >
               <span role="img" aria-label="info">
@@ -206,9 +236,18 @@ function App() {
           />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route path="/baseball/team/:teamId" element={<TeamDetailPage />} />
-          <Route path="/baseball/league/:leagueId/matchups/:matchupId" element={<MatchupDetailPage />} />
-          <Route path="/baseball/league/:leagueId/standings" element={<StandingsPage />} />
-          <Route path="/baseball/league/:leagueId/commissioner" element={<CommissionerPage />} />
+          <Route
+            path="/baseball/league/:leagueId/matchups/:matchupId"
+            element={<MatchupDetailPage />}
+          />
+          <Route
+            path="/baseball/league/:leagueId/standings"
+            element={<StandingsPage />}
+          />
+          <Route
+            path="/baseball/league/:leagueId/commissioner"
+            element={<CommissionerPage />}
+          />
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />
           <Route path="/players/stats" element={<WebPlayerStatsPage />} />

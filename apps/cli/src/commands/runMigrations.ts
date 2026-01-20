@@ -1,8 +1,5 @@
 import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { runMigrations as executeDrizzleMigrations } from '@legacy-sports/db-client';
-
-import { ArgsType } from './ArgsType';
 
 export const runMigrationsCommandBuilder = (argv: Argv) =>
   argv.usage('runMigrations').option('production', {
@@ -11,34 +8,16 @@ export const runMigrationsCommandBuilder = (argv: Argv) =>
     description: 'Use production AWS credentials',
   });
 
-type HandleRunMigrationsArgs = ArgsType<
-  ReturnType<typeof runMigrationsCommandBuilder>
->;
-
-export async function handleRunMigrations(
-  args: HandleRunMigrationsArgs,
-): Promise<void> {
-  try {
-    LOGGER.info('🔧 Running Drizzle Database Migrations...');
-
-    if (args.production) {
-      LOGGER.info('🔐 Using production AWS credentials');
-    } else {
-      LOGGER.info('🛠️ Using local development credentials');
-    }
-
-    // Run Drizzle migrations (no return value, just executes)
-    await executeDrizzleMigrations();
-
-    LOGGER.info('✅ Migration completed successfully');
-  } catch (error) {
-    LOGGER.error('❌ Migration failed:');
-    if (error instanceof Error) {
-      LOGGER.error(`Error message: ${error.message}`);
-      LOGGER.error(`Stack trace: ${error.stack}`);
-    } else {
-      LOGGER.error('Unknown error type:', String(error));
-    }
-    process.exit(1);
-  }
+export function handleRunMigrations(): void {
+  LOGGER.error('❌ This command has been deprecated.');
+  LOGGER.info('');
+  LOGGER.info('Please use one of the following instead:');
+  LOGGER.info('  • make db-migrate           (recommended)');
+  LOGGER.info('  • pnpm run db:migrate       (from root)');
+  LOGGER.info('  • pnpm run db:up            (from lib/db-client)');
+  LOGGER.info('');
+  LOGGER.info(
+    'These commands use the TypeScript migration runner with proper role separation.',
+  );
+  process.exit(1);
 }

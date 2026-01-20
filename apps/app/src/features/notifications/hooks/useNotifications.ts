@@ -14,7 +14,7 @@ import {
 
 /**
  * Hook for managing user notification preferences and history
- * 
+ *
  * Note: GraphQL codegen produces types that ESLint marks as `any` in some contexts,
  * but they are actually type-safe at runtime. File-level eslint-disable used for
  * GraphQL type safety warnings.
@@ -43,14 +43,14 @@ export function useNotifications(userId: number) {
   });
 
   // Fetch unread count
-  const {
-    data: countData,
-    refetch: refetchCount,
-  } = useQuery(GetUnreadNotificationCountDocument, {
-    variables: { userId },
-    skip: !userId,
-    pollInterval: 30000, // Poll every 30 seconds
-  });
+  const { data: countData, refetch: refetchCount } = useQuery(
+    GetUnreadNotificationCountDocument,
+    {
+      variables: { userId },
+      skip: !userId,
+      pollInterval: 30000, // Poll every 30 seconds
+    },
+  );
 
   // Update unread count when data changes
   useEffect(() => {
@@ -60,14 +60,12 @@ export function useNotifications(userId: number) {
   }, [countData]);
 
   // Update notification preferences mutation
-  const [updatePreferencesMutation, { loading: updatingPreferences }] = useMutation(
-    UpdateNotificationPreferencesDocument,
-    {
+  const [updatePreferencesMutation, { loading: updatingPreferences }] =
+    useMutation(UpdateNotificationPreferencesDocument, {
       onCompleted: () => {
         void refetchPreferences();
       },
-    }
-  );
+    });
 
   // Mark notification as read mutation
   const [markAsReadMutation] = useMutation(MarkNotificationAsReadDocument, {
@@ -78,12 +76,15 @@ export function useNotifications(userId: number) {
   });
 
   // Mark all notifications as read mutation
-  const [markAllAsReadMutation] = useMutation(MarkAllNotificationsAsReadDocument, {
-    onCompleted: () => {
-      void refetchHistory();
-      void refetchCount();
+  const [markAllAsReadMutation] = useMutation(
+    MarkAllNotificationsAsReadDocument,
+    {
+      onCompleted: () => {
+        void refetchHistory();
+        void refetchCount();
+      },
     },
-  });
+  );
 
   // Helper functions
   const updatePreferences = useCallback(
@@ -100,7 +101,7 @@ export function useNotifications(userId: number) {
         throw error;
       }
     },
-    [userId, updatePreferencesMutation]
+    [userId, updatePreferencesMutation],
   );
 
   const markAsRead = useCallback(
@@ -114,7 +115,7 @@ export function useNotifications(userId: number) {
         throw error;
       }
     },
-    [markAsReadMutation]
+    [markAsReadMutation],
   );
 
   const markAllAsRead = useCallback(async () => {

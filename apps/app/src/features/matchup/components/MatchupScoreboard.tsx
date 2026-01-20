@@ -1,6 +1,9 @@
 import React from 'react';
 import { Card, H3, H5, Separator, Text, XStack, YStack } from 'tamagui';
-import { type MatchupFragment, MatchupStatus } from '../../../api/db/graphql.generated';
+import {
+  type MatchupFragment,
+  MatchupStatus,
+} from '../../../api/db/graphql.generated';
 
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
@@ -25,7 +28,8 @@ export function MatchupScoreboard({
     );
   }
 
-  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } = matchup;
+  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } =
+    matchup;
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);
@@ -58,7 +62,9 @@ export function MatchupScoreboard({
               backgroundColor="$backgroundPress"
               borderRadius="$2"
             >
-              {status === MatchupStatus.InProgress ? 'LIVE' : status?.toUpperCase()}
+              {status === MatchupStatus.InProgress
+                ? 'LIVE'
+                : status?.toUpperCase()}
             </Text>
           </XStack>
         </XStack>
@@ -135,7 +141,8 @@ export function MatchupScoreboard({
         {gamesPerMatchup && (
           <Text fontSize="$2" color="$gray11" textAlign="center">
             {gamesPerMatchup} game matchup
-            {gamesRemaining > 0 && ` • ${gamesPerMatchup - gamesRemaining} games completed`}
+            {gamesRemaining > 0 &&
+              ` • ${gamesPerMatchup - gamesRemaining} games completed`}
           </Text>
         )}
       </YStack>

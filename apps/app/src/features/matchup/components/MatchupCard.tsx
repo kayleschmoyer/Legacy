@@ -1,6 +1,9 @@
 import React from 'react';
 import { Card, H4, Text, XStack, YStack } from 'tamagui';
-import { type MatchupFragment, MatchupStatus } from '../../../api/db/graphql.generated';
+import {
+  type MatchupFragment,
+  MatchupStatus,
+} from '../../../api/db/graphql.generated';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;
@@ -21,7 +24,8 @@ export function MatchupCard({
     return null;
   }
 
-  const { weekNumber, team1Score, team2Score, status, selectedSeason } = matchup;
+  const { weekNumber, team1Score, team2Score, status, selectedSeason } =
+    matchup;
 
   const getStatusColor = () => {
     switch (status) {

@@ -10,15 +10,16 @@
  */
 
 import { config } from 'dotenv';
-import { Pool } from 'pg';
+import { resolve } from 'path';
+config({ path: resolve(__dirname, '../../../../.env') });
+
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
-import { join, resolve } from 'path';
 import { existsSync } from 'fs';
-
-config({ path: resolve(__dirname, '../../../../.env') });
-import { getMigrationDatabaseConfig } from '../config/database';
+import { join } from 'path';
+import { getDatabaseConfig } from '../config/database';
 
 // Load environment variables from root .env file (already done above)
 
@@ -27,10 +28,10 @@ async function runMigrations() {
     LOGGER.info('🔧 Legacy Sports Database Migration (Drizzle)');
     LOGGER.info('===========================================');
 
-    LOGGER.info('🔍 Resolving migration database credentials...');
+    LOGGER.info('🔍 Resolving database credentials...');
 
-    // Get database configuration with migration user credentials
-    const dbConfig = await getMigrationDatabaseConfig();
+    // Get database configuration
+    const dbConfig = await getDatabaseConfig();
 
     LOGGER.info(
       `� Connected to database: ${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}`,
@@ -71,13 +72,14 @@ async function runMigrations() {
 
     // Close connection
     await pool.end();
-  } catch (error) {
+  } catch (error: unknown) {
     LOGGER.error('❌ Migration failed:');
     if (error instanceof Error) {
       LOGGER.error(`Error message: ${error.message}`);
-      LOGGER.error(`Stack trace: ${error.stack}`);
+      LOGGER.error(`Stack trace: ${error.stack ?? 'No stack trace available'}`);
     } else {
-      LOGGER.error('Unknown error type:', String(error));
+      LOGGER.error('Unknown error type');
+      LOGGER.error(JSON.stringify(error, null, 2));
     }
     process.exit(1);
   }

@@ -39,19 +39,10 @@ Use Twig's branch tree management features to:
 - Verify unique commits per branch
 - Cascade rebases across dependent branches
 - Detect and fix duplicate commits early
-- ✅ Track rewritten commits that already landed upstream (record old → new after resolving conflicts)
 
-### Conflict-Aware Skip Workflow (New)
+---
 
-When a rebase rewrites a commit because you resolved conflicts, you must capture the old hash before adding it to any skip list. This keeps downstream cascades safe and prevents accidental data loss.
-
-1. **Let Git tell you the offender** – during `git rebase`, note the SHA shown in the “could not apply <sha> …” line.
-2. **Resolve the conflicts normally** – edit files, run `git add`, then `git rebase --continue`.
-3. **Record the replacement** – immediately run `git log -1 --oneline` (or `git rev-parse HEAD`) to grab the new SHA for the rewritten commit.
-4. **Update the skip list** – append a line like `abc1234 # replaced by def5678 on LS-25 after conflict resolution` to `skip-migration-commits-all.txt` (or the skip file you’re using). Only add the _old_ hash after the new commit exists.
-5. **Reuse the list downstream** – pass that skip file (or hash set) to `twig rebase --skip-commits` / cascade scripts so child branches automatically skip the redundant commit.
-
-> **Never pre-populate skip lists with hashes that haven’t actually been rewritten upstream.** If you skip too aggressively you will drop real work, as we saw when the LS-17 tree temporarily lost feature commits.
+## 🌳 Understanding the Branch Tree
 
 ### Viewing Your Tree
 
@@ -340,16 +331,6 @@ Use the `rebase-branch-tree.ps1` script with skip-commits:
 # Via Makefile
 make rebase-tree SKIP_COMMITS="1111111,2222222"
 ```
-
-**Conflict-aware workflow (recommended after large squashes)**
-
-1. **Start with a seed file**: `skip-commits.txt` can be empty or pre-populated. Pass it to the script with `-SkipCommitsFile skip-commits.txt`.
-2. **Optional bootstrapping**: provide legacy hashes via `-SkipCommits` and set `-PrependInitialSkips` to place them at the top of the file before the rebase starts.
-3. **Let the script track conflicts**: whenever a commit triggers a conflict, the script records the offending hash (from `REBASE_HEAD`) to the top of the skip file so downstream branches automatically skip it.
-4. **Cascade immediately**: either run `.\scripts\rebase-branch-tree.ps1 ... -AutoCascade` to call `twig cascade` automatically, or follow the prompt, run `twig cascade --skip-commits <hashes>` manually, then hit Enter to continue.
-5. **Cleanup**: the skip file is restored to its original contents once the cascade finishes. Use `-KeepSkipFile` if you want to persist the auto-added hashes for later reference.
-
-> Need to postpone the cascade? Run the script with `-SkipCascade` so it doesn't prompt, then call `twig cascade` manually later and clean up the skip file yourself.
 
 ### Using Twig Cascade
 
@@ -643,26 +624,6 @@ git merge-base parent current
 5. **Fix duplicates immediately** - don't wait until you have 14 dirty branches
 6. **Use cascade for bulk rebases** - it handles the tree structure automatically
 7. **Verify before force-pushing** - check `twig tree` and commit logs first
-
----
-
-## 📼 Non-Interactive Rebase Demo (Nov 20, 2025)
-
-The Matchup branch tree (LS-17 → LS-53) was taken through a full, non-interactive cascade to validate the scripted workflow. Each command below was executed from `D:\code\legacy-sports` and produced the noted outcome:
-
-| Step           | Command                                                    | Result       | Notes                                                                              |
-| -------------- | ---------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------- |
-| Cascade rebase | `make rebase-tree-skip SKIP_COMMITS_FILE=skip-commits.txt` | ✅ PASS      | Used the 9 known skip hashes; LS-27 rebased without prompts.                       |
-| Typecheck      | `pnpm exec nx affected -t typecheck`                       | ✅ PASS      | Confirms regenerated GraphQL types compile everywhere.                             |
-| Mobile lint    | `pnpm exec nx run app:lint`                                | ✅ PASS      | Previously unsafe scoring hooks are now fully typed.                               |
-| Skip detection | `make detect-skip-commits`                                 | ⚠️ FOLLOW-UP | Script still reports LS-28–LS-34 and LS-49–LS-53 containing the rewritten commits. |
-
-**Next steps highlighted by the demo**
-
-- Add or confirm the flagged hashes in `skip-commits.txt`, then rerun `make rebase-tree-skip` starting at LS-28 to cascade through LS-53.
-- Repeat `make detect-skip-commits` until every branch prints `[OK]`, capturing the final green transcript for this guide.
-- **Commit the fixes immediately after validation.** Once typecheck/lint/test/build pass, checkpoint the tooling/doc updates and regenerated artifacts so the cascade leaves the repo clean for the next branch.
-- Keep the validation order (typecheck → lint → test/build) after every cascade so regressions surface immediately.
 
 ---
 

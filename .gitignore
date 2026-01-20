@@ -281,6 +281,3 @@ terraform/*.zip
 
 # Tamagui generated files
 **/.tamagui/
-
-# Local skip lists for branch tree rebases
-skip-commits.txt

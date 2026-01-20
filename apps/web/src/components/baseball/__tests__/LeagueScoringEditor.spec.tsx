@@ -38,7 +38,11 @@ function mockPickDomProps(
       continue;
     }
 
-    if (key.startsWith('data-') || key.startsWith('aria-') || allowedSet.has(key)) {
+    if (
+      key.startsWith('data-') ||
+      key.startsWith('aria-') ||
+      allowedSet.has(key)
+    ) {
       domProps[key] = value;
     }
   }
@@ -52,7 +56,10 @@ jest.mock('../../../api/db/graphql.generated', () => {
   >('../../../api/db/graphql.generated');
   return {
     ...actual,
-    useUpdateLeagueScoringProfileMutation: jest.fn(() => [jest.fn(), { loading: false }]),
+    useUpdateLeagueScoringProfileMutation: jest.fn(() => [
+      jest.fn(),
+      { loading: false },
+    ]),
   };
 });
 
@@ -83,12 +90,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     const domProps = mockPickDomProps(props);
 
     return (
-      <button
-        type="button"
-        onClick={onPress}
-        disabled={disabled}
-        {...domProps}
-      >
+      <button type="button" onClick={onPress} disabled={disabled} {...domProps}>
         {children}
       </button>
     );
@@ -129,8 +131,12 @@ jest.mock('tamagui', () => {
   const Input = React.forwardRef<HTMLInputElement, Record<string, unknown>>(
     (allProps, forwardedRef) => {
       const props = { ...allProps };
-      const onChangeText = props.onChangeText as undefined | ((value: string) => void);
-      const onChangeProp = props.onChange as undefined | ((value: unknown) => void);
+      const onChangeText = props.onChangeText as
+        | undefined
+        | ((value: string) => void);
+      const onChangeProp = props.onChange as
+        | undefined
+        | ((value: unknown) => void);
       const value = props.value as string | undefined;
       const defaultValue = props.defaultValue as string | undefined;
       const textAlign = props.textAlign as string | undefined;
@@ -158,7 +164,8 @@ jest.mock('tamagui', () => {
       }
 
       if (width !== undefined) {
-        inlineStyle.width = typeof width === 'number' ? `${width}px` : String(width);
+        inlineStyle.width =
+          typeof width === 'number' ? `${width}px` : String(width);
       }
 
       if (backgroundColor) {
@@ -181,10 +188,13 @@ jest.mock('tamagui', () => {
         'type',
       ]);
 
-      const inputType = typeof domProps.type === 'string' ? (domProps.type) : 'text';
+      const inputType =
+        typeof domProps.type === 'string' ? domProps.type : 'text';
       delete domProps.type;
 
-      const handleChange = (changeEvent: React.ChangeEvent<HTMLInputElement>) => {
+      const handleChange = (
+        changeEvent: React.ChangeEvent<HTMLInputElement>,
+      ) => {
         if (typeof onChangeProp === 'function') {
           onChangeProp(changeEvent);
         }
@@ -195,7 +205,7 @@ jest.mock('tamagui', () => {
       };
 
       const inputProps: React.InputHTMLAttributes<HTMLInputElement> = {
-        ...(domProps),
+        ...domProps,
         onChange: handleChange,
         style: inlineStyle,
         type: inputType,
@@ -305,8 +315,7 @@ describe('LeagueScoringEditor', () => {
   it('submits multiplier overrides when Save Changes is pressed', async () => {
     const refetchMock = jest.fn().mockResolvedValue(undefined);
     const mutateMock = jest.fn().mockResolvedValue(undefined);
-    const mockedUpdateHook =
-      useUpdateLeagueScoringProfileMutation;
+    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation;
     mockedUpdateHook.mockReturnValue([mutateMock, createMutationState()]);
 
     render(
@@ -347,8 +356,7 @@ describe('LeagueScoringEditor', () => {
   it('resets overrides back to default values', () => {
     const refetchMock = jest.fn().mockResolvedValue(undefined);
     const mutateMock = jest.fn().mockResolvedValue(undefined);
-    const mockedUpdateHook =
-      useUpdateLeagueScoringProfileMutation;
+    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation;
     mockedUpdateHook.mockReturnValue([mutateMock, createMutationState()]);
 
     render(

@@ -24,7 +24,12 @@ export function MatchupGrid({
 }: MatchupGridProps) {
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={200}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={200}
+      >
         <Spinner size="large" color="$blue10" />
         <Text marginTop="$2" color="$gray11">
           Loading matchups...
@@ -35,7 +40,12 @@ export function MatchupGrid({
 
   if (error) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={200}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={200}
+      >
         <Text color="$red10" fontSize="$5" fontWeight="bold">
           Error loading matchups
         </Text>
@@ -48,7 +58,12 @@ export function MatchupGrid({
 
   if (matchups.length === 0) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={200}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={200}
+      >
         <Text color="$gray11" fontSize="$4">
           No matchups found{weekNumber ? ` for week ${weekNumber}` : ''}
         </Text>
@@ -59,17 +74,18 @@ export function MatchupGrid({
   return (
     <YStack width="100%" padding="$2">
       {weekNumber && (
-        <Text fontSize="$5" fontWeight="bold" marginBottom="$3" paddingHorizontal="$2">
+        <Text
+          fontSize="$5"
+          fontWeight="bold"
+          marginBottom="$3"
+          paddingHorizontal="$2"
+        >
           Week {weekNumber} Matchups
         </Text>
       )}
-      
+
       {/* Grid layout - responsive */}
-      <XStack 
-        flexWrap="wrap" 
-        justifyContent="flex-start"
-        gap="$2"
-      >
+      <XStack flexWrap="wrap" justifyContent="flex-start" gap="$2">
         {matchups.map((matchup) => (
           <YStack
             key={matchup.id}

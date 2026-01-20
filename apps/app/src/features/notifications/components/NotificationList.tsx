@@ -96,7 +96,12 @@ export function NotificationList({
 
   if (notifications.length === 0) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" space="$2">
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        space="$2"
+      >
         <Bell size="$4" color="$gray10" />
         <Text fontSize="$4" color="$gray11">
           No notifications

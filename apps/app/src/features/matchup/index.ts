@@ -1,5 +1,11 @@
 // Hooks
-export { useMatchup, useMatchupById, useMatchupsForLeague, useCurrentMatchup, useMatchupsByWeek } from './hooks/useMatchup';
+export {
+  useMatchup,
+  useMatchupById,
+  useMatchupsForLeague,
+  useCurrentMatchup,
+  useMatchupsByWeek,
+} from './hooks/useMatchup';
 export { useStandings } from './hooks/useStandings';
 
 // Components

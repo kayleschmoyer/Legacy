@@ -16,6 +16,10 @@ import {
   loadSinglePlayerStatsCommandBuilder,
 } from './commands/loadSinglePlayerStats';
 import {
+  checkStatsStatusCommandBuilder,
+  handleCheckStatsStatus,
+} from './commands/checkStatsStatus';
+import {
   handleListPlayers,
   listPlayersCommandBuilder,
 } from './commands/listPlayers';
@@ -90,6 +94,23 @@ import {
   handleStartDraft,
   startDraftCommandBuilder,
 } from './commands/startDraft';
+import {
+  investigateLeague13,
+  investigateLeague13CommandBuilder,
+} from './commands/investigateLeague13';
+import {
+  handleInvestigateMatchup,
+  investigateMatchupCommandBuilder,
+} from './commands/investigateMatchup';
+import {
+  findMatchupFromPlayerCommandBuilder,
+  handleFindMatchupFromPlayer,
+} from './commands/findMatchupFromPlayer';
+import {
+  getLeagueAvailableSeasonsCommandBuilder,
+  handleGetLeagueSeasons,
+} from './commands/getLeagueSeasons';
+import { handleQueryDb, queryDbCommandBuilder } from './commands/queryDb';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -111,6 +132,12 @@ async function run(): Promise<void> {
       'Load career stats for a specific player',
       loadSinglePlayerStatsCommandBuilder,
       handleLoadSinglePlayerStats,
+    )
+    .command(
+      'check-stats-status',
+      'Check the status of season stats loading',
+      checkStatsStatusCommandBuilder,
+      handleCheckStatsStatus,
     )
     .command(
       'list-players',
@@ -147,6 +174,12 @@ async function run(): Promise<void> {
       'Inspect current database state and migration status',
       inspectDatabaseCommandBuilder,
       inspectDatabase,
+    )
+    .command(
+      'query-db',
+      'Execute a SQL query against the database',
+      queryDbCommandBuilder,
+      handleQueryDb,
     )
     .command(
       'reset-database',
@@ -251,6 +284,30 @@ async function run(): Promise<void> {
       'Start a draft for a specific league',
       startDraftCommandBuilder,
       handleStartDraft,
+    )
+    .command(
+      'investigate-league-13',
+      'Investigate why league 13 players have stats_last_fetched_at but no season_batting',
+      investigateLeague13CommandBuilder,
+      investigateLeague13,
+    )
+    .command(
+      'investigate-matchup <matchupId>',
+      'Investigate why a matchup has null game numbers',
+      investigateMatchupCommandBuilder,
+      handleInvestigateMatchup,
+    )
+    .command(
+      'find-matchup-from-player <matchupPlayerId>',
+      'Find matchup ID from matchup player ID',
+      findMatchupFromPlayerCommandBuilder,
+      handleFindMatchupFromPlayer,
+    )
+    .command(
+      'get-league-seasons <leagueId>',
+      'Get available seasons with stats for a league',
+      getLeagueAvailableSeasonsCommandBuilder,
+      handleGetLeagueSeasons,
     )
     .demandCommand()
     .help()

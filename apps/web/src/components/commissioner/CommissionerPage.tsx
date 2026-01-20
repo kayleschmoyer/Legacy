@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { useGetLeagueByIdQuery } from '../../api/db/graphql.generated';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { GameSelectionControl } from '../commissioner/GameSelectionControl';
+import { MatchupControl } from '../commissioner/MatchupControl';
+import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 
 /**
  * CommissionerPage - Commissioner controls for league management
@@ -17,8 +20,16 @@ export function CommissionerPage() {
   const leagueIdNum = leagueId ? parseInt(leagueId, 10) : null;
   const { matchup, loading, error, refetch } = useCurrentMatchup(leagueIdNum);
 
-  const handleSuccess = () => {
-    setSuccessMessage('Game selection triggered successfully!');
+  // Fetch league data for delete control
+  const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
+    variables: { id: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+
+  const league = leagueData?.league;
+
+  const handleSuccess = (message?: string) => {
+    setSuccessMessage(message ?? 'Operation completed successfully!');
     setErrorMessage(null);
     void refetch();
     setTimeout(() => setSuccessMessage(null), 5000);
@@ -30,9 +41,20 @@ export function CommissionerPage() {
   };
 
   return (
-    <YStack width="100%" maxWidth={1200} alignSelf="center" padding="$4" space="$4">
+    <YStack
+      width="100%"
+      maxWidth={1200}
+      alignSelf="center"
+      padding="$4"
+      space="$4"
+    >
       {/* Header */}
-      <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$2">
+      <XStack
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        gap="$2"
+      >
         <H2>Commissioner Tools</H2>
         <Button
           theme="alt2"
@@ -43,7 +65,13 @@ export function CommissionerPage() {
       </XStack>
 
       {successMessage && (
-        <YStack padding="$3" backgroundColor="$green3" borderRadius="$3" borderWidth={1} borderColor="$green8">
+        <YStack
+          padding="$3"
+          backgroundColor="$green3"
+          borderRadius="$3"
+          borderWidth={1}
+          borderColor="$green8"
+        >
           <Text color="$green11" fontWeight="bold">
             {successMessage}
           </Text>
@@ -51,7 +79,13 @@ export function CommissionerPage() {
       )}
 
       {errorMessage && (
-        <YStack padding="$3" backgroundColor="$red3" borderRadius="$3" borderWidth={1} borderColor="$red8">
+        <YStack
+          padding="$3"
+          backgroundColor="$red3"
+          borderRadius="$3"
+          borderWidth={1}
+          borderColor="$red8"
+        >
           <Text color="$red11" fontWeight="bold">
             Error: {errorMessage}
           </Text>
@@ -60,20 +94,47 @@ export function CommissionerPage() {
 
       <Separator />
 
-      {/* Game Selection Section */}
+      {/* Matchup Management Section */}
       <YStack space="$3">
-        <H3>Automated Game Selection</H3>
-        
+        <H3>Matchup Management</H3>
+
         {loading ? (
           <Text color="$gray11">Loading current matchup...</Text>
         ) : error ? (
           <Text color="$red10">Error loading matchup: {error.message}</Text>
-        ) : matchup && matchup.id ? (
+        ) : (
+          <MatchupControl
+            leagueId={leagueIdNum ?? 0}
+            currentMatchup={matchup}
+            onSuccess={() => handleSuccess('Matchup updated successfully!')}
+            onError={handleError}
+          />
+        )}
+      </YStack>
+
+      <Separator />
+
+      {/* Game Selection Section */}
+      <YStack space="$3">
+        <H3>Automated Game Selection</H3>
+
+        {loading ? (
+          <Text color="$gray11">Loading current matchup...</Text>
+        ) : error ? (
+          <Text color="$red10">Error loading matchup: {error.message}</Text>
+        ) : matchup && matchup.id && matchup.weekNumber ? (
           <GameSelectionControl
             leagueId={leagueIdNum ?? 0}
-            matchupId={typeof matchup.id === 'string' ? parseInt(matchup.id, 10) : matchup.id}
+            matchupId={
+              typeof matchup.id === 'string'
+                ? parseInt(matchup.id, 10)
+                : matchup.id
+            }
+            weekNumber={matchup.weekNumber}
             gamesPerMatchup={matchup.gamesPerMatchup ?? 1}
-            onSuccess={handleSuccess}
+            onSuccess={() =>
+              handleSuccess('Game selection triggered successfully!')
+            }
             onError={handleError}
           />
         ) : (
@@ -81,33 +142,32 @@ export function CommissionerPage() {
         )}
 
         <Text fontSize="$2" color="$gray10">
-          Use this control to trigger automated game selection for the current matchup.
-          The system will select games for all teams based on the configured rules and the selected season.
+          Use this control to trigger automated game selection for the current
+          matchup. The system will select games for all teams based on the
+          configured rules and the selected season.
         </Text>
       </YStack>
 
       <Separator />
 
-      {/* Other Commissioner Tools (Placeholder) */}
+      {/* Delete League Section */}
       <YStack space="$3">
-        <H3>Other Commissioner Tools</H3>
-        <Text color="$gray11">
-          Additional commissioner features coming soon:
-        </Text>
-        <YStack space="$2" paddingLeft="$4">
-          <Text fontSize="$3" color="$gray10">
-            • Matchup scheduling configuration
-          </Text>
-          <Text fontSize="$3" color="$gray10">
-            • League settings management
-          </Text>
-          <Text fontSize="$3" color="$gray10">
-            • Team management
-          </Text>
-          <Text fontSize="$3" color="$gray10">
-            • Playoff bracket configuration
-          </Text>
-        </YStack>
+        <H3>League Management</H3>
+
+        {leagueLoading ? (
+          <Text color="$gray11">Loading league data...</Text>
+        ) : league ? (
+          <DeleteLeagueControl
+            leagueId={leagueIdNum ?? 0}
+            leagueName={league.name ?? 'Unknown League'}
+            onSuccess={() =>
+              handleSuccess('League deleted successfully! Redirecting...')
+            }
+            onError={handleError}
+          />
+        ) : (
+          <Text color="$red10">Error loading league data</Text>
+        )}
       </YStack>
     </YStack>
   );

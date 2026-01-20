@@ -16,7 +16,12 @@ export function StandingsPage() {
 
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Spinner size="large" color="$blue10" />
         <Text marginTop="$2" color="$gray11">
           Loading standings...
@@ -27,7 +32,12 @@ export function StandingsPage() {
 
   if (error) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Text color="$red10" fontSize="$5" fontWeight="bold">
           Error loading standings
         </Text>
@@ -42,9 +52,20 @@ export function StandingsPage() {
   }
 
   return (
-    <YStack width="100%" maxWidth={1200} alignSelf="center" padding="$4" space="$4">
+    <YStack
+      width="100%"
+      maxWidth={1200}
+      alignSelf="center"
+      padding="$4"
+      space="$4"
+    >
       {/* Header */}
-      <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$2">
+      <XStack
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        gap="$2"
+      >
         <H2>League Standings</H2>
         <XStack space="$2">
           <Button theme="alt2" onPress={() => refetch()}>

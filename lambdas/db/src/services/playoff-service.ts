@@ -34,89 +34,84 @@ export class PlayoffService {
    */
   static async createBracket(params: CreateBracketParams) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
-      // Wrap in transaction to ensure bracket, seeds, and matchups are created atomically
-      return await db.transaction(async (tx) => {
-        const { leagueId, season, format, startWeek, multiWeekMatchups } =
-          params;
+      const { leagueId, season, format, startWeek, multiWeekMatchups } = params;
 
-        // Get standings to determine seeding
-        const { StandingsService } = await import('./standings-service');
-        const standings = await StandingsService.getStandings({
+      // Get standings to determine seeding
+      const { StandingsService } = await import('./standings-service');
+      const standings = await StandingsService.getStandings({
+        leagueId,
+        season,
+      });
+
+      const numTeams = parseInt(format.split('-')[0]);
+      if (standings.length < numTeams) {
+        throw new Error(
+          `Not enough teams for ${format} playoff. Need ${numTeams}, have ${standings.length}`,
+        );
+      }
+
+      // Create bracket structure
+      const bracketStructure = this.getBracketStructure(
+        format,
+        startWeek,
+        multiWeekMatchups,
+      );
+      const endWeek =
+        bracketStructure.rounds[bracketStructure.rounds.length - 1].weekNumber;
+
+      // Insert playoff bracket record
+      const bracketResults = await db
+        .insert(PublicSchema.playoffBrackets)
+        .values({
           leagueId,
           season,
-        });
-
-        const numTeams = parseInt(format.split('-')[0]);
-        if (standings.length < numTeams) {
-          throw new Error(
-            `Not enough teams for ${format} playoff. Need ${numTeams}, have ${standings.length}`,
-          );
-        }
-
-        // Create bracket structure
-        const bracketStructure = this.getBracketStructure(
           format,
           startWeek,
-          multiWeekMatchups,
-        );
-        const endWeek =
-          bracketStructure.rounds[bracketStructure.rounds.length - 1]
-            .weekNumber;
+          endWeek,
+          status: 'scheduled',
+        })
+        .returning();
 
-        // Insert playoff bracket record
-        const bracketResults = await tx
-          .insert(PublicSchema.playoffBrackets)
-          .values({
-            leagueId,
-            season,
-            format,
-            startWeek,
-            endWeek,
-            status: 'scheduled',
-          })
-          .returning();
+      const bracket = bracketResults[0];
 
-        const bracket = bracketResults[0];
+      // Insert seeds
+      const seedValues = standings
+        .slice(0, numTeams)
+        .map((standing, index) => ({
+          bracketId: bracket.id,
+          teamId: standing.teamId,
+          seedNumber: index + 1,
+          regularSeasonWins: standing.wins,
+          regularSeasonLosses: standing.losses,
+          pointsFor: standing.pointsFor.toString(),
+        }));
 
-        // Insert seeds
-        const seedValues = standings
-          .slice(0, numTeams)
-          .map((standing, index) => ({
-            bracketId: bracket.id,
-            teamId: standing.teamId,
-            seedNumber: index + 1,
-            regularSeasonWins: standing.wins,
-            regularSeasonLosses: standing.losses,
-            pointsFor: standing.pointsFor.toString(),
-          }));
+      await db.insert(PublicSchema.playoffSeeds).values(seedValues);
 
-        await tx.insert(PublicSchema.playoffSeeds).values(seedValues);
+      // Create matchups based on bracket structure
+      const matchupValues = bracketStructure.rounds.flatMap((round) =>
+        round.matchups.map((matchup) => ({
+          bracketId: bracket.id,
+          round: round.round,
+          matchupNumber: matchup.matchupNumber,
+          highSeedTeamId:
+            matchup.highSeed !== 0
+              ? standings[matchup.highSeed - 1].teamId
+              : null,
+          lowSeedTeamId:
+            matchup.lowSeed !== 0
+              ? standings[matchup.lowSeed - 1].teamId
+              : null,
+          weekNumber: round.weekNumber,
+          isMultiWeek: multiWeekMatchups,
+          status: 'scheduled' as const,
+        })),
+      );
 
-        // Create matchups based on bracket structure
-        const matchupValues = bracketStructure.rounds.flatMap((round) =>
-          round.matchups.map((matchup) => ({
-            bracketId: bracket.id,
-            round: round.round,
-            matchupNumber: matchup.matchupNumber,
-            highSeedTeamId:
-              matchup.highSeed !== 0
-                ? standings[matchup.highSeed - 1].teamId
-                : null,
-            lowSeedTeamId:
-              matchup.lowSeed !== 0
-                ? standings[matchup.lowSeed - 1].teamId
-                : null,
-            weekNumber: round.weekNumber,
-            isMultiWeek: multiWeekMatchups,
-            status: 'scheduled' as const,
-          })),
-        );
+      await db.insert(PublicSchema.playoffMatchups).values(matchupValues);
 
-        await tx.insert(PublicSchema.playoffMatchups).values(matchupValues);
-
-        return bracket;
-      }); // End transaction
-    }); // End runWithPublicClient
+      return bracket;
+    });
   }
 
   /**
@@ -212,102 +207,99 @@ export class PlayoffService {
    */
   static async advanceBracket(bracketId: number) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
-      // Wrap in transaction to ensure all bracket advancement operations are atomic
-      return await db.transaction(async (tx) => {
-        // Get all matchups in bracket
-        const matchups = await tx
-          .select()
-          .from(PublicSchema.playoffMatchups)
-          .where(eq(PublicSchema.playoffMatchups.bracketId, bracketId))
-          .orderBy(
-            asc(PublicSchema.playoffMatchups.round),
-            asc(PublicSchema.playoffMatchups.matchupNumber),
-          );
-
-        // Determine which rounds are complete
-        const wildcardMatchups = matchups.filter((m) => m.round === 'wildcard');
-        const semifinalMatchups = matchups.filter(
-          (m) => m.round === 'semifinals',
-        );
-        const finalMatchups = matchups.filter((m) => m.round === 'finals');
-
-        const wildcardComplete = wildcardMatchups.every(
-          (m) => m.status === 'completed',
-        );
-        const semifinalsComplete = semifinalMatchups.every(
-          (m) => m.status === 'completed',
+      // Get all matchups in bracket
+      const matchups = await db
+        .select()
+        .from(PublicSchema.playoffMatchups)
+        .where(eq(PublicSchema.playoffMatchups.bracketId, bracketId))
+        .orderBy(
+          asc(PublicSchema.playoffMatchups.round),
+          asc(PublicSchema.playoffMatchups.matchupNumber),
         );
 
-        // Advance wildcard winners to semifinals
-        if (wildcardComplete && wildcardMatchups.length > 0) {
-          const wildcardWinners = wildcardMatchups
-            .map((m) => m.winnerTeamId)
-            .filter((id): id is number => id !== null);
+      // Determine which rounds are complete
+      const wildcardMatchups = matchups.filter((m) => m.round === 'wildcard');
+      const semifinalMatchups = matchups.filter(
+        (m) => m.round === 'semifinals',
+      );
+      const finalMatchups = matchups.filter((m) => m.round === 'finals');
 
-          if (wildcardWinners.length === wildcardMatchups.length) {
-            // Set semifinal opponents
-            for (let i = 0; i < semifinalMatchups.length; i++) {
-              const semifinal = semifinalMatchups[i];
-              if (semifinal.lowSeedTeamId === null && wildcardWinners[i]) {
-                await tx
-                  .update(PublicSchema.playoffMatchups)
-                  .set({ lowSeedTeamId: wildcardWinners[i] })
-                  .where(eq(PublicSchema.playoffMatchups.id, semifinal.id));
-              }
-            }
-          }
-        }
+      const wildcardComplete = wildcardMatchups.every(
+        (m) => m.status === 'completed',
+      );
+      const semifinalsComplete = semifinalMatchups.every(
+        (m) => m.status === 'completed',
+      );
 
-        // Advance semifinal winners to finals
-        if (semifinalsComplete && semifinalMatchups.length > 0) {
-          const semifinalWinners = semifinalMatchups
-            .map((m) => m.winnerTeamId)
-            .filter((id): id is number => id !== null);
+      // Advance wildcard winners to semifinals
+      if (wildcardComplete && wildcardMatchups.length > 0) {
+        const wildcardWinners = wildcardMatchups
+          .map((m) => m.winnerTeamId)
+          .filter((id): id is number => id !== null);
 
-          if (semifinalWinners.length === 2 && finalMatchups.length > 0) {
-            const final = finalMatchups[0];
-            if (final.highSeedTeamId === null) {
-              await tx
+        if (wildcardWinners.length === wildcardMatchups.length) {
+          // Set semifinal opponents
+          for (let i = 0; i < semifinalMatchups.length; i++) {
+            const semifinal = semifinalMatchups[i];
+            if (semifinal.lowSeedTeamId === null && wildcardWinners[i]) {
+              await db
                 .update(PublicSchema.playoffMatchups)
-                .set({
-                  highSeedTeamId: semifinalWinners[0],
-                  lowSeedTeamId: semifinalWinners[1],
-                })
-                .where(eq(PublicSchema.playoffMatchups.id, final.id));
+                .set({ lowSeedTeamId: wildcardWinners[i] })
+                .where(eq(PublicSchema.playoffMatchups.id, semifinal.id));
             }
           }
         }
+      }
 
-        // Update bracket status
-        const allComplete = matchups.every((m) => m.status === 'completed');
-        if (allComplete) {
-          const championMatchup = finalMatchups[0];
-          if (championMatchup && championMatchup.winnerTeamId) {
-            await tx
-              .update(PublicSchema.playoffBrackets)
+      // Advance semifinal winners to finals
+      if (semifinalsComplete && semifinalMatchups.length > 0) {
+        const semifinalWinners = semifinalMatchups
+          .map((m) => m.winnerTeamId)
+          .filter((id): id is number => id !== null);
+
+        if (semifinalWinners.length === 2 && finalMatchups.length > 0) {
+          const final = finalMatchups[0];
+          if (final.highSeedTeamId === null) {
+            await db
+              .update(PublicSchema.playoffMatchups)
               .set({
-                status: 'completed',
-                championTeamId: championMatchup.winnerTeamId,
+                highSeedTeamId: semifinalWinners[0],
+                lowSeedTeamId: semifinalWinners[1],
               })
-              .where(eq(PublicSchema.playoffBrackets.id, bracketId));
+              .where(eq(PublicSchema.playoffMatchups.id, final.id));
           }
-        } else {
-          await tx
+        }
+      }
+
+      // Update bracket status
+      const allComplete = matchups.every((m) => m.status === 'completed');
+      if (allComplete) {
+        const championMatchup = finalMatchups[0];
+        if (championMatchup && championMatchup.winnerTeamId) {
+          await db
             .update(PublicSchema.playoffBrackets)
-            .set({ status: 'in_progress' })
+            .set({
+              status: 'completed',
+              championTeamId: championMatchup.winnerTeamId,
+            })
             .where(eq(PublicSchema.playoffBrackets.id, bracketId));
         }
+      } else {
+        await db
+          .update(PublicSchema.playoffBrackets)
+          .set({ status: 'in_progress' })
+          .where(eq(PublicSchema.playoffBrackets.id, bracketId));
+      }
 
-        // Return updated bracket
-        const bracketResults = await tx
-          .select()
-          .from(PublicSchema.playoffBrackets)
-          .where(eq(PublicSchema.playoffBrackets.id, bracketId))
-          .limit(1);
+      // Return updated bracket
+      const bracketResults = await db
+        .select()
+        .from(PublicSchema.playoffBrackets)
+        .where(eq(PublicSchema.playoffBrackets.id, bracketId))
+        .limit(1);
 
-        return bracketResults[0];
-      }); // End transaction
-    }); // End runWithPublicClient
+      return bracketResults[0];
+    });
   }
 
   /**
@@ -315,75 +307,72 @@ export class PlayoffService {
    */
   static async awardChampionship(bracketId: number) {
     return await runWithPublicClient(getDbOptions(), async (db) => {
-      // Wrap in transaction to ensure trophy creation is atomic
-      return await db.transaction(async (tx) => {
-        // Get bracket info
-        const bracketResults = await tx
-          .select()
-          .from(PublicSchema.playoffBrackets)
-          .where(eq(PublicSchema.playoffBrackets.id, bracketId))
-          .limit(1);
+      // Get bracket info
+      const bracketResults = await db
+        .select()
+        .from(PublicSchema.playoffBrackets)
+        .where(eq(PublicSchema.playoffBrackets.id, bracketId))
+        .limit(1);
 
-        const bracket = bracketResults[0];
-        if (!bracket) {
-          throw new Error('Bracket not found');
-        }
+      const bracket = bracketResults[0];
+      if (!bracket) {
+        throw new Error('Bracket not found');
+      }
 
-        if (!bracket.championTeamId) {
-          throw new Error('No champion determined yet');
-        }
+      if (!bracket.championTeamId) {
+        throw new Error('No champion determined yet');
+      }
 
-        // Get championship matchup
-        const finalMatchups = await tx
-          .select()
-          .from(PublicSchema.playoffMatchups)
-          .where(
-            and(
-              eq(PublicSchema.playoffMatchups.bracketId, bracketId),
-              eq(PublicSchema.playoffMatchups.round, 'finals'),
-            ),
-          )
-          .limit(1);
+      // Get championship matchup
+      const finalMatchups = await db
+        .select()
+        .from(PublicSchema.playoffMatchups)
+        .where(
+          and(
+            eq(PublicSchema.playoffMatchups.bracketId, bracketId),
+            eq(PublicSchema.playoffMatchups.round, 'finals'),
+          ),
+        )
+        .limit(1);
 
-        const finalMatchup = finalMatchups[0];
-        if (!finalMatchup || !finalMatchup.winnerTeamId) {
-          throw new Error('Championship matchup not completed');
-        }
+      const finalMatchup = finalMatchups[0];
+      if (!finalMatchup || !finalMatchup.winnerTeamId) {
+        throw new Error('Championship matchup not completed');
+      }
 
-        // Determine runner-up
-        const runnerUpTeamId =
-          finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
-            ? finalMatchup.lowSeedTeamId
-            : finalMatchup.highSeedTeamId;
-        const runnerUpScore =
-          finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
-            ? finalMatchup.lowSeedScore
-            : finalMatchup.highSeedScore;
-        const finalScore =
-          finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
-            ? finalMatchup.highSeedScore
-            : finalMatchup.lowSeedScore;
+      // Determine runner-up
+      const runnerUpTeamId =
+        finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
+          ? finalMatchup.lowSeedTeamId
+          : finalMatchup.highSeedTeamId;
+      const runnerUpScore =
+        finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
+          ? finalMatchup.lowSeedScore
+          : finalMatchup.highSeedScore;
+      const finalScore =
+        finalMatchup.winnerTeamId === finalMatchup.highSeedTeamId
+          ? finalMatchup.highSeedScore
+          : finalMatchup.lowSeedScore;
 
-        if (!finalScore) {
-          throw new Error('Championship scores not available');
-        }
+      if (!finalScore) {
+        throw new Error('Championship scores not available');
+      }
 
-        // Create trophy record
-        const trophyResults = await tx
-          .insert(PublicSchema.championTrophies)
-          .values({
-            leagueId: bracket.leagueId,
-            season: bracket.season,
-            teamId: bracket.championTeamId,
-            championshipWeek: finalMatchup.weekNumber,
-            finalScore,
-            runnerUpTeamId,
-            runnerUpScore,
-          })
-          .returning();
+      // Create trophy record
+      const trophyResults = await db
+        .insert(PublicSchema.championTrophies)
+        .values({
+          leagueId: bracket.leagueId,
+          season: bracket.season,
+          teamId: bracket.championTeamId,
+          championshipWeek: finalMatchup.weekNumber,
+          finalScore,
+          runnerUpTeamId,
+          runnerUpScore,
+        })
+        .returning();
 
-        return trophyResults[0];
-      }); // End transaction
-    }); // End runWithPublicClient
+      return trophyResults[0];
+    });
   }
 }

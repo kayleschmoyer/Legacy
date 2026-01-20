@@ -304,7 +304,6 @@ export type Matchup = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   selectedSeason?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
-  statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
   team1?: Maybe<Team>;
   team1Id?: Maybe<Scalars['Int']['output']>;
@@ -338,15 +337,19 @@ export type MatchupPlayer = {
 export type MatchupPlayerGame = {
   __typename?: 'MatchupPlayerGame';
   battingGameNum?: Maybe<Scalars['Int']['output']>;
+  battingScore?: Maybe<Scalars['Float']['output']>;
   battingStats?: Maybe<GameBatting>;
   fieldingGameNum?: Maybe<Scalars['Int']['output']>;
   fieldingGamePos?: Maybe<Scalars['String']['output']>;
+  fieldingScore?: Maybe<Scalars['Float']['output']>;
   fieldingStats?: Maybe<GameFielding>;
   gameNum?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGameNum?: Maybe<Scalars['Int']['output']>;
+  pitchingScore?: Maybe<Scalars['Float']['output']>;
   pitchingStats?: Maybe<GamePitching>;
+  totalScore?: Maybe<Scalars['Float']['output']>;
 };
 
 export enum MatchupStatus {
@@ -1036,13 +1039,6 @@ export type SeasonResults = {
   standings?: Maybe<Array<TeamStanding>>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
-
-export enum StatsLoadingStatus {
-  Completed = 'completed',
-  Failed = 'failed',
-  Loading = 'loading',
-  NotStarted = 'not_started',
-}
 
 /** A team in a league */
 export type Team = {

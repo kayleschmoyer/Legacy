@@ -173,11 +173,11 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         (n: any) => n?.playerId === hitter.playerId,
       );
 
-  let sum = computeScoring(mp?.matchupBatting, battingSettings);
+      let sum = computeScoring(mp?.matchupBatting, battingSettings);
 
       const position = lineupSlots.find((l) => l?.id === hitter.positionId);
       if (position?.positionType !== PositionSlot.Dh) {
-  sum += computeScoring(mp?.matchupFielding, fieldingSettings);
+        sum += computeScoring(mp?.matchupFielding, fieldingSettings);
       }
 
       result[hitter.playerId] = sum;
@@ -299,57 +299,54 @@ export default function Team(): React.JSX.Element {
       },
     });
 
-  const scoringSettings = useMemo(
-    () => {
-      const base = {
-        batting: { ...DEFAULT_BATTING_SCORING },
-        fielding: { ...DEFAULT_FIELDING_SCORING },
-        pitching: { ...DEFAULT_PITCHING_SCORING },
-      } as {
-        batting: Partial<Record<string, number>>;
-        fielding: Partial<Record<string, number>>;
-        pitching: Partial<Record<string, number>>;
-      };
+  const scoringSettings = useMemo(() => {
+    const base = {
+      batting: { ...DEFAULT_BATTING_SCORING },
+      fielding: { ...DEFAULT_FIELDING_SCORING },
+      pitching: { ...DEFAULT_PITCHING_SCORING },
+    } as {
+      batting: Partial<Record<string, number>>;
+      fielding: Partial<Record<string, number>>;
+      pitching: Partial<Record<string, number>>;
+    };
 
-      const groups =
-        scoringProfileData?.leagueScoringProfile?.multiplierGroups ?? [];
+    const groups =
+      scoringProfileData?.leagueScoringProfile?.multiplierGroups ?? [];
 
-      for (const group of groups) {
-        if (!group?.group || !group.values) {
-          continue;
-        }
-
-        let target: Partial<Record<string, number>>;
-
-        switch (group.group) {
-          case ScoringStatGroup.Batting:
-            target = base.batting;
-            break;
-          case ScoringStatGroup.Fielding:
-            target = base.fielding;
-            break;
-          case ScoringStatGroup.Pitching:
-            target = base.pitching;
-            break;
-          default:
-            continue;
-        }
-
-        for (const entry of group.values) {
-          if (
-            entry?.sourceColumn &&
-            typeof entry.multiplier === 'number' &&
-            Number.isFinite(entry.multiplier)
-          ) {
-            target[entry.sourceColumn] = entry.multiplier;
-          }
-        }
+    for (const group of groups) {
+      if (!group?.group || !group.values) {
+        continue;
       }
 
-      return base;
-    },
-    [scoringProfileData],
-  );
+      let target: Partial<Record<string, number>>;
+
+      switch (group.group) {
+        case ScoringStatGroup.Batting:
+          target = base.batting;
+          break;
+        case ScoringStatGroup.Fielding:
+          target = base.fielding;
+          break;
+        case ScoringStatGroup.Pitching:
+          target = base.pitching;
+          break;
+        default:
+          continue;
+      }
+
+      for (const entry of group.values) {
+        if (
+          entry?.sourceColumn &&
+          typeof entry.multiplier === 'number' &&
+          Number.isFinite(entry.multiplier)
+        ) {
+          target[entry.sourceColumn] = entry.multiplier;
+        }
+      }
+    }
+
+    return base;
+  }, [scoringProfileData]);
 
   const battingSettings = scoringSettings.batting;
   const fieldingSettings = scoringSettings.fielding;
@@ -426,7 +423,12 @@ export default function Team(): React.JSX.Element {
     }).catch(handleError);
   };
 
-  if (loadingTeam || loadingPositions || loadingLeague || loadingScoringProfile) {
+  if (
+    loadingTeam ||
+    loadingPositions ||
+    loadingLeague ||
+    loadingScoringProfile
+  ) {
     return <LoadingPanel />;
   }
 

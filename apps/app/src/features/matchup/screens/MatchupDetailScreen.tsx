@@ -14,10 +14,18 @@ import { useStandings } from '../hooks/useStandings';
  */
 export default function MatchupDetailScreen() {
   const params = useLocalSearchParams();
-  const matchupId = params.matchupId ? parseInt(params.matchupId as string, 10) : null;
-  const leagueId = params.leagueId ? parseInt(params.leagueId as string, 10) : null;
+  const matchupId = params.matchupId
+    ? parseInt(params.matchupId as string, 10)
+    : null;
+  const leagueId = params.leagueId
+    ? parseInt(params.leagueId as string, 10)
+    : null;
 
-  const { matchup, loading: matchupLoading, error: matchupError } = useMatchupById(matchupId);
+  const {
+    matchup,
+    loading: matchupLoading,
+    error: matchupError,
+  } = useMatchupById(matchupId);
   const { standings, loading: standingsLoading } = useStandings(leagueId);
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -84,8 +92,11 @@ export default function MatchupDetailScreen() {
         <Tabs.Content value="overview" padding="$2">
           <ScrollView>
             <YStack space="$2">
-              <MatchupScoreboard matchup={matchup} gamesRemaining={gamesRemaining} />
-              
+              <MatchupScoreboard
+                matchup={matchup}
+                gamesRemaining={gamesRemaining}
+              />
+
               {gamesTotal > 0 && (
                 <GamesRemaining
                   gamesTotal={gamesTotal}
@@ -109,7 +120,7 @@ export default function MatchupDetailScreen() {
               <Text fontSize="$5" fontWeight="bold">
                 Matchup Details
               </Text>
-              
+
               <YStack space="$2">
                 <Text color="$gray11">
                   <Text fontWeight="bold">Week:</Text> {matchup.weekNumber}
@@ -119,17 +130,20 @@ export default function MatchupDetailScreen() {
                 </Text>
                 {matchup.selectedSeason && (
                   <Text color="$gray11">
-                    <Text fontWeight="bold">Season:</Text> {matchup.selectedSeason}
+                    <Text fontWeight="bold">Season:</Text>{' '}
+                    {matchup.selectedSeason}
                   </Text>
                 )}
                 {matchup.startTime && (
                   <Text color="$gray11">
-                    <Text fontWeight="bold">Start:</Text> {new Date(matchup.startTime).toLocaleString()}
+                    <Text fontWeight="bold">Start:</Text>{' '}
+                    {new Date(matchup.startTime).toLocaleString()}
                   </Text>
                 )}
                 {matchup.endTime && (
                   <Text color="$gray11">
-                    <Text fontWeight="bold">End:</Text> {new Date(matchup.endTime).toLocaleString()}
+                    <Text fontWeight="bold">End:</Text>{' '}
+                    {new Date(matchup.endTime).toLocaleString()}
                   </Text>
                 )}
               </YStack>

@@ -101,7 +101,6 @@ export async function queryHistoricalMatchups(
     conditions.push(sql`${Schema.matchups.startTime} >= ${filters.startDate}`);
   }
   if (filters.endDate) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal typing
     conditions.push(sql`${Schema.matchups.endTime} <= ${filters.endDate}`);
   }
 
@@ -215,7 +214,6 @@ export async function calculateStandings(
 
   if (season !== undefined) {
     if (season === null) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
       matchupConditions.push(sql`${Schema.matchups.selectedSeason} IS NULL`);
     } else {
       matchupConditions.push(eq(Schema.matchups.selectedSeason, season));

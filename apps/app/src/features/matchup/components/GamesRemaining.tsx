@@ -38,7 +38,10 @@ export function GamesRemaining({
       <YStack padding="$3" space="$3">
         {/* Progress Bar */}
         <Progress value={progress} size="$2" backgroundColor="$gray5">
-          <Progress.Indicator animation="bouncy" backgroundColor={getProgressColor()} />
+          <Progress.Indicator
+            animation="bouncy"
+            backgroundColor={getProgressColor()}
+          />
         </Progress>
 
         {/* Stats */}
@@ -74,12 +77,19 @@ export function GamesRemaining({
         {/* Status Message */}
         {gamesRemaining > 0 && (
           <Text fontSize="$2" color="$gray11" textAlign="center" marginTop="$2">
-            Select {gamesRemaining} more {gamesRemaining === 1 ? 'game' : 'games'} to complete your roster
+            Select {gamesRemaining} more{' '}
+            {gamesRemaining === 1 ? 'game' : 'games'} to complete your roster
           </Text>
         )}
 
         {gamesRemaining === 0 && gamesTotal > 0 && (
-          <Text fontSize="$2" color="$green10" textAlign="center" marginTop="$2" fontWeight="bold">
+          <Text
+            fontSize="$2"
+            color="$green10"
+            textAlign="center"
+            marginTop="$2"
+            fontWeight="bold"
+          >
             ✓ All games selected
           </Text>
         )}

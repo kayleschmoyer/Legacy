@@ -10,7 +10,10 @@ import { useMatchupById } from '../../hooks/useMatchup';
  * Shows scoreboard, games remaining, and detailed team stats
  */
 export function MatchupDetailPage() {
-  const { leagueId, matchupId } = useParams<{ leagueId: string; matchupId: string }>();
+  const { leagueId, matchupId } = useParams<{
+    leagueId: string;
+    matchupId: string;
+  }>();
   const navigate = useNavigate();
 
   const matchupIdNum = matchupId ? parseInt(matchupId, 10) : null;
@@ -18,7 +21,12 @@ export function MatchupDetailPage() {
 
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Spinner size="large" color="$blue10" />
         <Text marginTop="$2" color="$gray11">
           Loading matchup details...
@@ -29,7 +37,12 @@ export function MatchupDetailPage() {
 
   if (error) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Text color="$red10" fontSize="$5" fontWeight="bold">
           Error loading matchup
         </Text>
@@ -49,7 +62,12 @@ export function MatchupDetailPage() {
 
   if (!matchup) {
     return (
-      <YStack padding="$4" alignItems="center" justifyContent="center" minHeight={400}>
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
         <Text color="$gray11" fontSize="$4">
           Matchup not found
         </Text>
@@ -67,9 +85,20 @@ export function MatchupDetailPage() {
   const gamesRemaining = (matchup.gamesPerMatchup ?? 0) - 0; // TODO: Calculate actual games remaining
 
   return (
-    <YStack width="100%" maxWidth={1200} alignSelf="center" padding="$4" space="$4">
+    <YStack
+      width="100%"
+      maxWidth={1200}
+      alignSelf="center"
+      padding="$4"
+      space="$4"
+    >
       {/* Header */}
-      <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$2">
+      <XStack
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        gap="$2"
+      >
         <H2>Matchup Details</H2>
         <Button
           theme="alt2"
