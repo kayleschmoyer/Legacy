@@ -1,4 +1,26 @@
 {
   "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base",
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".nx",
+    "android",
+    "terraform",
+    "playwright-report",
+    "test-results",
+    "logs",
+    "tmp",
+    "certs",
+    "resources",
+    "static",
+    ".tamagui",
+    "lambdas",
+    "scripts",
+    "tests",
+    "tools",
+    "apps/web-e2e",
+    "apps/app-e2e",
+    "apps/cli-e2e"
+  ]
 }
