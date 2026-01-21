@@ -1,4 +1,5 @@
 Category,Subcategory,Rule_Type,Pattern_Concept,Description,Code_Example,File_Path
+# NOTE: For concrete command execution see .github/copilot/skills/ - This CSV focuses on workflow patterns and best practices
 development_workflow,ai_tools,RECOMMENDED,use_twig_mcp_server,Use Twig MCP server for twig operations if available,"MCP provides structured responses and better error handling than terminal commands",".vscode/settings.json"
 development_workflow,comprehensive_guide,CRITICAL,ai_agent_workflow,Complete step-by-step contribution workflow for AI agents,"See full guide for planning, branching, implementing, validating, committing, and PR creation","docs/guides/ai-agent-contribution-workflow.md"
 development_workflow,branch_management,CRITICAL,verify_branch_tree,Always verify branch tree structure with twig,"twig tree",""

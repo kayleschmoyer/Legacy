@@ -22,6 +22,7 @@ This comprehensive guide covers the complete development lifecycle:
 **Quick Commands**: See [Quick Reference](#-quick-reference) below
 
 **CSV Guidelines**: [Structured Agent Instructions](docs/agents/README.md)
+**Skills Documentation**: [GitHub Copilot Skills](.github/copilot/skills/README.md)
 
 ---
 
@@ -33,6 +34,42 @@ This comprehensive guide covers the complete development lifecycle:
 - **[Branch Tree Management](docs/guides/branch-tree-management.md)** 🌳 - Twig tree management for clean dependent branches
 - **[Development Setup](docs/guides/development-setup.md)** - Environment configuration
 - **[Troubleshooting Guide](docs/guides/troubleshooting.md)** - Common issues and solutions
+
+### 🛠️ Development Skills
+
+Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/copilot/skills/):
+
+**Validation & Quality**:
+- [Type Checking](.github/copilot/skills/typecheck.md) - TypeScript validation
+- [Linting](.github/copilot/skills/lint.md) - ESLint code quality
+- [Testing](.github/copilot/skills/test.md) - Jest testing
+- [Building](.github/copilot/skills/build.md) - Compiling and bundling
+- [Formatting](.github/copilot/skills/format.md) - Prettier formatting
+
+**Development Servers**:
+- [Dev Web Server](.github/copilot/skills/dev-web.md) - Next.js dev server
+- [Dev DB Lambda](.github/copilot/skills/dev-db-lambda.md) - Local GraphQL Lambda
+- [Sync Environment](.github/copilot/skills/sync-env.md) - AWS env sync
+
+**Workflow & Branches**:
+- [Branch Creation](.github/copilot/skills/branch-create.md) - Creating feature branches
+- [Jira Tickets](.github/copilot/skills/jira-ticket.md) - Managing ticket status
+- [Pull Requests](.github/copilot/skills/create-pr.md) - Creating PRs
+- [Branch Trees](.github/copilot/skills/branch-tree.md) - Managing dependent branches
+
+**Code & Database**:
+- [GraphQL Codegen](.github/copilot/skills/codegen.md) - Regenerating types
+- [DB Migration](.github/copilot/skills/db-migrate.md) - Running migrations
+- [DB Connection](.github/copilot/skills/db-connect.md) - Testing connectivity
+
+**Troubleshooting**:
+- [Nx Reset](.github/copilot/skills/nx-reset.md) - Clearing cache
+- [Affected Check](.github/copilot/skills/affected-check.md) - Dependency graph
+- [Workspace Validation](.github/copilot/skills/validate-workspace.md) - Validating workspace
+
+**Deployment**:
+- [Lambda Deploy](.github/copilot/skills/deploy-lambda.md) - Deploying Lambdas
+- [Terraform](.github/copilot/skills/terraform-apply.md) - Infrastructure changes
 
 ### 🤖 Structured Guidelines (CSV Format)
 

@@ -4,6 +4,16 @@
 
 This document provides structured guidance for AI agents working on the Legacy Sports codebase. The instructions are organized into topic-based CSV files for efficient processing and selective loading.
 
+## 🛠️ Skills Documentation
+
+**Detailed Task Guides**: [GitHub Copilot Skills](../../.github/copilot/skills/README.md)
+
+⚡ **For concrete command execution** (how to run specific commands), see the **skills documentation** in `.github/copilot/skills/`.
+
+📋 **For patterns and guidelines** (when to use certain approaches, best practices), see the **CSV files** below.
+
+**Available Skills**: 20 comprehensive skill guides covering validation, development servers, workflow management, code generation, database operations, troubleshooting, and deployment. Each skill includes commands, alternatives, troubleshooting, and integration guidance.
+
 ## 🤖 AI Agent Tools
 
 ### Twig MCP Server (Recommended)
@@ -58,10 +68,17 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 
 ### **For AI Agents:**
 
+**When to use Skills vs CSV files:**
+- 🔧 **Skills** - When you need to execute a specific command (e.g., "run tests", "create a branch", "deploy a lambda")
+- 📋 **CSV files** - When you need to understand patterns, best practices, or architectural decisions (e.g., "when to use magic strings", "how to structure types")
+
+**Using CSV Files:**
+
 1. **Load Relevant Topics**: Load only the CSV files relevant to your current task
 2. **Filter by Rule Type**: Use the `Rule_Type` column to find CRITICAL, DO, DON'T, etc.
 3. **Search by Pattern**: Use `Pattern_Concept` for specific implementation patterns
 4. **Reference Examples**: Use `Code_Example` and `File_Path` columns for implementation guidance
+5. **Cross-Reference Skills**: When CSV mentions a command, check if a skill exists for detailed execution steps
 
 ### ✅ Jira Hygiene (New!)
 
