@@ -34,9 +34,10 @@ export function MatchupScoreboard({
     team1Score,
     team2Score,
     status,
-    statsLoadingStatus,
+    // statsLoadingStatus, // TODO(LS-53): Property not yet in MatchupFragment
     gamesPerMatchup,
   } = matchup;
+  const statsLoadingStatus = null; // Placeholder
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);

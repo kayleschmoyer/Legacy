@@ -12,7 +12,20 @@ import {
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
+// import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
+
+// TODO(LS-53): Placeholder until useGetAllPlayerSeasonStatsQuery is implemented
+/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
+const useGetAllPlayerSeasonStatsQuery = (_params?: any) => ({
+  data: {
+    playerSeasonBatting: [] as any[],
+    playerSeasonPitching: [] as any[],
+    playerSeasonFielding: [] as any[],
+  },
+  loading: false,
+  error: { message: '' } as any,
+});
+/* eslint-enable */
 
 export interface PlayerSeasonStatsModalProps {
   /** Player ID to load stats for */
@@ -93,10 +106,14 @@ export function PlayerSeasonStatsModal({
     const seasons = new Map<number, SeasonRow>();
 
     // Add batting stats
-    data.playerSeasonBatting?.forEach((batting) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
+    data.playerSeasonBatting?.forEach((batting: any) => {
       if (!batting?.season) return;
 
-      const season = seasons.get(batting.season) || { season: batting.season };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
+      const season: SeasonRow = seasons.get(batting.season) || {
+        season: batting.season,
+      };
       const ab = batting.atBats ?? 0;
       const h = batting.hits ?? 0;
       const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
@@ -110,14 +127,17 @@ export function PlayerSeasonStatsModal({
         rbi: batting.rbi ?? 0,
         avg,
       };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(batting.season, season);
     });
 
     // Add pitching stats
-    data.playerSeasonPitching?.forEach((pitching) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
+    data.playerSeasonPitching?.forEach((pitching: any) => {
       if (!pitching?.season) return;
 
-      const season = seasons.get(pitching.season) || {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
+      const season: SeasonRow = seasons.get(pitching.season) || {
         season: pitching.season,
       };
       const ip = pitching.inningsPitched ?? 0;
@@ -132,14 +152,17 @@ export function PlayerSeasonStatsModal({
         ip,
         so: pitching.strikeouts ?? 0,
       };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(pitching.season, season);
     });
 
     // Add fielding stats (aggregate across multiple positions if player played multiple positions in a season)
-    data.playerSeasonFielding?.forEach((fielding) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
+    data.playerSeasonFielding?.forEach((fielding: any) => {
       if (!fielding?.season) return;
 
-      const season = seasons.get(fielding.season) || {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
+      const season: SeasonRow = seasons.get(fielding.season) || {
         season: fielding.season,
       };
 
@@ -152,6 +175,7 @@ export function PlayerSeasonStatsModal({
         season.fielding.e += fielding.errors ?? 0;
         // Add position to the list if not already there
         const pos = fielding.position ?? '';
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
         if (pos && !season.fielding.position.includes(pos)) {
           season.fielding.position +=
             (season.fielding.position ? ', ' : '') + pos;
@@ -168,6 +192,7 @@ export function PlayerSeasonStatsModal({
         };
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(fielding.season, season);
     });
 

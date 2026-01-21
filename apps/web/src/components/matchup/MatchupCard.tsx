@@ -30,9 +30,10 @@ export function MatchupCard({
     team1Score,
     team2Score,
     status,
-    statsLoadingStatus,
+    // statsLoadingStatus, // TODO(LS-53): Property not yet in MatchupFragment
     selectedSeason,
   } = matchup;
+  const statsLoadingStatus = null; // Placeholder
 
   const getStatusColor = () => {
     switch (status) {

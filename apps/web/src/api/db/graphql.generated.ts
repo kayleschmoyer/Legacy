@@ -174,79 +174,6 @@ export type DeviceTokenInput = {
   userId: Scalars['Int']['input'];
 };
 
-export type GameBatting = {
-  __typename?: 'GameBatting';
-  atBats?: Maybe<Scalars['Int']['output']>;
-  baseOnBalls?: Maybe<Scalars['Int']['output']>;
-  battingAverage?: Maybe<Scalars['Float']['output']>;
-  caughtStealing?: Maybe<Scalars['Int']['output']>;
-  doubles?: Maybe<Scalars['Int']['output']>;
-  gameIdentifier?: Maybe<Scalars['String']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
-  groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
-  hitByPitch?: Maybe<Scalars['Int']['output']>;
-  hits?: Maybe<Scalars['Int']['output']>;
-  homeRuns?: Maybe<Scalars['Int']['output']>;
-  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
-  plateAppearances?: Maybe<Scalars['Int']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  rbi?: Maybe<Scalars['Int']['output']>;
-  runs?: Maybe<Scalars['Int']['output']>;
-  sacrificeFlies?: Maybe<Scalars['String']['output']>;
-  sacrificeHits?: Maybe<Scalars['Int']['output']>;
-  season?: Maybe<Scalars['Int']['output']>;
-  stolenBases?: Maybe<Scalars['Int']['output']>;
-  strikeouts?: Maybe<Scalars['Int']['output']>;
-  triples?: Maybe<Scalars['Int']['output']>;
-};
-
-export type GameFielding = {
-  __typename?: 'GameFielding';
-  assists?: Maybe<Scalars['Int']['output']>;
-  caughtStealing?: Maybe<Scalars['Int']['output']>;
-  doublePlays?: Maybe<Scalars['Int']['output']>;
-  errors?: Maybe<Scalars['Int']['output']>;
-  fieldingPercentage?: Maybe<Scalars['Float']['output']>;
-  gameIdentifier?: Maybe<Scalars['String']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
-  games?: Maybe<Scalars['Int']['output']>;
-  gamesStarted?: Maybe<Scalars['Int']['output']>;
-  inningsPlayed?: Maybe<Scalars['Float']['output']>;
-  passedBalls?: Maybe<Scalars['Int']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  position?: Maybe<Scalars['String']['output']>;
-  putouts?: Maybe<Scalars['Int']['output']>;
-  season?: Maybe<Scalars['Int']['output']>;
-  stolenBasesAllowed?: Maybe<Scalars['Int']['output']>;
-};
-
-export type GamePitching = {
-  __typename?: 'GamePitching';
-  baseOnBalls?: Maybe<Scalars['Int']['output']>;
-  battersFaced?: Maybe<Scalars['Int']['output']>;
-  completeGames?: Maybe<Scalars['Int']['output']>;
-  earnedRuns?: Maybe<Scalars['Int']['output']>;
-  era?: Maybe<Scalars['Float']['output']>;
-  gameIdentifier?: Maybe<Scalars['String']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
-  gamesFinished?: Maybe<Scalars['Int']['output']>;
-  gamesStarted?: Maybe<Scalars['Int']['output']>;
-  hitByPitch?: Maybe<Scalars['Int']['output']>;
-  hits?: Maybe<Scalars['Int']['output']>;
-  homeRuns?: Maybe<Scalars['Int']['output']>;
-  inningsPitched?: Maybe<Scalars['Float']['output']>;
-  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
-  losses?: Maybe<Scalars['Int']['output']>;
-  outsRecorded?: Maybe<Scalars['Int']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  runs?: Maybe<Scalars['Int']['output']>;
-  saves?: Maybe<Scalars['Int']['output']>;
-  season?: Maybe<Scalars['Int']['output']>;
-  shutouts?: Maybe<Scalars['Int']['output']>;
-  strikeouts?: Maybe<Scalars['Int']['output']>;
-  wins?: Maybe<Scalars['Int']['output']>;
-};
-
 /** Head-to-head record between two teams */
 export type HeadToHeadRecord = {
   __typename?: 'HeadToHeadRecord';
@@ -272,7 +199,6 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
-  schedulingStrategy?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
 };
@@ -304,7 +230,6 @@ export type Matchup = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   selectedSeason?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
-  statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
   team1?: Maybe<Team>;
   team1Id?: Maybe<Scalars['Int']['output']>;
@@ -313,40 +238,6 @@ export type Matchup = {
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
-};
-
-/** A player assigned to a matchup (season from league_week_player_seasons) */
-export type MatchupPlayer = {
-  __typename?: 'MatchupPlayer';
-  games?: Maybe<Array<MatchupPlayerGame>>;
-  id?: Maybe<Scalars['ID']['output']>;
-  matchupId?: Maybe<Scalars['Int']['output']>;
-  player?: Maybe<Player>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  positionId?: Maybe<Scalars['Int']['output']>;
-  season?: Maybe<Scalars['Int']['output']>;
-  /** Season batting stats for this player's selected season */
-  seasonBatting?: Maybe<SeasonBatting>;
-  /** Season fielding stats for this player's selected season */
-  seasonFielding?: Maybe<SeasonFielding>;
-  /** Season pitching stats for this player's selected season */
-  seasonPitching?: Maybe<SeasonPitching>;
-  teamId?: Maybe<Scalars['Int']['output']>;
-};
-
-/** Stats from a single game for a player in a matchup */
-export type MatchupPlayerGame = {
-  __typename?: 'MatchupPlayerGame';
-  battingGameNum?: Maybe<Scalars['Int']['output']>;
-  battingStats?: Maybe<GameBatting>;
-  fieldingGameNum?: Maybe<Scalars['Int']['output']>;
-  fieldingGamePos?: Maybe<Scalars['String']['output']>;
-  fieldingStats?: Maybe<GameFielding>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
-  id?: Maybe<Scalars['ID']['output']>;
-  matchupPlayerId?: Maybe<Scalars['Int']['output']>;
-  pitchingGameNum?: Maybe<Scalars['Int']['output']>;
-  pitchingStats?: Maybe<GamePitching>;
 };
 
 export enum MatchupStatus {
@@ -370,12 +261,9 @@ export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<Array<Matchup>>;
-  advanceWeekGames?: Maybe<Scalars['Boolean']['output']>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
-  deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   joinLeagueByCode?: Maybe<Team>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
@@ -394,25 +282,12 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-export type MutationAdvanceLeagueWeekArgs = {
-  leagueId: Scalars['Int']['input'];
-};
-
-export type MutationAdvanceWeekGamesArgs = {
-  leagueId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
-};
-
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
 };
 
 export type MutationCreateMatchupArgs = {
   input: CreateMatchupInput;
-};
-
-export type MutationDeleteLeagueArgs = {
-  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -442,8 +317,8 @@ export type MutationStartDraftArgs = {
 };
 
 export type MutationTriggerGameSelectionArgs = {
+  gameNumber: Scalars['Int']['input'];
   matchupId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -567,7 +442,6 @@ export type Query = {
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
-  getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
@@ -664,10 +538,6 @@ export type QueryGetMatchupHistoryArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<MatchupStatus>;
   teamId?: InputMaybe<Scalars['Int']['input']>;
-};
-
-export type QueryGetMatchupPlayersArgs = {
-  matchupId: Scalars['Int']['input'];
 };
 
 export type QueryGetMatchupStatusCountsArgs = {
@@ -1037,13 +907,6 @@ export type SeasonResults = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
-export enum StatsLoadingStatus {
-  Completed = 'completed',
-  Failed = 'failed',
-  Loading = 'loading',
-  NotStarted = 'not_started',
-}
-
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
@@ -1237,15 +1100,6 @@ export type DeleteAllLeaguesMutation = {
   deleteAllLeagues?: string | null;
 };
 
-export type DeleteLeagueMutationVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
-}>;
-
-export type DeleteLeagueMutation = {
-  __typename?: 'Mutation';
-  deleteLeague?: string | null;
-};
-
 export type StartDraftMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   draftType?: InputMaybe<Scalars['String']['input']>;
@@ -1320,7 +1174,6 @@ export type MatchupFragment = {
   team1Score?: number | null;
   team2Score?: number | null;
   status?: MatchupStatus | null;
-  statsLoadingStatus?: StatsLoadingStatus | null;
   selectedSeason?: number | null;
   gamesPerMatchup?: number | null;
   startTime?: string | null;
@@ -1343,7 +1196,6 @@ export type GetMatchupByIdQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
     selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
@@ -1368,7 +1220,6 @@ export type GetMatchupsForLeagueQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
     selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
@@ -1392,7 +1243,6 @@ export type GetCurrentMatchupForLeagueQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
     selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
@@ -1417,7 +1267,6 @@ export type GetMatchupsByWeekQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
     selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
@@ -1464,573 +1313,11 @@ export type GetMatchupHistoryQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
     selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
     endTime?: string | null;
   }> | null;
-};
-
-export type MatchupPlayerGameFragment = {
-  __typename?: 'MatchupPlayerGame';
-  id?: string | null;
-  matchupPlayerId?: number | null;
-  gameNum?: number | null;
-  battingGameNum?: number | null;
-  fieldingGameNum?: number | null;
-  pitchingGameNum?: number | null;
-  fieldingGamePos?: string | null;
-  battingStats?: {
-    __typename?: 'GameBatting';
-    playerId?: number | null;
-    season?: number | null;
-    gameNum?: number | null;
-    plateAppearances?: number | null;
-    atBats?: number | null;
-    runs?: number | null;
-    hits?: number | null;
-    doubles?: number | null;
-    triples?: number | null;
-    homeRuns?: number | null;
-    rbi?: number | null;
-    stolenBases?: number | null;
-    caughtStealing?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    groundedIntoDoublePlays?: number | null;
-    hitByPitch?: number | null;
-    sacrificeHits?: number | null;
-    intentionalBaseOnBalls?: number | null;
-    battingAverage?: number | null;
-  } | null;
-  pitchingStats?: {
-    __typename?: 'GamePitching';
-    playerId?: number | null;
-    season?: number | null;
-    gameNum?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    gamesStarted?: number | null;
-    gamesFinished?: number | null;
-    completeGames?: number | null;
-    shutouts?: number | null;
-    saves?: number | null;
-    inningsPitched?: number | null;
-    hits?: number | null;
-    runs?: number | null;
-    earnedRuns?: number | null;
-    homeRuns?: number | null;
-    baseOnBalls?: number | null;
-    intentionalBaseOnBalls?: number | null;
-    strikeouts?: number | null;
-    hitByPitch?: number | null;
-    battersFaced?: number | null;
-    outsRecorded?: number | null;
-    era?: number | null;
-  } | null;
-  fieldingStats?: {
-    __typename?: 'GameFielding';
-    playerId?: number | null;
-    season?: number | null;
-    gameNum?: number | null;
-    position?: string | null;
-    games?: number | null;
-    gamesStarted?: number | null;
-    inningsPlayed?: number | null;
-    putouts?: number | null;
-    assists?: number | null;
-    errors?: number | null;
-    doublePlays?: number | null;
-    passedBalls?: number | null;
-    stolenBasesAllowed?: number | null;
-    caughtStealing?: number | null;
-    fieldingPercentage?: number | null;
-  } | null;
-};
-
-export type MatchupPlayerFragment = {
-  __typename?: 'MatchupPlayer';
-  id?: string | null;
-  matchupId?: number | null;
-  playerId?: number | null;
-  season?: number | null;
-  teamId?: number | null;
-  positionId?: number | null;
-  player?: {
-    __typename?: 'Player';
-    id?: number | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    brefId?: string | null;
-  } | null;
-  games?: Array<{
-    __typename?: 'MatchupPlayerGame';
-    id?: string | null;
-    matchupPlayerId?: number | null;
-    gameNum?: number | null;
-    battingGameNum?: number | null;
-    fieldingGameNum?: number | null;
-    pitchingGameNum?: number | null;
-    fieldingGamePos?: string | null;
-    battingStats?: {
-      __typename?: 'GameBatting';
-      playerId?: number | null;
-      season?: number | null;
-      gameNum?: number | null;
-      plateAppearances?: number | null;
-      atBats?: number | null;
-      runs?: number | null;
-      hits?: number | null;
-      doubles?: number | null;
-      triples?: number | null;
-      homeRuns?: number | null;
-      rbi?: number | null;
-      stolenBases?: number | null;
-      caughtStealing?: number | null;
-      baseOnBalls?: number | null;
-      strikeouts?: number | null;
-      groundedIntoDoublePlays?: number | null;
-      hitByPitch?: number | null;
-      sacrificeHits?: number | null;
-      intentionalBaseOnBalls?: number | null;
-      battingAverage?: number | null;
-    } | null;
-    pitchingStats?: {
-      __typename?: 'GamePitching';
-      playerId?: number | null;
-      season?: number | null;
-      gameNum?: number | null;
-      wins?: number | null;
-      losses?: number | null;
-      gamesStarted?: number | null;
-      gamesFinished?: number | null;
-      completeGames?: number | null;
-      shutouts?: number | null;
-      saves?: number | null;
-      inningsPitched?: number | null;
-      hits?: number | null;
-      runs?: number | null;
-      earnedRuns?: number | null;
-      homeRuns?: number | null;
-      baseOnBalls?: number | null;
-      intentionalBaseOnBalls?: number | null;
-      strikeouts?: number | null;
-      hitByPitch?: number | null;
-      battersFaced?: number | null;
-      outsRecorded?: number | null;
-      era?: number | null;
-    } | null;
-    fieldingStats?: {
-      __typename?: 'GameFielding';
-      playerId?: number | null;
-      season?: number | null;
-      gameNum?: number | null;
-      position?: string | null;
-      games?: number | null;
-      gamesStarted?: number | null;
-      inningsPlayed?: number | null;
-      putouts?: number | null;
-      assists?: number | null;
-      errors?: number | null;
-      doublePlays?: number | null;
-      passedBalls?: number | null;
-      stolenBasesAllowed?: number | null;
-      caughtStealing?: number | null;
-      fieldingPercentage?: number | null;
-    } | null;
-  }> | null;
-  seasonBatting?: {
-    __typename?: 'SeasonBatting';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    plateAppearances?: number | null;
-    atBats?: number | null;
-    runs?: number | null;
-    hits?: number | null;
-    doubles?: number | null;
-    triples?: number | null;
-    homeRuns?: number | null;
-    rbi?: number | null;
-    stolenBases?: number | null;
-    caughtStealing?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    groundedIntoDoublePlays?: number | null;
-    hitByPitch?: number | null;
-    sacrificeHits?: number | null;
-    intentionalBaseOnBalls?: number | null;
-  } | null;
-  seasonPitching?: {
-    __typename?: 'SeasonPitching';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    gamesStarted?: number | null;
-    gamesFinished?: number | null;
-    completeGames?: number | null;
-    shutouts?: number | null;
-    saves?: number | null;
-    inningsPitched?: number | null;
-    hits?: number | null;
-    runs?: number | null;
-    earnedRuns?: number | null;
-    homeRuns?: number | null;
-    baseOnBalls?: number | null;
-    intentionalBaseOnBalls?: number | null;
-    strikeouts?: number | null;
-    hitByPitch?: number | null;
-    battersFaced?: number | null;
-    outsRecorded?: number | null;
-  } | null;
-  seasonFielding?: {
-    __typename?: 'SeasonFielding';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    inningsDefended?: number | null;
-    chances?: number | null;
-    putouts?: number | null;
-    assists?: number | null;
-    errors?: number | null;
-    doublePlays?: number | null;
-  } | null;
-};
-
-export type GetMatchupPlayersQueryVariables = Exact<{
-  matchupId: Scalars['Int']['input'];
-}>;
-
-export type GetMatchupPlayersQuery = {
-  __typename?: 'Query';
-  getMatchupPlayers?: Array<{
-    __typename?: 'MatchupPlayer';
-    id?: string | null;
-    matchupId?: number | null;
-    playerId?: number | null;
-    season?: number | null;
-    teamId?: number | null;
-    positionId?: number | null;
-    player?: {
-      __typename?: 'Player';
-      id?: number | null;
-      firstName?: string | null;
-      lastName?: string | null;
-      brefId?: string | null;
-    } | null;
-    games?: Array<{
-      __typename?: 'MatchupPlayerGame';
-      id?: string | null;
-      matchupPlayerId?: number | null;
-      gameNum?: number | null;
-      battingGameNum?: number | null;
-      fieldingGameNum?: number | null;
-      pitchingGameNum?: number | null;
-      fieldingGamePos?: string | null;
-      battingStats?: {
-        __typename?: 'GameBatting';
-        playerId?: number | null;
-        season?: number | null;
-        gameNum?: number | null;
-        plateAppearances?: number | null;
-        atBats?: number | null;
-        runs?: number | null;
-        hits?: number | null;
-        doubles?: number | null;
-        triples?: number | null;
-        homeRuns?: number | null;
-        rbi?: number | null;
-        stolenBases?: number | null;
-        caughtStealing?: number | null;
-        baseOnBalls?: number | null;
-        strikeouts?: number | null;
-        groundedIntoDoublePlays?: number | null;
-        hitByPitch?: number | null;
-        sacrificeHits?: number | null;
-        intentionalBaseOnBalls?: number | null;
-        battingAverage?: number | null;
-      } | null;
-      pitchingStats?: {
-        __typename?: 'GamePitching';
-        playerId?: number | null;
-        season?: number | null;
-        gameNum?: number | null;
-        wins?: number | null;
-        losses?: number | null;
-        gamesStarted?: number | null;
-        gamesFinished?: number | null;
-        completeGames?: number | null;
-        shutouts?: number | null;
-        saves?: number | null;
-        inningsPitched?: number | null;
-        hits?: number | null;
-        runs?: number | null;
-        earnedRuns?: number | null;
-        homeRuns?: number | null;
-        baseOnBalls?: number | null;
-        intentionalBaseOnBalls?: number | null;
-        strikeouts?: number | null;
-        hitByPitch?: number | null;
-        battersFaced?: number | null;
-        outsRecorded?: number | null;
-        era?: number | null;
-      } | null;
-      fieldingStats?: {
-        __typename?: 'GameFielding';
-        playerId?: number | null;
-        season?: number | null;
-        gameNum?: number | null;
-        position?: string | null;
-        games?: number | null;
-        gamesStarted?: number | null;
-        inningsPlayed?: number | null;
-        putouts?: number | null;
-        assists?: number | null;
-        errors?: number | null;
-        doublePlays?: number | null;
-        passedBalls?: number | null;
-        stolenBasesAllowed?: number | null;
-        caughtStealing?: number | null;
-        fieldingPercentage?: number | null;
-      } | null;
-    }> | null;
-    seasonBatting?: {
-      __typename?: 'SeasonBatting';
-      playerId?: number | null;
-      season?: number | null;
-      games?: number | null;
-      plateAppearances?: number | null;
-      atBats?: number | null;
-      runs?: number | null;
-      hits?: number | null;
-      doubles?: number | null;
-      triples?: number | null;
-      homeRuns?: number | null;
-      rbi?: number | null;
-      stolenBases?: number | null;
-      caughtStealing?: number | null;
-      baseOnBalls?: number | null;
-      strikeouts?: number | null;
-      groundedIntoDoublePlays?: number | null;
-      hitByPitch?: number | null;
-      sacrificeHits?: number | null;
-      intentionalBaseOnBalls?: number | null;
-    } | null;
-    seasonPitching?: {
-      __typename?: 'SeasonPitching';
-      playerId?: number | null;
-      season?: number | null;
-      games?: number | null;
-      wins?: number | null;
-      losses?: number | null;
-      gamesStarted?: number | null;
-      gamesFinished?: number | null;
-      completeGames?: number | null;
-      shutouts?: number | null;
-      saves?: number | null;
-      inningsPitched?: number | null;
-      hits?: number | null;
-      runs?: number | null;
-      earnedRuns?: number | null;
-      homeRuns?: number | null;
-      baseOnBalls?: number | null;
-      intentionalBaseOnBalls?: number | null;
-      strikeouts?: number | null;
-      hitByPitch?: number | null;
-      battersFaced?: number | null;
-      outsRecorded?: number | null;
-    } | null;
-    seasonFielding?: {
-      __typename?: 'SeasonFielding';
-      playerId?: number | null;
-      season?: number | null;
-      games?: number | null;
-      inningsDefended?: number | null;
-      chances?: number | null;
-      putouts?: number | null;
-      assists?: number | null;
-      errors?: number | null;
-      doublePlays?: number | null;
-    } | null;
-  }> | null;
-};
-
-export type AdvanceLeagueWeekMutationVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
-}>;
-
-export type AdvanceLeagueWeekMutation = {
-  __typename?: 'Mutation';
-  advanceLeagueWeek?: Array<{
-    __typename?: 'Matchup';
-    id?: string | null;
-    weekNumber?: number | null;
-    leagueId?: number | null;
-    team1Id?: number | null;
-    team2Id?: number | null;
-    team1Score?: number | null;
-    team2Score?: number | null;
-    status?: MatchupStatus | null;
-    statsLoadingStatus?: StatsLoadingStatus | null;
-    selectedSeason?: number | null;
-    gamesPerMatchup?: number | null;
-    startTime?: string | null;
-    endTime?: string | null;
-  }> | null;
-};
-
-export type GetPlayerSeasonStatsQueryVariables = Exact<{
-  playerId: Scalars['Int']['input'];
-  season: Scalars['Int']['input'];
-}>;
-
-export type GetPlayerSeasonStatsQuery = {
-  __typename?: 'Query';
-  playerSeasonBatting?: Array<{
-    __typename?: 'SeasonBatting';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    plateAppearances?: number | null;
-    atBats?: number | null;
-    runs?: number | null;
-    hits?: number | null;
-    doubles?: number | null;
-    triples?: number | null;
-    homeRuns?: number | null;
-    rbi?: number | null;
-    stolenBases?: number | null;
-    caughtStealing?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    groundedIntoDoublePlays?: number | null;
-    hitByPitch?: number | null;
-    sacrificeHits?: number | null;
-    intentionalBaseOnBalls?: number | null;
-  }> | null;
-  playerSeasonPitching?: Array<{
-    __typename?: 'SeasonPitching';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    gamesStarted?: number | null;
-    gamesFinished?: number | null;
-    completeGames?: number | null;
-    shutouts?: number | null;
-    saves?: number | null;
-    inningsPitched?: number | null;
-    hits?: number | null;
-    runs?: number | null;
-    earnedRuns?: number | null;
-    homeRuns?: number | null;
-    baseOnBalls?: number | null;
-    intentionalBaseOnBalls?: number | null;
-    strikeouts?: number | null;
-    hitByPitch?: number | null;
-    battersFaced?: number | null;
-    outsRecorded?: number | null;
-  }> | null;
-  playerSeasonFielding?: Array<{
-    __typename?: 'SeasonFielding';
-    playerId?: number | null;
-    season?: number | null;
-    games?: number | null;
-    inningsDefended?: number | null;
-    chances?: number | null;
-    putouts?: number | null;
-    assists?: number | null;
-    errors?: number | null;
-    doublePlays?: number | null;
-  }> | null;
-};
-
-export type GetAllPlayerSeasonStatsQueryVariables = Exact<{
-  playerId: Scalars['Int']['input'];
-}>;
-
-export type GetAllPlayerSeasonStatsQuery = {
-  __typename?: 'Query';
-  playerSeasonBatting?: Array<{
-    __typename?: 'SeasonBatting';
-    season?: number | null;
-    team?: string | null;
-    games?: number | null;
-    plateAppearances?: number | null;
-    atBats?: number | null;
-    runs?: number | null;
-    hits?: number | null;
-    doubles?: number | null;
-    triples?: number | null;
-    homeRuns?: number | null;
-    rbi?: number | null;
-    stolenBases?: number | null;
-    caughtStealing?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    battingAverage?: number | null;
-    onBasePercentage?: number | null;
-    sluggingPercentage?: number | null;
-  }> | null;
-  playerSeasonPitching?: Array<{
-    __typename?: 'SeasonPitching';
-    season?: number | null;
-    team?: string | null;
-    games?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    gamesStarted?: number | null;
-    completeGames?: number | null;
-    shutouts?: number | null;
-    saves?: number | null;
-    inningsPitched?: number | null;
-    hits?: number | null;
-    runs?: number | null;
-    earnedRuns?: number | null;
-    homeRuns?: number | null;
-    baseOnBalls?: number | null;
-    strikeouts?: number | null;
-    earnedRunAverage?: string | null;
-    whip?: number | null;
-  }> | null;
-  playerSeasonFielding?: Array<{
-    __typename?: 'SeasonFielding';
-    season?: number | null;
-    team?: string | null;
-    position?: string | null;
-    games?: number | null;
-    gamesStarted?: number | null;
-    inningsDefended?: number | null;
-    putouts?: number | null;
-    assists?: number | null;
-    errors?: number | null;
-    doublePlays?: number | null;
-    fieldingPercentage?: number | null;
-  }> | null;
-};
-
-export type TriggerGameSelectionMutationVariables = Exact<{
-  matchupId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
-}>;
-
-export type TriggerGameSelectionMutation = {
-  __typename?: 'Mutation';
-  triggerGameSelection?: boolean | null;
-};
-
-export type AdvanceWeekGamesMutationVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
-}>;
-
-export type AdvanceWeekGamesMutation = {
-  __typename?: 'Mutation';
-  advanceWeekGames?: boolean | null;
 };
 
 export type NotificationPreferenceFragment = {
@@ -2492,161 +1779,11 @@ export const MatchupFragmentDoc = gql`
     team1Score
     team2Score
     status
-    statsLoadingStatus
     selectedSeason
     gamesPerMatchup
     startTime
     endTime
   }
-`;
-export const MatchupPlayerGameFragmentDoc = gql`
-  fragment MatchupPlayerGame on MatchupPlayerGame {
-    id
-    matchupPlayerId
-    gameNum
-    battingGameNum
-    fieldingGameNum
-    pitchingGameNum
-    fieldingGamePos
-    battingStats {
-      playerId
-      season
-      gameNum
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      groundedIntoDoublePlays
-      hitByPitch
-      sacrificeHits
-      intentionalBaseOnBalls
-      battingAverage
-    }
-    pitchingStats {
-      playerId
-      season
-      gameNum
-      wins
-      losses
-      gamesStarted
-      gamesFinished
-      completeGames
-      shutouts
-      saves
-      inningsPitched
-      hits
-      runs
-      earnedRuns
-      homeRuns
-      baseOnBalls
-      intentionalBaseOnBalls
-      strikeouts
-      hitByPitch
-      battersFaced
-      outsRecorded
-      era
-    }
-    fieldingStats {
-      playerId
-      season
-      gameNum
-      position
-      games
-      gamesStarted
-      inningsPlayed
-      putouts
-      assists
-      errors
-      doublePlays
-      passedBalls
-      stolenBasesAllowed
-      caughtStealing
-      fieldingPercentage
-    }
-  }
-`;
-export const MatchupPlayerFragmentDoc = gql`
-  fragment MatchupPlayer on MatchupPlayer {
-    id
-    matchupId
-    playerId
-    season
-    teamId
-    positionId
-    player {
-      id
-      firstName
-      lastName
-      brefId
-    }
-    games {
-      ...MatchupPlayerGame
-    }
-    seasonBatting {
-      playerId
-      season
-      games
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      groundedIntoDoublePlays
-      hitByPitch
-      sacrificeHits
-      intentionalBaseOnBalls
-    }
-    seasonPitching {
-      playerId
-      season
-      games
-      wins
-      losses
-      gamesStarted
-      gamesFinished
-      completeGames
-      shutouts
-      saves
-      inningsPitched
-      hits
-      runs
-      earnedRuns
-      homeRuns
-      baseOnBalls
-      intentionalBaseOnBalls
-      strikeouts
-      hitByPitch
-      battersFaced
-      outsRecorded
-    }
-    seasonFielding {
-      playerId
-      season
-      games
-      inningsDefended
-      chances
-      putouts
-      assists
-      errors
-      doublePlays
-    }
-  }
-  ${MatchupPlayerGameFragmentDoc}
 `;
 export const NotificationPreferenceFragmentDoc = gql`
   fragment NotificationPreference on NotificationPreference {
@@ -3064,54 +2201,6 @@ export type DeleteAllLeaguesMutationResult =
 export type DeleteAllLeaguesMutationOptions = Apollo.BaseMutationOptions<
   DeleteAllLeaguesMutation,
   DeleteAllLeaguesMutationVariables
->;
-export const DeleteLeague = gql`
-  mutation DeleteLeague($leagueId: Int!) {
-    deleteLeague(leagueId: $leagueId)
-  }
-`;
-export type DeleteLeagueMutationFn = Apollo.MutationFunction<
-  DeleteLeagueMutation,
-  DeleteLeagueMutationVariables
->;
-
-/**
- * __useDeleteLeagueMutation__
- *
- * To run a mutation, you first call `useDeleteLeagueMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useDeleteLeagueMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [deleteLeagueMutation, { data, loading, error }] = useDeleteLeagueMutation({
- *   variables: {
- *      leagueId: // value for 'leagueId'
- *   },
- * });
- */
-export function useDeleteLeagueMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    DeleteLeagueMutation,
-    DeleteLeagueMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    DeleteLeagueMutation,
-    DeleteLeagueMutationVariables
-  >(DeleteLeague, options);
-}
-export type DeleteLeagueMutationHookResult = ReturnType<
-  typeof useDeleteLeagueMutation
->;
-export type DeleteLeagueMutationResult =
-  Apollo.MutationResult<DeleteLeagueMutation>;
-export type DeleteLeagueMutationOptions = Apollo.BaseMutationOptions<
-  DeleteLeagueMutation,
-  DeleteLeagueMutationVariables
 >;
 export const StartDraft = gql`
   mutation StartDraft($leagueId: Int!, $draftType: String) {
@@ -3903,505 +2992,6 @@ export type GetMatchupHistorySuspenseQueryHookResult = ReturnType<
 export type GetMatchupHistoryQueryResult = Apollo.QueryResult<
   GetMatchupHistoryQuery,
   GetMatchupHistoryQueryVariables
->;
-export const GetMatchupPlayers = gql`
-  query GetMatchupPlayers($matchupId: Int!) {
-    getMatchupPlayers(matchupId: $matchupId) {
-      ...MatchupPlayer
-    }
-  }
-  ${MatchupPlayerFragmentDoc}
-`;
-
-/**
- * __useGetMatchupPlayersQuery__
- *
- * To run a query within a React component, call `useGetMatchupPlayersQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetMatchupPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetMatchupPlayersQuery({
- *   variables: {
- *      matchupId: // value for 'matchupId'
- *   },
- * });
- */
-export function useGetMatchupPlayersQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    GetMatchupPlayersQuery,
-    GetMatchupPlayersQueryVariables
-  > &
-    (
-      | { variables: GetMatchupPlayersQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    GetMatchupPlayersQuery,
-    GetMatchupPlayersQueryVariables
-  >(GetMatchupPlayers, options);
-}
-export function useGetMatchupPlayersLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetMatchupPlayersQuery,
-    GetMatchupPlayersQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    GetMatchupPlayersQuery,
-    GetMatchupPlayersQueryVariables
-  >(GetMatchupPlayers, options);
-}
-export function useGetMatchupPlayersSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetMatchupPlayersQuery,
-        GetMatchupPlayersQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetMatchupPlayersQuery,
-    GetMatchupPlayersQueryVariables
-  >(GetMatchupPlayers, options);
-}
-export type GetMatchupPlayersQueryHookResult = ReturnType<
-  typeof useGetMatchupPlayersQuery
->;
-export type GetMatchupPlayersLazyQueryHookResult = ReturnType<
-  typeof useGetMatchupPlayersLazyQuery
->;
-export type GetMatchupPlayersSuspenseQueryHookResult = ReturnType<
-  typeof useGetMatchupPlayersSuspenseQuery
->;
-export type GetMatchupPlayersQueryResult = Apollo.QueryResult<
-  GetMatchupPlayersQuery,
-  GetMatchupPlayersQueryVariables
->;
-export const AdvanceLeagueWeek = gql`
-  mutation AdvanceLeagueWeek($leagueId: Int!) {
-    advanceLeagueWeek(leagueId: $leagueId) {
-      ...Matchup
-    }
-  }
-  ${MatchupFragmentDoc}
-`;
-export type AdvanceLeagueWeekMutationFn = Apollo.MutationFunction<
-  AdvanceLeagueWeekMutation,
-  AdvanceLeagueWeekMutationVariables
->;
-
-/**
- * __useAdvanceLeagueWeekMutation__
- *
- * To run a mutation, you first call `useAdvanceLeagueWeekMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useAdvanceLeagueWeekMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [advanceLeagueWeekMutation, { data, loading, error }] = useAdvanceLeagueWeekMutation({
- *   variables: {
- *      leagueId: // value for 'leagueId'
- *   },
- * });
- */
-export function useAdvanceLeagueWeekMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    AdvanceLeagueWeekMutation,
-    AdvanceLeagueWeekMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    AdvanceLeagueWeekMutation,
-    AdvanceLeagueWeekMutationVariables
-  >(AdvanceLeagueWeek, options);
-}
-export type AdvanceLeagueWeekMutationHookResult = ReturnType<
-  typeof useAdvanceLeagueWeekMutation
->;
-export type AdvanceLeagueWeekMutationResult =
-  Apollo.MutationResult<AdvanceLeagueWeekMutation>;
-export type AdvanceLeagueWeekMutationOptions = Apollo.BaseMutationOptions<
-  AdvanceLeagueWeekMutation,
-  AdvanceLeagueWeekMutationVariables
->;
-export const GetPlayerSeasonStats = gql`
-  query GetPlayerSeasonStats($playerId: Int!, $season: Int!) {
-    playerSeasonBatting(playerId: $playerId, season: $season) {
-      playerId
-      season
-      games
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      groundedIntoDoublePlays
-      hitByPitch
-      sacrificeHits
-      intentionalBaseOnBalls
-    }
-    playerSeasonPitching(playerId: $playerId, season: $season) {
-      playerId
-      season
-      games
-      wins
-      losses
-      gamesStarted
-      gamesFinished
-      completeGames
-      shutouts
-      saves
-      inningsPitched
-      hits
-      runs
-      earnedRuns
-      homeRuns
-      baseOnBalls
-      intentionalBaseOnBalls
-      strikeouts
-      hitByPitch
-      battersFaced
-      outsRecorded
-    }
-    playerSeasonFielding(playerId: $playerId, season: $season) {
-      playerId
-      season
-      games
-      inningsDefended
-      chances
-      putouts
-      assists
-      errors
-      doublePlays
-    }
-  }
-`;
-
-/**
- * __useGetPlayerSeasonStatsQuery__
- *
- * To run a query within a React component, call `useGetPlayerSeasonStatsQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetPlayerSeasonStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetPlayerSeasonStatsQuery({
- *   variables: {
- *      playerId: // value for 'playerId'
- *      season: // value for 'season'
- *   },
- * });
- */
-export function useGetPlayerSeasonStatsQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    GetPlayerSeasonStatsQuery,
-    GetPlayerSeasonStatsQueryVariables
-  > &
-    (
-      | { variables: GetPlayerSeasonStatsQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    GetPlayerSeasonStatsQuery,
-    GetPlayerSeasonStatsQueryVariables
-  >(GetPlayerSeasonStats, options);
-}
-export function useGetPlayerSeasonStatsLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetPlayerSeasonStatsQuery,
-    GetPlayerSeasonStatsQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    GetPlayerSeasonStatsQuery,
-    GetPlayerSeasonStatsQueryVariables
-  >(GetPlayerSeasonStats, options);
-}
-export function useGetPlayerSeasonStatsSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetPlayerSeasonStatsQuery,
-        GetPlayerSeasonStatsQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetPlayerSeasonStatsQuery,
-    GetPlayerSeasonStatsQueryVariables
-  >(GetPlayerSeasonStats, options);
-}
-export type GetPlayerSeasonStatsQueryHookResult = ReturnType<
-  typeof useGetPlayerSeasonStatsQuery
->;
-export type GetPlayerSeasonStatsLazyQueryHookResult = ReturnType<
-  typeof useGetPlayerSeasonStatsLazyQuery
->;
-export type GetPlayerSeasonStatsSuspenseQueryHookResult = ReturnType<
-  typeof useGetPlayerSeasonStatsSuspenseQuery
->;
-export type GetPlayerSeasonStatsQueryResult = Apollo.QueryResult<
-  GetPlayerSeasonStatsQuery,
-  GetPlayerSeasonStatsQueryVariables
->;
-export const GetAllPlayerSeasonStats = gql`
-  query GetAllPlayerSeasonStats($playerId: Int!) {
-    playerSeasonBatting(playerId: $playerId) {
-      season
-      team
-      games
-      plateAppearances
-      atBats
-      runs
-      hits
-      doubles
-      triples
-      homeRuns
-      rbi
-      stolenBases
-      caughtStealing
-      baseOnBalls
-      strikeouts
-      battingAverage
-      onBasePercentage
-      sluggingPercentage
-    }
-    playerSeasonPitching(playerId: $playerId) {
-      season
-      team
-      games
-      wins
-      losses
-      gamesStarted
-      completeGames
-      shutouts
-      saves
-      inningsPitched
-      hits
-      runs
-      earnedRuns
-      homeRuns
-      baseOnBalls
-      strikeouts
-      earnedRunAverage
-      whip
-    }
-    playerSeasonFielding(playerId: $playerId) {
-      season
-      team
-      position
-      games
-      gamesStarted
-      inningsDefended
-      putouts
-      assists
-      errors
-      doublePlays
-      fieldingPercentage
-    }
-  }
-`;
-
-/**
- * __useGetAllPlayerSeasonStatsQuery__
- *
- * To run a query within a React component, call `useGetAllPlayerSeasonStatsQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetAllPlayerSeasonStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetAllPlayerSeasonStatsQuery({
- *   variables: {
- *      playerId: // value for 'playerId'
- *   },
- * });
- */
-export function useGetAllPlayerSeasonStatsQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    GetAllPlayerSeasonStatsQuery,
-    GetAllPlayerSeasonStatsQueryVariables
-  > &
-    (
-      | { variables: GetAllPlayerSeasonStatsQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<
-    GetAllPlayerSeasonStatsQuery,
-    GetAllPlayerSeasonStatsQueryVariables
-  >(GetAllPlayerSeasonStats, options);
-}
-export function useGetAllPlayerSeasonStatsLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetAllPlayerSeasonStatsQuery,
-    GetAllPlayerSeasonStatsQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<
-    GetAllPlayerSeasonStatsQuery,
-    GetAllPlayerSeasonStatsQueryVariables
-  >(GetAllPlayerSeasonStats, options);
-}
-export function useGetAllPlayerSeasonStatsSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetAllPlayerSeasonStatsQuery,
-        GetAllPlayerSeasonStatsQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetAllPlayerSeasonStatsQuery,
-    GetAllPlayerSeasonStatsQueryVariables
-  >(GetAllPlayerSeasonStats, options);
-}
-export type GetAllPlayerSeasonStatsQueryHookResult = ReturnType<
-  typeof useGetAllPlayerSeasonStatsQuery
->;
-export type GetAllPlayerSeasonStatsLazyQueryHookResult = ReturnType<
-  typeof useGetAllPlayerSeasonStatsLazyQuery
->;
-export type GetAllPlayerSeasonStatsSuspenseQueryHookResult = ReturnType<
-  typeof useGetAllPlayerSeasonStatsSuspenseQuery
->;
-export type GetAllPlayerSeasonStatsQueryResult = Apollo.QueryResult<
-  GetAllPlayerSeasonStatsQuery,
-  GetAllPlayerSeasonStatsQueryVariables
->;
-export const TriggerGameSelection = gql`
-  mutation TriggerGameSelection($matchupId: Int!, $weekNumber: Int!) {
-    triggerGameSelection(matchupId: $matchupId, weekNumber: $weekNumber)
-  }
-`;
-export type TriggerGameSelectionMutationFn = Apollo.MutationFunction<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
->;
-
-/**
- * __useTriggerGameSelectionMutation__
- *
- * To run a mutation, you first call `useTriggerGameSelectionMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useTriggerGameSelectionMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [triggerGameSelectionMutation, { data, loading, error }] = useTriggerGameSelectionMutation({
- *   variables: {
- *      matchupId: // value for 'matchupId'
- *      weekNumber: // value for 'weekNumber'
- *   },
- * });
- */
-export function useTriggerGameSelectionMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >(TriggerGameSelection, options);
-}
-export type TriggerGameSelectionMutationHookResult = ReturnType<
-  typeof useTriggerGameSelectionMutation
->;
-export type TriggerGameSelectionMutationResult =
-  Apollo.MutationResult<TriggerGameSelectionMutation>;
-export type TriggerGameSelectionMutationOptions = Apollo.BaseMutationOptions<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
->;
-export const AdvanceWeekGames = gql`
-  mutation AdvanceWeekGames($leagueId: Int!, $weekNumber: Int!) {
-    advanceWeekGames(leagueId: $leagueId, weekNumber: $weekNumber)
-  }
-`;
-export type AdvanceWeekGamesMutationFn = Apollo.MutationFunction<
-  AdvanceWeekGamesMutation,
-  AdvanceWeekGamesMutationVariables
->;
-
-/**
- * __useAdvanceWeekGamesMutation__
- *
- * To run a mutation, you first call `useAdvanceWeekGamesMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useAdvanceWeekGamesMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [advanceWeekGamesMutation, { data, loading, error }] = useAdvanceWeekGamesMutation({
- *   variables: {
- *      leagueId: // value for 'leagueId'
- *      weekNumber: // value for 'weekNumber'
- *   },
- * });
- */
-export function useAdvanceWeekGamesMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    AdvanceWeekGamesMutation,
-    AdvanceWeekGamesMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    AdvanceWeekGamesMutation,
-    AdvanceWeekGamesMutationVariables
-  >(AdvanceWeekGames, options);
-}
-export type AdvanceWeekGamesMutationHookResult = ReturnType<
-  typeof useAdvanceWeekGamesMutation
->;
-export type AdvanceWeekGamesMutationResult =
-  Apollo.MutationResult<AdvanceWeekGamesMutation>;
-export type AdvanceWeekGamesMutationOptions = Apollo.BaseMutationOptions<
-  AdvanceWeekGamesMutation,
-  AdvanceWeekGamesMutationVariables
 >;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences($userId: Int!) {

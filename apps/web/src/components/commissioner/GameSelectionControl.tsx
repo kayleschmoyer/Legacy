@@ -9,10 +9,24 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  useAdvanceWeekGamesMutation,
-  useGetMatchupPlayersQuery,
-} from '../../api/db/graphql.generated';
+// import {
+//   useAdvanceWeekGamesMutation,
+//   useGetMatchupPlayersQuery,
+// } from '../../api/db/graphql.generated';
+
+// TODO(LS-53): Placeholders until GraphQL operations are implemented
+/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
+const useAdvanceWeekGamesMutation = (_config?: any) =>
+  [
+    (_params?: any) => Promise.resolve({ data: { advanceWeekGames: false } }),
+    { loading: false },
+  ] as const;
+const useGetMatchupPlayersQuery = (_params?: any) => ({
+  data: { getMatchupPlayers: [] } as any,
+  loading: false,
+  error: undefined,
+});
+/* eslint-enable */
 
 export interface GameSelectionControlProps {
   leagueId: number;
@@ -58,8 +72,10 @@ export function GameSelectionControl({
     // Count unique game numbers that have been selected
     const gameNums = new Set<number>();
 
-    playersData.getMatchupPlayers.forEach((player) => {
-      player.games?.forEach((game) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder types
+    playersData.getMatchupPlayers.forEach((player: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: using placeholder types
+      player.games?.forEach((game: any) => {
         if (
           (game.battingGameNum !== null ||
             game.fieldingGameNum !== null ||
@@ -67,6 +83,7 @@ export function GameSelectionControl({
           game.gameNum !== null &&
           game.gameNum !== undefined
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: game placeholder type
           gameNums.add(game.gameNum);
         }
       });

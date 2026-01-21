@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
 import React, { useState } from 'react';
 import {
   Button,
@@ -11,9 +12,17 @@ import {
 } from 'tamagui';
 import {
   type Matchup,
-  useAdvanceLeagueWeekMutation,
+  // useAdvanceLeagueWeekMutation,
   useGetMatchupsForLeagueQuery,
 } from '../../api/db/graphql.generated';
+
+// TODO(LS-53): Placeholder until useAdvanceLeagueWeekMutation is implemented
+
+const useAdvanceLeagueWeekMutation = () =>
+  [
+    (_params?: any) => Promise.reject(new Error('Not implemented')),
+    { loading: false },
+  ] as const;
 
 export interface MatchupControlProps {
   leagueId: number;

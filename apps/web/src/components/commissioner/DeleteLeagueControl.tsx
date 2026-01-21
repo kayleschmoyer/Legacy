@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -11,7 +12,16 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useDeleteLeagueMutation } from '../../../src/api/db/graphql.generated';
+// import { useDeleteLeagueMutation } from '../../../src/api/db/graphql.generated';
+
+// TODO(LS-53): Placeholder until useDeleteLeagueMutation is implemented in GraphQL schema
+
+const useDeleteLeagueMutation = () =>
+  [
+    (_params?: any) =>
+      Promise.reject(new Error('useDeleteLeagueMutation not yet implemented')),
+    { loading: false },
+  ] as const;
 
 export interface DeleteLeagueControlProps {
   leagueId: number;

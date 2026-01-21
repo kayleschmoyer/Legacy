@@ -56,6 +56,12 @@ export const scoringStatGroup = pgEnum('scoring_stat_group', [
   'fielding',
 ]);
 
+export const schedulingStrategy = pgEnum('scheduling_strategy', [
+  'round-robin',
+  'divisional',
+  'random',
+]);
+
 export const scoringProfileStatus = pgEnum('scoring_profile_status', [
   'draft',
   'active',
@@ -80,10 +86,4 @@ export const rosterLockTiming = pgEnum('roster_lock_timing', [
   'day_before',
   'week_before',
   'custom',
-]);
-
-export const schedulingStrategy = pgEnum('scheduling_strategy', [
-  'round-robin',
-  'divisional',
-  'random',
 ]);

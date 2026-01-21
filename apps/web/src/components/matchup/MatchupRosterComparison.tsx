@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
 import React, { useMemo, useState } from 'react';
 import {
   Card,
@@ -18,8 +19,8 @@ import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
   type MatchupFragment,
-  type MatchupPlayerFragment,
-  useGetMatchupPlayersQuery,
+  // type MatchupPlayerFragment,
+  // useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -28,6 +29,29 @@ import {
   mapFieldingStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
+
+// TODO(LS-53): Placeholders until MatchupPlayerFragment and useGetMatchupPlayersQuery are implemented
+type MatchupPlayerFragment = {
+  id: string;
+  playerId: number;
+  positionId?: number | null;
+  season?: number | null;
+  teamId?: number | null;
+  seasonBatting?: any;
+  seasonPitching?: any;
+  seasonFielding?: any;
+  player?: {
+    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
+  games?: any[];
+};
+const useGetMatchupPlayersQuery = (_params?: any) => ({
+  data: { getMatchupPlayers: [] } as any,
+  loading: false,
+  error: { message: '' } as any,
+});
 
 export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
@@ -101,7 +125,7 @@ export function MatchupRosterComparison({
       'players',
     );
 
-    data.getMatchupPlayers.forEach((matchupPlayer) => {
+    data.getMatchupPlayers.forEach((matchupPlayer: MatchupPlayerFragment) => {
       const playerId = matchupPlayer.playerId;
       const season = matchupPlayer.season;
       const batting = matchupPlayer.seasonBatting;
@@ -338,10 +362,10 @@ export function MatchupRosterComparison({
     }
 
     const team1All = data.getMatchupPlayers.filter(
-      (mp) => mp.teamId === team1Id,
+      (mp: MatchupPlayerFragment) => mp.teamId === team1Id,
     );
     const team2All = data.getMatchupPlayers.filter(
-      (mp) => mp.teamId === team2Id,
+      (mp: MatchupPlayerFragment) => mp.teamId === team2Id,
     );
 
     // Helper to check if a position is a pitcher position
@@ -354,57 +378,69 @@ export function MatchupRosterComparison({
     };
 
     // Separate starters (have positionId) from bench (positionId is null)
-    const team1Starters = team1All.filter((p) => p.positionId !== null);
-    const team1Bench = team1All.filter((p) => p.positionId === null);
-    const team2Starters = team2All.filter((p) => p.positionId !== null);
-    const team2Bench = team2All.filter((p) => p.positionId === null);
+    const team1Starters = team1All.filter(
+      (p: MatchupPlayerFragment) => p.positionId !== null,
+    );
+    const team1Bench = team1All.filter(
+      (p: MatchupPlayerFragment) => p.positionId === null,
+    );
+    const team2Starters = team2All.filter(
+      (p: MatchupPlayerFragment) => p.positionId !== null,
+    );
+    const team2Bench = team2All.filter(
+      (p: MatchupPlayerFragment) => p.positionId === null,
+    );
 
     // Further separate starters into batters and pitchers
     const team1Batters = team1Starters.filter(
-      (p) => !isPitcherPosition(p.positionId),
+      (p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId),
     );
-    const team1Pitchers = team1Starters.filter((p) =>
+    const team1Pitchers = team1Starters.filter((p: MatchupPlayerFragment) =>
       isPitcherPosition(p.positionId),
     );
     const team2Batters = team2Starters.filter(
-      (p) => !isPitcherPosition(p.positionId),
+      (p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId),
     );
-    const team2Pitchers = team2Starters.filter((p) =>
+    const team2Pitchers = team2Starters.filter((p: MatchupPlayerFragment) =>
       isPitcherPosition(p.positionId),
     );
 
     // Calculate totals (only starters count toward matchup score)
     const team1Totals = {
-      actual: team1Starters.reduce((sum, p) => {
+      actual: team1Starters.reduce((sum: any, p: MatchupPlayerFragment) => {
         const gameSum =
-          p.games?.reduce((s, g) => s + calculateGameScore(g), 0) ?? 0;
+          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
+          0;
         return sum + gameSum;
       }, 0),
       projected: team1Starters.reduce(
-        (sum, p) => sum + calculatePlayerProjection(p),
+        (sum: any, p: MatchupPlayerFragment) =>
+          sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
     const team2Totals = {
-      actual: team2Starters.reduce((sum, p) => {
+      actual: team2Starters.reduce((sum: any, p: MatchupPlayerFragment) => {
         const gameSum =
-          p.games?.reduce((s, g) => s + calculateGameScore(g), 0) ?? 0;
+          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
+          0;
         return sum + gameSum;
       }, 0),
       projected: team2Starters.reduce(
-        (sum, p) => sum + calculatePlayerProjection(p),
+        (sum: any, p: MatchupPlayerFragment) =>
+          sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
     // Calculate expected scores based on games played (for color coding totals)
     const team1TotalGamesPlayed = team1Starters.reduce(
-      (sum, p) => sum + (p.games?.length ?? 0),
+      (sum: any, p: MatchupPlayerFragment) => sum + (p.games?.length ?? 0),
       0,
     );
     const team2TotalGamesPlayed = team2Starters.reduce(
-      (sum, p) => sum + (p.games?.length ?? 0),
+      (sum: any, p: MatchupPlayerFragment) => sum + (p.games?.length ?? 0),
       0,
     );
     const team1TotalGamesExpected = team1Starters.length * gamesPerMatchup;

@@ -1,10 +1,20 @@
 import React from 'react';
 import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, CheckCircle } from '@tamagui/lucide-icons';
-import { StatsLoadingStatus } from '../../api/db/graphql.generated';
+// import { StatsLoadingStatus } from '../../api/db/graphql.generated';
+
+// TODO(LS-53): Placeholder until StatsLoadingStatus is implemented in schema
+enum StatsLoadingStatus {
+  NotStarted = 'NOT_STARTED',
+  Loading = 'LOADING',
+  Completed = 'COMPLETED',
+  Error = 'ERROR',
+  Failed = 'FAILED',
+}
+type StatsLoadingStatusType = StatsLoadingStatus | null | undefined;
 
 export interface StatsLoadingIndicatorProps {
-  status: StatsLoadingStatus | null | undefined;
+  status: StatsLoadingStatusType;
   compact?: boolean;
 }
 

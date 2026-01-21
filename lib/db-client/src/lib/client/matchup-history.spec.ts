@@ -28,20 +28,56 @@ function createMockDbChain(finalResult: any): any {
     limit: jest.fn(),
   };
 
-  // Make all methods chain
+  // Make all methods chain and also resolve to finalResult (for functions that don't call orderBy)
   chain.select.mockReturnValue(chain);
   chain.from.mockReturnValue(chain);
-  chain.where.mockReturnValue(chain);
+
+  // where() can be awaited directly OR chained to orderBy()
+  const whereResult = Object.assign(Promise.resolve(finalResult), chain);
+  chain.where.mockReturnValue(whereResult);
+
   chain.orderBy.mockResolvedValue(finalResult);
   chain.limit.mockResolvedValue(finalResult);
 
   return chain;
 }
 
+// Helper to create a mock database that returns different results for multiple sequential queries
+function createMockDbWithSequentialResults(results: any[]): any {
+  const mockDb = {} as any;
+  let callIndex = 0;
+
+  mockDb.select = jest.fn().mockImplementation(() => {
+    const currentResult = results[callIndex] || [];
+    callIndex++;
+
+    const chain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn(),
+      orderBy: jest.fn(),
+      limit: jest.fn(),
+    };
+
+    // where() can be awaited directly OR chained
+    const whereResult = Object.assign(Promise.resolve(currentResult), {
+      orderBy: jest.fn().mockResolvedValue(currentResult),
+      limit: jest.fn().mockResolvedValue(currentResult),
+    });
+    chain.where.mockReturnValue(whereResult);
+    chain.orderBy.mockResolvedValue(currentResult);
+    chain.limit.mockResolvedValue(currentResult);
+
+    return chain;
+  });
+
+  return mockDb;
+}
+
 describe('Matchup History', () => {
   let mockDb: PublicDb;
 
   beforeEach(() => {
+    // Create a fresh mock for each test
     mockDb = createMockDbChain([]) as unknown as PublicDb;
   });
 
@@ -73,19 +109,20 @@ describe('Matchup History', () => {
     });
 
     it('should filter by season', async () => {
-      const filters: MatchupHistoryFilters = {
-        leagueId: 1,
-        season: 2023,
-      };
-
-      (mockDb as any).orderBy = jest.fn().mockResolvedValue([
+      const mockData = [
         {
           id: 1,
           leagueId: 1,
           selectedSeason: 2023,
           status: 'completed',
         },
-      ]);
+      ];
+      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+
+      const filters: MatchupHistoryFilters = {
+        leagueId: 1,
+        season: 2023,
+      };
 
       const results = await queryHistoricalMatchups(mockDb, filters);
 
@@ -94,19 +131,20 @@ describe('Matchup History', () => {
     });
 
     it('should filter by null season', async () => {
-      const filters: MatchupHistoryFilters = {
-        leagueId: 1,
-        season: null,
-      };
-
-      (mockDb as any).orderBy = jest.fn().mockResolvedValue([
+      const mockData = [
         {
           id: 1,
           leagueId: 1,
           selectedSeason: null,
           status: 'completed',
         },
-      ]);
+      ];
+      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+
+      const filters: MatchupHistoryFilters = {
+        leagueId: 1,
+        season: null,
+      };
 
       const results = await queryHistoricalMatchups(mockDb, filters);
 
@@ -114,12 +152,7 @@ describe('Matchup History', () => {
     });
 
     it('should filter by team participation', async () => {
-      const filters: MatchupHistoryFilters = {
-        leagueId: 1,
-        teamId: 5,
-      };
-
-      (mockDb as any).orderBy = jest.fn().mockResolvedValue([
+      const mockData = [
         {
           id: 1,
           leagueId: 1,
@@ -134,7 +167,13 @@ describe('Matchup History', () => {
           team2Id: 5,
           status: 'completed',
         },
-      ]);
+      ];
+      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+
+      const filters: MatchupHistoryFilters = {
+        leagueId: 1,
+        teamId: 5,
+      };
 
       const results = await queryHistoricalMatchups(mockDb, filters);
 
@@ -142,18 +181,19 @@ describe('Matchup History', () => {
     });
 
     it('should filter by status', async () => {
-      const filters: MatchupHistoryFilters = {
-        leagueId: 1,
-        status: 'completed',
-      };
-
-      (mockDb as any).orderBy = jest.fn().mockResolvedValue([
+      const mockData = [
         {
           id: 1,
           leagueId: 1,
           status: 'completed',
         },
-      ]);
+      ];
+      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+
+      const filters: MatchupHistoryFilters = {
+        leagueId: 1,
+        status: 'completed',
+      };
 
       const results = await queryHistoricalMatchups(mockDb, filters);
 
@@ -194,7 +234,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      (mockDb as any).where = jest.fn().mockResolvedValue(mockMatchups);
+      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -221,7 +261,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      (mockDb as any).where = jest.fn().mockResolvedValue(mockMatchups);
+      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -243,7 +283,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      (mockDb as any).where = jest.fn().mockResolvedValue(mockMatchups);
+      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -276,7 +316,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      (mockDb as any).where = jest.fn().mockResolvedValue(mockMatchups);
+      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -326,16 +366,10 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -391,23 +425,15 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const standings = await calculateStandings(mockDb, 1);
 
       expect(standings).toHaveLength(2);
-      const teamA = standings.find((team) => team.teamId === 1);
-      expect(teamA).toBeDefined();
-      expect(teamA.winPercentage).toBe(0.5); // 1 win, 1 loss = 50%
+      expect(standings[0].winPercentage).toBe(0.5); // 1 win, 1 loss = 50%
     });
 
     it('should handle ties in win percentage calculation', async () => {
@@ -428,23 +454,15 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const standings = await calculateStandings(mockDb, 1);
 
-      const teamA = standings.find((team) => team.teamId === 1);
-      expect(teamA).toBeDefined();
-      expect(teamA.ties).toBe(1);
-      expect(teamA.winPercentage).toBe(0.5); // Tie counts as 0.5
+      expect(standings[0].ties).toBe(1);
+      expect(standings[0].winPercentage).toBe(0.5); // Tie counts as 0.5
     });
 
     it('should sort by points for when win percentage is tied', async () => {
@@ -475,16 +493,10 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -521,23 +533,15 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const standings = await calculateStandings(mockDb, 1);
 
-      const teamA = standings.find((team) => team.teamId === 1);
-      expect(teamA).toBeDefined();
-      expect(teamA.averagePointsFor).toBe(90); // (100 + 80) / 2
-      expect(teamA.averagePointsAgainst).toBe(80); // (90 + 70) / 2
+      expect(standings[0].averagePointsFor).toBe(90); // (100 + 80) / 2
+      expect(standings[0].averagePointsAgainst).toBe(80); // (90 + 70) / 2
     });
   });
 
@@ -624,16 +628,10 @@ describe('Matchup History', () => {
         },
       ];
 
-      const mockDbWithSequence = mockDb as any;
-      let callCount = 0;
-      mockDbWithSequence.where = jest.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve(mockTeams);
-        } else {
-          return Promise.resolve(mockMatchups);
-        }
-      });
+      mockDb = createMockDbWithSequentialResults([
+        mockTeams,
+        mockMatchups,
+      ]) as unknown as PublicDb;
 
       const qualifications = await getPlayoffQualifications(mockDb, 1, null, 2);
 
@@ -662,7 +660,7 @@ describe('Matchup History', () => {
         { id: 5, leagueId: 1, status: 'cancelled' },
       ];
 
-      (mockDb as any).where = jest.fn().mockResolvedValue(mockMatchups);
+      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
 
       const counts = await getMatchupStatusCounts(mockDb, 1);
 
@@ -674,7 +672,7 @@ describe('Matchup History', () => {
     });
 
     it('should return zeros when no matchups exist', async () => {
-      (mockDb as any).where = jest.fn().mockResolvedValue([]);
+      mockDb = createMockDbChain([]) as unknown as PublicDb;
 
       const counts = await getMatchupStatusCounts(mockDb, 1);
 

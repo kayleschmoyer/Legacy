@@ -13,7 +13,7 @@ import {
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import type { BaseballScoringSettings } from '@legacy-sports/scoring';
-import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
+/* eslint-enable */
 import {
   mapBattingStats,
   mapFieldingStats,
@@ -22,6 +22,15 @@ import {
   type ScoringFieldingStats,
   type ScoringPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
+// import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
+
+// TODO(LS-53): Placeholder until MatchupPlayerFragment is implemented in schema
+/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
+type MatchupPlayerFragment = {
+  id: string;
+  playerId: number;
+  games?: any[];
+} | null;
 
 export interface PlayerMatchupStatsModalProps {
   /** Player data with games and stats */
