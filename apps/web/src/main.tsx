@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
-import { HashRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 
 // Initialize React Native Web
 import 'react-native-web/dist/cjs/exports/AppRegistry';
@@ -11,7 +11,11 @@ import '@tamagui/font-inter/css/400.css';
 import '@tamagui/font-inter/css/700.css';
 import './styles.css';
 
-import { AppProvider, AuthProvider, EnhancedAuthGuard } from '@legacy-sports/shared-components';
+import {
+  AppProvider,
+  AuthProvider,
+  EnhancedAuthGuard,
+} from '@legacy-sports/shared-components';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
@@ -29,12 +33,14 @@ const authConfig: OAuthConfig = {
 
 function AuthenticatedApp() {
   const initialColorScheme: 'light' | 'dark' =
-    typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
       : 'light';
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AppProvider
         apolloClient={apolloClient}
         colorScheme={initialColorScheme}
@@ -43,7 +49,7 @@ function AuthenticatedApp() {
       >
         <App />
       </AppProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 

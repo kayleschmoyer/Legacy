@@ -279,5 +279,14 @@ node_modules/
 terraform/build/
 terraform/*.zip
 
+# Terraform state files (contain sensitive data)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfvars
+
 # Tamagui generated files
 **/.tamagui/

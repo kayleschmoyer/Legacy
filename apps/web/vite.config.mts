@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production' || isDeployBuild;
 
   // Get build information - fallback to local git if not in CI
-  const commitSha = process.env.VITE_COMMIT_SHA || 
+  const commitSha =
+    process.env.VITE_COMMIT_SHA ||
     process.env.GITHUB_SHA ||
     (() => {
       try {
@@ -29,7 +30,7 @@ export default defineConfig(({ mode }) => {
         return 'dev';
       }
     })();
-  
+
   const appVersion = process.env.VITE_APP_VERSION || '0.0.0';
   const buildDate = new Date().toISOString();
 
@@ -41,12 +42,8 @@ export default defineConfig(({ mode }) => {
     - Commit SHA: ${commitSha}
   `);
 
-  // Determine base path based on deployment target
-  // Custom domain (legacy-fantasy.com) = root path /
-  // GitHub Pages subdirectory (bkrupa.github.io/legacy-sports/) = /legacy-sports/
-  const basePath = process.env.VITE_USE_CUSTOM_DOMAIN === 'true' || isDeployBuild 
-    ? '/' 
-    : (process.env.NODE_ENV === 'production' ? '/legacy-sports/' : '/');
+  // Always use root path since we have a custom domain
+  const basePath = '/';
 
   console.log(`📍 Base Path: ${basePath}`);
 
@@ -112,7 +109,8 @@ export default defineConfig(({ mode }) => {
       outDir: '../../dist/web',
       emptyOutDir: true,
       // Report compressed size for deploy builds to track bundle growth
-      reportCompressedSize: isDeployBuild || process.env.NX_VERBOSE_LOGGING === 'true',
+      reportCompressedSize:
+        isDeployBuild || process.env.NX_VERBOSE_LOGGING === 'true',
       // Enable minification for production and deploy builds
       minify: isProduction ? 'esbuild' : false,
       // Generate sourcemaps for deploy builds to aid debugging
@@ -123,11 +121,13 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           // Better chunk splitting for deploy builds
-          manualChunks: isDeployBuild ? {
-            'react-vendor': ['react', 'react-dom'],
-            'apollo-vendor': ['@apollo/client'],
-            'tamagui-vendor': ['tamagui', '@tamagui/core'],
-          } : undefined,
+          manualChunks: isDeployBuild
+            ? {
+                'react-vendor': ['react', 'react-dom'],
+                'apollo-vendor': ['@apollo/client'],
+                'tamagui-vendor': ['tamagui', '@tamagui/core'],
+              }
+            : undefined,
         },
       },
     },

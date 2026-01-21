@@ -40,9 +40,34 @@ Use Twig's branch tree management features to:
 - Cascade rebases across dependent branches
 - Detect and fix duplicate commits early
 
+<<<<<<< HEAD
+
+- Visualize branch dependencies
+- Verify unique commits per branch
+- Cascade rebases across dependent branches
+- Detect and fix duplicate commits early
+- # ✅ Track rewritten commits that already landed upstream (record old → new after resolving conflicts)
+
 ---
 
+> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
+
 ## 🌳 Understanding the Branch Tree
+
+<<<<<<< HEAD
+When a rebase rewrites a commit because you resolved conflicts, you must capture the old hash before adding it to any skip list. This keeps downstream cascades safe and prevents accidental data loss.
+
+1. **Let Git tell you the offender** – during `git rebase`, note the SHA shown in the “could not apply <sha> …” line.
+2. **Resolve the conflicts normally** – edit files, run `git add`, then `git rebase --continue`.
+3. **Record the replacement** – immediately run `git log -1 --oneline` (or `git rev-parse HEAD`) to grab the new SHA for the rewritten commit.
+4. **Update the skip list** – append a line like `abc1234 # replaced by def5678 on LS-25 after conflict resolution` to `skip-migration-commits-all.txt` (or the skip file you’re using). Only add the _old_ hash after the new commit exists.
+5. **Reuse the list downstream** – pass that skip file (or hash set) to `twig rebase --skip-commits` / cascade scripts so child branches automatically skip the redundant commit.
+
+> **Never pre-populate skip lists with hashes that haven’t actually been rewritten upstream.** If you skip too aggressively you will drop real work, as we saw when the LS-17 tree temporarily lost feature commits.
+
+=======
+
+> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
 
 ### Viewing Your Tree
 
@@ -627,4 +652,29 @@ git merge-base parent current
 
 ---
 
-**Remember**: A clean branch tree is a happy branch tree! 🌳✨
+<<<<<<< HEAD
+
+## 📼 Non-Interactive Rebase Demo (Nov 20, 2025)
+
+The Matchup branch tree (LS-17 → LS-53) was taken through a full, non-interactive cascade to validate the scripted workflow. Each command below was executed from `D:\code\legacy-sports` and produced the noted outcome:
+
+| Step           | Command                                                    | Result       | Notes                                                                              |
+| -------------- | ---------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------- |
+| Cascade rebase | `make rebase-tree-skip SKIP_COMMITS_FILE=skip-commits.txt` | ✅ PASS      | Used the 9 known skip hashes; LS-27 rebased without prompts.                       |
+| Typecheck      | `pnpm exec nx affected -t typecheck`                       | ✅ PASS      | Confirms regenerated GraphQL types compile everywhere.                             |
+| Mobile lint    | `pnpm exec nx run app:lint`                                | ✅ PASS      | Previously unsafe scoring hooks are now fully typed.                               |
+| Skip detection | `make detect-skip-commits`                                 | ⚠️ FOLLOW-UP | Script still reports LS-28–LS-34 and LS-49–LS-53 containing the rewritten commits. |
+
+**Next steps highlighted by the demo**
+
+- Add or confirm the flagged hashes in `skip-commits.txt`, then rerun `make rebase-tree-skip` starting at LS-28 to cascade through LS-53.
+- Repeat `make detect-skip-commits` until every branch prints `[OK]`, capturing the final green transcript for this guide.
+- **Commit the fixes immediately after validation.** Once typecheck/lint/test/build pass, checkpoint the tooling/doc updates and regenerated artifacts so the cascade leaves the repo clean for the next branch.
+- Keep the validation order (typecheck → lint → test/build) after every cascade so regressions surface immediately.
+
+---
+
+=======
+
+> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
+> > > > > > > **Remember**: A clean branch tree is a happy branch tree! 🌳✨

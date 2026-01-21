@@ -74,7 +74,6 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-          VITE_USE_CUSTOM_DOMAIN: "true"
           # Only set Nx Cloud token if DTE is available, otherwise unset to avoid quota errors
           NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
         run: |
