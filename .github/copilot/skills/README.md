@@ -19,15 +19,16 @@ This directory contains structured skill documentation for AI agents working on 
 8. **[Sync Environment](sync-env.md)** - Syncing environment variables from AWS
 
 ### Workflow & Branch Management Skills
-9. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
-10. **[Jira Ticket Management](jira-ticket.md)** - Managing ticket status and workflow
-11. **[Pull Request Creation](create-pr.md)** - Creating PRs with twig
-12. **[Branch Tree Management](branch-tree.md)** - Managing dependent branch trees
+9. **[Complete Workflow: Ticket to PR](workflow-ticket-to-pr.md)** ⭐ **START HERE** - Complete workflow preventing common mistakes
+10. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
+11. **[Jira Ticket Management](jira-ticket.md)** - Managing ticket status and workflow
+12. **[Pull Request Creation](create-pr.md)** - Creating PRs with twig
+13. **[Branch Tree Management](branch-tree.md)** - Managing dependent branch trees
 
 ### Code Generation & Database Skills
-13. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
-14. **[Database Migration](db-migrate.md)** - Running database migrations
-15. **[Database Connection](db-connect.md)** - Testing database connectivity
+14. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
+15. **[Database Migration](db-migrate.md)** - Running database migrations
+16. **[Database Connection](db-connect.md)** - Testing database connectivity
 
 ### Troubleshooting & Maintenance Skills
 16. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck

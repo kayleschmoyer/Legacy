@@ -1,5 +1,16 @@
 # GitHub Copilot Instructions for Legacy Sports
 
+## 🚨 CRITICAL WORKFLOW RULE
+
+**NEVER COMMIT DIRECTLY TO MAIN**
+
+Before making ANY changes to files:
+1. Check current branch: `git branch`
+2. If on main, CREATE feature branch: `twig switch LS-####`
+3. THEN make changes
+
+See: [Complete Workflow: Ticket to PR](copilot/skills/workflow-ticket-to-pr.md) ⭐
+
 ## Overview
 
 This workspace contains a comprehensive set of AI agent documentation and skills for contributing to the Legacy Sports codebase. GitHub Copilot should use these resources to provide accurate, context-aware assistance.
@@ -16,9 +27,18 @@ This file provides:
 
 ## Skills Documentation
 
+**⭐ START HERE**: [Complete Workflow: Ticket to PR](copilot/skills/workflow-ticket-to-pr.md) - Prevents common mistakes
+
 **Location**: [`.github/copilot/skills/`](.github/copilot/skills/)
 
 Structured skill documentation for common development tasks:
+
+### Workflow & Branch Management (CRITICAL)
+- [Complete Workflow: Ticket to PR](copilot/skills/workflow-ticket-to-pr.md) ⭐ **READ THIS FIRST**
+- [Branch Creation](copilot/skills/branch-create.md) - Creating feature branches
+- [Jira Tickets](copilot/skills/jira-ticket.md) - Managing ticket status
+- [Pull Requests](copilot/skills/create-pr.md) - Creating PRs
+- [Branch Trees](copilot/skills/branch-tree.md) - Managing dependent branches
 
 ### Validation & Quality
 - [Type Checking](copilot/skills/typecheck.md) - TypeScript type validation

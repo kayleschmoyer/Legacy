@@ -2,6 +2,19 @@
 
 Welcome! If you're an AI agent working on the Legacy Sports codebase, this is your starting point.
 
+## � CRITICAL: Read This First
+
+**NEVER COMMIT DIRECTLY TO MAIN**
+
+Always create a feature branch before making changes:
+```powershell
+git branch              # Check current branch
+twig switch LS-####     # Create feature branch
+# NOW you can edit files
+```
+
+See: [Complete Workflow Guide](docs/guides/ai-agent-contribution-workflow.md) for full process.
+
 ## 🚀 Quick Start
 
 ### First Time Working on This Project?
@@ -11,7 +24,7 @@ Welcome! If you're an AI agent working on the Legacy Sports codebase, this is yo
 This comprehensive guide covers the complete development lifecycle:
 
 - Planning work with Jira tickets (using `acli`)
-- Creating branches with `twig`
+- Creating branches with `twig` **BEFORE editing files**
 - Implementing changes in the Nx monorepo
 - Running pre-commit validations
 - Committing and creating pull requests
@@ -39,6 +52,13 @@ This comprehensive guide covers the complete development lifecycle:
 
 Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/copilot/skills/):
 
+**Workflow & Branch Management**:
+- [Complete Workflow: Ticket to PR](.github/copilot/skills/workflow-ticket-to-pr.md) ⭐ **READ THIS FIRST**
+- [Branch Creation](.github/copilot/skills/branch-create.md) - Creating feature branches
+- [Jira Tickets](.github/copilot/skills/jira-ticket.md) - Managing ticket status
+- [Pull Requests](.github/copilot/skills/create-pr.md) - Creating PRs
+- [Branch Trees](.github/copilot/skills/branch-tree.md) - Managing dependent branches
+
 **Validation & Quality**:
 - [Type Checking](.github/copilot/skills/typecheck.md) - TypeScript validation
 - [Linting](.github/copilot/skills/lint.md) - ESLint code quality
@@ -50,12 +70,6 @@ Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/co
 - [Dev Web Server](.github/copilot/skills/dev-web.md) - Next.js dev server
 - [Dev DB Lambda](.github/copilot/skills/dev-db-lambda.md) - Local GraphQL Lambda
 - [Sync Environment](.github/copilot/skills/sync-env.md) - AWS env sync
-
-**Workflow & Branches**:
-- [Branch Creation](.github/copilot/skills/branch-create.md) - Creating feature branches
-- [Jira Tickets](.github/copilot/skills/jira-ticket.md) - Managing ticket status
-- [Pull Requests](.github/copilot/skills/create-pr.md) - Creating PRs
-- [Branch Trees](.github/copilot/skills/branch-tree.md) - Managing dependent branches
 
 **Code & Database**:
 - [GraphQL Codegen](.github/copilot/skills/codegen.md) - Regenerating types
