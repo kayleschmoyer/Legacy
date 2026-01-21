@@ -81,7 +81,7 @@ builder.objectType(PlayoffBracket, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, bracket.championTeamId))
+            .where(eq(PublicSchema.teams.id, bracket.championTeamId ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -168,7 +168,7 @@ builder.objectType(PlayoffMatchup, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId))
+            .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -187,7 +187,7 @@ builder.objectType(PlayoffMatchup, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId))
+            .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -206,7 +206,7 @@ builder.objectType(PlayoffMatchup, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.winnerTeamId))
+            .where(eq(PublicSchema.teams.id, matchup.winnerTeamId ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -325,7 +325,7 @@ builder.objectType(ChampionTrophy, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId))
+            .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -516,9 +516,9 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
             .limit(1);
 
           if (matchup[0]) {
-            if (args.highSeedScore > args.lowSeedScore) {
+            if ((args.highSeedScore ?? 0) > (args.lowSeedScore ?? 0)) {
               updateData.winnerTeamId = matchup[0].highSeedTeamId;
-            } else if (args.lowSeedScore > args.highSeedScore) {
+            } else if ((args.lowSeedScore ?? 0) > (args.highSeedScore ?? 0)) {
               updateData.winnerTeamId = matchup[0].lowSeedTeamId;
             }
             updateData.status = 'completed';

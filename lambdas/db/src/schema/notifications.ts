@@ -191,7 +191,7 @@ builder.queryField('getNotificationHistory', (t) =>
     },
     resolve: async (_parent, args) => {
       return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUserNotificationHistory(db, args.userId, args.limit);
+        return await getUserNotificationHistory(db, args.userId, args.limit ?? undefined);
       });
     },
   }),
@@ -235,13 +235,13 @@ builder.mutationField('updateNotificationPreferences', (t) =>
     resolve: async (_parent, args) => {
       return await runWithPublicClient(getDbOptions(), async (db) => {
         const input: NotificationPreferenceInputType = {
-          matchupStartedEnabled: args.input.matchupStartedEnabled,
-          matchupEndedEnabled: args.input.matchupEndedEnabled,
-          matchupCloseGameEnabled: args.input.matchupCloseGameEnabled,
-          matchupReminderEnabled: args.input.matchupReminderEnabled,
-          pushEnabled: args.input.pushEnabled,
-          emailEnabled: args.input.emailEnabled,
-          closeGameThreshold: args.input.closeGameThreshold,
+          matchupStartedEnabled: args.input.matchupStartedEnabled ?? undefined,
+          matchupEndedEnabled: args.input.matchupEndedEnabled ?? undefined,
+          matchupCloseGameEnabled: args.input.matchupCloseGameEnabled ?? undefined,
+          matchupReminderEnabled: args.input.matchupReminderEnabled ?? undefined,
+          pushEnabled: args.input.pushEnabled ?? undefined,
+          emailEnabled: args.input.emailEnabled ?? undefined,
+          closeGameThreshold: args.input.closeGameThreshold ?? undefined,
         };
         return await updateNotificationPreferences(db, args.userId, input);
       });
@@ -261,7 +261,7 @@ builder.mutationField('registerDeviceToken', (t) =>
           userId: args.input.userId,
           deviceToken: args.input.deviceToken,
           platform: args.input.platform as 'ios' | 'android' | 'expo',
-          endpointArn: args.input.endpointArn,
+          endpointArn: args.input.endpointArn ?? undefined,
         };
         return await registerDeviceToken(db, input);
       });

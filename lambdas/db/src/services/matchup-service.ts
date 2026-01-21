@@ -118,7 +118,10 @@ export class MatchupService {
         if (!teamPlayerMap.has(tm.teamId)) {
           teamPlayerMap.set(tm.teamId, []);
         }
-        teamPlayerMap.get(tm.teamId).push(tm.playerId);
+        const playerList = teamPlayerMap.get(tm.teamId);
+        if (playerList) {
+          playerList.push(tm.playerId);
+        }
       }
 
       for (const teamId of teamIds) {

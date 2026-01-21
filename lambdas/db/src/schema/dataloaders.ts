@@ -446,7 +446,10 @@ const createMatchupPlayerGamesLoader = () =>
       if (!gamesMap.has(matchupPlayerId)) {
         gamesMap.set(matchupPlayerId, []);
       }
-      gamesMap.get(matchupPlayerId).push(game);
+      const games = gamesMap.get(matchupPlayerId);
+      if (games) {
+        games.push(game);
+      }
     });
 
     // Return results in the same order as keys (empty array if no games)

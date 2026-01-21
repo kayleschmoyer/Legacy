@@ -178,7 +178,7 @@ LeagueMember.implement({
                 leagueId: PublicSchema.teams.leagueId,
               })
               .from(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.id, parent.teamId))
+              .where(eq(PublicSchema.teams.id, parent.teamId ?? 0))
               .limit(1);
 
             return results.length > 0 ? results[0] : null;
@@ -1456,7 +1456,7 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
                 teamId: null as number | null,
                 leagueId: 0,
                 playerId: 0,
-                positionId: positionId,
+                positionId: positionId ?? null,
               },
             ];
 

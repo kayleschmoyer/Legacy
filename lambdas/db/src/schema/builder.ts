@@ -104,7 +104,6 @@ export const builder = new SchemaBuilder<{
 }>({
   plugins: [RelayPlugin, DataloaderPlugin, ValidationPlugin],
   validation: {},
-  notStrict: "Pothos may not work correctly when strict mode is not enabled in tsconfig.json",
 });
 
 // Create the basic Query type (types will be added by separate files)

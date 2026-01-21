@@ -48,7 +48,7 @@ async function startServer() {
     });
     LOGGER.info('✅ Database connection successful!');
   } catch (error) {
-    LOGGER.error(`❌ Database connection failed: ${error}`);
+    LOGGER.error(`❌ Database connection failed: ${error instanceof Error ? error.message : String(error)}`);
     LOGGER.info(
       '📝 Make sure your .env.local file has the correct database credentials',
     );
@@ -112,7 +112,7 @@ async function startServer() {
             };
           }
         } catch (error) {
-          LOGGER.warn(`Failed to decode JWT: ${error}`);
+          LOGGER.warn(`Failed to decode JWT: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 

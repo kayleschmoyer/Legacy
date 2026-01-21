@@ -65,7 +65,7 @@ builder.objectType(Matchup, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.team1Id))
+            .where(eq(PublicSchema.teams.id, matchup.team1Id ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -84,7 +84,7 @@ builder.objectType(Matchup, {
               leagueId: PublicSchema.teams.leagueId,
             })
             .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.team2Id))
+            .where(eq(PublicSchema.teams.id, matchup.team2Id ?? 0))
             .limit(1);
           return results[0] || null;
         });
@@ -680,8 +680,8 @@ builder.queryField('getMatchupHistory', (t) =>
       return await StandingsService.getMatchupHistory({
         leagueId: args.leagueId,
         season: args.season,
-        teamId: args.teamId,
-        status: args.status,
+        teamId: args.teamId ?? undefined,
+        status: args.status ?? undefined,
         limit: args.limit ?? undefined,
       });
     },

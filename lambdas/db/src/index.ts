@@ -207,7 +207,9 @@ const baseHandler = startServerAndCreateLambdaHandler(
             };
           }
         } catch (error) {
-          console.warn(`Failed to decode JWT: ${error}`);
+          console.warn(
+            `Failed to decode JWT: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
 
