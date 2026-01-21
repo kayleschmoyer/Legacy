@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
+  "useDaemonProcess": true,
+  "nxCloudAccessToken": "$(NX_CLOUD_ACCESS_TOKEN)",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
