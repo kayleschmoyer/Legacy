@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, H4, Text, XStack, YStack } from 'tamagui';
-import { StatsLoadingIndicator } from './StatsLoadingIndicator';
 import {
   type MatchupFragment,
   MatchupStatus,
@@ -25,15 +24,8 @@ export function MatchupCard({
     return null;
   }
 
-  const {
-    weekNumber,
-    team1Score,
-    team2Score,
-    status,
-    // statsLoadingStatus, // TODO(LS-53): Property not yet in MatchupFragment
-    selectedSeason,
-  } = matchup;
-  const statsLoadingStatus = null; // Placeholder
+  const { weekNumber, team1Score, team2Score, status, selectedSeason } =
+    matchup;
 
   const getStatusColor = () => {
     switch (status) {
@@ -95,11 +87,6 @@ export function MatchupCard({
       </Card.Header>
 
       <YStack padding="$3" space="$2">
-        {/* Stats Loading Indicator */}
-        {statsLoadingStatus && (
-          <StatsLoadingIndicator status={statsLoadingStatus} compact />
-        )}
-
         {/* Team 1 */}
         <XStack justifyContent="space-between" alignItems="center">
           <H4 flex={1}>Team 1</H4>

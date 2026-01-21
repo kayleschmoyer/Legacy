@@ -712,7 +712,6 @@ export function LeagueDetailPage(): React.JSX.Element {
               ? parseInt(currentMatchup.id, 10)
               : currentMatchup.id
           }
-          weekNumber={currentMatchup.weekNumber}
           gamesPerMatchup={currentMatchup.gamesPerMatchup ?? 1}
           onSuccess={() => {
             setMatchupSuccessMessage('Game selection triggered successfully!');

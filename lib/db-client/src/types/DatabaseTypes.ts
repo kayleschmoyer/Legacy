@@ -17,6 +17,7 @@ import {
   leagueScoringChangeLog,
   leagueScoringProfileEntries,
   leagueScoringProfiles,
+  matchupPlayerGames,
   matchupPlayers,
   matchups,
   playerEligiblePositions,
@@ -54,6 +55,7 @@ export type GamePitching = typeof gamePitching.$inferSelect;
 export type InternalUser = typeof usersInAppInternal.$inferSelect;
 export type Matchup = typeof matchups.$inferSelect;
 export type MatchupPlayer = typeof matchupPlayers.$inferSelect;
+export type MatchupPlayerGame = typeof matchupPlayerGames.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type SeasonBatting = typeof seasonBatting.$inferSelect;
 export type SeasonFielding = typeof seasonFielding.$inferSelect;

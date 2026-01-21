@@ -39,7 +39,7 @@ const baseSelectGameHandler = async (
 
   const failures: SQSBatchItemFailure[] = [];
 
-  try {
+  await withDb(async (db) => {
     for (const record of event.Records) {
       try {
         const matchup = JSON.parse(record.body) as SelectGameEvent;
@@ -57,9 +57,7 @@ const baseSelectGameHandler = async (
 
         // Use the new season-game-selector service which automatically
         // uses the matchup's selected_season field
-        await withDb(async (db) => {
-          await selectGamesForMatchup(db, matchup.matchupId, matchup.game);
-        });
+        await selectGamesForMatchup(db, matchup.matchupId, matchup.game);
 
         LOGGER.info('Successfully selected games for matchup', {
           matchupId: matchup.matchupId,
@@ -84,12 +82,7 @@ const baseSelectGameHandler = async (
         });
       }
     }
-  } catch (err) {
-    LOGGER.error('Fatal error processing batch', {
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
-  }
+  });
 
   return {
     batchItemFailures: failures,

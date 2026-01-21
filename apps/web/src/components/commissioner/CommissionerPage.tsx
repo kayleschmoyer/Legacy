@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, H3, Separator, Text, XStack, YStack } from 'tamagui';
-import { useGetLeagueByIdQuery } from '../../api/db/graphql.generated';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { GameSelectionControl } from '../commissioner/GameSelectionControl';
-import { MatchupControl } from '../commissioner/MatchupControl';
-import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 
 /**
  * CommissionerPage - Commissioner controls for league management
@@ -20,16 +17,8 @@ export function CommissionerPage() {
   const leagueIdNum = leagueId ? parseInt(leagueId, 10) : null;
   const { matchup, loading, error, refetch } = useCurrentMatchup(leagueIdNum);
 
-  // Fetch league data for delete control
-  const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
-    variables: { id: leagueIdNum ?? 0 },
-    skip: !leagueIdNum,
-  });
-
-  const league = leagueData?.league;
-
-  const handleSuccess = (message?: string) => {
-    setSuccessMessage(message ?? 'Operation completed successfully!');
+  const handleSuccess = () => {
+    setSuccessMessage('Game selection triggered successfully!');
     setErrorMessage(null);
     void refetch();
     setTimeout(() => setSuccessMessage(null), 5000);
@@ -94,26 +83,6 @@ export function CommissionerPage() {
 
       <Separator />
 
-      {/* Matchup Management Section */}
-      <YStack space="$3">
-        <H3>Matchup Management</H3>
-
-        {loading ? (
-          <Text color="$gray11">Loading current matchup...</Text>
-        ) : error ? (
-          <Text color="$red10">Error loading matchup: {error.message}</Text>
-        ) : (
-          <MatchupControl
-            leagueId={leagueIdNum ?? 0}
-            currentMatchup={matchup}
-            onSuccess={() => handleSuccess('Matchup updated successfully!')}
-            onError={handleError}
-          />
-        )}
-      </YStack>
-
-      <Separator />
-
       {/* Game Selection Section */}
       <YStack space="$3">
         <H3>Automated Game Selection</H3>
@@ -122,7 +91,7 @@ export function CommissionerPage() {
           <Text color="$gray11">Loading current matchup...</Text>
         ) : error ? (
           <Text color="$red10">Error loading matchup: {error.message}</Text>
-        ) : matchup && matchup.id && matchup.weekNumber ? (
+        ) : matchup && matchup.id ? (
           <GameSelectionControl
             leagueId={leagueIdNum ?? 0}
             matchupId={
@@ -130,11 +99,8 @@ export function CommissionerPage() {
                 ? parseInt(matchup.id, 10)
                 : matchup.id
             }
-            weekNumber={matchup.weekNumber}
             gamesPerMatchup={matchup.gamesPerMatchup ?? 1}
-            onSuccess={() =>
-              handleSuccess('Game selection triggered successfully!')
-            }
+            onSuccess={handleSuccess}
             onError={handleError}
           />
         ) : (
@@ -150,24 +116,26 @@ export function CommissionerPage() {
 
       <Separator />
 
-      {/* Delete League Section */}
+      {/* Other Commissioner Tools (Placeholder) */}
       <YStack space="$3">
-        <H3>League Management</H3>
-
-        {leagueLoading ? (
-          <Text color="$gray11">Loading league data...</Text>
-        ) : league ? (
-          <DeleteLeagueControl
-            leagueId={leagueIdNum ?? 0}
-            leagueName={league.name ?? 'Unknown League'}
-            onSuccess={() =>
-              handleSuccess('League deleted successfully! Redirecting...')
-            }
-            onError={handleError}
-          />
-        ) : (
-          <Text color="$red10">Error loading league data</Text>
-        )}
+        <H3>Other Commissioner Tools</H3>
+        <Text color="$gray11">
+          Additional commissioner features coming soon:
+        </Text>
+        <YStack space="$2" paddingLeft="$4">
+          <Text fontSize="$3" color="$gray10">
+            • Matchup scheduling configuration
+          </Text>
+          <Text fontSize="$3" color="$gray10">
+            • League settings management
+          </Text>
+          <Text fontSize="$3" color="$gray10">
+            • Team management
+          </Text>
+          <Text fontSize="$3" color="$gray10">
+            • Playoff bracket configuration
+          </Text>
+        </YStack>
       </YStack>
     </YStack>
   );

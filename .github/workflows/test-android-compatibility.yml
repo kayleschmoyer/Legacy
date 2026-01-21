@@ -105,7 +105,7 @@ jobs:
 
     steps:
       - name: "🚀 Checkout Repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
@@ -137,7 +137,7 @@ jobs:
 
       # Android-specific cache for matrix testing
       - name: "📦 Cache Gradle Dependencies"
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/wrapper

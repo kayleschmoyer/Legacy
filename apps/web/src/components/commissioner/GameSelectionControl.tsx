@@ -1,37 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Button,
   Card,
   Dialog,
   H4,
+  Input,
   Separator,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
-// import {
-//   useAdvanceWeekGamesMutation,
-//   useGetMatchupPlayersQuery,
-// } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholders until GraphQL operations are implemented
-/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
-const useAdvanceWeekGamesMutation = (_config?: any) =>
-  [
-    (_params?: any) => Promise.resolve({ data: { advanceWeekGames: false } }),
-    { loading: false },
-  ] as const;
-const useGetMatchupPlayersQuery = (_params?: any) => ({
-  data: { getMatchupPlayers: [] } as any,
-  loading: false,
-  error: undefined,
-});
-/* eslint-enable */
 
 export interface GameSelectionControlProps {
   leagueId: number;
   matchupId: number;
-  weekNumber: number;
   gamesPerMatchup: number;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
@@ -39,80 +21,53 @@ export interface GameSelectionControlProps {
 
 /**
  * GameSelectionControl - Commissioner control for triggering game selection
- * Includes game selection count display, button to trigger, and confirmation dialog
+ * Includes game number input, confirmation dialog, and progress indicator
+ *
+ * NOTE: Requires triggerGameSelection mutation to be implemented in GraphQL API
  */
 export function GameSelectionControl({
   leagueId,
   matchupId,
-  weekNumber,
   gamesPerMatchup,
   onSuccess,
   onError,
 }: GameSelectionControlProps) {
+  const [gameNumber, setGameNumber] = useState<string>('1');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-
-  // Query matchup players to check game selection status
-  const { data: playersData, loading: playersLoading } =
-    useGetMatchupPlayersQuery({
-      variables: { matchupId },
-      skip: !matchupId,
-    });
-
-  // Mutation to advance week games (select next game for all matchups)
-  const [advanceWeekGames, { loading: mutationLoading }] =
-    useAdvanceWeekGamesMutation({
-      refetchQueries: ['GetMatchupPlayers'],
-      awaitRefetchQueries: true,
-    });
-
-  // Calculate how many games have been selected
-  const selectedGamesCount = useMemo(() => {
-    if (!playersData?.getMatchupPlayers) return 0;
-
-    // Count unique game numbers that have been selected
-    const gameNums = new Set<number>();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder types
-    playersData.getMatchupPlayers.forEach((player: any) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: using placeholder types
-      player.games?.forEach((game: any) => {
-        if (
-          (game.battingGameNum !== null ||
-            game.fieldingGameNum !== null ||
-            game.pitchingGameNum !== null) &&
-          game.gameNum !== null &&
-          game.gameNum !== undefined
-        ) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: game placeholder type
-          gameNums.add(game.gameNum);
-        }
-      });
-    });
-
-    return gameNums.size;
-  }, [playersData]);
-
-  const allGamesSelected = selectedGamesCount >= gamesPerMatchup;
-  const loading = playersLoading || mutationLoading;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleTriggerSelection = async () => {
-    try {
-      const result = await advanceWeekGames({
-        variables: {
-          leagueId,
-          weekNumber,
-        },
-      });
+    const gameNum = parseInt(gameNumber, 10);
 
-      if (result.data?.advanceWeekGames) {
-        setShowConfirmDialog(false);
-        onSuccess?.();
-      } else {
-        throw new Error('Game selection failed');
-      }
+    if (isNaN(gameNum) || gameNum < 1 || gameNum > gamesPerMatchup) {
+      setError(`Game number must be between 1 and ${gamesPerMatchup}`);
+      onError?.(
+        new Error(`Game number must be between 1 and ${gamesPerMatchup}`),
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // TODO: Implement triggerGameSelection mutation in GraphQL API
+      // const result = await triggerGameSelection({
+      //   variables: { leagueId, matchupId, gameNumber: gameNum },
+      // });
+
+      // Placeholder for now
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setShowConfirmDialog(false);
+      setLoading(false);
+      onSuccess?.();
     } catch (err) {
+      setError((err as Error).message);
       onError?.(err as Error);
       setShowConfirmDialog(false);
+      setLoading(false);
     }
   };
 
@@ -128,52 +83,39 @@ export function GameSelectionControl({
 
         <Separator />
 
-        <YStack space="$3">
-          {/* Game Selection Status */}
-          <YStack space="$2">
-            <Text fontSize="$3" color="$gray11">
-              Games Selected (Current Matchup):
-            </Text>
-            <XStack space="$2" alignItems="center">
-              <Text
-                fontSize="$6"
-                fontWeight="bold"
-                color={allGamesSelected ? '$green11' : '$blue11'}
-              >
-                {selectedGamesCount} / {gamesPerMatchup}
-              </Text>
-              {allGamesSelected && (
-                <Text fontSize="$3" color="$green11" fontWeight="600">
-                  ✓ Complete
-                </Text>
-              )}
-            </XStack>
-          </YStack>
+        <YStack space="$2">
+          <Text fontSize="$3" color="$gray11">
+            Select which game number to trigger selection for (1-
+            {gamesPerMatchup}):
+          </Text>
 
-          {/* Trigger Button */}
-          <XStack space="$2" alignItems="center">
+          <XStack space="$2" alignItems="center" flexWrap="wrap">
+            <Input
+              placeholder="Game number"
+              value={gameNumber}
+              onChangeText={setGameNumber}
+              width={120}
+              size="$4"
+              inputMode="numeric"
+            />
+
             <Button
               theme="blue"
               onPress={() => setShowConfirmDialog(true)}
-              disabled={loading || allGamesSelected}
-              opacity={allGamesSelected ? 0.5 : 1}
+              disabled={loading}
             >
-              {loading
-                ? 'Processing...'
-                : `Advance Week Games (Week ${weekNumber})`}
+              {loading ? 'Selecting...' : 'Trigger Selection'}
             </Button>
-
-            {allGamesSelected && (
-              <Text fontSize="$2" color="$gray10">
-                All games already selected
-              </Text>
-            )}
           </XStack>
 
+          {error && (
+            <Text fontSize="$3" color="$red10">
+              Error: {error}
+            </Text>
+          )}
+
           <Text fontSize="$2" color="$gray10">
-            Selects the next game number for ALL matchups in week {weekNumber}.
-            {!allGamesSelected &&
-              ' Each click advances one game (game 1, then game 2, etc.).'}
+            This will automatically select games for all teams in the matchup.
           </Text>
         </YStack>
 
@@ -204,21 +146,11 @@ export function GameSelectionControl({
               gap="$3"
               maxWidth={500}
             >
-              <Dialog.Title>Confirm Advance Week Games</Dialog.Title>
+              <Dialog.Title>Confirm Game Selection</Dialog.Title>
               <Dialog.Description>
-                Are you sure you want to advance games for week {weekNumber}?
-                <Text
-                  display="block"
-                  marginTop="$2"
-                  fontWeight="bold"
-                  color="$orange11"
-                >
-                  This will select game {selectedGamesCount + 1} for ALL
-                  matchups in week {weekNumber}.
-                </Text>
-                <Text display="block" marginTop="$2" color="$gray11">
-                  Current progress: {selectedGamesCount} of {gamesPerMatchup}{' '}
-                  games selected.
+                Are you sure you want to trigger game selection #{gameNumber}?
+                <Text display="block" marginTop="$2" fontWeight="bold">
+                  This will select games for all teams in matchup {matchupId}.
                 </Text>
               </Dialog.Description>
 
@@ -231,7 +163,7 @@ export function GameSelectionControl({
                   onPress={handleTriggerSelection}
                   disabled={loading}
                 >
-                  {loading ? 'Triggering...' : 'Confirm'}
+                  {loading ? 'Selecting...' : 'Confirm'}
                 </Button>
               </XStack>
             </Dialog.Content>
