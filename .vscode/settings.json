@@ -10,5 +10,37 @@
       "command": "twig",
       "args": ["mcp-server"]
     }
-  }
+  },
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.nx": true,
+    "**/android/build": true,
+    "**/android/.gradle": true,
+    "**/playwright-report": true,
+    "**/logs": true,
+    "**/tmp": true,
+    "**/certs": true,
+    "**/resources": true,
+    "**/.tamagui": true,
+    "**/terraform.tfstate*": true,
+    "**/*.log": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.nx/**": true,
+    "**/android/build/**": true,
+    "**/android/.gradle/**": true,
+    "**/playwright-report/**": true,
+    "**/logs/**": true,
+    "**/tmp/**": true,
+    "**/certs/**": true,
+    "**/resources/**": true,
+    "**/.tamagui/**": true,
+    "**/*.log": true
+  },
+  "typescript.tsserver.maxTsServerMemory": 8192,
+  "typescript.preferences.excludeLibrarySymbolsInNavTo": true
 }
