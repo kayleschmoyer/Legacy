@@ -38,6 +38,9 @@ This directory contains structured skill documentation for AI agents working on 
 19. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
 20. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
+### CLI & Administrative Tools
+21. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
+
 ## Skill Structure
 
 Each skill document follows this structure:
@@ -98,11 +101,21 @@ npm start
 
 # Start DB Lambda locally
 pnpm exec nx run db:serve
-# Building only
-pnpm exec nx affected -t build
+```
 
-# Formatting (entire project)
-pnpm exec prettier --write .
+### CLI Tools
+```powershell
+# Test database connection
+pnpm run cli:test-connection
+
+# List all players
+pnpm run cli:list-players
+
+# Add a new user
+pnpm exec nx start cli -- add-user --email "user@example.com" --username "username"
+
+# Authenticate CLI for GraphQL operations
+pnpm exec nx start cli -- auth login
 ```
 
 ## Why This Order Matters
