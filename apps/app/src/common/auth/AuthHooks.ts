@@ -111,10 +111,10 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     async (response: OAuthResponse) => {
       try {
         const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
-        
+
         // Handle both web (code/credential) and mobile (serverAuthCode) responses
         const authPayload: { code?: string; credential?: string } = {};
-        
+
         if (response.code) {
           // Authorization code flow (web and mobile)
           authPayload.code = response.code;
@@ -125,7 +125,9 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
           // Web ID token from One Tap
           authPayload.credential = response.credential;
         } else {
-          throw new Error('No valid authentication code or credential received');
+          throw new Error(
+            'No valid authentication code or credential received',
+          );
         }
 
         const tokenResponse = await axios.post<OAuthProxyTokens>(
@@ -141,7 +143,9 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       } catch (error) {
         console.error('Authentication success handler error:', error);
         if (onFailure) {
-          onFailure(error instanceof Error ? error.message : 'Authentication failed');
+          onFailure(
+            error instanceof Error ? error.message : 'Authentication failed',
+          );
         }
       }
     },
@@ -166,7 +170,7 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       console.warn('Error during OAuth sign-out:', error);
       // Continue with local logout even if OAuth sign-out fails
     }
-    
+
     // Clear all secrets
     await resetToken();
 
@@ -179,13 +183,21 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       await successHandler(response);
     } catch (error) {
       // Check if it's already an OAuthError
-      if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        'message' in error
+      ) {
         failureHandler(error as OAuthError);
       } else {
         // Create a proper OAuthError
         const oauthError: OAuthError = {
           code: 'UNKNOWN_ERROR' as OAuthErrorCode,
-          message: error instanceof Error ? error.message : 'Unknown authentication error',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unknown authentication error',
           originalError: error,
         };
         failureHandler(oauthError);
@@ -240,7 +252,9 @@ export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
         await refreshJwt(lastUpdateTime);
       } catch (err) {
         // This is okay, we probably don't have one
-        LOGGER.info(`Could not refresh jwt: ${err}`);
+        LOGGER.info(
+          `Could not refresh jwt: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
 
       jwt = await getJwt();

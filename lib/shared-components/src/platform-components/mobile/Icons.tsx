@@ -67,7 +67,9 @@ const NativeIcons: React.FC<IconProps> = ({
   if (isLoading) {
     return (
       <Text
-        style={safeStyle([{ fontSize: size, color }, style]) as StyleProp<TextStyle>}
+        style={
+          safeStyle([{ fontSize: size, color }, style]) as StyleProp<TextStyle>
+        }
         accessibilityLabel="Loading gear"
       >
         {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
@@ -108,7 +110,12 @@ const NativeIcons: React.FC<IconProps> = ({
 
   return (
     <Text
-      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style]) as StyleProp<TextStyle>}
+      style={
+        safeStyle([
+          { fontSize: size, color, lineHeight: size },
+          style,
+        ]) as StyleProp<TextStyle>
+      }
     >
       {iconSymbol}
     </Text>

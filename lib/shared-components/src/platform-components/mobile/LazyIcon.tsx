@@ -24,12 +24,9 @@ export const LazyIcon: React.FC<IconProps> = ({
     cursor: onPress ? 'pointer' : 'default',
     ...(style as unknown as React.CSSProperties),
   };
-  
+
   return (
-    <span
-      style={iconStyle}
-      onClick={onPress}
-    >
+    <span style={iconStyle} onClick={onPress}>
       {name}
     </span>
   );

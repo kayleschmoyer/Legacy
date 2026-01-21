@@ -191,7 +191,11 @@ builder.queryField('getNotificationHistory', (t) =>
     },
     resolve: async (_parent, args) => {
       return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUserNotificationHistory(db, args.userId, args.limit ?? undefined);
+        return await getUserNotificationHistory(
+          db,
+          args.userId,
+          args.limit ?? undefined,
+        );
       });
     },
   }),
@@ -237,8 +241,10 @@ builder.mutationField('updateNotificationPreferences', (t) =>
         const input: NotificationPreferenceInputType = {
           matchupStartedEnabled: args.input.matchupStartedEnabled ?? undefined,
           matchupEndedEnabled: args.input.matchupEndedEnabled ?? undefined,
-          matchupCloseGameEnabled: args.input.matchupCloseGameEnabled ?? undefined,
-          matchupReminderEnabled: args.input.matchupReminderEnabled ?? undefined,
+          matchupCloseGameEnabled:
+            args.input.matchupCloseGameEnabled ?? undefined,
+          matchupReminderEnabled:
+            args.input.matchupReminderEnabled ?? undefined,
           pushEnabled: args.input.pushEnabled ?? undefined,
           emailEnabled: args.input.emailEnabled ?? undefined,
           closeGameThreshold: args.input.closeGameThreshold ?? undefined,

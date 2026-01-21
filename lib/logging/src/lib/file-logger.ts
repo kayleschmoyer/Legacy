@@ -9,7 +9,7 @@ import { EnvironmentVariable } from '../EnvironmentVariable';
 
 // File logger module - Node.js only, contains fs and path dependencies
 export class FileLogger {
-  private logFile: string | null;
+  private logFile: string | undefined;
 
   constructor() {
     this.logFile = getEnvVarOptional(EnvironmentVariable.LOG_LOCATION);

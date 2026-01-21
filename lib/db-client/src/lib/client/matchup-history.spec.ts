@@ -378,24 +378,24 @@ describe('Matchup History', () => {
       // Team A should be first (2-0)
       const teamA = standings.find((s) => s.teamId === 1);
       expect(teamA).toBeDefined();
-      expect(teamA.wins).toBe(2);
-      expect(teamA.losses).toBe(0);
-      expect(teamA.rank).toBe(1);
-      expect(teamA.pointsFor).toBe(195);
-      expect(teamA.pointsAgainst).toBe(175);
+      expect(teamA!.wins).toBe(2);
+      expect(teamA!.losses).toBe(0);
+      expect(teamA!.rank).toBe(1);
+      expect(teamA!.pointsFor).toBe(195);
+      expect(teamA!.pointsAgainst).toBe(175);
 
       // Team B should be second (1-1)
       const teamB = standings.find((s) => s.teamId === 2);
       expect(teamB).toBeDefined();
-      expect(teamB.wins).toBe(1);
-      expect(teamB.losses).toBe(1);
+      expect(teamB!.wins).toBe(1);
+      expect(teamB!.losses).toBe(1);
 
       // Team C should be last (0-2)
       const teamC = standings.find((s) => s.teamId === 3);
       expect(teamC).toBeDefined();
-      expect(teamC.wins).toBe(0);
-      expect(teamC.losses).toBe(2);
-      expect(teamC.rank).toBe(3);
+      expect(teamC!.wins).toBe(0);
+      expect(teamC!.losses).toBe(2);
+      expect(teamC!.rank).toBe(3);
     });
 
     it('should calculate win percentage correctly', async () => {

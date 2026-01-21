@@ -61,7 +61,9 @@ export class E2EJwtUtil {
       return jwt;
     } catch (error) {
       console.error(`[E2E JWT] ❌ Failed to generate JWT for ${email}:`, error);
-      throw new Error(`Failed to generate JWT for E2E test: ${error}`);
+      throw new Error(
+        `Failed to generate JWT for E2E test: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -152,7 +154,9 @@ export class E2EJwtUtil {
       const decoded = Buffer.from(payload, 'base64url').toString('utf8');
       return JSON.parse(decoded);
     } catch (error) {
-      throw new Error(`Failed to decode JWT payload: ${error}`);
+      throw new Error(
+        `Failed to decode JWT payload: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

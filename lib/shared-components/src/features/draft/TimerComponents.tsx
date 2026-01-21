@@ -143,7 +143,9 @@ function TimerBar({
   const seconds = time % 60;
 
   // Create default color animation if not provided
-  const defaultColorAnim = useRef(new Animated.Value(1) as AnimatedValue).current;
+  const defaultColorAnim = useRef(
+    new Animated.Value(1) as AnimatedValue,
+  ).current;
   const activeColorAnim: AnimatedValue = colorAnim || defaultColorAnim;
 
   // Update default animation if no external animation provided

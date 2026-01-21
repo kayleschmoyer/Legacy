@@ -284,7 +284,9 @@ export class StandingsService {
         .filter((m) => m.team1Score && m.team2Score)
         .map((m) => ({
           matchup: m,
-          margin: Math.abs(parseFloat(m.team1Score ?? '0') - parseFloat(m.team2Score ?? '0')),
+          margin: Math.abs(
+            parseFloat(m.team1Score ?? '0') - parseFloat(m.team2Score ?? '0'),
+          ),
         }))
         .sort((a, b) => a.margin - b.margin)
         .slice(0, limit);
@@ -315,7 +317,9 @@ export class StandingsService {
         .filter((m) => m.team1Score && m.team2Score)
         .map((m) => ({
           matchup: m,
-          margin: Math.abs(parseFloat(m.team1Score ?? '0') - parseFloat(m.team2Score ?? '0')),
+          margin: Math.abs(
+            parseFloat(m.team1Score ?? '0') - parseFloat(m.team2Score ?? '0'),
+          ),
         }))
         .sort((a, b) => b.margin - a.margin)
         .slice(0, limit);

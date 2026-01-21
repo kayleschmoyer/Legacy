@@ -38,7 +38,10 @@ export class DivisionalStrategy implements SchedulingStrategy {
       if (!divisions.has(divisionId)) {
         divisions.set(divisionId, []);
       }
-      divisions.get(divisionId).push(team);
+      const divisionTeams = divisions.get(divisionId);
+      if (divisionTeams) {
+        divisionTeams.push(team);
+      }
     }
 
     // If only one division or no divisions set, fall back to round-robin-like
@@ -88,7 +91,10 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
             teamsAvailableThisWeek.delete(team1.id);
             teamsAvailableThisWeek.delete(team2.id);
-            weekPairings.get(currentWeek).add(`${team1.id}-${team2.id}`);
+            const weekPairingsSet = weekPairings.get(currentWeek);
+            if (weekPairingsSet) {
+              weekPairingsSet.add(`${team1.id}-${team2.id}`);
+            }
             divisionalGamesScheduled++;
 
             if (divisionalGamesScheduled >= divisionalGames) break;
@@ -120,7 +126,10 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
               teamsAvailableThisWeek.delete(team1.id);
               teamsAvailableThisWeek.delete(team2.id);
-              weekPairings.get(currentWeek).add(`${team1.id}-${team2.id}`);
+              const weekPairingsSet = weekPairings.get(currentWeek);
+              if (weekPairingsSet) {
+                weekPairingsSet.add(`${team1.id}-${team2.id}`);
+              }
               interDivisionalGamesScheduled++;
 
               if (interDivisionalGamesScheduled >= interDivisionalGames) break;

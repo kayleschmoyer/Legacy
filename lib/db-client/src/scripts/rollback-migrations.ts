@@ -68,8 +68,10 @@ function getMigrationFiles(): MigrationFile[] {
 
     return files;
   } catch (error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    LOGGER.error('Error reading migrations directory:', error);
+    LOGGER.error(
+      'Error reading migrations directory:',
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return [];
   }
 }
@@ -215,8 +217,10 @@ async function runMigrationsUp(
           LOGGER.error(`❌ No 'up' function found in ${migration.filename}`);
         }
       } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        LOGGER.error(`❌ Error applying ${migration.filename}:`, error);
+        LOGGER.error(
+          `❌ Error applying ${migration.filename}:`,
+          error instanceof Error ? error : new Error(String(error)),
+        );
         throw error;
       }
     } else {
@@ -276,8 +280,7 @@ async function runMigrationDown(
   } catch (error) {
     LOGGER.error(
       `❌ Error rolling back ${migrationToRollback.filename}:`,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      error,
+      error instanceof Error ? error : new Error(String(error)),
     );
     throw error;
   }
@@ -317,8 +320,10 @@ async function runFreshMigrations(
           LOGGER.info(`✅ Rolled back: ${migration.filename}`);
         }
       } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        LOGGER.error(`❌ Error rolling back ${migration.filename}:`, error);
+        LOGGER.error(
+          `❌ Error rolling back ${migration.filename}:`,
+          error instanceof Error ? error : new Error(String(error)),
+        );
         throw error;
       }
     }

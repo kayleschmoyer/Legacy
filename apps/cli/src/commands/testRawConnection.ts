@@ -88,7 +88,9 @@ export async function handleTestRawConnection(): Promise<void> {
       };
       LOGGER.info('SSL certificate loaded successfully');
     } catch (error) {
-      LOGGER.error(`Failed to read SSL certificate: ${error}`);
+      LOGGER.error(
+        `Failed to read SSL certificate: ${error instanceof Error ? error.message : String(error)}`,
+      );
       LOGGER.info('Proceeding without SSL...');
       sslConfig = false;
     }

@@ -36,7 +36,10 @@ export function determineEligibleSeasons(
     if (!playerSeasonGames.has(pgc.playerId)) {
       playerSeasonGames.set(pgc.playerId, new Map());
     }
-    playerSeasonGames.get(pgc.playerId).set(pgc.season, pgc.gamesPlayed);
+    const seasonMap = playerSeasonGames.get(pgc.playerId);
+    if (seasonMap) {
+      seasonMap.set(pgc.season, pgc.gamesPlayed);
+    }
   }
 
   // Get all unique seasons from player game counts

@@ -25,7 +25,10 @@ class WebSentryImplementation implements SentryInterface {
         dsn: config.dsn ? 'SET' : 'NOT_SET',
       });
     } catch (error) {
-      LOGGER.error('Failed to initialize Sentry', error);
+      LOGGER.error(
+        'Failed to initialize Sentry',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
@@ -42,7 +45,12 @@ class WebSentryImplementation implements SentryInterface {
         Sentry.captureException(error);
       }
     } catch (captureError) {
-      LOGGER.error('Failed to capture error in Sentry', captureError);
+      LOGGER.error(
+        'Failed to capture error in Sentry',
+        captureError instanceof Error
+          ? captureError
+          : new Error(String(captureError)),
+      );
       LOGGER.error('Original error was:', error);
     }
   }
