@@ -83,14 +83,10 @@ async function createMatchup(
       season = seasons[seasonIdx].season;
     }
 
-    // TODO: This code needs to be updated to include teamId
-    // The schema requires teamId but getMissingMatchupRecords doesn't return it
-    // This handler may need to be refactored or deprecated
     const record: CreateMatchupPlayer = {
       matchupId: matchup.id,
       playerId: player.id,
-      teamId: 0, // FIXME: Need to determine correct team for player
-      // season: season, // Field removed from schema
+      teamId: player.teamId,
     };
 
     LOGGER.debug(

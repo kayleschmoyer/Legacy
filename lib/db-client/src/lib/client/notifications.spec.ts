@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { PublicDb } from './PublicDbClient';
 import {
   createNotificationHistory,
@@ -13,12 +12,6 @@ const mockDb = {
   update: jest.fn(),
   delete: jest.fn(),
 } as unknown as PublicDb;
-
-const createResolvedPromiseMock = <T>(value: T) => {
-  const mock = jest.fn<() => Promise<T>>();
-  mock.mockResolvedValue(value);
-  return mock;
-};
 
 describe('Notification Client Functions', () => {
   beforeEach(() => {
@@ -42,11 +35,10 @@ describe('Notification Client Functions', () => {
       };
 
       // Mock the database call
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Test mock
-      (mockDb as any).select.mockReturnValue({
+      (mockDb.select as ReturnType<typeof jest.fn>).mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            limit: createResolvedPromiseMock([mockPreferences]),
+            limit: jest.fn().mockResolvedValue([mockPreferences]),
           }),
         }),
       });
@@ -69,21 +61,17 @@ describe('Notification Client Functions', () => {
         updatedAt: '2025-01-01T00:00:00Z',
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Test mock
-      (mockDb as any).select.mockReturnValue({
+      (mockDb.select as ReturnType<typeof jest.fn>).mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            limit: createResolvedPromiseMock([]),
+            limit: jest.fn().mockResolvedValue([]),
           }),
         }),
       });
 
-      const returningMock = createResolvedPromiseMock([mockToken]);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Test mock
-      (mockDb as any).insert.mockReturnValue({
+      (mockDb.insert as ReturnType<typeof jest.fn>).mockReturnValue({
         values: jest.fn().mockReturnValue({
-          returning: returningMock,
+          returning: jest.fn().mockResolvedValue([mockToken]),
         }),
       });
 
@@ -116,14 +104,9 @@ describe('Notification Client Functions', () => {
         createdAt: '2025-01-01T00:00:00Z',
       };
 
-      const notificationReturningMock = createResolvedPromiseMock([
-        mockNotification,
-      ]);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Test mock
-      (mockDb as any).insert.mockReturnValue({
+      (mockDb.insert as ReturnType<typeof jest.fn>).mockReturnValue({
         values: jest.fn().mockReturnValue({
-          returning: notificationReturningMock,
+          returning: jest.fn().mockResolvedValue([mockNotification]),
         }),
       });
 

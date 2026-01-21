@@ -2,13 +2,12 @@ import DataLoader from 'dataloader';
 import {
   Matchup,
   MatchupPlayer,
+  MatchupPlayerGame,
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { inArray } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
-
-type MatchupPlayerGame = typeof PublicSchema.matchupPlayerGames.$inferSelect;
 
 /**
  * DataLoader for matchups by ID

@@ -302,10 +302,10 @@ export function getSeasonFieldingStatsForPlayerSeason(
     );
 }
 
-export function getMissingMatchupRecords(
+export async function getMissingMatchupRecords(
   db: PublicDb,
   matchupId: number,
-): Promise<Player[]> {
+): Promise<Array<Player & { teamId: number }>> {
   const populatedMatchups = db
     .select({
       playerId: Schema.matchupPlayers.playerId,
@@ -313,24 +313,35 @@ export function getMissingMatchupRecords(
     .from(Schema.matchupPlayers)
     .where(eq(Schema.matchupPlayers.matchupId, matchupId));
 
-  const teamMembers = db
-    .select({ playerId: Schema.teamMembers.playerId })
-    .from(Schema.teamMembers)
+  const results = await db
+    .select({
+      id: Schema.players.id,
+      firstName: Schema.players.firstName,
+      lastName: Schema.players.lastName,
+      brefId: Schema.players.brefId,
+      statsLastFetchedAt: Schema.players.statsLastFetchedAt,
+      teamId: Schema.teamMembers.teamId,
+    })
+    .from(Schema.players)
+    .innerJoin(
+      Schema.teamMembers,
+      eq(Schema.players.id, Schema.teamMembers.playerId),
+    )
     .innerJoin(
       Schema.matchups,
       eq(Schema.matchups.leagueId, Schema.teamMembers.leagueId),
     )
-    .where(eq(Schema.matchups.id, matchupId));
-
-  return db
-    .select()
-    .from(Schema.players)
     .where(
       and(
-        inArray(Schema.players.id, teamMembers),
+        eq(Schema.matchups.id, matchupId),
         not(inArray(Schema.players.id, populatedMatchups)),
       ),
     );
+
+  // Filter out any records where teamId is null (shouldn't happen with inner join, but for type safety)
+  return results.filter(
+    (r): r is Player & { teamId: number } => r.teamId !== null,
+  );
 }
 
 export async function createMatchupRecord(

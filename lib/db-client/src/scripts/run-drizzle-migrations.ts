@@ -10,16 +10,17 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
-config({ path: resolve(__dirname, '../../../../.env') });
-
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+
 import { LOGGER } from '@legacy-sports/logging';
+import { join, resolve } from 'path';
 import { existsSync } from 'fs';
-import { join } from 'path';
+
 import { getDatabaseConfig } from '../config/database';
+
+config({ path: resolve(__dirname, '../../../../.env') });
 
 // Load environment variables from root .env file (already done above)
 
@@ -72,14 +73,13 @@ async function runMigrations() {
 
     // Close connection
     await pool.end();
-  } catch (error: unknown) {
+  } catch (error) {
     LOGGER.error('❌ Migration failed:');
     if (error instanceof Error) {
       LOGGER.error(`Error message: ${error.message}`);
-      LOGGER.error(`Stack trace: ${error.stack ?? 'No stack trace available'}`);
+      LOGGER.error(`Stack trace: ${error.stack}`);
     } else {
-      LOGGER.error('Unknown error type');
-      LOGGER.error(JSON.stringify(error, null, 2));
+      LOGGER.error('Unknown error type:', String(error));
     }
     process.exit(1);
   }

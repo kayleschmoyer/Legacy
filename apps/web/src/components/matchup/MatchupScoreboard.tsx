@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, H3, H5, Separator, Text, XStack, YStack } from 'tamagui';
-import { StatsLoadingIndicator } from './StatsLoadingIndicator';
 import {
   type MatchupFragment,
   MatchupStatus,
@@ -29,15 +28,8 @@ export function MatchupScoreboard({
     );
   }
 
-  const {
-    weekNumber,
-    team1Score,
-    team2Score,
-    status,
-    // statsLoadingStatus, // TODO(LS-53): Property not yet in MatchupFragment
-    gamesPerMatchup,
-  } = matchup;
-  const statsLoadingStatus = null; // Placeholder
+  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } =
+    matchup;
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);
@@ -92,13 +84,6 @@ export function MatchupScoreboard({
       </Card.Header>
 
       <Separator />
-
-      {/* Stats Loading Indicator */}
-      {statsLoadingStatus && (
-        <YStack padding="$4" paddingBottom="$2">
-          <StatsLoadingIndicator status={statsLoadingStatus} compact />
-        </YStack>
-      )}
 
       {/* Scoreboard */}
       <YStack padding="$4" space="$3">
