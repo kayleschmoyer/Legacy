@@ -1,10 +1,11 @@
 import React from 'react';
+import type { ReactNativeStyleProperties } from '../types/platform-exports';
 
 export interface IconProps {
   name: string;
   size?: number;
   color?: string;
-  style?: React.CSSProperties;
+  style?: ReactNativeStyleProperties;
   onPress?: () => void;
 }
 
@@ -17,14 +18,16 @@ export const LazyIcon: React.FC<IconProps> = ({
   onPress,
 }) => {
   // Placeholder implementation - could be replaced with actual icon library
+  const iconStyle: React.CSSProperties = {
+    fontSize: size,
+    color: color || 'black',
+    cursor: onPress ? 'pointer' : 'default',
+    ...(style as unknown as React.CSSProperties),
+  };
+  
   return (
     <span
-      style={{
-        fontSize: size,
-        color,
-        cursor: onPress ? 'pointer' : 'default',
-        ...style,
-      }}
+      style={iconStyle}
       onClick={onPress}
     >
       {name}

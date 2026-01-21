@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useCallback, useRef } from 'react';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { Animated } from '../../platform-components';
@@ -141,12 +138,9 @@ function PlayerCard({
 
   return (
     <Animated.View
-      style={
-        {
-          transform: [{ scale: scaleAnim }],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
-      }
+      style={{
+        transform: [{ scale: scaleAnim }],
+      }}
     >
       <Card
         borderRadius="$4"

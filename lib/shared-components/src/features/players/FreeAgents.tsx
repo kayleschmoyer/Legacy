@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Button,
@@ -112,12 +109,9 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
   return (
     <Animated.View
-      style={
-        {
-          transform: [{ scale: scaleAnim }],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
-      }
+      style={{
+        transform: [{ scale: scaleAnim }],
+      }}
     >
       <Card
         backgroundColor="$gray3"

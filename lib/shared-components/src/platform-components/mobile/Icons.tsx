@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
+import type { StyleProp, TextStyle } from 'react-native';
 import type { IconProps } from './LazyIcon';
 import { safeStyle } from '../../utils/styles';
 // Simple logger fallback for Icons
@@ -65,16 +66,13 @@ const NativeIcons: React.FC<IconProps> = ({
   // Show loading state briefly
   if (isLoading) {
     return (
-      <>
+      <Text
+        style={safeStyle([{ fontSize: size, color }, style]) as StyleProp<TextStyle>}
+        accessibilityLabel="Loading gear"
+      >
         {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-        <Text
-          // @ts-expect-error - Cross-platform style compatibility
-          style={safeStyle([{ fontSize: size, color }, style])}
-          accessibilityLabel="Loading gear"
-        >
-          ⚙️
-        </Text>
-      </>
+        ⚙️
+      </Text>
     );
   }
 
@@ -110,8 +108,7 @@ const NativeIcons: React.FC<IconProps> = ({
 
   return (
     <Text
-      // @ts-expect-error - Cross-platform style compatibility
-      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style])}
+      style={safeStyle([{ fontSize: size, color, lineHeight: size }, style]) as StyleProp<TextStyle>}
     >
       {iconSymbol}
     </Text>

@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useEffect, useRef } from 'react';
 import { Button, ScrollView, Sheet, Text, XStack, YStack } from 'tamagui';
 import { Animated, Dimensions } from '../../platform-components';
@@ -133,12 +130,9 @@ function FilterChip({
 
   return (
     <Animated.View
-      style={
-        {
-          transform: [{ scale: scaleAnim }],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
-      }
+      style={{
+        transform: [{ scale: scaleAnim }],
+      }}
     >
       <Button
         {...getChipProps()}

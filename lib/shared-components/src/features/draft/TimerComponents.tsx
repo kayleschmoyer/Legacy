@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Text as TamaguiText, View as TamaguiView, YStack } from 'tamagui';
 import { Animated, Platform, Vibration } from '../../platform-components';
+import type { AnimatedValue } from '../../platform-components/types/platform-exports';
 
 export interface TimerProps {
   initialTime: number;
@@ -17,9 +15,8 @@ export interface TimerProps {
 export interface TimerBarProps {
   time: number;
   maxTime: number;
-  // React Native Animated.Value - complex type with interpolate, setValue, etc.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  colorAnim?: any;
+  // React Native Animated.Value - accepts the animated value instance
+  colorAnim?: AnimatedValue;
   label?: string;
   variant?: 'default' | 'compact' | 'large';
 }
@@ -37,7 +34,7 @@ export function useTimer({
 }: TimerProps) {
   const [time, setTime] = React.useState(initialTime);
   const [isActive, setIsActive] = React.useState(autoStart);
-  const colorAnim = useRef(new Animated.Value(1)).current;
+  const colorAnim = useRef(new Animated.Value(1) as AnimatedValue).current;
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -146,9 +143,8 @@ function TimerBar({
   const seconds = time % 60;
 
   // Create default color animation if not provided
-  const defaultColorAnim = useRef(new Animated.Value(1)).current;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const activeColorAnim = colorAnim || defaultColorAnim;
+  const defaultColorAnim = useRef(new Animated.Value(1) as AnimatedValue).current;
+  const activeColorAnim: AnimatedValue = colorAnim || defaultColorAnim;
 
   // Update default animation if no external animation provided
   useEffect(() => {
@@ -162,7 +158,6 @@ function TimerBar({
         animationValue = 0.5;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       Animated.timing(defaultColorAnim, {
         duration: 300,
         toValue: animationValue,
@@ -171,7 +166,6 @@ function TimerBar({
     }
   }, [time, maxTime, colorAnim, defaultColorAnim]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
   const backgroundColor = activeColorAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: ['#ef4444', '#f59e0b', '#10b981'], // Red, Yellow, Green

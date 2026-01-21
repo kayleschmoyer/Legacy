@@ -54,11 +54,8 @@ function ScreenContainer({ children, style }: ScreenContainerProps) {
   );
 }
 
-// Layout Components (using Tamagui directly)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-export const XStack = TamaguiXStack;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-export const YStack = TamaguiYStack;
+// Layout Components - direct export from Tamagui
+export { TamaguiXStack as XStack, TamaguiYStack as YStack };
 
 // Typography Components (using Tamagui directly)
 export const H1: React.FC<H1Props> = (props: H1Props) => (

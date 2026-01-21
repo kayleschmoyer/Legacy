@@ -1,3 +1,5 @@
+import type * as ExpoSecureStore from 'expo-secure-store';
+
 // Simple logger fallback for SecureStorage
 const LOGGER = {
   debug: (message: string, ...args: unknown[]) =>
@@ -8,7 +10,7 @@ const LOGGER = {
 };
 
 // Dynamic import for Expo SecureStore
-let secureStore: typeof import('expo-secure-store') | null = null;
+let secureStore: typeof ExpoSecureStore | null = null;
 
 // Initialize Expo SecureStore
 const initializeStorage = async () => {
@@ -51,7 +53,6 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await secureStore.setItemAsync(key, value, {
           requireAuthentication: options?.requireAuthentication || false,
         });
@@ -81,7 +82,6 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return
         return await secureStore.getItemAsync(key, {
           requireAuthentication: options?.requireAuthentication || false,
         });
@@ -107,7 +107,6 @@ export class SecureStorage {
     try {
       if (secureStore) {
         // Use Expo SecureStore for mobile
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await secureStore.deleteItemAsync(key);
       } else {
         // Fallback to sessionStorage if SecureStore unavailable
@@ -133,7 +132,6 @@ export class SecureStorage {
         const knownKeys = ['GOOGLE_JWT', 'INTERNAL_JWT'];
         for (const key of knownKeys) {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
             await secureStore.deleteItemAsync(key);
           } catch {
             // Ignore errors for keys that don't exist

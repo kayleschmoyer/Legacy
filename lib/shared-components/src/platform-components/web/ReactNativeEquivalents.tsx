@@ -467,6 +467,7 @@ const Animated: AnimatedAPI = {
     private listeners: Map<string, (value: { value: number }) => void> =
       new Map();
     private listenerCounter = 0;
+    [key: string]: unknown;
 
     constructor(value: number) {
       this.value = value;

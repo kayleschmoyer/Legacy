@@ -1,6 +1,6 @@
 import React from 'react';
 import { ApolloClient, ApolloProvider } from '@apollo/client';
-import { TamaguiProvider } from 'tamagui';
+import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
@@ -15,9 +15,7 @@ const LOGGER = {
 interface AppProviderProps {
   children: React.ReactNode;
   apolloClient: ApolloClient; // Apollo client instance
-  // Tamagui config has complex generic constraints that are difficult to type properly
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tamaguiConfig: any; // Tamagui configuration object
+  tamaguiConfig: TamaguiProviderProps['config']; // Tamagui configuration object
   colorScheme?: 'light' | 'dark';
   isLoading?: boolean;
 }

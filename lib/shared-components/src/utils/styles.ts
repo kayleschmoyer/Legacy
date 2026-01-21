@@ -16,8 +16,7 @@ export function combineStyles(
   const flatStyles = styles
     .flat(Infinity)
     .filter(Boolean) as ReactNativeStyleProperties[];
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return Object.assign({}, ...flatStyles);
+  return Object.assign({}, ...flatStyles) as ReactNativeStyleProperties;
 }
 
 /**

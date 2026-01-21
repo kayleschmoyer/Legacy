@@ -280,11 +280,17 @@ export interface AnimatedValue {
   addListener?: (callback: (value: { value: number }) => void) => string;
   removeListener?: (id: string) => void;
   removeAllListeners?: () => void;
-  interpolate?: (config: {
+  interpolate: (config: {
     inputRange: number[];
     outputRange: (number | string)[];
     extrapolate?: 'extend' | 'clamp' | 'identity';
-  }) => { __getValue: () => number | string };
+  }) => AnimatedInterpolation;
+  [key: string]: unknown;
+}
+
+export interface AnimatedInterpolation {
+  __getValue?: () => number | string;
+  [key: string]: unknown;
 }
 
 export interface SpringConfig {

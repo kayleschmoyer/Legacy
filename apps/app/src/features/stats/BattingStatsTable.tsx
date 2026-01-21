@@ -1,5 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - react-native-table-component lacks TypeScript definitions
 import { Row, Rows, Table } from 'react-native-table-component';
 import React, { useMemo } from 'react';
 import { useTheme } from 'tamagui';

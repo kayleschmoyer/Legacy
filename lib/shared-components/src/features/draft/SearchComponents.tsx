@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import React, { useRef } from 'react';
 import type { TextInput } from 'react-native';
 import { Search } from '@tamagui/lucide-icons';
