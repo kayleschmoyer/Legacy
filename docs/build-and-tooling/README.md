@@ -18,6 +18,7 @@ This directory contains documentation for build systems, development tools, and 
 ### Testing Infrastructure
 - **[Jest Changed Files Config](jest-changed-files-config.md)** - Test only changed code
 - **[E2E Testing Migration](e2e-testing-migration.md)** - End-to-end test setup
+- **[E2E Test Maintenance](e2e-test-maintenance.md)** - Test skip policies and maintenance guidelines
 
 ### Build Standards
 - **[Package.json Standards](package-json-standards.md)** - Package configuration conventions

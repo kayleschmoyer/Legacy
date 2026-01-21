@@ -190,6 +190,22 @@ test-e2e: ## Run end-to-end tests
 	@$(call echo_blue,Running e2e tests...)
 	pnpm exec nx run-many -t e2e
 
+check-skipped-tests: ## Check for skipped tests and report them
+	@$(call echo_blue,Checking for skipped tests...)
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1
+else
+	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1
+endif
+
+check-skipped-tests-verbose: ## Check for skipped tests with detailed output
+	@$(call echo_blue,Checking for skipped tests (verbose)...)
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1 -ShowDetails
+else
+	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1 -ShowDetails
+endif
+
 # Building
 build: ## Build all affected projects
 	@$(call echo_blue,Building affected projects...)

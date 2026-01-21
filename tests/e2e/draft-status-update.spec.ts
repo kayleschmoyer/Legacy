@@ -19,6 +19,7 @@ test.describe('Draft Status Update Verification', () => {
   let testLeagueId: number;
   let adminJwt: string;
   let userJwt: string;
+  let isGraphQLAvailable = false;
 
   test.beforeAll(async () => {
     console.log('🔧 Setting up test authentication...');
@@ -30,6 +31,24 @@ test.describe('Draft Status Update Verification', () => {
     console.log('✅ Generated test JWTs');
     console.log('   Admin JWT:', adminJwt.substring(0, 30) + '...');
     console.log('   User JWT:', userJwt.substring(0, 30) + '...');
+
+    // Check if GraphQL endpoint is available
+    try {
+      const response = await fetch(GRAPHQL_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userJwt}` },
+        body: JSON.stringify({ query: '{ __typename }' }),
+      });
+      isGraphQLAvailable = response.ok;
+      if (isGraphQLAvailable) {
+        console.log('✅ GraphQL server is available at', GRAPHQL_ENDPOINT);
+      } else {
+        console.log('⚠️  GraphQL server returned non-OK status:', response.status);
+      }
+    } catch (error) {
+      console.log('⚠️  GraphQL server not available:', GRAPHQL_ENDPOINT);
+      console.log('   Error:', error instanceof Error ? error.message : String(error));
+    }
   });
 
   /**
@@ -153,17 +172,16 @@ test.describe('Draft Status Update Verification', () => {
   }
 
   test('should update league draft status from not-started to queued when starting draft', async () => {
-    console.log('\n🚀 TEST: Draft Status Update Verification');
-    console.log('=====================================');
-
-    // Skip if GraphQL endpoint is not available
-    try {
-      await makeGraphQLRequest('{ __typename }');
-    } catch (error) {
+    // SKIP-REASON: GraphQL server must be running for E2E tests
+    // TODO: Document how to start GraphQL server in test setup
+    if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available:', GRAPHQL_ENDPOINT);
       test.skip();
       return;
     }
+
+    console.log('\n🚀 TEST: Draft Status Update Verification');
+    console.log('=====================================');
 
     // Step 1: Create a test league
     testLeagueId = await createTestLeague();
@@ -232,17 +250,16 @@ test.describe('Draft Status Update Verification', () => {
   });
 
   test('should handle draft start with different user permissions', async () => {
-    console.log('\n🔐 TEST: Draft Start Permission Testing');
-    console.log('======================================');
-
-    // Skip if GraphQL endpoint is not available
-    try {
-      await makeGraphQLRequest('{ __typename }');
-    } catch (error) {
+    // SKIP-REASON: GraphQL server must be running for E2E tests
+    // TODO: Add environment setup documentation for local GraphQL server
+    if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available');
       test.skip();
       return;
     }
+
+    console.log('\n🔐 TEST: Draft Start Permission Testing');
+    console.log('======================================')
 
     // Create a fresh league for this test
     const permissionTestLeagueId = await createTestLeague();
@@ -277,17 +294,16 @@ test.describe('Draft Status Update Verification', () => {
   });
 
   test('should validate draft type parameter', async () => {
-    console.log('\n📋 TEST: Draft Type Validation');
-    console.log('==============================');
-
-    // Skip if GraphQL endpoint is not available  
-    try {
-      await makeGraphQLRequest('{ __typename }');
-    } catch (error) {
+    // SKIP-REASON: GraphQL server must be running for E2E tests
+    // TODO: Add pre-test validation to check GraphQL availability before running suite
+    if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available');
       test.skip();
       return;
     }
+
+    console.log('\n📋 TEST: Draft Type Validation');
+    console.log('==============================')
 
     // Create a test league
     const validationTestLeagueId = await createTestLeague();
