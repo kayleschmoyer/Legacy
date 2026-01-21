@@ -173,7 +173,7 @@ test.describe('Draft Status Update Verification', () => {
 
   test('should update league draft status from not-started to queued when starting draft', async () => {
     // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Document how to start GraphQL server in test setup
+    // TODO: Document how to start GraphQL server in test setup (LS-64)
     if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available:', GRAPHQL_ENDPOINT);
       test.skip();
@@ -251,7 +251,7 @@ test.describe('Draft Status Update Verification', () => {
 
   test('should handle draft start with different user permissions', async () => {
     // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Add environment setup documentation for local GraphQL server
+    // TODO: Add environment setup documentation for local GraphQL server (LS-64)
     if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available');
       test.skip();
@@ -295,7 +295,7 @@ test.describe('Draft Status Update Verification', () => {
 
   test('should validate draft type parameter', async () => {
     // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Add pre-test validation to check GraphQL availability before running suite
+    // TODO: Add pre-test validation to check GraphQL availability before running suite (LS-64)
     if (!isGraphQLAvailable) {
       console.log('⚠️  Skipping test - GraphQL server not available');
       test.skip();

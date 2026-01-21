@@ -171,7 +171,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
     
     // SKIP-REASON: UI state - Start draft button not available (league may be drafted or user lacks permissions)
-    // TODO: Ensure test runs against fresh league with 'not-started' status
+    // TODO: Ensure test runs against fresh league with 'not-started' status (LS-63)
     if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
       console.log('⚠️  Start draft button not available - skipping mutation test');
       test.skip();
@@ -259,7 +259,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
     
     // SKIP-REASON: UI state - Start draft button not available for error simulation
-    // TODO: Ensure test runs against fresh league or implement mock state setup
+    // TODO: Ensure test runs against fresh league or implement mock state setup (LS-63)
     if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
       console.log('⚠️  Start draft button not available - skipping error test');
       test.skip();
@@ -366,7 +366,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
     
     // SKIP-REASON: UI state - Start draft button not available for cache validation
-    // TODO: Implement test data setup to ensure repeatable test state
+    // TODO: Implement test data setup to ensure repeatable test state (LS-63)
     if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
       console.log('⚠️  Start draft button not available - skipping cache test');
       test.skip();

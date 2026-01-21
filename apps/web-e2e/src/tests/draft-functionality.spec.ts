@@ -63,7 +63,7 @@ test.describe('Draft Status Web UI Tests', () => {
     
     // Check if button is available and enabled
     // SKIP-REASON: UI state - League already drafted or user lacks permissions
-    // TODO: Add test data setup to ensure repeatable 'not-started' league state
+    // TODO: Add test data setup to ensure repeatable 'not-started' league state (LS-63)
     if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
       console.log('⚠️  Start draft button not available - league may already be drafted or user lacks permissions');
       test.skip();
@@ -126,7 +126,7 @@ test.describe('Draft Status Web UI Tests', () => {
         console.log('✅ Draft already in queued/progress state - testing persistence');
       } else {
         // SKIP-REASON: UI state - No draft button available and no queued draft exists in test data
-        // TODO: Provide consistent test data with either available draft button or pre-queued draft
+        // TODO: Provide consistent test data with either available draft button or pre-queued draft (LS-63)
         test.skip();
       }
     } else {
@@ -200,7 +200,7 @@ test.describe('Draft Status Web UI Tests', () => {
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
     
     // SKIP-REASON: UI state - Need available draft button to test rapid interactions
-    // TODO: Implement test fixture to reset league state before test
+    // TODO: Implement test fixture to reset league state before test (LS-63)
     if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
       console.log('⚠️  Start draft button not available for rapid interaction test');
       test.skip();
