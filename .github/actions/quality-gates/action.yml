@@ -273,6 +273,7 @@ runs:
         # Disable Nx Cloud completely when DTE is not available to avoid quota errors
         unset NX_CLOUD_ACCESS_TOKEN
         export NX_CLOUD_NO_TIMEOUTS=true
+        export NX_NO_CLOUD=true
 
         echo "📋 Using local execution with parallel quality gates"
         echo "🎯 Running lint, typecheck, and tests in parallel for optimized execution"

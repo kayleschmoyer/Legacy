@@ -100,6 +100,7 @@ runs:
         unset NX_CLOUD_ACCESS_TOKEN
         export NX_CLOUD_DISTRIBUTED_EXECUTION=false
         export NX_CLOUD_NO_TIMEOUTS=true
+        export NX_NO_CLOUD=true
         echo "ℹ️ Nx Cloud disabled - running E2E tests locally for reliability"
 
         echo "�📋 E2E Test Configuration:"

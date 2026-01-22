@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   coverageDirectory: '../../coverage/lib/shared-components/web',
   displayName: 'shared-components:web',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
