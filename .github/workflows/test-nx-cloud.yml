@@ -53,12 +53,26 @@ jobs:
           fi
           echo "✅ pnpm available"
           
-          if ! pnpm exec nx-cloud --version >/dev/null 2>&1; then
-            echo "❌ ERROR: nx-cloud CLI not available!"
+          # Debug: Show what's in node_modules/.bin
+          echo "📦 Contents of node_modules/.bin:"
+          ls -la node_modules/.bin/ | grep nx || echo "No nx binaries found"
+          
+          # Try multiple approaches to invoke nx-cloud
+          echo "🔍 Attempting to locate nx-cloud CLI..."
+          if pnpm exec nx-cloud --version >/dev/null 2>&1; then
+            NX_CLOUD_VERSION=$(pnpm exec nx-cloud --version 2>&1)
+            echo "✅ nx-cloud CLI available via 'pnpm exec' (version: $NX_CLOUD_VERSION)"
+          elif npx nx-cloud --version >/dev/null 2>&1; then
+            NX_CLOUD_VERSION=$(npx nx-cloud --version 2>&1)
+            echo "✅ nx-cloud CLI available via 'npx' (version: $NX_CLOUD_VERSION)"
+          elif ./node_modules/.bin/nx-cloud --version >/dev/null 2>&1; then
+            NX_CLOUD_VERSION=$(./node_modules/.bin/nx-cloud --version 2>&1)
+            echo "✅ nx-cloud CLI available directly (version: $NX_CLOUD_VERSION)"
+          else
+            echo "❌ ERROR: nx-cloud CLI not available via any method!"
+            echo "Tried: pnpm exec, npx, direct path"
             exit 1
           fi
-          NX_CLOUD_VERSION=$(pnpm exec nx-cloud --version 2>&1)
-          echo "✅ nx-cloud CLI available (version: $NX_CLOUD_VERSION)"
           
           echo ""
           echo "☁️ Testing Nx Cloud authentication..."
