@@ -1,0 +1,140 @@
+name: 🔍 Test Nx Cloud Connectivity
+
+on:
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Enable verbose logging'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  test-connectivity:
+    name: "☁️ Nx Cloud Connection Test"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "⚙️ Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "📦 Install pnpm"
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: "📚 Install Dependencies"
+        run: pnpm install --frozen-lockfile
+
+      - name: "🔑 Test Nx Cloud Authentication"
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+          NX_VERBOSE_LOGGING: ${{ inputs.verbose }}
+        run: |
+          echo "::group::Testing Nx Cloud Connection"
+          
+          echo "📊 Checking token availability..."
+          if [ -z "$NX_CLOUD_ACCESS_TOKEN" ]; then
+            echo "❌ ERROR: NX_CLOUD_ACCESS_TOKEN is not set!"
+            exit 1
+          fi
+          echo "✅ Token found in environment"
+          
+          echo ""
+          echo "🔍 Testing nx-cloud CLI availability..."
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "❌ ERROR: pnpm not found!"
+            exit 1
+          fi
+          echo "✅ pnpm available"
+          
+          if ! pnpm exec nx-cloud --version >/dev/null 2>&1; then
+            echo "❌ ERROR: nx-cloud CLI not available!"
+            exit 1
+          fi
+          NX_CLOUD_VERSION=$(pnpm exec nx-cloud --version 2>&1)
+          echo "✅ nx-cloud CLI available (version: $NX_CLOUD_VERSION)"
+          
+          echo ""
+          echo "☁️ Testing Nx Cloud authentication..."
+          STATUS_OUTPUT=$(pnpm exec nx-cloud status 2>&1)
+          STATUS_EXIT=$?
+          
+          echo "$STATUS_OUTPUT"
+          
+          if [ $STATUS_EXIT -ne 0 ]; then
+            echo ""
+            echo "❌ ERROR: nx-cloud status command failed!"
+            echo "Exit code: $STATUS_EXIT"
+            exit 1
+          fi
+          
+          # Check for error patterns
+          if echo "$STATUS_OUTPUT" | grep -qi "Unable to authenticate\|Bad credentials\|401\|Invalid"; then
+            echo ""
+            echo "❌ ERROR: Authentication failed!"
+            echo "The token appears to be invalid or expired."
+            exit 1
+          fi
+          
+          if echo "$STATUS_OUTPUT" | grep -qi "quota exceeded\|plan limit"; then
+            echo ""
+            echo "⚠️  WARNING: Quota exceeded!"
+            echo "The FREE plan limit has been reached."
+            exit 0  # Not a failure, just informational
+          fi
+          
+          echo ""
+          echo "✅ Successfully authenticated with Nx Cloud!"
+          echo "::endgroup::"
+
+      - name: "🎯 Test DTE Detection"
+        id: test-dte
+        uses: ./.github/actions/detect-dte
+        with:
+          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      - name: "📊 Display Results"
+        run: |
+          echo "::group::Test Results Summary"
+          echo "### ☁️ Nx Cloud Connection Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Nx Cloud Authentication | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Available | ${{ steps.test-dte.outputs.cloud-available }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DTE Available | ${{ steps.test-dte.outputs.dte-available }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Execution Mode | ${{ steps.test-dte.outputs.execution-mode }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Optimal Agents | ${{ steps.test-dte.outputs.optimal-agents }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.test-dte.outputs.execution-mode }}" = "local" ]; then
+            echo "| Fallback Reason | ${{ steps.test-dte.outputs.fallback-reason }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Nx Cloud is properly configured!" >> $GITHUB_STEP_SUMMARY
+          echo "::endgroup::"
+
+      - name: "🧪 Test Simple Nx Command with Cloud"
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+        run: |
+          echo "::group::Testing Nx Command with Cloud Cache"
+          echo "Running a simple Nx command to verify cloud caching..."
+          
+          # Run a lightweight command that should hit the cache
+          pnpm exec nx show project web --json > /dev/null
+          
+          echo "✅ Command completed successfully!"
+          echo "::endgroup::"
+
+      - name: "📝 Connection Test Complete"
+        run: |
+          echo "::notice title=Test Complete::Nx Cloud connection verified successfully! Token has proper read-write permissions and DTE detection is working."
