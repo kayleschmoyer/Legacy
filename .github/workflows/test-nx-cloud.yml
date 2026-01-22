@@ -85,13 +85,27 @@ jobs:
           
           echo ""
           echo "☁️ Testing Nx Cloud authentication..."
+          
+          # Explicitly disable exit-on-error for this command
+          set +e
+          echo "DEBUG: Running command: $NX_CLOUD_CMD status"
+          echo "DEBUG: Current directory: $(pwd)"
+          echo "DEBUG: NX config exists: $([ -f nx.json ] && echo 'Yes' || echo 'No')"
+          
           STATUS_OUTPUT=$($NX_CLOUD_CMD status 2>&1)
           STATUS_EXIT=$?
+          set -e
           
+          echo ""
+          echo "DEBUG: Command completed with exit code: $STATUS_EXIT"
+          echo "DEBUG: Output length: ${#STATUS_OUTPUT} characters"
+          echo ""
+          echo "--- Output from nx-cloud status ---"
           echo "$STATUS_OUTPUT"
+          echo "--- End output ---"
+          echo ""
           
           if [ $STATUS_EXIT -ne 0 ]; then
-            echo ""
             echo "❌ ERROR: nx-cloud status command failed!"
             echo "Exit code: $STATUS_EXIT"
             exit 1
