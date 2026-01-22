@@ -35,15 +35,27 @@ outputs:
   formatting-result:
     description: "Code formatting check result"
     value: ${{ steps.formatting.outputs.result }}
+  formatting-failed-projects:
+    description: "Projects that failed formatting (comma-separated)"
+    value: ${{ steps.formatting.outputs.failed-projects }}
   lint-result:
     description: "ESLint validation result"
     value: ${{ steps.distributed.outputs.lint-result || steps.local.outputs.lint-result }}
+  lint-failed-projects:
+    description: "Projects that failed lint (comma-separated)"
+    value: ${{ steps.distributed.outputs.lint-failed-projects || steps.local.outputs.lint-failed-projects }}
   typecheck-result:
     description: "TypeScript type checking result"
     value: ${{ steps.distributed.outputs.typecheck-result || steps.local.outputs.typecheck-result }}
+  typecheck-failed-projects:
+    description: "Projects that failed typecheck (comma-separated)"
+    value: ${{ steps.distributed.outputs.typecheck-failed-projects || steps.local.outputs.typecheck-failed-projects }}
   test-result:
     description: "Unit tests result"
     value: ${{ steps.distributed.outputs.test-result || steps.local.outputs.test-result }}
+  test-failed-projects:
+    description: "Projects that failed tests (comma-separated)"
+    value: ${{ steps.distributed.outputs.test-failed-projects || steps.local.outputs.test-failed-projects }}
   execution-strategy:
     description: "Strategy used (distributed/local-affected/local-full)"
     value: ${{ steps.distributed.outputs.strategy || steps.local.outputs.strategy }}
@@ -152,6 +164,7 @@ runs:
         if $NX_CMD format:check --base="${{ inputs.base-ref }}" --head="${{ inputs.head-ref }}" 2>&1 | tee format-check.log; then
           echo "✅ All affected files are properly formatted"
           echo "result=success" >> $GITHUB_OUTPUT
+          echo "failed-projects=" >> $GITHUB_OUTPUT
         else
           # Check if the error was due to affected detection issues
           if grep -q "Could not find Nx modules\|Unable to determine affected\|No base found" format-check.log; then
@@ -161,6 +174,7 @@ runs:
             if $NX_CMD format:check 2>&1 | tee format-check-full.log; then
               echo "✅ All files are properly formatted (full check)"
               echo "result=success" >> $GITHUB_OUTPUT
+              echo "failed-projects=" >> $GITHUB_OUTPUT
             else
               echo "❌ Code formatting issues detected (full workspace)"
               echo "::error::Code formatting check failed. Run '$NX_CMD format:write' to fix."
@@ -168,6 +182,10 @@ runs:
               # Show specific files that need formatting
               echo "Files requiring formatting:"
               grep -E "would be reformatted|needs formatting|✖" format-check-full.log || true
+              
+              # Extract failed projects from formatting output (files are in projects)
+              FAILED_PROJECTS=$(grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" format-check-full.log 2>/dev/null | sort -u | xargs | tr ' ' ',' || echo "formatting")
+              echo "failed-projects=$FAILED_PROJECTS" >> $GITHUB_OUTPUT
               
               echo "result=failure" >> $GITHUB_OUTPUT
               exit 1
@@ -179,6 +197,10 @@ runs:
             # Show specific files that need formatting
             echo "Files requiring formatting:"
             grep -E "would be reformatted|needs formatting|✖" format-check.log || true
+            
+            # Extract failed projects from formatting output (files are in projects)
+            FAILED_PROJECTS=$(grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" format-check.log 2>/dev/null | sort -u | xargs | tr ' ' ',' || echo "formatting")
+            echo "failed-projects=$FAILED_PROJECTS" >> $GITHUB_OUTPUT
             
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
@@ -212,31 +234,44 @@ runs:
         LINT_SUCCESS=true
         TYPECHECK_SUCCESS=true
         TEST_SUCCESS=true
+        LINT_FAILED_PROJECTS=""
+        TYPECHECK_FAILED_PROJECTS=""
+        TEST_FAILED_PROJECTS=""
 
         echo "🔧 Running lint and typecheck with DTE..."
         if $NX_CMD affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
           echo "✅ Code quality checks passed (DTE)"
           echo "lint-result=success" >> $GITHUB_OUTPUT
+          echo "lint-failed-projects=" >> $GITHUB_OUTPUT
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
+          echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
         else
           echo "❌ Code quality checks failed (DTE)"
           echo "## DTE Quality Errors"
           grep -E "error|warning|failed" dte-quality.log | head -20 || true
           echo "::error::Code quality checks failed in DTE mode. Check dte-quality.log for details."
 
+          # Extract failed projects from Nx output (look for "✖" or "failed" followed by project name)
+          LINT_FAILED_PROJECTS=$(grep -B2 "lint.*failed\|ESLint.*failed" dte-quality.log 2>/dev/null | grep -oE "nx run [^:]+:lint" | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
+          TYPECHECK_FAILED_PROJECTS=$(grep -B2 "typecheck.*failed\|TypeScript.*failed" dte-quality.log 2>/dev/null | grep -oE "nx run [^:]+:typecheck" | sed 's/nx run //;s/:typecheck//' | sort -u | xargs | tr ' ' ',' || echo "")
+
           # Determine which specific checks failed
           if grep -q "lint.*failed\|ESLint" dte-quality.log; then
             echo "lint-result=failure" >> $GITHUB_OUTPUT
+            echo "lint-failed-projects=$LINT_FAILED_PROJECTS" >> $GITHUB_OUTPUT
             LINT_SUCCESS=false
           else
             echo "lint-result=success" >> $GITHUB_OUTPUT
+            echo "lint-failed-projects=" >> $GITHUB_OUTPUT
           fi
 
           if grep -q "typecheck.*failed\|TypeScript\|TS[0-9]" dte-quality.log; then
             echo "typecheck-result=failure" >> $GITHUB_OUTPUT
+            echo "typecheck-failed-projects=$TYPECHECK_FAILED_PROJECTS" >> $GITHUB_OUTPUT
             TYPECHECK_SUCCESS=false
           else
             echo "typecheck-result=success" >> $GITHUB_OUTPUT
+            echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
           fi
         fi
 
@@ -244,12 +279,18 @@ runs:
         if $NX_CMD affected -t test --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-test.log; then
           echo "✅ Tests passed (DTE)"
           echo "test-result=success" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
           echo "❌ Tests failed (DTE)"
           echo "## DTE Test Errors"
           grep -E "FAIL|error" dte-test.log | head -10 || true
           echo "::error::Tests failed in DTE mode. Check dte-test.log for details."
+          
+          # Extract failed projects from test output
+          TEST_FAILED_PROJECTS=$(grep -B2 "test.*failed\|FAIL" dte-test.log 2>/dev/null | grep -oE "nx run [^:]+:test" | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
+          
           echo "test-result=failure" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=$TEST_FAILED_PROJECTS" >> $GITHUB_OUTPUT
           TEST_SUCCESS=false
         fi
 
@@ -378,12 +419,22 @@ runs:
         if [ "$LINT_EXIT_CODE" -eq 0 ]; then
           echo "✅ ESLint validation: PASSED"
           echo "lint-result=success" >> $GITHUB_OUTPUT
+          echo "lint-failed-projects=" >> $GITHUB_OUTPUT
         else
           echo "❌ ESLint validation: FAILED (exit code: $LINT_EXIT_CODE)"
           echo "## ESLint Errors Summary"
           grep -E "error|warning" "$LINT_LOG" | head -20 || echo "No specific errors found in log"
           echo "::error::ESLint validation failed. Check $LINT_LOG for details."
+          
+          # Extract failed projects from Nx lint output
+          LINT_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:lint" "$LINT_LOG" 2>/dev/null | grep -B5 "failed\|error" "$LINT_LOG" | grep -oE "nx run [^:]+:lint" | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
+          if [ -z "$LINT_FAILED_PROJECTS" ]; then
+            # Fallback: try to extract from error messages
+            LINT_FAILED_PROJECTS=$(grep -E "Running target.*lint.*failed" "$LINT_LOG" 2>/dev/null | sed -E 's/.*Running target "lint" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "lint")
+          fi
+          
           echo "lint-result=failure" >> $GITHUB_OUTPUT
+          echo "lint-failed-projects=$LINT_FAILED_PROJECTS" >> $GITHUB_OUTPUT
           OVERALL_SUCCESS=false
         fi
 
@@ -391,12 +442,22 @@ runs:
         if [ "$TYPECHECK_EXIT_CODE" -eq 0 ]; then
           echo "✅ TypeScript type checking: PASSED"
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
+          echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
         else
           echo "❌ TypeScript type checking: FAILED (exit code: $TYPECHECK_EXIT_CODE)"
           echo "## TypeScript Errors Summary"
           grep -E "error|TS[0-9]" "$TYPECHECK_LOG" | head -15 || echo "No specific errors found in log"
           echo "::error::TypeScript validation failed. Check $TYPECHECK_LOG for details."
+          
+          # Extract failed projects from Nx typecheck output
+          TYPECHECK_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:typecheck" "$TYPECHECK_LOG" 2>/dev/null | grep -B5 "failed\|error" "$TYPECHECK_LOG" | grep -oE "nx run [^:]+:typecheck" | sed 's/nx run //;s/:typecheck//' | sort -u | xargs | tr ' ' ',' || echo "")
+          if [ -z "$TYPECHECK_FAILED_PROJECTS" ]; then
+            # Fallback: try to extract from error messages
+            TYPECHECK_FAILED_PROJECTS=$(grep -E "Running target.*typecheck.*failed" "$TYPECHECK_LOG" 2>/dev/null | sed -E 's/.*Running target "typecheck" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "typecheck")
+          fi
+          
           echo "typecheck-result=failure" >> $GITHUB_OUTPUT
+          echo "typecheck-failed-projects=$TYPECHECK_FAILED_PROJECTS" >> $GITHUB_OUTPUT
           OVERALL_SUCCESS=false
         fi
 
@@ -404,12 +465,22 @@ runs:
         if [ "$TEST_EXIT_CODE" -eq 0 ]; then
           echo "✅ Unit tests: PASSED"
           echo "test-result=success" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
           echo "❌ Unit tests: FAILED (exit code: $TEST_EXIT_CODE)"
           echo "## Test Errors Summary"
           grep -E "FAIL|error" "$TEST_LOG" | head -10 || echo "No specific errors found in log"
           echo "::error::Unit tests failed. Check $TEST_LOG for details."
+          
+          # Extract failed projects from Nx test output
+          TEST_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:test" "$TEST_LOG" 2>/dev/null | grep -B5 "FAIL\|failed" "$TEST_LOG" | grep -oE "nx run [^:]+:test" | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
+          if [ -z "$TEST_FAILED_PROJECTS" ]; then
+            # Fallback: try to extract from error messages  
+            TEST_FAILED_PROJECTS=$(grep -E "Running target.*test.*failed\|FAIL.*spec" "$TEST_LOG" 2>/dev/null | sed -E 's/.*Running target "test" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "test")
+          fi
+          
           echo "test-result=failure" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=$TEST_FAILED_PROJECTS" >> $GITHUB_OUTPUT
           OVERALL_SUCCESS=false
         fi
 

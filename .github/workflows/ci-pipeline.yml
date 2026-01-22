@@ -192,6 +192,20 @@ jobs:
           step-results: ${{ steps.collect-results.outputs.step-results }}
           workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
           run-id: ${{ github.run_id }}
+          quality-gates-subsections: |
+            {
+              "formatting": "${{ steps.quality-gates.outputs.formatting-result }}",
+              "lint": "${{ steps.quality-gates.outputs.lint-result }}",
+              "typecheck": "${{ steps.quality-gates.outputs.typecheck-result }}",
+              "test": "${{ steps.quality-gates.outputs.test-result }}"
+            }
+          project-failures: |
+            {
+              "formatting": "${{ steps.quality-gates.outputs.formatting-failed-projects }}",
+              "lint": "${{ steps.quality-gates.outputs.lint-failed-projects }}",
+              "typecheck": "${{ steps.quality-gates.outputs.typecheck-failed-projects }}",
+              "test": "${{ steps.quality-gates.outputs.test-failed-projects }}"
+            }
 
       # ======================================================================
       # FINAL STATUS ORCHESTRATION

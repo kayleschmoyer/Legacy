@@ -40,6 +40,12 @@ inputs:
   job-id:
     description: "GitHub Actions job ID"
     required: false
+  quality-gates-subsections:
+    description: "JSON object with quality gates subsection results (formatting, lint, typecheck, test)"
+    required: false
+  project-failures:
+    description: "JSON object with project-level failures for each subsection (e.g., {lint: ['app', 'web'], test: ['shared-components']})"
+    required: false
 
 outputs:
   comment-id:
@@ -161,7 +167,29 @@ runs:
             'quality-gates': {
               reason: 'Code quality validation failed',
               command: 'pnpm exec nx affected -t lint,typecheck,test --parallel=4',
-              debug: 'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.'
+              debug: 'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.',
+              subsections: {
+                'formatting': { 
+                  reason: 'Code formatting check failed', 
+                  command: 'pnpm exec nx format:write',
+                  debug: 'Code is not properly formatted. Run the command above to auto-fix formatting issues.'
+                },
+                'lint': { 
+                  reason: 'ESLint validation failed', 
+                  command: 'pnpm exec nx affected -t lint --fix',
+                  debug: 'ESLint found code quality issues. Run the command above to attempt automatic fixes.'
+                },
+                'typecheck': { 
+                  reason: 'TypeScript type checking failed', 
+                  command: 'pnpm exec nx affected -t typecheck',
+                  debug: 'TypeScript compilation errors detected. Fix type errors in the affected files.'
+                },
+                'test': { 
+                  reason: 'Unit tests failed', 
+                  command: 'pnpm exec nx affected -t test',
+                  debug: 'One or more unit tests are failing. Review test output and fix the failing tests.'
+                }
+              }
             },
             'build-validation': {
               reason: 'Build validation failed',
@@ -175,12 +203,62 @@ runs:
             }
           };
 
+          // Parse quality gates subsection results if provided
+          let qualityGatesSubsections = {};
+          try {
+            if ('${{ inputs.quality-gates-subsections }}') {
+              qualityGatesSubsections = JSON.parse('${{ inputs.quality-gates-subsections }}');
+            }
+          } catch (e) {
+            console.log('No quality gates subsections provided or parsing failed');
+          }
+
+          // Parse project-level failures if provided
+          let projectFailures = {};
+          try {
+            if ('${{ inputs.project-failures }}') {
+              projectFailures = JSON.parse('${{ inputs.project-failures }}');
+            }
+          } catch (e) {
+            console.log('No project failures provided or parsing failed');
+          }
+
           // Check step results for first failure
           let failedSteps = [];
+          let failedQualityGatesSections = [];
+
           Object.entries(stepResults).forEach(([step, result]) => {
             if (result === 'failure') {
               failedSteps.push(step);
-              if (!reproCommand.includes('format') && stepAnalysis[step]) {
+              
+              // Check for quality-gates failure and drill down into subsections
+              if (step === 'quality-gates' && Object.keys(qualityGatesSubsections).length > 0) {
+                Object.entries(qualityGatesSubsections).forEach(([subsection, subResult]) => {
+                  if (subResult === 'failure') {
+                    failedQualityGatesSections.push(subsection);
+                    
+                    // Use specific subsection guidance if available
+                    if (stepAnalysis['quality-gates'].subsections[subsection]) {
+                      const subsectionInfo = stepAnalysis['quality-gates'].subsections[subsection];
+                      failureReason = subsectionInfo.reason;
+                      reproCommand = subsectionInfo.command;
+                      debugSection = subsectionInfo.debug;
+                      
+                      // Add project-specific information if available
+                      if (projectFailures[subsection] && projectFailures[subsection].length > 0) {
+                        const failedProjects = projectFailures[subsection];
+                        failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
+                        
+                        // Update repro command to target specific projects
+                        const target = subsection === 'formatting' ? 'format:check' : subsection;
+                        reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+                        
+                        debugSection += `\n\n**Failed Projects**: ${failedProjects.map(p => '`' + p + '`').join(', ')}`;
+                      }
+                    }
+                  }
+                });
+              } else if (stepAnalysis[step] && !reproCommand.includes('format')) {
                 failureReason = stepAnalysis[step].reason;
                 reproCommand = stepAnalysis[step].command;
                 debugSection = stepAnalysis[step].debug;
@@ -200,6 +278,33 @@ runs:
                           result === 'skipped' ? '⏭️' : '❓';
               const stepName = step.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               stepStatusTable += `| ${stepName} | ${icon} ${result || 'unknown'} |\n`;
+              
+              // Add subsection details for quality-gates
+              if (step === 'quality-gates' && Object.keys(qualityGatesSubsections).length > 0) {
+                Object.entries(qualityGatesSubsections).forEach(([subsection, subResult]) => {
+                  if (subResult) {
+                    const subIcon = subResult === 'success' ? '✅' : 
+                                   subResult === 'failure' ? '❌' : 
+                                   subResult === 'skipped' ? '⏭️' : '❓';
+                    const subName = subsection.charAt(0).toUpperCase() + subsection.slice(1);
+                    
+                    // Add project count if available
+                    let projectInfo = '';
+                    if (subResult === 'failure' && projectFailures[subsection] && projectFailures[subsection].length > 0) {
+                      projectInfo = ` (${projectFailures[subsection].length} project${projectFailures[subsection].length > 1 ? 's' : ''})`;
+                    }
+                    
+                    stepStatusTable += `| &nbsp;&nbsp;&nbsp;↳ ${subName}${projectInfo} | ${subIcon} ${subResult} |\n`;
+                    
+                    // List failed projects under subsection
+                    if (subResult === 'failure' && projectFailures[subsection] && projectFailures[subsection].length > 0) {
+                      projectFailures[subsection].forEach(project => {
+                        stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• \`${project}\` | ❌ failed |\n`;
+                      });
+                    }
+                  }
+                });
+              }
             });
             stepStatusTable += "\n";
           }
@@ -209,9 +314,15 @@ runs:
           const fallbackReason = "${{ inputs.fallback-reason }}";
           const runId = "${{ inputs.run-id }}";
 
+          // Build detailed failure reason with quality gates subsections if applicable
+          let detailedFailureReason = failureReason;
+          if (failedQualityGatesSections.length > 0) {
+            detailedFailureReason += ` (${failedQualityGatesSections.join(', ')})`;
+          }
+
           const comment = commentMarker + "\n" +
                          "## ❌ CI Pipeline Failed\n\n" +
-                         "**Failure**: " + failureReason + "\n\n" +
+                         "**Failure**: " + detailedFailureReason + "\n\n" +
                          "### 🔍 Quick Debug\n" +
                          debugSection + "\n\n" +
                          stepStatusTable +
@@ -227,6 +338,7 @@ runs:
                          (fallbackReason ? "- **Fallback Reason**: " + fallbackReason + "\n" : "") +
                          "- **Agents/Processes**: " + agents + "\n" +
                          (failedSteps.length > 0 ? "- **Failed Steps**: " + failedSteps.join(', ') + "\n" : "") +
+                         (failedQualityGatesSections.length > 0 ? "- **Failed Quality Gates**: " + failedQualityGatesSections.join(', ') + "\n" : "") +
                          "\n### 📋 Next Steps\n" +
                          "1. **Run the reproduction command** above to identify the specific issue\n" +
                          "2. **Fix the failing tests/lint/build** issues\n" +
