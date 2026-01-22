@@ -23,7 +23,7 @@ jobs:
       - name: "⚙️ Setup Node.js"
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: "📦 Install pnpm"
         uses: pnpm/action-setup@v4
@@ -59,24 +59,41 @@ jobs:
           
           # Try multiple approaches to invoke nx-cloud
           echo "🔍 Attempting to locate nx-cloud CLI..."
-          if pnpm exec nx-cloud --version >/dev/null 2>&1; then
-            NX_CLOUD_VERSION=$(pnpm exec nx-cloud --version 2>&1)
-            echo "✅ nx-cloud CLI available via 'pnpm exec' (version: $NX_CLOUD_VERSION)"
-          elif npx nx-cloud --version >/dev/null 2>&1; then
-            NX_CLOUD_VERSION=$(npx nx-cloud --version 2>&1)
-            echo "✅ nx-cloud CLI available via 'npx' (version: $NX_CLOUD_VERSION)"
-          elif ./node_modules/.bin/nx-cloud --version >/dev/null 2>&1; then
-            NX_CLOUD_VERSION=$(./node_modules/.bin/nx-cloud --version 2>&1)
-            echo "✅ nx-cloud CLI available directly (version: $NX_CLOUD_VERSION)"
+          
+          # Try pnpm exec and capture error
+          echo "Trying 'pnpm exec nx-cloud --version'..."
+          if PNPM_OUTPUT=$(pnpm exec nx-cloud --version 2>&1); then
+            echo "✅ nx-cloud CLI available via 'pnpm exec' (version: $PNPM_OUTPUT)"
+            NX_CLOUD_CMD="pnpm exec nx-cloud"
           else
-            echo "❌ ERROR: nx-cloud CLI not available via any method!"
-            echo "Tried: pnpm exec, npx, direct path"
-            exit 1
+            echo "❌ pnpm exec failed with: $PNPM_OUTPUT"
+            
+            # Try npx
+            echo "Trying 'npx nx-cloud --version'..."
+            if NPX_OUTPUT=$(npx nx-cloud --version 2>&1); then
+              echo "✅ nx-cloud CLI available via 'npx' (version: $NPX_OUTPUT)"
+              NX_CLOUD_CMD="npx nx-cloud"
+            else
+              echo "❌ npx failed with: $NPX_OUTPUT"
+              
+              # Try direct path
+              echo "Trying './node_modules/.bin/nx-cloud --version'..."
+              if DIRECT_OUTPUT=$(./node_modules/.bin/nx-cloud --version 2>&1); then
+                echo "✅ nx-cloud CLI available directly (version: $DIRECT_OUTPUT)"
+                NX_CLOUD_CMD="./node_modules/.bin/nx-cloud"
+              else
+                echo "❌ direct path failed with: $DIRECT_OUTPUT"
+                echo ""
+                echo "❌ ERROR: nx-cloud CLI not available via any method!"
+                echo "Binary exists but fails to execute - this may be a permissions or Node.js version issue"
+                exit 1
+              fi
+            fi
           fi
           
           echo ""
           echo "☁️ Testing Nx Cloud authentication..."
-          STATUS_OUTPUT=$(pnpm exec nx-cloud status 2>&1)
+          STATUS_OUTPUT=$($NX_CLOUD_CMD status 2>&1)
           STATUS_EXIT=$?
           
           echo "$STATUS_OUTPUT"
