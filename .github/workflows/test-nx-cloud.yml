@@ -143,6 +143,7 @@ jobs:
           echo "============================================"
 
           # Run nx command that would connect to Cloud
+          set +e
           TEST_OUTPUT=$(pnpm exec nx show projects --verbose 2>&1)
           TEST_EXIT=$?
           set -e
@@ -151,8 +152,8 @@ jobs:
           echo "DEBUG: Command completed with exit code: $TEST_EXIT"
           echo "DEBUG: Output length: ${#TEST_OUTPUT} characters"
           echo ""
-          echo "--- Output sample (first 50 lines) ---"
-          echo "$TEST_OUTPUT" | head -50
+          echo "--- Output sample (first 100 lines) ---"
+          echo "$TEST_OUTPUT" | head -100
           echo "--- End output sample ---"
           echo ""
 
@@ -197,6 +198,30 @@ jobs:
         with:
           nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
+      - name: "📊 Analyze DTE Detection Results"
+        run: |
+          echo "::group::DTE Detection Analysis"
+          echo ""
+          echo "============================================"
+          echo "📊 DTE Detection Results"
+          echo "============================================"
+          echo "Cloud Available: ${{ steps.test-dte.outputs.cloud-available }}"
+          echo "DTE Available: ${{ steps.test-dte.outputs.dte-available }}"
+          echo "Execution Mode: ${{ steps.test-dte.outputs.execution-mode }}"
+          echo "Optimal Agents: ${{ steps.test-dte.outputs.optimal-agents }}"
+          echo "Fallback Reason: ${{ steps.test-dte.outputs.fallback-reason }}"
+          echo ""
+
+          if [ "${{ steps.test-dte.outputs.dte-available }}" = "false" ]; then
+            echo "🔴 DTE IS NOT AVAILABLE"
+            echo "Reason: ${{ steps.test-dte.outputs.fallback-reason }}"
+            echo ""
+            echo "This explains why main CI falls back to local execution!"
+          else
+            echo "✅ DTE IS AVAILABLE"
+          fi
+          echo "::endgroup::"
+
       - name: "📊 Display Results"
         run: |
           echo "::group::Test Results Summary"
@@ -218,17 +243,57 @@ jobs:
           echo "### ✅ Nx Cloud is properly configured!" >> $GITHUB_STEP_SUMMARY
           echo "::endgroup::"
 
-      - name: "🧪 Test Simple Nx Command with Cloud"
+      - name: "🧪 Test Task Execution with Nx Cloud"
         env:
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
         run: |
-          echo "::group::Testing Nx Command with Cloud Cache"
-          echo "Running a simple Nx command to verify cloud caching..."
+          echo "::group::Testing Task Execution with Cloud"
+          echo ""
+          echo "============================================"
+          echo "🧪 Testing actual task execution"
+          echo "============================================"
+          echo "This tests if token can execute tasks (not just read)"
+          echo ""
 
-          # Run a lightweight command that should hit the cache
-          pnpm exec nx show project web --json > /dev/null
+          set +e
+          echo "Starting at: $(date '+%H:%M:%S')"
+          LINT_OUTPUT=$(pnpm exec nx run web:lint --skip-nx-cache=false 2>&1)
+          LINT_EXIT=$?
+          echo "Completed at: $(date '+%H:%M:%S')"
+          set -e
 
-          echo "✅ Command completed successfully!"
+          echo "Exit code: $LINT_EXIT"
+          echo "Output length: ${#LINT_OUTPUT} characters"
+          echo ""
+
+          # Check for the specific error from main CI
+          if echo "$LINT_OUTPUT" | grep -qi "invalid credentials.*ci access token"; then
+            echo "🔴 FOUND IT! The exact error from main CI:"
+            echo "$LINT_OUTPUT" | grep -Ei "invalid|credentials|access token" | head -10
+            echo ""
+            echo "::error title=Token Cannot Execute Tasks::Token has 'Invalid Credentials (CI Access Token)' error"
+            exit 1
+          fi
+
+          if echo "$LINT_OUTPUT" | grep -qi "workspace could not be found"; then
+            echo "🔴 ERROR: Workspace not found"
+            echo "$LINT_OUTPUT" | grep -i "workspace" | head -5
+            echo ""
+            echo "::error title=Workspace Error::Token doesn't reference a valid workspace"
+            exit 1
+          fi
+
+          echo "--- Full lint output (last 150 lines) ---"
+          echo "$LINT_OUTPUT" | tail -150
+          echo "--- End lint output ---"
+          echo ""
+
+          if [ $LINT_EXIT -eq 0 ]; then
+            echo "✅ Task execution succeeded"
+          else
+            echo "⚠️ Task failed (exit $LINT_EXIT) - may be legitimate lint error"
+          fi
+
           echo "::endgroup::"
 
       - name: "📝 Connection Test Complete"
