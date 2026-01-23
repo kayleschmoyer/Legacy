@@ -88,49 +88,22 @@ runs:
             FALLBACK_REASON="Nx Cloud CLI not available (pnpm/pnpm exec missing)"
             echo "❌ $FALLBACK_REASON"
           else
-            # Try to verify we can connect to Nx Cloud with the token
-            # We'll attempt a lightweight operation that requires authentication
-            # Using a short timeout to avoid hanging
-            echo "🔑 Verifying Nx Cloud authentication..."
+            # Modern Nx Cloud v19+ handles authentication during task execution
+            # No need for pre-flight connectivity checks - they're unreliable
+            # If token exists, we assume DTE is available
+            # Actual authentication and quota limits enforced by Nx Cloud at runtime
             
-            # Try to make a simple authenticated API call to verify connection and quota
-            # We'll test by attempting to check cloud status
-            CLI_TEST=$(timeout 15s $NX_CLOUD_CMD status 2>&1 || echo "COMMAND_FAILED")
+            echo "✅ Nx Cloud CLI available"
+            echo "🎯 Token present - DTE will be available"
+            echo "ℹ️  Authentication verified during actual task execution"
             
-            # Check the output for various error conditions
-            if echo "$CLI_TEST" | grep -qi "Unable to authenticate\|Bad credentials\|401"; then
-              FALLBACK_REASON="Nx Cloud authentication failed - invalid or expired token"
-              echo "❌ $FALLBACK_REASON"
-            elif echo "$CLI_TEST" | grep -qi "disabled due to exceeding\|exceeded.*plan\|quota exceeded"; then
-              FALLBACK_REASON="Nx Cloud quota exceeded - FREE plan limit reached"
-              echo "❌ $FALLBACK_REASON"
-              echo "::warning::Nx Cloud FREE plan quota exceeded. Visit https://cloud.nx.app to upgrade or wait for quota reset. Falling back to local execution."
-            elif echo "$CLI_TEST" | grep -q "COMMAND_FAILED"; then
-              FALLBACK_REASON="Nx Cloud CLI command timed out or failed"
-              echo "❌ $FALLBACK_REASON"
-            elif echo "$CLI_TEST" | grep -qi "error\|failed"; then
-              FALLBACK_REASON="Nx Cloud returned an error"
-              echo "❌ $FALLBACK_REASON"
-              echo "Debug output: $CLI_TEST"
-            else
-              # If we didn't get an error, assume connection is working
-              echo "✅ Nx Cloud accessible and authenticated"
-              CLOUD_AVAILABLE="true"
-              
-              # For modern Nx Cloud (v19+), we can't query quotas/agents upfront
-              # The system handles agent allocation automatically via start-ci-run
-              # If we can authenticate, we assume DTE is available
-              # Actual quota/usage limits will be enforced by Nx Cloud at runtime
-              
-              echo "🎯 Nx Cloud ready for DTE"
-              
-              DTE_AVAILABLE="true"
-              EXECUTION_MODE="distributed"
-              # Use default of 8 agents - Nx Cloud will allocate based on plan/usage
-              OPTIMAL_AGENTS=8
-              MEMORY_LIMIT="6144"
-              echo "🚀 DTE configured - Nx Cloud will manage agent allocation and usage limits"
-            fi
+            CLOUD_AVAILABLE="true"
+            DTE_AVAILABLE="true"
+            EXECUTION_MODE="distributed"
+            # Use default of 8 agents - Nx Cloud will allocate based on plan/usage
+            OPTIMAL_AGENTS=8
+            MEMORY_LIMIT="6144"
+            echo "🚀 DTE configured - Nx Cloud manages authentication and agent allocation"
           fi
         else
           FALLBACK_REASON="No Nx Cloud token provided"
