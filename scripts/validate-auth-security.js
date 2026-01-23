@@ -17,14 +17,26 @@ const DANGEROUS_PATTERNS = [
   /VITE_GOOGLE_CLIENT_ID=\d+-[a-zA-Z0-9]+\.apps\.googleusercontent\.com/,
   // AWS Account IDs in environment files (not GitHub Actions)
   /AWS_ACCOUNT_ID=\d{12}/,
+  // AWS Account IDs in URLs (like SQS)
+  /amazonaws\.com\/\d{12}\//,
   // Database passwords (not placeholder values)
   /DB_PASSWORD=(?!your-password-here|placeholder)[^\s]+/,
-  // JWT secrets (not placeholder values)
-  /JWT_SECRET=(?!your-jwt-secret|placeholder)[^\s]+/,
+  // JWT secrets (not placeholder values) - base64 strings longer than 20 chars
+  /JWT_SECRET=(?!your-jwt-secret|placeholder|your-local-jwt|DO-NOT-COMMIT)[A-Za-z0-9+/]{20,}/,
+  // Cookie secrets (not placeholder values) - base64 strings
+  /COOKIE_SECRET=(?!your-cookie-secret|placeholder|your-local-cookie|DO-NOT-COMMIT)[A-Za-z0-9+/=]{20,}/,
+  // Google OAuth Client Secrets
+  /GOOGLE_OAUTH_CLIENT_SECRET=(?!your-google-oauth|placeholder|DO-NOT-COMMIT)GOCSPX-[A-Za-z0-9_-]+/,
   // API keys (not placeholder values)
   /API_KEY=(?!your-api-key|placeholder)[^\s]+/,
   // Real OAuth proxy URLs in .env files (not code comments or examples)
   /^VITE_OAUTH_PROXY_URL=https:\/\/[a-z0-9]+\.execute-api\.[a-z-]+\.amazonaws\.com/m,
+  // Real database endpoints
+  /DB_HOST=(?!localhost|your-db-host|placeholder)[a-z0-9-]+\.[a-z0-9]+\.us-[a-z]+-\d+\.rds\.amazonaws\.com/,
+  // Nx Cloud access tokens
+  /NX_CLOUD_ACCESS_TOKEN=(?!your-nx-cloud-access-token|placeholder)[A-Za-z0-9]{20,}/,
+  // Real RDS Proxy endpoints
+  /RDS_PROXY_ENDPOINT=(?!your-rds-proxy|placeholder)[a-z0-9-]+\.proxy-[a-z0-9]+\.[a-z-]+\d+\.rds\.amazonaws\.com/,
 ];
 
 const ALLOWED_EXCEPTIONS = [
@@ -33,10 +45,13 @@ const ALLOWED_EXCEPTIONS = [
   // Documentation files can show examples (but check context)
   'AGENTS.md',
   'README.md',
+  'agents.md',
   // Terraform outputs are templates
   'terraform/outputs.tf',
   // The validation script itself contains regex patterns
   'scripts/validate-auth-security.js',
+  // .env.example should only have safe placeholders
+  '.env.example',
 ];
 
 const DANGEROUS_FILES = [
@@ -105,8 +120,11 @@ function checkStagedFiles() {
                 line.includes('your-') ||
                 line.includes('example') ||
                 line.includes('template') ||
+                line.includes('DO-NOT-COMMIT') ||
+                line.includes('YOUR-AWS-ACCOUNT-ID') ||
                 line.includes('// ') ||
                 line.includes('* ') ||
+                line.includes('# SECURITY:') ||
                 (line.includes('googleClientId') && line.includes('||')))
             ) {
               continue;

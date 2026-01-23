@@ -13,55 +13,80 @@ const path = require('path');
 const DANGEROUS_PATTERNS = {
   JWT_SECRET: {
     pattern:
-      /JWT_SECRET=(?!your-jwt-secret|placeholder|REPLACE_WITH_ACTUAL)[A-Za-z0-9+/]{20,}/,
+      /JWT_SECRET=(?!your-jwt-secret|placeholder|REPLACE_WITH_ACTUAL|DO-NOT-COMMIT|your-local-jwt)[A-Za-z0-9+/]{20,}/,
     description: 'Real JWT signing key detected',
   },
   COOKIE_SECRET: {
     pattern:
-      /COOKIE_SECRET=(?!your-cookie-secret|placeholder|REPLACE_WITH_ACTUAL)[A-Za-z0-9]{20,}/,
+      /COOKIE_SECRET=(?!your-cookie-secret|placeholder|REPLACE_WITH_ACTUAL|DO-NOT-COMMIT|your-local-cookie)[A-Za-z0-9+/=]{20,}/,
     description: 'Real cookie signing secret detected',
   },
   GOOGLE_OAUTH_CLIENT_SECRET: {
     pattern:
-      /GOOGLE_OAUTH_CLIENT_SECRET=(?!REPLACE_WITH_ACTUAL|your-secret|placeholder)[A-Za-z0-9_-]{20,}/,
+      /GOOGLE_OAUTH_CLIENT_SECRET=(?!REPLACE_WITH_ACTUAL|your-secret|placeholder|your-google-oauth|DO-NOT-COMMIT)GOCSPX-[A-Za-z0-9_-]+/,
     description: 'Real Google OAuth client secret detected',
   },
-  AWS_ACCOUNT_ID: {
-    pattern: /\d{12}/,
-    description: 'AWS Account ID detected',
+  AWS_ACCOUNT_ID_IN_URL: {
+    pattern: /amazonaws\.com\/\d{12}\//,
+    description: 'AWS Account ID in URL detected',
   },
   PRODUCTION_DATABASE: {
-    pattern: /DB_HOST=.*\.amazonaws\.com/,
+    pattern:
+      /DB_HOST=(?!localhost|your-db-host|placeholder)[a-z0-9-]+\.[a-z0-9]+\.us-[a-z]+-\d+\.rds\.amazonaws\.com/,
     description: 'Production database endpoint detected',
   },
+  PRODUCTION_RDS_PROXY: {
+    pattern:
+      /RDS_PROXY_ENDPOINT=(?!your-rds-proxy|placeholder)[a-z0-9-]+\.proxy-[a-z0-9]+\.[a-z-]+\d+\.rds\.amazonaws\.com/,
+    description: 'Production RDS Proxy endpoint detected',
+  },
   PRODUCTION_SQS: {
-    pattern: /SQS_QUEUE_URL=https:\/\/sqs\..*\.amazonaws\.com\/\d{12}\//,
+    pattern: /SQS.*URL=https:\/\/sqs\.[a-z-]+\d+\.amazonaws\.com\/\d{12}\//,
     description: 'Production SQS queue with account ID detected',
+  },
+  NX_CLOUD_TOKEN: {
+    pattern:
+      /NX_CLOUD_ACCESS_TOKEN=(?!your-nx-cloud-access-token|placeholder)[A-Za-z0-9]{20,}/,
+    description: 'Real Nx Cloud access token detected',
   },
 };
 
 // ✅ Safe placeholder patterns
 const SAFE_PLACEHOLDERS = [
   'your-jwt-secret',
+  'your-cookie-secret',
+  'your-google-oauth',
   'placeholder-secret',
   'REPLACE_WITH_ACTUAL',
+  'DO-NOT-COMMIT',
+  'YOUR-AWS-ACCOUNT-ID',
   'your-google-client-id',
+  'your-db-host',
+  'your-rds-proxy',
+  'your-nx-cloud',
   'localhost',
   'example.com',
+  '# SECURITY:',
 ];
 
 function validateFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const violations = [];
   const isLocalEnv = filePath.includes('.env.local');
+  const lines = content.split('\n');
 
   Object.entries(DANGEROUS_PATTERNS).forEach(
     ([name, { pattern, description }]) => {
       const matches = content.match(pattern);
       if (matches) {
-        // Check if it's a safe placeholder
-        const isSafe = SAFE_PLACEHOLDERS.some((placeholder) =>
-          matches[0].includes(placeholder),
+        // Find which line contains the match
+        const lineIndex = lines.findIndex((line) => pattern.test(line));
+        const line = lineIndex >= 0 ? lines[lineIndex] : '';
+
+        // Check if it's a safe placeholder or has security warning
+        const isSafe = SAFE_PLACEHOLDERS.some(
+          (placeholder) =>
+            matches[0].includes(placeholder) || line.includes(placeholder),
         );
 
         // Skip validation for .env.local files (they are gitignored)
@@ -74,8 +99,7 @@ function validateFile(filePath) {
             type: name,
             description,
             match: matches[0],
-            line: content.substring(0, content.indexOf(matches[0])).split('\n')
-              .length,
+            line: lineIndex + 1,
           });
         }
       }

@@ -4,24 +4,30 @@
 
 This guide ensures no sensitive information is accidentally committed to git and provides secure credential management for the Legacy Sports application.
 
+> **🔒 Security Update (LS-55):** All production secrets have been removed from the `.env` file and replaced with safe placeholders. The `.env` file now serves as a template with security warnings. Real credentials should only exist in `.env.local` (gitignored) or AWS Secrets Manager.
+
 ## 🚨 CRITICAL: What NOT to Commit
 
 ### ❌ Never Commit These to Git:
 
-- **Real JWT signing keys** (`JWT_SECRET=long-base64-string`)
-- **Real cookie secrets** (`COOKIE_SECRET=long-string`)
-- **AWS account IDs** (12-digit numbers like `176661590736`)
-- **Production database endpoints** (`*.amazonaws.com`)
-- **Google OAuth client secrets** (real values, not placeholders)
-- **Real SQS queue URLs** with account IDs
-- **Real database passwords**
+- **Real JWT signing keys** (`JWT_SECRET=BjyuX301kYZ...` - base64 strings longer than 20 chars)
+- **Real cookie secrets** (`COOKIE_SECRET=ZiqhZN/p8p4...` - base64 strings)
+- **Real Google OAuth client secrets** (`GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...`)
+- **Nx Cloud access tokens** (`NX_CLOUD_ACCESS_TOKEN=NWJhZDNmYTY...`)
+- **AWS account IDs** (12-digit numbers like `176661590736`) in URLs or configuration
+- **Production database endpoints** (`legacy-sports-dev-postgres.*.rds.amazonaws.com`)
+- **Production RDS Proxy endpoints** (`*.proxy-*.rds.amazonaws.com`)
+- **Real SQS queue URLs** with AWS account IDs (`sqs.us-east-1.amazonaws.com/176661590736/...`)
+- **Real API Gateway URLs** (`https://bd1opa1yv7.execute-api...`)
+- **Real database passwords** (not placeholders)
 
 ### ✅ Safe to Commit:
 
-- **Placeholder values** (`your-jwt-secret-here`, `REPLACE_WITH_ACTUAL`)
-- **Template configurations** (`.env.example` files)
-- **Local development defaults** (`localhost`, `placeholder-client-id`)
+- **Placeholder values** (`your-jwt-secret-here`, `DO-NOT-COMMIT-REAL-VALUE`, `YOUR-AWS-ACCOUNT-ID`)
+- **Template configurations** (`.env.example` files with placeholders only)
+- **Local development defaults** (`localhost`, `your-google-client-id.apps.googleusercontent.com`)
 - **AWS secret names/ARNs** (without the actual secret values)
+- **Security warning comments** (lines with `# SECURITY:` warnings)
 
 ## 🛠️ Security Tools
 
@@ -48,12 +54,18 @@ The validation script checks for dangerous patterns:
 
 ### `.env` (Production Template - Tracked by Git)
 
+**⚠️ IMPORTANT: The `.env` file should ONLY contain safe placeholders!**
+
 ```bash
-# ✅ SAFE - Only placeholders and template variables
+# ✅ SAFE - Only placeholders and template variables with security warnings
 USE_LOCAL_CREDENTIALS=false
-DB_SECRET_NAME=${DB_SECRET_NAME}  # Terraform substitution
-JWT_SECRET=${JWT_SECRET}          # AWS Secrets Manager
-GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+# SECURITY: Production DB credentials are managed by AWS Secrets Manager
+DB_SECRET_NAME=your-db-secret-name
+DB_HOST=your-db-host.rds.amazonaws.com
+JWT_SECRET=your-jwt-secret-here-DO-NOT-COMMIT-REAL-VALUE
+COOKIE_SECRET=your-cookie-secret-here-DO-NOT-COMMIT-REAL-VALUE
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-secret-here-DO-NOT-COMMIT-REAL-VALUE
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
 ### `.env.local` (Development - Gitignored)
@@ -62,7 +74,7 @@ GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 # ✅ SAFE - Local development only, not tracked by git
 USE_LOCAL_CREDENTIALS=true
 DB_HOST=localhost:5432
-DB_PASSWORD=my-actual-local-password
+DB_PASSWORD=your-actual-local-password
 ```
 
 ### `.env.example` (Template - Tracked by Git)
