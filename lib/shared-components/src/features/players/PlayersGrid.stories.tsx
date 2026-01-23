@@ -110,7 +110,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[successMock]} addTypename={false}>
+      <MockedProvider mocks={[successMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>
@@ -125,7 +125,7 @@ export const Default: Story = {
 export const Loading: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[loadingMock]} addTypename={false}>
+      <MockedProvider mocks={[loadingMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>
@@ -140,7 +140,7 @@ export const Loading: Story = {
 export const Error: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[errorMock]} addTypename={false}>
+      <MockedProvider mocks={[errorMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>
@@ -155,7 +155,7 @@ export const Error: Story = {
 export const Empty: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[emptyMock]} addTypename={false}>
+      <MockedProvider mocks={[emptyMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>
@@ -170,7 +170,7 @@ export const Empty: Story = {
 export const WithoutSearch: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[successMock]} addTypename={false}>
+      <MockedProvider mocks={[successMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>
@@ -186,7 +186,7 @@ export const WithoutSearch: Story = {
 export const WithoutSorting: Story = {
   decorators: [
     (Story) => (
-      <MockedProvider mocks={[successMock]} addTypename={false}>
+      <MockedProvider mocks={[successMock]}>
         <div style={{ height: '100vh' }}>
           <Story />
         </div>

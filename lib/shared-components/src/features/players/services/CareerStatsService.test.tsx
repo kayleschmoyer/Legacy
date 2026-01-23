@@ -134,11 +134,7 @@ interface TestWrapperProps {
 const TestWrapper: React.FC<TestWrapperProps> = ({
   children,
   mocks = [mockGraphQLResponse],
-}) => (
-  <MockedProvider mocks={mocks} addTypename={false}>
-    {children}
-  </MockedProvider>
-);
+}) => <MockedProvider mocks={mocks}>{children}</MockedProvider>;
 
 // =============================================================================
 // Data Transformation Tests
