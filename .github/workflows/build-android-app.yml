@@ -367,7 +367,7 @@ jobs:
 
     steps:
       - name: Download APK Artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: android-apk-${{ needs.setup.outputs.build_type }}
           path: ./artifacts
