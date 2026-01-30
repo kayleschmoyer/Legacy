@@ -2,11 +2,20 @@
 
 ## Overview
 
-This directory contains structured skill documentation for AI agents working on the Legacy Sports codebase. Each skill provides detailed guidance on executing specific development tasks.
+This directory contains **detailed** skill documentation for AI agents. For **quick reference**, see:
+
+- [`quick-reference.md`](../quick-reference.md) - Essential commands and workflows
+- [`tasks/`](../tasks/) - Quick task guides (2-3 KB each)
+- [`commands.yml`](../commands.yml) - Structured command lookup
+
+**Load skills files only when task guides are insufficient.**
+
+Each skill provides comprehensive guidance on executing specific development tasks.
 
 ## Available Skills
 
 ### Core Validation Skills
+
 1. **[Type Checking](typecheck.md)** - TypeScript type validation
 2. **[Linting](lint.md)** - Code quality and style checking with ESLint
 3. **[Testing](test.md)** - Running Jest tests
@@ -14,11 +23,13 @@ This directory contains structured skill documentation for AI agents working on 
 5. **[Formatting](format.md)** - Code formatting with Prettier
 
 ### Development Server Skills
+
 6. **[Dev Web Server](dev-web.md)** - Running Next.js development server
 7. **[Dev DB Lambda](dev-db-lambda.md)** - Running local GraphQL Lambda
 8. **[Sync Environment](sync-env.md)** - Syncing environment variables from AWS
 
 ### Workflow & Branch Management Skills
+
 9. **[Complete Workflow: Ticket to PR](workflow-ticket-to-pr.md)** ⭐ **START HERE** - Complete workflow preventing common mistakes
 10. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
 11. **[Jira Ticket Management](jira-ticket.md)** - Managing ticket status and workflow
@@ -26,20 +37,24 @@ This directory contains structured skill documentation for AI agents working on 
 13. **[Branch Tree Management](branch-tree.md)** - Managing dependent branch trees
 
 ### Code Generation & Database Skills
+
 14. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
 15. **[Database Migration](db-migrate.md)** - Running database migrations
 16. **[Database Connection](db-connect.md)** - Testing database connectivity
 
 ### Troubleshooting & Maintenance Skills
+
 16. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
 17. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
 18. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
 
 ### Deployment Skills
+
 19. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
 20. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
 ### CLI & Administrative Tools
+
 21. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
 
 ## Skill Structure
@@ -74,7 +89,8 @@ pnpm exec nx affected -t build       # 4. Building
 ## Quick Commands
 
 ### Makefile Shortcuts
-```pValidation Skills
+
+````pValidation Skills
 ```powershell
 # Type checking only
 pnpm exec nx affected -t typecheck
@@ -90,9 +106,10 @@ pnpm exec nx affected -t build
 
 # Formatting (entire project)
 pnpm exec prettier --write .
-```
+````
 
 ### Development Server Skills
+
 ```powershell
 # Sync environment variables
 .\scripts\sync-env.ps1
@@ -105,6 +122,7 @@ pnpm exec nx run db:serve
 ```
 
 ### CLI Tools
+
 ```powershell
 # Test database connection
 pnpm run cli:test-connection
@@ -129,13 +147,17 @@ pnpm exec nx start cli -- auth login
 ## Performance Tips
 
 ### Use Affected Commands
+
 Always use `nx affected` to only check changed files:
+
 ```powershell
 pnpm exec nx affected -t <target>
 ```
 
 ### Parallel Execution
+
 Nx aStart Development Session
+
 ```powershell
 # 1. Sync environment variables
 .\scripts\sync-env.ps1
@@ -152,9 +174,11 @@ pnpm exec nx run db:serve
 ### utomatically parallelizes across projects - don't run tasks manually in parallel.
 
 ### Cache Benefits
+
 Nx caches results - unchanged projects skip execution automatically.
 
 ### Reset Cache if Needed
+
 ```powershell
 pnpm exec nx reset
 ```
@@ -162,16 +186,19 @@ pnpm exec nx reset
 ## Common Workflows
 
 ### Quick Development Check
+
 ```powershell
 make quick-check  # Fast: typecheck + lint
 ```
 
 ### Full Pre-commit Validation
+
 ```powershell
 make pre-commit  # Complete: all 4 validation steps
 ```
 
 ### Specific Project Only
+
 ```powershell
 pnpm exec nx run <project-name>:typecheck
 pnpm exec nx run <project-name>:lint --fix
@@ -182,6 +209,7 @@ pnpm exec nx run <project-name>:build
 ## Integration with CI/CD
 
 These same commands run in CI pipelines:
+
 - GitHub Actions uses identical Nx commands
 - Same caching mechanisms apply
 - Parallel execution across CI workers
@@ -207,7 +235,8 @@ When working on tasks:
 4. **Fix issues in order**: Don't skip steps if earlier validation fails
 5. **Use affected commands**: Don't waste time checking unchanged code
 6. **Read error messages carefully**: They often indicate the fix needed
-7 **[Development Workflow CSV](../development-workflow.csv)** - Quick reference patterns
+   7 **[Development Workflow CSV](../development-workflow.csv)** - Quick reference patterns
+
 - **[Troubleshooting Guide](../../guides/troubleshooting.md)** - Common issues and solutions
 - **[ESLint Standards CSV](../eslint-standards.csv)** - Linting rules details
 - **[Type Safety CSV](../type-safety.csv)** - TypeScript patterns

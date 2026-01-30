@@ -1,0 +1,122 @@
+# Linting Error Fixes for AI Agents
+# Common ESLint errors and solutions
+
+auto_fixable:
+  note: "Most issues fixed automatically with --fix flag"
+  command: "pnpm exec nx affected -t lint --fix"
+  handles:
+    - "Import ordering"
+    - "Spacing and formatting"
+    - "Quote style (single vs double)"
+    - "Semicolons"
+    - "Trailing commas"
+    - "Unused imports"
+
+manual_fixes_required:
+  floating_promises:
+    error: "@typescript-eslint/no-floating-promises"
+    cause: "Async function called without await or void"
+    severity: "high"
+    fix: "Add void keyword or await the promise"
+    example: |
+      // ❌ Bad - promise not handled
+      someAsyncFunction();
+
+      // ✅ Good - explicitly void
+      void someAsyncFunction();
+
+      // ✅ Good - awaited
+      await someAsyncFunction();
+
+      // ✅ Good - handled
+      someAsyncFunction().catch(err => LOGGER.error(err));
+
+  unused_variables:
+    error: "@typescript-eslint/no-unused-vars"
+    cause: "Variable declared but never used"
+    fix: "Remove unused code or use the variable"
+    example: |
+      // ❌ Bad
+      const unused = fetchData();
+
+      // ✅ Good - use it
+      const data = fetchData();
+      console.log(data);
+
+      // ✅ Good - prefix with underscore if intentionally unused
+      const _unused = fetchData();
+
+  any_types:
+    error: "@typescript-eslint/no-explicit-any"
+    cause: "Using 'any' type reduces type safety"
+    severity: "high"
+    fix: "Create proper interface"
+    example: |
+      // ❌ Bad
+      function process(data: any) { }
+
+      // ✅ Good
+      interface DataType {
+        id: number;
+        name: string;
+      }
+      function process(data: DataType) { }
+
+  console_statements:
+    error: "no-console"
+    cause: "Console.log used in production code"
+    fix: "Use structured logging"
+    example: |
+      // ❌ Bad
+      console.log('debug info', data);
+      console.error('error occurred', error);
+
+      // ✅ Good
+      import { LOGGER } from '@legacy-sports/logging';
+      LOGGER.info('debug info', { data });
+      LOGGER.error('error occurred', { error });
+
+  prefer_const:
+    error: "prefer-const"
+    cause: "Variable declared with let but never reassigned"
+    fix: "Change let to const"
+    example: |
+      // ❌ Bad
+      let value = 123;
+
+      // ✅ Good
+      const value = 123;
+
+disable_rules:
+  when_to_use: "Only when absolutely necessary with clear justification"
+  format: "// eslint-disable-next-line <rule-name>"
+
+  acceptable:
+    example: |
+      // ✅ Good - Documented reason
+      // Platform compatibility requires any type here
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).StyleSheet = StyleSheet;
+
+  unacceptable:
+    example: |
+      // ❌ Bad - No justification
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = response;
+
+workflow:
+  step1:
+    action: "Run linter with auto-fix"
+    command: "pnpm exec nx affected -t lint --fix"
+
+  step2:
+    action: "Review remaining errors"
+    note: "Auto-fix handles ~80% of issues"
+
+  step3:
+    action: "Fix manually according to error type"
+    reference: "See manual_fixes_required section"
+
+  step4:
+    action: "Continue to testing"
+    command: "pnpm exec nx affected -t test"

@@ -1,0 +1,82 @@
+# TypeScript Error Fixes for AI Agents
+# Common type errors and their solutions
+
+module_errors:
+  cannot_find_module:
+    error: "Cannot find module '@legacy-sports/...'"
+    cause: "Library dependencies not built"
+    fix: "pnpm run build:libs"
+    note: "Always build libraries before apps"
+
+type_mismatches:
+  not_assignable:
+    error: "Type 'X' is not assignable to type 'Y'"
+    cause: "Type mismatch or missing interface"
+    fix: "Create proper interface with specific types"
+    example: |
+      // ❌ Bad
+      const data: any = response;
+
+      // ✅ Good
+      interface ApiResponse {
+        users: User[];
+        pagination: PaginationInfo;
+      }
+      const data: ApiResponse = response;
+    rule: "Never use 'any' - create specific interfaces"
+
+  property_not_exist:
+    error: "Property 'X' does not exist on type 'Y'"
+    cause: "Missing property or optional property not handled"
+    fix: "Use optional chaining or update interface"
+    example: |
+      // Use optional chaining for possibly undefined properties
+      const value = object?.property?.nestedProperty;
+
+      // Or check explicitly
+      if (object.property) {
+        const value = object.property.nested;
+      }
+
+generated_types:
+  out_of_sync:
+    error: "Type definitions don't match schema"
+    cause: "GraphQL schema or API changed"
+    fix: "Regenerate types with codegen"
+    command: "pnpm exec nx run {project}:codegen"
+    common_projects: ["shared-components", "api", "db"]
+
+any_type_errors:
+  implicit_any:
+    error: "Parameter/variable implicitly has 'any' type"
+    cause: "Missing type annotation"
+    fix: "Add explicit type annotation"
+    example: |
+      // ❌ Bad
+      function process(data) { }
+
+      // ✅ Good
+      interface InputData {
+        id: number;
+        name: string;
+      }
+      function process(data: InputData) { }
+
+circular_dependencies:
+  import_cycle:
+    error: "Circular dependency detected"
+    cause: "Two or more files import each other"
+    fix: "Refactor to break the cycle"
+    detection: "pnpm exec nx graph"
+    solution: |
+      1. Run 'pnpm exec nx graph' to visualize
+      2. Extract shared types to separate file
+      3. Use dependency injection
+      4. Restructure imports to be unidirectional
+
+best_practices:
+  - rule: "Never use 'any' without documented justification"
+  - rule: "Create specific interfaces for all data structures"
+  - rule: "Use union types for known values: type Status = 'loading' | 'success' | 'error'"
+  - rule: "Use optional chaining for nullable properties"
+  - rule: "Build libraries before checking types"
