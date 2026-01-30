@@ -1,0 +1,81 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Drafts Resolver - Integration Tests CRUD Operations should create a draft with all fields 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "normal",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests CRUD Operations should read a draft by id 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "blind",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests CRUD Operations should update draft type 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "legacy",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests Draft Orders should support normal draft order 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "normal",
+  "draftType": "normal",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests Draft Orders should support snake draft order 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "normal",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests Draft Types should support blind draft type 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "blind",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests Draft Types should support legacy draft type 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "legacy",
+  "id": 1,
+  "leagueId": 1,
+}
+`;
+
+exports[`Drafts Resolver - Integration Tests Draft Types should support normal draft type 1`] = `
+{
+  "date": "2024-03-15T00:00:00.000Z",
+  "draftOrder": "snake",
+  "draftType": "normal",
+  "id": 1,
+  "leagueId": 1,
+}
+`;

@@ -5,59 +5,67 @@ import React from 'react';
 import App from './app';
 
 // Mock all the components that might have complex dependencies
-jest.mock('@legacy-sports/shared-components', () => ({
-  Button: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
-      {children}
-    </button>
-  ),
-  H1: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>{children}</h1>
-  ),
-  XStack: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
-  YStack: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
-  BaseballScreen: () => <div>Baseball Screen</div>,
-  FootballScreen: () => <div>Football Screen</div>,
-  PlayersScreen: () => <div>Players Screen</div>,
-  useAuth: () => ({
-    isAuthenticated: true,
-    isLoading: false,
-    user: {
-      id: 'test-user-id',
-      username: 'testuser',
-      email: 'test@example.com',
-    },
-    logout: jest.fn(),
-  }),
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const actual = jest.requireActual('@legacy-sports/shared-components');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return {
+    ...actual,
+    Button: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => (
+      <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
+        {children}
+      </button>
+    ),
+    H1: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => (
+      <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>
+        {children}
+      </h1>
+    ),
+    XStack: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => (
+      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+    ),
+    YStack: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => (
+      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+    ),
+    BaseballScreen: () => <div>Baseball Screen</div>,
+    FootballScreen: () => <div>Football Screen</div>,
+    PlayersScreen: () => <div>Players Screen</div>,
+    useAuth: () => ({
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        id: 'test-user-id',
+        username: 'testuser',
+        email: 'test@example.com',
+      },
+      logout: jest.fn(),
+    }),
+  };
+});
 
 // Mock the styled function to avoid Tamagui issues
 jest.mock('tamagui', () => ({
@@ -76,6 +84,67 @@ jest.mock('../components/UserProfileDropdown', () => ({
 jest.mock('../components/WebPlayerStatsPage', () => ({
   WebPlayerDetailPage: () => <div>Web Player Detail Page</div>,
   WebPlayerStatsPage: () => <div>Web Player Stats Page</div>,
+}));
+
+// Mock navigation components
+jest.mock('../components/SportsDropdown', () => ({
+  SportsDropdown: () => <div>Sports Dropdown</div>,
+}));
+
+jest.mock('../components/PlayersDropdown', () => ({
+  PlayersDropdown: () => <div>Players Dropdown</div>,
+}));
+
+jest.mock('../components/a11y/GlobalAnnouncer', () => ({
+  GlobalAnnouncer: () => <div>Global Announcer</div>,
+}));
+
+// Mock page components (default exports)
+jest.mock('../components/AboutPage', () => ({
+  default: () => <div>About Page</div>,
+}));
+
+jest.mock('../components/ManagementPage', () => ({
+  default: () => <div>Management Page</div>,
+}));
+
+// Mock baseball components
+jest.mock('../components/EliteDraftBoard', () => ({
+  EliteDraftBoardScreen: () => <div>Elite Draft Board Screen</div>,
+}));
+
+jest.mock('../components/baseball', () => ({
+  BaseballScreen: () => <div>Baseball Screen</div>,
+}));
+
+jest.mock('../components/baseball/LeagueCreatePage', () => ({
+  default: () => <div>League Create Page</div>,
+}));
+
+jest.mock('../components/baseball/LeagueDetailPage', () => ({
+  default: () => <div>League Detail Page</div>,
+}));
+
+jest.mock('../components/baseball/TeamDetailPage', () => ({
+  TeamDetailPage: () => <div>Team Detail Page</div>,
+}));
+
+jest.mock('../components/baseball/JoinLeagueByCode', () => ({
+  default: () => <div>Join League By Code</div>,
+}));
+
+// Mock matchup components
+jest.mock('../components/matchup/MatchupDetailPage', () => ({
+  MatchupDetailPage: () => <div>Matchup Detail Page</div>,
+}));
+
+jest.mock('../components/matchup/StandingsPage', () => ({
+  StandingsPage: () => <div>Standings Page</div>,
+}));
+
+// Mock commissioner components
+jest.mock('../components/commissioner/CommissionerPage', () => ({
+  CommissionerPage: () => <div>Commissioner Page</div>,
 }));
 
 describe('App', () => {

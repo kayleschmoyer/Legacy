@@ -22,15 +22,7 @@ import {
   type ScoringFieldingStats,
   type ScoringPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
-// import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until MatchupPlayerFragment is implemented in schema
-/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
-type MatchupPlayerFragment = {
-  id: string;
-  playerId: number;
-  games?: any[];
-} | null;
+import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
 
 export interface PlayerMatchupStatsModalProps {
   /** Player data with games and stats */
@@ -76,22 +68,22 @@ export function PlayerMatchupStatsModal({
 
     // Aggregate stats across all games - map GraphQL to DB format first
     const battingGames = player.games
-      .filter((g) => g.battingStats)
+      .filter((g) => g.battingGame)
       .map((g) => ({
         ...g,
-        mappedBatting: mapBattingStats(g.battingStats),
+        mappedBatting: mapBattingStats(g.battingGame),
       }));
     const pitchingGames = player.games
-      .filter((g) => g.pitchingStats)
+      .filter((g) => g.pitchingGame)
       .map((g) => ({
         ...g,
-        mappedPitching: mapPitchingStats(g.pitchingStats),
+        mappedPitching: mapPitchingStats(g.pitchingGame),
       }));
     const fieldingGames = player.games
-      .filter((g) => g.fieldingStats)
+      .filter((g) => g.fieldingGame)
       .map((g) => ({
         ...g,
-        mappedFielding: mapFieldingStats(g.fieldingStats),
+        mappedFielding: mapFieldingStats(g.fieldingGame),
       }));
 
     // Process batting stats - now using DB field names

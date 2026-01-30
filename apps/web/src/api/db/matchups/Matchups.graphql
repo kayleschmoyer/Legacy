@@ -67,3 +67,158 @@ query GetMatchupHistory(
     ...Matchup
   }
 }
+
+fragment MatchupPlayer on MatchupPlayer {
+  id
+  matchupId
+  playerId
+  teamId
+  positionId
+  season
+  player {
+    id
+    firstName
+    lastName
+    brefId
+  }
+  seasonBatting {
+    games
+    plateAppearances
+    atBats
+    runs
+    hits
+    doubles
+    triples
+    homeRuns
+    rbi
+    stolenBases
+    caughtStealing
+    baseOnBalls
+    strikeouts
+    groundedIntoDoublePlays
+    hitByPitch
+    sacrificeHits
+    intentionalBaseOnBalls
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+  }
+  seasonPitching {
+    wins
+    losses
+    winLossPercentage
+    earnedRunAverage
+    games
+    gamesStarted
+    gamesFinished
+    completeGames
+    shutouts
+    saves
+    inningsPitched
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    intentionalBaseOnBalls
+    strikeouts
+    hitByPitch
+    balks
+    wildPitches
+    battersFaced
+    outsRecorded
+  }
+  seasonFielding {
+    games
+    gamesStarted
+    inningsDefended
+    chances
+    putouts
+    assists
+    errors
+    doublePlays
+    fieldingPercentage
+  }
+  games {
+    id
+    matchupPlayerId
+    gameNum
+    battingGameNum
+    pitchingGameNum
+    fieldingGameNum
+    fieldingGamePos
+    battingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      groundedIntoDoublePlays
+      hitByPitch
+      sacrificeHits
+      sacrificeFlies
+      intentionalBaseOnBalls
+      battingAverage
+    }
+    pitchingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      wins
+      losses
+      gamesStarted
+      gamesFinished
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      intentionalBaseOnBalls
+      strikeouts
+      hitByPitch
+      battersFaced
+      outsRecorded
+      era
+    }
+    fieldingGame {
+      playerId
+      season
+      gameNum
+      gameIdentifier
+      position
+      games
+      gamesStarted
+      inningsPlayed
+      putouts
+      assists
+      errors
+      doublePlays
+      passedBalls
+      stolenBasesAllowed
+      caughtStealing
+      fieldingPercentage
+    }
+  }
+}
+
+query GetMatchupPlayers($matchupId: Int!) {
+  getMatchupPlayers(matchupId: $matchupId) {
+    ...MatchupPlayer
+  }
+}

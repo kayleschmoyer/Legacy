@@ -37,18 +37,18 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: "📊 Collect and Process Results"
+    - name: "Collect and Process Results"
       id: collect
       shell: bash
       run: |
-        echo "::group::📊 Collecting CI Results and Metrics"
+        echo "::group::Collecting CI Results and Metrics"
 
         # Parse input step results
         STEP_RESULTS='${{ inputs.step-results }}'
         FAILURE_THRESHOLD="${{ inputs.failure-threshold }}"
         INCLUDE_PERF="${{ inputs.include-performance-metrics }}"
 
-        echo "📋 Processing step results..."
+        echo "Processing step results..."
 
         # Validate and enhance step results
         if ! echo "$STEP_RESULTS" | jq . >/dev/null 2>&1; then
@@ -69,11 +69,11 @@ runs:
           if [ "$STEP_RESULT" = "failure" ]; then
             OVERALL_STATUS="failure"
             FAILED_STEPS+=("$step")
-            echo "❌ Critical step '$step' failed"
+            echo "[FAILED] Critical step '$step' failed"
           elif [ "$STEP_RESULT" = "success" ]; then
-            echo "✅ Critical step '$step' passed"
+            echo "[SUCCESS] Critical step '$step' passed"
           else
-            echo "❓ Critical step '$step' status: $STEP_RESULT"
+            echo "[UNKNOWN] Critical step '$step' status: $STEP_RESULT"
           fi
         done
 
@@ -82,7 +82,7 @@ runs:
         WORKFLOW_START="${{ inputs.workflow-start-time }}"
 
         if [ -n "$WORKFLOW_START" ]; then
-          echo "⏱️ Calculating workflow duration..."
+          echo "Calculating workflow duration..."
           START_SECONDS=$(date -d "$WORKFLOW_START" +%s 2>/dev/null || date +%s)
           CURRENT_SECONDS=$(date +%s)
           WORKFLOW_DURATION=$((CURRENT_SECONDS - START_SECONDS))
@@ -92,7 +92,7 @@ runs:
         # Generate performance summary if enabled
         PERFORMANCE_SUMMARY="{}"
         if [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then
-          echo "📊 Generating performance analysis..."
+          echo "Generating performance analysis..."
           
           PERFORMANCE_CATEGORY="normal"
           PERFORMANCE_RATING="good"
@@ -135,8 +135,8 @@ runs:
         echo "performance-summary=$(echo "$PERFORMANCE_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
 
         # Create step summary
-        echo "## 📊 CI Results Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Overall Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "✅ Success" || echo "❌ Failed" )" >> $GITHUB_STEP_SUMMARY
+        echo "## CI Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Overall Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "SUCCESS" || echo "FAILED" )" >> $GITHUB_STEP_SUMMARY
         echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY
         echo "- **Failed Steps**: $( [ ${#FAILED_STEPS[@]} -eq 0 ] && echo "None" || printf '%s, ' "${FAILED_STEPS[@]}" | sed 's/, $//' )" >> $GITHUB_STEP_SUMMARY
 
@@ -149,7 +149,7 @@ runs:
         echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
 
-        echo "$STEP_RESULTS" | jq -r 'to_entries[] | "| " + .key + " | " + (if .value == "success" then "✅ " + .value elif .value == "failure" then "❌ " + .value else "❓ " + .value end) + " |"' >> $GITHUB_STEP_SUMMARY
+        echo "$STEP_RESULTS" | jq -r 'to_entries[] | "| " + .key + " | " + (if .value == "success" then "[SUCCESS] " + .value elif .value == "failure" then "[FAILED] " + .value else "[UNKNOWN] " + .value end) + " |"' >> $GITHUB_STEP_SUMMARY
 
-        echo "📊 Results collection completed: $OVERALL_STATUS"
+        echo "Results collection completed: $OVERALL_STATUS"
         echo "::endgroup::"

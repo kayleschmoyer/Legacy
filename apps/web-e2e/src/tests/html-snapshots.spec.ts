@@ -165,7 +165,10 @@ test.describe('HTML Snapshots', () => {
     await page.waitForLoadState('networkidle');
 
     // Get the accessibility tree
+    // Playwright's accessibility API returns untyped results by design
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const accessibilityTree = await page.accessibility.snapshot();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     expect(JSON.stringify(accessibilityTree, null, 2)).toMatchSnapshot(
       'accessibility-tree.json',
     );

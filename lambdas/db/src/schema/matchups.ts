@@ -1,8 +1,16 @@
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues';
+import {
+  GameBattingRef,
+  GameFieldingRef,
+  GamePitchingRef,
+  SeasonBattingRef,
+  SeasonFieldingRef,
+  SeasonPitchingRef,
+} from './statistics';
 
 // Matchup status enum
 const MatchupStatus = builder.enumType('MatchupStatus', {
@@ -557,9 +565,8 @@ builder.queryField('getLeagueStandings', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       const standings = await StandingsService.getStandings({
         leagueId: args.leagueId,
@@ -586,9 +593,8 @@ builder.queryField('getHeadToHeadRecord', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       return await StandingsService.getHeadToHead({
         leagueId: args.leagueId,
@@ -612,9 +618,8 @@ builder.queryField('getSeasonResults', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       const results = await StandingsService.getSeasonSummary(
         args.leagueId,
@@ -641,9 +646,8 @@ builder.queryField('getPlayoffRace', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       const qualifications = await StandingsService.getPlayoffRace({
         leagueId: args.leagueId,
@@ -673,9 +677,8 @@ builder.queryField('getMatchupHistory', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       return await StandingsService.getMatchupHistory({
         leagueId: args.leagueId,
@@ -701,9 +704,8 @@ builder.queryField('getTeamRecentMatchups', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       return await StandingsService.getTeamRecentMatchups(
         args.teamId,
@@ -726,9 +728,8 @@ builder.queryField('getMatchupStatusCounts', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       return await StandingsService.getMatchupStats(
         args.leagueId,
@@ -751,9 +752,8 @@ builder.queryField('getPowerRankings', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { StandingsService } = await import(
-        '../services/standings-service'
-      );
+      const { StandingsService } =
+        await import('../services/standings-service');
 
       const powerRankings = await StandingsService.getPowerRankings(
         args.leagueId,
@@ -765,6 +765,557 @@ builder.queryField('getPowerRankings', (t) =>
         ...pr,
         rank: pr.powerRank,
       }));
+    },
+  }),
+);
+
+// MatchupPlayer type
+const MatchupPlayer = builder.objectRef<{
+  id: number;
+  matchupId: number;
+  playerId: number;
+  teamId: number;
+  positionId: number | null;
+  season: number | null;
+}>('MatchupPlayer');
+
+builder.objectType(MatchupPlayer, {
+  description: 'A player selected for a specific matchup',
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    matchupId: t.exposeInt('matchupId'),
+    playerId: t.exposeInt('playerId'),
+    teamId: t.exposeInt('teamId'),
+    positionId: t.exposeInt('positionId', { nullable: true }),
+    season: t.exposeInt('season', { nullable: true }),
+    // Player details
+    player: t.field({
+      type: 'Player',
+      nullable: true,
+      resolve: async (matchupPlayer) => {
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const results = await db
+            .select({
+              id: PublicSchema.players.id,
+              firstName: PublicSchema.players.firstName,
+              lastName: PublicSchema.players.lastName,
+              brefId: PublicSchema.players.brefId,
+              statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
+            })
+            .from(PublicSchema.players)
+            .where(eq(PublicSchema.players.id, matchupPlayer.playerId))
+            .limit(1);
+
+          return results[0] || null;
+        });
+      },
+    }),
+    // Season stats
+    seasonBatting: t.field({
+      type: SeasonBattingRef,
+      nullable: true,
+      resolve: async (matchupPlayer) => {
+        if (!matchupPlayer.season) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const results = await db
+            .select()
+            .from(PublicSchema.seasonBatting)
+            .where(
+              and(
+                eq(PublicSchema.seasonBatting.playerId, matchupPlayer.playerId),
+                eq(
+                  PublicSchema.seasonBatting.season,
+                  matchupPlayer.season ?? 0,
+                ),
+              ),
+            )
+            .limit(1);
+
+          return results[0] || null;
+        });
+      },
+    }),
+    seasonPitching: t.field({
+      type: SeasonPitchingRef,
+      nullable: true,
+      resolve: async (matchupPlayer) => {
+        if (!matchupPlayer.season) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const results = await db
+            .select()
+            .from(PublicSchema.seasonPitching)
+            .where(
+              and(
+                eq(
+                  PublicSchema.seasonPitching.playerId,
+                  matchupPlayer.playerId,
+                ),
+                eq(
+                  PublicSchema.seasonPitching.season,
+                  matchupPlayer.season ?? 0,
+                ),
+              ),
+            )
+            .limit(1);
+
+          return results[0] || null;
+        });
+      },
+    }),
+    seasonFielding: t.field({
+      type: SeasonFieldingRef,
+      nullable: true,
+      resolve: async (matchupPlayer) => {
+        if (!matchupPlayer.season) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const results = await db
+            .select()
+            .from(PublicSchema.seasonFielding)
+            .where(
+              and(
+                eq(
+                  PublicSchema.seasonFielding.playerId,
+                  matchupPlayer.playerId,
+                ),
+                eq(
+                  PublicSchema.seasonFielding.season,
+                  matchupPlayer.season ?? 0,
+                ),
+              ),
+            );
+
+          return results[0] || null;
+        });
+      },
+    }),
+
+    // Games selected for this matchup player
+    games: t.field({
+      type: [MatchupPlayerGameRef],
+      resolve: async (matchupPlayer) => {
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const results = await db
+            .select()
+            .from(PublicSchema.matchupPlayerGames)
+            .where(
+              eq(
+                PublicSchema.matchupPlayerGames.matchupPlayerId,
+                matchupPlayer.id,
+              ),
+            );
+
+          return results;
+        });
+      },
+    }),
+  }),
+});
+
+// MatchupPlayerGame type - represents a selected game for a matchup player
+export const MatchupPlayerGameRef = builder.objectRef<{
+  id: number;
+  matchupPlayerId: number;
+  gameNum: number;
+  battingGameNum: number | null;
+  pitchingGameNum: number | null;
+  fieldingGameNum: number | null;
+  fieldingGamePos: string;
+}>('MatchupPlayerGame');
+
+MatchupPlayerGameRef.implement({
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    matchupPlayerId: t.exposeInt('matchupPlayerId'),
+    gameNum: t.exposeInt('gameNum'),
+    battingGameNum: t.exposeInt('battingGameNum', { nullable: true }),
+    pitchingGameNum: t.exposeInt('pitchingGameNum', { nullable: true }),
+    fieldingGameNum: t.exposeInt('fieldingGameNum', { nullable: true }),
+    fieldingGamePos: t.exposeString('fieldingGamePos'),
+
+    // Resolve the actual game stats for this selected game
+    battingGame: t.field({
+      type: GameBattingRef,
+      nullable: true,
+      resolve: async (game) => {
+        if (!game.battingGameNum) return null;
+
+        // Get the matchup player info
+        const matchupPlayerInfo = await runWithPublicClient(
+          getDbOptions(),
+          async (db) => {
+            const mpResult = await db
+              .select({
+                playerId: PublicSchema.matchupPlayers.playerId,
+                matchupId: PublicSchema.matchupPlayers.matchupId,
+              })
+              .from(PublicSchema.matchupPlayers)
+              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+              .limit(1);
+
+            if (!mpResult[0]) return null;
+
+            // Get matchup to find league and week
+            const matchupResult = await db
+              .select({
+                leagueId: PublicSchema.matchups.leagueId,
+                weekNumber: PublicSchema.matchups.weekNumber,
+              })
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+              .limit(1);
+
+            if (!matchupResult[0]) return null;
+
+            // Get season from league_week_player_seasons
+            const seasonResult = await db
+              .select({
+                season: PublicSchema.leagueWeekPlayerSeasons.season,
+              })
+              .from(PublicSchema.leagueWeekPlayerSeasons)
+              .where(
+                and(
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                    matchupResult[0].leagueId,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                    matchupResult[0].weekNumber,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.playerId,
+                    mpResult[0].playerId,
+                  ),
+                ),
+              )
+              .limit(1);
+
+            if (!seasonResult[0]) return null;
+
+            return {
+              playerId: mpResult[0].playerId,
+              season: seasonResult[0].season,
+            };
+          },
+        );
+
+        if (!matchupPlayerInfo) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const result = await db
+            .select()
+            .from(PublicSchema.gameBatting)
+            .where(
+              and(
+                eq(
+                  PublicSchema.gameBatting.playerId,
+                  matchupPlayerInfo.playerId,
+                ),
+                eq(PublicSchema.gameBatting.season, matchupPlayerInfo.season),
+                eq(PublicSchema.gameBatting.gameNum, game.battingGameNum ?? 0),
+              ),
+            )
+            .limit(1);
+          return result[0] || null;
+        });
+      },
+    }),
+
+    pitchingGame: t.field({
+      type: GamePitchingRef,
+      nullable: true,
+      resolve: async (game) => {
+        if (!game.pitchingGameNum) return null;
+
+        // Get the matchup player info
+        const matchupPlayerInfo = await runWithPublicClient(
+          getDbOptions(),
+          async (db) => {
+            const mpResult = await db
+              .select({
+                playerId: PublicSchema.matchupPlayers.playerId,
+                matchupId: PublicSchema.matchupPlayers.matchupId,
+              })
+              .from(PublicSchema.matchupPlayers)
+              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+              .limit(1);
+
+            if (!mpResult[0]) return null;
+
+            // Get matchup to find league and week
+            const matchupResult = await db
+              .select({
+                leagueId: PublicSchema.matchups.leagueId,
+                weekNumber: PublicSchema.matchups.weekNumber,
+              })
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+              .limit(1);
+
+            if (!matchupResult[0]) return null;
+
+            // Get season from league_week_player_seasons
+            const seasonResult = await db
+              .select({
+                season: PublicSchema.leagueWeekPlayerSeasons.season,
+              })
+              .from(PublicSchema.leagueWeekPlayerSeasons)
+              .where(
+                and(
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                    matchupResult[0].leagueId,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                    matchupResult[0].weekNumber,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.playerId,
+                    mpResult[0].playerId,
+                  ),
+                ),
+              )
+              .limit(1);
+
+            if (!seasonResult[0]) return null;
+
+            return {
+              playerId: mpResult[0].playerId,
+              season: seasonResult[0].season,
+            };
+          },
+        );
+
+        if (!matchupPlayerInfo) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const result = await db
+            .select()
+            .from(PublicSchema.gamePitching)
+            .where(
+              and(
+                eq(
+                  PublicSchema.gamePitching.playerId,
+                  matchupPlayerInfo.playerId,
+                ),
+                eq(PublicSchema.gamePitching.season, matchupPlayerInfo.season),
+                eq(
+                  PublicSchema.gamePitching.gameNum,
+                  game.pitchingGameNum ?? 0,
+                ),
+              ),
+            )
+            .limit(1);
+          return result[0] || null;
+        });
+      },
+    }),
+
+    fieldingGame: t.field({
+      type: GameFieldingRef,
+      nullable: true,
+      resolve: async (game) => {
+        if (!game.fieldingGameNum) return null;
+
+        // Get the matchup player info
+        const matchupPlayerInfo = await runWithPublicClient(
+          getDbOptions(),
+          async (db) => {
+            const mpResult = await db
+              .select({
+                playerId: PublicSchema.matchupPlayers.playerId,
+                matchupId: PublicSchema.matchupPlayers.matchupId,
+              })
+              .from(PublicSchema.matchupPlayers)
+              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+              .limit(1);
+
+            if (!mpResult[0]) return null;
+
+            // Get matchup to find league and week
+            const matchupResult = await db
+              .select({
+                leagueId: PublicSchema.matchups.leagueId,
+                weekNumber: PublicSchema.matchups.weekNumber,
+              })
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+              .limit(1);
+
+            if (!matchupResult[0]) return null;
+
+            // Get season from league_week_player_seasons
+            const seasonResult = await db
+              .select({
+                season: PublicSchema.leagueWeekPlayerSeasons.season,
+              })
+              .from(PublicSchema.leagueWeekPlayerSeasons)
+              .where(
+                and(
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                    matchupResult[0].leagueId,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                    matchupResult[0].weekNumber,
+                  ),
+                  eq(
+                    PublicSchema.leagueWeekPlayerSeasons.playerId,
+                    mpResult[0].playerId,
+                  ),
+                ),
+              )
+              .limit(1);
+
+            if (!seasonResult[0]) return null;
+
+            return {
+              playerId: mpResult[0].playerId,
+              season: seasonResult[0].season,
+            };
+          },
+        );
+
+        if (!matchupPlayerInfo) return null;
+
+        return await runWithPublicClient(getDbOptions(), async (db) => {
+          const result = await db
+            .select({
+              playerId: PublicSchema.gameFielding.playerId,
+              season: PublicSchema.gameFielding.season,
+              gameNum: PublicSchema.gameFielding.gameNum,
+              gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
+              // Map database column names to expected GraphQL type properties
+              pos: sql<string>`${game.fieldingGamePos}`.as('pos'), // Use the position from game object
+              g: sql<number | null>`NULL`.as('g'), // Not available in game_fielding
+              gs: sql<number | null>`NULL`.as('gs'), // Not available in game_fielding
+              inn: PublicSchema.gameFielding.innDef, // Map innDef → inn
+              po: PublicSchema.gameFielding.po,
+              a: PublicSchema.gameFielding.a,
+              e: PublicSchema.gameFielding.eDef, // Map eDef → e
+              dp: PublicSchema.gameFielding.dpDef, // Map dpDef → dp
+              pb: sql<number | null>`NULL`.as('pb'), // Not available in game_fielding
+              sb: sql<number | null>`NULL`.as('sb'), // Not available in game_fielding
+              cs: sql<number | null>`NULL`.as('cs'), // Not available in game_fielding
+            })
+            .from(PublicSchema.gameFielding)
+            .where(
+              and(
+                eq(
+                  PublicSchema.gameFielding.playerId,
+                  matchupPlayerInfo.playerId,
+                ),
+                eq(PublicSchema.gameFielding.season, matchupPlayerInfo.season),
+                eq(
+                  PublicSchema.gameFielding.gameNum,
+                  game.fieldingGameNum ?? 0,
+                ),
+                // Note: pos column doesn't exist in game_fielding table, removed filter
+              ),
+            )
+            .limit(1);
+          return result[0] || null;
+        });
+      },
+    }),
+  }),
+});
+
+// Query: getMatchupPlayers
+builder.queryField('getMatchupPlayers', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    args: {
+      matchupId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      return await runWithPublicClient(getDbOptions(), async (db) => {
+        // Get matchup players with their selected seasons from league_week_player_seasons
+        const matchupResults = await db
+          .select({
+            matchupId: PublicSchema.matchups.id,
+            leagueId: PublicSchema.matchups.leagueId,
+            weekNumber: PublicSchema.matchups.weekNumber,
+          })
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.id, args.matchupId))
+          .limit(1);
+
+        if (!matchupResults[0]) {
+          return [];
+        }
+
+        const { leagueId, weekNumber } = matchupResults[0];
+
+        // Get matchup players
+        const playersResults = await db
+          .select({
+            id: PublicSchema.matchupPlayers.id,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+            playerId: PublicSchema.matchupPlayers.playerId,
+            teamId: PublicSchema.matchupPlayers.teamId,
+          })
+          .from(PublicSchema.matchupPlayers)
+          .where(eq(PublicSchema.matchupPlayers.matchupId, args.matchupId));
+
+        // Get team members to find position assignments
+        const playerIds = playersResults.map((p) => p.playerId);
+
+        if (playerIds.length === 0) {
+          return [];
+        }
+
+        const teamMembersResults = await db
+          .select({
+            playerId: PublicSchema.teamMembers.playerId,
+            positionId: PublicSchema.teamMembers.positionId,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.leagueId, leagueId),
+              // Filter to only the players in this matchup
+            ),
+          );
+
+        const positionMap = new Map(
+          teamMembersResults.map((tm) => [tm.playerId, tm.positionId]),
+        );
+
+        // Get selected seasons from league_week_player_seasons
+        const seasonsResults = await db
+          .select({
+            playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            and(
+              eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+              eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+            ),
+          );
+
+        const seasonMap = new Map(
+          seasonsResults.map((s) => [s.playerId, s.season]),
+        );
+
+        // Combine the data
+        return playersResults.map((player) => ({
+          ...player,
+          positionId: positionMap.get(player.playerId) ?? null,
+          season: seasonMap.get(player.playerId) ?? null,
+        }));
+      });
     },
   }),
 );

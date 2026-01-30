@@ -12,17 +12,22 @@
     "test:all-files": "jest"
   },
   "dependencies": {
-    "@pothos/core": "*",
     "@apollo/server": "*",
     "@as-integrations/aws-lambda": "*",
-    "graphql": "*",
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/sentry": "workspace:*",
-    "@legacy-sports/utils": "workspace:*"
+    "@legacy-sports/utils": "workspace:*",
+    "@pothos/core": "*",
+    "graphql": "*"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^11.11.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.6.2",
+    "drizzle-orm": "*",
+    "testcontainers": "^11.11.0",
     "tsx": "*"
   }
 }

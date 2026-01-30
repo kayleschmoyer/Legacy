@@ -45,6 +45,9 @@ outputs:
   nx-parallel:
     description: "Recommended NX_PARALLEL value"
     value: ${{ steps.detect.outputs.nx-parallel }}
+  quota-remaining:
+    description: "DTE quota status (available/0/unknown)"
+    value: ${{ steps.detect.outputs.quota-remaining }}
 
 runs:
   using: "composite"
@@ -62,11 +65,13 @@ runs:
         OPTIMAL_AGENTS=4
         FALLBACK_REASON=""
         MEMORY_LIMIT="4096"
+        QUOTA_REMAINING="unknown"
 
         # Get input values
         NX_CLOUD_TOKEN="${{ inputs.nx-cloud-token }}"
         MAX_RETRIES="${{ inputs.max-retries }}"
         TIMEOUT_SECONDS="${{ inputs.timeout-seconds }}"
+        QUOTA_THRESHOLD="${{ inputs.quota-threshold }}"
 
         if [ -n "$NX_CLOUD_TOKEN" ]; then
           echo "✅ Nx Cloud token found"
@@ -75,7 +80,7 @@ runs:
           export NX_CLOUD_ACCESS_TOKEN="$NX_CLOUD_TOKEN"
           
           # Test basic cloud connectivity
-          echo "🌐 Testing cloud connectivity..."
+          echo "🌐 Testing cloud connectivity and quota..."
           # First locate nx-cloud CLI via pnpm or npx
           NX_CLOUD_CMD=""
           if command -v pnpm >/dev/null 2>&1 && pnpm exec nx-cloud --version >/dev/null 2>&1; then
@@ -88,22 +93,76 @@ runs:
             FALLBACK_REASON="Nx Cloud CLI not available (pnpm/pnpm exec missing)"
             echo "❌ $FALLBACK_REASON"
           else
-            # Modern Nx Cloud v19+ handles authentication during task execution
-            # No need for pre-flight connectivity checks - they're unreliable
-            # If token exists, we assume DTE is available
-            # Actual authentication and quota limits enforced by Nx Cloud at runtime
-            
             echo "✅ Nx Cloud CLI available"
-            echo "🎯 Token present - DTE will be available"
-            echo "ℹ️  Authentication verified during actual task execution"
             
-            CLOUD_AVAILABLE="true"
-            DTE_AVAILABLE="true"
-            EXECUTION_MODE="distributed"
-            # Use default of 8 agents - Nx Cloud will allocate based on plan/usage
-            OPTIMAL_AGENTS=8
-            MEMORY_LIMIT="6144"
-            echo "🚀 DTE configured - Nx Cloud manages authentication and agent allocation"
+            # CHECK DTE QUOTA - Try to start a minimal CI run to test availability
+            echo "🔍 Checking DTE quota availability..."
+            
+            # Attempt to start DTE with minimal resources and capture output
+            QUOTA_CHECK_OUTPUT=$(mktemp)
+            QUOTA_CHECK_RESULT=0
+            
+            # Try to get workspace status which includes quota info
+            if $NX_CLOUD_CMD report --help >/dev/null 2>&1; then
+              $NX_CLOUD_CMD report 2>&1 | tee "$QUOTA_CHECK_OUTPUT" || QUOTA_CHECK_RESULT=$?
+            else
+              # Fallback: try to start a minimal DTE session
+              echo "Testing DTE availability with minimal session..."
+              timeout 10 $NX_CLOUD_CMD start-ci-run --distribute-on="1 linux-medium-js" 2>&1 | tee "$QUOTA_CHECK_OUTPUT" || QUOTA_CHECK_RESULT=$?
+              # Stop the test run immediately
+              $NX_CLOUD_CMD stop-all-agents >/dev/null 2>&1 || true
+            fi
+            
+            # Check for quota-related errors OR authorization failures in output
+            if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$QUOTA_CHECK_OUTPUT"; then
+              FALLBACK_REASON="DTE quota exceeded, insufficient, or authorization failed"
+              echo "⚠️ $FALLBACK_REASON"
+              echo "Quota check output:"
+              cat "$QUOTA_CHECK_OUTPUT"
+              QUOTA_REMAINING="0"
+              
+              # Even though quota may be exceeded, keep trying - sometimes it's just a warning
+              CLOUD_AVAILABLE="true"
+              DTE_AVAILABLE="false"
+              EXECUTION_MODE="local"
+            elif [ $QUOTA_CHECK_RESULT -eq 124 ]; then
+              # Timeout occurred - this is actually OK, means DTE started
+              echo "✅ DTE session started successfully (timeout is expected)"
+              CLOUD_AVAILABLE="true"
+              DTE_AVAILABLE="true"
+              EXECUTION_MODE="distributed"
+              OPTIMAL_AGENTS=8
+              MEMORY_LIMIT="6144"
+              QUOTA_REMAINING="available"
+            elif [ $QUOTA_CHECK_RESULT -ne 0 ]; then
+              # Non-zero exit but not quota related
+              echo "⚠️ DTE check returned non-zero exit code: $QUOTA_CHECK_RESULT"
+              echo "Check output:"
+              cat "$QUOTA_CHECK_OUTPUT"
+              
+              # Still try to use DTE - errors might be transient
+              CLOUD_AVAILABLE="true"
+              DTE_AVAILABLE="true"
+              EXECUTION_MODE="distributed"
+              OPTIMAL_AGENTS=8
+              MEMORY_LIMIT="6144"
+              QUOTA_REMAINING="unknown"
+            else
+              # Success - DTE is available
+              echo "✅ DTE quota check passed"
+              CLOUD_AVAILABLE="true"
+              DTE_AVAILABLE="true"
+              EXECUTION_MODE="distributed"
+              OPTIMAL_AGENTS=8
+              MEMORY_LIMIT="6144"
+              QUOTA_REMAINING="available"
+            fi
+            
+            rm -f "$QUOTA_CHECK_OUTPUT"
+            
+            echo "🚀 DTE configuration complete"
+            echo "   Execution mode: $EXECUTION_MODE"
+            echo "   Quota status: $QUOTA_REMAINING"
           fi
         else
           FALLBACK_REASON="No Nx Cloud token provided"
@@ -118,6 +177,7 @@ runs:
         echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
         echo "memory-limit=$MEMORY_LIMIT" >> $GITHUB_OUTPUT
         echo "nx-parallel=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
+        echo "quota-remaining=$QUOTA_REMAINING" >> $GITHUB_OUTPUT
 
         # Create summary report
         echo "## ☁️ Execution Mode Detection" >> $GITHUB_STEP_SUMMARY
@@ -126,6 +186,7 @@ runs:
         echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
         echo "- **Agents/Parallel**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
         echo "- **Memory Limit**: ${MEMORY_LIMIT}MB" >> $GITHUB_STEP_SUMMARY
+        echo "- **Quota Status**: $QUOTA_REMAINING" >> $GITHUB_STEP_SUMMARY
 
         if [ "$EXECUTION_MODE" == "local" ] && [ -n "$FALLBACK_REASON" ]; then
           echo "- **Fallback Reason**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
@@ -133,9 +194,13 @@ runs:
 
         # Set appropriate notices
         if [ "$DTE_AVAILABLE" == "true" ]; then
-          echo "::notice title=Nx Cloud DTE::Using distributed execution with $OPTIMAL_AGENTS agents"
+          echo "::notice title=Nx Cloud DTE::Using distributed execution with $OPTIMAL_AGENTS agents (quota: $QUOTA_REMAINING)"
         else
-          echo "::notice title=Local Execution::$FALLBACK_REASON - using GitHub Actions ($OPTIMAL_AGENTS processes)"
+          if [ "$QUOTA_REMAINING" == "0" ]; then
+            echo "::warning title=DTE Quota Exhausted::$FALLBACK_REASON - using GitHub Actions ($OPTIMAL_AGENTS processes)"
+          else
+            echo "::notice title=Local Execution::$FALLBACK_REASON - using GitHub Actions ($OPTIMAL_AGENTS processes)"
+          fi
         fi
 
         echo "::endgroup::"

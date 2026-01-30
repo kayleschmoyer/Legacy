@@ -174,6 +174,79 @@ export type DeviceTokenInput = {
   userId: Scalars['Int']['input'];
 };
 
+export type GameBatting = {
+  __typename?: 'GameBatting';
+  atBats?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  battingAverage?: Maybe<Scalars['Float']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  plateAppearances?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  sacrificeFlies?: Maybe<Scalars['String']['output']>;
+  sacrificeHits?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  stolenBases?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
+};
+
+export type GameFielding = {
+  __typename?: 'GameFielding';
+  assists?: Maybe<Scalars['Int']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  doublePlays?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Scalars['Int']['output']>;
+  fieldingPercentage?: Maybe<Scalars['Float']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  games?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  inningsPlayed?: Maybe<Scalars['Float']['output']>;
+  passedBalls?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  putouts?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  stolenBasesAllowed?: Maybe<Scalars['Int']['output']>;
+};
+
+export type GamePitching = {
+  __typename?: 'GamePitching';
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  battersFaced?: Maybe<Scalars['Int']['output']>;
+  completeGames?: Maybe<Scalars['Int']['output']>;
+  earnedRuns?: Maybe<Scalars['Int']['output']>;
+  era?: Maybe<Scalars['Float']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  gamesFinished?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  inningsPitched?: Maybe<Scalars['Float']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  outsRecorded?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  saves?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  shutouts?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Head-to-head record between two teams */
 export type HeadToHeadRecord = {
   __typename?: 'HeadToHeadRecord';
@@ -199,6 +272,7 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  schedulingStrategy?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
 };
@@ -230,6 +304,7 @@ export type Matchup = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   selectedSeason?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
+  statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
   team1?: Maybe<Team>;
   team1Id?: Maybe<Scalars['Int']['output']>;
@@ -238,6 +313,40 @@ export type Matchup = {
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player assigned to a matchup (season from league_week_player_seasons) */
+export type MatchupPlayer = {
+  __typename?: 'MatchupPlayer';
+  games?: Maybe<Array<MatchupPlayerGame>>;
+  id?: Maybe<Scalars['ID']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  positionId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  /** Season batting stats for this player's selected season */
+  seasonBatting?: Maybe<SeasonBatting>;
+  /** Season fielding stats for this player's selected season */
+  seasonFielding?: Maybe<SeasonFielding>;
+  /** Season pitching stats for this player's selected season */
+  seasonPitching?: Maybe<SeasonPitching>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Stats from a single game for a player in a matchup */
+export type MatchupPlayerGame = {
+  __typename?: 'MatchupPlayerGame';
+  battingGameNum?: Maybe<Scalars['Int']['output']>;
+  battingStats?: Maybe<GameBatting>;
+  fieldingGameNum?: Maybe<Scalars['Int']['output']>;
+  fieldingGamePos?: Maybe<Scalars['String']['output']>;
+  fieldingStats?: Maybe<GameFielding>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  pitchingGameNum?: Maybe<Scalars['Int']['output']>;
+  pitchingStats?: Maybe<GamePitching>;
 };
 
 export enum MatchupStatus {
@@ -261,9 +370,12 @@ export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  advanceLeagueWeek?: Maybe<Array<Matchup>>;
+  advanceWeekGames?: Maybe<Scalars['Boolean']['output']>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
+  deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   joinLeagueByCode?: Maybe<Team>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
@@ -282,12 +394,25 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationAdvanceLeagueWeekArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAdvanceWeekGamesArgs = {
+  leagueId: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
+};
+
 export type MutationCreateLeagueAndTeamsArgs = {
   input: CreateLeagueAndTeamsInput;
 };
 
 export type MutationCreateMatchupArgs = {
   input: CreateMatchupInput;
+};
+
+export type MutationDeleteLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -317,8 +442,8 @@ export type MutationStartDraftArgs = {
 };
 
 export type MutationTriggerGameSelectionArgs = {
-  gameNumber: Scalars['Int']['input'];
   matchupId: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -442,6 +567,7 @@ export type Query = {
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
+  getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
@@ -538,6 +664,10 @@ export type QueryGetMatchupHistoryArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<MatchupStatus>;
   teamId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMatchupPlayersArgs = {
+  matchupId: Scalars['Int']['input'];
 };
 
 export type QueryGetMatchupStatusCountsArgs = {
@@ -906,6 +1036,13 @@ export type SeasonResults = {
   standings?: Maybe<Array<TeamStanding>>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
+
+export enum StatsLoadingStatus {
+  Completed = 'completed',
+  Failed = 'failed',
+  Loading = 'loading',
+  NotStarted = 'not_started',
+}
 
 /** A team in a league */
 export type Team = {

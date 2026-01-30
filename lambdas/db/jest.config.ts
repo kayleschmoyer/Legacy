@@ -7,6 +7,8 @@ const config: Config = {
   testEnvironment: 'node',
   coverageDirectory: '../../coverage/lambdas/db',
   setupFiles: ['<rootDir>/test-setup.ts'],
+  // Explicitly transform workspace packages
+  transformIgnorePatterns: ['node_modules/(?!@legacy-sports)'],
 };
 
 export default config;

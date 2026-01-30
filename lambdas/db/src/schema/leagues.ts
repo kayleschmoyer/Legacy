@@ -1309,6 +1309,271 @@ builder.mutationField('joinLeagueByCode', (t) =>
   }),
 );
 
+// Input type for simple league creation
+// TODO: Remove if not used or implement in resolver
+// const CreateLeagueInput = builder.inputType('CreateLeagueInput', {
+//   fields: (t) => ({
+//     name: t.string({ required: true }),
+//     maxRosterSize: t.int({ required: false }),
+//   }),
+// });
+
+// Return type for joinLeague mutation
+const JoinLeaguePayload = builder.objectRef<{
+  success: boolean;
+  message: string;
+  leagueId?: number;
+  teamId?: number;
+}>('JoinLeaguePayload');
+
+JoinLeaguePayload.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean('success'),
+    message: t.exposeString('message'),
+    leagueId: t.exposeInt('leagueId', { nullable: true }),
+    teamId: t.exposeInt('teamId', { nullable: true }),
+  }),
+});
+
+// Mutation field to create a league with basic configuration
+builder.mutationField('createLeague', (t) =>
+  t.field({
+    type: League,
+    args: {
+      name: t.arg.string({ required: true }),
+      maxRosterSize: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const userId = context.user.id;
+      const maxRosterSize = args.maxRosterSize ?? 25; // Default to 25
+
+      try {
+        const result = await runWithPublicClient(getDbOptions(), async (db) => {
+          // Generate unique invite code
+          const inviteCode = await generateUniqueInviteCode(db);
+
+          // Create league
+          const leagues = await db
+            .insert(PublicSchema.leagues)
+            .values({
+              name: args.name,
+              owner: userId,
+              maxRosterSize,
+              inviteCode,
+            })
+            .returning({
+              id: PublicSchema.leagues.id,
+              name: PublicSchema.leagues.name,
+              owner: PublicSchema.leagues.owner,
+              maxRosterSize: PublicSchema.leagues.maxRosterSize,
+              currentMatchup: PublicSchema.leagues.currentMatchup,
+              draftStatus: PublicSchema.leagues.draftStatus,
+              inviteCode: PublicSchema.leagues.inviteCode,
+            });
+
+          if (leagues.length === 0) {
+            throw new Error('Failed to create league');
+          }
+
+          return leagues[0];
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Error creating league:', error);
+        throw new Error(
+          `Failed to create league: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    },
+  }),
+);
+
+// Mutation field to join a league using an invite code
+builder.mutationField('joinLeague', (t) =>
+  t.field({
+    type: JoinLeaguePayload,
+    args: {
+      inviteCode: t.arg.string({ required: true }),
+      teamName: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const userId = context.user.id;
+      const { inviteCode, teamName } = args;
+
+      try {
+        const result = await runWithPublicClient(getDbOptions(), async (db) => {
+          // Find league by invite code
+          const leagues = await db
+            .select({
+              id: PublicSchema.leagues.id,
+              name: PublicSchema.leagues.name,
+              maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.inviteCode, inviteCode))
+            .limit(1);
+
+          if (leagues.length === 0) {
+            throw new Error('Invalid invite code');
+          }
+
+          const league = leagues[0];
+
+          // Check if user is already a member
+          const existingMembership = await db
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, league.id),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1);
+
+          if (existingMembership.length > 0) {
+            return {
+              success: false,
+              message: 'You are already a member of this league',
+              leagueId: league.id,
+            };
+          }
+
+          // Create team for the user
+          const teams = await db
+            .insert(PublicSchema.teams)
+            .values({
+              name: teamName,
+              leagueId: league.id,
+            })
+            .returning({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+              leagueId: PublicSchema.teams.leagueId,
+            });
+
+          if (teams.length === 0) {
+            throw new Error('Failed to create team');
+          }
+
+          const team = teams[0];
+
+          // Add user as league member
+          await db.insert(PublicSchema.leagueMembers).values({
+            leagueId: league.id,
+            userId: userId,
+            teamId: team.id,
+            permissionLevel: 'commissioner',
+          });
+
+          return {
+            success: true,
+            message: `Successfully joined ${league.name}`,
+            leagueId: league.id,
+            teamId: team.id,
+          };
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Error joining league:', error);
+        throw new Error(
+          `Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    },
+  }),
+);
+
+// Mutation field to delete a single league by ID
+builder.mutationField('deleteLeague', (t) =>
+  t.field({
+    type: 'String',
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      // Check if user is authenticated
+      if (!context.user) {
+        throw new Error('Authentication required to delete league');
+      }
+
+      try {
+        const result = await runWithPublicClient(getDbOptions(), async (db) => {
+          // First, verify the league exists and user has permission
+          const league = await db
+            .select({
+              id: PublicSchema.leagues.id,
+              owner: PublicSchema.leagues.owner,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, args.leagueId))
+            .limit(1);
+
+          if (league.length === 0) {
+            throw new Error('League not found');
+          }
+
+          // Check if user is the owner or admin
+          if (!context.user) {
+            throw new Error('User not authenticated');
+          }
+
+          if (league[0].owner !== context.user.id && !context.user.isAdmin) {
+            throw new Error(
+              'Only the league owner or admin can delete this league',
+            );
+          }
+
+          // Delete in correct order due to foreign key constraints
+          // 1. Delete team members
+          await db
+            .delete(PublicSchema.teamMembers)
+            .where(eq(PublicSchema.teamMembers.leagueId, args.leagueId));
+
+          // 2. Delete league positions
+          await db
+            .delete(PublicSchema.leaguePosition)
+            .where(eq(PublicSchema.leaguePosition.leagueId, args.leagueId));
+
+          // 3. Delete league members
+          await db
+            .delete(PublicSchema.leagueMembers)
+            .where(eq(PublicSchema.leagueMembers.leagueId, args.leagueId));
+
+          // 4. Delete teams
+          await db
+            .delete(PublicSchema.teams)
+            .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+
+          // 5. Finally delete the league
+          await db
+            .delete(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, args.leagueId));
+
+          return `Successfully deleted league ${args.leagueId} and all associated data`;
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Error deleting league:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        throw new Error('Failed to delete league: ' + errorMessage);
+      }
+    },
+  }),
+);
+
 // Mutation field to delete all leagues (for development/testing)
 builder.mutationField('deleteAllLeagues', (t) =>
   t.field({

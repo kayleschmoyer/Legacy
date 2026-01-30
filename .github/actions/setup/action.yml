@@ -260,6 +260,18 @@ runs:
 
         echo "✅ pnpm installation complete"
 
+    - name: Fix Tamagui Installation
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: |
+        echo "🔧 Running Tamagui postinstall fix..."
+        if [ -f "scripts/fix-tamagui-install.js" ]; then
+          node scripts/fix-tamagui-install.js
+          echo "✅ Tamagui postinstall fix applied"
+        else
+          echo "⚠️  Fix script not found, skipping..."
+        fi
+
     - name: Skip Install (Cache Hit)
       if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'npm' && steps.cached-dependencies.outputs.cache-hit == 'true'
       shell: bash

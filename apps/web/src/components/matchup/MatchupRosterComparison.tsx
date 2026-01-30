@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Complex type mapping for scoring calculations */
 import React, { useMemo, useState } from 'react';
 import {
   Card,
@@ -19,8 +19,8 @@ import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
   type MatchupFragment,
-  // type MatchupPlayerFragment,
-  // useGetMatchupPlayersQuery,
+  type MatchupPlayerFragment,
+  useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -29,29 +29,6 @@ import {
   mapFieldingStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
-
-// TODO(LS-53): Placeholders until MatchupPlayerFragment and useGetMatchupPlayersQuery are implemented
-type MatchupPlayerFragment = {
-  id: string;
-  playerId: number;
-  positionId?: number | null;
-  season?: number | null;
-  teamId?: number | null;
-  seasonBatting?: any;
-  seasonPitching?: any;
-  seasonFielding?: any;
-  player?: {
-    name?: string | null;
-    firstName?: string | null;
-    lastName?: string | null;
-  } | null;
-  games?: any[];
-};
-const useGetMatchupPlayersQuery = (_params?: any) => ({
-  data: { getMatchupPlayers: [] } as any,
-  loading: false,
-  error: { message: '' } as any,
-});
 
 export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
@@ -252,20 +229,20 @@ export function MatchupRosterComparison({
       let total = 0;
 
       // Calculate batting score - map GraphQL field names (runs, hits) to DB names (r, h)
-      if (game.battingStats) {
-        const mappedBatting = mapBattingStats(game.battingStats);
+      if (game.battingGame) {
+        const mappedBatting = mapBattingStats(game.battingGame);
         total += computeScoring(mappedBatting, scoringSettings.batting || {});
       }
 
       // Calculate pitching score - map GraphQL field names to DB names
-      if (game.pitchingStats) {
-        const mappedPitching = mapPitchingStats(game.pitchingStats);
+      if (game.pitchingGame) {
+        const mappedPitching = mapPitchingStats(game.pitchingGame);
         total += computeScoring(mappedPitching, scoringSettings.pitching || {});
       }
 
       // Calculate fielding score - map GraphQL field names to DB names
-      if (game.fieldingStats) {
-        const mappedFielding = mapFieldingStats(game.fieldingStats);
+      if (game.fieldingGame) {
+        const mappedFielding = mapFieldingStats(game.fieldingGame);
         total += computeScoring(mappedFielding, scoringSettings.fielding || {});
       }
 
@@ -533,13 +510,13 @@ export function MatchupRosterComparison({
 
     // Map of stat field names to their display labels and extraction functions
     type BattingStatsType = NonNullable<
-      NonNullable<MatchupPlayerFragment['games']>[number]['battingStats']
+      NonNullable<MatchupPlayerFragment['games']>[number]['battingGame']
     >;
     type PitchingStatsType = NonNullable<
-      NonNullable<MatchupPlayerFragment['games']>[number]['pitchingStats']
+      NonNullable<MatchupPlayerFragment['games']>[number]['pitchingGame']
     >;
     type FieldingStatsType = NonNullable<
-      NonNullable<MatchupPlayerFragment['games']>[number]['fieldingStats']
+      NonNullable<MatchupPlayerFragment['games']>[number]['fieldingGame']
     >;
     type StatExtractor<T> = (stats: T) => number;
     interface StatConfig<T> {
@@ -549,7 +526,7 @@ export function MatchupRosterComparison({
     }
 
     // Aggregate batting stats (only show stats that actually contributed points for this player)
-    const battingGames = player.games.filter((g) => g.battingStats);
+    const battingGames = player.games.filter((g) => g.battingGame);
     if (battingGames.length > 0) {
       const battingStats: StatConfig<BattingStatsType>[] = [
         {
@@ -616,8 +593,8 @@ export function MatchupRosterComparison({
         if (scoringValue !== undefined && scoringValue !== 0) {
           // Calculate the total for this stat across all games
           const total = battingGames.reduce((sum, g) => {
-            if (!g.battingStats) return sum;
-            return sum + stat.extract(g.battingStats);
+            if (!g.battingGame) return sum;
+            return sum + stat.extract(g.battingGame);
           }, 0);
 
           // Only show if this player actually has non-zero value for this stat
@@ -633,7 +610,7 @@ export function MatchupRosterComparison({
     }
 
     // Aggregate pitching stats (only show stats that actually contributed points for this player)
-    const pitchingGames = player.games.filter((g) => g.pitchingStats);
+    const pitchingGames = player.games.filter((g) => g.pitchingGame);
     if (pitchingGames.length > 0) {
       const pitchingStats: StatConfig<PitchingStatsType>[] = [
         {
@@ -679,7 +656,7 @@ export function MatchupRosterComparison({
       const outsRecordedScoring = scoringSettings.pitching.outsRecorded;
       if (outsRecordedScoring !== undefined && outsRecordedScoring !== 0) {
         const totalOuts = pitchingGames.reduce(
-          (sum, g) => sum + (g.pitchingStats?.outsRecorded ?? 0),
+          (sum, g) => sum + (g.pitchingGame?.outsRecorded ?? 0),
           0,
         );
         if (totalOuts > 0) {
@@ -692,8 +669,8 @@ export function MatchupRosterComparison({
         const scoringValue = scoringSettings.pitching[stat.scoringKey];
         if (scoringValue !== undefined && scoringValue !== 0) {
           const total = pitchingGames.reduce((sum, g) => {
-            if (!g.pitchingStats) return sum;
-            return sum + stat.extract(g.pitchingStats);
+            if (!g.pitchingGame) return sum;
+            return sum + stat.extract(g.pitchingGame);
           }, 0);
 
           // Only show if this player actually has non-zero value for this stat
@@ -709,7 +686,7 @@ export function MatchupRosterComparison({
     }
 
     // Aggregate fielding stats (only show stats that actually contributed points for this player)
-    const fieldingGames = player.games.filter((g) => g.fieldingStats);
+    const fieldingGames = player.games.filter((g) => g.fieldingGame);
     if (fieldingGames.length > 0) {
       const fieldingStats: StatConfig<FieldingStatsType>[] = [
         {
@@ -724,8 +701,8 @@ export function MatchupRosterComparison({
         const scoringValue = scoringSettings.fielding[stat.scoringKey];
         if (scoringValue !== undefined && scoringValue !== 0) {
           const total = fieldingGames.reduce((sum, g) => {
-            if (!g.fieldingStats) return sum;
-            return sum + stat.extract(g.fieldingStats);
+            if (!g.fieldingGame) return sum;
+            return sum + stat.extract(g.fieldingGame);
           }, 0);
 
           // Only show if this player actually has non-zero value for this stat

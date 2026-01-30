@@ -5,7 +5,9 @@
     "declaration": true,
     "outDir": "../../dist/out-tsc",
     "module": "commonjs",
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": [
     "jest.config.ts",

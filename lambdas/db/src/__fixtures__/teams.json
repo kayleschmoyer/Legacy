@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "name": "Test Team Alpha",
+    "leagueId": 1
+  },
+  {
+    "id": 2,
+    "name": "Test Team Beta",
+    "leagueId": 1
+  },
+  {
+    "id": 3,
+    "name": "Test Team Gamma",
+    "leagueId": 2
+  },
+  {
+    "id": 4,
+    "name": "Test Team Delta",
+    "leagueId": 2
+  }
+]

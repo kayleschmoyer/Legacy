@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "firstName": "Mike",
+    "lastName": "Trout",
+    "brefId": "troutmi01"
+  },
+  {
+    "id": 2,
+    "firstName": "Aaron",
+    "lastName": "Judge",
+    "brefId": "judgeaa01"
+  },
+  {
+    "id": 3,
+    "firstName": "Shohei",
+    "lastName": "Ohtani",
+    "brefId": "ohtansh01"
+  },
+  {
+    "id": 4,
+    "firstName": "Ronald",
+    "lastName": "Acuna Jr.",
+    "brefId": "acunaro01"
+  },
+  {
+    "id": 5,
+    "firstName": "Fernando",
+    "lastName": "Tatis Jr.",
+    "brefId": "tatisfe02"
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "Test League Alpha",
+    "owner": 1,
+    "maxRosterSize": 25,
+    "currentMatchup": null,
+    "draftStatus": "not-started",
+    "inviteCode": "ALPHA123",
+    "minGamesPerSeason": 10,
+    "gamesPerMatchup": 5
+  },
+  {
+    "id": 2,
+    "name": "Test League Beta",
+    "owner": 2,
+    "maxRosterSize": 30,
+    "currentMatchup": 1,
+    "draftStatus": "completed",
+    "inviteCode": "BETA456",
+    "minGamesPerSeason": 15,
+    "gamesPerMatchup": 7
+  }
+]

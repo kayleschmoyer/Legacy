@@ -25,6 +25,12 @@ inputs:
   fallback-reason:
     description: "Reason for DTE fallback"
     required: false
+  quota-status:
+    description: "DTE quota remaining status (available/limited/exhausted)"
+    required: false
+  quota-exceeded:
+    description: "Whether DTE quota was exceeded during execution (true/false)"
+    required: false
   execution-plan:
     description: "JSON execution plan"
     required: false
@@ -58,7 +64,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: "📊 Generate CI Report"
+    - name: "Generate CI Report"
       id: generate-report
       shell: bash
       run: |
@@ -110,11 +116,30 @@ runs:
           fi
         fi
 
+        # Display DTE quota status
+        QUOTA_STATUS="${{ inputs.quota-status }}"
+        QUOTA_EXCEEDED="${{ inputs.quota-exceeded }}"
+
         if [ "$EXECUTION_MODE" = "distributed" ]; then
           echo "- **Optimization**: 🚀 DTE enabled (60-80% faster)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$QUOTA_STATUS" ]; then
+            case "$QUOTA_STATUS" in
+              "available")
+                echo "- **DTE Quota**: ✅ Available" >> $GITHUB_STEP_SUMMARY
+                ;;
+              "limited")
+                echo "- **DTE Quota**: ⚠️ Limited (consider optimization)" >> $GITHUB_STEP_SUMMARY
+                ;;
+              "exhausted")
+                echo "- **DTE Quota**: ❌ Exhausted" >> $GITHUB_STEP_SUMMARY
+                ;;
+            esac
+          fi
         else
           echo "- **Optimization**: ⚡ Local execution" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$FALLBACK_REASON" ]; then
+          if [ "$QUOTA_EXCEEDED" = "true" ]; then
+            echo "- **DTE Status**: ⚠️ Quota exceeded during execution - fell back to local runners" >> $GITHUB_STEP_SUMMARY
+          elif [ -n "$FALLBACK_REASON" ]; then
             echo "- **DTE Fallback**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
           fi
         fi
@@ -122,354 +147,46 @@ runs:
         echo "📊 CI report generated successfully"
         echo "::endgroup::"
 
-    - name: "💬 PR Comment - Failure Report"
+    - name: "PR Comment - Failure Report"
       id: pr-failure-comment
       if: inputs.status == 'failure' && inputs.event-name == 'pull_request' && inputs.pr-number != ''
       uses: actions/github-script@v7
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        STEP_RESULTS: ${{ toJSON(inputs.step-results) }}
+        QUALITY_GATES_SUBSECTIONS: ${{ toJSON(inputs.quality-gates-subsections) }}
+        PROJECT_FAILURES: ${{ toJSON(inputs.project-failures) }}
+        EXECUTION_MODE: ${{ inputs.execution-mode }}
+        OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
+        FALLBACK_REASON: ${{ inputs.fallback-reason }}
+        QUOTA_STATUS: ${{ inputs.quota-status }}
+        QUOTA_EXCEEDED: ${{ inputs.quota-exceeded }}
+        RUN_ID: ${{ inputs.run-id }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const commentMarker = "<!-- CI-PIPELINE-STATUS -->";
+          const reportFailure = require('./.github/scripts/ci-report-failure.js');
+          return await reportFailure({ github, context, core });
 
-          // Parse step results if provided
-          let stepResults = {};
-          try {
-            if ('${{ inputs.step-results }}') {
-              stepResults = JSON.parse('${{ inputs.step-results }}');
-            }
-          } catch (e) {
-            console.log('No step results provided or parsing failed');
-          }
-
-          // Find existing CI comment to update (using unified marker)
-          const comments = await github.rest.issues.listComments({
-            issue_number: ${{ inputs.pr-number }},
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-          });
-
-          let existingComment = comments.data.find(comment => 
-            comment.body && comment.body.includes(commentMarker)
-          );
-
-          // Determine specific failure context and provide targeted guidance
-          let failureReason = "CI pipeline failure detected";
-          let reproCommand = "pnpm exec nx affected -t lint,typecheck,test,build --parallel=4";
-          let debugSection = "A CI step failed. Run the reproduction command to identify the specific issue.";
-
-          // Analyze step results for specific guidance
-          const stepAnalysis = {
-            'format-check': {
-              reason: 'Code formatting check failed',
-              command: 'pnpm exec nx format:write',
-              debug: 'Code formatting issues detected. Run the command above to auto-fix formatting, then commit the changes.'
-            },
-            'quality-gates': {
-              reason: 'Code quality validation failed',
-              command: 'pnpm exec nx affected -t lint,typecheck,test --parallel=4',
-              debug: 'Quality gates failed. This typically means ESLint errors, TypeScript compilation issues, or failing tests.',
-              subsections: {
-                'formatting': { 
-                  reason: 'Code formatting check failed', 
-                  command: 'pnpm exec nx format:write',
-                  debug: 'Code is not properly formatted. Run the command above to auto-fix formatting issues.'
-                },
-                'lint': { 
-                  reason: 'ESLint validation failed', 
-                  command: 'pnpm exec nx affected -t lint --fix',
-                  debug: 'ESLint found code quality issues. Run the command above to attempt automatic fixes.'
-                },
-                'typecheck': { 
-                  reason: 'TypeScript type checking failed', 
-                  command: 'pnpm exec nx affected -t typecheck',
-                  debug: 'TypeScript compilation errors detected. Fix type errors in the affected files.'
-                },
-                'test': { 
-                  reason: 'Unit tests failed', 
-                  command: 'pnpm exec nx affected -t test',
-                  debug: 'One or more unit tests are failing. Review test output and fix the failing tests.'
-                }
-              }
-            },
-            'build-validation': {
-              reason: 'Build validation failed',
-              command: 'pnpm exec nx affected -t build --parallel=4',
-              debug: 'Build validation failed. Check for compilation errors, missing dependencies, or configuration issues.'
-            },
-            'e2e-testing': {
-              reason: 'End-to-end tests failed',
-              command: 'cd apps/web-e2e && pnpm exec playwright test --ui',
-              debug: 'E2E tests are failing. Check for UI changes, API issues, or test environment problems.'
-            }
-          };
-
-          // Parse quality gates subsection results if provided
-          let qualityGatesSubsections = {};
-          try {
-            if ('${{ inputs.quality-gates-subsections }}') {
-              qualityGatesSubsections = JSON.parse('${{ inputs.quality-gates-subsections }}');
-            }
-          } catch (e) {
-            console.log('No quality gates subsections provided or parsing failed');
-          }
-
-          // Parse project-level failures if provided
-          let projectFailures = {};
-          try {
-            if ('${{ inputs.project-failures }}') {
-              projectFailures = JSON.parse('${{ inputs.project-failures }}');
-            }
-          } catch (e) {
-            console.log('No project failures provided or parsing failed');
-          }
-
-          // Check step results for first failure
-          let failedSteps = [];
-          let failedQualityGatesSections = [];
-
-          Object.entries(stepResults).forEach(([step, result]) => {
-            if (result === 'failure') {
-              failedSteps.push(step);
-              
-              // Check for quality-gates failure and drill down into subsections
-              if (step === 'quality-gates' && Object.keys(qualityGatesSubsections).length > 0) {
-                Object.entries(qualityGatesSubsections).forEach(([subsection, subResult]) => {
-                  if (subResult === 'failure') {
-                    failedQualityGatesSections.push(subsection);
-                    
-                    // Use specific subsection guidance if available
-                    if (stepAnalysis['quality-gates'].subsections[subsection]) {
-                      const subsectionInfo = stepAnalysis['quality-gates'].subsections[subsection];
-                      failureReason = subsectionInfo.reason;
-                      reproCommand = subsectionInfo.command;
-                      debugSection = subsectionInfo.debug;
-                      
-                      // Add project-specific information if available
-                      if (projectFailures[subsection] && projectFailures[subsection].length > 0) {
-                        const failedProjects = projectFailures[subsection];
-                        failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
-                        
-                        // Update repro command to target specific projects
-                        const target = subsection === 'formatting' ? 'format:check' : subsection;
-                        reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
-                        
-                        debugSection += `\n\n**Failed Projects**: ${failedProjects.map(p => '`' + p + '`').join(', ')}`;
-                      }
-                    }
-                  }
-                });
-              } else if (stepAnalysis[step] && !reproCommand.includes('format')) {
-                failureReason = stepAnalysis[step].reason;
-                reproCommand = stepAnalysis[step].command;
-                debugSection = stepAnalysis[step].debug;
-              }
-            }
-          });
-
-          // Create step status table if we have step results
-          let stepStatusTable = "";
-          if (Object.keys(stepResults).length > 0) {
-            stepStatusTable = "\n### 🔍 Step Status Details\n" +
-                             "| Step | Status |\n" +
-                             "|------|--------|\n";
-            Object.entries(stepResults).forEach(([step, result]) => {
-              const icon = result === 'success' ? '✅' : 
-                          result === 'failure' ? '❌' : 
-                          result === 'skipped' ? '⏭️' : '❓';
-              const stepName = step.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-              stepStatusTable += `| ${stepName} | ${icon} ${result || 'unknown'} |\n`;
-              
-              // Add subsection details for quality-gates
-              if (step === 'quality-gates' && Object.keys(qualityGatesSubsections).length > 0) {
-                Object.entries(qualityGatesSubsections).forEach(([subsection, subResult]) => {
-                  if (subResult) {
-                    const subIcon = subResult === 'success' ? '✅' : 
-                                   subResult === 'failure' ? '❌' : 
-                                   subResult === 'skipped' ? '⏭️' : '❓';
-                    const subName = subsection.charAt(0).toUpperCase() + subsection.slice(1);
-                    
-                    // Add project count if available
-                    let projectInfo = '';
-                    if (subResult === 'failure' && projectFailures[subsection] && projectFailures[subsection].length > 0) {
-                      projectInfo = ` (${projectFailures[subsection].length} project${projectFailures[subsection].length > 1 ? 's' : ''})`;
-                    }
-                    
-                    stepStatusTable += `| &nbsp;&nbsp;&nbsp;↳ ${subName}${projectInfo} | ${subIcon} ${subResult} |\n`;
-                    
-                    // List failed projects under subsection
-                    if (subResult === 'failure' && projectFailures[subsection] && projectFailures[subsection].length > 0) {
-                      projectFailures[subsection].forEach(project => {
-                        stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• \`${project}\` | ❌ failed |\n`;
-                      });
-                    }
-                  }
-                });
-              }
-            });
-            stepStatusTable += "\n";
-          }
-
-          const executionMode = "${{ inputs.execution-mode }}";
-          const agents = "${{ inputs.optimal-agents }}";
-          const fallbackReason = "${{ inputs.fallback-reason }}";
-          const runId = "${{ inputs.run-id }}";
-
-          // Build detailed failure reason with quality gates subsections if applicable
-          let detailedFailureReason = failureReason;
-          if (failedQualityGatesSections.length > 0) {
-            detailedFailureReason += ` (${failedQualityGatesSections.join(', ')})`;
-          }
-
-          const comment = commentMarker + "\n" +
-                         "## ❌ CI Pipeline Failed\n\n" +
-                         "**Failure**: " + detailedFailureReason + "\n\n" +
-                         "### 🔍 Quick Debug\n" +
-                         debugSection + "\n\n" +
-                         stepStatusTable +
-                         "### 🛠️ How to Fix Locally\n" +
-                         "```bash\n" +
-                         "# Reproduce the failure:\n" +
-                         reproCommand + "\n\n" +
-                         "# Full local CI simulation:\n" +
-                         "pnpm run ci:local  # Run full CI pipeline locally\n" +
-                         "```\n\n" +
-                         "### 📊 Execution Context\n" +
-                         "- **Mode**: " + (executionMode === 'distributed' ? 'Distributed Task Execution (DTE)' : 'Local GitHub Actions') + "\n" +
-                         (fallbackReason ? "- **Fallback Reason**: " + fallbackReason + "\n" : "") +
-                         "- **Agents/Processes**: " + agents + "\n" +
-                         (failedSteps.length > 0 ? "- **Failed Steps**: " + failedSteps.join(', ') + "\n" : "") +
-                         (failedQualityGatesSections.length > 0 ? "- **Failed Quality Gates**: " + failedQualityGatesSections.join(', ') + "\n" : "") +
-                         "\n### 📋 Next Steps\n" +
-                         "1. **Run the reproduction command** above to identify the specific issue\n" +
-                         "2. **Fix the failing tests/lint/build** issues\n" +
-                         "3. **Push your changes** - CI will automatically re-run\n" +
-                         "4. **Check our [troubleshooting guide](./docs/troubleshooting.md)** for common issues\n\n" +
-                         "### 🔗 Useful Links\n" +
-                         (runId ? "- 📊 [Workflow Run Details](" + context.payload.repository.html_url + "/actions/runs/" + runId + ")\n" : "") +
-                         "- 🔍 [CI Documentation](" + context.payload.repository.html_url + "/blob/main/README.md#ci-pipeline)\n" +
-                         "- 🧠 [Troubleshooting Guide](" + context.payload.repository.html_url + "/blob/main/docs/troubleshooting.md)\n\n" +
-                         "---\n" +
-                         "*This comment is automatically updated by CI on each run.*\n";
-
-          // Update existing comment or create new one
-          if (existingComment) {
-            await github.rest.issues.updateComment({
-              comment_id: existingComment.id,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-            console.log("Updated existing CI failure comment #" + existingComment.id);
-            core.setOutput('comment_id', existingComment.id);
-            return { comment_id: existingComment.id };
-          } else {
-            const newComment = await github.rest.issues.createComment({
-              issue_number: ${{ inputs.pr-number }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-            console.log("Created new CI failure comment #" + newComment.data.id);
-            core.setOutput('comment_id', newComment.data.id);
-            return { comment_id: newComment.data.id };
-          }
-
-    - name: "✅ PR Comment - Success Report"
+    - name: "PR Comment - Success Report"
       id: pr-success-comment
       if: inputs.status == 'success' && inputs.event-name == 'pull_request' && inputs.pr-number != ''
       uses: actions/github-script@v7
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        EXECUTION_MODE: ${{ inputs.execution-mode }}
+        OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
+        FALLBACK_REASON: ${{ inputs.fallback-reason }}
+        QUOTA_STATUS: ${{ inputs.quota-status }}
+        QUOTA_EXCEEDED: ${{ inputs.quota-exceeded }}
+        WORKFLOW_DURATION: ${{ inputs.workflow-duration }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const commentMarker = "<!-- CI-PIPELINE-STATUS -->";
+          const reportSuccess = require('./.github/scripts/ci-report-success.js');
+          return await reportSuccess({ github, context, core });
 
-          const executionMode = "${{ inputs.execution-mode }}";
-          const agents = "${{ inputs.optimal-agents }}";
-          const fallbackReason = "${{ inputs.fallback-reason }}";
-          const workflowDuration = "${{ inputs.workflow-duration }}";
-
-          let performanceNote = "";
-          if (executionMode === 'distributed') {
-            performanceNote = "🚀 **Performance**: 60-80% faster with Distributed Task Execution";
-          } else {
-            performanceNote = "⚡ **Performance**: Standard GitHub Actions";
-            if (!fallbackReason) {
-              performanceNote += " (add NX_CLOUD_ACCESS_TOKEN for 60-80% speedup)";
-            }
-          }
-
-          // Add duration context if available
-          let durationNote = "";
-          if (workflowDuration && workflowDuration !== 'unknown') {
-            const duration = parseInt(workflowDuration);
-            const minutes = Math.floor(duration / 60);
-            const seconds = duration % 60;
-            
-            if (duration < 300) {
-              durationNote = `⚡ **Duration**: ${minutes}m ${seconds}s (Excellent!)`;
-            } else if (duration < 600) {
-              durationNote = `✅ **Duration**: ${minutes}m ${seconds}s (Good)`;
-            } else {
-              durationNote = `⚠️ **Duration**: ${minutes}m ${seconds}s (Consider optimization)`;
-            }
-          }
-
-          const comment = commentMarker + "\n" +
-                         "## ✅ CI Pipeline Passed\n\n" +
-                         "All checks completed successfully! This PR is ready for review and merge.\n\n" +
-                         "### 📊 Execution Summary\n" +
-                         "- **Mode**: " + (executionMode === 'distributed' ? 'Distributed Task Execution (DTE)' : 'Local GitHub Actions') + "\n" +
-                         "- **Agents/Processes**: " + agents + "\n" +
-                         "- " + performanceNote + "\n" +
-                         (durationNote ? "- " + durationNote + "\n" : "") +
-                         (fallbackReason ? "- **Note**: " + fallbackReason + "\n" : "") +
-                         "\n### 🎯 What Was Validated\n" +
-                         "- ✅ Code formatting and style\n" +
-                         "- ✅ ESLint rules and best practices\n" +
-                         "- ✅ TypeScript type checking\n" +
-                         "- ✅ Unit tests and coverage\n" +
-                         "- ✅ Build validation for all affected projects\n" +
-                         "- ✅ End-to-end tests (if web changes detected)\n\n" +
-                         "Ready for review! 🎉\n\n" +
-                         "---\n" +
-                         "*This comment is automatically updated by CI on each run.*\n";
-
-          // Try to find existing CI comment (using unified marker)
-          const { data: comments } = await github.rest.issues.listComments({
-            issue_number: ${{ inputs.pr-number }},
-            owner: context.repo.owner,
-            repo: context.repo.repo
-          });
-
-          const existingComment = comments.find(comment => 
-            comment.body && comment.body.includes(commentMarker)
-          );
-
-          if (existingComment) {
-            // Update existing comment
-            const updatedComment = await github.rest.issues.updateComment({
-              comment_id: existingComment.id,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-            console.log("✅ Updated existing CI comment #" + existingComment.id);
-            core.setOutput('comment_id', existingComment.id);
-            return { comment_id: existingComment.id };
-          } else {
-            // Create new comment
-            const newComment = await github.rest.issues.createComment({
-              issue_number: ${{ inputs.pr-number }},
-              owner: context.repo.owner,  
-              repo: context.repo.repo,
-              body: comment
-            });
-            console.log("✅ Created new CI comment #" + newComment.data.id);
-            core.setOutput('comment_id', newComment.data.id);
-            return { comment_id: newComment.data.id };
-          }
-
-    - name: "📋 Set Comment Output"
+    - name: "Set Comment Output"
       id: pr-comment
       if: inputs.event-name == 'pull_request' && inputs.pr-number != ''
       shell: bash
@@ -484,7 +201,7 @@ runs:
           echo "comment_id=$FAILURE_COMMENT_ID" >> $GITHUB_OUTPUT
         fi
 
-    - name: "📊 Pipeline Summary"
+    - name: "Pipeline Summary"
       if: always()
       shell: bash
       run: |

@@ -1,4 +1,4 @@
-name: "🚀 Legacy Sports CI Pipeline"
+name: "Legacy Sports CI Pipeline"
 
 # =============================================================================
 # Legacy Sports CI Pipeline - Unified PR & Integration Testing
@@ -63,13 +63,13 @@ jobs:
       # STAGE 1: ENVIRONMENT SETUP & INTELLIGENCE
       # ======================================================================
 
-      - name: "🚀 Checkout Repository"
+      - name: "Checkout Repository"
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
           filter: tree:0
 
-      - name: "🔧 Setup Workspace"
+      - name: "Setup Workspace"
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -78,20 +78,20 @@ jobs:
           # Skip optional deps (Storybook, Appium) for faster CI - ~160MB, 4-6 min savings
           include-optional-deps: false
 
-      - name: "☁️ Detect DTE Availability"
+      - name: "Detect DTE Availability"
         id: detect-dte
         uses: ./.github/actions/detect-dte
         with:
           nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
-      - name: "🔍 Detect Project Changes"
+      - name: "Detect Project Changes"
         id: detect-changes
         uses: ./.github/actions/detect-changes
         with:
           # Force full build on main branch (integration mode) or debug mode
           force-full-build: ${{ github.ref == 'refs/heads/main' || inputs.debug_mode }}
 
-      - name: "📊 Generate Execution Plan"
+      - name: "Generate Execution Plan"
         id: execution-plan
         uses: ./.github/actions/execution-plan
         with:
@@ -107,7 +107,7 @@ jobs:
       # STAGE 2: VALIDATION PIPELINE
       # ======================================================================
 
-      - name: "🎨 Code Quality Gates"
+      - name: "Code Quality Gates"
         id: quality-gates
         uses: ./.github/actions/quality-gates
         with:
@@ -115,7 +115,7 @@ jobs:
           dte-available: ${{ steps.detect-dte.outputs.dte-available }}
           optimal-agents: ${{ steps.detect-dte.outputs.optimal-agents }}
 
-      - name: "🏗️ Build Validation"
+      - name: "Build Validation"
         id: build-validation
         if: success() && steps.quality-gates.outputs.result == 'success'
         uses: ./.github/actions/build-validation
@@ -127,7 +127,7 @@ jobs:
           execution-mode: ${{ steps.detect-dte.outputs.execution-mode }}
           optimal-agents: ${{ steps.detect-dte.outputs.optimal-agents }}
 
-      - name: "🎭 E2E Testing"
+      - name: "E2E Testing"
         id: e2e-testing
         if: steps.build-validation.outputs.overall-result == 'success' || steps.build-validation.outputs.overall-result == ''
         uses: ./.github/actions/e2e-testing
@@ -138,18 +138,18 @@ jobs:
       # STAGE 3: RESULTS & DEPLOYMENT READINESS
       # ======================================================================
 
-      - name: "� Stop DTE Agents"
+      - name: "Stop DTE Agents"
         if: always() && steps.detect-dte.outputs.dte-available == 'true'
         run: |
-          echo "🛑 Stopping Nx Cloud DTE agents..."
+          echo "STOPPING Nx Cloud DTE agents..."
           if command -v pnpm >/dev/null 2>&1; then
-            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+            pnpm exec nx-cloud stop-all-agents || echo "WARNING: Failed to stop agents (they may have already stopped)"
           else
-            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
+            pnpm exec nx-cloud stop-all-agents || echo "WARNING: Failed to stop agents (they may have already stopped)"
           fi
-          echo "✅ Agent cleanup complete"
+          echo "SUCCESS: Agent cleanup complete"
 
-      - name: "�📊 Collect Results"
+      - name: "Collect Results"
         id: collect-results
         if: always()
         uses: ./.github/actions/collect-results
@@ -166,7 +166,7 @@ jobs:
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
           failure-threshold: "quality-gates,build-validation"
 
-      - name: "🚀 Deployment Gate"
+      - name: "Deployment Gate"
         id: deployment-gate
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: ./.github/actions/deployment-gate
@@ -176,7 +176,7 @@ jobs:
           execution-plan: ${{ steps.execution-plan.outputs.execution-plan }}
           environment: "production"
 
-      - name: "📢 CI Pipeline Reporting"
+      - name: "CI Pipeline Reporting"
         id: ci-reporting
         if: always()
         uses: ./.github/actions/ci-reporting
@@ -188,6 +188,8 @@ jobs:
           execution-mode: ${{ steps.detect-dte.outputs.execution-mode }}
           optimal-agents: ${{ steps.detect-dte.outputs.optimal-agents }}
           fallback-reason: ${{ steps.detect-dte.outputs.fallback-reason }}
+          quota-status: ${{ steps.detect-dte.outputs.quota-remaining }}
+          quota-exceeded: ${{ steps.quality-gates.outputs.dte-quota-exceeded }}
           execution-plan: ${{ steps.execution-plan.outputs.execution-plan }}
           step-results: ${{ steps.collect-results.outputs.step-results }}
           workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
@@ -211,7 +213,7 @@ jobs:
       # FINAL STATUS ORCHESTRATION
       # ======================================================================
 
-      - name: "🎖️ Update CI Status Badges"
+      - name: "Update CI Status Badges"
         if: always() && github.ref == 'refs/heads/main'
         continue-on-error: true
         uses: ./.github/actions/update-badges
@@ -234,26 +236,26 @@ jobs:
           commit-sha: ${{ github.sha }}
           dte-status: ${{ steps.detect-dte.outputs.dte-available }}
 
-      - name: "🎉 Success Summary"
+      - name: "Success Summary"
         if: steps.collect-results.outputs.overall-status == 'success'
         run: |
-          echo "🎉 CI Pipeline completed successfully!"
+          echo "SUCCESS: CI Pipeline completed successfully!"
           echo ""
-          echo "📊 Final Summary:"
+          echo "FINAL SUMMARY:"
           echo "- Strategy: ${{ steps.execution-plan.outputs.strategy }}"
           echo "- Duration: ${{ steps.collect-results.outputs.workflow-duration }}s"
           echo "- Execution Mode: ${{ steps.detect-dte.outputs.execution-mode }}"
           echo ""
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "✅ This PR is ready for review and merge!"
+            echo "SUCCESS: This PR is ready for review and merge!"
           elif [ "${{ steps.deployment-gate.outputs.deployment-ready }}" = "true" ]; then
-            echo "🚀 Ready for deployment using ${{ steps.deployment-gate.outputs.deployment-strategy }} strategy!"
+            echo "READY: Ready for deployment using ${{ steps.deployment-gate.outputs.deployment-strategy }} strategy!"
           fi
 
-      - name: "❌ Failure Summary"
+      - name: "Failure Summary"
         if: steps.collect-results.outputs.overall-status != 'success'
         run: |
-          echo "❌ CI Pipeline failed"
+          echo "FAILED: CI Pipeline failed"
           echo ""
           echo "Failed Steps: ${{ steps.collect-results.outputs.failed-steps }}"
           echo "Duration: ${{ steps.collect-results.outputs.workflow-duration }}s"

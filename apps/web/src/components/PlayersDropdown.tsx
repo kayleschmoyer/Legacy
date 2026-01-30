@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button, YStack } from '@legacy-sports/shared-components';
+import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 
 const DropdownButton = styled(Button, {
@@ -72,14 +73,14 @@ export const PlayersDropdown: React.FC = () => {
   const sportTone = location.pathname.startsWith('/baseball')
     ? 'baseball'
     : location.pathname === '/football'
-    ? 'football'
-    : 'neutral';
+      ? 'football'
+      : 'neutral';
   const highlightBg =
     sportTone === 'baseball'
       ? '$sportBaseballPrimary'
       : sportTone === 'football'
-      ? '$sportFootballPrimary'
-      : '$blue9';
+        ? '$sportFootballPrimary'
+        : '$blue9';
 
   // Click outside handler
   useEffect(() => {
@@ -117,10 +118,11 @@ export const PlayersDropdown: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls={menuId}
       >
-        <span role="img" aria-label="players">
+        <span role="img" aria-label="Players icon">
           👥
-        </span>{' '}
-        Players {isOpen ? '▲' : '▼'}
+        </span>
+        <Text> </Text>
+        <Text>Players {isOpen ? '▲' : '▼'}</Text>
       </DropdownButton>
 
       {isOpen && (

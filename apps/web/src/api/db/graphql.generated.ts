@@ -174,6 +174,79 @@ export type DeviceTokenInput = {
   userId: Scalars['Int']['input'];
 };
 
+export type GameBatting = {
+  __typename?: 'GameBatting';
+  atBats?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  battingAverage?: Maybe<Scalars['Float']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  plateAppearances?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  sacrificeFlies?: Maybe<Scalars['String']['output']>;
+  sacrificeHits?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  stolenBases?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
+};
+
+export type GameFielding = {
+  __typename?: 'GameFielding';
+  assists?: Maybe<Scalars['Int']['output']>;
+  caughtStealing?: Maybe<Scalars['Int']['output']>;
+  doublePlays?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Scalars['Int']['output']>;
+  fieldingPercentage?: Maybe<Scalars['Float']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  games?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  inningsPlayed?: Maybe<Scalars['Float']['output']>;
+  passedBalls?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  putouts?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  stolenBasesAllowed?: Maybe<Scalars['Int']['output']>;
+};
+
+export type GamePitching = {
+  __typename?: 'GamePitching';
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  battersFaced?: Maybe<Scalars['Int']['output']>;
+  completeGames?: Maybe<Scalars['Int']['output']>;
+  earnedRuns?: Maybe<Scalars['Int']['output']>;
+  era?: Maybe<Scalars['Float']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  gamesFinished?: Maybe<Scalars['Int']['output']>;
+  gamesStarted?: Maybe<Scalars['Int']['output']>;
+  hitByPitch?: Maybe<Scalars['Int']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  inningsPitched?: Maybe<Scalars['Float']['output']>;
+  intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  outsRecorded?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  saves?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  shutouts?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Head-to-head record between two teams */
 export type HeadToHeadRecord = {
   __typename?: 'HeadToHeadRecord';
@@ -238,6 +311,36 @@ export type Matchup = {
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player selected for a specific matchup */
+export type MatchupPlayer = {
+  __typename?: 'MatchupPlayer';
+  games?: Maybe<Array<MatchupPlayerGame>>;
+  id?: Maybe<Scalars['ID']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  positionId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  seasonBatting?: Maybe<SeasonBatting>;
+  seasonFielding?: Maybe<SeasonFielding>;
+  seasonPitching?: Maybe<SeasonPitching>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type MatchupPlayerGame = {
+  __typename?: 'MatchupPlayerGame';
+  battingGame?: Maybe<GameBatting>;
+  battingGameNum?: Maybe<Scalars['Int']['output']>;
+  fieldingGame?: Maybe<GameFielding>;
+  fieldingGameNum?: Maybe<Scalars['Int']['output']>;
+  fieldingGamePos?: Maybe<Scalars['String']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  pitchingGame?: Maybe<GamePitching>;
+  pitchingGameNum?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum MatchupStatus {
@@ -442,6 +545,7 @@ export type Query = {
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
+  getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
@@ -538,6 +642,10 @@ export type QueryGetMatchupHistoryArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<MatchupStatus>;
   teamId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMatchupPlayersArgs = {
+  matchupId: Scalars['Int']['input'];
 };
 
 export type QueryGetMatchupStatusCountsArgs = {
@@ -1100,6 +1208,15 @@ export type DeleteAllLeaguesMutation = {
   deleteAllLeagues?: string | null;
 };
 
+export type DeleteLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type DeleteLeagueMutation = {
+  __typename?: 'Mutation';
+  deleteAllLeagues?: string | null;
+};
+
 export type StartDraftMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   draftType?: InputMaybe<Scalars['String']['input']>;
@@ -1317,6 +1434,329 @@ export type GetMatchupHistoryQuery = {
     gamesPerMatchup?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+  }> | null;
+};
+
+export type MatchupPlayerFragment = {
+  __typename?: 'MatchupPlayer';
+  id?: string | null;
+  matchupId?: number | null;
+  playerId?: number | null;
+  teamId?: number | null;
+  positionId?: number | null;
+  season?: number | null;
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+  } | null;
+  seasonBatting?: {
+    __typename?: 'SeasonBatting';
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    groundedIntoDoublePlays?: number | null;
+    hitByPitch?: number | null;
+    sacrificeHits?: number | null;
+    intentionalBaseOnBalls?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  } | null;
+  seasonPitching?: {
+    __typename?: 'SeasonPitching';
+    wins?: number | null;
+    losses?: number | null;
+    winLossPercentage?: string | null;
+    earnedRunAverage?: string | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    gamesFinished?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    intentionalBaseOnBalls?: number | null;
+    strikeouts?: number | null;
+    hitByPitch?: number | null;
+    balks?: number | null;
+    wildPitches?: number | null;
+    battersFaced?: number | null;
+    outsRecorded?: number | null;
+  } | null;
+  seasonFielding?: {
+    __typename?: 'SeasonFielding';
+    games?: number | null;
+    gamesStarted?: number | null;
+    inningsDefended?: number | null;
+    chances?: number | null;
+    putouts?: number | null;
+    assists?: number | null;
+    errors?: number | null;
+    doublePlays?: number | null;
+    fieldingPercentage?: number | null;
+  } | null;
+  games?: Array<{
+    __typename?: 'MatchupPlayerGame';
+    id?: number | null;
+    matchupPlayerId?: number | null;
+    gameNum?: number | null;
+    battingGameNum?: number | null;
+    pitchingGameNum?: number | null;
+    fieldingGameNum?: number | null;
+    fieldingGamePos?: string | null;
+    battingGame?: {
+      __typename?: 'GameBatting';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      sacrificeFlies?: string | null;
+      intentionalBaseOnBalls?: number | null;
+      battingAverage?: number | null;
+    } | null;
+    pitchingGame?: {
+      __typename?: 'GamePitching';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+      era?: number | null;
+    } | null;
+    fieldingGame?: {
+      __typename?: 'GameFielding';
+      playerId?: number | null;
+      season?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      position?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      inningsPlayed?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+      passedBalls?: number | null;
+      stolenBasesAllowed?: number | null;
+      caughtStealing?: number | null;
+      fieldingPercentage?: number | null;
+    } | null;
+  }> | null;
+};
+
+export type GetMatchupPlayersQueryVariables = Exact<{
+  matchupId: Scalars['Int']['input'];
+}>;
+
+export type GetMatchupPlayersQuery = {
+  __typename?: 'Query';
+  getMatchupPlayers?: Array<{
+    __typename?: 'MatchupPlayer';
+    id?: string | null;
+    matchupId?: number | null;
+    playerId?: number | null;
+    teamId?: number | null;
+    positionId?: number | null;
+    season?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+    } | null;
+    seasonBatting?: {
+      __typename?: 'SeasonBatting';
+      games?: number | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      battingAverage?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    } | null;
+    seasonPitching?: {
+      __typename?: 'SeasonPitching';
+      wins?: number | null;
+      losses?: number | null;
+      winLossPercentage?: string | null;
+      earnedRunAverage?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      balks?: number | null;
+      wildPitches?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    seasonFielding?: {
+      __typename?: 'SeasonFielding';
+      games?: number | null;
+      gamesStarted?: number | null;
+      inningsDefended?: number | null;
+      chances?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+      fieldingPercentage?: number | null;
+    } | null;
+    games?: Array<{
+      __typename?: 'MatchupPlayerGame';
+      id?: number | null;
+      matchupPlayerId?: number | null;
+      gameNum?: number | null;
+      battingGameNum?: number | null;
+      pitchingGameNum?: number | null;
+      fieldingGameNum?: number | null;
+      fieldingGamePos?: string | null;
+      battingGame?: {
+        __typename?: 'GameBatting';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        plateAppearances?: number | null;
+        atBats?: number | null;
+        runs?: number | null;
+        hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        stolenBases?: number | null;
+        caughtStealing?: number | null;
+        baseOnBalls?: number | null;
+        strikeouts?: number | null;
+        groundedIntoDoublePlays?: number | null;
+        hitByPitch?: number | null;
+        sacrificeHits?: number | null;
+        sacrificeFlies?: string | null;
+        intentionalBaseOnBalls?: number | null;
+        battingAverage?: number | null;
+      } | null;
+      pitchingGame?: {
+        __typename?: 'GamePitching';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        wins?: number | null;
+        losses?: number | null;
+        gamesStarted?: number | null;
+        gamesFinished?: number | null;
+        completeGames?: number | null;
+        shutouts?: number | null;
+        saves?: number | null;
+        inningsPitched?: number | null;
+        hits?: number | null;
+        runs?: number | null;
+        earnedRuns?: number | null;
+        homeRuns?: number | null;
+        baseOnBalls?: number | null;
+        intentionalBaseOnBalls?: number | null;
+        strikeouts?: number | null;
+        hitByPitch?: number | null;
+        battersFaced?: number | null;
+        outsRecorded?: number | null;
+        era?: number | null;
+      } | null;
+      fieldingGame?: {
+        __typename?: 'GameFielding';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        position?: string | null;
+        games?: number | null;
+        gamesStarted?: number | null;
+        inningsPlayed?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        doublePlays?: number | null;
+        passedBalls?: number | null;
+        stolenBasesAllowed?: number | null;
+        caughtStealing?: number | null;
+        fieldingPercentage?: number | null;
+      } | null;
+    }> | null;
   }> | null;
 };
 
@@ -1785,6 +2225,156 @@ export const MatchupFragmentDoc = gql`
     endTime
   }
 `;
+export const MatchupPlayerFragmentDoc = gql`
+  fragment MatchupPlayer on MatchupPlayer {
+    id
+    matchupId
+    playerId
+    teamId
+    positionId
+    season
+    player {
+      id
+      firstName
+      lastName
+      brefId
+    }
+    seasonBatting {
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      groundedIntoDoublePlays
+      hitByPitch
+      sacrificeHits
+      intentionalBaseOnBalls
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    seasonPitching {
+      wins
+      losses
+      winLossPercentage
+      earnedRunAverage
+      games
+      gamesStarted
+      gamesFinished
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      intentionalBaseOnBalls
+      strikeouts
+      hitByPitch
+      balks
+      wildPitches
+      battersFaced
+      outsRecorded
+    }
+    seasonFielding {
+      games
+      gamesStarted
+      inningsDefended
+      chances
+      putouts
+      assists
+      errors
+      doublePlays
+      fieldingPercentage
+    }
+    games {
+      id
+      matchupPlayerId
+      gameNum
+      battingGameNum
+      pitchingGameNum
+      fieldingGameNum
+      fieldingGamePos
+      battingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        plateAppearances
+        atBats
+        runs
+        hits
+        doubles
+        triples
+        homeRuns
+        rbi
+        stolenBases
+        caughtStealing
+        baseOnBalls
+        strikeouts
+        groundedIntoDoublePlays
+        hitByPitch
+        sacrificeHits
+        sacrificeFlies
+        intentionalBaseOnBalls
+        battingAverage
+      }
+      pitchingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        wins
+        losses
+        gamesStarted
+        gamesFinished
+        completeGames
+        shutouts
+        saves
+        inningsPitched
+        hits
+        runs
+        earnedRuns
+        homeRuns
+        baseOnBalls
+        intentionalBaseOnBalls
+        strikeouts
+        hitByPitch
+        battersFaced
+        outsRecorded
+        era
+      }
+      fieldingGame {
+        playerId
+        season
+        gameNum
+        gameIdentifier
+        position
+        games
+        gamesStarted
+        inningsPlayed
+        putouts
+        assists
+        errors
+        doublePlays
+        passedBalls
+        stolenBasesAllowed
+        caughtStealing
+        fieldingPercentage
+      }
+    }
+  }
+`;
 export const NotificationPreferenceFragmentDoc = gql`
   fragment NotificationPreference on NotificationPreference {
     id
@@ -2201,6 +2791,54 @@ export type DeleteAllLeaguesMutationResult =
 export type DeleteAllLeaguesMutationOptions = Apollo.BaseMutationOptions<
   DeleteAllLeaguesMutation,
   DeleteAllLeaguesMutationVariables
+>;
+export const DeleteLeague = gql`
+  mutation DeleteLeague($leagueId: Int!) {
+    deleteAllLeagues
+  }
+`;
+export type DeleteLeagueMutationFn = Apollo.MutationFunction<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueMutation, { data, loading, error }] = useDeleteLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useDeleteLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >(DeleteLeague, options);
+}
+export type DeleteLeagueMutationHookResult = ReturnType<
+  typeof useDeleteLeagueMutation
+>;
+export type DeleteLeagueMutationResult =
+  Apollo.MutationResult<DeleteLeagueMutation>;
+export type DeleteLeagueMutationOptions = Apollo.BaseMutationOptions<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
 >;
 export const StartDraft = gql`
   mutation StartDraft($leagueId: Int!, $draftType: String) {
@@ -2992,6 +3630,89 @@ export type GetMatchupHistorySuspenseQueryHookResult = ReturnType<
 export type GetMatchupHistoryQueryResult = Apollo.QueryResult<
   GetMatchupHistoryQuery,
   GetMatchupHistoryQueryVariables
+>;
+export const GetMatchupPlayers = gql`
+  query GetMatchupPlayers($matchupId: Int!) {
+    getMatchupPlayers(matchupId: $matchupId) {
+      ...MatchupPlayer
+    }
+  }
+  ${MatchupPlayerFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupPlayersQuery({
+ *   variables: {
+ *      matchupId: // value for 'matchupId'
+ *   },
+ * });
+ */
+export function useGetMatchupPlayersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  > &
+    (
+      | { variables: GetMatchupPlayersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(GetMatchupPlayers, options);
+}
+export function useGetMatchupPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(GetMatchupPlayers, options);
+}
+export function useGetMatchupPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupPlayersQuery,
+        GetMatchupPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >(GetMatchupPlayers, options);
+}
+export type GetMatchupPlayersQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersQuery
+>;
+export type GetMatchupPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersLazyQuery
+>;
+export type GetMatchupPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupPlayersSuspenseQuery
+>;
+export type GetMatchupPlayersQueryResult = Apollo.QueryResult<
+  GetMatchupPlayersQuery,
+  GetMatchupPlayersQueryVariables
 >;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences($userId: Int!) {

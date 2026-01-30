@@ -3,11 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/db",
   "projectType": "application",
-  "tags": [
-    "platform:node",
-    "scope:lambda",
-    "type:api"
-  ],
+  "tags": ["platform:node", "scope:lambda", "type:api"],
   "// targets": "to see all targets run: nx show project db --web",
   "targets": {
     "build": {
@@ -27,9 +23,7 @@
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "../../scripts/deploy-lambda.sh graphql",
         "cwd": "lambdas/db"
@@ -37,9 +31,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for GraphQL lambda...'",
@@ -60,9 +52,7 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "echo 'Legacy serverless package command. Use nx deploy db instead.'",
         "cwd": "lambdas/db"
@@ -87,6 +77,24 @@
       "options": {
         "command": "tsx watch --tsconfig ../../tsconfig.base.json src/dev.ts",
         "cwd": "lambdas/db"
+      }
+    },
+    "test:integration": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/lambdas/db-integration"],
+      "options": {
+        "jestConfig": "lambdas/db/jest.integration.config.ts",
+        "testPathPattern": "\\.integration\\.spec\\.ts$",
+        "runInBand": true
+      }
+    },
+    "test:integration:watch": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "lambdas/db/jest.integration.config.ts",
+        "testPathPattern": "\\.integration\\.spec\\.ts$",
+        "watch": true,
+        "runInBand": true
       }
     }
   }

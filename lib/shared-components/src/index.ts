@@ -3,7 +3,7 @@ import './types/tamagui.d.ts';
 export * from './Button';
 export * from './IconButton';
 export * from './Layout';
-export * from './screens/SportsScreens';
+// export * from './screens/SportsScreens'; // Deprecated - use features/sports/SportScreens instead
 export * from './screens/DraftBoardScreen';
 
 // New shared components
@@ -84,6 +84,7 @@ export * from './utils/SecureStorage';
 
 // Sports components
 export * from './features/sports/SportHome';
+export * from './features/sports/SportScreens';
 
 // Home components
 export * from './features/home/HomeScreen';

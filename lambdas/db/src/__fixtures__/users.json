@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "email": "test.user@example.com",
+    "username": "testuser",
+    "password": "hashed_password_123",
+    "accessLevel": "none"
+  },
+  {
+    "id": 2,
+    "email": "admin@example.com",
+    "username": "admin",
+    "password": "hashed_admin_pass",
+    "accessLevel": "admin"
+  },
+  {
+    "id": 3,
+    "email": "league.owner@example.com",
+    "username": "leagueowner",
+    "password": "hashed_owner_pass",
+    "accessLevel": "none"
+  }
+]

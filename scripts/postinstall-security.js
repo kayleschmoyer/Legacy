@@ -60,3 +60,10 @@ console.log(
   '   ℹ️  Note: npm audit may still report these due to package-lock.json',
 );
 console.log('');
+
+// Fix Tamagui installation issue (see scripts/fix-tamagui-install.js)
+try {
+  require('./fix-tamagui-install.js');
+} catch (error) {
+  console.warn('⚠️  Tamagui fix script failed:', error.message);
+}

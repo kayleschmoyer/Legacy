@@ -93,8 +93,15 @@ runs:
             echo "⚠️ Nx Cloud DTE failed - falling back to local build"
             echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
             
-            # Retry with local execution (no DTE)
-            BUILD_CMD_LOCAL="pnpm exec nx build web --configuration=production"
+            # Disable Nx Cloud completely for local fallback
+            unset NX_CLOUD_ACCESS_TOKEN
+            export NX_CLOUD_NO_TIMEOUTS=true
+            export NX_NO_CLOUD=true
+            export NX_DAEMON=false
+            echo "ℹ️ Nx Cloud disabled for local fallback build"
+            
+            # Retry with local execution (no DTE, no Nx Cloud)
+            BUILD_CMD_LOCAL="pnpm exec nx build web --configuration=production --skip-nx-cache"
             if $BUILD_CMD_LOCAL --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
               echo "✅ Web application built successfully (local fallback)"
             else
@@ -201,6 +208,13 @@ runs:
           if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan" "${ERROR_CONTEXT}.log"; then
             echo "⚠️ Nx Cloud DTE failed - falling back to local build"
             echo "::warning::Nx Cloud connection failed during lambda build. Retrying with local execution..."
+            
+            # Disable Nx Cloud for local fallback
+            unset NX_CLOUD_ACCESS_TOKEN
+            export NX_CLOUD_NO_TIMEOUTS=true
+            export NX_NO_CLOUD=true
+            export NX_DAEMON=false
+            echo "ℹ️ Nx Cloud disabled for local fallback build"
             
             # Retry with local execution
             BUILD_CMD_LOCAL="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"

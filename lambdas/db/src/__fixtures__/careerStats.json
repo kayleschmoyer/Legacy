@@ -1,0 +1,46 @@
+{
+  "battingStats": [
+    {
+      "playerId": 1,
+      "g": 1500,
+      "pa": 6500,
+      "ab": 5800,
+      "r": 1200,
+      "h": 1850,
+      "doubles": 380,
+      "triples": 50,
+      "hr": 450,
+      "rbi": 1300,
+      "sb": 200,
+      "cs": 45,
+      "bb": 850,
+      "so": 1400,
+      "battingAvg": 0.319,
+      "onbasePerc": 0.42,
+      "sluggingPerc": 0.645,
+      "onbasePlusSlugging": 1.065
+    }
+  ],
+  "pitchingStats": [
+    {
+      "playerId": 3,
+      "w": 95,
+      "l": 48,
+      "winLossPerc": 0.664,
+      "earnedRunAvg": 2.85,
+      "g": 200,
+      "gs": 180,
+      "gf": 0,
+      "cg": 12,
+      "sho": 5,
+      "sv": 0,
+      "ip": 1250.1,
+      "h": 950,
+      "r": 425,
+      "er": 396,
+      "hr": 125,
+      "bb": 350,
+      "so": 1450
+    }
+  ]
+}

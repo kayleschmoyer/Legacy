@@ -2,12 +2,9 @@
 
 exports[`App FootballScreen should match complete football page layout snapshot 1`] = `
 <div>
-  <div
-    aria-atomic="true"
-    aria-live="polite"
-    class="sr-only"
-    data-announcer-seq="0"
-  />
+  <div>
+    Global Announcer
+  </div>
   <a
     class="skip-link sr-only"
     href="#main-content"
@@ -49,50 +46,11 @@ exports[`App FootballScreen should match complete football page layout snapshot 
         display="none"
         role="navigation"
       >
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="sports-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="$sportFootballPrimary"
-            bordercolor="$sportFootballPrimary"
-            color="white"
-            id="sports-menu-button"
-          >
-            <span
-              aria-label="sports"
-              role="img"
-            >
-              🏆
-            </span>
-             
-            Sports 
-            ▼
-          </button>
+        <div>
+          Sports Dropdown
         </div>
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="players-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="transparent"
-            bordercolor="$borderColor"
-            id="players-menu-button"
-          >
-            <span
-              aria-label="players"
-              role="img"
-            >
-              👥
-            </span>
-             
-            Players 
-            ▼
-          </button>
+        <div>
+          Players Dropdown
         </div>
         <a
           href="/management"
@@ -158,12 +116,9 @@ exports[`App Homepage Snapshot should match homepage content snapshot 1`] = `nul
 
 exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
 <div>
-  <div
-    aria-atomic="true"
-    aria-live="polite"
-    class="sr-only"
-    data-announcer-seq="0"
-  />
+  <div>
+    Global Announcer
+  </div>
   <a
     class="skip-link sr-only"
     href="#main-content"
@@ -205,49 +160,11 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
         display="none"
         role="navigation"
       >
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="sports-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="transparent"
-            bordercolor="$borderColor"
-            id="sports-menu-button"
-          >
-            <span
-              aria-label="sports"
-              role="img"
-            >
-              🏆
-            </span>
-             
-            Sports 
-            ▼
-          </button>
+        <div>
+          Sports Dropdown
         </div>
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="players-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="transparent"
-            bordercolor="$borderColor"
-            id="players-menu-button"
-          >
-            <span
-              aria-label="players"
-              role="img"
-            >
-              👥
-            </span>
-             
-            Players 
-            ▼
-          </button>
+        <div>
+          Players Dropdown
         </div>
         <a
           href="/management"
@@ -311,12 +228,9 @@ exports[`App Navigation should match navigation snapshot 1`] = `null`;
 
 exports[`App Navigation should render navigation with correct links 1`] = `
 <div>
-  <div
-    aria-atomic="true"
-    aria-live="polite"
-    class="sr-only"
-    data-announcer-seq="0"
-  />
+  <div>
+    Global Announcer
+  </div>
   <a
     class="skip-link sr-only"
     href="#main-content"
@@ -358,49 +272,11 @@ exports[`App Navigation should render navigation with correct links 1`] = `
         display="none"
         role="navigation"
       >
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="sports-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="transparent"
-            bordercolor="$borderColor"
-            id="sports-menu-button"
-          >
-            <span
-              aria-label="sports"
-              role="img"
-            >
-              🏆
-            </span>
-             
-            Sports 
-            ▼
-          </button>
+        <div>
+          Sports Dropdown
         </div>
-        <div
-          position="relative"
-        >
-          <button
-            aria-controls="players-menu"
-            aria-expanded="false"
-            aria-haspopup="menu"
-            backgroundcolor="transparent"
-            bordercolor="$borderColor"
-            id="players-menu-button"
-          >
-            <span
-              aria-label="players"
-              role="img"
-            >
-              👥
-            </span>
-             
-            Players 
-            ▼
-          </button>
+        <div>
+          Players Dropdown
         </div>
         <a
           href="/management"

@@ -32,6 +32,9 @@ outputs:
   result:
     description: "Overall quality gates result (success/failure)"
     value: ${{ steps.check-results.outputs.result }}
+  dte-quota-exceeded:
+    description: "Whether DTE quota was exceeded during execution"
+    value: ${{ steps.distributed.outputs.dte-quota-exceeded || 'false' }}
   formatting-result:
     description: "Code formatting check result"
     value: ${{ steps.formatting.outputs.result }}
@@ -222,11 +225,36 @@ runs:
         # Start DTE session with automatic agent provisioning
         # Don't stop agents after build - let them continue for all build targets
         # This allows build-validation step to also use DTE
+        DTE_START_OUTPUT=$(mktemp)
+        DTE_START_RESULT=0
+
         if command -v pnpm >/dev/null 2>&1; then
-          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js"
+          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
         else
-          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js"
+          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
         fi
+
+        # Check if DTE start failed due to quota or authorization
+        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$DTE_START_OUTPUT"; then
+          echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable (quota exceeded or authorization failed). Falling back to local GitHub Actions execution."
+          echo "DTE start output:"
+          cat "$DTE_START_OUTPUT"
+          rm -f "$DTE_START_OUTPUT"
+          
+          # Set output to indicate DTE is not actually available
+          echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
+          
+          # Export flag so local execution runs instead
+          echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
+          
+          # Clean up any partial DTE session
+          pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
+          
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        rm -f "$DTE_START_OUTPUT"
 
         echo "strategy=distributed" >> $GITHUB_OUTPUT
 
@@ -239,6 +267,7 @@ runs:
         TEST_FAILED_PROJECTS=""
 
         echo "🔧 Running lint and typecheck with DTE..."
+        DTE_QUALITY_RESULT=0
         if $NX_CMD affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
           echo "✅ Code quality checks passed (DTE)"
           echo "lint-result=success" >> $GITHUB_OUTPUT
@@ -246,6 +275,25 @@ runs:
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
           echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
         else
+          DTE_QUALITY_RESULT=$?
+          
+          # Check if failure was due to quota or authorization
+          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" dte-quality.log; then
+            echo "::warning title=DTE Unavailable During Execution::DTE unavailable mid-run (quota or authorization). Setting up fallback to local execution."
+            echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
+            echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
+            
+            # Add summary for DTE unavailability
+            echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
+            echo "Nx Cloud DTE became unavailable during quality checks execution (quota exceeded or authorization failed)." >> $GITHUB_STEP_SUMMARY
+            echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
+            echo "::endgroup::"
+            exit 0
+          fi
+          
           echo "❌ Code quality checks failed (DTE)"
           echo "## DTE Quality Errors"
           grep -E "error|warning|failed" dte-quality.log | head -20 || true
@@ -281,6 +329,23 @@ runs:
           echo "test-result=success" >> $GITHUB_OUTPUT
           echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
+          # Check if failure was due to quota or authorization
+          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" dte-test.log; then
+            echo "::warning title=DTE Unavailable During Tests::DTE unavailable during test execution (quota or authorization). Setting up fallback to local execution."
+            echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
+            echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
+            
+            # Add summary for DTE unavailability
+            echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
+            echo "Nx Cloud DTE became unavailable during test execution (quota exceeded or authorization failed)." >> $GITHUB_STEP_SUMMARY
+            echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
+            echo "::endgroup::"
+            exit 0
+          fi
+          
           echo "❌ Tests failed (DTE)"
           echo "## DTE Test Errors"
           grep -E "FAIL|error" dte-test.log | head -10 || true
@@ -306,10 +371,18 @@ runs:
 
     - name: "🔧 Local Parallel Quality Gates"
       id: local
-      if: inputs.dte-available != 'true'
+      if: inputs.dte-available != 'true' || env.DTE_QUOTA_EXHAUSTED == 'true'
       shell: bash
       run: |
         echo "::group::⚡ Parallel Quality Gates (GitHub Actions)"
+
+        # Check why we're running locally
+        if [ "${DTE_QUOTA_EXHAUSTED:-false}" = "true" ]; then
+          echo "⚠️ Running locally due to DTE quota exhaustion"
+          echo "::warning title=Fallback to Local Execution::DTE quota was exhausted, running tests on GitHub Actions runners"
+        else
+          echo "📋 Running locally as DTE is not available"
+        fi
 
         # Disable Nx Cloud completely when DTE is not available to avoid quota errors
         unset NX_CLOUD_ACCESS_TOKEN
