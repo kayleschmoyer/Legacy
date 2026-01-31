@@ -10,8 +10,9 @@
  */
 
 import { renderHook, waitFor } from '@testing-library/react';
-import { MockedProvider, MockedResponse } from '@apollo/client/testing';
+import { MockedResponse } from '@apollo/client/testing';
 import React from 'react';
+import { MockedProvider } from '../../../test-utils/MockedProvider';
 import {
   CAREER_BATTING_STATS_QUERY,
   CAREER_STATS_SORT_OPTIONS,

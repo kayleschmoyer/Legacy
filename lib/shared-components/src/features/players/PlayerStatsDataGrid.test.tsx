@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
- * PlayerStatsDataGrid.test.tsx - Component Integration Tests  
+ * PlayerStatsDataGrid.test.tsx - Component Integration Tests
  *
  * Comprehensive test suite for the PlayerStatsDataGrid component
  * rendering, interaction, and integration with the CareerStatsService.
@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MockedProvider, MockedResponse } from '@apollo/client/testing';
+import { MockedResponse } from '@apollo/client/testing';
 import {
   PlayerStatsDataGrid,
   type PlayerStatsDataGridProps,
@@ -21,6 +21,7 @@ import {
   type CareerBattingStatsRaw,
   PLAYERS_QUERY,
 } from './services/CareerStatsService';
+import { MockedProvider } from '../../test-utils/MockedProvider';
 
 // Mock TamaguiProvider to avoid font creation issues in tests
 const MockTamaguiProvider = ({ children }: { children: React.ReactNode }) => (
@@ -133,7 +134,10 @@ const defaultMock: MockedResponse = {
           hasNextPage: false,
           hasPreviousPage: false,
           startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
-          endCursor: mockPlayerData.length > 0 ? `cursor-${mockPlayerData.length - 1}` : null,
+          endCursor:
+            mockPlayerData.length > 0
+              ? `cursor-${mockPlayerData.length - 1}`
+              : null,
         },
         totalCount: mockPlayerData.length,
       },
@@ -173,7 +177,10 @@ const baseMock: MockedResponse = {
           hasNextPage: false,
           hasPreviousPage: false,
           startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
-          endCursor: mockPlayerData.length > 0 ? `cursor-${Math.min(9, mockPlayerData.length - 1)}` : null,
+          endCursor:
+            mockPlayerData.length > 0
+              ? `cursor-${Math.min(9, mockPlayerData.length - 1)}`
+              : null,
         },
         totalCount: mockPlayerData.length,
       },
@@ -182,7 +189,7 @@ const baseMock: MockedResponse = {
 };
 
 // Mock for page size 50 (used in page size test)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment  
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const pageSize50Mock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -212,7 +219,10 @@ const pageSize50Mock: MockedResponse = {
           hasNextPage: false,
           hasPreviousPage: false,
           startCursor: mockPlayerData.length > 0 ? 'cursor-0' : null,
-          endCursor: mockPlayerData.length > 0 ? `cursor-${mockPlayerData.length - 1}` : null,
+          endCursor:
+            mockPlayerData.length > 0
+              ? `cursor-${mockPlayerData.length - 1}`
+              : null,
         },
         totalCount: mockPlayerData.length,
       },
@@ -291,9 +301,7 @@ const TestWrapper: React.FC<TestWrapperProps> = ({
   mocks = [defaultMock, playersQueryMock],
 }) => (
   <MockTamaguiProvider>
-    <MockedProvider mocks={mocks}>
-      {children}
-    </MockedProvider>
+    <MockedProvider mocks={mocks}>{children}</MockedProvider>
   </MockTamaguiProvider>
 );
 
@@ -658,7 +666,7 @@ describe('PlayerStatsDataGrid - Performance', () => {
       },
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment  
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const largeMock: MockedResponse = {
       ...defaultMock,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -676,7 +684,10 @@ describe('PlayerStatsDataGrid - Performance', () => {
               hasNextPage: false,
               hasPreviousPage: false,
               startCursor: largeMockData.length > 0 ? 'cursor-0' : null,
-              endCursor: largeMockData.length > 0 ? `cursor-${largeMockData.length - 1}` : null,
+              endCursor:
+                largeMockData.length > 0
+                  ? `cursor-${largeMockData.length - 1}`
+                  : null,
             },
             totalCount: largeMockData.length,
           },
