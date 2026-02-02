@@ -22,6 +22,7 @@ env:
   AWS_VPC_SUBNET_IDS: subnet-06f49eeff089ef92d
   DATABASE_SCHEMAS: public
   DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 permissions:
   id-token: write

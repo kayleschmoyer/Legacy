@@ -20,6 +20,7 @@ env:
   AWS_STAGE: dev
   AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2,sg-07083f37d7e8e24c5,sg-05999e0f1cbd13139
   AWS_VPC_SUBNET_IDS: subnet-031d24899cb105d13
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 permissions:
   id-token: write

@@ -26,7 +26,7 @@ env:
   NX_CACHE_DIRECTORY: .nx-cache
   NX_SKIP_NX_CACHE: false
   NODE_OPTIONS: "--max_old_space_size=4096"
-  # NX_CLOUD_ACCESS_TOKEN set conditionally in build step based on DTE availability
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 jobs:
   build-and-deploy:
@@ -74,8 +74,8 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-          # Only set Nx Cloud token if DTE is available, otherwise unset to avoid quota errors
-          NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
+          # Disable Nx Cloud if DTE start failed
+          NX_NO_CLOUD: ${{ steps.start-dte.outcome != 'success' && 'true' || 'false' }}
         run: |
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then
