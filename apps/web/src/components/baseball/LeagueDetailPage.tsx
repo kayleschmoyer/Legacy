@@ -945,14 +945,20 @@ export function LeagueDetailPage(): React.JSX.Element {
             <>
               <MatchupScoreboard
                 matchup={currentMatchup}
-                gamesRemaining={(currentMatchup.gamesPerMatchup ?? 0) - 0}
+                gamesRemaining={
+                  (currentMatchup.gamesPerMatchup ?? 0) -
+                  (currentMatchup.selectedGamesCount ?? 0)
+                }
               />
 
               <MatchupRosterComparison matchup={currentMatchup} />
 
               {currentMatchup.gamesPerMatchup && (
                 <GamesRemaining
-                  gamesRemaining={(currentMatchup.gamesPerMatchup ?? 0) - 0}
+                  gamesRemaining={
+                    (currentMatchup.gamesPerMatchup ?? 0) -
+                    (currentMatchup.selectedGamesCount ?? 0)
+                  }
                   totalGames={currentMatchup.gamesPerMatchup}
                 />
               )}

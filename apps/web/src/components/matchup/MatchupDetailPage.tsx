@@ -82,7 +82,8 @@ export function MatchupDetailPage() {
     );
   }
 
-  const gamesRemaining = (matchup.gamesPerMatchup ?? 0) - 0; // TODO: Calculate actual games remaining
+  const gamesRemaining =
+    (matchup.gamesPerMatchup ?? 0) - (matchup.selectedGamesCount ?? 0);
 
   return (
     <YStack
