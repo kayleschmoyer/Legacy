@@ -234,11 +234,23 @@ runs:
           pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
         fi
 
-        # Check if DTE start failed due to quota, authorization, or insufficient agents
-        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
-          echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable (quota exceeded, authorization failed, or insufficient agents). Falling back to local GitHub Actions execution."
-          echo "DTE start output:"
-          cat "$DTE_START_OUTPUT"
+        # Check if DTE start failed - distinguish between auth and quota issues
+        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|invalid credentials\|minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
+          # Determine specific failure reason
+          if grep -qi "unauthorized\|authorization\|401\|invalid credentials" "$DTE_START_OUTPUT"; then
+            echo "::error title=Nx Cloud Authentication Failed::Invalid or expired NX_CLOUD_ACCESS_TOKEN. Please check your token configuration."
+            echo "🔒 Authentication Error Details:"
+            cat "$DTE_START_OUTPUT"
+          elif grep -qi "minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
+            echo "::warning title=DTE Quota Exhausted::Insufficient agents available for DTE. Falling back to local execution."
+            echo "📊 Agent Availability:"
+            cat "$DTE_START_OUTPUT"
+          else
+            echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable. Falling back to local execution."
+            echo "DTE start output:"
+            cat "$DTE_START_OUTPUT"
+          fi
+          
           rm -f "$DTE_START_OUTPUT"
           
           # Set output to indicate DTE is not actually available
