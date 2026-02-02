@@ -143,7 +143,7 @@ jobs:
           chmod +x gradlew
 
       - name: Verify Gradle Setup
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           cd apps/app/android
 
@@ -151,7 +151,7 @@ jobs:
           echo "🕐 Gradle setup started at $(date)"
 
           # Set network timeout environment variables for better CI reliability
-          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
+          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=180000 -Dorg.gradle.internal.http.socketTimeout=180000"
 
           # Version compatibility validation
           echo "🔍 Validating version matrix compatibility..."
@@ -162,9 +162,9 @@ jobs:
 
           # Check Gradle version with increased timeout for network-dependent operations
           echo "🔍 Checking Gradle wrapper version..."
-          timeout 420s ./gradlew --version --no-daemon || {
+          timeout 600s ./gradlew --version --no-daemon || {
             echo "⚠️  Gradle version check failed - checking connectivity and retrying with offline mode"
-            timeout 120s ./gradlew --version --offline --no-daemon || {
+            timeout 180s ./gradlew --version --offline --no-daemon || {
               echo "❌ Gradle setup failed completely - check network connectivity and gradle wrapper"
               exit 1
             }
@@ -175,11 +175,11 @@ jobs:
           echo "Target Android API Level: ${{ env.ANDROID_API_LEVEL }}"
           echo "NDK Version: ${{ env.NDK_VERSION }}"
 
-          # Quick validation that build.gradle is parseable (without dependency resolution)
+          # Quick validation that build.gradle is parseable (with dependency resolution allowed on first run)
           echo "🔍 Validating build configuration..."
-          timeout 240s ./gradlew help --quiet --no-daemon > /dev/null || {
+          timeout 600s ./gradlew help --quiet --no-daemon > /dev/null || {
             echo "⚠️  Build configuration issue detected - showing details:"
-            timeout 180s ./gradlew help --no-daemon --info  # Show error details with more info
+            timeout 300s ./gradlew help --no-daemon --info  # Show error details with more info
           }
 
           echo "✅ Gradle setup and version matrix verified at $(date)"
