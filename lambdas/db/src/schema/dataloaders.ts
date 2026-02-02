@@ -1,14 +1,15 @@
 import DataLoader from 'dataloader';
 import { and, eq, or } from 'drizzle-orm';
-import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 
 /**
  * DataLoader for game batting stats
  * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
  */
-export const createGameBattingLoader = () =>
+export const createGameBattingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
   new DataLoader<string, typeof PublicSchema.gameBatting.$inferSelect | null>(
     async (keys) => {
       LOGGER.debug(`[gameBatting loader] Looking up ${keys.length} keys`);
@@ -21,57 +22,54 @@ export const createGameBattingLoader = () =>
 
       // Execute individual queries in parallel to avoid Drizzle parameter binding bug
       // The OR/AND query with many parameters was returning wrong data
-      const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-        LOGGER.debug(
-          `[gameBatting loader] First 3 lookups: ${JSON.stringify(lookups.slice(0, 3))}`,
-        );
+      LOGGER.debug(
+        `[gameBatting loader] First 3 lookups: ${JSON.stringify(lookups.slice(0, 3))}`,
+      );
 
-        const results = await Promise.all(
-          lookups.map(async ({ playerId, season, gameNum }) => {
-            const result = await db
-              .select()
-              .from(PublicSchema.gameBatting)
-              .where(
-                and(
-                  eq(PublicSchema.gameBatting.playerId, playerId),
-                  eq(PublicSchema.gameBatting.season, season),
-                  eq(PublicSchema.gameBatting.gameNum, gameNum),
-                ),
-              )
-              .limit(1);
-            return result;
-          }),
-        );
+      const results = await Promise.all(
+        lookups.map(async ({ playerId, season, gameNum }) => {
+          const result = await db
+            .select()
+            .from(PublicSchema.gameBatting)
+            .where(
+              and(
+                eq(PublicSchema.gameBatting.playerId, playerId),
+                eq(PublicSchema.gameBatting.season, season),
+                eq(PublicSchema.gameBatting.gameNum, gameNum),
+              ),
+            )
+            .limit(1);
+          return result;
+        }),
+      );
 
-        LOGGER.debug(
-          `[gameBatting loader] Results array length: ${results.length}, each contains: ${results
-            .map((r) => r.length)
-            .slice(0, 10)
-            .join(',')}`,
-        );
+      LOGGER.debug(
+        `[gameBatting loader] Results array length: ${results.length}, each contains: ${results
+          .map((r) => r.length)
+          .slice(0, 10)
+          .join(',')}`,
+      );
 
-        // Check for any non-empty results
-        const nonEmpty = results.filter((r) => r.length > 0);
+      // Check for any non-empty results
+      const nonEmpty = results.filter((r) => r.length > 0);
+      LOGGER.debug(
+        `[gameBatting loader] Non-empty results: ${nonEmpty.length}`,
+      );
+      if (nonEmpty.length > 0) {
         LOGGER.debug(
-          `[gameBatting loader] Non-empty results: ${nonEmpty.length}`,
+          `[gameBatting loader] First non-empty: ${JSON.stringify({
+            playerId: nonEmpty[0][0].playerId,
+            season: nonEmpty[0][0].season,
+            gameNum: nonEmpty[0][0].gameNum,
+          })}`,
         );
-        if (nonEmpty.length > 0) {
-          LOGGER.debug(
-            `[gameBatting loader] First non-empty: ${JSON.stringify({
-              playerId: nonEmpty[0][0].playerId,
-              season: nonEmpty[0][0].season,
-              gameNum: nonEmpty[0][0].gameNum,
-            })}`,
-          );
-        }
+      }
 
-        // Flatten results (each query returns array of 0 or 1 item)
-        const flattened = results.flat();
-        LOGGER.debug(
-          `[gameBatting loader] After flatten: ${flattened.length} records`,
-        );
-        return flattened;
-      });
+      // Flatten results (each query returns array of 0 or 1 item)
+      const allStats = results.flat();
+      LOGGER.debug(
+        `[gameBatting loader] After flatten: ${allStats.length} records`,
+      );
 
       LOGGER.debug(
         `[gameBatting loader] Query returned: ${allStats.length} records`,
@@ -97,13 +95,13 @@ export const createGameBattingLoader = () =>
       });
 
       // Return results in the same order as keys
-      const results = keys.map((key) => statsMap.get(key) ?? null);
-      const foundCount = results.filter((r) => r !== null).length;
+      const finalResults = keys.map((key) => statsMap.get(key) ?? null);
+      const foundCount = finalResults.filter((r) => r !== null).length;
       LOGGER.debug(
         `[gameBatting loader] Returning: ${foundCount} found, ${keys.length - foundCount} null`,
       );
 
-      return results;
+      return finalResults;
     },
   );
 
@@ -111,7 +109,9 @@ export const createGameBattingLoader = () =>
  * DataLoader for game pitching stats
  * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
  */
-export const createGamePitchingLoader = () =>
+export const createGamePitchingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
   new DataLoader<string, typeof PublicSchema.gamePitching.$inferSelect | null>(
     async (keys) => {
       // Parse keys into lookup objects
@@ -121,24 +121,22 @@ export const createGamePitchingLoader = () =>
       });
 
       // Execute individual queries in parallel to avoid Drizzle parameter binding bug
-      const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await Promise.all(
-          lookups.map(({ playerId, season, gameNum }) =>
-            db
-              .select()
-              .from(PublicSchema.gamePitching)
-              .where(
-                and(
-                  eq(PublicSchema.gamePitching.playerId, playerId),
-                  eq(PublicSchema.gamePitching.season, season),
-                  eq(PublicSchema.gamePitching.gameNum, gameNum),
-                ),
-              )
-              .limit(1),
-          ),
-        );
-        return results.flat();
-      });
+      const results = await Promise.all(
+        lookups.map(({ playerId, season, gameNum }) =>
+          db
+            .select()
+            .from(PublicSchema.gamePitching)
+            .where(
+              and(
+                eq(PublicSchema.gamePitching.playerId, playerId),
+                eq(PublicSchema.gamePitching.season, season),
+                eq(PublicSchema.gamePitching.gameNum, gameNum),
+              ),
+            )
+            .limit(1),
+        ),
+      );
+      const allStats = results.flat();
 
       // Create a map for fast lookup
       const statsMap = new Map<
@@ -159,7 +157,9 @@ export const createGamePitchingLoader = () =>
  * DataLoader for game fielding stats
  * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
  */
-export const createGameFieldingLoader = () =>
+export const createGameFieldingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
   new DataLoader<string, typeof PublicSchema.gameFielding.$inferSelect | null>(
     async (keys) => {
       // Parse keys into lookup objects
@@ -169,24 +169,22 @@ export const createGameFieldingLoader = () =>
       });
 
       // Execute individual queries in parallel to avoid Drizzle parameter binding bug
-      const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await Promise.all(
-          lookups.map(({ playerId, season, gameNum }) =>
-            db
-              .select()
-              .from(PublicSchema.gameFielding)
-              .where(
-                and(
-                  eq(PublicSchema.gameFielding.playerId, playerId),
-                  eq(PublicSchema.gameFielding.season, season),
-                  eq(PublicSchema.gameFielding.gameNum, gameNum),
-                ),
-              )
-              .limit(1),
-          ),
-        );
-        return results.flat();
-      });
+      const results = await Promise.all(
+        lookups.map(({ playerId, season, gameNum }) =>
+          db
+            .select()
+            .from(PublicSchema.gameFielding)
+            .where(
+              and(
+                eq(PublicSchema.gameFielding.playerId, playerId),
+                eq(PublicSchema.gameFielding.season, season),
+                eq(PublicSchema.gameFielding.gameNum, gameNum),
+              ),
+            )
+            .limit(1),
+        ),
+      );
+      const allStats = results.flat();
 
       // Create a map for fast lookup
       const statsMap = new Map<
@@ -207,7 +205,7 @@ export const createGameFieldingLoader = () =>
  * DataLoader for season batting stats
  * Key format: "playerId-season" (e.g., "1234-2019")
  */
-const createSeasonBattingLoader = () =>
+const createSeasonBattingLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<string, typeof PublicSchema.seasonBatting.$inferSelect | null>(
     async (keys) => {
       // Parse keys into lookup objects
@@ -217,21 +215,19 @@ const createSeasonBattingLoader = () =>
       });
 
       // Fetch all stats in a single batched query
-      const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-        return await db
-          .select()
-          .from(PublicSchema.seasonBatting)
-          .where(
-            or(
-              ...lookups.map(({ playerId, season }) =>
-                and(
-                  eq(PublicSchema.seasonBatting.playerId, playerId),
-                  eq(PublicSchema.seasonBatting.season, season),
-                ),
+      const allStats = await db
+        .select()
+        .from(PublicSchema.seasonBatting)
+        .where(
+          or(
+            ...lookups.map(({ playerId, season }) =>
+              and(
+                eq(PublicSchema.seasonBatting.playerId, playerId),
+                eq(PublicSchema.seasonBatting.season, season),
               ),
             ),
-          );
-      });
+          ),
+        );
 
       // Create a map for fast lookup
       const statsMap = new Map<
@@ -252,7 +248,7 @@ const createSeasonBattingLoader = () =>
  * DataLoader for season pitching stats
  * Key format: "playerId-season" (e.g., "1234-2019")
  */
-const createSeasonPitchingLoader = () =>
+const createSeasonPitchingLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<
     string,
     typeof PublicSchema.seasonPitching.$inferSelect | null
@@ -264,21 +260,19 @@ const createSeasonPitchingLoader = () =>
     });
 
     // Fetch all stats in a single batched query
-    const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-      return await db
-        .select()
-        .from(PublicSchema.seasonPitching)
-        .where(
-          or(
-            ...lookups.map(({ playerId, season }) =>
-              and(
-                eq(PublicSchema.seasonPitching.playerId, playerId),
-                eq(PublicSchema.seasonPitching.season, season),
-              ),
+    const allStats = await db
+      .select()
+      .from(PublicSchema.seasonPitching)
+      .where(
+        or(
+          ...lookups.map(({ playerId, season }) =>
+            and(
+              eq(PublicSchema.seasonPitching.playerId, playerId),
+              eq(PublicSchema.seasonPitching.season, season),
             ),
           ),
-        );
-    });
+        ),
+      );
 
     // Create a map for fast lookup
     const statsMap = new Map<
@@ -298,7 +292,7 @@ const createSeasonPitchingLoader = () =>
  * DataLoader for season fielding stats
  * Key format: "playerId-season" (e.g., "1234-2019")
  */
-const createSeasonFieldingLoader = () =>
+const createSeasonFieldingLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<
     string,
     typeof PublicSchema.seasonFielding.$inferSelect | null
@@ -310,21 +304,19 @@ const createSeasonFieldingLoader = () =>
     });
 
     // Fetch all stats in a single batched query
-    const allStats = await runWithPublicClient(getDbOptions(), async (db) => {
-      return await db
-        .select()
-        .from(PublicSchema.seasonFielding)
-        .where(
-          or(
-            ...lookups.map(({ playerId, season }) =>
-              and(
-                eq(PublicSchema.seasonFielding.playerId, playerId),
-                eq(PublicSchema.seasonFielding.season, season),
-              ),
+    const allStats = await db
+      .select()
+      .from(PublicSchema.seasonFielding)
+      .where(
+        or(
+          ...lookups.map(({ playerId, season }) =>
+            and(
+              eq(PublicSchema.seasonFielding.playerId, playerId),
+              eq(PublicSchema.seasonFielding.season, season),
             ),
           ),
-        );
-    });
+        ),
+      );
 
     // Create a map for fast lookup
     const statsMap = new Map<
@@ -344,18 +336,14 @@ const createSeasonFieldingLoader = () =>
  * DataLoader for teams
  * Key format: teamId (number)
  */
-const createTeamsLoader = () =>
+const createTeamsLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<number, typeof PublicSchema.teams.$inferSelect | null>(
     async (keys) => {
       // Fetch all teams in a single batched query
-      const allTeams = await runWithPublicClient(getDbOptions(), async (db) => {
-        return await db
-          .select()
-          .from(PublicSchema.teams)
-          .where(
-            or(...keys.map((teamId) => eq(PublicSchema.teams.id, teamId))),
-          );
-      });
+      const allTeams = await db
+        .select()
+        .from(PublicSchema.teams)
+        .where(or(...keys.map((teamId) => eq(PublicSchema.teams.id, teamId))));
 
       // Create a map for fast lookup
       const teamsMap = new Map<
@@ -375,25 +363,16 @@ const createTeamsLoader = () =>
  * DataLoader for players
  * Key format: playerId (number)
  */
-const createPlayersLoader = () =>
+const createPlayersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<number, typeof PublicSchema.players.$inferSelect | null>(
     async (keys) => {
       // Fetch all players in a single batched query
-      const allPlayers = await runWithPublicClient(
-        getDbOptions(),
-        async (db) => {
-          return await db
-            .select()
-            .from(PublicSchema.players)
-            .where(
-              or(
-                ...keys.map((playerId) =>
-                  eq(PublicSchema.players.id, playerId),
-                ),
-              ),
-            );
-        },
-      );
+      const allPlayers = await db
+        .select()
+        .from(PublicSchema.players)
+        .where(
+          or(...keys.map((playerId) => eq(PublicSchema.players.id, playerId))),
+        );
 
       // Create a map for fast lookup
       const playersMap = new Map<
@@ -414,27 +393,27 @@ const createPlayersLoader = () =>
  * Key format: matchupPlayerId (number)
  * Returns: Array of games for that matchup player
  */
-const createMatchupPlayerGamesLoader = () =>
+const createMatchupPlayerGamesLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
   new DataLoader<
     number,
     Array<typeof PublicSchema.matchupPlayerGames.$inferSelect>
   >(async (keys) => {
     // Fetch all matchup player games in a single batched query
-    const allGames = await runWithPublicClient(getDbOptions(), async (db) => {
-      return await db
-        .select()
-        .from(PublicSchema.matchupPlayerGames)
-        .where(
-          or(
-            ...keys.map((matchupPlayerId) =>
-              eq(
-                PublicSchema.matchupPlayerGames.matchupPlayerId,
-                matchupPlayerId,
-              ),
+    const allGames = await db
+      .select()
+      .from(PublicSchema.matchupPlayerGames)
+      .where(
+        or(
+          ...keys.map((matchupPlayerId) =>
+            eq(
+              PublicSchema.matchupPlayerGames.matchupPlayerId,
+              matchupPlayerId,
             ),
           ),
-        );
-    });
+        ),
+      );
 
     // Group games by matchupPlayerId
     const gamesMap = new Map<
@@ -458,17 +437,18 @@ const createMatchupPlayerGamesLoader = () =>
 
 /**
  * Create all loaders for GraphQL context
+ * Now accepts a shared database connection instead of creating its own
  */
-export const createLoaders = () => ({
-  gameBatting: createGameBattingLoader(),
-  gamePitching: createGamePitchingLoader(),
-  gameFielding: createGameFieldingLoader(),
-  seasonBatting: createSeasonBattingLoader(),
-  seasonPitching: createSeasonPitchingLoader(),
-  seasonFielding: createSeasonFieldingLoader(),
-  teams: createTeamsLoader(),
-  players: createPlayersLoader(),
-  matchupPlayerGames: createMatchupPlayerGamesLoader(),
+export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
+  gameBatting: createGameBattingLoader(db),
+  gamePitching: createGamePitchingLoader(db),
+  gameFielding: createGameFieldingLoader(db),
+  seasonBatting: createSeasonBattingLoader(db),
+  seasonPitching: createSeasonPitchingLoader(db),
+  seasonFielding: createSeasonFieldingLoader(db),
+  teams: createTeamsLoader(db),
+  players: createPlayersLoader(db),
+  matchupPlayerGames: createMatchupPlayerGamesLoader(db),
 });
 
 /**

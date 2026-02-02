@@ -109,7 +109,7 @@ variable "sentry_dsn" {
 variable "domain_name" {
   description = "Primary domain name for the application (e.g., legacysports.com)"
   type        = string
-  default     = "legacy-fantasy.com"  # Set in terraform.tfvars or via -var flag
+  default     = "legacy-fantasy.com" # Set in terraform.tfvars or via -var flag
 }
 
 variable "github_username" {

@@ -185,13 +185,31 @@ describe('League scoring GraphQL resolvers', () => {
     const result = await leagueScoringField.resolve(
       {},
       { leagueId },
-      { user: { id: userId } },
+      {
+        user: { id: userId },
+        db: {
+          select: () => ({
+            from: () => ({
+              where: () => ({
+                limit: () =>
+                  Promise.resolve([
+                    {
+                      leagueId,
+                      userId,
+                      permissionLevel: 'owner',
+                    },
+                  ]),
+              }),
+            }),
+          }),
+        },
+      },
       undefined as never,
     );
 
     assertIsScoringConfig(result);
 
-    expect(runWithPublicClientMock).toHaveBeenCalled();
+    // Note: runWithPublicClient is not called when db is provided in context
     expect(
       databaseServiceMock.scoring.getActiveProfileDetails,
     ).toHaveBeenCalledWith(leagueId);

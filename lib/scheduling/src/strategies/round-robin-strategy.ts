@@ -65,7 +65,6 @@ export class RoundRobinStrategy implements SchedulingStrategy {
             team1Id: isHomeSwapped ? away.id : home.id,
             team2Id: isHomeSwapped ? home.id : away.id,
             weekNumber: currentWeek,
-            selectedSeason: 0, // Will be filled by scheduler
             gamesPerMatchup: 0, // Will be filled by scheduler
           });
         }

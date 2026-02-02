@@ -2,8 +2,12 @@ import SchemaBuilder from '@pothos/core';
 import RelayPlugin from '@pothos/plugin-relay';
 import DataloaderPlugin from '@pothos/plugin-dataloader';
 import ValidationPlugin from '@pothos/plugin-validation';
-import { createDatabaseService } from '@legacy-sports/db-client';
+import {
+  createDatabaseService,
+  type GenericDatabase,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
+import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { type Loaders } from './dataloaders';
 
 // Initialize database service
@@ -18,6 +22,7 @@ export interface Context {
     isAdmin?: boolean;
   } | null;
   loaders: Loaders; // DataLoaders for batching queries
+  db: GenericDatabase<typeof PublicSchema>; // Shared database connection for this request
 }
 
 // Define the schema builder with comprehensive types

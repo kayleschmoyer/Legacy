@@ -1201,18 +1201,6 @@
             "deprecationReason": null
           },
           {
-            "name": "selectedSeason",
-            "description": null,
-            "type": {
-              "kind": "SCALAR",
-              "name": "Int",
-              "ofType": null
-            },
-            "defaultValue": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "startTime",
             "description": null,
             "type": {
@@ -2384,6 +2372,66 @@
       },
       {
         "kind": "OBJECT",
+        "name": "JoinLeaguePayload",
+        "description": null,
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "leagueId",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "message",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "success",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "teamId",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "League",
         "description": "A fantasy sports league",
         "isOneOf": null,
@@ -2467,18 +2515,6 @@
             "type": {
               "kind": "SCALAR",
               "name": "Int",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "schedulingStrategy",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2689,18 +2725,6 @@
             "deprecationReason": null
           },
           {
-            "name": "selectedSeason",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "Int",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "startTime",
             "description": null,
             "args": [],
@@ -2829,7 +2853,7 @@
       {
         "kind": "OBJECT",
         "name": "MatchupPlayer",
-        "description": "A player assigned to a matchup (season from league_week_player_seasons)",
+        "description": "A player selected for a specific matchup",
         "isOneOf": null,
         "fields": [
           {
@@ -2926,7 +2950,7 @@
           },
           {
             "name": "seasonBatting",
-            "description": "Season batting stats for this player's selected season",
+            "description": null,
             "args": [],
             "type": {
               "kind": "OBJECT",
@@ -2938,7 +2962,7 @@
           },
           {
             "name": "seasonFielding",
-            "description": "Season fielding stats for this player's selected season",
+            "description": null,
             "args": [],
             "type": {
               "kind": "OBJECT",
@@ -2950,7 +2974,7 @@
           },
           {
             "name": "seasonPitching",
-            "description": "Season pitching stats for this player's selected season",
+            "description": null,
             "args": [],
             "type": {
               "kind": "OBJECT",
@@ -2981,9 +3005,21 @@
       {
         "kind": "OBJECT",
         "name": "MatchupPlayerGame",
-        "description": "Stats from a single game for a player in a matchup",
+        "description": null,
         "isOneOf": null,
         "fields": [
+          {
+            "name": "battingGame",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "GameBatting",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
           {
             "name": "battingGameNum",
             "description": null,
@@ -2997,12 +3033,12 @@
             "deprecationReason": null
           },
           {
-            "name": "battingStats",
+            "name": "fieldingGame",
             "description": null,
             "args": [],
             "type": {
               "kind": "OBJECT",
-              "name": "GameBatting",
+              "name": "GameFielding",
               "ofType": null
             },
             "isDeprecated": false,
@@ -3033,18 +3069,6 @@
             "deprecationReason": null
           },
           {
-            "name": "fieldingStats",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "OBJECT",
-              "name": "GameFielding",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "gameNum",
             "description": null,
             "args": [],
@@ -3062,7 +3086,7 @@
             "args": [],
             "type": {
               "kind": "SCALAR",
-              "name": "ID",
+              "name": "Int",
               "ofType": null
             },
             "isDeprecated": false,
@@ -3081,24 +3105,24 @@
             "deprecationReason": null
           },
           {
-            "name": "pitchingGameNum",
+            "name": "pitchingGame",
             "description": null,
             "args": [],
             "type": {
-              "kind": "SCALAR",
-              "name": "Int",
+              "kind": "OBJECT",
+              "name": "GamePitching",
               "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
           },
           {
-            "name": "pitchingStats",
+            "name": "pitchingGameNum",
             "description": null,
             "args": [],
             "type": {
-              "kind": "OBJECT",
-              "name": "GamePitching",
+              "kind": "SCALAR",
+              "name": "Int",
               "ofType": null
             },
             "isDeprecated": false,
@@ -3274,71 +3298,30 @@
             "deprecationReason": null
           },
           {
-            "name": "advanceLeagueWeek",
+            "name": "createLeague",
             "description": null,
             "args": [
               {
-                "name": "leagueId",
+                "name": "maxRosterSize",
                 "description": null,
                 "type": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  }
-                },
-                "defaultValue": null,
-                "isDeprecated": false,
-                "deprecationReason": null
-              }
-            ],
-            "type": {
-              "kind": "LIST",
-              "name": null,
-              "ofType": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Matchup",
+                  "kind": "SCALAR",
+                  "name": "Int",
                   "ofType": null
-                }
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "advanceWeekGames",
-            "description": null,
-            "args": [
-              {
-                "name": "leagueId",
-                "description": null,
-                "type": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  }
                 },
                 "defaultValue": null,
                 "isDeprecated": false,
                 "deprecationReason": null
               },
               {
-                "name": "weekNumber",
+                "name": "name",
                 "description": null,
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "String",
                     "ofType": null
                   }
                 },
@@ -3348,8 +3331,8 @@
               }
             ],
             "type": {
-              "kind": "SCALAR",
-              "name": "Boolean",
+              "kind": "OBJECT",
+              "name": "League",
               "ofType": null
             },
             "isDeprecated": false,
@@ -3478,6 +3461,51 @@
             "type": {
               "kind": "SCALAR",
               "name": "Boolean",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "joinLeague",
+            "description": null,
+            "args": [
+              {
+                "name": "inviteCode",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "teamName",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "OBJECT",
+              "name": "JoinLeaguePayload",
               "ofType": null
             },
             "isDeprecated": false,
@@ -3661,7 +3689,7 @@
             "description": null,
             "args": [
               {
-                "name": "matchupId",
+                "name": "gameNumber",
                 "description": null,
                 "type": {
                   "kind": "NON_NULL",
@@ -3677,7 +3705,7 @@
                 "deprecationReason": null
               },
               {
-                "name": "weekNumber",
+                "name": "matchupId",
                 "description": null,
                 "type": {
                   "kind": "NON_NULL",
@@ -8876,6 +8904,12 @@
           },
           {
             "name": "not_started",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "queued",
             "description": null,
             "isDeprecated": false,
             "deprecationReason": null

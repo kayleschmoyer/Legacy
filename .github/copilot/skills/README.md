@@ -27,8 +27,9 @@ Each skill provides comprehensive guidance on executing specific development tas
 6. **[Dev Web Server](dev-web.md)** - Running Next.js development server
 7. **[Dev DB Lambda](dev-db-lambda.md)** - Running local GraphQL Lambda
 8. **[Sync Environment](sync-env.md)** - Syncing environment variables from AWS
+9. **[Database Query](db-query.md)** - Execute SQL queries for debugging and verification
 
-### Workflow & Branch Management Skills
+### Code & Database Skills### Workflow & Branch Management Skills
 
 9. **[Complete Workflow: Ticket to PR](workflow-ticket-to-pr.md)** ⭐ **START HERE** - Complete workflow preventing common mistakes
 10. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
@@ -39,23 +40,24 @@ Each skill provides comprehensive guidance on executing specific development tas
 ### Code Generation & Database Skills
 
 14. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
-15. **[Database Migration](db-migrate.md)** - Running database migrations
-16. **[Database Connection](db-connect.md)** - Testing database connectivity
+15. **[Write Database Migration](db-migration-write.md)** - Creating new database migration files
+16. **[Run Database Migration](db-migrate.md)** - Applying pending migrations
+17. **[Database Connection](db-connect.md)** - Testing database connectivity
 
 ### Troubleshooting & Maintenance Skills
 
-16. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
-17. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
-18. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
+18. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
+19. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
+20. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
 
 ### Deployment Skills
 
-19. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
-20. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
+21. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
+22. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
 ### CLI & Administrative Tools
 
-21. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
+23. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
 
 ## Skill Structure
 

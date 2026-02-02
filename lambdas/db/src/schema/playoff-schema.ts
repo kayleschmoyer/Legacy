@@ -1,5 +1,4 @@
-import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues';
@@ -71,37 +70,33 @@ builder.objectType(PlayoffBracket, {
     championTeam: t.field({
       type: Team,
       nullable: true,
-      resolve: async (bracket) => {
+      resolve: async (bracket, _args, context) => {
         if (!bracket.championTeamId) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, bracket.championTeamId ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, bracket.championTeamId ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
     // Relational field: all matchups in this bracket
     matchups: t.field({
       type: [PlayoffMatchup],
-      resolve: async (bracket) => {
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select()
-            .from(PublicSchema.playoffMatchups)
-            .where(eq(PublicSchema.playoffMatchups.bracketId, bracket.id))
-            .orderBy(
-              asc(PublicSchema.playoffMatchups.round),
-              asc(PublicSchema.playoffMatchups.matchupNumber),
-            );
-          return results;
-        });
+      resolve: async (bracket, _args, context) => {
+        const results = await context.db
+          .select()
+          .from(PublicSchema.playoffMatchups)
+          .where(eq(PublicSchema.playoffMatchups.bracketId, bracket.id))
+          .orderBy(
+            asc(PublicSchema.playoffMatchups.round),
+            asc(PublicSchema.playoffMatchups.matchupNumber),
+          );
+        return results;
       },
     }),
   }),
@@ -158,58 +153,52 @@ builder.objectType(PlayoffMatchup, {
     highSeedTeam: t.field({
       type: Team,
       nullable: true,
-      resolve: async (matchup) => {
+      resolve: async (matchup, _args, context) => {
         if (!matchup.highSeedTeamId) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
     lowSeedTeam: t.field({
       type: Team,
       nullable: true,
-      resolve: async (matchup) => {
+      resolve: async (matchup, _args, context) => {
         if (!matchup.lowSeedTeamId) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
     winnerTeam: t.field({
       type: Team,
       nullable: true,
-      resolve: async (matchup) => {
+      resolve: async (matchup, _args, context) => {
         if (!matchup.winnerTeamId) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.winnerTeamId ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, matchup.winnerTeamId ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
   }),
@@ -243,19 +232,17 @@ builder.objectType(PlayoffSeed, {
     // Relational field
     team: t.field({
       type: Team,
-      resolve: async (seed) => {
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, seed.teamId))
-            .limit(1);
-          return results[0] || null;
-        });
+      resolve: async (seed, _args, context) => {
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, seed.teamId))
+          .limit(1);
+        return results[0] || null;
       },
     }),
   }),
@@ -297,38 +284,34 @@ builder.objectType(ChampionTrophy, {
     // Relational fields
     championTeam: t.field({
       type: Team,
-      resolve: async (trophy) => {
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, trophy.teamId))
-            .limit(1);
-          return results[0] || null;
-        });
+      resolve: async (trophy, _args, context) => {
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, trophy.teamId))
+          .limit(1);
+        return results[0] || null;
       },
     }),
     runnerUpTeam: t.field({
       type: Team,
       nullable: true,
-      resolve: async (trophy) => {
+      resolve: async (trophy, _args, context) => {
         if (!trophy.runnerUpTeamId) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
   }),
@@ -349,34 +332,32 @@ builder.queryField('getPlayoffBracket', (t) =>
       leagueId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const query = db
+    resolve: async (_parent, args, context) => {
+      const query = context.db
+        .select()
+        .from(PublicSchema.playoffBrackets)
+        .where(eq(PublicSchema.playoffBrackets.leagueId, args.leagueId));
+
+      if (args.season !== null && args.season !== undefined) {
+        const results = await context.db
           .select()
           .from(PublicSchema.playoffBrackets)
-          .where(eq(PublicSchema.playoffBrackets.leagueId, args.leagueId));
-
-        if (args.season !== null && args.season !== undefined) {
-          const results = await db
-            .select()
-            .from(PublicSchema.playoffBrackets)
-            .where(
-              and(
-                eq(PublicSchema.playoffBrackets.leagueId, args.leagueId),
-                eq(PublicSchema.playoffBrackets.season, args.season),
-              ),
-            )
-            .orderBy(desc(PublicSchema.playoffBrackets.season))
-            .limit(1);
-          return results[0] || null;
-        }
-
-        const results = await query
+          .where(
+            and(
+              eq(PublicSchema.playoffBrackets.leagueId, args.leagueId),
+              eq(PublicSchema.playoffBrackets.season, args.season),
+            ),
+          )
           .orderBy(desc(PublicSchema.playoffBrackets.season))
           .limit(1);
-
         return results[0] || null;
-      });
+      }
+
+      const results = await query
+        .orderBy(desc(PublicSchema.playoffBrackets.season))
+        .limit(1);
+
+      return results[0] || null;
     },
   }),
 );
@@ -390,15 +371,13 @@ builder.queryField('getPlayoffSeeds', (t) =>
     args: {
       bracketId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await db
-          .select()
-          .from(PublicSchema.playoffSeeds)
-          .where(eq(PublicSchema.playoffSeeds.bracketId, args.bracketId))
-          .orderBy(asc(PublicSchema.playoffSeeds.seedNumber));
-        return results;
-      });
+    resolve: async (_parent, args, context) => {
+      const results = await context.db
+        .select()
+        .from(PublicSchema.playoffSeeds)
+        .where(eq(PublicSchema.playoffSeeds.bracketId, args.bracketId))
+        .orderBy(asc(PublicSchema.playoffSeeds.seedNumber));
+      return results;
     },
   }),
 );
@@ -412,15 +391,13 @@ builder.queryField('getChampionshipTrophies', (t) =>
     args: {
       leagueId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await db
-          .select()
-          .from(PublicSchema.championTrophies)
-          .where(eq(PublicSchema.championTrophies.leagueId, args.leagueId))
-          .orderBy(desc(PublicSchema.championTrophies.season));
-        return results;
-      });
+    resolve: async (_parent, args, context) => {
+      const results = await context.db
+        .select()
+        .from(PublicSchema.championTrophies)
+        .where(eq(PublicSchema.championTrophies.leagueId, args.leagueId))
+        .orderBy(desc(PublicSchema.championTrophies.season));
+      return results;
     },
   }),
 );
@@ -442,9 +419,9 @@ builder.mutationField('createPlayoffBracket', (t) =>
       startWeek: t.arg.int({ required: true }),
       multiWeekMatchups: t.arg.boolean({ required: false }),
     },
-    resolve: async (_parent, args) => {
+    resolve: async (_parent, args, context) => {
       const { PlayoffService } = await import('../services/playoff-service');
-      const bracket = await PlayoffService.createBracket({
+      const bracket = await PlayoffService.createBracket(context.db, {
         leagueId: args.leagueId,
         season: args.season,
         format: args.format,
@@ -465,9 +442,12 @@ builder.mutationField('advancePlayoffBracket', (t) =>
     args: {
       bracketId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
+    resolve: async (_parent, args, context) => {
       const { PlayoffService } = await import('../services/playoff-service');
-      const bracket = await PlayoffService.advanceBracket(args.bracketId);
+      const bracket = await PlayoffService.advanceBracket(
+        context.db,
+        args.bracketId,
+      );
       return bracket;
     },
   }),
@@ -485,54 +465,49 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
       lowSeedScore: t.arg.float({ required: false }),
       status: t.arg({ type: PlayoffMatchupStatus, required: false }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const updateData: {
-          highSeedScore?: string;
-          lowSeedScore?: string;
-          status?: 'scheduled' | 'in_progress' | 'completed';
-          winnerTeamId?: number | null;
-        } = {};
+    resolve: async (_parent, args, context) => {
+      const updateData: {
+        highSeedScore?: string;
+        lowSeedScore?: string;
+        status?: 'scheduled' | 'in_progress' | 'completed';
+        winnerTeamId?: number | null;
+      } = {};
 
-        if (args.highSeedScore !== undefined && args.highSeedScore !== null) {
-          updateData.highSeedScore = args.highSeedScore.toString();
-        }
-        if (args.lowSeedScore !== undefined && args.lowSeedScore !== null) {
-          updateData.lowSeedScore = args.lowSeedScore.toString();
-        }
-        if (args.status) {
-          updateData.status = args.status;
-        }
+      if (args.highSeedScore !== undefined && args.highSeedScore !== null) {
+        updateData.highSeedScore = args.highSeedScore.toString();
+      }
+      if (args.lowSeedScore !== undefined && args.lowSeedScore !== null) {
+        updateData.lowSeedScore = args.lowSeedScore.toString();
+      }
+      if (args.status) {
+        updateData.status = args.status;
+      }
 
-        // Determine winner if both scores provided
-        if (
-          args.highSeedScore !== undefined &&
-          args.lowSeedScore !== undefined
-        ) {
-          const matchup = await db
-            .select()
-            .from(PublicSchema.playoffMatchups)
-            .where(eq(PublicSchema.playoffMatchups.id, args.matchupId))
-            .limit(1);
-
-          if (matchup[0]) {
-            if ((args.highSeedScore ?? 0) > (args.lowSeedScore ?? 0)) {
-              updateData.winnerTeamId = matchup[0].highSeedTeamId;
-            } else if ((args.lowSeedScore ?? 0) > (args.highSeedScore ?? 0)) {
-              updateData.winnerTeamId = matchup[0].lowSeedTeamId;
-            }
-            updateData.status = 'completed';
-          }
-        }
-
-        const results = await db
-          .update(PublicSchema.playoffMatchups)
-          .set(updateData)
+      // Determine winner if both scores provided
+      if (args.highSeedScore !== undefined && args.lowSeedScore !== undefined) {
+        const matchup = await context.db
+          .select()
+          .from(PublicSchema.playoffMatchups)
           .where(eq(PublicSchema.playoffMatchups.id, args.matchupId))
-          .returning();
+          .limit(1);
 
-        return results[0];
-      });
+        if (matchup[0]) {
+          if ((args.highSeedScore ?? 0) > (args.lowSeedScore ?? 0)) {
+            updateData.winnerTeamId = matchup[0].highSeedTeamId;
+          } else if ((args.lowSeedScore ?? 0) > (args.highSeedScore ?? 0)) {
+            updateData.winnerTeamId = matchup[0].lowSeedTeamId;
+          }
+          updateData.status = 'completed';
+        }
+      }
+
+      const results = await context.db
+        .update(PublicSchema.playoffMatchups)
+        .set(updateData)
+        .where(eq(PublicSchema.playoffMatchups.id, args.matchupId))
+        .returning();
+
+      return results[0];
     },
   }),
 );
@@ -546,9 +521,12 @@ builder.mutationField('awardChampionship', (t) =>
     args: {
       bracketId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
+    resolve: async (_parent, args, context) => {
       const { PlayoffService } = await import('../services/playoff-service');
-      const trophy = await PlayoffService.awardChampionship(args.bracketId);
+      const trophy = await PlayoffService.awardChampionship(
+        context.db,
+        args.bracketId,
+      );
       return trophy;
     },
   }),

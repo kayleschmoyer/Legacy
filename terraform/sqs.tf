@@ -53,6 +53,77 @@ resource "aws_sqs_queue_policy" "load_season_stats" {
   })
 }
 
+# SQS Queue for game selection
+resource "aws_sqs_queue" "select_game_dlq" {
+  name = "${local.name_prefix}-select-game-dlq.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue" "select_game" {
+  name = "${local.name_prefix}-select-game.fifo"
+
+  fifo_queue                  = true
+  content_based_deduplication = true
+
+  # Message settings
+  visibility_timeout_seconds = 90      # 1.5 minutes (longer than lambda timeout)
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
+  # Redrive policy for dead letter queue
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.select_game_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = local.common_tags
+}
+
+# SQS Queue Policy for game selection
+resource "aws_sqs_queue_policy" "select_game" {
+  queue_url = aws_sqs_queue.select_game.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "${local.name_prefix}-select-game-policy"
+    Statement = [
+      {
+        Sid    = "AllowLambdaServiceAccess"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.select_game.arn
+      },
+      {
+        Sid    = "AllowApplicationSendMessages"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.select_game.arn
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = data.aws_region.current.name
+          }
+        }
+      }
+    ]
+  })
+}
+
 # SQS Queue for processing automatic drafts
 resource "aws_sqs_queue" "automatic_drafts_dlq" {
   name = "${local.name_prefix}-automatic-drafts-dlq.fifo"

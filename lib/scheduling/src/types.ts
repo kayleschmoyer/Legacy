@@ -22,7 +22,6 @@ export interface MatchupPairing {
   team1Id: number;
   team2Id: number;
   weekNumber: number;
-  selectedSeason: number; // The season selected for this matchup
   gamesPerMatchup: number;
 }
 
@@ -32,7 +31,6 @@ export interface ScheduledMatchup {
   leagueId: number;
   team1Id: number | null; // null for bye weeks
   team2Id: number | null; // null for bye weeks
-  selectedSeason: number | null;
   gamesPerMatchup: number | null;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 }

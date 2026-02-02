@@ -1,9 +1,11 @@
 # Skill: Lambda Deployment
 
 ## Overview
+
 Deploy AWS Lambda functions to cloud environment using deployment scripts.
 
 ## When to Use
+
 - After Lambda code changes are merged
 - Deploying hotfixes to production
 - Initial Lambda setup
@@ -22,27 +24,27 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 ### Deploy Single Lambda
 
 ```powershell
-# Deploy specific Lambda
-.\scripts\deploy-lambda.ps1 -LambdaName db
-.\scripts\deploy-lambda.ps1 -LambdaName oauth-proxy
-.\scripts\deploy-lambda.ps1 -LambdaName stats-lambda
-.\scripts\deploy-lambda.ps1 -LambdaName game-selection
+# Deploy specific Lambda (db/graphql Lambda)
+.\scripts\deploy-lambda.ps1 -FunctionName db
+# Other Lambdas
+.\scripts\deploy-lambda.ps1 -FunctionName oauth-proxy
+.\scripts\deploy-lambda.ps1 -FunctionName stats
+.\scripts\deploy-lambda.ps1 -FunctionName game-selection
+.\scripts\deploy-lambda.ps1 -FunctionName draft-processor
 ```
 
 ### Deploy with Options
 
 ```powershell
 # Deploy to specific environment
-.\scripts\deploy-lambda.ps1 -LambdaName db -Environment production
+.\scripts\deploy-lambda.ps1 -FunctionName db -Environment production
 
-# Force rebuild before deploy
-.\scripts\deploy-lambda.ps1 -LambdaName db -ForceBuild
-
-# Dry run (see what would be deployed)
-.\scripts\deploy-lambda.ps1 -LambdaName db -DryRun
+# Deploy with different AWS region
+.\scripts\deploy-lambda.ps1 -FunctionName db -AwsRegion us-west-2
 ```
 
 ## Expected Output
+
 - **Build**: "Building Lambda function..."
 - **Package**: "Creating deployment package..."
 - **Upload**: "Uploading to AWS..."
@@ -52,8 +54,10 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 ## Common Issues
 
 ### Issue: AWS credentials not configured
+
 **Symptom**: "Unable to locate credentials"
 **Solution**: Configure AWS credentials
+
 ```powershell
 # Configure AWS CLI
 aws configure
@@ -68,8 +72,10 @@ aws sts get-caller-identity
 ```
 
 ### Issue: Build fails before deployment
+
 **Symptom**: TypeScript errors or build errors
 **Solution**: Fix build issues locally first
+
 ```powershell
 # Test build locally
 pnpm exec nx build <lambda-name>
@@ -79,12 +85,14 @@ pnpm exec nx affected -t typecheck
 pnpm exec nx affected -t lint --fix
 
 # Then deploy
-.\scripts\deploy-lambda.ps1 -LambdaName db
+.\scripts\deploy-lambda.ps1 -FunctionName db
 ```
 
 ### Issue: Lambda package too large
+
 **Symptom**: "Deployment package exceeds size limit"
 **Solution**: Check dependencies and exclude unnecessary files
+
 ```powershell
 # Check package contents
 # Ensure only necessary files included
@@ -97,8 +105,10 @@ pnpm prune
 ```
 
 ### Issue: Permission errors during deployment
+
 **Symptom**: "Access denied" or insufficient permissions
 **Solution**: Verify IAM permissions
+
 ```powershell
 # Check current IAM identity
 aws sts get-caller-identity
@@ -111,8 +121,10 @@ aws sts get-caller-identity
 ```
 
 ### Issue: Environment variables not updated
+
 **Symptom**: Lambda has old environment variables
 **Solution**: Update Lambda environment separately
+
 ```powershell
 # Use AWS Console or CLI to update env vars
 # Or use Terraform to manage configuration
@@ -121,6 +133,7 @@ terraform apply
 ```
 
 ## Best Practices
+
 1. **Test locally first** - Run Lambda locally before deploying
 2. **Deploy to dev first** - Test in dev environment before production
 3. **Backup before deploy** - Note current version for rollback
@@ -140,6 +153,7 @@ terraform apply
 ## Deployment Process
 
 ### Full Deployment Workflow
+
 ```powershell
 # 1. Verify changes locally
 pnpm exec nx run db:serve  # Test locally
@@ -147,14 +161,14 @@ pnpm exec nx run db:test   # Run tests
 pnpm exec nx build db      # Test build
 
 # 2. Deploy to dev environment
-.\scripts\deploy-lambda.ps1 -LambdaName db -Environment dev
+.\scripts\deploy-lambda.ps1 -FunctionName db -Environment dev
 
 # 3. Test in dev environment
 # Make API calls to dev endpoint
 # Check CloudWatch logs
 
 # 4. If successful, deploy to production
-.\scripts\deploy-lambda.ps1 -LambdaName db -Environment production
+.\scripts\deploy-lambda.ps1 -FunctionName db -Environment production
 
 # 5. Monitor production
 # Check CloudWatch logs
@@ -162,6 +176,7 @@ pnpm exec nx build db      # Test build
 ```
 
 ### Deploy All Lambdas
+
 ```powershell
 # Deploy all Lambda functions at once
 .\scripts\deploy-lambda-all.ps1
@@ -177,13 +192,14 @@ pnpm exec nx build db      # Test build
 ## Integration with Workflow
 
 ### After PR Merge
+
 ```powershell
 # 1. Pull latest changes
 git checkout main
 git pull
 
 # 2. Deploy Lambda that changed
-.\scripts\deploy-lambda.ps1 -LambdaName db
+.\scripts\deploy-lambda.ps1 -FunctionName db
 
 # 3. Update Jira ticket
 acli jira workitem transition --key LS-1234 --status "Done"
@@ -192,6 +208,7 @@ acli jira workitem comment create --key LS-1234 \
 ```
 
 ### Hotfix Deployment
+
 ```powershell
 # 1. Create hotfix branch
 git checkout -b hotfix/LS-1234
@@ -204,7 +221,7 @@ pnpm exec nx build <lambda-name>
 pnpm exec nx test <lambda-name>
 
 # 4. Deploy directly (if urgent)
-.\scripts\deploy-lambda.ps1 -LambdaName <lambda-name> -Environment production
+.\scripts\deploy-lambda.ps1 -FunctionName <lambda-name> -Environment production
 
 # 5. Create PR afterward
 twig github pr create-pr
@@ -213,6 +230,7 @@ twig github pr create-pr
 ## Rollback
 
 ### Rolling Back a Deployment
+
 ```powershell
 # 1. Find previous version
 aws lambda list-versions-by-function --function-name legacy-sports-dev-db
@@ -230,6 +248,7 @@ aws lambda update-alias \
 ## Monitoring After Deployment
 
 ### Check Lambda Logs
+
 ```powershell
 # View recent logs
 aws logs tail /aws/lambda/legacy-sports-dev-db --follow
@@ -239,6 +258,7 @@ aws logs tail /aws/lambda/legacy-sports-dev-db --filter-pattern "ERROR"
 ```
 
 ### Check Lambda Status
+
 ```powershell
 # Get Lambda configuration
 aws lambda get-function --function-name legacy-sports-dev-db
@@ -269,21 +289,25 @@ lambdas/
 ## Deployment Artifacts
 
 After deployment, artifacts stored in:
+
 - **S3 Bucket**: Deployment packages
 - **Lambda**: Updated function code
 - **CloudWatch**: Deployment logs
 - **Terraform State**: Infrastructure state
 
 ## Exit Codes
+
 - **0**: Deployment successful
 - **Non-zero**: Deployment failed (check error message)
 
 ## Related Skills
+
 - [Building](build.md) - Building Lambda before deploy
 - [Testing](test.md) - Testing Lambda before deploy
 - [Terraform Apply](terraform-apply.md) - Infrastructure changes
 
 ## Related Documentation
+
 - [Lambda Build Strategy](../../../docs/deployment/lambda-build-strategy.md)
 - [AWS Infrastructure](../../../docs/deployment/aws-infrastructure.md)
 - [Deployment Security](../../../docs/deployment/deployment-security.md)
@@ -291,6 +315,7 @@ After deployment, artifacts stored in:
 ## Security Notes
 
 ⚠️ **Important**:
+
 - Never commit AWS credentials
 - Use IAM roles with least privilege
 - Test in dev before production

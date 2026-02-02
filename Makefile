@@ -302,6 +302,15 @@ else
 	cd lib$(PATH_SEP)db-client && pnpm run db:reset
 endif
 
+db-check-connections: ## Check database connection pool status
+	@$(call echo_blue,Checking database connection pool status...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$config = Get-Content .env -ErrorAction SilentlyContinue | Where-Object { $$_ -match '^DB_' }; if ($$config) { $$env:PGPASSWORD = ($$config | Where-Object { $$_ -match '^DB_PASSWORD=' }) -replace 'DB_PASSWORD=',''; $$host = ($$config | Where-Object { $$_ -match '^DB_HOST=' }) -replace 'DB_HOST=',''; $$user = ($$config | Where-Object { $$_ -match '^DB_USER=' }) -replace 'DB_USER=','postgres'; psql -h $$host -U $$user -d legacy_sports -c \"SELECT count(*) as total_connections, max_conn, max_conn - count(*) as available FROM pg_stat_activity, (SELECT setting::int as max_conn FROM pg_settings WHERE name='max_connections') mc GROUP BY max_conn;\" -c \"SELECT pid, usename, application_name, client_addr, state, query_start FROM pg_stat_activity WHERE datname='legacy_sports' ORDER BY query_start;\" } else { Write-Host 'Database configuration not found in .env file' -ForegroundColor Yellow }"
+else
+	@source .env 2>/dev/null && psql -h $$DB_HOST -U $$DB_USER -d legacy_sports -c "SELECT count(*) as total_connections, max_conn, max_conn - count(*) as available FROM pg_stat_activity, (SELECT setting::int as max_conn FROM pg_settings WHERE name='max_connections') mc GROUP BY max_conn;" -c "SELECT pid, usename, application_name, client_addr, state, query_start FROM pg_stat_activity WHERE datname='legacy_sports' ORDER BY query_start;" || echo "Database configuration not found or psql not installed"
+endif
+
+
 # Code Generation
 codegen: ## Run code generation
 	@$(call echo_blue,Running code generation...)

@@ -207,6 +207,13 @@
         "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts run-migrations --schema internal --verbose",
         "cwd": "apps/cli"
       }
+    },
+    "query-db": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/main.ts query-db",
+        "cwd": "apps/cli"
+      }
     }
   }
 }

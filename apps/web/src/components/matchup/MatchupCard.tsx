@@ -24,8 +24,7 @@ export function MatchupCard({
     return null;
   }
 
-  const { weekNumber, team1Score, team2Score, status, selectedSeason } =
-    matchup;
+  const { weekNumber, team1Score, team2Score, status } = matchup;
 
   const getStatusColor = () => {
     switch (status) {
@@ -73,16 +72,9 @@ export function MatchupCard({
               Week {weekNumber}
             </Text>
           )}
-          <XStack space="$2" alignItems="center">
-            {selectedSeason && (
-              <Text fontSize="$2" color="$blue10">
-                {selectedSeason} Season
-              </Text>
-            )}
-            <Text fontSize="$2" color={getStatusColor()} fontWeight="bold">
-              {getStatusText()}
-            </Text>
-          </XStack>
+          <Text fontSize="$2" color={getStatusColor()} fontWeight="bold">
+            {getStatusText()}
+          </Text>
         </XStack>
       </Card.Header>
 

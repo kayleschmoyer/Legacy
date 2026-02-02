@@ -47,9 +47,9 @@ describe('MatchupScheduler', () => {
     expect(result.matchups.length).toBe(6); // 3 weeks * 2 matches
     expect(result.warnings.length).toBe(0);
 
-    // Check all matchups have seasons selected
+    // Check all matchups are properly configured
     for (const matchup of result.matchups) {
-      expect(matchup.selectedSeason).not.toBeNull();
+      // Note: selectedSeason removed - seasons are now per-player
       expect(matchup.gamesPerMatchup).toBe(5);
       expect(matchup.status).toBe('scheduled');
       expect(matchup.leagueId).toBe(1);
@@ -80,11 +80,12 @@ describe('MatchupScheduler', () => {
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings[0]).toContain('No eligible seasons');
 
-    // Matchups still generated but with null seasons
+    // Matchups still generated
     expect(result.matchups.length).toBe(6);
     for (const matchup of result.matchups) {
-      expect(matchup.selectedSeason).toBeNull();
-      expect(matchup.gamesPerMatchup).toBeNull();
+      // Note: selectedSeason removed - seasons are now per-player
+      // gamesPerMatchup comes from league config, not season selection
+      expect(matchup.gamesPerMatchup).toBe(5);
     }
   });
 
@@ -108,16 +109,9 @@ describe('MatchupScheduler', () => {
 
     expect(result.warnings.length).toBeGreaterThan(0);
 
-    // Some matchups should have seasons, some won't
-    const matchupsWithSeasons = result.matchups.filter(
-      (m) => m.selectedSeason !== null,
-    );
-    const matchupsWithoutSeasons = result.matchups.filter(
-      (m) => m.selectedSeason === null,
-    );
-
-    expect(matchupsWithSeasons.length).toBeGreaterThan(0);
-    expect(matchupsWithoutSeasons.length).toBeGreaterThan(0);
+    // Note: selectedSeason removed - seasons are now per-player
+    // Test that matchups are still created despite partial eligibility
+    expect(result.matchups.length).toBeGreaterThan(0);
   });
 
   it('should handle fewer than 2 teams', () => {

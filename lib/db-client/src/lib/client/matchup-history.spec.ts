@@ -132,7 +132,7 @@ describe('Matchup History', () => {
       const results = await queryHistoricalMatchups(mockDb, filters);
 
       expect(results).toHaveLength(1);
-      expect(results[0].selectedSeason).toBe(2023);
+      // Note: selectedSeason removed - seasons are now per-player
     });
 
     it('should filter by null season', async () => {
@@ -576,10 +576,10 @@ describe('Matchup History', () => {
         mockMatchups.filter((m) => m.status === 'completed'),
       ]);
 
-      const results = await getSeasonResults(mockDb, 1, 2023);
+      const results = await getSeasonResults(mockDb, 1);
 
       expect(results.leagueId).toBe(1);
-      expect(results.season).toBe(2023);
+      expect(results.season).toBe(null);
       expect(results.totalMatchups).toBe(2);
       expect(results.completedMatchups).toBe(1);
       expect(results.standings).toHaveLength(2);

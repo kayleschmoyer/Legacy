@@ -153,9 +153,9 @@ runs:
       uses: actions/github-script@v7
       env:
         PR_NUMBER: ${{ inputs.pr-number }}
-        STEP_RESULTS: ${{ toJSON(inputs.step-results) }}
-        QUALITY_GATES_SUBSECTIONS: ${{ toJSON(inputs.quality-gates-subsections) }}
-        PROJECT_FAILURES: ${{ toJSON(inputs.project-failures) }}
+        STEP_RESULTS: ${{ inputs.step-results }}
+        QUALITY_GATES_SUBSECTIONS: ${{ inputs.quality-gates-subsections }}
+        PROJECT_FAILURES: ${{ inputs.project-failures }}
         EXECUTION_MODE: ${{ inputs.execution-mode }}
         OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
         FALLBACK_REASON: ${{ inputs.fallback-reason }}

@@ -85,7 +85,6 @@ export class DivisionalStrategy implements SchedulingStrategy {
               team1Id: team1.id,
               team2Id: team2.id,
               weekNumber: currentWeek,
-              selectedSeason: 0,
               gamesPerMatchup: 0,
             });
 
@@ -120,7 +119,6 @@ export class DivisionalStrategy implements SchedulingStrategy {
                 team1Id: team1.id,
                 team2Id: team2.id,
                 weekNumber: currentWeek,
-                selectedSeason: 0,
                 gamesPerMatchup: 0,
               });
 
@@ -159,7 +157,6 @@ export class DivisionalStrategy implements SchedulingStrategy {
           team1Id: shuffled[i].id,
           team2Id: shuffled[i + 1].id,
           weekNumber: week,
-          selectedSeason: 0,
           gamesPerMatchup: 0,
         });
       }

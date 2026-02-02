@@ -73,7 +73,15 @@ output "sqs_automatic_drafts_url" {
   description = "URL of the automatic drafts SQS queue"
   value       = aws_sqs_queue.automatic_drafts.url
 }
+output "sqs_select_game_arn" {
+  description = "ARN of the Select Game SQS queue"
+  value       = aws_sqs_queue.select_game.arn
+}
 
+output "sqs_select_game_url" {
+  description = "URL of the Select Game SQS queue"
+  value       = aws_sqs_queue.select_game.url
+}
 output "lambda_deployment_bucket" {
   description = "S3 bucket for Lambda deployment packages"
   value       = aws_s3_bucket.lambda_deployments.bucket
@@ -160,6 +168,7 @@ output "environment_variables_summary" {
     oauth_proxy_cookie_secret_name  = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
     sqs_load_season_stats_url       = aws_sqs_queue.load_season_stats.url
     sqs_automatic_drafts_url        = aws_sqs_queue.automatic_drafts.url
+    sqs_select_game_url             = aws_sqs_queue.select_game.url
     google_oauth_client_id          = var.google_oauth_client_id
   }
 }
@@ -170,6 +179,6 @@ output "draft_processor_lambda_function_arn" {
 }
 
 output "draft_processor_lambda_function_name" {
-  description = "Name of the draft processor Lambda function"  
+  description = "Name of the draft processor Lambda function"
   value       = aws_lambda_function.draft_processor.function_name
 }

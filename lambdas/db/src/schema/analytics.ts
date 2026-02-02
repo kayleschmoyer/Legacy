@@ -1,5 +1,4 @@
-import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { PublicSchema } from '@legacy-sports/db-client';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { builder } from './builder';
 
@@ -182,45 +181,43 @@ builder.queryField('getTeamStatistics', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get all teams for the league
-        const teams = await db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+      // Get all teams for the league
+      const teams = await context.db
+        .select({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, args.leagueId));
 
-        // Get all completed matchups for the league
-        const matchupConditions = [
-          eq(PublicSchema.matchups.leagueId, args.leagueId),
-          eq(PublicSchema.matchups.status, 'completed'),
-        ];
+      // Get all completed matchups for the league
+      const matchupConditions = [
+        eq(PublicSchema.matchups.leagueId, args.leagueId),
+        eq(PublicSchema.matchups.status, 'completed'),
+      ];
 
-        if (args.startWeek !== null && args.startWeek !== undefined) {
-          matchupConditions.push(
-            gte(PublicSchema.matchups.weekNumber, args.startWeek),
-          );
-        }
-        if (args.endWeek !== null && args.endWeek !== undefined) {
-          matchupConditions.push(
-            lte(PublicSchema.matchups.weekNumber, args.endWeek),
-          );
-        }
+      if (args.startWeek !== null && args.startWeek !== undefined) {
+        matchupConditions.push(
+          gte(PublicSchema.matchups.weekNumber, args.startWeek),
+        );
+      }
+      if (args.endWeek !== null && args.endWeek !== undefined) {
+        matchupConditions.push(
+          lte(PublicSchema.matchups.weekNumber, args.endWeek),
+        );
+      }
 
-        const matchups = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(and(...matchupConditions))
-          .orderBy(PublicSchema.matchups.weekNumber);
+      const matchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(and(...matchupConditions))
+        .orderBy(PublicSchema.matchups.weekNumber);
 
-        // Calculate statistics using the analytics library
-        const { calculateTeamStats } = await import('@legacy-sports/analytics');
-        return calculateTeamStats(matchups, teams, {
-          startWeek: args.startWeek || undefined,
-          endWeek: args.endWeek || undefined,
-        });
+      // Calculate statistics using the analytics library
+      const { calculateTeamStats } = await import('@legacy-sports/analytics');
+      return calculateTeamStats(matchups, teams, {
+        startWeek: args.startWeek || undefined,
+        endWeek: args.endWeek || undefined,
       });
     },
   }),
@@ -242,54 +239,50 @@ builder.queryField('getHeadToHeadRecord', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get team names
-        const [team1, team2] = await Promise.all([
-          db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, args.team1Id))
-            .limit(1),
-          db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, args.team2Id))
-            .limit(1),
-        ]);
+      // Get team names
+      const [team1, team2] = await Promise.all([
+        context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, args.team1Id))
+          .limit(1),
+        context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, args.team2Id))
+          .limit(1),
+      ]);
 
-        if (!team1[0] || !team2[0]) {
-          throw new Error('One or both teams not found');
-        }
+      if (!team1[0] || !team2[0]) {
+        throw new Error('One or both teams not found');
+      }
 
-        // Get all matchups between these teams
-        const matchups = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(
-            and(
-              eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed'),
-              sql`(
-                (${PublicSchema.matchups.team1Id} = ${args.team1Id} AND ${PublicSchema.matchups.team2Id} = ${args.team2Id})
-                OR
-                (${PublicSchema.matchups.team1Id} = ${args.team2Id} AND ${PublicSchema.matchups.team2Id} = ${args.team1Id})
-              )`,
-            ),
-          )
-          .orderBy(desc(PublicSchema.matchups.weekNumber));
+      // Get all matchups between these teams
+      const matchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.status, 'completed'),
+            sql`(
+              (${PublicSchema.matchups.team1Id} = ${args.team1Id} AND ${PublicSchema.matchups.team2Id} = ${args.team2Id})
+              OR
+              (${PublicSchema.matchups.team1Id} = ${args.team2Id} AND ${PublicSchema.matchups.team2Id} = ${args.team1Id})
+            )`,
+          ),
+        )
+        .orderBy(desc(PublicSchema.matchups.weekNumber));
 
-        // Calculate head-to-head using the analytics library
-        const { calculateHeadToHead } = await import(
-          '@legacy-sports/analytics'
-        );
-        return calculateHeadToHead(matchups, team1[0], team2[0]);
-      });
+      // Calculate head-to-head using the analytics library
+      const { calculateHeadToHead } = await import('@legacy-sports/analytics');
+      return calculateHeadToHead(matchups, team1[0], team2[0]);
     },
   }),
 );
@@ -308,36 +301,34 @@ builder.queryField('getPowerRankings', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get all teams
-        const teams = await db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+      // Get all teams
+      const teams = await context.db
+        .select({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, args.leagueId));
 
-        // Get all completed matchups
-        const matchups = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(
-            and(
-              eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed'),
-            ),
-          )
-          .orderBy(PublicSchema.matchups.weekNumber);
+      // Get all completed matchups
+      const matchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.status, 'completed'),
+          ),
+        )
+        .orderBy(PublicSchema.matchups.weekNumber);
 
-        // Calculate power rankings using the analytics library
-        const { calculateTeamStats, calculateTrends, calculatePowerRankings } =
-          await import('@legacy-sports/analytics');
+      // Calculate power rankings using the analytics library
+      const { calculateTeamStats, calculateTrends, calculatePowerRankings } =
+        await import('@legacy-sports/analytics');
 
-        const teamStats = calculateTeamStats(matchups, teams);
-        const trends = calculateTrends(matchups, teams);
-        return calculatePowerRankings(teamStats, trends);
-      });
+      const teamStats = calculateTeamStats(matchups, teams);
+      const trends = calculateTrends(matchups, teams);
+      return calculatePowerRankings(teamStats, trends);
     },
   }),
 );
@@ -358,37 +349,35 @@ builder.queryField('getPlayoffProjections', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get all teams
-        const teams = await db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+      // Get all teams
+      const teams = await context.db
+        .select({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, args.leagueId));
 
-        // Get all completed matchups
-        const matchups = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(
-            and(
-              eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed'),
-            ),
-          )
-          .orderBy(PublicSchema.matchups.weekNumber);
+      // Get all completed matchups
+      const matchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.status, 'completed'),
+          ),
+        )
+        .orderBy(PublicSchema.matchups.weekNumber);
 
-        // Calculate playoff projections using the analytics library
-        const { calculateTeamStats, calculatePlayoffProjections } =
-          await import('@legacy-sports/analytics');
+      // Calculate playoff projections using the analytics library
+      const { calculateTeamStats, calculatePlayoffProjections } =
+        await import('@legacy-sports/analytics');
 
-        const teamStats = calculateTeamStats(matchups, teams);
-        return calculatePlayoffProjections(teamStats, {
-          playoffTeams: args.playoffTeams || undefined,
-          remainingWeeks: args.remainingWeeks || undefined,
-        });
+      const teamStats = calculateTeamStats(matchups, teams);
+      return calculatePlayoffProjections(teamStats, {
+        playoffTeams: args.playoffTeams || undefined,
+        remainingWeeks: args.remainingWeeks || undefined,
       });
     },
   }),
@@ -408,79 +397,77 @@ builder.queryField('getLeagueAnalytics', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get league info
-        const leagueResults = await db
-          .select({
-            id: PublicSchema.leagues.id,
-            name: PublicSchema.leagues.name,
-            currentMatchup: PublicSchema.leagues.currentMatchup,
-          })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, args.leagueId))
-          .limit(1);
+      // Get league info
+      const leagueResults = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          name: PublicSchema.leagues.name,
+          currentMatchup: PublicSchema.leagues.currentMatchup,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
 
-        if (!leagueResults[0]) {
-          throw new Error('League not found');
-        }
+      if (!leagueResults[0]) {
+        throw new Error('League not found');
+      }
 
-        const league = leagueResults[0];
+      const league = leagueResults[0];
 
-        // Get current week from current matchup
-        let currentWeek = 1;
-        if (league.currentMatchup) {
-          const currentMatchupResults = await db
-            .select({ weekNumber: PublicSchema.matchups.weekNumber })
-            .from(PublicSchema.matchups)
-            .where(eq(PublicSchema.matchups.id, league.currentMatchup))
-            .limit(1);
-          if (currentMatchupResults[0]) {
-            currentWeek = currentMatchupResults[0].weekNumber;
-          }
-        }
-
-        // Get all teams
-        const teams = await db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
-
-        // Get all completed matchups
-        const matchups = await db
-          .select()
+      // Get current week from current matchup
+      let currentWeek = 1;
+      if (league.currentMatchup) {
+        const currentMatchupResults = await context.db
+          .select({ weekNumber: PublicSchema.matchups.weekNumber })
           .from(PublicSchema.matchups)
-          .where(
-            and(
-              eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.status, 'completed'),
-            ),
-          )
-          .orderBy(PublicSchema.matchups.weekNumber);
+          .where(eq(PublicSchema.matchups.id, league.currentMatchup))
+          .limit(1);
+        if (currentMatchupResults[0]) {
+          currentWeek = currentMatchupResults[0].weekNumber;
+        }
+      }
 
-        // Generate comprehensive analytics using the analytics library
-        const {
-          generateLeagueAnalytics,
-          calculatePlayoffProjections,
-          calculateTeamStats,
-        } = await import('@legacy-sports/analytics');
+      // Get all teams
+      const teams = await context.db
+        .select({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, args.leagueId));
 
-        const analytics = generateLeagueAnalytics(
-          league.id,
-          league.name || 'Unknown League',
-          currentWeek,
-          matchups,
-          teams,
-        );
+      // Get all completed matchups
+      const matchups = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.status, 'completed'),
+          ),
+        )
+        .orderBy(PublicSchema.matchups.weekNumber);
 
-        // Add playoff projections
-        const teamStats = calculateTeamStats(matchups, teams);
-        analytics.playoffProjections = calculatePlayoffProjections(teamStats);
+      // Generate comprehensive analytics using the analytics library
+      const {
+        generateLeagueAnalytics,
+        calculatePlayoffProjections,
+        calculateTeamStats,
+      } = await import('@legacy-sports/analytics');
 
-        return analytics;
-      });
+      const analytics = generateLeagueAnalytics(
+        league.id,
+        league.name || 'Unknown League',
+        currentWeek,
+        matchups,
+        teams,
+      );
+
+      // Add playoff projections
+      const teamStats = calculateTeamStats(matchups, teams);
+      analytics.playoffProjections = calculatePlayoffProjections(teamStats);
+
+      return analytics;
     },
   }),
 );

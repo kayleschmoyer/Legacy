@@ -69,15 +69,8 @@ export async function queryHistoricalMatchups(
 ): Promise<Matchup[]> {
   const conditions = [eq(Schema.matchups.leagueId, filters.leagueId)];
 
-  // Filter by season if provided (handle null explicitly)
-  if (filters.season !== undefined) {
-    if (filters.season === null) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
-      conditions.push(sql`${Schema.matchups.selectedSeason} IS NULL` as any);
-    } else {
-      conditions.push(eq(Schema.matchups.selectedSeason, filters.season));
-    }
-  }
+  // Note: Season filtering removed - matchups no longer have a selected_season field.
+  // Seasons are now per-player (league_week_player_seasons table).
 
   // Filter by team participation
   if (filters.teamId !== undefined) {
@@ -192,7 +185,6 @@ export async function getHeadToHeadRecord(
 export async function calculateStandings(
   db: PublicDb,
   leagueId: number,
-  season?: number | null,
 ): Promise<TeamStanding[]> {
   // Get all teams in the league
   const teams = await db
@@ -213,14 +205,8 @@ export async function calculateStandings(
     eq(Schema.matchups.status, 'completed'),
   ];
 
-  if (season !== undefined) {
-    if (season === null) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
-      matchupConditions.push(sql`${Schema.matchups.selectedSeason} IS NULL`);
-    } else {
-      matchupConditions.push(eq(Schema.matchups.selectedSeason, season));
-    }
-  }
+  // Note: Season filtering removed - matchups no longer have a selected_season field.
+  // Seasons are now per-player (league_week_player_seasons table).
 
   // Get all completed matchups for the league/season
   const matchups = await db
@@ -321,13 +307,11 @@ export async function calculateStandings(
 export async function getSeasonResults(
   db: PublicDb,
   leagueId: number,
-  season: number | null,
 ): Promise<SeasonResults> {
   const matchupConditions = [eq(Schema.matchups.leagueId, leagueId)];
 
-  if (season !== null) {
-    matchupConditions.push(eq(Schema.matchups.selectedSeason, season));
-  }
+  // Note: Season filtering removed - matchups no longer have a selected_season field.
+  // Seasons are now per-player (league_week_player_seasons table).
 
   // Get all matchups for the season
   const allMatchups = await db
@@ -338,11 +322,11 @@ export async function getSeasonResults(
   const completedMatchups = allMatchups.filter((m) => m.status === 'completed');
 
   // Calculate standings
-  const standings = await calculateStandings(db, leagueId, season);
+  const standings = await calculateStandings(db, leagueId);
 
   return {
     leagueId,
-    season,
+    season: null,
     totalMatchups: allMatchups.length,
     completedMatchups: completedMatchups.length,
     standings,
@@ -367,7 +351,9 @@ export async function getPlayoffQualifications(
   season: number | null,
   playoffSpots: number,
 ): Promise<PlayoffQualification[]> {
-  const standings = await calculateStandings(db, leagueId, season);
+  // Note: Season parameter preserved for API compatibility but ignored
+  // Standings are now calculated across all seasons
+  const standings = await calculateStandings(db, leagueId);
 
   return standings.map((standing, index) => ({
     teamId: standing.teamId,
@@ -417,18 +403,11 @@ export interface MatchupStatusCounts {
 export async function getMatchupStatusCounts(
   db: PublicDb,
   leagueId: number,
-  season?: number | null,
 ): Promise<MatchupStatusCounts> {
   const conditions = [eq(Schema.matchups.leagueId, leagueId)];
 
-  if (season !== undefined) {
-    if (season === null) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- sql template literal for IS NULL check
-      conditions.push(sql`${Schema.matchups.selectedSeason} IS NULL` as any);
-    } else {
-      conditions.push(eq(Schema.matchups.selectedSeason, season));
-    }
-  }
+  // Note: Season filtering removed - matchups no longer have a selected_season field.
+  // Seasons are now per-player (league_week_player_seasons table).
 
   const matchups = await db
     .select()

@@ -1,9 +1,11 @@
 # Skill: GraphQL Code Generation
 
 ## Overview
+
 Regenerate TypeScript types and client code from GraphQL schemas using graphql-codegen.
 
 ## When to Use
+
 - After modifying GraphQL schema files
 - When GraphQL types are out of sync
 - After pulling changes that include schema updates
@@ -37,7 +39,7 @@ pnpm exec nx run <project-name>:codegen
 # Examples:
 pnpm exec nx run web:codegen
 pnpm exec nx run app:codegen
-pnpm exec nx run lambdas-db:codegen
+# Note: db Lambda does not have a codegen target
 ```
 
 ### Check GraphQL Endpoint
@@ -50,6 +52,7 @@ echo $env:VITE_GRAPHQL_HOST
 ```
 
 ## Expected Output
+
 - **Success**: Types generated in project src/generated folders
 - **Console**: List of generated files
 - **TypeScript**: Updated type definitions for queries/mutations
@@ -57,8 +60,10 @@ echo $env:VITE_GRAPHQL_HOST
 ## Common Issues
 
 ### Issue: GraphQL server not running
+
 **Symptom**: Connection refused or timeout errors
 **Solution**: Start the GraphQL server first
+
 ```powershell
 # Start DB Lambda (GraphQL server)
 pnpm exec nx run db:serve
@@ -66,8 +71,10 @@ pnpm exec nx run db:serve
 ```
 
 ### Issue: Wrong GraphQL endpoint
+
 **Symptom**: 404 or endpoint not found errors
 **Solution**: Set correct environment variable
+
 ```powershell
 # Set GraphQL host environment variable
 $env:VITE_GRAPHQL_HOST = 'http://localhost:4000/graphql'
@@ -77,16 +84,20 @@ pnpm exec nx affected -t codegen
 ```
 
 ### Issue: Schema validation errors
+
 **Symptom**: GraphQL schema errors or syntax issues
 **Solution**: Fix schema files before running codegen
+
 ```powershell
 # Check schema files in lambdas/db/src/schema/
 # Fix syntax errors, then run codegen
 ```
 
 ### Issue: Codegen fails with module errors
+
 **Symptom**: Cannot find modules or dependencies
 **Solution**: Install dependencies first
+
 ```powershell
 pnpm install
 pnpm run build:libs  # Build dependencies
@@ -94,8 +105,10 @@ pnpm exec nx affected -t codegen
 ```
 
 ### Issue: Stale generated types
+
 **Symptom**: Types exist but don't match schema
 **Solution**: Clean and regenerate
+
 ```powershell
 # Remove generated folders
 Remove-Item -Recurse -Force "apps/web/src/generated"
@@ -106,6 +119,7 @@ pnpm exec nx affected -t codegen
 ```
 
 ## Best Practices
+
 1. **Start GraphQL server first** before running codegen
 2. **Run after schema changes** to keep types in sync
 3. **Include in pre-commit** validation for schema changes
@@ -115,6 +129,7 @@ pnpm exec nx affected -t codegen
 ## Integration with Workflow
 
 ### After Schema Changes
+
 ```powershell
 # 1. Modify GraphQL schema files
 # Edit files in lambdas/db/src/schema/
@@ -135,6 +150,7 @@ git commit -m "feat(graphql): update schema and regenerate types"
 ```
 
 ### Pre-commit with Schema Changes
+
 ```powershell
 # If you modified schema files, include codegen in validation
 pnpm exec nx affected -t codegen
@@ -145,6 +161,7 @@ pnpm exec nx affected -t build
 ```
 
 ### Development Workflow
+
 ```powershell
 # 1. Pull latest changes
 git pull
@@ -159,6 +176,7 @@ pnpm run dev
 ## Generated File Locations
 
 ### Web Application
+
 ```
 apps/web/src/generated/
 ├── graphql.ts          # Generated types
@@ -166,6 +184,7 @@ apps/web/src/generated/
 ```
 
 ### Mobile Application
+
 ```
 apps/app/src/generated/
 ├── graphql.ts          # Generated types
@@ -173,6 +192,7 @@ apps/app/src/generated/
 ```
 
 ### Lambda Functions
+
 ```
 lambdas/db/src/generated/
 └── schema-types.ts     # Resolver types
@@ -181,11 +201,13 @@ lambdas/db/src/generated/
 ## Configuration Files
 
 GraphQL Codegen is configured in:
+
 - `codegen.yml` or `codegen.ts` files in project roots
 - `project.json` targets for each project
 - Environment variables for endpoint configuration
 
 ## Performance Notes
+
 - **Codegen time**: 5-15 seconds per project
 - **Affected only**: Much faster than running all
 - **Caching**: Nx caches unchanged results
@@ -201,14 +223,17 @@ GraphQL Codegen is configured in:
 - [ ] No stale generated files causing conflicts
 
 ## Exit Codes
+
 - **0**: Codegen successful
 - **Non-zero**: Errors occurred (check error message)
 
 ## Related Skills
+
 - [Dev DB Lambda](dev-db-lambda.md) - Starting GraphQL server
 - [Type Checking](typecheck.md) - Validating generated types
 - [Building](build.md) - Building with generated types
 
 ## Related Documentation
+
 - [GraphQL Integration](../../../docs/architecture/graphql-integration.md)
 - [Build System](../../../docs/architecture/build-system.md)

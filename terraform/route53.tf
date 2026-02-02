@@ -30,13 +30,13 @@ locals {
 # All GitHub Pages IPs must be in a single A record set
 resource "aws_route53_record" "apex" {
   count = var.domain_name != "" ? 1 : 0
-  
+
   zone_id = aws_route53_zone.main[0].zone_id
-  name    = ""  # Root/apex domain
+  name    = "" # Root/apex domain
   type    = "A"
   ttl     = 300
   records = local.github_pages_ips
-  
+
   # Allow overwriting existing records
   allow_overwrite = true
 }

@@ -128,11 +128,6 @@ export function MatchupDetailPage() {
           <Text fontSize="$3" color="$gray11">
             Week: {matchup.weekNumber}
           </Text>
-          {matchup.selectedSeason && (
-            <Text fontSize="$3" color="$gray11">
-              Season: {matchup.selectedSeason}
-            </Text>
-          )}
           {matchup.startTime && (
             <Text fontSize="$3" color="$gray11">
               Start: {new Date(matchup.startTime).toLocaleString()}

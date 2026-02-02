@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, H3, Separator, Text, XStack, YStack } from 'tamagui';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
-import { GameSelectionControl } from '../commissioner/GameSelectionControl';
+import { NextStepControl } from '../commissioner/NextStepControl';
 
 /**
  * CommissionerPage - Commissioner controls for league management
@@ -83,22 +83,18 @@ export function CommissionerPage() {
 
       <Separator />
 
-      {/* Game Selection Section */}
+      {/* Next Step Control */}
       <YStack space="$3">
-        <H3>Automated Game Selection</H3>
+        <H3>Next Step</H3>
 
         {loading ? (
           <Text color="$gray11">Loading current matchup...</Text>
         ) : error ? (
           <Text color="$red10">Error loading matchup: {error.message}</Text>
         ) : matchup && matchup.id ? (
-          <GameSelectionControl
+          <NextStepControl
             leagueId={leagueIdNum ?? 0}
-            matchupId={
-              typeof matchup.id === 'string'
-                ? parseInt(matchup.id, 10)
-                : matchup.id
-            }
+            currentMatchup={matchup}
             gamesPerMatchup={matchup.gamesPerMatchup ?? 1}
             onSuccess={handleSuccess}
             onError={handleError}
@@ -108,9 +104,9 @@ export function CommissionerPage() {
         )}
 
         <Text fontSize="$2" color="$gray10">
-          Use this control to trigger automated game selection for the current
-          matchup. The system will select games for all teams based on the
-          configured rules and the selected season.
+          The system intelligently determines the next action: if games remain
+          to be selected, it will select the next game. Once all games are
+          selected, it will advance to the next league week.
         </Text>
       </YStack>
 

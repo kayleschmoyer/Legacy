@@ -113,6 +113,24 @@ $newEnvVars["SQS_AUTOMATIC_DRAFTS_URL"] = $terraformOutput.environment_variables
 # Legacy support
 $newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url
 
+# Fetch database credentials for DATABASE_URL generation AND direct access
+Write-Host "Fetching database credentials to generate DATABASE_URL..." -ForegroundColor Yellow
+try {
+    $dbSecret = aws secretsmanager get-secret-value --secret-id $dbCredsSecretName --query "SecretString" --output text | ConvertFrom-Json
+    $dbUsername = $dbSecret.username
+    $dbPassword = $dbSecret.password
+    Write-Host "  [OK] Database credentials retrieved" -ForegroundColor Green
+    
+    # Add credentials to environment variables for tools that need them
+    # These will be properly escaped when written to the file
+    $newEnvVars["DB_USER"] = $dbUsername
+    $newEnvVars["DB_PASSWORD"] = $dbPassword
+} catch {
+    Write-Warning "Could not retrieve database credentials from Secrets Manager. DATABASE_URL will not be set."
+    $dbUsername = $null
+    $dbPassword = $null
+}
+
 # Get direct database endpoint for migrations (if available)
 try {
     Push-Location $TerraformDir
@@ -133,22 +151,43 @@ try {
         Write-Host "Using direct RDS access for DB_HOST (CLI development - publicly accessible)" -ForegroundColor Green
         Write-Host "Note: Lambdas continue using RDS Proxy for production reliability" -ForegroundColor Yellow
     }
+    
+    # Generate DATABASE_URL if we have credentials
+    if ($dbUsername -and $dbPassword -and $directDbHost) {
+        # URL-encode the password to handle special characters
+        $encodedPassword = [System.Uri]::EscapeDataString($dbPassword)
+        $newEnvVars["DATABASE_URL"] = "postgresql://${dbUsername}:${encodedPassword}@${directDbHost}:5432/postgres?sslmode=require"
+        Write-Host "  [OK] DATABASE_URL generated" -ForegroundColor Green
+    }
 } catch {
+    Pop-Location
     Write-Warning "Could not retrieve direct database endpoint."
     
     # Fallback to direct RDS access if available
     if ($directDbHost) {
         $newEnvVars["DB_HOST"] = $directDbHost
         Write-Host "Using direct RDS access for DB_HOST (CLI development)" -ForegroundColor Green
+        
+        # Generate DATABASE_URL if we have credentials
+        if ($dbUsername -and $dbPassword) {
+            $encodedPassword = [System.Uri]::EscapeDataString($dbPassword)
+            $newEnvVars["DATABASE_URL"] = "postgresql://${dbUsername}:${encodedPassword}@${directDbHost}:5432/postgres?sslmode=require"
+            Write-Host "  [OK] DATABASE_URL generated" -ForegroundColor Green
+        }
     } else {
         # Final fallback to production proxy if direct access fails
         $proxyEndpoint = $terraformOutput.environment_variables_summary.value.db_host
         $proxyHost = $proxyEndpoint -replace ':.*$', ''
         $newEnvVars["DB_HOST"] = $proxyHost
         Write-Host "Fallback: Using production RDS proxy endpoint for DB_HOST" -ForegroundColor Yellow
+        
+        # Generate DATABASE_URL with proxy endpoint if we have credentials
+        if ($dbUsername -and $dbPassword) {
+            $encodedPassword = [System.Uri]::EscapeDataString($dbPassword)
+            $newEnvVars["DATABASE_URL"] = "postgresql://${dbUsername}:${encodedPassword}@${proxyHost}:5432/postgres?sslmode=require"
+            Write-Host "  [OK] DATABASE_URL generated with proxy endpoint" -ForegroundColor Green
+        }
     }
-    
-    Pop-Location
 }
 
 if ($DryRun) {
@@ -253,6 +292,10 @@ Write-Host "Summary (New Unified Credential System):" -ForegroundColor Yellow
 Write-Host "  Credential Mode: AWS Secrets Manager (USE_LOCAL_CREDENTIALS=false)" -ForegroundColor Gray
 Write-Host "  Database Secret: $($newEnvVars["DB_SECRET_NAME"])" -ForegroundColor Gray
 Write-Host "  Database Host: $($newEnvVars["DB_HOST"])" -ForegroundColor Gray
+if ($newEnvVars.ContainsKey("DATABASE_URL")) {
+    $maskedUrl = $newEnvVars["DATABASE_URL"] -replace ':[^:@]+@', ':****@'
+    Write-Host "  Database URL: $maskedUrl" -ForegroundColor Gray
+}
 Write-Host "  RDS Proxy Endpoint: $($terraformOutput.rds_proxy_endpoint.value)" -ForegroundColor Gray
 Write-Host "  Direct RDS Endpoint: $($newEnvVars["DB_HOST_DIRECT"])" -ForegroundColor Gray
 Write-Host "  CLI Database Access: Direct RDS (publicly accessible)" -ForegroundColor Green
@@ -264,6 +307,7 @@ Write-Host "  Secrets configured: JWT, Google OAuth, Cookie" -ForegroundColor Gr
 Write-Host ""
 Write-Host "Database Credential Resolution:" -ForegroundColor Cyan
 Write-Host "  Production apps will automatically fetch DB credentials from AWS Secrets Manager" -ForegroundColor Green
+Write-Host "  DATABASE_URL set in .env for tools that require it (drizzle, etc.)" -ForegroundColor Green
 Write-Host "  Use 'pnpm run db:test:production' to validate database connectivity" -ForegroundColor Green
 Write-Host "  Use 'pnpm run db:credentials:production' to view resolved credentials" -ForegroundColor Green
 Write-Host ""

@@ -22,6 +22,7 @@ export const matchupStatus = pgEnum('matchup_status', [
 
 export const statsLoadingStatus = pgEnum('stats_loading_status', [
   'not_started',
+  'queued',
   'loading',
   'completed',
   'failed',
@@ -41,7 +42,6 @@ export const matchups = pgTable(
     statsLoadingStatus: statsLoadingStatus('stats_loading_status')
       .notNull()
       .default('not_started'),
-    selectedSeason: integer('selected_season'),
     gamesPerMatchup: integer('games_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
     endTime: timestamp('end_time', { mode: 'string' }),

@@ -85,7 +85,7 @@ resource "aws_s3_bucket_policy" "terraform_state" {
         Principal = {
           AWS = aws_iam_role.github_actions.arn
         }
-        Action = "s3:ListBucket"
+        Action   = "s3:ListBucket"
         Resource = aws_s3_bucket.terraform_state.arn
       }
     ]

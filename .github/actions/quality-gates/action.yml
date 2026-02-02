@@ -234,9 +234,9 @@ runs:
           pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
         fi
 
-        # Check if DTE start failed due to quota or authorization
-        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$DTE_START_OUTPUT"; then
-          echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable (quota exceeded or authorization failed). Falling back to local GitHub Actions execution."
+        # Check if DTE start failed due to quota, authorization, or insufficient agents
+        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
+          echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable (quota exceeded, authorization failed, or insufficient agents). Falling back to local GitHub Actions execution."
           echo "DTE start output:"
           cat "$DTE_START_OUTPUT"
           rm -f "$DTE_START_OUTPUT"
@@ -277,15 +277,15 @@ runs:
         else
           DTE_QUALITY_RESULT=$?
           
-          # Check if failure was due to quota or authorization
-          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" dte-quality.log; then
-            echo "::warning title=DTE Unavailable During Execution::DTE unavailable mid-run (quota or authorization). Setting up fallback to local execution."
+          # Check if failure was due to quota, authorization, or insufficient agents
+          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent\|unable to complete" dte-quality.log; then
+            echo "::warning title=DTE Unavailable During Execution::DTE unavailable mid-run (quota, authorization, or insufficient agents). Setting up fallback to local execution."
             echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
             echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
             
             # Add summary for DTE unavailability
             echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
-            echo "Nx Cloud DTE became unavailable during quality checks execution (quota exceeded or authorization failed)." >> $GITHUB_STEP_SUMMARY
+            echo "Nx Cloud DTE became unavailable during quality checks execution (quota exceeded, authorization failed, or insufficient agents)." >> $GITHUB_STEP_SUMMARY
             echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
@@ -329,15 +329,15 @@ runs:
           echo "test-result=success" >> $GITHUB_OUTPUT
           echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
-          # Check if failure was due to quota or authorization
-          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" dte-test.log; then
-            echo "::warning title=DTE Unavailable During Tests::DTE unavailable during test execution (quota or authorization). Setting up fallback to local execution."
+          # Check if failure was due to quota, authorization, or insufficient agents
+          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent\|unable to complete" dte-test.log; then
+            echo "::warning title=DTE Unavailable During Tests::DTE unavailable during test execution (quota, authorization, or insufficient agents). Setting up fallback to local execution."
             echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
             echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
             
             # Add summary for DTE unavailability
             echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
-            echo "Nx Cloud DTE became unavailable during test execution (quota exceeded or authorization failed)." >> $GITHUB_STEP_SUMMARY
+            echo "Nx Cloud DTE became unavailable during test execution (quota exceeded, authorization failed, or insufficient agents)." >> $GITHUB_STEP_SUMMARY
             echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             

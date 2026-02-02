@@ -65,7 +65,6 @@ export class RandomStrategy implements SchedulingStrategy {
           team1Id: homeTeam.id,
           team2Id: awayTeam.id,
           weekNumber: week,
-          selectedSeason: 0, // Will be filled by scheduler
           gamesPerMatchup: 0, // Will be filled by scheduler
         });
 

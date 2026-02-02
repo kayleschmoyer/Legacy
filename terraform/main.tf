@@ -1,19 +1,19 @@
 terraform {
   required_version = ">= 1.13"
-  
+
   # Backend configuration for state management
   # This allows Terraform to track what resources already exist in AWS
   # and only apply changes when needed (e.g., Lambda code updates via SSM)
   backend "s3" {
-    bucket = "legacy-sports-terraform-state"
-    key    = "legacy-sports/terraform.tfstate"
-    region = "us-east-1"
+    bucket  = "legacy-sports-terraform-state"
+    key     = "legacy-sports/terraform.tfstate"
+    region  = "us-east-1"
     encrypt = true
-    
+
     # State locking with DynamoDB
     dynamodb_table = "terraform-state-locks"
   }
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"

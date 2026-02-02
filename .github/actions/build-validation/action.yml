@@ -89,7 +89,7 @@ runs:
           echo "✅ Web application built successfully"
         else
           # Check if this was a DTE/Nx Cloud failure
-          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan" "${ERROR_CONTEXT}.log"; then
+          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan\|minimum.*agent.*required\|distributing on.*agent\|unable to complete" "${ERROR_CONTEXT}.log"; then
             echo "⚠️ Nx Cloud DTE failed - falling back to local build"
             echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
             
@@ -205,7 +205,7 @@ runs:
           echo "✅ Lambda functions built successfully"
         else
           # Check if this was a DTE/Nx Cloud failure
-          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan" "${ERROR_CONTEXT}.log"; then
+          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan\|minimum.*agent.*required\|distributing on.*agent\|unable to complete" "${ERROR_CONTEXT}.log"; then
             echo "⚠️ Nx Cloud DTE failed - falling back to local build"
             echo "::warning::Nx Cloud connection failed during lambda build. Retrying with local execution..."
             

@@ -71,6 +71,7 @@ describe('League Mutations', () => {
         id: 1,
         isAdmin: false,
       },
+      db: mockDb,
     };
   });
 
@@ -131,6 +132,7 @@ describe('League Mutations', () => {
           id: 1,
           isAdmin: true,
         },
+        db: mockDb,
       };
 
       const mutationType = schema.getMutationType();
@@ -346,6 +348,7 @@ describe('League Mutations', () => {
           id: 1,
           isAdmin: true,
         },
+        db: mockDb,
       };
 
       // Mock the SELECT query that fetches all leagues

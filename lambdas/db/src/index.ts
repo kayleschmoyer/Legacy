@@ -16,6 +16,8 @@ import {
   withSentry,
 } from '@legacy-sports/sentry';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { createDatabaseService } from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
 import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
@@ -39,6 +41,9 @@ const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Create database service for Lambda (module-level singleton for warm starts)
+const dbService = createDatabaseService(getDbOptions());
 
 /**
  * Example Career Statistics GraphQL Queries
@@ -213,11 +218,14 @@ const baseHandler = startServerAndCreateLambdaHandler(
         }
       }
 
-      // Make this actually async to satisfy linter
-      await Promise.resolve();
+      // Create a shared database connection for this request
+      // This prevents each resolver from creating its own connection
+      const db = await dbService.getDb();
+
       return {
         user,
-        loaders: createLoaders(), // Create fresh loaders for each request
+        loaders: createLoaders(db), // Pass shared connection to loaders
+        db, // Shared connection for all resolvers in this request
       };
     },
   },

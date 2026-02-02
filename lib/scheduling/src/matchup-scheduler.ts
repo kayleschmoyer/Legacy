@@ -83,9 +83,7 @@ export class MatchupScheduler {
         leagueId: leagueConfig.id,
         team1Id: pairing.team1Id,
         team2Id: pairing.team2Id,
-        selectedSeason: selectedSeason,
-        gamesPerMatchup:
-          selectedSeason !== null ? leagueConfig.gamesPerMatchup : null,
+        gamesPerMatchup: leagueConfig.gamesPerMatchup,
         status: 'scheduled',
       });
     }

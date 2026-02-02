@@ -102,6 +102,7 @@ describe('Matchup Queries', () => {
         id: 1,
         isAdmin: false,
       },
+      db: mockDb,
     };
   });
 

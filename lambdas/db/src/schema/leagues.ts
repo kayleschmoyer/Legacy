@@ -2,7 +2,6 @@ import {
   createDatabaseService,
   PublicDb,
   PublicSchema,
-  runWithPublicClient,
 } from '@legacy-sports/db-client';
 import type { Team as DbTeam } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -162,7 +161,7 @@ LeagueMember.implement({
     team: t.field({
       type: Team,
       nullable: true,
-      resolve: async (parent) => {
+      resolve: async (parent, _args, context) => {
         // If no teamId, return null
         if (!parent.teamId) {
           return null;
@@ -170,21 +169,17 @@ LeagueMember.implement({
 
         // Query the database to get the team details
         try {
-          const team = await runWithPublicClient(getDbOptions(), async (db) => {
-            const results = await db
-              .select({
-                id: PublicSchema.teams.id,
-                name: PublicSchema.teams.name,
-                leagueId: PublicSchema.teams.leagueId,
-              })
-              .from(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.id, parent.teamId ?? 0))
-              .limit(1);
+          const results = await context.db
+            .select({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+              leagueId: PublicSchema.teams.leagueId,
+            })
+            .from(PublicSchema.teams)
+            .where(eq(PublicSchema.teams.id, parent.teamId ?? 0))
+            .limit(1);
 
-            return results.length > 0 ? results[0] : null;
-          });
-
-          return team;
+          return results.length > 0 ? results[0] : null;
         } catch (error) {
           console.error('Error fetching team for LeagueMember:', error);
           return null;
@@ -317,81 +312,75 @@ builder.queryField('league', (t) =>
 
       try {
         // Query the database for the specific league
-        const league = await runWithPublicClient(getDbOptions(), async (db) => {
-          // First check if user has access to this league
-          const memberCheck = await db
-            .select({
-              leagueId: PublicSchema.leagueMembers.leagueId,
-            })
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
+        // First check if user has access to this league
+        const memberCheck = await context.db
+          .select({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+          })
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-          if (memberCheck.length === 0) {
-            throw new Error(
-              'Access denied: You are not a member of this league',
-            );
-          }
+        if (memberCheck.length === 0) {
+          throw new Error('Access denied: You are not a member of this league');
+        }
 
-          // Get the league details
-          const results = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-              currentMatchup: PublicSchema.leagues.currentMatchup,
-              draftStatus: PublicSchema.leagues.draftStatus,
-              inviteCode: PublicSchema.leagues.inviteCode,
-            })
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, leagueId))
-            .limit(1);
+        // Get the league details
+        const results = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            inviteCode: PublicSchema.leagues.inviteCode,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
 
-          if (results.length === 0) {
-            return null;
-          }
+        if (results.length === 0) {
+          return null;
+        }
 
-          const league = results[0];
+        const league = results[0];
 
-          // Get the user's membership info (including team ID)
-          const membershipResults = await db
-            .select({
-              leagueId: PublicSchema.leagueMembers.leagueId,
-              userId: PublicSchema.leagueMembers.userId,
-              teamId: PublicSchema.leagueMembers.teamId,
-              permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-            })
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
+        // Get the user's membership info (including team ID)
+        const membershipResults = await context.db
+          .select({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+            userId: PublicSchema.leagueMembers.userId,
+            teamId: PublicSchema.leagueMembers.teamId,
+            permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+          })
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-          const userMembership =
-            membershipResults.length > 0 ? membershipResults[0] : null;
+        const userMembership =
+          membershipResults.length > 0 ? membershipResults[0] : null;
 
-          return {
-            id: league.id,
-            name: league.name,
-            owner: league.owner,
-            maxRosterSize: league.maxRosterSize,
-            currentMatchup: league.currentMatchup,
-            draftStatus: league.draftStatus,
-            inviteCode: league.inviteCode,
-            userMembership,
-          };
-        });
-
-        return league;
+        return {
+          id: league.id,
+          name: league.name,
+          owner: league.owner,
+          maxRosterSize: league.maxRosterSize,
+          currentMatchup: league.currentMatchup,
+          draftStatus: league.draftStatus,
+          inviteCode: league.inviteCode,
+          userMembership,
+        };
       } catch (error) {
         console.error('Error fetching league:', error);
         if (error instanceof Error && error.message.includes('Access denied')) {
@@ -419,82 +408,73 @@ builder.queryField('userLeagues', (t) =>
         console.log(`Fetching leagues for userId: ${userId}`);
 
         // First try to get basic database connection and check if tables exist
-        const userLeagues = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            console.log('Database connection established, checking tables...');
+        const db = context.db;
+        console.log('Database connection established, checking tables...');
 
-            try {
-              // First check if we have any leagues at all
-              const allLeagues = await db
-                .select({
-                  id: PublicSchema.leagues.id,
-                  name: PublicSchema.leagues.name,
-                  owner: PublicSchema.leagues.owner,
-                  maxRosterSize: PublicSchema.leagues.maxRosterSize,
-                  currentMatchup: PublicSchema.leagues.currentMatchup,
-                  draftStatus: PublicSchema.leagues.draftStatus,
-                  inviteCode: PublicSchema.leagues.inviteCode,
-                })
-                .from(PublicSchema.leagues)
-                .limit(5);
+        try {
+          // First check if we have any leagues at all
+          const allLeagues = await db
+            .select({
+              id: PublicSchema.leagues.id,
+              name: PublicSchema.leagues.name,
+              owner: PublicSchema.leagues.owner,
+              maxRosterSize: PublicSchema.leagues.maxRosterSize,
+              currentMatchup: PublicSchema.leagues.currentMatchup,
+              draftStatus: PublicSchema.leagues.draftStatus,
+              inviteCode: PublicSchema.leagues.inviteCode,
+            })
+            .from(PublicSchema.leagues)
+            .limit(5);
 
-              console.log(
-                `Found ${allLeagues.length} total leagues in database`,
-              );
+          console.log(`Found ${allLeagues.length} total leagues in database`);
 
-              // Check if leagueMembers table has any data
-              const membershipCount = await db
-                .select()
-                .from(PublicSchema.leagueMembers)
-                .limit(5);
+          // Check if leagueMembers table has any data
+          const membershipCount = await db
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .limit(5);
 
-              console.log(
-                `Found ${membershipCount.length} league memberships in database`,
-              );
+          console.log(
+            `Found ${membershipCount.length} league memberships in database`,
+          );
 
-              // Try the actual query
-              const results = await db
-                .select({
-                  id: PublicSchema.leagues.id,
-                  name: PublicSchema.leagues.name,
-                  owner: PublicSchema.leagues.owner,
-                  maxRosterSize: PublicSchema.leagues.maxRosterSize,
-                  currentMatchup: PublicSchema.leagues.currentMatchup,
-                  draftStatus: PublicSchema.leagues.draftStatus,
-                  inviteCode: PublicSchema.leagues.inviteCode,
-                })
-                .from(PublicSchema.leagues)
-                .innerJoin(
-                  PublicSchema.leagueMembers,
-                  eq(
-                    PublicSchema.leagues.id,
-                    PublicSchema.leagueMembers.leagueId,
-                  ),
-                )
-                .where(eq(PublicSchema.leagueMembers.userId, userId))
-                .orderBy(PublicSchema.leagues.id);
+          // Try the actual query
+          const results = await db
+            .select({
+              id: PublicSchema.leagues.id,
+              name: PublicSchema.leagues.name,
+              owner: PublicSchema.leagues.owner,
+              maxRosterSize: PublicSchema.leagues.maxRosterSize,
+              currentMatchup: PublicSchema.leagues.currentMatchup,
+              draftStatus: PublicSchema.leagues.draftStatus,
+              inviteCode: PublicSchema.leagues.inviteCode,
+            })
+            .from(PublicSchema.leagues)
+            .innerJoin(
+              PublicSchema.leagueMembers,
+              eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+            )
+            .where(eq(PublicSchema.leagueMembers.userId, userId))
+            .orderBy(PublicSchema.leagues.id);
 
-              console.log(`Found ${results.length} leagues for user ${userId}`);
+          console.log(`Found ${results.length} leagues for user ${userId}`);
 
-              return results.map((league) => ({
-                id: league.id,
-                name: league.name,
-                owner: league.owner,
-                maxRosterSize: league.maxRosterSize,
-                currentMatchup: league.currentMatchup,
-                draftStatus: league.draftStatus,
-                inviteCode: league.inviteCode,
-              }));
-            } catch (dbError) {
-              console.error('Database query error:', dbError);
-              // Return empty array instead of throwing to help diagnose
-              return [];
-            }
-          },
-        );
+          const userLeagues = results.map((league) => ({
+            id: league.id,
+            name: league.name,
+            owner: league.owner,
+            maxRosterSize: league.maxRosterSize,
+            currentMatchup: league.currentMatchup,
+            draftStatus: league.draftStatus,
+            inviteCode: league.inviteCode,
+          }));
 
-        return userLeagues;
+          return userLeagues;
+        } catch (dbError) {
+          console.error('Database query error:', dbError);
+          // Return empty array instead of throwing to help diagnose
+          return [];
+        }
       } catch (error) {
         console.error('Error fetching user leagues:', error);
         console.error('Error details:', {
@@ -624,174 +604,172 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
       try {
         // Create league and teams in the database with proper types
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Calculate roster size: use frontend value or fallback to 25
-          const rosterSize = maxRosterSize || 25;
+        // Calculate roster size: use frontend value or fallback to 25
+        const rosterSize = maxRosterSize || 25;
 
-          // Generate unique invite code
-          const inviteCode = await generateUniqueInviteCode(db);
+        // Generate unique invite code
+        const inviteCode = await generateUniqueInviteCode(context.db);
 
-          // Prepare league data for insert
-          const leagueData = {
-            name: leagueName,
-            owner: userId,
-            maxRosterSize: rosterSize, // Frontend-controlled with fallback
-            currentMatchup: null,
-            inviteCode: inviteCode,
-          };
+        // Prepare league data for insert
+        const leagueData = {
+          name: leagueName,
+          owner: userId,
+          maxRosterSize: rosterSize, // Frontend-controlled with fallback
+          currentMatchup: null,
+          inviteCode: inviteCode,
+        };
 
-          // Insert league
-          const insertedLeagues = await db
-            .insert(PublicSchema.leagues)
-            .values(leagueData)
-            .returning({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-              currentMatchup: PublicSchema.leagues.currentMatchup,
-              draftStatus: PublicSchema.leagues.draftStatus,
-              inviteCode: PublicSchema.leagues.inviteCode,
-            });
+        // Insert league
+        const insertedLeagues = await context.db
+          .insert(PublicSchema.leagues)
+          .values(leagueData)
+          .returning({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            inviteCode: PublicSchema.leagues.inviteCode,
+          });
 
-          const league = insertedLeagues[0];
+        const league = insertedLeagues[0];
 
-          interface InsertedTeam {
-            id: number;
+        interface InsertedTeam {
+          id: number;
+          name: string;
+          leagueId: number;
+        }
+        let teams: InsertedTeam[] = [];
+        interface LeagueMemberInsert {
+          leagueId: number;
+          userId: number;
+          teamId: number;
+          permissionLevel: 'owner' | 'commissioner';
+        }
+        let leagueMembers: LeagueMemberInsert[] = [];
+
+        if (draftType === 'RANDOM-DRAFT') {
+          // For random draft leagues, create multiple teams automatically
+          const teamNames = [
+            `${username}'s Team`, // Owner's team first
+            'Team Alpha',
+            'Team Beta',
+            'Team Gamma',
+            'Team Delta',
+            'Team Epsilon',
+            'Team Zeta',
+            'Team Eta',
+            'Team Theta',
+            'Team Iota',
+            'Team Kappa',
+            'Team Lambda',
+            'Team Mu',
+            'Team Nu',
+            'Team Xi',
+            'Team Omicron',
+          ];
+
+          // Create teams up to numberOfTeams
+          const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
+          interface TeamInsertData {
             name: string;
             leagueId: number;
           }
-          let teams: InsertedTeam[] = [];
-          interface LeagueMemberInsert {
-            leagueId: number;
-            userId: number;
-            teamId: number;
-            permissionLevel: 'owner' | 'commissioner';
-          }
-          let leagueMembers: LeagueMemberInsert[] = [];
+          const teamData: TeamInsertData[] = [];
 
-          if (draftType === 'RANDOM-DRAFT') {
-            // For random draft leagues, create multiple teams automatically
-            const teamNames = [
-              `${username}'s Team`, // Owner's team first
-              'Team Alpha',
-              'Team Beta',
-              'Team Gamma',
-              'Team Delta',
-              'Team Epsilon',
-              'Team Zeta',
-              'Team Eta',
-              'Team Theta',
-              'Team Iota',
-              'Team Kappa',
-              'Team Lambda',
-              'Team Mu',
-              'Team Nu',
-              'Team Xi',
-              'Team Omicron',
-            ];
-
-            // Create teams up to numberOfTeams
-            const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-            interface TeamInsertData {
-              name: string;
-              leagueId: number;
-            }
-            const teamData: TeamInsertData[] = [];
-
-            for (let i = 0; i < teamsToCreate; i++) {
-              teamData.push({
-                name: teamNames[i],
-                leagueId: league.id,
-              });
-            }
-
-            // Insert all teams
-            const insertedTeams = await db
-              .insert(PublicSchema.teams)
-              .values(teamData)
-              .returning({
-                id: PublicSchema.teams.id,
-                name: PublicSchema.teams.name,
-                leagueId: PublicSchema.teams.leagueId,
-              });
-
-            teams = insertedTeams;
-
-            // Create league member for owner (assign to first team)
-            const ownerLeagueMember = {
+          for (let i = 0; i < teamsToCreate; i++) {
+            teamData.push({
+              name: teamNames[i],
               leagueId: league.id,
-              userId: userId,
-              teamId: teams[0].id,
-              permissionLevel: 'owner' as const,
-            };
-
-            await db
-              .insert(PublicSchema.leagueMembers)
-              .values(ownerLeagueMember);
-
-            leagueMembers = [ownerLeagueMember];
-
-            // NOTE: Draft processing is now handled asynchronously via SQS
-            // Use the startDraft mutation to trigger draft processing after league creation
-          } else {
-            // For other draft types, create single team for owner (existing behavior)
-            const teamData = {
-              name: `${username}'s Team`,
-              leagueId: league.id,
-            };
-
-            const insertedTeams = await db
-              .insert(PublicSchema.teams)
-              .values(teamData)
-              .returning({
-                id: PublicSchema.teams.id,
-                name: PublicSchema.teams.name,
-                leagueId: PublicSchema.teams.leagueId,
-              });
-
-            teams = insertedTeams;
-
-            // Create league member for owner
-            const leagueMemberData = {
-              leagueId: league.id,
-              userId: userId,
-              teamId: teams[0].id,
-              permissionLevel: 'owner' as const,
-            };
-
-            await db
-              .insert(PublicSchema.leagueMembers)
-              .values(leagueMemberData);
-
-            leagueMembers = [leagueMemberData];
+            });
           }
 
-          // Create roster positions for the league
-          // Only create the defined starter positions, bench spots are inferred
-          const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
-          const positionData = allPositions.map((positionType) => ({
+          // Insert all teams
+          const insertedTeams = await context.db
+            .insert(PublicSchema.teams)
+            .values(teamData)
+            .returning({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+              leagueId: PublicSchema.teams.leagueId,
+            });
+
+          teams = insertedTeams;
+
+          // Create league member for owner (assign to first team)
+          const ownerLeagueMember = {
             leagueId: league.id,
-            positionType: positionType,
-          }));
-
-          await db.insert(PublicSchema.leaguePosition).values(positionData);
-
-          return {
-            league: {
-              id: league.id,
-              name: league.name,
-              owner: league.owner,
-              maxRosterSize: league.maxRosterSize,
-              currentMatchup: league.currentMatchup,
-              draftStatus: league.draftStatus,
-            },
-            teams: teams,
-            leagueMembers: leagueMembers,
+            userId: userId,
+            teamId: teams[0].id,
+            permissionLevel: 'owner' as const,
           };
-        });
 
-        return result;
+          await context.db
+            .insert(PublicSchema.leagueMembers)
+            .values(ownerLeagueMember);
+
+          leagueMembers = [ownerLeagueMember];
+
+          // NOTE: Draft processing is now handled asynchronously via SQS
+          // Use the startDraft mutation to trigger draft processing after league creation
+        } else {
+          // For other draft types, create single team for owner (existing behavior)
+          const teamData = {
+            name: `${username}'s Team`,
+            leagueId: league.id,
+          };
+
+          const insertedTeams = await context.db
+            .insert(PublicSchema.teams)
+            .values(teamData)
+            .returning({
+              id: PublicSchema.teams.id,
+              name: PublicSchema.teams.name,
+              leagueId: PublicSchema.teams.leagueId,
+            });
+
+          teams = insertedTeams;
+
+          // Create league member for owner
+          const leagueMemberData = {
+            leagueId: league.id,
+            userId: userId,
+            teamId: teams[0].id,
+            permissionLevel: 'owner' as const,
+          };
+
+          await context.db
+            .insert(PublicSchema.leagueMembers)
+            .values(leagueMemberData);
+
+          leagueMembers = [leagueMemberData];
+        }
+
+        // Create roster positions for the league
+        // Only create the defined starter positions, bench spots are inferred
+        const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
+        const positionData = allPositions.map((positionType) => ({
+          leagueId: league.id,
+          positionType: positionType,
+        }));
+
+        await context.db
+          .insert(PublicSchema.leaguePosition)
+          .values(positionData);
+
+        return {
+          league: {
+            id: league.id,
+            name: league.name,
+            owner: league.owner,
+            maxRosterSize: league.maxRosterSize,
+            currentMatchup: league.currentMatchup,
+            draftStatus: league.draftStatus,
+          },
+          teams: teams,
+          leagueMembers: leagueMembers,
+        };
       } catch (error) {
         console.error('Error creating league and teams:', error);
         console.error('Error details:', {
@@ -835,39 +813,33 @@ builder.queryField('leaguePositions', (t) =>
 
       try {
         // Fetch league positions from the database
-        const positions = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            // First verify user has access to this league
-            const leagueAccess = await db
-              .select()
-              .from(PublicSchema.leagueMembers)
-              .where(
-                and(
-                  eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                  eq(PublicSchema.leagueMembers.userId, userId),
-                ),
-              )
-              .limit(1);
+        const db = context.db;
+        // First verify user has access to this league
+        const leagueAccess = await db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-            if (leagueAccess.length === 0) {
-              throw new Error('User does not have access to this league');
-            }
+        if (leagueAccess.length === 0) {
+          throw new Error('User does not have access to this league');
+        }
 
-            // Fetch league positions
-            const leaguePositions = await db
-              .select({
-                id: PublicSchema.leaguePosition.id,
-                leagueId: PublicSchema.leaguePosition.leagueId,
-                positionType: PublicSchema.leaguePosition.positionType,
-              })
-              .from(PublicSchema.leaguePosition)
-              .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
-              .orderBy(PublicSchema.leaguePosition.positionType);
-
-            return leaguePositions;
-          },
-        );
+        // Fetch league positions
+        const positions = await db
+          .select({
+            id: PublicSchema.leaguePosition.id,
+            leagueId: PublicSchema.leaguePosition.leagueId,
+            positionType: PublicSchema.leaguePosition.positionType,
+          })
+          .from(PublicSchema.leaguePosition)
+          .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
+          .orderBy(PublicSchema.leaguePosition.positionType);
 
         return positions;
       } catch (error) {
@@ -896,54 +868,48 @@ builder.queryField('teamMembers', (t) =>
 
       try {
         // Fetch team members from the database
-        const members = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            // First verify user is in the same league as this team (allows read-only access)
-            const team = await db
-              .select({
-                leagueId: PublicSchema.teams.leagueId,
-              })
-              .from(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.id, teamId))
-              .limit(1);
+        const db = context.db;
+        // First verify user is in the same league as this team (allows read-only access)
+        const team = await db
+          .select({
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, teamId))
+          .limit(1);
 
-            if (team.length === 0) {
-              throw new Error('Team not found');
-            }
+        if (team.length === 0) {
+          throw new Error('Team not found');
+        }
 
-            // Check if user is a member of this league
-            const leagueMember = await db
-              .select()
-              .from(PublicSchema.leagueMembers)
-              .where(
-                and(
-                  eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
-                  eq(PublicSchema.leagueMembers.userId, userId),
-                ),
-              )
-              .limit(1);
+        // Check if user is a member of this league
+        const leagueMember = await db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-            if (leagueMember.length === 0) {
-              throw new Error('User does not have access to this team');
-            }
+        if (leagueMember.length === 0) {
+          throw new Error('User does not have access to this team');
+        }
 
-            // Fetch team members (read access granted for all league members)
-            const teamMembers = await db
-              .select({
-                id: PublicSchema.teamMembers.id,
-                teamId: PublicSchema.teamMembers.teamId,
-                leagueId: PublicSchema.teamMembers.leagueId,
-                playerId: PublicSchema.teamMembers.playerId,
-                positionId: PublicSchema.teamMembers.positionId,
-              })
-              .from(PublicSchema.teamMembers)
-              .where(eq(PublicSchema.teamMembers.teamId, teamId))
-              .orderBy(PublicSchema.teamMembers.positionId);
-
-            return teamMembers;
-          },
-        );
+        // Fetch team members (read access granted for all league members)
+        const members = await db
+          .select({
+            id: PublicSchema.teamMembers.id,
+            teamId: PublicSchema.teamMembers.teamId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+            playerId: PublicSchema.teamMembers.playerId,
+            positionId: PublicSchema.teamMembers.positionId,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(eq(PublicSchema.teamMembers.teamId, teamId))
+          .orderBy(PublicSchema.teamMembers.positionId);
 
         return members;
       } catch (error) {
@@ -972,25 +938,21 @@ builder.queryField('userTeamId', (t) =>
       const userId = context.user.id;
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Get user's team ID for this league
-          const membership = await db
-            .select({
-              teamId: PublicSchema.leagueMembers.teamId,
-            })
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
+        // Get user's team ID for this league
+        const membership = await context.db
+          .select({
+            teamId: PublicSchema.leagueMembers.teamId,
+          })
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-          return membership.length > 0 ? membership[0].teamId : null;
-        });
-
-        return result;
+        return membership.length > 0 ? membership[0].teamId : null;
       } catch (error) {
         console.error('Error fetching user team ID:', error);
         throw new Error('Failed to fetch user team ID');
@@ -1016,36 +978,32 @@ builder.queryField('leagueTeams', (t) =>
       const userId = context.user.id;
 
       try {
-        const teams = await runWithPublicClient(getDbOptions(), async (db) => {
-          // First verify user has access to this league
-          const leagueAccess = await db
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
+        // First verify user has access to this league
+        const leagueAccess = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-          if (leagueAccess.length === 0) {
-            throw new Error('User does not have access to this league');
-          }
+        if (leagueAccess.length === 0) {
+          throw new Error('User does not have access to this league');
+        }
 
-          // Fetch all teams in the league
-          const leagueTeams = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.leagueId, leagueId))
-            .orderBy(PublicSchema.teams.name);
-
-          return leagueTeams;
-        });
+        // Fetch all teams in the league
+        const teams = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.leagueId, leagueId))
+          .orderBy(PublicSchema.teams.name);
 
         return teams;
       } catch (error) {
@@ -1073,72 +1031,68 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
       const userId = context.user.id;
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Verify user has owner access to this league
-          const leagueAccess = await db
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(PublicSchema.leagueMembers.userId, userId),
-                eq(PublicSchema.leagueMembers.permissionLevel, 'owner'),
-              ),
-            )
-            .limit(1);
+        // Verify user has owner access to this league
+        const leagueAccess = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+              eq(PublicSchema.leagueMembers.permissionLevel, 'owner'),
+            ),
+          )
+          .limit(1);
 
-          if (leagueAccess.length === 0) {
-            throw new Error('Only league owners can add positions to a league');
-          }
+        if (leagueAccess.length === 0) {
+          throw new Error('Only league owners can add positions to a league');
+        }
 
-          // Check if league already has positions
-          const existingPositions = await db
-            .select()
-            .from(PublicSchema.leaguePosition)
-            .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
-            .limit(1);
+        // Check if league already has positions
+        const existingPositions = await context.db
+          .select()
+          .from(PublicSchema.leaguePosition)
+          .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
+          .limit(1);
 
-          if (existingPositions.length > 0) {
-            throw new Error('League already has positions configured');
-          }
+        if (existingPositions.length > 0) {
+          throw new Error('League already has positions configured');
+        }
 
-          // Get the league's maxRosterSize
-          const league = await db
-            .select({
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-            })
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, leagueId))
-            .limit(1);
+        // Get the league's maxRosterSize
+        const league = await context.db
+          .select({
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
 
-          if (league.length === 0) {
-            throw new Error('League not found');
-          }
+        if (league.length === 0) {
+          throw new Error('League not found');
+        }
 
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const _maxRosterSize = league[0].maxRosterSize;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _maxRosterSize = league[0].maxRosterSize;
 
-          // Create roster positions for the league
-          // Only create the defined starter positions, bench spots are inferred
-          const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
-          const positionData = allPositions.map((positionType) => ({
-            leagueId: leagueId,
-            positionType: positionType,
-          }));
+        // Create roster positions for the league
+        // Only create the defined starter positions, bench spots are inferred
+        const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
+        const positionData = allPositions.map((positionType) => ({
+          leagueId: leagueId,
+          positionType: positionType,
+        }));
 
-          const insertedPositions = await db
-            .insert(PublicSchema.leaguePosition)
-            .values(positionData)
-            .returning({
-              id: PublicSchema.leaguePosition.id,
-              leagueId: PublicSchema.leaguePosition.leagueId,
-              positionType: PublicSchema.leaguePosition.positionType,
-            });
+        const insertedPositions = await context.db
+          .insert(PublicSchema.leaguePosition)
+          .values(positionData)
+          .returning({
+            id: PublicSchema.leaguePosition.id,
+            leagueId: PublicSchema.leaguePosition.leagueId,
+            positionType: PublicSchema.leaguePosition.positionType,
+          });
 
-          return insertedPositions;
-        });
-
-        return result;
+        return insertedPositions;
       } catch (error) {
         console.error('Error adding positions to league:', error);
         throw error;
@@ -1222,83 +1176,79 @@ builder.mutationField('joinLeagueByCode', (t) =>
 
       try {
         // Find league by invite code
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Look up league by invite code
-          const leagues = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-            })
-            .from(PublicSchema.leagues)
-            .where(
-              eq(PublicSchema.leagues.inviteCode, inviteCode.toUpperCase()),
-            )
-            .limit(1);
+        // Look up league by invite code
+        const leagues = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.inviteCode, inviteCode.toUpperCase()))
+          .limit(1);
 
-          if (leagues.length === 0) {
-            throw new Error(
-              'Invalid invite code. Please check the code and try again.',
-            );
-          }
-
-          const league = leagues[0];
-
-          // Check if user is already a member of this league
-          const existingMembership = await db
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, league.id),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
-
-          if (existingMembership.length > 0) {
-            throw new Error('You are already a member of this league');
-          }
-
-          // Create a new team for the user
-          const insertedTeams = await db
-            .insert(PublicSchema.teams)
-            .values({
-              name: teamName,
-              leagueId: league.id,
-            })
-            .returning({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            });
-
-          const team = insertedTeams[0];
-
-          // Add user to league members with explicit typing
-          const leagueMemberData: {
-            leagueId: number;
-            userId: number;
-            teamId: number;
-            permissionLevel: 'owner' | 'commissioner';
-          } = {
-            leagueId: league.id,
-            userId: userId,
-            teamId: team.id,
-            permissionLevel: 'commissioner',
-          };
-
-          await db.insert(PublicSchema.leagueMembers).values(leagueMemberData);
-
-          console.log(
-            `✅ User ${userId} joined league ${league.id} with team ${team.id}`,
+        if (leagues.length === 0) {
+          throw new Error(
+            'Invalid invite code. Please check the code and try again.',
           );
+        }
 
-          return team;
-        });
+        const league = leagues[0];
 
-        return result;
+        // Check if user is already a member of this league
+        const existingMembership = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, league.id),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (existingMembership.length > 0) {
+          throw new Error('You are already a member of this league');
+        }
+
+        // Create a new team for the user
+        const insertedTeams = await context.db
+          .insert(PublicSchema.teams)
+          .values({
+            name: teamName,
+            leagueId: league.id,
+          })
+          .returning({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          });
+
+        const team = insertedTeams[0];
+
+        // Add user to league members with explicit typing
+        const leagueMemberData: {
+          leagueId: number;
+          userId: number;
+          teamId: number;
+          permissionLevel: 'owner' | 'commissioner';
+        } = {
+          leagueId: league.id,
+          userId: userId,
+          teamId: team.id,
+          permissionLevel: 'commissioner',
+        };
+
+        await context.db
+          .insert(PublicSchema.leagueMembers)
+          .values(leagueMemberData);
+
+        console.log(
+          `✅ User ${userId} joined league ${league.id} with team ${team.id}`,
+        );
+
+        return team;
       } catch (error) {
         console.error('Error joining league:', error);
         throw new Error(
@@ -1352,37 +1302,33 @@ builder.mutationField('createLeague', (t) =>
       const maxRosterSize = args.maxRosterSize ?? 25; // Default to 25
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Generate unique invite code
-          const inviteCode = await generateUniqueInviteCode(db);
+        // Generate unique invite code
+        const inviteCode = await generateUniqueInviteCode(context.db);
 
-          // Create league
-          const leagues = await db
-            .insert(PublicSchema.leagues)
-            .values({
-              name: args.name,
-              owner: userId,
-              maxRosterSize,
-              inviteCode,
-            })
-            .returning({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-              currentMatchup: PublicSchema.leagues.currentMatchup,
-              draftStatus: PublicSchema.leagues.draftStatus,
-              inviteCode: PublicSchema.leagues.inviteCode,
-            });
+        // Create league
+        const leagues = await context.db
+          .insert(PublicSchema.leagues)
+          .values({
+            name: args.name,
+            owner: userId,
+            maxRosterSize,
+            inviteCode,
+          })
+          .returning({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            inviteCode: PublicSchema.leagues.inviteCode,
+          });
 
-          if (leagues.length === 0) {
-            throw new Error('Failed to create league');
-          }
+        if (leagues.length === 0) {
+          throw new Error('Failed to create league');
+        }
 
-          return leagues[0];
-        });
-
-        return result;
+        return leagues[0];
       } catch (error) {
         console.error('Error creating league:', error);
         throw new Error(
@@ -1410,80 +1356,76 @@ builder.mutationField('joinLeague', (t) =>
       const { inviteCode, teamName } = args;
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Find league by invite code
-          const leagues = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-            })
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.inviteCode, inviteCode))
-            .limit(1);
+        // Find league by invite code
+        const leagues = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.inviteCode, inviteCode))
+          .limit(1);
 
-          if (leagues.length === 0) {
-            throw new Error('Invalid invite code');
-          }
+        if (leagues.length === 0) {
+          throw new Error('Invalid invite code');
+        }
 
-          const league = leagues[0];
+        const league = leagues[0];
 
-          // Check if user is already a member
-          const existingMembership = await db
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, league.id),
-                eq(PublicSchema.leagueMembers.userId, userId),
-              ),
-            )
-            .limit(1);
+        // Check if user is already a member
+        const existingMembership = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, league.id),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-          if (existingMembership.length > 0) {
-            return {
-              success: false,
-              message: 'You are already a member of this league',
-              leagueId: league.id,
-            };
-          }
-
-          // Create team for the user
-          const teams = await db
-            .insert(PublicSchema.teams)
-            .values({
-              name: teamName,
-              leagueId: league.id,
-            })
-            .returning({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            });
-
-          if (teams.length === 0) {
-            throw new Error('Failed to create team');
-          }
-
-          const team = teams[0];
-
-          // Add user as league member
-          await db.insert(PublicSchema.leagueMembers).values({
+        if (existingMembership.length > 0) {
+          return {
+            success: false,
+            message: 'You are already a member of this league',
             leagueId: league.id,
-            userId: userId,
-            teamId: team.id,
-            permissionLevel: 'commissioner',
+          };
+        }
+
+        // Create team for the user
+        const teams = await context.db
+          .insert(PublicSchema.teams)
+          .values({
+            name: teamName,
+            leagueId: league.id,
+          })
+          .returning({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
           });
 
-          return {
-            success: true,
-            message: `Successfully joined ${league.name}`,
-            leagueId: league.id,
-            teamId: team.id,
-          };
+        if (teams.length === 0) {
+          throw new Error('Failed to create team');
+        }
+
+        const team = teams[0];
+
+        // Add user as league member
+        await context.db.insert(PublicSchema.leagueMembers).values({
+          leagueId: league.id,
+          userId: userId,
+          teamId: team.id,
+          permissionLevel: 'commissioner',
         });
 
-        return result;
+        return {
+          success: true,
+          message: `Successfully joined ${league.name}`,
+          leagueId: league.id,
+          teamId: team.id,
+        };
       } catch (error) {
         console.error('Error joining league:', error);
         throw new Error(
@@ -1508,62 +1450,58 @@ builder.mutationField('deleteLeague', (t) =>
       }
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // First, verify the league exists and user has permission
-          const league = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              owner: PublicSchema.leagues.owner,
-            })
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, args.leagueId))
-            .limit(1);
+        // First, verify the league exists and user has permission
+        const league = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            owner: PublicSchema.leagues.owner,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, args.leagueId))
+          .limit(1);
 
-          if (league.length === 0) {
-            throw new Error('League not found');
-          }
+        if (league.length === 0) {
+          throw new Error('League not found');
+        }
 
-          // Check if user is the owner or admin
-          if (!context.user) {
-            throw new Error('User not authenticated');
-          }
+        // Check if user is the owner or admin
+        if (!context.user) {
+          throw new Error('User not authenticated');
+        }
 
-          if (league[0].owner !== context.user.id && !context.user.isAdmin) {
-            throw new Error(
-              'Only the league owner or admin can delete this league',
-            );
-          }
+        if (league[0].owner !== context.user.id && !context.user.isAdmin) {
+          throw new Error(
+            'Only the league owner or admin can delete this league',
+          );
+        }
 
-          // Delete in correct order due to foreign key constraints
-          // 1. Delete team members
-          await db
-            .delete(PublicSchema.teamMembers)
-            .where(eq(PublicSchema.teamMembers.leagueId, args.leagueId));
+        // Delete in correct order due to foreign key constraints
+        // 1. Delete team members
+        await context.db
+          .delete(PublicSchema.teamMembers)
+          .where(eq(PublicSchema.teamMembers.leagueId, args.leagueId));
 
-          // 2. Delete league positions
-          await db
-            .delete(PublicSchema.leaguePosition)
-            .where(eq(PublicSchema.leaguePosition.leagueId, args.leagueId));
+        // 2. Delete league positions
+        await context.db
+          .delete(PublicSchema.leaguePosition)
+          .where(eq(PublicSchema.leaguePosition.leagueId, args.leagueId));
 
-          // 3. Delete league members
-          await db
-            .delete(PublicSchema.leagueMembers)
-            .where(eq(PublicSchema.leagueMembers.leagueId, args.leagueId));
+        // 3. Delete league members
+        await context.db
+          .delete(PublicSchema.leagueMembers)
+          .where(eq(PublicSchema.leagueMembers.leagueId, args.leagueId));
 
-          // 4. Delete teams
-          await db
-            .delete(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+        // 4. Delete teams
+        await context.db
+          .delete(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
 
-          // 5. Finally delete the league
-          await db
-            .delete(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, args.leagueId));
+        // 5. Finally delete the league
+        await context.db
+          .delete(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, args.leagueId));
 
-          return `Successfully deleted league ${args.leagueId} and all associated data`;
-        });
-
-        return result;
+        return `Successfully deleted league ${args.leagueId} and all associated data`;
       } catch (error) {
         console.error('Error deleting league:', error);
         const errorMessage =
@@ -1590,60 +1528,56 @@ builder.mutationField('deleteAllLeagues', (t) =>
       }
 
       try {
-        const result = await runWithPublicClient(getDbOptions(), async (db) => {
-          // Get all leagues in the system (admin operation)
-          const allLeagues = await db
-            .select({
-              id: PublicSchema.leagues.id,
-            })
-            .from(PublicSchema.leagues);
+        // Get all leagues in the system (admin operation)
+        const allLeagues = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+          })
+          .from(PublicSchema.leagues);
 
-          if (allLeagues.length === 0) {
-            return 'No leagues found to delete';
-          }
+        if (allLeagues.length === 0) {
+          return 'No leagues found to delete';
+        }
 
-          const leagueIds = allLeagues.map((l) => l.id);
+        const leagueIds = allLeagues.map((l) => l.id);
 
-          // Delete in correct order due to foreign key constraints
-          // 1. Delete team members first
-          for (const leagueId of leagueIds) {
-            await db
-              .delete(PublicSchema.teamMembers)
-              .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
-          }
+        // Delete in correct order due to foreign key constraints
+        // 1. Delete team members first
+        for (const leagueId of leagueIds) {
+          await context.db
+            .delete(PublicSchema.teamMembers)
+            .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+        }
 
-          // 2. Delete league positions
-          for (const leagueId of leagueIds) {
-            await db
-              .delete(PublicSchema.leaguePosition)
-              .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
-          }
+        // 2. Delete league positions
+        for (const leagueId of leagueIds) {
+          await context.db
+            .delete(PublicSchema.leaguePosition)
+            .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
+        }
 
-          // 3. Delete league members
-          for (const leagueId of leagueIds) {
-            await db
-              .delete(PublicSchema.leagueMembers)
-              .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
-          }
+        // 3. Delete league members
+        for (const leagueId of leagueIds) {
+          await context.db
+            .delete(PublicSchema.leagueMembers)
+            .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
+        }
 
-          // 4. Delete teams
-          for (const leagueId of leagueIds) {
-            await db
-              .delete(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.leagueId, leagueId));
-          }
+        // 4. Delete teams
+        for (const leagueId of leagueIds) {
+          await context.db
+            .delete(PublicSchema.teams)
+            .where(eq(PublicSchema.teams.leagueId, leagueId));
+        }
 
-          // 5. Finally delete leagues
-          for (const leagueId of leagueIds) {
-            await db
-              .delete(PublicSchema.leagues)
-              .where(eq(PublicSchema.leagues.id, leagueId));
-          }
+        // 5. Finally delete leagues
+        for (const leagueId of leagueIds) {
+          await context.db
+            .delete(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId));
+        }
 
-          return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
-        });
-
-        return result;
+        return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {
         console.error('Error deleting leagues:', error);
         const errorMessage =
@@ -1675,65 +1609,59 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
 
       try {
         // Update team member position
-        const updatedMember = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            // First verify user has access to this team member
-            const memberAccess = await db
-              .select()
-              .from(PublicSchema.teamMembers)
-              .innerJoin(
-                PublicSchema.leagueMembers,
-                eq(
-                  PublicSchema.leagueMembers.teamId,
-                  PublicSchema.teamMembers.teamId,
-                ),
-              )
-              .where(
-                and(
-                  eq(PublicSchema.teamMembers.id, teamMemberId),
-                  eq(PublicSchema.leagueMembers.userId, userId),
-                ),
-              )
-              .limit(1);
+        const db = context.db;
+        // First verify user has access to this team member
+        const memberAccess = await db
+          .select()
+          .from(PublicSchema.teamMembers)
+          .innerJoin(
+            PublicSchema.leagueMembers,
+            eq(
+              PublicSchema.leagueMembers.teamId,
+              PublicSchema.teamMembers.teamId,
+            ),
+          )
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.id, teamMemberId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
 
-            if (memberAccess.length === 0) {
-              throw new Error('User does not have access to this team member');
-            }
+        if (memberAccess.length === 0) {
+          throw new Error('User does not have access to this team member');
+        }
 
-            // TODO: Fix this update operation - there's a TypeScript error with positionId type
-            // Update the team member position
-            // const updated = await db.update(PublicSchema.teamMembers)
-            //   .set({ positionId })
-            //   .where(eq(PublicSchema.teamMembers.id, teamMemberId))
-            //   .returning({
-            //     id: PublicSchema.teamMembers.id,
-            //     teamId: PublicSchema.teamMembers.teamId,
-            //     leagueId: PublicSchema.teamMembers.leagueId,
-            //     playerId: PublicSchema.teamMembers.playerId,
-            //     positionId: PublicSchema.teamMembers.positionId,
-            //   });
+        // TODO: Fix this update operation - there's a TypeScript error with positionId type
+        // Update the team member position
+        // const updated = await db.update(PublicSchema.teamMembers)
+        //   .set({ positionId })
+        //   .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+        //   .returning({
+        //     id: PublicSchema.teamMembers.id,
+        //     teamId: PublicSchema.teamMembers.teamId,
+        //     leagueId: PublicSchema.teamMembers.leagueId,
+        //     playerId: PublicSchema.teamMembers.playerId,
+        //     positionId: PublicSchema.teamMembers.positionId,
+        //   });
 
-            // For now, return a placeholder result
-            const updated = [
-              {
-                id: teamMemberId,
-                teamId: null as number | null,
-                leagueId: 0,
-                playerId: 0,
-                positionId: positionId ?? null,
-              },
-            ];
-
-            if (updated.length === 0) {
-              throw new Error('Failed to update team member position');
-            }
-
-            return updated[0];
+        // For now, return a placeholder result
+        const updated = [
+          {
+            id: teamMemberId,
+            teamId: null as number | null,
+            leagueId: 0,
+            playerId: 0,
+            positionId: positionId ?? null,
           },
-        );
+        ];
 
-        return updatedMember;
+        if (updated.length === 0) {
+          throw new Error('Failed to update team member position');
+        }
+
+        return updated[0];
       } catch (error) {
         console.error('Error updating team member position:', error);
         throw new Error('Failed to update team member position');

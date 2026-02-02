@@ -28,8 +28,13 @@ export default defineConfig(({ mode }) => {
       },
       outDir: 'dist',
       rollupOptions: {
-        // Bundle all dependencies except Node.js built-ins
+        // Bundle all dependencies except Node.js built-ins and pg-native
         external: (id) => {
+          // Externalize pg-native (optional native dependency)
+          if (id === 'pg-native') {
+            return true;
+          }
+
           // Only externalize Node.js built-in modules
           return [
             'assert',

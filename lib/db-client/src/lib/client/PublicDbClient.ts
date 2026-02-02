@@ -430,7 +430,6 @@ export async function createMatchup(
     weekNumber: number;
     team1Id?: number | null;
     team2Id?: number | null;
-    selectedSeason?: number | null;
     gamesPerMatchup?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -443,7 +442,6 @@ export async function createMatchup(
       weekNumber: input.weekNumber,
       team1Id: input.team1Id ?? null,
       team2Id: input.team2Id ?? null,
-      selectedSeason: input.selectedSeason ?? null,
       gamesPerMatchup: input.gamesPerMatchup ?? null,
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,

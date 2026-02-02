@@ -58,7 +58,6 @@ export const handleFindMatchupFromPlayer = async (
     const matchup = matchups[0];
     LOGGER.info(`\n=== Matchup ${matchupId} Details ===`);
     LOGGER.info(`  League ID: ${matchup.leagueId}`);
-    LOGGER.info(`  Selected Season: ${matchup.selectedSeason}`);
     LOGGER.info(`  Games Per Matchup: ${matchup.gamesPerMatchup}`);
     LOGGER.info(`  Status: ${matchup.status}`);
     LOGGER.info(`  Team 1 ID: ${matchup.team1Id}`);

@@ -25,9 +25,8 @@ import {
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
 import { LeagueStandings } from '../roster/LeagueStandings';
 import { useLeagueScoringSettings } from '../../lib/scoring';
-import { MatchupControl } from '../commissioner/MatchupControl';
+import { NextStepControl } from '../commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
-import { GameSelectionControl } from '../commissioner/GameSelectionControl';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
 import { GamesRemaining } from '../matchup/GamesRemaining';
@@ -242,7 +241,9 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   const handleMatchupSuccess = useCallback(() => {
-    setMatchupSuccessMessage('Matchup updated successfully!');
+    setMatchupSuccessMessage(
+      'Game selection triggered! Processing in background...',
+    );
     setMatchupErrorMessage(null);
     void refetchMatchup();
     setTimeout(() => setMatchupSuccessMessage(null), 5000);
@@ -695,35 +696,14 @@ export function LeagueDetailPage(): React.JSX.Element {
           </Text>
         </Card>
       ) : (
-        <MatchupControl
+        <NextStepControl
           leagueId={leagueId}
           currentMatchup={currentMatchup}
+          gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
           onSuccess={handleMatchupSuccess}
           onError={handleMatchupError}
         />
       )}
-
-      {/* Game Selection */}
-      {currentMatchup && currentMatchup.id && currentMatchup.weekNumber ? (
-        <GameSelectionControl
-          leagueId={leagueId}
-          matchupId={
-            typeof currentMatchup.id === 'string'
-              ? parseInt(currentMatchup.id, 10)
-              : currentMatchup.id
-          }
-          gamesPerMatchup={currentMatchup.gamesPerMatchup ?? 1}
-          onSuccess={() => {
-            setMatchupSuccessMessage('Game selection triggered successfully!');
-            setMatchupErrorMessage(null);
-            setTimeout(() => setMatchupSuccessMessage(null), 5000);
-          }}
-          onError={(error) => {
-            setMatchupErrorMessage(error.message);
-            setMatchupSuccessMessage(null);
-          }}
-        />
-      ) : null}
 
       <LeagueScoringEditor
         leagueId={leagueId}
@@ -985,11 +965,6 @@ export function LeagueDetailPage(): React.JSX.Element {
                     <Text fontSize="$3" color="$gray11">
                       Week: {currentMatchup.weekNumber}
                     </Text>
-                    {currentMatchup.selectedSeason && (
-                      <Text fontSize="$3" color="$gray11">
-                        Season: {currentMatchup.selectedSeason}
-                      </Text>
-                    )}
                     {currentMatchup.startTime && (
                       <Text fontSize="$3" color="$gray11">
                         Start:{' '}

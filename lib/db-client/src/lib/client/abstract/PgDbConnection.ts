@@ -4,8 +4,9 @@ import { readFileSync } from 'fs';
 import { BaseDbConnection, InitProperties } from './BaseDbClient';
 import { getDatabaseConfig } from '../../../config/database';
 
-interface PostgresDbInitProps<TSchema extends Record<string, unknown>>
-  extends InitProperties<TSchema> {
+interface PostgresDbInitProps<
+  TSchema extends Record<string, unknown>,
+> extends InitProperties<TSchema> {
   pool: Pool;
   client: PoolClient;
 }
@@ -95,12 +96,20 @@ export class PgDbConnection<
       schema: this.schema,
     });
 
-    // Get one client to verify connection works
-    const testClient = await pgPool.connect();
-    testClient.release();
+    // Get one client to verify connection works, then immediately release it
+    try {
+      const testClient = await pgPool.connect();
+      testClient.release();
+    } catch (err) {
+      // If connection test fails, clean up the pool
+      await pgPool.end();
+      throw err;
+    }
 
     return {
-      client: testClient, // Kept for backwards compatibility, but not used
+      // Deprecated field - pool manages all clients now, but kept for backward compatibility
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      client: null as any,
       db: db,
       pool: pgPool,
     };

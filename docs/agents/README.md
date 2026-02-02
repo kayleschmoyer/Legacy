@@ -33,26 +33,28 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 
 ### **Core Development Guidelines**
 
-| Topic                               | File                                                                                         | Description                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Contribution Workflow** ⭐        | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv)           | Complete contribution process from planning to PR creation     |
-| **Branch Tree Management** 🌳       | [`docs/guides/branch-tree-management.md`](../guides/branch-tree-management.md)               | Twig tree management for dependent branches and clean commits  |
-| **Cascade After Squashing** 🆕      | [`docs/agents/cascade-after-squashing.csv`](./docs/agents/cascade-after-squashing.csv)       | Using --skip-commits to maintain clean history during cascades |
-| **Platform Components**             | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)               | Magic string system for cross-platform compatibility           |
-| **Type Safety**                     | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                               | TypeScript standards and `any` type usage guidelines           |
-| **ESLint Standards**                | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)                     | Code quality enforcement and lint error resolution             |
-| **Development Workflow**            | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv)             | Daily workflows, terminal compatibility, fail-fast philosophy  |
+| Topic                          | File                                                                                   | Description                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Contribution Workflow** ⭐   | [`docs/agents/contribution-workflow.csv`](./docs/agents/contribution-workflow.csv)     | Complete contribution process from planning to PR creation     |
+| **Branch Tree Management** 🌳  | [`docs/guides/branch-tree-management.md`](../guides/branch-tree-management.md)         | Twig tree management for dependent branches and clean commits  |
+| **Cascade After Squashing** 🆕 | [`docs/agents/cascade-after-squashing.csv`](./docs/agents/cascade-after-squashing.csv) | Using --skip-commits to maintain clean history during cascades |
+| **Platform Components**        | [`docs/agents/platform-components.csv`](./docs/agents/platform-components.csv)         | Magic string system for cross-platform compatibility           |
+| **Type Safety**                | [`docs/agents/type-safety.csv`](./docs/agents/type-safety.csv)                         | TypeScript standards and `any` type usage guidelines           |
+| **ESLint Standards**           | [`docs/agents/eslint-standards.csv`](./docs/agents/eslint-standards.csv)               | Code quality enforcement and lint error resolution             |
+| **Development Workflow**       | [`docs/agents/development-workflow.csv`](./docs/agents/development-workflow.csv)       | Daily workflows, terminal compatibility, fail-fast philosophy  |
 
 ### **Architecture & Infrastructure**
 
-| Topic                       | File                                                                                   | Description                                                        |
-| --------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **GraphQL API**             | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration        |
-| **Database Schema**         | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management               |
-| **AWS Infrastructure**      | [`docs/agents/aws-infrastructure.csv`](./docs/agents/aws-infrastructure.csv)           | Lambda architecture, Terraform management, cost optimization       |
-| **Repository Architecture** | [`docs/agents/repository-architecture.csv`](./docs/agents/repository-architecture.csv) | Nx monorepo structure, build system, file conventions              |
-| **Build System**            | [`docs/agents/build-system.csv`](./docs/agents/build-system.csv)                       | Nx workspace management, dependency resolution, build optimization |
-| **Scoring Workflows**       | [`docs/agents/scoring-workflows.csv`](./docs/agents/scoring-workflows.csv)             | Data access, GraphQL, caching, and troubleshooting for scoring     |
+| Topic                            | File                                                                                   | Description                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **GraphQL API**                  | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration         |
+| **Database Schema**              | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management                |
+| **Migration Policy** ⚠️          | [`docs/database/migration-policy.md`](../database/migration-policy.md)                 | **CRITICAL**: All schema changes MUST use migrations, never scripts |
+| **AWS Infrastructure**           | [`docs/agents/aws-infrastructure.csv`](./docs/agents/aws-infrastructure.csv)           | Lambda architecture, Terraform management, cost optimization        |
+| **Async State Management** ⚡ 🆕 | [`docs/agents/async-state-management.csv`](./docs/agents/async-state-management.csv)   | SQS/Lambda patterns, status tracking, DLQ monitoring, lost messages |
+| **Repository Architecture**      | [`docs/agents/repository-architecture.csv`](./docs/agents/repository-architecture.csv) | Nx monorepo structure, build system, file conventions               |
+| **Build System**                 | [`docs/agents/build-system.csv`](./docs/agents/build-system.csv)                       | Nx workspace management, dependency resolution, build optimization  |
+| **Scoring Workflows**            | [`docs/agents/scoring-workflows.csv`](./docs/agents/scoring-workflows.csv)             | Data access, GraphQL, caching, and troubleshooting for scoring      |
 
 ### **Quality Assurance & Operations**
 
@@ -69,6 +71,7 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 ### **For AI Agents:**
 
 **When to use Skills vs CSV files:**
+
 - 🔧 **Skills** - When you need to execute a specific command (e.g., "run tests", "create a branch", "deploy a lambda")
 - 📋 **CSV files** - When you need to understand patterns, best practices, or architectural decisions (e.g., "when to use magic strings", "how to structure types")
 

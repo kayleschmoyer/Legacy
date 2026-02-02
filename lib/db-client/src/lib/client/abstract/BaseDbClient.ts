@@ -12,8 +12,7 @@ export interface InitProperties<TSchema extends Record<string, unknown>> {
 export abstract class BaseDbConnection<
   TSchema extends Record<string, unknown>,
   TInitProperties extends InitProperties<TSchema> = InitProperties<TSchema>,
-> implements DbClient<TSchema>
-{
+> implements DbClient<TSchema> {
   private _initProperties: TInitProperties | undefined;
 
   get initProperties(): TInitProperties {
@@ -26,6 +25,10 @@ export abstract class BaseDbConnection<
     return this._initProperties;
   }
 
+  public get isInitialized(): boolean {
+    return this._initProperties !== undefined;
+  }
+
   public get db(): GenericDatabase<TSchema> {
     return this.initProperties.db;
   }
@@ -34,7 +37,8 @@ export abstract class BaseDbConnection<
 
   public async initialize(): Promise<void> {
     if (this._initProperties !== undefined) {
-      throw new Error('This connection has already been initialized.');
+      // In development with connection caching, this is expected - skip re-initialization
+      return;
     }
 
     this._initProperties = await this._initialize();

@@ -1,9 +1,11 @@
 # Skill: Terraform Infrastructure Management
 
 ## Overview
+
 Apply infrastructure changes using Terraform to manage AWS resources.
 
 ## When to Use
+
 - Creating new AWS resources
 - Updating infrastructure configuration
 - Modifying Lambda settings
@@ -70,6 +72,7 @@ terraform state show aws_lambda_function.db
 ```
 
 ## Expected Output
+
 - **Plan**: List of resources to create, update, or destroy
 - **Apply**: Progress of resource changes
 - **Success**: "Apply complete! Resources: X added, Y changed, Z destroyed"
@@ -77,8 +80,10 @@ terraform state show aws_lambda_function.db
 ## Common Issues
 
 ### Issue: State lock error
+
 **Symptom**: "Error acquiring the state lock"
 **Solution**: Wait for lock to release or force unlock
+
 ```powershell
 # Check who has the lock (if multi-user)
 terraform force-unlock <lock-id>
@@ -88,8 +93,10 @@ pnpm run terraform:unlock
 ```
 
 ### Issue: AWS credentials not configured
+
 **Symptom**: "No valid credential sources found"
 **Solution**: Configure AWS credentials
+
 ```powershell
 # Set environment variables
 $env:AWS_ACCESS_KEY_ID = "your-key"
@@ -101,8 +108,10 @@ aws configure
 ```
 
 ### Issue: Terraform state drift
+
 **Symptom**: Plan shows unexpected changes
 **Solution**: Review changes and refresh state
+
 ```powershell
 # Refresh state from AWS
 terraform refresh
@@ -115,8 +124,10 @@ terraform apply
 ```
 
 ### Issue: Resource already exists
+
 **Symptom**: "Resource already exists"
 **Solution**: Import existing resource to state
+
 ```powershell
 # Import existing resource
 terraform import aws_lambda_function.db legacy-sports-dev-db
@@ -126,8 +137,10 @@ terraform apply
 ```
 
 ### Issue: Terraform version mismatch
+
 **Symptom**: "Required version constraint"
 **Solution**: Use correct Terraform version
+
 ```powershell
 # Check version
 terraform version
@@ -137,6 +150,7 @@ terraform version
 ```
 
 ## Best Practices
+
 1. **Always run plan first** - Review changes before applying
 2. **Use version control** - Commit Terraform files
 3. **Never force-unlock** unless sure lock is stale
@@ -157,6 +171,7 @@ terraform version
 ## Terraform Workflow
 
 ### Making Infrastructure Changes
+
 ```powershell
 # 1. Navigate to terraform directory
 cd terraform
@@ -183,6 +198,7 @@ git commit -m "infra: add new Lambda function"
 ```
 
 ### Updating Existing Resources
+
 ```powershell
 # 1. Modify terraform configuration
 # Edit terraform/*.tf files
@@ -198,6 +214,7 @@ terraform apply -target=aws_lambda_function.db
 ```
 
 ### Destroying Resources (Careful!)
+
 ```powershell
 # Plan destruction
 terraform plan -destroy
@@ -212,6 +229,7 @@ terraform destroy
 ## Integration with Workflow
 
 ### After PR Merge with Terraform Changes
+
 ```powershell
 # 1. Pull latest changes
 git checkout main
@@ -231,6 +249,7 @@ terraform apply
 ```
 
 ### Adding New Lambda Function
+
 ```powershell
 # 1. Create Lambda .tf file
 # New file: terraform/lambda-new-function.tf
@@ -245,12 +264,13 @@ terraform plan
 terraform apply
 
 # 5. Deploy Lambda code
-.\scripts\deploy-lambda.ps1 -LambdaName new-function
+.\scripts\deploy-lambda.ps1 -FunctionName new-function
 ```
 
 ## Common Terraform Operations
 
 ### View Resources
+
 ```powershell
 # List all resources
 terraform state list
@@ -263,6 +283,7 @@ terraform output
 ```
 
 ### Import Existing Resources
+
 ```powershell
 # Import existing AWS resource to state
 terraform import aws_lambda_function.db legacy-sports-dev-db
@@ -273,6 +294,7 @@ terraform import -target=aws_lambda_function.db \
 ```
 
 ### Refresh State
+
 ```powershell
 # Update state from AWS (no changes)
 terraform refresh
@@ -284,11 +306,13 @@ terraform refresh -target=aws_lambda_function.db
 ## Terraform State Management
 
 ### State Location
+
 - **Remote**: S3 bucket (configured in backend.tf)
 - **Lock**: DynamoDB table for locking
 - **Local**: `.terraform/` directory (gitignored)
 
 ### State Commands
+
 ```powershell
 # List resources
 terraform state list
@@ -318,6 +342,7 @@ terraform/
 ## Sensitive Resources
 
 **Extra caution needed**:
+
 - 🔴 **Database** - Don't destroy accidentally
 - 🔴 **State bucket** - Contains all state
 - 🔴 **IAM roles** - Can break access
@@ -325,15 +350,18 @@ terraform/
 - 🟡 **API Gateway** - Can break API
 
 ## Exit Codes
+
 - **0**: Apply successful
 - **Non-zero**: Apply failed (check error message)
 
 ## Related Skills
+
 - [Lambda Deployment](deploy-lambda.md) - Deploying Lambda code
 - [Database Connection](db-connect.md) - Testing infrastructure
 - [Validate Workspace](validate-workspace.md) - Pre-deployment checks
 
 ## Related Documentation
+
 - [AWS Infrastructure](../../../docs/deployment/aws-infrastructure.md)
 - [Terraform Lambda Deployment](../../../docs/deployment/terraform/terraform-lambda-deployment.md)
 - [Terraform State Management](../../../docs/deployment/terraform/terraform-state-solution.md)
@@ -342,6 +370,7 @@ terraform/
 ## Security Notes
 
 ⚠️ **CRITICAL**:
+
 - Never commit AWS credentials
 - Never commit terraform.tfstate (use remote state)
 - Review plans carefully before applying

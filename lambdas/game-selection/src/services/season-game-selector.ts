@@ -94,7 +94,7 @@ export async function selectGamesForMatchupPlayer(
 
 /**
  * Select games for all players in a matchup for a specific game number
- * Uses the matchup's selected_season field to determine which season to use
+ * Uses per-player season assignments from league_week_player_seasons
  * @param db - Database connection
  * @param matchupId - ID of the matchup
  * @param gameNumber - Game number in the matchup (1-7 for weekly matchups)
@@ -104,7 +104,7 @@ export async function selectGamesForMatchup(
   matchupId: number,
   gameNumber: number,
 ): Promise<void> {
-  // First, get the matchup to retrieve the selected_season
+  // First, get the matchup to retrieve league and week information
   const matchup = await db
     .select()
     .from(PublicSchema.matchups)
@@ -115,17 +115,13 @@ export async function selectGamesForMatchup(
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  const selectedSeason = matchup.selectedSeason;
+  LOGGER.info(`Selecting games for matchup ${matchupId}, game ${gameNumber}`);
 
-  if (!selectedSeason) {
-    throw new Error(
-      `Matchup ${matchupId} does not have a selected_season specified`,
-    );
-  }
-
-  LOGGER.info(
-    `Selecting games for matchup ${matchupId}, game ${gameNumber}, season ${selectedSeason}`,
-  );
+  // Update matchup stats loading status to 'loading' (transitioning from 'queued')
+  await db
+    .update(PublicSchema.matchups)
+    .set({ statsLoadingStatus: 'loading' })
+    .where(eq(PublicSchema.matchups.id, matchupId));
 
   // Get all matchup players for this matchup that don't have games selected for this game number yet
   const matchupPlayers = await db
@@ -135,6 +131,24 @@ export async function selectGamesForMatchup(
 
   LOGGER.debug(
     `Found ${matchupPlayers.length} matchup player records for matchup ${matchupId}`,
+  );
+
+  // Get per-player season assignments from league_week_player_seasons
+  const playerSeasons = await db
+    .select({
+      playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+      season: PublicSchema.leagueWeekPlayerSeasons.season,
+    })
+    .from(PublicSchema.leagueWeekPlayerSeasons)
+    .where(
+      and(
+        eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
+        eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, matchup.weekNumber),
+      ),
+    );
+
+  const seasonMap = new Map(
+    playerSeasons.map((ps) => [ps.playerId, ps.season]),
   );
 
   for (const matchupPlayer of matchupPlayers) {
@@ -156,12 +170,28 @@ export async function selectGamesForMatchup(
       continue;
     }
 
-    // Select games for this player using the matchup's selected season
+    // Get this player's assigned season from league_week_player_seasons
+    const playerSeason = seasonMap.get(matchupPlayer.playerId);
+
+    if (!playerSeason) {
+      LOGGER.error(
+        `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber}`,
+      );
+      throw new Error(
+        `Player ${matchupPlayer.playerId} does not have a season assigned for this matchup`,
+      );
+    }
+
+    LOGGER.debug(
+      `Selecting games for player ${matchupPlayer.playerId} using season ${playerSeason}`,
+    );
+
+    // Select games for this player using their assigned season
     const selectedGames = await selectGamesForMatchupPlayer(
       db,
       matchupPlayer.id,
       matchupPlayer.playerId,
-      selectedSeason,
+      playerSeason,
       gameNumber,
     );
 
@@ -187,6 +217,12 @@ export async function selectGamesForMatchup(
       `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber}`,
     );
   }
+
+  // Update matchup stats loading status to 'completed'
+  await db
+    .update(PublicSchema.matchups)
+    .set({ statsLoadingStatus: 'completed' })
+    .where(eq(PublicSchema.matchups.id, matchupId));
 
   LOGGER.info(
     `Completed game selection for matchup ${matchupId}, game ${gameNumber}`,

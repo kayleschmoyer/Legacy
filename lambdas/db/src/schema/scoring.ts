@@ -1,15 +1,15 @@
 import { and, eq } from 'drizzle-orm';
 import {
   createDatabaseService,
+  PublicDb,
   PublicSchema,
-  runWithPublicClient,
 } from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
 import type {
   LeagueScoringProfileEntry,
   ScoringStatDefinition,
   ScoringStatGroup,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 
 const dbService = createDatabaseService(getDbOptions());
@@ -148,53 +148,50 @@ function buildStatValues(
 }
 
 async function ensureLeagueAccess(
+  db: PublicDb,
   leagueId: number,
   userId: number,
 ): Promise<void> {
-  const hasAccess = await runWithPublicClient(getDbOptions(), async (db) => {
-    const membership = await db
-      .select({ leagueId: PublicSchema.leagueMembers.leagueId })
-      .from(PublicSchema.leagueMembers)
-      .where(
-        and(
-          eq(PublicSchema.leagueMembers.leagueId, leagueId),
-          eq(PublicSchema.leagueMembers.userId, userId),
-        ),
-      )
-      .limit(1);
+  const membership = await db
+    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
 
-    return membership.length > 0;
-  });
-
-  if (!hasAccess) {
+  if (membership.length === 0) {
     throw new Error('Access denied: You are not a member of this league');
   }
 }
 
 async function ensureLeagueCommissionerAccess(
+  db: PublicDb,
   leagueId: number,
   userId: number,
 ): Promise<void> {
-  await ensureLeagueAccess(leagueId, userId);
+  await ensureLeagueAccess(db, leagueId, userId);
 
-  const permission = await runWithPublicClient(getDbOptions(), async (db) => {
-    const membership = await db
-      .select({
-        permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-      })
-      .from(PublicSchema.leagueMembers)
-      .where(
-        and(
-          eq(PublicSchema.leagueMembers.leagueId, leagueId),
-          eq(PublicSchema.leagueMembers.userId, userId),
-        ),
-      )
-      .limit(1);
+  const membership = await db
+    .select({
+      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+    })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
 
-    return membership[0]?.permissionLevel ?? null;
-  });
-
-  if (permission !== 'owner' && permission !== 'commissioner') {
+  if (
+    membership[0]?.permissionLevel !== 'owner' &&
+    membership[0]?.permissionLevel !== 'commissioner'
+  ) {
     throw new Error(
       'Access denied: Commissioner or owner role required to update scoring profile',
     );
@@ -429,7 +426,7 @@ builder.queryField('leagueScoringProfile', (t) =>
         throw new Error('Authentication required to fetch scoring profile');
       }
 
-      await ensureLeagueAccess(args.leagueId, context.user.id);
+      await ensureLeagueAccess(context.db, args.leagueId, context.user.id);
       return loadLeagueScoringConfig(args.leagueId);
     },
   }),
@@ -459,7 +456,11 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
       }
 
       if (!context.user.isAdmin) {
-        await ensureLeagueCommissionerAccess(args.leagueId, context.user.id);
+        await ensureLeagueCommissionerAccess(
+          context.db,
+          args.leagueId,
+          context.user.id,
+        );
       }
 
       for (const update of updates) {

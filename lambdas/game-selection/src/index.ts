@@ -1,4 +1,10 @@
-import { APIGatewayEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
+import {
+  APIGatewayEvent,
+  APIGatewayProxyResult,
+  Context,
+  SQSBatchResponse,
+  SQSEvent,
+} from 'aws-lambda';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -14,6 +20,7 @@ import {
 } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { handler as selectGameHandler } from './handlers/select-game';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -855,8 +862,23 @@ const baseGameSelectionHandler = async (
 
 // Export the Sentry-wrapped handler
 export const handler = async (
-  event: APIGatewayEvent,
+  event: APIGatewayEvent | SQSEvent,
   context: Context,
-): Promise<APIGatewayProxyResult> => {
-  return await withSentry(baseGameSelectionHandler)(event, context);
+): Promise<APIGatewayProxyResult | SQSBatchResponse> => {
+  // Detect event type and route to appropriate handler
+  if (
+    'Records' in event &&
+    Array.isArray(event.Records) &&
+    event.Records[0]?.eventSource === 'aws:sqs'
+  ) {
+    // SQS Event - route to select-game handler
+    LOGGER.info('Detected SQS event, routing to select-game handler');
+    return selectGameHandler(event);
+  }
+
+  // API Gateway Event - route to main handler
+  return await withSentry(baseGameSelectionHandler)(
+    event as APIGatewayEvent,
+    context,
+  );
 };

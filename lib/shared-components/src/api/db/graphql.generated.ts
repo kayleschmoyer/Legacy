@@ -147,7 +147,6 @@ export type CreateMatchupInput = {
   endTime?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
-  selectedSeason?: InputMaybe<Scalars['Int']['input']>;
   startTime?: InputMaybe<Scalars['String']['input']>;
   team1Id?: InputMaybe<Scalars['Int']['input']>;
   team2Id?: InputMaybe<Scalars['Int']['input']>;
@@ -262,6 +261,14 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type JoinLeaguePayload = {
+  __typename?: 'JoinLeaguePayload';
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
@@ -272,7 +279,6 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
-  schedulingStrategy?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
 };
@@ -302,7 +308,6 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
-  selectedSeason?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
   statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
@@ -315,7 +320,7 @@ export type Matchup = {
   weekNumber?: Maybe<Scalars['Int']['output']>;
 };
 
-/** A player assigned to a matchup (season from league_week_player_seasons) */
+/** A player selected for a specific matchup */
 export type MatchupPlayer = {
   __typename?: 'MatchupPlayer';
   games?: Maybe<Array<MatchupPlayerGame>>;
@@ -325,28 +330,24 @@ export type MatchupPlayer = {
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
   season?: Maybe<Scalars['Int']['output']>;
-  /** Season batting stats for this player's selected season */
   seasonBatting?: Maybe<SeasonBatting>;
-  /** Season fielding stats for this player's selected season */
   seasonFielding?: Maybe<SeasonFielding>;
-  /** Season pitching stats for this player's selected season */
   seasonPitching?: Maybe<SeasonPitching>;
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
-/** Stats from a single game for a player in a matchup */
 export type MatchupPlayerGame = {
   __typename?: 'MatchupPlayerGame';
+  battingGame?: Maybe<GameBatting>;
   battingGameNum?: Maybe<Scalars['Int']['output']>;
-  battingStats?: Maybe<GameBatting>;
+  fieldingGame?: Maybe<GameFielding>;
   fieldingGameNum?: Maybe<Scalars['Int']['output']>;
   fieldingGamePos?: Maybe<Scalars['String']['output']>;
-  fieldingStats?: Maybe<GameFielding>;
   gameNum?: Maybe<Scalars['Int']['output']>;
-  id?: Maybe<Scalars['ID']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  pitchingGame?: Maybe<GamePitching>;
   pitchingGameNum?: Maybe<Scalars['Int']['output']>;
-  pitchingStats?: Maybe<GamePitching>;
 };
 
 export enum MatchupStatus {
@@ -370,13 +371,13 @@ export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<Array<Matchup>>;
-  advanceWeekGames?: Maybe<Scalars['Boolean']['output']>;
+  createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
@@ -394,13 +395,9 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-export type MutationAdvanceLeagueWeekArgs = {
-  leagueId: Scalars['Int']['input'];
-};
-
-export type MutationAdvanceWeekGamesArgs = {
-  leagueId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
+export type MutationCreateLeagueArgs = {
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  name: Scalars['String']['input'];
 };
 
 export type MutationCreateLeagueAndTeamsArgs = {
@@ -417,6 +414,11 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationJoinLeagueArgs = {
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
 };
 
 export type MutationJoinLeagueByCodeArgs = {
@@ -442,8 +444,8 @@ export type MutationStartDraftArgs = {
 };
 
 export type MutationTriggerGameSelectionArgs = {
+  gameNumber: Scalars['Int']['input'];
   matchupId: Scalars['Int']['input'];
-  weekNumber: Scalars['Int']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -1042,6 +1044,7 @@ export enum StatsLoadingStatus {
   Failed = 'failed',
   Loading = 'loading',
   NotStarted = 'not_started',
+  Queued = 'queued',
 }
 
 /** A team in a league */
@@ -1232,6 +1235,16 @@ export type PlayerFragment = {
   lastName?: string | null;
   brefId?: string | null;
   statsLastFetchedAt?: string | null;
+};
+
+export type TriggerGameSelectionMutationVariables = Exact<{
+  matchupId: Scalars['Int']['input'];
+  gameNumber: Scalars['Int']['input'];
+}>;
+
+export type TriggerGameSelectionMutation = {
+  __typename?: 'Mutation';
+  triggerGameSelection?: boolean | null;
 };
 
 export const CareerBattingFragmentDoc = gql`
@@ -1486,4 +1499,53 @@ export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<
 export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables
+>;
+export const TriggerGameSelection = gql`
+  mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
+    triggerGameSelection(matchupId: $matchupId, gameNumber: $gameNumber)
+  }
+`;
+export type TriggerGameSelectionMutationFn = Apollo.MutationFunction<
+  TriggerGameSelectionMutation,
+  TriggerGameSelectionMutationVariables
+>;
+
+/**
+ * __useTriggerGameSelectionMutation__
+ *
+ * To run a mutation, you first call `useTriggerGameSelectionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTriggerGameSelectionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [triggerGameSelectionMutation, { data, loading, error }] = useTriggerGameSelectionMutation({
+ *   variables: {
+ *      matchupId: // value for 'matchupId'
+ *      gameNumber: // value for 'gameNumber'
+ *   },
+ * });
+ */
+export function useTriggerGameSelectionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TriggerGameSelectionMutation,
+    TriggerGameSelectionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TriggerGameSelectionMutation,
+    TriggerGameSelectionMutationVariables
+  >(TriggerGameSelection, options);
+}
+export type TriggerGameSelectionMutationHookResult = ReturnType<
+  typeof useTriggerGameSelectionMutation
+>;
+export type TriggerGameSelectionMutationResult =
+  Apollo.MutationResult<TriggerGameSelectionMutation>;
+export type TriggerGameSelectionMutationOptions = Apollo.BaseMutationOptions<
+  TriggerGameSelectionMutation,
+  TriggerGameSelectionMutationVariables
 >;

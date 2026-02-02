@@ -170,9 +170,9 @@ resource "aws_lambda_function" "draft_processor" {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Sentry configuration
-      SENTRY_DSN               = var.sentry_dsn
+      SENTRY_DSN                = var.sentry_dsn
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
-      SENTRY_DEBUG             = "false"
+      SENTRY_DEBUG              = "false"
     }
   }
 
@@ -201,11 +201,11 @@ resource "aws_lambda_event_source_mapping" "draft_processor_sqs" {
   function_name    = aws_lambda_function.draft_processor.arn
 
   # Batch configuration
-  batch_size                         = 1   # Process one draft at a time
-  maximum_batching_window_in_seconds = 0   # No batching delay
+  batch_size                         = 1 # Process one draft at a time
+  maximum_batching_window_in_seconds = 0 # No batching delay
 
   # Error handling
-  bisect_batch_on_function_error   = false
+  bisect_batch_on_function_error = false
 
   depends_on = [
     aws_lambda_function.draft_processor,

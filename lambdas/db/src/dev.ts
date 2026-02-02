@@ -38,10 +38,12 @@ async function startServer() {
   LOGGER.info(`  DB_CERT_PATH: ${process.env.DB_CERT_PATH || 'NOT SET'}`);
   LOGGER.info(`  USE_LOCAL_CREDS: ${process.env.USE_LOCAL_CREDS || 'NOT SET'}`);
 
+  // Create database service for use in context
+  const dbService = createDatabaseService(getDbOptions());
+
   // Test database connection
   try {
     LOGGER.info('🔗 Testing database connection...');
-    const dbService = createDatabaseService(getDbOptions());
     // Test the connection by making a simple query
     void dbService.users.getUserById(1).catch(() => {
       // Query may fail, but it tests the connection
@@ -122,7 +124,6 @@ async function startServer() {
 
       // Development fallback: provide a default user when no auth token is present
       if (!user) {
-        LOGGER.info('🔧 Development mode: Using fallback user for testing');
         user = {
           id: 1,
           email: 'dev@example.com',
@@ -131,11 +132,14 @@ async function startServer() {
         };
       }
 
-      // Make this actually async to satisfy linter
-      await Promise.resolve();
+      // Create a shared database connection for this request
+      // This prevents each resolver from creating its own connection
+      const db = await dbService.getDb();
+
       return {
         user,
-        loaders: createLoaders(), // Create fresh loaders for each request
+        loaders: createLoaders(db), // Pass shared connection to loaders
+        db, // Shared connection for all resolvers in this request
       };
     },
   });

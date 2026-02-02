@@ -2,7 +2,7 @@ import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ArgsType } from './ArgsType';
 
 export const investigateMatchupCommandBuilder = (argv: Argv) =>
@@ -40,7 +40,6 @@ export const handleInvestigateMatchup = async (
     LOGGER.info('📋 Matchup Details:');
     LOGGER.info(`  ID: ${matchup.id}`);
     LOGGER.info(`  League ID: ${matchup.leagueId}`);
-    LOGGER.info(`  Selected Season: ${matchup.selectedSeason}`);
     LOGGER.info(`  Games Per Matchup: ${matchup.gamesPerMatchup}`);
     LOGGER.info(`  Week Number: ${matchup.weekNumber}`);
     LOGGER.info(`  Status: ${matchup.status}`);
@@ -84,48 +83,16 @@ export const handleInvestigateMatchup = async (
       LOGGER.info(`    Fielding Game Num: ${game.fieldingGameNum}`);
     });
 
-    // 4. Check if players have stats for the selected season
-    if (matchup.selectedSeason) {
-      const firstPlayer = matchupPlayers[0];
-      if (firstPlayer) {
-        const battingStats = await db
-          .select()
-          .from(PublicSchema.gameBatting)
-          .where(
-            and(
-              eq(PublicSchema.gameBatting.playerId, firstPlayer.playerId),
-              eq(PublicSchema.gameBatting.season, matchup.selectedSeason),
-            ),
-          )
-          .limit(5);
-
-        LOGGER.info(
-          `\n📊 Sample Batting Stats for Player ${firstPlayer.playerId} in ${matchup.selectedSeason}:`,
-        );
-        LOGGER.info(`  Found ${battingStats.length} games`);
-        battingStats.forEach((stat, idx) => {
-          LOGGER.info(
-            `    Game ${idx + 1}: gameNum=${stat.gameNum}, H=${stat.h}, AB=${stat.ab}`,
-          );
-        });
-      }
-    }
-
-    // 5. Summary
+    // 4. Summary
     LOGGER.info('\n=== Summary ===');
     LOGGER.info(`✅ Matchup exists: ${matchups.length > 0}`);
-    LOGGER.info(`✅ Has selected_season: ${!!matchup.selectedSeason}`);
     LOGGER.info(`✅ Has players: ${matchupPlayers.length > 0}`);
     LOGGER.info(`✅ Has games: ${matchupPlayerGames.length > 0}`);
     LOGGER.info(
       `${matchupPlayerGames.some((g) => g.battingGameNum !== null) ? '✅' : '❌'} Game numbers populated: ${matchupPlayerGames.some((g) => g.battingGameNum !== null)}`,
     );
 
-    if (!matchup.selectedSeason) {
-      LOGGER.warn(
-        '\n⚠️  ISSUE: selected_season is NULL! Game selection needs a season to work.',
-      );
-    } else if (!matchupPlayerGames.some((g) => g.battingGameNum !== null)) {
+    if (!matchupPlayerGames.some((g) => g.battingGameNum !== null)) {
       LOGGER.warn(
         '\n⚠️  ISSUE: Game numbers are NULL. Game selection may not have run, or failed.',
       );

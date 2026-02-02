@@ -1,0 +1,3 @@
+mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
+  triggerGameSelection(matchupId: $matchupId, gameNumber: $gameNumber)
+}

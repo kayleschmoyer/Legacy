@@ -46,6 +46,17 @@ resource "aws_iam_policy" "game_selection_lambda_secrets" {
         Resource = [
           aws_secretsmanager_secret.database_credentials.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = [
+          aws_sqs_queue.select_game.arn
+        ]
       }
     ]
   })
@@ -131,9 +142,9 @@ resource "aws_lambda_function" "game_selection" {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Sentry configuration
-      SENTRY_DSN               = var.sentry_dsn
+      SENTRY_DSN                = var.sentry_dsn
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
-      SENTRY_DEBUG             = "false"
+      SENTRY_DEBUG              = "false"
     }
   }
 
@@ -235,4 +246,18 @@ resource "aws_lambda_permission" "game_selection_api_gateway" {
   function_name = aws_lambda_function.game_selection.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# SQS Event Source Mapping
+resource "aws_lambda_event_source_mapping" "game_selection_sqs" {
+  event_source_arn = aws_sqs_queue.select_game.arn
+  function_name    = aws_lambda_function.game_selection.arn
+  batch_size       = 1
+  enabled          = true
+
+  function_response_types = ["ReportBatchItemFailures"]
+
+  depends_on = [
+    aws_iam_role_policy_attachment.game_selection_lambda_secrets
+  ]
 }

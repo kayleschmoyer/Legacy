@@ -1,199 +1,232 @@
-# Skill: Database Migration
+# Skill: Run Database Migration
 
-## Overview
-Run database schema migrations using Drizzle ORM migration system.
+## Purpose
+
+Apply pending database migrations to update the schema in development or production environments.
 
 ## When to Use
-- After creating new migration files
-- Setting up database for first time
-- Pulling changes that include new migrations
-- Updating database schema
-- Deploying to new environment
 
-## Command
+- After creating a new migration file
+- Setting up a new environment
+- Deploying schema changes to production
+- After pulling changes with new migrations
 
-```powershell
-# Run database migrations
-pnpm run db:migrate
-```
-
-## Alternative Commands
+## Migration Commands
 
 ### Check Migration Status
 
-```powershell
-# No built-in status command, but you can check manually
-# View applied migrations in database migrations table
-pnpm run db:psql
-# Then: SELECT * FROM drizzle_migrations;
-```
-
-### Generate New Migration
+View which migrations are applied and which are pending.
 
 ```powershell
-# Generate migration from schema changes
-# (This is done in lib/db-client directory)
+# From root directory
+pnpm run db:migrate status
+
+# Alternative: From lib/db-client directory
 cd lib/db-client
-pnpm run db:generate
-
-# Or use drizzle-kit directly
-pnpm exec drizzle-kit generate:pg
+pnpm run db:status
 ```
 
-### Test Database Connection First
+**Output**:
 
-```powershell
-# Verify database connection before migrating
-pnpm run db:test
-
-# Or test with CLI
-pnpm run cli:test-connection
+```
+✅ Applied: 20251117_190000_add_matchup_stats_loading_status.ts
+⏸️  Pending: 20260131_210000_add_queued_status_to_stats_loading.ts
 ```
 
-### Production Migrations (Use Carefully)
+### Run Pending Migrations
+
+Apply all pending migrations (most common operation).
 
 ```powershell
-# Migrate production database (requires production credentials)
-pnpm run db:migrate:production
-```
-
-## Expected Output
-- **Success**: "Migrations applied successfully" message
-- **Up-to-date**: "No pending migrations" if already current
-- **Console**: List of applied migrations
-
-## Common Issues
-
-### Issue: Database connection failed
-**Symptom**: Cannot connect to database
-**Solution**: Sync environment variables first
-```powershell
-# Sync database credentials
-pnpm run sync-env
-
-# Test connection
-pnpm run db:test
-
-# Then run migrations
+# From root directory (recommended)
 pnpm run db:migrate
+
+# Alternative: From lib/db-client directory
+cd lib/db-client
+pnpm run db:up
 ```
 
-### Issue: Migration failed mid-execution
-**Symptom**: Some migrations applied, some failed
-**Solution**: Check database state and fix schema issues
+**What it does**:
+
+- Connects to database using credentials from `.env`
+- Creates `drizzle.__drizzle_migrations` table if needed
+- Reads migration files from `lib/db-client/migrations/`
+- Applies pending migrations in order
+- Records applied migrations in database
+
+### Rollback Last Migration
+
+Undo the most recently applied migration.
+
+```powershell
+cd lib/db-client
+pnpm run db:down
+```
+
+⚠️ **Warning**: Only use in development. Rollback may cause data loss.
+
+### Other Migration Commands
+
+```powershell
+# Rollback all migrations and reapply
+cd lib/db-client
+pnpm run db:refresh
+
+# Rollback all migrations
+cd lib/db-client
+pnpm run db:fresh
+
+# Manual migration for complex operations
+cd lib/db-client
+pnpm run db:manual-migration
+```
+
+## Database Connection
+
+Migrations use database credentials from `.env` file:
+
+```env
+DB_HOST=your-db-host.rds.amazonaws.com
+DB_USER=postgres
+DB_PASSWORD=your-password
+DB_CERT_PATH=certs/us-east-1-bundle.pem  # For RDS SSL
+```
+
+### Connection Priority
+
+1. Environment variables (`.env` file)
+2. AWS Secrets Manager (fallback if AWS credentials available)
+3. Manual migration user if `DB_MIGRATION_USER` set
+
+## Complete Migration Workflow
+
+### 1. Check Current State
+
+```powershell
+cd lib/db-client
+pnpm run db:status
+```
+
+### 2. Run Pending Migrations
+
+```powershell
+pnpm run db:up
+```
+
+### 3. Verify Changes
+
 ```powershell
 # Connect to database
 pnpm run db:psql
 
-# Check migrations table
-SELECT * FROM drizzle_migrations ORDER BY created_at DESC;
+# Check table structure
+\d table_name
 
-# If needed, manually rollback or fix issues
-# Then re-run migrations
-pnpm run db:migrate
+# Check enum values
+SELECT enumlabel FROM pg_enum WHERE enumtypid = 'enum_name'::regtype ORDER BY enumsortorder;
+
+# Exit psql
+\q
 ```
 
-### Issue: Migration file syntax errors
-**Symptom**: SQL syntax errors in migration
-**Solution**: Fix migration file SQL syntax
+### 4. Update Application Code
+
+After migrations run, restart services that use the database:
+
+- Restart local DB Lambda (if running)
+- Regenerate GraphQL types if schema changed
+- Deploy updated Lambda functions
+
+## Troubleshooting
+
+### Migration Fails Midway
+
+**Symptom**: Error during migration execution
+**Solution**:
+
+1. Check error message in output
+2. Fix migration SQL
+3. Manually rollback if needed: `pnpm run db:down`
+4. Fix migration file
+5. Run again: `pnpm run db:up`
+
+### "Cannot connect to database"
+
+**Solution**:
+
 ```powershell
-# Migration files are in: lib/db-client/drizzle/
-# Edit the .sql file to fix syntax
-# Then re-run migrations
-```
+# Verify .env has correct credentials
+Get-Content .env | Select-String "DB_"
 
-### Issue: Wrong database targeted
-**Symptom**: Migrations run on wrong environment
-**Solution**: Verify environment variables
-```powershell
-# Check which database you're connected to
-pnpm run db:url
-
-# Should show development database URL
-# If production, STOP and fix environment
-```
-
-### Issue: Permission errors
-**Symptom**: Insufficient privileges to create tables
-**Solution**: Ensure database user has proper permissions
-```powershell
-# Check database credentials
-pnpm run db:credentials
-
-# Contact DevOps if user lacks permissions
-```
-
-## Best Practices
-1. **Sync environment first** - Always run `pnpm run sync-env` before migrations
-2. **Test connection** - Verify database connectivity before migrating
-3. **Backup first** (production) - Backup production database before migrations
-4. **Review migrations** - Check migration SQL before running
-5. **Run locally first** - Test migrations on development before production
-
-## Migration Workflow
-
-### Creating New Migration
-```powershell
-# 1. Modify Drizzle schema files
-# Edit files in lib/db-client/src/lib/schema/
-
-# 2. Generate migration
+# Test connection
 cd lib/db-client
-pnpm run db:generate
-
-# 3. Review generated migration
-# Check lib/db-client/drizzle/XXXX_migration_name.sql
-
-# 4. Apply migration locally
-cd ../..
-pnpm run db:migrate
-
-# 5. Test the changes
-pnpm run cli:inspect-database
-
-# 6. Commit migration files
-git add lib/db-client/drizzle/
-git commit -m "feat(db): add new table for feature"
+pnpm run db:test
 ```
 
-### Applying Migrations After Pull
+### "Migration already applied" but schema not updated
+
+**Possible causes**:
+
+1. Migration ran but failed partway
+2. Manual schema changes conflict
+3. Transaction rolled back
+
+**Solution**:
+
 ```powershell
-# 1. Pull latest changes
-git pull
+# Check what's actually in database
+pnpm run db:psql
 
-# 2. Sync environment (if needed)
-pnpm run sync-env
-
-# 3. Run migrations
-pnpm run db:migrate
-
-# 4. Verify schema
-pnpm run cli:inspect-database
+# Compare with migration file expectations
+# May need to remove migration from tracking table if necessary
 ```
 
-### Production Deployment
+### Enum Value Already Exists
+
+**Symptom**: `enum label "value" already exists, skipping`
+**Cause**: Migration uses `IF NOT EXISTS` - this is normal
+**Solution**: No action needed - migration is idempotent
+
+## Post-Migration Tasks
+
+After running migrations:
+
+### 1. Restart Local Services
+
 ```powershell
-# 1. Backup production database
-# (Use AWS RDS snapshot or pg_dump)
-
-# 2. Set production environment
-# (Update .env.local or use production credentials)
-
-# 3. Test connection
-pnpm run db:test:production
-
-# 4. Run migrations
-pnpm run db:migrate:production
-
-# 5. Verify migration success
-pnpm run db:credentials:production
-pnpm run db:psql:production
-# Check tables exist
+# Restart DB Lambda to pick up schema changes
+# Stop current: Ctrl+C in terminal
+# Start: pnpm exec nx run db:serve
 ```
+
+### 2. Regenerate Types (if GraphQL schema changed)
+
+```powershell
+pnpm exec nx run shared-components:codegen
+```
+
+### 3. Update Documentation
+
+- Document schema changes in `docs/architecture/database-schema.md`
+- Update CSV agent instructions if patterns changed
+- Update API documentation if endpoints affected
+
+## Related Skills
+
+- [Write Database Migration](db-migration-write.md)
+- [Database Connection](db-connect.md)
+- [Sync Environment](sync-env.md)
+
+## Related Documentation
+
+- [Migration System Code](../../lib/db-client/src/scripts/rollback-migrations.ts)
+- [Database Schema](../../docs/architecture/database-schema.md)
+- [Drizzle ORM Docs](https://orm.drizzle.team/)
 
 ## Integration with Workflow
 
 ### Before Commit
+
 ```powershell
 # If you modified database schema:
 
@@ -211,11 +244,13 @@ make pre-commit
 ```
 
 ### CI/CD Pipeline
+
 Migrations are NOT automatically run in CI/CD. They must be applied manually to each environment.
 
 ## Database Tools
 
 ### Connect to Database
+
 ```powershell
 # Interactive PostgreSQL shell
 pnpm run db:psql
@@ -225,6 +260,7 @@ pnpm run db:psql:production
 ```
 
 ### View Database URL
+
 ```powershell
 # Show connection string (credentials masked)
 pnpm run db:url
@@ -234,6 +270,7 @@ pnpm run db:url:production
 ```
 
 ### View Credentials
+
 ```powershell
 # Display database credentials
 pnpm run db:credentials
@@ -265,15 +302,18 @@ lib/db-client/src/lib/schema/
 ```
 
 ## Exit Codes
+
 - **0**: Migrations applied successfully
 - **Non-zero**: Migration failed (check error message)
 
 ## Related Skills
+
 - [Database Connection](db-connect.md) - Testing database connectivity
 - [Sync Environment](sync-env.md) - Syncing database credentials
 - [Dev DB Lambda](dev-db-lambda.md) - Running local GraphQL server
 
 ## Related Documentation
+
 - [Database Schema](../../../docs/architecture/database-schema.md)
 - [Schema Validation](../../../docs/architecture/schema-validation.md)
 - [Development Setup](../../../docs/guides/development-setup.md)

@@ -11,12 +11,15 @@ import {
   StatisticsService,
 } from './StatisticsService';
 import { createScoringService, ScoringService } from './ScoringService';
+import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
+import * as PublicSchema from '../../drizzle/public/schema';
 
 export class DatabaseService {
   public readonly users: UserService;
   public readonly players: PlayerService;
   public readonly statistics: StatisticsService;
   public readonly scoring: ScoringService;
+  private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
 
   constructor(private options: DbOptions) {
     this.users = createUserService(options);
@@ -30,6 +33,20 @@ export class DatabaseService {
    */
   getOptions(): DbOptions {
     return this.options;
+  }
+
+  /**
+   * Get a shared database connection for direct queries
+   * This connection is initialized on first use and reused for subsequent calls
+   * Useful for GraphQL context to share connections across resolvers
+   */
+  async getDb(): Promise<GenericDatabase<typeof PublicSchema>> {
+    if (!this._dbConnection) {
+      const connection = getPublicDbConnection(this.options);
+      await connection.initialize();
+      this._dbConnection = connection.db;
+    }
+    return this._dbConnection;
   }
 }
 

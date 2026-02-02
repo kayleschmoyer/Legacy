@@ -7,14 +7,12 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   registerDeviceToken,
-  runWithPublicClient,
   updateNotificationPreferences,
 } from '@legacy-sports/db-client';
 import type {
   DeviceTokenInput as DeviceTokenInputType,
   NotificationPreferenceInput as NotificationPreferenceInputType,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 
 // Enums
@@ -174,10 +172,8 @@ builder.queryField('getUserNotificationPreferences', (t) =>
     args: {
       userId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUserNotificationPreferences(db, args.userId);
-      });
+    resolve: async (_parent, args, context) => {
+      return await getUserNotificationPreferences(context.db, args.userId);
     },
   }),
 );
@@ -189,14 +185,12 @@ builder.queryField('getNotificationHistory', (t) =>
       userId: t.arg.int({ required: true }),
       limit: t.arg.int({ defaultValue: 50 }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUserNotificationHistory(
-          db,
-          args.userId,
-          args.limit ?? undefined,
-        );
-      });
+    resolve: async (_parent, args, context) => {
+      return await getUserNotificationHistory(
+        context.db,
+        args.userId,
+        args.limit ?? undefined,
+      );
     },
   }),
 );
@@ -206,10 +200,8 @@ builder.queryField('getUnreadNotificationCount', (t) =>
     args: {
       userId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUnreadNotificationCount(db, args.userId);
-      });
+    resolve: async (_parent, args, context) => {
+      return await getUnreadNotificationCount(context.db, args.userId);
     },
   }),
 );
@@ -220,10 +212,8 @@ builder.queryField('getUserDeviceTokens', (t) =>
     args: {
       userId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await getUserDeviceTokens(db, args.userId);
-      });
+    resolve: async (_parent, args, context) => {
+      return await getUserDeviceTokens(context.db, args.userId);
     },
   }),
 );
@@ -236,21 +226,22 @@ builder.mutationField('updateNotificationPreferences', (t) =>
       userId: t.arg.int({ required: true }),
       input: t.arg({ type: NotificationPreferenceInput, required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const input: NotificationPreferenceInputType = {
-          matchupStartedEnabled: args.input.matchupStartedEnabled ?? undefined,
-          matchupEndedEnabled: args.input.matchupEndedEnabled ?? undefined,
-          matchupCloseGameEnabled:
-            args.input.matchupCloseGameEnabled ?? undefined,
-          matchupReminderEnabled:
-            args.input.matchupReminderEnabled ?? undefined,
-          pushEnabled: args.input.pushEnabled ?? undefined,
-          emailEnabled: args.input.emailEnabled ?? undefined,
-          closeGameThreshold: args.input.closeGameThreshold ?? undefined,
-        };
-        return await updateNotificationPreferences(db, args.userId, input);
-      });
+    resolve: async (_parent, args, context) => {
+      const input: NotificationPreferenceInputType = {
+        matchupStartedEnabled: args.input.matchupStartedEnabled ?? undefined,
+        matchupEndedEnabled: args.input.matchupEndedEnabled ?? undefined,
+        matchupCloseGameEnabled:
+          args.input.matchupCloseGameEnabled ?? undefined,
+        matchupReminderEnabled: args.input.matchupReminderEnabled ?? undefined,
+        pushEnabled: args.input.pushEnabled ?? undefined,
+        emailEnabled: args.input.emailEnabled ?? undefined,
+        closeGameThreshold: args.input.closeGameThreshold ?? undefined,
+      };
+      return await updateNotificationPreferences(
+        context.db,
+        args.userId,
+        input,
+      );
     },
   }),
 );
@@ -261,16 +252,14 @@ builder.mutationField('registerDeviceToken', (t) =>
     args: {
       input: t.arg({ type: DeviceTokenInput, required: true }),
     },
-    resolve: async (_parent, args) => {
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const input: DeviceTokenInputType = {
-          userId: args.input.userId,
-          deviceToken: args.input.deviceToken,
-          platform: args.input.platform as 'ios' | 'android' | 'expo',
-          endpointArn: args.input.endpointArn ?? undefined,
-        };
-        return await registerDeviceToken(db, input);
-      });
+    resolve: async (_parent, args, context) => {
+      const input: DeviceTokenInputType = {
+        userId: args.input.userId,
+        deviceToken: args.input.deviceToken,
+        platform: args.input.platform as 'ios' | 'android' | 'expo',
+        endpointArn: args.input.endpointArn ?? undefined,
+      };
+      return await registerDeviceToken(context.db, input);
     },
   }),
 );
@@ -280,10 +269,8 @@ builder.mutationField('disableDeviceToken', (t) =>
     args: {
       deviceToken: t.arg.string({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      await runWithPublicClient(getDbOptions(), async (db) => {
-        await disableDeviceToken(db, args.deviceToken);
-      });
+    resolve: async (_parent, args, context) => {
+      await disableDeviceToken(context.db, args.deviceToken);
       return true;
     },
   }),
@@ -294,10 +281,8 @@ builder.mutationField('markNotificationAsRead', (t) =>
     args: {
       notificationId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      await runWithPublicClient(getDbOptions(), async (db) => {
-        await markNotificationAsRead(db, args.notificationId);
-      });
+    resolve: async (_parent, args, context) => {
+      await markNotificationAsRead(context.db, args.notificationId);
       return true;
     },
   }),
@@ -308,10 +293,8 @@ builder.mutationField('markAllNotificationsAsRead', (t) =>
     args: {
       userId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args) => {
-      await runWithPublicClient(getDbOptions(), async (db) => {
-        await markAllNotificationsAsRead(db, args.userId);
-      });
+    resolve: async (_parent, args, context) => {
+      await markAllNotificationsAsRead(context.db, args.userId);
       return true;
     },
   }),

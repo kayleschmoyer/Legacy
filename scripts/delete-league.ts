@@ -6,6 +6,18 @@ import * as dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+/**
+ * Delete League Script - Data Operations Only
+ *
+ * ⚠️ IMPORTANT: This script performs DATA operations (DELETE) only.
+ *
+ * For SCHEMA changes (ALTER TABLE, CREATE TABLE, etc.),
+ * see: docs/database/migration-policy.md
+ *
+ * All schema changes MUST be done through migrations in:
+ * lib/db-client/migrations/
+ */
+
 async function deleteLeague(leagueId: number) {
   const dbOptions = getDbOptions();
   const db = await getPublicDbConnection(dbOptions);

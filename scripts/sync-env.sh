@@ -56,6 +56,7 @@ AWS_REGION=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.va
 RDS_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.rds_proxy_endpoint.value')
 SQS_LOAD_SEASON_STATS_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_load_season_stats_url')
 SQS_AUTOMATIC_DRAFTS_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_automatic_drafts_url')
+SQS_SELECT_GAME_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_summary.value.sqs_select_game_url')
 # Legacy support
 SQS_QUEUE_URL=$SQS_LOAD_SEASON_STATS_URL
 OAUTH_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.oauth_proxy_endpoint.value')
@@ -129,6 +130,7 @@ RDS_PROXY_ENDPOINT=$RDS_PROXY_ENDPOINT
 # SQS Queue URLs
 SQS_LOAD_SEASON_STATS_URL=$SQS_LOAD_SEASON_STATS_URL
 SQS_AUTOMATIC_DRAFTS_URL=$SQS_AUTOMATIC_DRAFTS_URL
+SQS_SELECT_GAME_URL=$SQS_SELECT_GAME_URL
 # Legacy support
 SQS_QUEUE_URL=$SQS_QUEUE_URL
 EOF

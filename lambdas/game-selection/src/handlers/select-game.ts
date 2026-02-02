@@ -7,6 +7,8 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { PublicSchema } from '@legacy-sports/db-client';
+import { eq } from 'drizzle-orm';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
@@ -65,6 +67,23 @@ const baseSelectGameHandler = async (
         });
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
+
+        // Extract matchupId from the failed record to update status
+        try {
+          const matchup = JSON.parse(record.body) as SelectGameEvent;
+          await db
+            .update(PublicSchema.matchups)
+            .set({ statsLoadingStatus: 'failed' })
+            .where(eq(PublicSchema.matchups.id, matchup.matchupId));
+        } catch (updateErr) {
+          LOGGER.error('Failed to update matchup status to failed', {
+            error:
+              updateErr instanceof Error
+                ? updateErr.message
+                : String(updateErr),
+          });
+        }
+
         LOGGER.error('Error processing record', {
           error: err instanceof Error ? err.message : String(err),
           stack: err instanceof Error ? err.stack : undefined,

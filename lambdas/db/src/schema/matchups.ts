@@ -1,6 +1,7 @@
-import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
-import { and, eq, sql } from 'drizzle-orm';
+import { PublicSchema } from '@legacy-sports/db-client';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
 import { Team } from './leagues';
 import {
@@ -17,6 +18,11 @@ const MatchupStatus = builder.enumType('MatchupStatus', {
   values: ['scheduled', 'in_progress', 'completed', 'cancelled'] as const,
 });
 
+// Stats loading status enum
+const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
+  values: ['not_started', 'queued', 'loading', 'completed', 'failed'] as const,
+});
+
 // Extended Matchup type with all new fields
 const Matchup = builder.objectRef<{
   id: number;
@@ -27,7 +33,12 @@ const Matchup = builder.objectRef<{
   team1Score: string | null; // Decimal stored as string
   team2Score: string | null; // Decimal stored as string
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  selectedSeason: number | null;
+  statsLoadingStatus:
+    | 'not_started'
+    | 'queued'
+    | 'loading'
+    | 'completed'
+    | 'failed';
   gamesPerMatchup: number | null;
   startTime: string | null;
   endTime: string | null;
@@ -55,7 +66,10 @@ builder.objectType(Matchup, {
       type: MatchupStatus,
       resolve: (matchup) => matchup.status,
     }),
-    selectedSeason: t.exposeInt('selectedSeason', { nullable: true }),
+    statsLoadingStatus: t.field({
+      type: StatsLoadingStatus,
+      resolve: (matchup) => matchup.statsLoadingStatus,
+    }),
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
@@ -63,39 +77,56 @@ builder.objectType(Matchup, {
     team1: t.field({
       type: Team,
       nullable: true,
-      resolve: async (matchup) => {
+      resolve: async (matchup, _args, context) => {
         if (!matchup.team1Id) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.team1Id ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, matchup.team1Id ?? 0))
+          .limit(1);
+        return results[0] || null;
       },
     }),
     team2: t.field({
       type: Team,
       nullable: true,
-      resolve: async (matchup) => {
+      resolve: async (matchup, _args, context) => {
         if (!matchup.team2Id) return null;
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, matchup.team2Id ?? 0))
-            .limit(1);
-          return results[0] || null;
-        });
+        const results = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, matchup.team2Id ?? 0))
+          .limit(1);
+        return results[0] || null;
+      },
+    }),
+    selectedGamesCount: t.int({
+      description: 'Number of unique games selected for this matchup',
+      resolve: async (matchup, _args, context) => {
+        // Count distinct game_num values for this matchup
+        const result = await context.db
+          .select({
+            count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+          })
+          .from(PublicSchema.matchupPlayerGames)
+          .innerJoin(
+            PublicSchema.matchupPlayers,
+            eq(
+              PublicSchema.matchupPlayerGames.matchupPlayerId,
+              PublicSchema.matchupPlayers.id,
+            ),
+          )
+          .where(eq(PublicSchema.matchupPlayers.matchupId, matchup.id));
+
+        return result[0]?.count ?? 0;
       },
     }),
   }),
@@ -114,15 +145,13 @@ builder.queryField('getMatchupById', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(eq(PublicSchema.matchups.id, args.id))
-          .limit(1);
+      const results = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, args.id))
+        .limit(1);
 
-        return results[0] || null;
-      });
+      return results[0] || null;
     },
   }),
 );
@@ -140,20 +169,16 @@ builder.queryField('getMatchupsForLeague', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const conditions = [eq(PublicSchema.matchups.leagueId, args.leagueId)];
+      const conditions = [eq(PublicSchema.matchups.leagueId, args.leagueId)];
 
-        if (args.weekNumber !== null && args.weekNumber !== undefined) {
-          conditions.push(
-            eq(PublicSchema.matchups.weekNumber, args.weekNumber),
-          );
-        }
+      if (args.weekNumber !== null && args.weekNumber !== undefined) {
+        conditions.push(eq(PublicSchema.matchups.weekNumber, args.weekNumber));
+      }
 
-        return await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(and(...conditions));
-      });
+      return await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(and(...conditions));
     },
   }),
 );
@@ -171,26 +196,24 @@ builder.queryField('getCurrentMatchupForLeague', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get the current matchup ID from the league
-        const leagueResults = await db
-          .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, args.leagueId))
-          .limit(1);
+      // Get the current matchup ID from the league
+      const leagueResults = await context.db
+        .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
 
-        if (!leagueResults[0]?.currentMatchup) {
-          return null;
-        }
+      if (!leagueResults[0]?.currentMatchup) {
+        return null;
+      }
 
-        const matchupResults = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(eq(PublicSchema.matchups.id, leagueResults[0].currentMatchup))
-          .limit(1);
+      const matchupResults = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, leagueResults[0].currentMatchup))
+        .limit(1);
 
-        return matchupResults[0] || null;
-      });
+      return matchupResults[0] || null;
     },
   }),
 );
@@ -208,17 +231,15 @@ builder.queryField('getMatchupsByWeek', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        return await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(
-            and(
-              eq(PublicSchema.matchups.leagueId, args.leagueId),
-              eq(PublicSchema.matchups.weekNumber, args.weekNumber),
-            ),
-          );
-      });
+      return await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.weekNumber, args.weekNumber),
+          ),
+        );
     },
   }),
 );
@@ -230,7 +251,6 @@ const CreateMatchupInput = builder.inputType('CreateMatchupInput', {
     weekNumber: t.int({ required: true }),
     team1Id: t.int({ required: false }),
     team2Id: t.int({ required: false }),
-    selectedSeason: t.int({ required: false }),
     gamesPerMatchup: t.int({ required: false }),
     startTime: t.string({ required: false }),
     endTime: t.string({ required: false }),
@@ -249,42 +269,39 @@ builder.mutationField('createMatchup', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get league configuration for defaults
-        const league = await db
-          .select({
-            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-            minGamesPerSeason: PublicSchema.leagues.minGamesPerSeason,
-          })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, args.input.leagueId))
-          .limit(1);
+      // Get league configuration for defaults
+      const league = await context.db
+        .select({
+          gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+          minGamesPerSeason: PublicSchema.leagues.minGamesPerSeason,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.input.leagueId))
+        .limit(1);
 
-        if (!league[0]) {
-          throw new Error('League not found');
-        }
+      if (!league[0]) {
+        throw new Error('League not found');
+      }
 
-        const gamesPerMatchup =
-          args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
+      const gamesPerMatchup =
+        args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
 
-        // Insert the matchup
-        const results = await db
-          .insert(PublicSchema.matchups)
-          .values({
-            leagueId: args.input.leagueId,
-            weekNumber: args.input.weekNumber,
-            team1Id: args.input.team1Id ?? null,
-            team2Id: args.input.team2Id ?? null,
-            selectedSeason: args.input.selectedSeason ?? null,
-            gamesPerMatchup,
-            startTime: args.input.startTime ?? null,
-            endTime: args.input.endTime ?? null,
-            status: 'scheduled',
-          })
-          .returning();
+      // Insert the matchup
+      const results = await context.db
+        .insert(PublicSchema.matchups)
+        .values({
+          leagueId: args.input.leagueId,
+          weekNumber: args.input.weekNumber,
+          team1Id: args.input.team1Id ?? null,
+          team2Id: args.input.team2Id ?? null,
+          gamesPerMatchup,
+          startTime: args.input.startTime ?? null,
+          endTime: args.input.endTime ?? null,
+          status: 'scheduled',
+        })
+        .returning();
 
-        return results[0];
-      });
+      return results[0];
     },
   }),
 );
@@ -303,28 +320,26 @@ builder.mutationField('updateMatchupScore', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const updateData: { team1Score?: string; team2Score?: string } = {};
+      const updateData: { team1Score?: string; team2Score?: string } = {};
 
-        if (args.team1Score !== null && args.team1Score !== undefined) {
-          updateData.team1Score = args.team1Score.toString();
-        }
-        if (args.team2Score !== null && args.team2Score !== undefined) {
-          updateData.team2Score = args.team2Score.toString();
-        }
+      if (args.team1Score !== null && args.team1Score !== undefined) {
+        updateData.team1Score = args.team1Score.toString();
+      }
+      if (args.team2Score !== null && args.team2Score !== undefined) {
+        updateData.team2Score = args.team2Score.toString();
+      }
 
-        const results = await db
-          .update(PublicSchema.matchups)
-          .set(updateData)
-          .where(eq(PublicSchema.matchups.id, args.matchupId))
-          .returning();
+      const results = await context.db
+        .update(PublicSchema.matchups)
+        .set(updateData)
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .returning();
 
-        if (!results[0]) {
-          throw new Error('Matchup not found');
-        }
+      if (!results[0]) {
+        throw new Error('Matchup not found');
+      }
 
-        return results[0];
-      });
+      return results[0];
     },
   }),
 );
@@ -342,24 +357,22 @@ builder.mutationField('updateMatchupStatus', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const results = await db
-          .update(PublicSchema.matchups)
-          .set({ status: args.status })
-          .where(eq(PublicSchema.matchups.id, args.matchupId))
-          .returning();
+      const results = await context.db
+        .update(PublicSchema.matchups)
+        .set({ status: args.status })
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .returning();
 
-        if (!results[0]) {
-          throw new Error('Matchup not found');
-        }
+      if (!results[0]) {
+        throw new Error('Matchup not found');
+      }
 
-        return results[0];
-      });
+      return results[0];
     },
   }),
 );
 
-// Mutation: triggerGameSelection (placeholder for commissioner action)
+// Mutation: triggerGameSelection - triggers the game-selection lambda via SQS
 builder.mutationField('triggerGameSelection', (t) =>
   t.field({
     type: 'Boolean',
@@ -372,22 +385,63 @@ builder.mutationField('triggerGameSelection', (t) =>
         throw new Error('Authentication required');
       }
 
-      // This is a placeholder - actual game selection logic will be implemented in later stories
-      // For now, just validate the matchup exists
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        const matchup = await db
-          .select()
-          .from(PublicSchema.matchups)
-          .where(eq(PublicSchema.matchups.id, args.matchupId))
-          .limit(1);
+      // Validate the matchup exists
+      const matchup = await context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .limit(1);
 
-        if (!matchup[0]) {
-          throw new Error('Matchup not found');
-        }
+      if (!matchup[0]) {
+        throw new Error('Matchup not found');
+      }
 
-        // TODO: Implement actual game selection logic in LS-20
-        return true;
+      // Update status to 'queued' before triggering game selection
+      await context.db
+        .update(PublicSchema.matchups)
+        .set({ statsLoadingStatus: 'queued' })
+        .where(eq(PublicSchema.matchups.id, args.matchupId));
+
+      // Trigger the game-selection lambda via SQS
+      const sqsQueueUrl = process.env.SQS_SELECT_GAME_URL;
+      if (!sqsQueueUrl) {
+        LOGGER.error('SQS_SELECT_GAME_URL not configured');
+        throw new Error('Game selection service not configured');
+      }
+
+      const sqsClient = new SQSClient({
+        region: process.env.AWS_REGION || 'us-east-1',
       });
+
+      try {
+        const message = {
+          matchupId: args.matchupId,
+          game: args.gameNumber,
+        };
+
+        const command = new SendMessageCommand({
+          QueueUrl: sqsQueueUrl,
+          MessageBody: JSON.stringify(message),
+          MessageGroupId: `matchup-${args.matchupId}`,
+          MessageDeduplicationId: `${args.matchupId}-${args.gameNumber}-${Date.now()}`,
+        });
+
+        await sqsClient.send(command);
+
+        LOGGER.info('Game selection triggered', {
+          matchupId: args.matchupId,
+          gameNumber: args.gameNumber,
+        });
+
+        return true;
+      } catch (error) {
+        LOGGER.error('Failed to trigger game selection', {
+          error: error instanceof Error ? error.message : String(error),
+          matchupId: args.matchupId,
+          gameNumber: args.gameNumber,
+        });
+        throw new Error('Failed to trigger game selection');
+      }
     },
   }),
 );
@@ -568,7 +622,7 @@ builder.queryField('getLeagueStandings', (t) =>
       const { StandingsService } =
         await import('../services/standings-service');
 
-      const standings = await StandingsService.getStandings({
+      const standings = await StandingsService.getStandings(context.db, {
         leagueId: args.leagueId,
         season: args.season,
       });
@@ -596,7 +650,7 @@ builder.queryField('getHeadToHeadRecord', (t) =>
       const { StandingsService } =
         await import('../services/standings-service');
 
-      return await StandingsService.getHeadToHead({
+      return await StandingsService.getHeadToHead(context.db, {
         leagueId: args.leagueId,
         team1Id: args.team1Id,
         team2Id: args.team2Id,
@@ -622,6 +676,7 @@ builder.queryField('getSeasonResults', (t) =>
         await import('../services/standings-service');
 
       const results = await StandingsService.getSeasonSummary(
+        context.db,
         args.leagueId,
         args.season ?? null,
       );
@@ -649,7 +704,7 @@ builder.queryField('getPlayoffRace', (t) =>
       const { StandingsService } =
         await import('../services/standings-service');
 
-      const qualifications = await StandingsService.getPlayoffRace({
+      const qualifications = await StandingsService.getPlayoffRace(context.db, {
         leagueId: args.leagueId,
         season: args.season ?? null,
         playoffSpots: args.playoffSpots,
@@ -680,7 +735,7 @@ builder.queryField('getMatchupHistory', (t) =>
       const { StandingsService } =
         await import('../services/standings-service');
 
-      return await StandingsService.getMatchupHistory({
+      return await StandingsService.getMatchupHistory(context.db, {
         leagueId: args.leagueId,
         season: args.season,
         teamId: args.teamId ?? undefined,
@@ -708,6 +763,7 @@ builder.queryField('getTeamRecentMatchups', (t) =>
         await import('../services/standings-service');
 
       return await StandingsService.getTeamRecentMatchups(
+        context.db,
         args.teamId,
         args.limit ?? 10,
       );
@@ -732,6 +788,7 @@ builder.queryField('getMatchupStatusCounts', (t) =>
         await import('../services/standings-service');
 
       return await StandingsService.getMatchupStats(
+        context.db,
         args.leagueId,
         args.season ?? undefined,
       );
@@ -756,6 +813,7 @@ builder.queryField('getPowerRankings', (t) =>
         await import('../services/standings-service');
 
       const powerRankings = await StandingsService.getPowerRankings(
+        context.db,
         args.leagueId,
         args.season ?? undefined,
       );
@@ -792,123 +850,98 @@ builder.objectType(MatchupPlayer, {
     player: t.field({
       type: 'Player',
       nullable: true,
-      resolve: async (matchupPlayer) => {
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select({
-              id: PublicSchema.players.id,
-              firstName: PublicSchema.players.firstName,
-              lastName: PublicSchema.players.lastName,
-              brefId: PublicSchema.players.brefId,
-              statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
-            })
-            .from(PublicSchema.players)
-            .where(eq(PublicSchema.players.id, matchupPlayer.playerId))
-            .limit(1);
+      resolve: async (matchupPlayer, _args, context) => {
+        const results = await context.db
+          .select({
+            id: PublicSchema.players.id,
+            firstName: PublicSchema.players.firstName,
+            lastName: PublicSchema.players.lastName,
+            brefId: PublicSchema.players.brefId,
+            statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
+          })
+          .from(PublicSchema.players)
+          .where(eq(PublicSchema.players.id, matchupPlayer.playerId))
+          .limit(1);
 
-          return results[0] || null;
-        });
+        return results[0] || null;
       },
     }),
     // Season stats
     seasonBatting: t.field({
       type: SeasonBattingRef,
       nullable: true,
-      resolve: async (matchupPlayer) => {
+      resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
 
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select()
-            .from(PublicSchema.seasonBatting)
-            .where(
-              and(
-                eq(PublicSchema.seasonBatting.playerId, matchupPlayer.playerId),
-                eq(
-                  PublicSchema.seasonBatting.season,
-                  matchupPlayer.season ?? 0,
-                ),
-              ),
-            )
-            .limit(1);
+        const results = await context.db
+          .select()
+          .from(PublicSchema.seasonBatting)
+          .where(
+            and(
+              eq(PublicSchema.seasonBatting.playerId, matchupPlayer.playerId),
+              eq(PublicSchema.seasonBatting.season, matchupPlayer.season ?? 0),
+            ),
+          )
+          .limit(1);
 
-          return results[0] || null;
-        });
+        return results[0] || null;
       },
     }),
     seasonPitching: t.field({
       type: SeasonPitchingRef,
       nullable: true,
-      resolve: async (matchupPlayer) => {
+      resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
 
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select()
-            .from(PublicSchema.seasonPitching)
-            .where(
-              and(
-                eq(
-                  PublicSchema.seasonPitching.playerId,
-                  matchupPlayer.playerId,
-                ),
-                eq(
-                  PublicSchema.seasonPitching.season,
-                  matchupPlayer.season ?? 0,
-                ),
-              ),
-            )
-            .limit(1);
+        const results = await context.db
+          .select()
+          .from(PublicSchema.seasonPitching)
+          .where(
+            and(
+              eq(PublicSchema.seasonPitching.playerId, matchupPlayer.playerId),
+              eq(PublicSchema.seasonPitching.season, matchupPlayer.season ?? 0),
+            ),
+          )
+          .limit(1);
 
-          return results[0] || null;
-        });
+        return results[0] || null;
       },
     }),
     seasonFielding: t.field({
       type: SeasonFieldingRef,
       nullable: true,
-      resolve: async (matchupPlayer) => {
+      resolve: async (matchupPlayer, _args, context) => {
         if (!matchupPlayer.season) return null;
 
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select()
-            .from(PublicSchema.seasonFielding)
-            .where(
-              and(
-                eq(
-                  PublicSchema.seasonFielding.playerId,
-                  matchupPlayer.playerId,
-                ),
-                eq(
-                  PublicSchema.seasonFielding.season,
-                  matchupPlayer.season ?? 0,
-                ),
-              ),
-            );
+        const results = await context.db
+          .select()
+          .from(PublicSchema.seasonFielding)
+          .where(
+            and(
+              eq(PublicSchema.seasonFielding.playerId, matchupPlayer.playerId),
+              eq(PublicSchema.seasonFielding.season, matchupPlayer.season ?? 0),
+            ),
+          );
 
-          return results[0] || null;
-        });
+        return results[0] || null;
       },
     }),
 
     // Games selected for this matchup player
     games: t.field({
       type: [MatchupPlayerGameRef],
-      resolve: async (matchupPlayer) => {
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const results = await db
-            .select()
-            .from(PublicSchema.matchupPlayerGames)
-            .where(
-              eq(
-                PublicSchema.matchupPlayerGames.matchupPlayerId,
-                matchupPlayer.id,
-              ),
-            );
+      resolve: async (matchupPlayer, _args, context) => {
+        const results = await context.db
+          .select()
+          .from(PublicSchema.matchupPlayerGames)
+          .where(
+            eq(
+              PublicSchema.matchupPlayerGames.matchupPlayerId,
+              matchupPlayer.id,
+            ),
+          );
 
-          return results;
-        });
+        return results;
       },
     }),
   }),
@@ -939,288 +972,252 @@ MatchupPlayerGameRef.implement({
     battingGame: t.field({
       type: GameBattingRef,
       nullable: true,
-      resolve: async (game) => {
+      resolve: async (game, _args, context) => {
         if (!game.battingGameNum) return null;
 
         // Get the matchup player info
-        const matchupPlayerInfo = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            const mpResult = await db
-              .select({
-                playerId: PublicSchema.matchupPlayers.playerId,
-                matchupId: PublicSchema.matchupPlayers.matchupId,
-              })
-              .from(PublicSchema.matchupPlayers)
-              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
-              .limit(1);
+        const mpResult = await context.db
+          .select({
+            playerId: PublicSchema.matchupPlayers.playerId,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+          })
+          .from(PublicSchema.matchupPlayers)
+          .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+          .limit(1);
 
-            if (!mpResult[0]) return null;
+        if (!mpResult[0]) return null;
 
-            // Get matchup to find league and week
-            const matchupResult = await db
-              .select({
-                leagueId: PublicSchema.matchups.leagueId,
-                weekNumber: PublicSchema.matchups.weekNumber,
-              })
-              .from(PublicSchema.matchups)
-              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
-              .limit(1);
+        // Get matchup to find league and week
+        const matchupResult = await context.db
+          .select({
+            leagueId: PublicSchema.matchups.leagueId,
+            weekNumber: PublicSchema.matchups.weekNumber,
+          })
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+          .limit(1);
 
-            if (!matchupResult[0]) return null;
+        if (!matchupResult[0]) return null;
 
-            // Get season from league_week_player_seasons
-            const seasonResult = await db
-              .select({
-                season: PublicSchema.leagueWeekPlayerSeasons.season,
-              })
-              .from(PublicSchema.leagueWeekPlayerSeasons)
-              .where(
-                and(
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
-                    matchupResult[0].leagueId,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-                    matchupResult[0].weekNumber,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.playerId,
-                    mpResult[0].playerId,
-                  ),
-                ),
-              )
-              .limit(1);
-
-            if (!seasonResult[0]) return null;
-
-            return {
-              playerId: mpResult[0].playerId,
-              season: seasonResult[0].season,
-            };
-          },
-        );
-
-        if (!matchupPlayerInfo) return null;
-
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const result = await db
-            .select()
-            .from(PublicSchema.gameBatting)
-            .where(
-              and(
-                eq(
-                  PublicSchema.gameBatting.playerId,
-                  matchupPlayerInfo.playerId,
-                ),
-                eq(PublicSchema.gameBatting.season, matchupPlayerInfo.season),
-                eq(PublicSchema.gameBatting.gameNum, game.battingGameNum ?? 0),
+        // Get season from league_week_player_seasons
+        const seasonResult = await context.db
+          .select({
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            and(
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                matchupResult[0].leagueId,
               ),
-            )
-            .limit(1);
-          return result[0] || null;
-        });
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                matchupResult[0].weekNumber,
+              ),
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.playerId,
+                mpResult[0].playerId,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (!seasonResult[0]) return null;
+
+        const matchupPlayerInfo = {
+          playerId: mpResult[0].playerId,
+          season: seasonResult[0].season,
+        };
+
+        const result = await context.db
+          .select()
+          .from(PublicSchema.gameBatting)
+          .where(
+            and(
+              eq(PublicSchema.gameBatting.playerId, matchupPlayerInfo.playerId),
+              eq(PublicSchema.gameBatting.season, matchupPlayerInfo.season),
+              eq(PublicSchema.gameBatting.gameNum, game.battingGameNum ?? 0),
+            ),
+          )
+          .limit(1);
+        return result[0] || null;
       },
     }),
 
     pitchingGame: t.field({
       type: GamePitchingRef,
       nullable: true,
-      resolve: async (game) => {
+      resolve: async (game, _args, context) => {
         if (!game.pitchingGameNum) return null;
 
         // Get the matchup player info
-        const matchupPlayerInfo = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            const mpResult = await db
-              .select({
-                playerId: PublicSchema.matchupPlayers.playerId,
-                matchupId: PublicSchema.matchupPlayers.matchupId,
-              })
-              .from(PublicSchema.matchupPlayers)
-              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
-              .limit(1);
+        const mpResult = await context.db
+          .select({
+            playerId: PublicSchema.matchupPlayers.playerId,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+          })
+          .from(PublicSchema.matchupPlayers)
+          .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+          .limit(1);
 
-            if (!mpResult[0]) return null;
+        if (!mpResult[0]) return null;
 
-            // Get matchup to find league and week
-            const matchupResult = await db
-              .select({
-                leagueId: PublicSchema.matchups.leagueId,
-                weekNumber: PublicSchema.matchups.weekNumber,
-              })
-              .from(PublicSchema.matchups)
-              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
-              .limit(1);
+        // Get matchup to find league and week
+        const matchupResult = await context.db
+          .select({
+            leagueId: PublicSchema.matchups.leagueId,
+            weekNumber: PublicSchema.matchups.weekNumber,
+          })
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+          .limit(1);
 
-            if (!matchupResult[0]) return null;
+        if (!matchupResult[0]) return null;
 
-            // Get season from league_week_player_seasons
-            const seasonResult = await db
-              .select({
-                season: PublicSchema.leagueWeekPlayerSeasons.season,
-              })
-              .from(PublicSchema.leagueWeekPlayerSeasons)
-              .where(
-                and(
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
-                    matchupResult[0].leagueId,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-                    matchupResult[0].weekNumber,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.playerId,
-                    mpResult[0].playerId,
-                  ),
-                ),
-              )
-              .limit(1);
-
-            if (!seasonResult[0]) return null;
-
-            return {
-              playerId: mpResult[0].playerId,
-              season: seasonResult[0].season,
-            };
-          },
-        );
-
-        if (!matchupPlayerInfo) return null;
-
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const result = await db
-            .select()
-            .from(PublicSchema.gamePitching)
-            .where(
-              and(
-                eq(
-                  PublicSchema.gamePitching.playerId,
-                  matchupPlayerInfo.playerId,
-                ),
-                eq(PublicSchema.gamePitching.season, matchupPlayerInfo.season),
-                eq(
-                  PublicSchema.gamePitching.gameNum,
-                  game.pitchingGameNum ?? 0,
-                ),
+        // Get season from league_week_player_seasons
+        const seasonResult = await context.db
+          .select({
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            and(
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                matchupResult[0].leagueId,
               ),
-            )
-            .limit(1);
-          return result[0] || null;
-        });
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                matchupResult[0].weekNumber,
+              ),
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.playerId,
+                mpResult[0].playerId,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (!seasonResult[0]) return null;
+
+        const matchupPlayerInfo = {
+          playerId: mpResult[0].playerId,
+          season: seasonResult[0].season,
+        };
+
+        const result = await context.db
+          .select()
+          .from(PublicSchema.gamePitching)
+          .where(
+            and(
+              eq(
+                PublicSchema.gamePitching.playerId,
+                matchupPlayerInfo.playerId,
+              ),
+              eq(PublicSchema.gamePitching.season, matchupPlayerInfo.season),
+              eq(PublicSchema.gamePitching.gameNum, game.pitchingGameNum ?? 0),
+            ),
+          )
+          .limit(1);
+        return result[0] || null;
       },
     }),
 
     fieldingGame: t.field({
       type: GameFieldingRef,
       nullable: true,
-      resolve: async (game) => {
+      resolve: async (game, _args, context) => {
         if (!game.fieldingGameNum) return null;
 
         // Get the matchup player info
-        const matchupPlayerInfo = await runWithPublicClient(
-          getDbOptions(),
-          async (db) => {
-            const mpResult = await db
-              .select({
-                playerId: PublicSchema.matchupPlayers.playerId,
-                matchupId: PublicSchema.matchupPlayers.matchupId,
-              })
-              .from(PublicSchema.matchupPlayers)
-              .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
-              .limit(1);
+        const mpResult = await context.db
+          .select({
+            playerId: PublicSchema.matchupPlayers.playerId,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+          })
+          .from(PublicSchema.matchupPlayers)
+          .where(eq(PublicSchema.matchupPlayers.id, game.matchupPlayerId))
+          .limit(1);
 
-            if (!mpResult[0]) return null;
+        if (!mpResult[0]) return null;
 
-            // Get matchup to find league and week
-            const matchupResult = await db
-              .select({
-                leagueId: PublicSchema.matchups.leagueId,
-                weekNumber: PublicSchema.matchups.weekNumber,
-              })
-              .from(PublicSchema.matchups)
-              .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
-              .limit(1);
+        // Get matchup to find league and week
+        const matchupResult = await context.db
+          .select({
+            leagueId: PublicSchema.matchups.leagueId,
+            weekNumber: PublicSchema.matchups.weekNumber,
+          })
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.id, mpResult[0].matchupId))
+          .limit(1);
 
-            if (!matchupResult[0]) return null;
+        if (!matchupResult[0]) return null;
 
-            // Get season from league_week_player_seasons
-            const seasonResult = await db
-              .select({
-                season: PublicSchema.leagueWeekPlayerSeasons.season,
-              })
-              .from(PublicSchema.leagueWeekPlayerSeasons)
-              .where(
-                and(
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.leagueId,
-                    matchupResult[0].leagueId,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-                    matchupResult[0].weekNumber,
-                  ),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.playerId,
-                    mpResult[0].playerId,
-                  ),
-                ),
-              )
-              .limit(1);
-
-            if (!seasonResult[0]) return null;
-
-            return {
-              playerId: mpResult[0].playerId,
-              season: seasonResult[0].season,
-            };
-          },
-        );
-
-        if (!matchupPlayerInfo) return null;
-
-        return await runWithPublicClient(getDbOptions(), async (db) => {
-          const result = await db
-            .select({
-              playerId: PublicSchema.gameFielding.playerId,
-              season: PublicSchema.gameFielding.season,
-              gameNum: PublicSchema.gameFielding.gameNum,
-              gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
-              // Map database column names to expected GraphQL type properties
-              pos: sql<string>`${game.fieldingGamePos}`.as('pos'), // Use the position from game object
-              g: sql<number | null>`NULL`.as('g'), // Not available in game_fielding
-              gs: sql<number | null>`NULL`.as('gs'), // Not available in game_fielding
-              inn: PublicSchema.gameFielding.innDef, // Map innDef → inn
-              po: PublicSchema.gameFielding.po,
-              a: PublicSchema.gameFielding.a,
-              e: PublicSchema.gameFielding.eDef, // Map eDef → e
-              dp: PublicSchema.gameFielding.dpDef, // Map dpDef → dp
-              pb: sql<number | null>`NULL`.as('pb'), // Not available in game_fielding
-              sb: sql<number | null>`NULL`.as('sb'), // Not available in game_fielding
-              cs: sql<number | null>`NULL`.as('cs'), // Not available in game_fielding
-            })
-            .from(PublicSchema.gameFielding)
-            .where(
-              and(
-                eq(
-                  PublicSchema.gameFielding.playerId,
-                  matchupPlayerInfo.playerId,
-                ),
-                eq(PublicSchema.gameFielding.season, matchupPlayerInfo.season),
-                eq(
-                  PublicSchema.gameFielding.gameNum,
-                  game.fieldingGameNum ?? 0,
-                ),
-                // Note: pos column doesn't exist in game_fielding table, removed filter
+        // Get season from league_week_player_seasons
+        const seasonResult = await context.db
+          .select({
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            and(
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                matchupResult[0].leagueId,
               ),
-            )
-            .limit(1);
-          return result[0] || null;
-        });
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                matchupResult[0].weekNumber,
+              ),
+              eq(
+                PublicSchema.leagueWeekPlayerSeasons.playerId,
+                mpResult[0].playerId,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (!seasonResult[0]) return null;
+
+        const matchupPlayerInfo = {
+          playerId: mpResult[0].playerId,
+          season: seasonResult[0].season,
+        };
+
+        const result = await context.db
+          .select({
+            playerId: PublicSchema.gameFielding.playerId,
+            season: PublicSchema.gameFielding.season,
+            gameNum: PublicSchema.gameFielding.gameNum,
+            gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
+            // Map database column names to expected GraphQL type properties
+            pos: sql<string>`${game.fieldingGamePos}`.as('pos'), // Use the position from game object
+            g: sql<number | null>`NULL`.as('g'), // Not available in game_fielding
+            gs: sql<number | null>`NULL`.as('gs'), // Not available in game_fielding
+            inn: PublicSchema.gameFielding.innDef, // Map innDef → inn
+            po: PublicSchema.gameFielding.po,
+            a: PublicSchema.gameFielding.a,
+            e: PublicSchema.gameFielding.eDef, // Map eDef → e
+            dp: PublicSchema.gameFielding.dpDef, // Map dpDef → dp
+            pb: sql<number | null>`NULL`.as('pb'), // Not available in game_fielding
+            sb: sql<number | null>`NULL`.as('sb'), // Not available in game_fielding
+            cs: sql<number | null>`NULL`.as('cs'), // Not available in game_fielding
+          })
+          .from(PublicSchema.gameFielding)
+          .where(
+            and(
+              eq(
+                PublicSchema.gameFielding.playerId,
+                matchupPlayerInfo.playerId,
+              ),
+              eq(PublicSchema.gameFielding.season, matchupPlayerInfo.season),
+              eq(PublicSchema.gameFielding.gameNum, game.fieldingGameNum ?? 0),
+              // Note: pos column doesn't exist in game_fielding table, removed filter
+            ),
+          )
+          .limit(1);
+        return result[0] || null;
       },
     }),
   }),
@@ -1238,84 +1235,82 @@ builder.queryField('getMatchupPlayers', (t) =>
         throw new Error('Authentication required');
       }
 
-      return await runWithPublicClient(getDbOptions(), async (db) => {
-        // Get matchup players with their selected seasons from league_week_player_seasons
-        const matchupResults = await db
-          .select({
-            matchupId: PublicSchema.matchups.id,
-            leagueId: PublicSchema.matchups.leagueId,
-            weekNumber: PublicSchema.matchups.weekNumber,
-          })
-          .from(PublicSchema.matchups)
-          .where(eq(PublicSchema.matchups.id, args.matchupId))
-          .limit(1);
+      // Get matchup players with their selected seasons from league_week_player_seasons
+      const matchupResults = await context.db
+        .select({
+          matchupId: PublicSchema.matchups.id,
+          leagueId: PublicSchema.matchups.leagueId,
+          weekNumber: PublicSchema.matchups.weekNumber,
+        })
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .limit(1);
 
-        if (!matchupResults[0]) {
-          return [];
-        }
+      if (!matchupResults[0]) {
+        return [];
+      }
 
-        const { leagueId, weekNumber } = matchupResults[0];
+      const { leagueId, weekNumber } = matchupResults[0];
 
-        // Get matchup players
-        const playersResults = await db
-          .select({
-            id: PublicSchema.matchupPlayers.id,
-            matchupId: PublicSchema.matchupPlayers.matchupId,
-            playerId: PublicSchema.matchupPlayers.playerId,
-            teamId: PublicSchema.matchupPlayers.teamId,
-          })
-          .from(PublicSchema.matchupPlayers)
-          .where(eq(PublicSchema.matchupPlayers.matchupId, args.matchupId));
+      // Get matchup players
+      const playersResults = await context.db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(eq(PublicSchema.matchupPlayers.matchupId, args.matchupId));
 
-        // Get team members to find position assignments
-        const playerIds = playersResults.map((p) => p.playerId);
+      // Get team members to find position assignments
+      const playerIds = playersResults.map((p) => p.playerId);
 
-        if (playerIds.length === 0) {
-          return [];
-        }
+      if (playerIds.length === 0) {
+        return [];
+      }
 
-        const teamMembersResults = await db
-          .select({
-            playerId: PublicSchema.teamMembers.playerId,
-            positionId: PublicSchema.teamMembers.positionId,
-          })
-          .from(PublicSchema.teamMembers)
-          .where(
-            and(
-              eq(PublicSchema.teamMembers.leagueId, leagueId),
-              // Filter to only the players in this matchup
-            ),
-          );
-
-        const positionMap = new Map(
-          teamMembersResults.map((tm) => [tm.playerId, tm.positionId]),
+      const teamMembersResults = await context.db
+        .select({
+          playerId: PublicSchema.teamMembers.playerId,
+          positionId: PublicSchema.teamMembers.positionId,
+        })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+            inArray(PublicSchema.teamMembers.playerId, playerIds),
+          ),
         );
 
-        // Get selected seasons from league_week_player_seasons
-        const seasonsResults = await db
-          .select({
-            playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
-            season: PublicSchema.leagueWeekPlayerSeasons.season,
-          })
-          .from(PublicSchema.leagueWeekPlayerSeasons)
-          .where(
-            and(
-              eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
-              eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
-            ),
-          );
+      const positionMap = new Map(
+        teamMembersResults.map((tm) => [tm.playerId, tm.positionId]),
+      );
 
-        const seasonMap = new Map(
-          seasonsResults.map((s) => [s.playerId, s.season]),
+      // Get selected seasons from league_week_player_seasons
+      const seasonsResults = await context.db
+        .select({
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+            eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+          ),
         );
 
-        // Combine the data
-        return playersResults.map((player) => ({
-          ...player,
-          positionId: positionMap.get(player.playerId) ?? null,
-          season: seasonMap.get(player.playerId) ?? null,
-        }));
-      });
+      const seasonMap = new Map(
+        seasonsResults.map((s) => [s.playerId, s.season]),
+      );
+
+      // Combine the data
+      return playersResults.map((player) => ({
+        ...player,
+        positionId: positionMap.get(player.playerId) ?? null,
+        season: seasonMap.get(player.playerId) ?? null,
+      }));
     },
   }),
 );
