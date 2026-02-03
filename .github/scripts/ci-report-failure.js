@@ -157,16 +157,30 @@ module.exports = async ({ github, context, core }) => {
                   projectFailures[subsection] &&
                   projectFailures[subsection].length > 0
                 ) {
-                  const failedProjects = projectFailures[subsection];
-                  failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
-                  detailedFailureReason = failureReason;
+                  let failedProjects = projectFailures[subsection];
 
-                  // Update repro command to target specific projects
-                  const target =
-                    subsection === 'formatting' ? 'format:check' : subsection;
-                  reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+                  // Handle case where failedProjects might be a comma-separated string or an array
+                  if (typeof failedProjects === 'string') {
+                    failedProjects = failedProjects
+                      .split(',')
+                      .map((p) => p.trim())
+                      .filter((p) => p);
+                  }
 
-                  debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
+                  if (
+                    Array.isArray(failedProjects) &&
+                    failedProjects.length > 0
+                  ) {
+                    failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
+                    detailedFailureReason = failureReason;
+
+                    // Update repro command to target specific projects
+                    const target =
+                      subsection === 'formatting' ? 'format:check' : subsection;
+                    reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+
+                    debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
+                  }
                 }
               }
             }
@@ -228,7 +242,20 @@ module.exports = async ({ github, context, core }) => {
                 projectFailures[subsection] &&
                 projectFailures[subsection].length > 0
               ) {
-                projectInfo = ` (${projectFailures[subsection].length} project${projectFailures[subsection].length > 1 ? 's' : ''})`;
+                let failedProjects = projectFailures[subsection];
+                // Handle case where failedProjects might be a comma-separated string
+                if (typeof failedProjects === 'string') {
+                  failedProjects = failedProjects
+                    .split(',')
+                    .map((p) => p.trim())
+                    .filter((p) => p);
+                }
+                if (
+                  Array.isArray(failedProjects) &&
+                  failedProjects.length > 0
+                ) {
+                  projectInfo = ` (${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''})`;
+                }
               }
 
               stepStatusTable += `| &nbsp;&nbsp;&nbsp;> ${subName}${projectInfo} | ${subIcon} ${subResult} |\n`;
@@ -239,9 +266,19 @@ module.exports = async ({ github, context, core }) => {
                 projectFailures[subsection] &&
                 projectFailures[subsection].length > 0
               ) {
-                projectFailures[subsection].forEach((project) => {
-                  stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- \`${project}\` | FAIL failed |\n`;
-                });
+                let failedProjects = projectFailures[subsection];
+                // Handle case where failedProjects might be a comma-separated string
+                if (typeof failedProjects === 'string') {
+                  failedProjects = failedProjects
+                    .split(',')
+                    .map((p) => p.trim())
+                    .filter((p) => p);
+                }
+                if (Array.isArray(failedProjects)) {
+                  failedProjects.forEach((project) => {
+                    stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- \`${project}\` | FAIL failed |\n`;
+                  });
+                }
               }
             }
           },

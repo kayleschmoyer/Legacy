@@ -74,14 +74,17 @@ install: ## Install all dependencies (Node.js and Python)
 
 install-force: ## Force install dependencies (handles Windows file locks)
 	@$(call echo_blue,Force installing dependencies...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH)/scripts/force-clean-node-modules.ps1"
+else
 	@$(call echo_yellow,Stopping potential background processes...)
 	@$(KILL_NODE)
 	@$(KILL_ESBUILD)
-	@$(call echo_blue,Removing node_modules and package-lock...)
+	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
-	@$(RM_FILE) package-lock.json $(NULL_REDIRECT) || echo No package-lock to remove
+endif
 	@$(call echo_blue,Installing fresh dependencies...)
-	pnpm install
+	pnpm install --frozen-lockfile
 	@$(CHECK_POETRY)
 
 install-tools: ## Install additional development tools (npkill, rimraf)
@@ -103,28 +106,31 @@ setup-force: install-force ## Setup with force install for Windows file lock iss
 # Cleaning
 clean-safe: ## Safely clean build artifacts and cache
 	@$(call echo_blue,Cleaning workspace safely...)
-	pnpm exec nx reset
+	npx nx reset
 	@$(call echo_blue,Safe clean completed)
 
 clean: ## Clean all build artifacts and dependencies
 	@$(call echo_blue,Cleaning workspace...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
 	@$(call echo_blue,Clearing Nx cache...)
-	pnpm exec nx reset $(NULL_REDIRECT) || echo Nx reset skipped
+	npx nx reset $(NULL_REDIRECT) || echo Nx reset skipped
 	@$(call echo_blue,Stopping Nx daemon if running...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -Command "$$job = Start-Job { pnpm exec nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+	@powershell -Command "$$job = Start-Job { npx nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 else
-	@timeout 5 pnpm exec nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+	@timeout 5 npx nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 endif
 	@$(call echo_blue,Stopping workspace-affiliated processes...)
 	@$(KILL_WORKSPACE_PROCS)
 ifeq ($(DETECTED_OS),Windows)
 	@$(call echo_blue,Waiting for file handles to release...)
 	@powershell -Command "Start-Sleep -Seconds 3"
-endif
+	@$(call echo_blue,Removing node_modules (using Windows-safe method)...)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (Test-Path $$nmPath) { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP 'empty_$$(Get-Random)'; New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } } else { Write-Host 'No node_modules to remove' }"
+else
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
+endif
 	@$(call echo_blue,Removing Nx cache directory...)
 ifeq ($(DETECTED_OS),Windows)
 	@if exist .nx $(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
@@ -133,6 +139,18 @@ else
 endif
 	@$(call echo_yellow,Note: If file lock errors occur during install, use 'make install-force')
 	@$(call echo_green,Clean completed)
+
+force-clean: ## Force clean node_modules with Windows file lock handling
+	@$(call echo_blue,Force cleaning node_modules...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH)/scripts/force-clean-node-modules.ps1"
+else
+	@$(KILL_NODE)
+	@$(KILL_ESBUILD)
+	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
+	@$(RM_DIR) .nx $(NULL_REDIRECT) || echo No Nx cache to remove
+endif
+	@$(call echo_green,Force clean completed)
 
 clean-node: ## Clean Node.js dependencies
 	@$(call echo_blue,Cleaning Node.js dependencies...)
@@ -144,30 +162,30 @@ clean-python: ## Clean Python dependencies only
 
 clean-cache: ## Clear Nx cache
 	@$(call echo_blue,Clearing Nx cache...)
-	pnpm exec nx reset
+	npx nx reset
 
 reset: ## Reset Nx cache (alias for clean-cache)
 	@$(call echo_blue,Resetting Nx cache...)
-	pnpm exec nx reset
+	npx nx reset
 
 # Code Quality
 lint: ## Run linting on all projects
 	@$(call echo_blue,Running linters...)
-	pnpm exec nx run-many -t lint
+	npx nx run-many -t lint
 
 lint-fix: ## Run linting with auto-fix on all projects
 	@$(call echo_blue,Running linters with auto-fix...)
-	pnpm exec nx run-many -t lint --fix
+	npx nx run-many -t lint --fix
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
-	pnpm exec nx format:write
+	npx nx format:write
 
 fmt: format ## Alias for format command
 
 typecheck: ## Run TypeScript type checking
 	@$(call echo_blue,Running type checking...)
-	pnpm exec nx run-many -t typecheck
+	npx nx run-many -t typecheck
 
 validate: ## Validate package.json and workspace dependencies
 	@$(call echo_blue,Validating workspace...)
@@ -176,19 +194,19 @@ validate: ## Validate package.json and workspace dependencies
 # Testing
 test: ## Run tests on changed files
 	@$(call echo_blue,Running tests on changed files...)
-	pnpm exec nx affected -t test
+	npx nx affected -t test
 
 test-all: ## Run all tests
 	@$(call echo_blue,Running all tests...)
-	pnpm exec nx run-many -t test
+	npx nx run-many -t test
 
 test-watch: ## Run tests in watch mode
 	@$(call echo_blue,Running tests in watch mode...)
-	pnpm exec nx run-many -t test --watch
+	npx nx run-many -t test --watch
 
 test-e2e: ## Run end-to-end tests
 	@$(call echo_blue,Running e2e tests...)
-	pnpm exec nx run-many -t e2e
+	npx nx run-many -t e2e
 
 check-skipped-tests: ## Check for skipped tests and report them
 	@$(call echo_blue,Checking for skipped tests...)
@@ -209,27 +227,27 @@ endif
 # Building
 build: ## Build all affected projects
 	@$(call echo_blue,Building affected projects...)
-	pnpm exec nx affected -t build
+	npx nx affected -t build
 
 build-all: ## Build all projects
 	@$(call echo_blue,Building all projects...)
-	pnpm exec nx run-many -t build
+	npx nx run-many -t build
 
 build-web: ## Build web application
 	@$(call echo_blue,Building web application...)
-	pnpm exec nx build web
+	npx nx build web
 
 build-mobile: ## Build mobile application
 	@$(call echo_blue,Building mobile application...)
-	pnpm exec nx build app
+	npx nx build app
 
 build-lambdas: ## Build all lambda functions
 	@$(call echo_blue,Building lambda functions...)
-	pnpm exec nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
+	npx nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
 
 build-libs: ## Build all libraries
 	@$(call echo_blue,Building libraries...)
-	pnpm exec nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
+	npx nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
 
 # Development
 start: ## Start the dev server
@@ -242,11 +260,11 @@ dev: ## Start all development services
 
 dev-web: ## Start web development server
 	@$(call echo_blue,Starting web development server...)
-	pnpm exec nx serve web
+	npx nx serve web
 
 dev-mobile: ## Start mobile development server
 	@$(call echo_blue,Starting mobile development server...)
-	pnpm exec nx start app
+	npx nx start app
 
 dev-db: ## Start database development server
 	@$(call echo_blue,Starting database service...)
@@ -254,7 +272,7 @@ dev-db: ## Start database development server
 
 dev-graphql: ## Start GraphQL service (alias for dev-db)
 	@$(call echo_blue,Starting GraphQL service on http://localhost:5000/graphql...)
-	pnpm exec nx run db:serve
+	npx nx run db:serve
 
 dev-storybook: ## Start Storybook for component development
 	@$(call echo_blue,Starting Storybook...)
@@ -292,7 +310,7 @@ endif
 
 db-studio: ## Open database studio
 	@$(call echo_blue,Opening database studio...)
-	pnpm exec nx studio:public db-client
+	npx nx studio:public db-client
 
 db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
@@ -371,15 +389,15 @@ check-services: ## Check service health
 # Utilities
 graph: ## Show Nx project dependency graph
 	@$(call echo_blue,Opening Nx project graph...)
-	pnpm exec nx graph
+	npx nx graph
 
 affected: ## Show affected projects
 	@$(call echo_blue,Showing affected projects...)
-	pnpm exec nx show projects --affected
+	npx nx show projects --affected
 
 list-projects: ## List all projects in workspace
 	@$(call echo_blue,Listing all projects...)
-	pnpm exec nx show projects
+	npx nx show projects
 
 workspace-lint: ## Run workspace-level validations
 	@$(call echo_blue,Running workspace validations...)
@@ -432,7 +450,7 @@ diagnose: ## Diagnose common issues
 	@$(call echo_plain,NPM version (optional):)
 	@npm --version || echo "npm not installed"
 	@$(call echo_plain,Nx version:)
-	@pnpm exec nx --version
+	@npx nx --version
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
@@ -496,33 +514,33 @@ pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
 	@$(call echo_plain,1/5 Type checking...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t typecheck --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t typecheck --base=main"
 else
-	@pnpm exec nx affected -t typecheck --base=main
+	@npx nx affected -t typecheck --base=main
 endif
 	@$(call echo_plain,2/5 Formatting...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx format:write"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx format:write"
 else
-	@pnpm exec nx format:write
+	@npx nx format:write
 endif
 	@$(call echo_plain,3/5 Linting...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t lint --fix --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t lint --fix --base=main"
 else
-	@pnpm exec nx affected -t lint --fix --base=main
+	@npx nx affected -t lint --fix --base=main
 endif
 	@$(call echo_plain,4/5 Testing...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t test --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t test --base=main"
 else
-	@pnpm exec nx affected -t test --base=main
+	@npx nx affected -t test --base=main
 endif
 	@$(call echo_plain,5/5 Building...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t build --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t build --base=main"
 else
-	@pnpm exec nx affected -t build --base=main
+	@npx nx affected -t build --base=main
 endif
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
@@ -531,10 +549,10 @@ pc: pre-commit ## Alias for pre-commit
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t typecheck --base=main"
-	@powershell -NoProfile -WindowStyle Hidden -Command "pnpm exec nx affected -t lint --fix --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t typecheck --base=main"
+	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t lint --fix --base=main"
 else
-	@pnpm exec nx affected -t typecheck --base=main
-	@pnpm exec nx affected -t lint --fix --base=main
+	@npx nx affected -t typecheck --base=main
+	@npx nx affected -t lint --fix --base=main
 endif
 	@$(call echo_green,✓ Quick checks passed!)

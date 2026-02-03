@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -139,12 +139,55 @@ function getDraftButtonText(status?: string | null, loading = false): string {
 export function LeagueDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const leagueId = parseInt(id || '0', 10);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial tab from URL or default to 'info'
+  const getTabFromUrl = useCallback(():
+    | 'info'
+    | 'roster'
+    | 'commissioner'
+    | 'standings'
+    | 'matchup' => {
+    const tabParam = searchParams.get('tab');
+    const validTabs = [
+      'info',
+      'roster',
+      'commissioner',
+      'standings',
+      'matchup',
+    ] as const;
+    if (
+      tabParam &&
+      validTabs.includes(tabParam as (typeof validTabs)[number])
+    ) {
+      return tabParam as (typeof validTabs)[number];
+    }
+    return 'info';
+  }, [searchParams]);
+
   const [activeTab, setActiveTab] = useState<
     'info' | 'roster' | 'commissioner' | 'standings' | 'matchup'
-  >('info');
+  >(getTabFromUrl());
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const { user } = useAuth();
+
+  // Update active tab when URL changes (e.g., back/forward navigation)
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [getTabFromUrl, activeTab]);
+
+  // Helper function to change tab and update URL
+  const changeTab = useCallback(
+    (newTab: 'info' | 'roster' | 'commissioner' | 'standings' | 'matchup') => {
+      setActiveTab(newTab);
+      setSearchParams({ tab: newTab }, { replace: false });
+    },
+    [setSearchParams],
+  );
 
   const { data, loading, error } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId),
@@ -837,7 +880,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           variant={activeTab === 'info' ? 'primary' : 'secondary'}
           backgroundColor={activeTab === 'info' ? '$blue9' : '$gray6'}
           color={activeTab === 'info' ? 'white' : '$gray12'}
-          onPress={() => setActiveTab('info')}
+          onPress={() => changeTab('info')}
           role="tab"
           id="tab-info"
           aria-selected={activeTab === 'info'}
@@ -850,7 +893,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           variant={activeTab === 'roster' ? 'primary' : 'secondary'}
           backgroundColor={activeTab === 'roster' ? '$blue9' : '$gray6'}
           color={activeTab === 'roster' ? 'white' : '$gray12'}
-          onPress={() => setActiveTab('roster')}
+          onPress={() => changeTab('roster')}
           role="tab"
           id="tab-roster"
           aria-selected={activeTab === 'roster'}
@@ -863,7 +906,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           variant={activeTab === 'standings' ? 'primary' : 'secondary'}
           backgroundColor={activeTab === 'standings' ? '$blue9' : '$gray6'}
           color={activeTab === 'standings' ? 'white' : '$gray12'}
-          onPress={() => setActiveTab('standings')}
+          onPress={() => changeTab('standings')}
           role="tab"
           id="tab-standings"
           aria-selected={activeTab === 'standings'}
@@ -876,7 +919,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           variant={activeTab === 'matchup' ? 'primary' : 'secondary'}
           backgroundColor={activeTab === 'matchup' ? '$blue9' : '$gray6'}
           color={activeTab === 'matchup' ? 'white' : '$gray12'}
-          onPress={() => setActiveTab('matchup')}
+          onPress={() => changeTab('matchup')}
           role="tab"
           id="tab-matchup"
           aria-selected={activeTab === 'matchup'}
@@ -890,7 +933,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             variant={activeTab === 'commissioner' ? 'primary' : 'secondary'}
             backgroundColor={activeTab === 'commissioner' ? '$blue9' : '$gray6'}
             color={activeTab === 'commissioner' ? 'white' : '$gray12'}
-            onPress={() => setActiveTab('commissioner')}
+            onPress={() => changeTab('commissioner')}
             role="tab"
             id="tab-commissioner"
             aria-selected={activeTab === 'commissioner'}
