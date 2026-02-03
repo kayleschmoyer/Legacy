@@ -1,5 +1,11 @@
 import React from 'react';
-import { H1, H3, XStack, YStack } from '@legacy-sports/shared-components';
+import {
+  Button,
+  H1,
+  H3,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
 import { env } from '../config/environment';
 
@@ -44,9 +50,40 @@ const Value = styled(Text, {
   fontFamily: '$mono',
 });
 
+const LinkValue = styled(Text, {
+  color: '$blue10',
+  fontSize: '$4',
+  fontFamily: '$mono',
+  cursor: 'pointer',
+  textDecorationLine: 'underline',
+  hoverStyle: {
+    color: '$blue11',
+  },
+});
+
 export default function AboutPage() {
   // Read build-time environment variables from centralized config
   const { appVersion, commitSha, buildDate } = env;
+
+  // Generate GitHub commit URL
+  const repoUrl = 'https://github.com/bbarclay/legacy-sports';
+  const commitUrl =
+    commitSha && commitSha !== 'unknown' && commitSha !== 'dev'
+      ? `${repoUrl}/commit/${commitSha}`
+      : null;
+
+  // Format build date
+  const formattedBuildDate =
+    buildDate && buildDate !== 'unknown'
+      ? new Date(buildDate).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short',
+        })
+      : buildDate;
 
   return (
     <Container>
@@ -58,7 +95,8 @@ export default function AboutPage() {
           About Legacy Sports
         </H1>
         <Text color="$gray11" fontSize="$5">
-          Version and deployment information
+          Fantasy sports management platform - Version and deployment
+          information
         </Text>
       </YStack>
 
@@ -72,12 +110,22 @@ export default function AboutPage() {
 
         <InfoRow>
           <Label>Commit SHA:</Label>
-          <Value>{commitSha}</Value>
+          {commitUrl ? (
+            <LinkValue
+              onPress={() => window.open(commitUrl, '_blank')}
+              role="link"
+              aria-label={`View commit ${commitSha} on GitHub`}
+            >
+              {commitSha}
+            </LinkValue>
+          ) : (
+            <Value>{commitSha}</Value>
+          )}
         </InfoRow>
 
         <InfoRow>
           <Label>Build Date:</Label>
-          <Value>{buildDate}</Value>
+          <Value>{formattedBuildDate}</Value>
         </InfoRow>
       </InfoCard>
 
@@ -90,10 +138,53 @@ export default function AboutPage() {
         </InfoRow>
 
         <InfoRow>
+          <Label>GraphQL API:</Label>
+          <Value>{env.graphqlUrl}</Value>
+        </InfoRow>
+
+        <InfoRow>
           <Label>Base URL:</Label>
           <Value>{env.baseUrl}</Value>
         </InfoRow>
       </InfoCard>
+
+      <InfoCard>
+        <H3 marginBottom="$2">Links</H3>
+
+        <YStack gap="$3">
+          <Button
+            onPress={() => window.open(repoUrl, '_blank')}
+            variant="secondary"
+            size="$3"
+          >
+            <span role="img" aria-label="package">
+              📦
+            </span>{' '}
+            View on GitHub
+          </Button>
+          {commitUrl && (
+            <Button
+              onPress={() => window.open(commitUrl, '_blank')}
+              variant="secondary"
+              size="$3"
+            >
+              <span role="img" aria-label="search">
+                🔍
+              </span>{' '}
+              View Current Commit
+            </Button>
+          )}
+        </YStack>
+      </InfoCard>
+
+      <YStack marginTop="$4" alignItems="center">
+        <Text color="$gray10" fontSize="$3" textAlign="center">
+          © {new Date().getFullYear()} Legacy Sports
+        </Text>
+        <Text color="$gray10" fontSize="$3" textAlign="center" marginTop="$2">
+          Built with React, TypeScript, and Tamagui
+        </Text>
+      </YStack>
     </Container>
   );
 }

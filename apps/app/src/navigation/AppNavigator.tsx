@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from '../app/(app)/index';
 import FootballScreen from '../screens/FootballScreen';
 import BaseballScreen from '../screens/BaseballScreen';
+import AboutScreen from '../screens/AboutScreen';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -26,6 +27,11 @@ function HomeStack() {
         name="Baseball"
         component={BaseballScreen}
         options={{ title: 'Baseball' }}
+      />
+      <Stack.Screen
+        name="About"
+        component={AboutScreen}
+        options={{ title: 'About' }}
       />
     </Stack.Navigator>
   );

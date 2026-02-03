@@ -5,16 +5,6 @@
   "projectType": "library",
   "tags": ["platform:shared", "scope:lib", "type:util"],
   "targets": {
-    "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
-      "options": {
-        "outputPath": "dist/lib/analytics",
-        "main": "lib/analytics/src/index.ts",
-        "tsConfig": "lib/analytics/tsconfig.lib.json",
-        "assets": []
-      }
-    },
     "test": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],

@@ -12,6 +12,7 @@ type RootStackParamList = {
   Home: undefined;
   Football: undefined;
   Baseball: undefined;
+  About: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -58,6 +59,23 @@ export default function Home() {
             </Button>
           ))}
         </XStack>
+
+        {/* About button */}
+        <Button
+          alignItems="center"
+          backgroundColor="$blue8"
+          borderRadius="$4"
+          padding="$4"
+          width="100%"
+          marginTop="$4"
+          onPress={() => navigation.navigate('About')}
+        >
+          <YStack>
+            <Text color="$color" fontSize="$5" fontWeight="600">
+              About
+            </Text>
+          </YStack>
+        </Button>
       </YStack>
     </ScrollView>
   );

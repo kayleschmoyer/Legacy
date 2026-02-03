@@ -4,16 +4,6 @@
   "sourceRoot": "lib/scheduling/src",
   "projectType": "library",
   "targets": {
-    "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
-      "options": {
-        "outputPath": "dist/lib/scheduling",
-        "main": "lib/scheduling/src/index.ts",
-        "tsConfig": "lib/scheduling/tsconfig.lib.json",
-        "assets": []
-      }
-    },
     "lint": {
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],
@@ -36,5 +26,5 @@
       }
     }
   },
-  "tags": ["type:lib", "scope:scheduling"]
+  "tags": ["platform:shared", "scope:lib", "type:business"]
 }
