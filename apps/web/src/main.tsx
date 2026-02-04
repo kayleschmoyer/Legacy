@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { Provider as ReduxProvider } from 'react-redux';
 
 // Initialize React Native Web
 import 'react-native-web/dist/cjs/exports/AppRegistry';
@@ -22,6 +23,7 @@ import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
+import { store } from './store/store';
 
 // Create secure OAuth configuration (single-lambda architecture)
 const authConfig: OAuthConfig = {
@@ -40,16 +42,18 @@ function AuthenticatedApp() {
       : 'light';
 
   return (
-    <BrowserRouter>
-      <AppProvider
-        apolloClient={apolloClient}
-        colorScheme={initialColorScheme}
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        tamaguiConfig={tamaguiConfig}
-      >
-        <App />
-      </AppProvider>
-    </BrowserRouter>
+    <ReduxProvider store={store}>
+      <BrowserRouter>
+        <AppProvider
+          apolloClient={apolloClient}
+          colorScheme={initialColorScheme}
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          tamaguiConfig={tamaguiConfig}
+        >
+          <App />
+        </AppProvider>
+      </BrowserRouter>
+    </ReduxProvider>
   );
 }
 

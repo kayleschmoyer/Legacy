@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
-  Card,
   useAuth,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { H1, H2, Spinner, Text } from 'tamagui';
+import { Card, H1, H2, Spinner, Text } from 'tamagui';
 import { Check, Copy } from '@tamagui/lucide-icons';
 import { gql, useLazyQuery } from '@apollo/client';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
@@ -31,6 +30,17 @@ import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
 import { GamesRemaining } from '../matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../matchup/MatchupRosterComparison';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  setIsCommissioner,
+  setLeagueData,
+  setLeagueId,
+  setLeaguePositions,
+  setLeagueTeams,
+  setTeamMembers,
+  setTeamsLoading,
+  setUserTeamId,
+} from '../../store/leagueSlice';
 
 // Manual GraphQL query for getting user's team ID in a league
 const GET_USER_TEAM_ID = gql`
@@ -137,9 +147,20 @@ function getDraftButtonText(status?: string | null, loading = false): string {
 }
 
 export function LeagueDetailPage(): React.JSX.Element {
-  const { id } = useParams<{ id: string }>();
+  const { id, tab: tabParam } = useParams<{ id: string; tab?: string }>();
   const leagueId = parseInt(id || '0', 10);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+
+  // Redux state
+  const {
+    leagueData: reduxLeagueData,
+    positions: reduxPositions,
+    teamMembers: reduxTeamMembers,
+    leagueTeams: reduxLeagueTeams,
+    userTeamId: reduxUserTeamId,
+    isCommissioner: reduxIsCommissioner,
+  } = useAppSelector((state) => state.league);
 
   // Get initial tab from URL or default to 'info'
   const getTabFromUrl = useCallback(():
@@ -148,7 +169,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     | 'commissioner'
     | 'standings'
     | 'matchup' => {
-    const tabParam = searchParams.get('tab');
     const validTabs = [
       'info',
       'roster',
@@ -163,7 +183,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       return tabParam as (typeof validTabs)[number];
     }
     return 'info';
-  }, [searchParams]);
+  }, [tabParam]);
 
   const [activeTab, setActiveTab] = useState<
     'info' | 'roster' | 'commissioner' | 'standings' | 'matchup'
@@ -171,6 +191,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const { user } = useAuth();
+
+  // Initialize Redux state when league changes
+  useEffect(() => {
+    if (!isNaN(leagueId)) {
+      dispatch(setLeagueId(leagueId));
+    }
+  }, [leagueId, dispatch]);
 
   // Update active tab when URL changes (e.g., back/forward navigation)
   useEffect(() => {
@@ -184,60 +211,132 @@ export function LeagueDetailPage(): React.JSX.Element {
   const changeTab = useCallback(
     (newTab: 'info' | 'roster' | 'commissioner' | 'standings' | 'matchup') => {
       setActiveTab(newTab);
-      setSearchParams({ tab: newTab }, { replace: false });
+      navigate(`/baseball/league/${leagueId}/${newTab}`, { replace: false });
     },
-    [setSearchParams],
+    [navigate, leagueId],
   );
 
+  // Fetch league data only if not in Redux
   const { data, loading, error } = useGetLeagueByIdQuery({
-    skip: isNaN(leagueId),
+    skip: isNaN(leagueId) || !!reduxLeagueData,
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
+    onCompleted: (data) => {
+      if (data.league) {
+        dispatch(setLeagueData(data.league));
+        dispatch(setIsCommissioner(data.league.owner === user?.id));
+      }
+    },
   });
 
-  // Fetch league positions for roster management
+  // Fetch league positions only if not in Redux
   const { data: positionsData, loading: positionsLoading } =
     useGetPositionsForLeagueQuery({
-      skip: isNaN(leagueId),
+      skip: isNaN(leagueId) || reduxPositions.length > 0,
       variables: { leagueId },
+      onCompleted: (data) => {
+        if (data.leaguePositions) {
+          dispatch(
+            setLeaguePositions(
+              data.leaguePositions as LeaguePositionFragment[],
+            ),
+          );
+        }
+      },
     });
 
   // Use the proper userTeamId GraphQL query to get the user's team in this league
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID);
+    useLazyQuery(GET_USER_TEAM_ID, {
+      onCompleted: (data) => {
+        if (data.userTeamId !== undefined) {
+          dispatch(setUserTeamId(data.userTeamId as number | null));
+        }
+      },
+    });
 
   // Fetch league teams for standings
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+  ] = useLazyQuery(GET_LEAGUE_TEAMS, {
+    onCompleted: (data) => {
+      if (data.leagueTeams) {
+        dispatch(
+          setLeagueTeams(
+            data.leagueTeams as Array<{
+              id: number;
+              name: string;
+              leagueId: number;
+            }>,
+          ),
+        );
+      }
+    },
+  });
 
-  // Effect to fetch user's team ID when league ID changes
+  // Effect to fetch user's team ID when league ID changes (only if not in Redux)
   useEffect(() => {
-    if (!isNaN(leagueId) && user?.id) {
+    if (!isNaN(leagueId) && user?.id && reduxUserTeamId === null) {
       void getUserTeamId({
         variables: { leagueId },
       });
     }
-  }, [leagueId, user?.id, getUserTeamId]);
+  }, [leagueId, user?.id, reduxUserTeamId, getUserTeamId]);
 
-  // Effect to fetch league teams when on standings tab
+  // Effect to fetch league teams when on standings tab (only if not in Redux)
   useEffect(() => {
-    if (activeTab === 'standings' && !isNaN(leagueId)) {
+    if (
+      activeTab === 'standings' &&
+      !isNaN(leagueId) &&
+      reduxLeagueTeams.length === 0
+    ) {
+      dispatch(setTeamsLoading(true));
       void getLeagueTeams({
         variables: { leagueId },
       });
     }
-  }, [activeTab, leagueId, getLeagueTeams]);
+  }, [activeTab, leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
 
-  const userTeamId = userTeamData?.userTeamId;
+  // Use Redux data or fallback to GraphQL data
+  const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId;
+  const league = reduxLeagueData ?? data?.league;
+  const positions =
+    reduxPositions.length > 0
+      ? reduxPositions
+      : (positionsData?.leaguePositions as LeaguePositionFragment[]) || [];
+  const leagueTeams =
+    reduxLeagueTeams.length > 0
+      ? reduxLeagueTeams
+      : leagueTeamsData?.leagueTeams || [];
+  const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
+
+  // Fetch team members only if not in Redux
   const { data: teamMembersData, loading: teamMembersLoading } =
     useGetTeamMembersQuery({
-      skip: !userTeamId,
+      skip: !userTeamId || reduxTeamMembers.length > 0,
       variables: {
         teamId: userTeamId || 0,
       },
+      onCompleted: (data) => {
+        if (data.teamMembers) {
+          dispatch(
+            setTeamMembers(
+              data.teamMembers.filter(
+                (m) => m !== null,
+              ) as TeamMemberFragment[],
+            ),
+          );
+        }
+      },
     });
+
+  const teamMembers =
+    reduxTeamMembers.length > 0
+      ? reduxTeamMembers
+      : (teamMembersData?.teamMembers?.filter(
+          (m) => m !== null,
+        ) as TeamMemberFragment[]) || [];
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
@@ -268,12 +367,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     error: matchupError,
     refetch: refetchMatchup,
   } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
-
-  // Check if user is league owner/commissioner
-  const isCommissioner = useMemo(() => {
-    if (!data?.league || !user) return false;
-    return data.league.owner === user.id || user.accessLevel === 'admin';
-  }, [data?.league, user]);
 
   // State for matchup operation messages
   const [matchupSuccessMessage, setMatchupSuccessMessage] = useState<
@@ -428,7 +521,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     );
   }
 
-  if (error || !data?.league) {
+  if (error || !league) {
     return (
       <YStack
         flex={1}
@@ -451,10 +544,6 @@ export function LeagueDetailPage(): React.JSX.Element {
       </YStack>
     );
   }
-
-  const league = data.league;
-  const positions = positionsData?.leaguePositions || [];
-  const teamMembers = teamMembersData?.teamMembers || [];
 
   const renderLeagueInfo = () => (
     <YStack
@@ -958,7 +1047,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           aria-labelledby="tab-standings"
         >
           <LeagueStandings
-            teams={leagueTeamsData?.leagueTeams || []}
+            teams={leagueTeams}
             loading={leagueTeamsLoading}
             userTeamId={userTeamId}
           />

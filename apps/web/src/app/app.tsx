@@ -25,8 +25,6 @@ import AboutPage from '../components/AboutPage';
 import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../components/matchup/MatchupDetailPage';
-import { StandingsPage } from '../components/matchup/StandingsPage';
-import { CommissionerPage } from '../components/commissioner/CommissionerPage';
 
 // Styled Tamagui components for navigation
 const NavContainer = styled(YStack, {
@@ -235,18 +233,14 @@ function App() {
             element={<JoinLeagueByCode />}
           />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
+          <Route
+            path="/baseball/league/:id/:tab"
+            element={<LeagueDetailPage />}
+          />
           <Route path="/baseball/team/:teamId" element={<TeamDetailPage />} />
           <Route
             path="/baseball/league/:leagueId/matchups/:matchupId"
             element={<MatchupDetailPage />}
-          />
-          <Route
-            path="/baseball/league/:leagueId/standings"
-            element={<StandingsPage />}
-          />
-          <Route
-            path="/baseball/league/:leagueId/commissioner"
-            element={<CommissionerPage />}
           />
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />

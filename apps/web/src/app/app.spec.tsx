@@ -138,15 +138,6 @@ jest.mock('../components/matchup/MatchupDetailPage', () => ({
   MatchupDetailPage: () => <div>Matchup Detail Page</div>,
 }));
 
-jest.mock('../components/matchup/StandingsPage', () => ({
-  StandingsPage: () => <div>Standings Page</div>,
-}));
-
-// Mock commissioner components
-jest.mock('../components/commissioner/CommissionerPage', () => ({
-  CommissionerPage: () => <div>Commissioner Page</div>,
-}));
-
 describe('App', () => {
   beforeEach(() => {
     // Clear any timers between tests

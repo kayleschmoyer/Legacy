@@ -2552,6 +2552,27 @@ export function useGetLeagueByIdLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetLeagueByIdSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetLeagueByIdQuery,
+    GetLeagueByIdQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueByIdQuery,
+  GetLeagueByIdQueryVariables
+>;
+export function useGetLeagueByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueByIdQuery,
+        GetLeagueByIdQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueByIdQuery | undefined,
+  GetLeagueByIdQueryVariables
+>;
 export function useGetLeagueByIdSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -2683,6 +2704,27 @@ export function useGetUserLeaguesLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetUserLeaguesSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUserLeaguesQuery,
+    GetUserLeaguesQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserLeaguesQuery,
+  GetUserLeaguesQueryVariables
+>;
+export function useGetUserLeaguesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserLeaguesQuery,
+        GetUserLeaguesQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserLeaguesQuery | undefined,
+  GetUserLeaguesQueryVariables
+>;
 export function useGetUserLeaguesSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -2766,6 +2808,27 @@ export function useGetPositionsForLeagueLazyQuery(
     GetPositionsForLeagueQueryVariables
   >(GetPositionsForLeague, options);
 }
+// @ts-ignore
+export function useGetPositionsForLeagueSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetPositionsForLeagueQuery,
+  GetPositionsForLeagueQueryVariables
+>;
+export function useGetPositionsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPositionsForLeagueQuery,
+        GetPositionsForLeagueQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetPositionsForLeagueQuery | undefined,
+  GetPositionsForLeagueQueryVariables
+>;
 export function useGetPositionsForLeagueSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3050,6 +3113,27 @@ export function useGetLeagueTeamsLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetLeagueTeamsSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetLeagueTeamsQuery,
+    GetLeagueTeamsQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueTeamsQuery,
+  GetLeagueTeamsQueryVariables
+>;
+export function useGetLeagueTeamsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueTeamsQuery,
+        GetLeagueTeamsQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueTeamsQuery | undefined,
+  GetLeagueTeamsQueryVariables
+>;
 export function useGetLeagueTeamsSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3130,6 +3214,27 @@ export function useGetUserTeamIdLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetUserTeamIdSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUserTeamIdQuery,
+    GetUserTeamIdQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserTeamIdQuery,
+  GetUserTeamIdQueryVariables
+>;
+export function useGetUserTeamIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserTeamIdQuery,
+        GetUserTeamIdQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserTeamIdQuery | undefined,
+  GetUserTeamIdQueryVariables
+>;
 export function useGetUserTeamIdSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3213,6 +3318,27 @@ export function useGetMatchupByIdLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetMatchupByIdSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetMatchupByIdQuery,
+    GetMatchupByIdQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupByIdQuery,
+  GetMatchupByIdQueryVariables
+>;
+export function useGetMatchupByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupByIdQuery,
+        GetMatchupByIdQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupByIdQuery | undefined,
+  GetMatchupByIdQueryVariables
+>;
 export function useGetMatchupByIdSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3297,6 +3423,27 @@ export function useGetMatchupsForLeagueLazyQuery(
     GetMatchupsForLeagueQueryVariables
   >(GetMatchupsForLeague, options);
 }
+// @ts-ignore
+export function useGetMatchupsForLeagueSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetMatchupsForLeagueQuery,
+    GetMatchupsForLeagueQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupsForLeagueQuery,
+  GetMatchupsForLeagueQueryVariables
+>;
+export function useGetMatchupsForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupsForLeagueQuery,
+        GetMatchupsForLeagueQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupsForLeagueQuery | undefined,
+  GetMatchupsForLeagueQueryVariables
+>;
 export function useGetMatchupsForLeagueSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3380,6 +3527,27 @@ export function useGetCurrentMatchupForLeagueLazyQuery(
     GetCurrentMatchupForLeagueQueryVariables
   >(GetCurrentMatchupForLeague, options);
 }
+// @ts-ignore
+export function useGetCurrentMatchupForLeagueSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetCurrentMatchupForLeagueQuery,
+    GetCurrentMatchupForLeagueQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetCurrentMatchupForLeagueQuery,
+  GetCurrentMatchupForLeagueQueryVariables
+>;
+export function useGetCurrentMatchupForLeagueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCurrentMatchupForLeagueQuery,
+        GetCurrentMatchupForLeagueQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetCurrentMatchupForLeagueQuery | undefined,
+  GetCurrentMatchupForLeagueQueryVariables
+>;
 export function useGetCurrentMatchupForLeagueSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3464,6 +3632,27 @@ export function useGetMatchupsByWeekLazyQuery(
     GetMatchupsByWeekQueryVariables
   >(GetMatchupsByWeek, options);
 }
+// @ts-ignore
+export function useGetMatchupsByWeekSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupsByWeekQuery,
+  GetMatchupsByWeekQueryVariables
+>;
+export function useGetMatchupsByWeekSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupsByWeekQuery,
+        GetMatchupsByWeekQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupsByWeekQuery | undefined,
+  GetMatchupsByWeekQueryVariables
+>;
 export function useGetMatchupsByWeekSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3553,6 +3742,27 @@ export function useGetLeagueStandingsLazyQuery(
     GetLeagueStandingsQueryVariables
   >(GetLeagueStandings, options);
 }
+// @ts-ignore
+export function useGetLeagueStandingsSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetLeagueStandingsQuery,
+    GetLeagueStandingsQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueStandingsQuery,
+  GetLeagueStandingsQueryVariables
+>;
+export function useGetLeagueStandingsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueStandingsQuery,
+        GetLeagueStandingsQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueStandingsQuery | undefined,
+  GetLeagueStandingsQueryVariables
+>;
 export function useGetLeagueStandingsSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3652,6 +3862,27 @@ export function useGetMatchupHistoryLazyQuery(
     GetMatchupHistoryQueryVariables
   >(GetMatchupHistory, options);
 }
+// @ts-ignore
+export function useGetMatchupHistorySuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetMatchupHistoryQuery,
+    GetMatchupHistoryQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupHistoryQuery,
+  GetMatchupHistoryQueryVariables
+>;
+export function useGetMatchupHistorySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupHistoryQuery,
+        GetMatchupHistoryQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupHistoryQuery | undefined,
+  GetMatchupHistoryQueryVariables
+>;
 export function useGetMatchupHistorySuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3735,6 +3966,27 @@ export function useGetMatchupPlayersLazyQuery(
     GetMatchupPlayersQueryVariables
   >(GetMatchupPlayers, options);
 }
+// @ts-ignore
+export function useGetMatchupPlayersSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetMatchupPlayersQuery,
+    GetMatchupPlayersQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupPlayersQuery,
+  GetMatchupPlayersQueryVariables
+>;
+export function useGetMatchupPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupPlayersQuery,
+        GetMatchupPlayersQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetMatchupPlayersQuery | undefined,
+  GetMatchupPlayersQueryVariables
+>;
 export function useGetMatchupPlayersSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3870,6 +4122,27 @@ export function useGetUserNotificationPreferencesLazyQuery(
     GetUserNotificationPreferencesQueryVariables
   >(GetUserNotificationPreferences, options);
 }
+// @ts-ignore
+export function useGetUserNotificationPreferencesSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUserNotificationPreferencesQuery,
+    GetUserNotificationPreferencesQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserNotificationPreferencesQuery,
+  GetUserNotificationPreferencesQueryVariables
+>;
+export function useGetUserNotificationPreferencesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserNotificationPreferencesQuery,
+        GetUserNotificationPreferencesQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserNotificationPreferencesQuery | undefined,
+  GetUserNotificationPreferencesQueryVariables
+>;
 export function useGetUserNotificationPreferencesSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3954,6 +4227,27 @@ export function useGetNotificationHistoryLazyQuery(
     GetNotificationHistoryQueryVariables
   >(GetNotificationHistory, options);
 }
+// @ts-ignore
+export function useGetNotificationHistorySuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetNotificationHistoryQuery,
+    GetNotificationHistoryQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetNotificationHistoryQuery,
+  GetNotificationHistoryQueryVariables
+>;
+export function useGetNotificationHistorySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetNotificationHistoryQuery,
+        GetNotificationHistoryQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetNotificationHistoryQuery | undefined,
+  GetNotificationHistoryQueryVariables
+>;
 export function useGetNotificationHistorySuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4034,6 +4328,27 @@ export function useGetUnreadNotificationCountLazyQuery(
     GetUnreadNotificationCountQueryVariables
   >(GetUnreadNotificationCount, options);
 }
+// @ts-ignore
+export function useGetUnreadNotificationCountSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUnreadNotificationCountQuery,
+    GetUnreadNotificationCountQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetUnreadNotificationCountQuery,
+  GetUnreadNotificationCountQueryVariables
+>;
+export function useGetUnreadNotificationCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUnreadNotificationCountQuery,
+        GetUnreadNotificationCountQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUnreadNotificationCountQuery | undefined,
+  GetUnreadNotificationCountQueryVariables
+>;
 export function useGetUnreadNotificationCountSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4117,6 +4432,27 @@ export function useGetUserDeviceTokensLazyQuery(
     GetUserDeviceTokensQueryVariables
   >(GetUserDeviceTokens, options);
 }
+// @ts-ignore
+export function useGetUserDeviceTokensSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUserDeviceTokensQuery,
+    GetUserDeviceTokensQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserDeviceTokensQuery,
+  GetUserDeviceTokensQueryVariables
+>;
+export function useGetUserDeviceTokensSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserDeviceTokensQuery,
+        GetUserDeviceTokensQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserDeviceTokensQuery | undefined,
+  GetUserDeviceTokensQueryVariables
+>;
 export function useGetUserDeviceTokensSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4481,6 +4817,27 @@ export function useGetLeagueScoringProfileLazyQuery(
     GetLeagueScoringProfileQueryVariables
   >(GetLeagueScoringProfile, options);
 }
+// @ts-ignore
+export function useGetLeagueScoringProfileSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetLeagueScoringProfileQuery,
+    GetLeagueScoringProfileQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueScoringProfileQuery,
+  GetLeagueScoringProfileQueryVariables
+>;
+export function useGetLeagueScoringProfileSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueScoringProfileQuery,
+        GetLeagueScoringProfileQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetLeagueScoringProfileQuery | undefined,
+  GetLeagueScoringProfileQueryVariables
+>;
 export function useGetLeagueScoringProfileSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4587,6 +4944,27 @@ export function useGetDefaultScoringProfileLazyQuery(
     GetDefaultScoringProfileQueryVariables
   >(GetDefaultScoringProfile, options);
 }
+// @ts-ignore
+export function useGetDefaultScoringProfileSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetDefaultScoringProfileQuery,
+    GetDefaultScoringProfileQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetDefaultScoringProfileQuery,
+  GetDefaultScoringProfileQueryVariables
+>;
+export function useGetDefaultScoringProfileSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDefaultScoringProfileQuery,
+        GetDefaultScoringProfileQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetDefaultScoringProfileQuery | undefined,
+  GetDefaultScoringProfileQueryVariables
+>;
 export function useGetDefaultScoringProfileSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4755,6 +5133,27 @@ export function useGetTeamMembersLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetTeamMembersSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetTeamMembersQuery,
+  GetTeamMembersQueryVariables
+>;
+export function useGetTeamMembersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamMembersQuery,
+        GetTeamMembersQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetTeamMembersQuery | undefined,
+  GetTeamMembersQueryVariables
+>;
 export function useGetTeamMembersSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -4894,6 +5293,24 @@ export function useGetUserByIdLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetUserByIdSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetUserByIdQuery,
+    GetUserByIdQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<GetUserByIdQuery, GetUserByIdQueryVariables>;
+export function useGetUserByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserByIdQuery,
+        GetUserByIdQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetUserByIdQuery | undefined,
+  GetUserByIdQueryVariables
+>;
 export function useGetUserByIdSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
