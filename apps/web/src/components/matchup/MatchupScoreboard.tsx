@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, H3, H5, Separator, Text, XStack, YStack } from 'tamagui';
+import { computeScoring } from '@legacy-sports/scoring';
 import {
   type MatchupFragment,
+  type MatchupPlayerFragment,
   MatchupStatus,
+  useGetMatchupPlayersQuery,
 } from '../../api/db/graphql.generated';
+import { useLeagueScoringSettings } from '../../lib/scoring';
+import {
+  mapBattingStats,
+  mapFieldingStats,
+  mapPitchingStats,
+} from '../../lib/scoring/mapGraphQLToScoringFormat';
 
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
@@ -18,6 +27,86 @@ export function MatchupScoreboard({
   matchup,
   gamesRemaining = 0,
 }: MatchupScoreboardProps) {
+  // Extract IDs before early return to use in hooks
+  const matchupIdStr = matchup?.id;
+  const leagueIdNum = matchup?.leagueId ?? undefined;
+  const matchupIdNum = matchupIdStr ? parseInt(matchupIdStr, 10) : 0;
+
+  // Fetch matchup players to calculate actual scores (hooks must come before early return)
+  const { data: playersData } = useGetMatchupPlayersQuery({
+    variables: { matchupId: matchupIdNum },
+    skip: !matchupIdNum,
+  });
+
+  // Fetch scoring settings
+  const { settings: scoringSettings } = useLeagueScoringSettings(leagueIdNum);
+
+  // Calculate team scores from individual player game scores
+  const { team1Score, team2Score } = useMemo(() => {
+    if (!playersData?.getMatchupPlayers || !scoringSettings || !matchup) {
+      // Fall back to database values if data not loaded yet
+      return {
+        team1Score: matchup?.team1Score ?? 0,
+        team2Score: matchup?.team2Score ?? 0,
+      };
+    }
+
+    const players = playersData.getMatchupPlayers;
+
+    // Helper: Calculate score for a single game
+    const calculateGameScore = (
+      game: NonNullable<MatchupPlayerFragment['games']>[number],
+    ): number => {
+      let total = 0;
+
+      if (game.battingGame) {
+        const mappedBatting = mapBattingStats(game.battingGame);
+        total += computeScoring(mappedBatting, scoringSettings.batting || {});
+      }
+
+      if (game.pitchingGame) {
+        const mappedPitching = mapPitchingStats(game.pitchingGame);
+        total += computeScoring(mappedPitching, scoringSettings.pitching || {});
+      }
+
+      if (game.fieldingGame) {
+        const mappedFielding = mapFieldingStats(game.fieldingGame);
+        total += computeScoring(mappedFielding, scoringSettings.fielding || {});
+      }
+
+      return total;
+    };
+
+    // Calculate totals for each team (only count starters, not bench players)
+    let team1Total = 0;
+    let team2Total = 0;
+
+    players.forEach((player) => {
+      // Skip bench players (positionId is null for bench)
+      if (player.positionId === null) {
+        return;
+      }
+
+      const playerScore =
+        player.games?.reduce(
+          (sum, game) => sum + calculateGameScore(game),
+          0,
+        ) ?? 0;
+
+      if (player.teamId === matchup.team1Id) {
+        team1Total += playerScore;
+      } else if (player.teamId === matchup.team2Id) {
+        team2Total += playerScore;
+      }
+    });
+
+    return {
+      team1Score: team1Total,
+      team2Score: team2Total,
+    };
+  }, [playersData, scoringSettings, matchup]);
+
+  // Early return after all hooks
   if (!matchup) {
     return (
       <Card elevate size="$4" bordered margin="$2">
@@ -28,8 +117,7 @@ export function MatchupScoreboard({
     );
   }
 
-  const { weekNumber, team1Score, team2Score, status, gamesPerMatchup } =
-    matchup;
+  const { weekNumber, status, gamesPerMatchup } = matchup;
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);

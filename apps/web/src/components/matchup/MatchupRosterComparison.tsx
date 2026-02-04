@@ -213,10 +213,10 @@ export function MatchupRosterComparison({
     team1Pitchers,
     team2Batters,
     team2Pitchers,
-    team1Totals,
-    team2Totals,
-    team1ExpectedForGamesPlayed,
-    team2ExpectedForGamesPlayed,
+    team1BatterTotals,
+    team1PitcherTotals,
+    team2BatterTotals,
+    team2PitcherTotals,
     calculatePlayerProjection,
     calculateGameScore,
   } = useMemo(() => {
@@ -331,6 +331,10 @@ export function MatchupRosterComparison({
         team2Pitchers: [],
         team1Totals: { projected: 0, actual: 0 },
         team2Totals: { projected: 0, actual: 0 },
+        team1BatterTotals: { projected: 0, actual: 0 },
+        team1PitcherTotals: { projected: 0, actual: 0 },
+        team2BatterTotals: { projected: 0, actual: 0 },
+        team2PitcherTotals: { projected: 0, actual: 0 },
         team1ExpectedForGamesPlayed: 0,
         team2ExpectedForGamesPlayed: 0,
         calculatePlayerProjection,
@@ -382,56 +386,62 @@ export function MatchupRosterComparison({
       isPitcherPosition(p.positionId),
     );
 
-    // Calculate totals (only starters count toward matchup score)
-    const team1Totals = {
-      actual: team1Starters.reduce((sum: any, p: MatchupPlayerFragment) => {
+    // Calculate separate totals for batters and pitchers
+    const team1BatterTotals = {
+      actual: team1Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
         const gameSum =
           p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
           0;
         return sum + gameSum;
       }, 0),
-      projected: team1Starters.reduce(
+      projected: team1Batters.reduce(
         (sum: any, p: MatchupPlayerFragment) =>
           sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
-    const team2Totals = {
-      actual: team2Starters.reduce((sum: any, p: MatchupPlayerFragment) => {
+    const team1PitcherTotals = {
+      actual: team1Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
         const gameSum =
           p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
           0;
         return sum + gameSum;
       }, 0),
-      projected: team2Starters.reduce(
+      projected: team1Pitchers.reduce(
         (sum: any, p: MatchupPlayerFragment) =>
           sum + calculatePlayerProjection(p),
         0,
       ),
     };
 
-    // Calculate expected scores based on games played (for color coding totals)
-    const team1TotalGamesPlayed = team1Starters.reduce(
-      (sum: any, p: MatchupPlayerFragment) => sum + (p.games?.length ?? 0),
-      0,
-    );
-    const team2TotalGamesPlayed = team2Starters.reduce(
-      (sum: any, p: MatchupPlayerFragment) => sum + (p.games?.length ?? 0),
-      0,
-    );
-    const team1TotalGamesExpected = team1Starters.length * gamesPerMatchup;
-    const team2TotalGamesExpected = team2Starters.length * gamesPerMatchup;
-    const team1ExpectedForGamesPlayed =
-      team1TotalGamesPlayed > 0
-        ? (team1Totals.projected / team1TotalGamesExpected) *
-          team1TotalGamesPlayed
-        : 0;
-    const team2ExpectedForGamesPlayed =
-      team2TotalGamesPlayed > 0
-        ? (team2Totals.projected / team2TotalGamesExpected) *
-          team2TotalGamesPlayed
-        : 0;
+    const team2BatterTotals = {
+      actual: team2Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
+        const gameSum =
+          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
+          0;
+        return sum + gameSum;
+      }, 0),
+      projected: team2Batters.reduce(
+        (sum: any, p: MatchupPlayerFragment) =>
+          sum + calculatePlayerProjection(p),
+        0,
+      ),
+    };
+
+    const team2PitcherTotals = {
+      actual: team2Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
+        const gameSum =
+          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
+          0;
+        return sum + gameSum;
+      }, 0),
+      projected: team2Pitchers.reduce(
+        (sum: any, p: MatchupPlayerFragment) =>
+          sum + calculatePlayerProjection(p),
+        0,
+      ),
+    };
 
     return {
       team1Starters,
@@ -442,10 +452,10 @@ export function MatchupRosterComparison({
       team1Pitchers,
       team2Batters,
       team2Pitchers,
-      team1Totals,
-      team2Totals,
-      team1ExpectedForGamesPlayed,
-      team2ExpectedForGamesPlayed,
+      team1BatterTotals,
+      team1PitcherTotals,
+      team2BatterTotals,
+      team2PitcherTotals,
       calculatePlayerProjection,
       calculateGameScore,
     };
@@ -1159,6 +1169,50 @@ export function MatchupRosterComparison({
         </>
       )}
 
+      {/* Totals Row - Hitters */}
+      <XStack
+        paddingVertical="$2"
+        paddingHorizontal="$3"
+        backgroundColor="$blue2"
+        borderTopWidth={2}
+        borderTopColor="$blue8"
+        marginTop="$3"
+      >
+        <YStack width={50} /> {/* Position column spacer */}
+        <YStack flex={1}>
+          <Text fontSize="$3" fontWeight="bold" color="$blue11">
+            Hitters Total
+          </Text>
+        </YStack>
+        <YStack width={70} alignItems="center">
+          <Text fontSize="$3" fontWeight="600" color="$gray10">
+            {team1BatterTotals.projected.toFixed(1)}
+          </Text>
+        </YStack>
+        <YStack width={70} alignItems="center">
+          <Text fontSize="$4" fontWeight="bold" color="$blue11">
+            {team1BatterTotals.actual.toFixed(1)}
+          </Text>
+        </YStack>
+        <Separator vertical marginHorizontal="$3" borderColor="$blue6" />
+        <YStack width={70} alignItems="center">
+          <Text fontSize="$4" fontWeight="bold" color="$blue11">
+            {team2BatterTotals.actual.toFixed(1)}
+          </Text>
+        </YStack>
+        <YStack width={70} alignItems="center">
+          <Text fontSize="$3" fontWeight="600" color="$gray10">
+            {team2BatterTotals.projected.toFixed(1)}
+          </Text>
+        </YStack>
+        <YStack flex={1} alignItems="flex-end">
+          <Text fontSize="$3" fontWeight="bold" color="$blue11">
+            Hitters Total
+          </Text>
+        </YStack>
+        <YStack width={50} /> {/* Position column spacer */}
+      </XStack>
+
       {/* Pitchers Section */}
       {(team1Pitchers.length > 0 || team2Pitchers.length > 0) && (
         <>
@@ -1183,9 +1237,9 @@ export function MatchupRosterComparison({
         </>
       )}
 
-      {/* Totals Row */}
+      {/* Totals Row - Pitchers */}
       <XStack
-        paddingVertical="$3"
+        paddingVertical="$2"
         paddingHorizontal="$3"
         backgroundColor="$blue2"
         borderTopWidth={2}
@@ -1194,50 +1248,34 @@ export function MatchupRosterComparison({
       >
         <YStack width={50} /> {/* Position column spacer */}
         <YStack flex={1}>
+          <Text fontSize="$3" fontWeight="bold" color="$blue11">
+            Pitchers Total
+          </Text>
+        </YStack>
+        <YStack width={70} alignItems="center">
+          <Text fontSize="$3" fontWeight="600" color="$gray10">
+            {team1PitcherTotals.projected.toFixed(1)}
+          </Text>
+        </YStack>
+        <YStack width={70} alignItems="center">
           <Text fontSize="$4" fontWeight="bold" color="$blue11">
-            TOTAL (Starters Only)
-          </Text>
-        </YStack>
-        <YStack width={70} alignItems="center">
-          <Text fontSize="$4" fontWeight="600" color="$gray10">
-            {team1Totals.projected.toFixed(1)}
-          </Text>
-        </YStack>
-        <YStack width={70} alignItems="center">
-          <Text
-            fontSize="$5"
-            fontWeight="bold"
-            color={
-              team1Totals.actual >= team1ExpectedForGamesPlayed
-                ? '$green10'
-                : '$red10'
-            }
-          >
-            {team1Totals.actual.toFixed(1)}
+            {team1PitcherTotals.actual.toFixed(1)}
           </Text>
         </YStack>
         <Separator vertical marginHorizontal="$3" borderColor="$blue6" />
         <YStack width={70} alignItems="center">
-          <Text
-            fontSize="$5"
-            fontWeight="bold"
-            color={
-              team2Totals.actual >= team2ExpectedForGamesPlayed
-                ? '$green10'
-                : '$red10'
-            }
-          >
-            {team2Totals.actual.toFixed(1)}
+          <Text fontSize="$4" fontWeight="bold" color="$blue11">
+            {team2PitcherTotals.actual.toFixed(1)}
           </Text>
         </YStack>
         <YStack width={70} alignItems="center">
-          <Text fontSize="$4" fontWeight="600" color="$gray10">
-            {team2Totals.projected.toFixed(1)}
+          <Text fontSize="$3" fontWeight="600" color="$gray10">
+            {team2PitcherTotals.projected.toFixed(1)}
           </Text>
         </YStack>
         <YStack flex={1} alignItems="flex-end">
-          <Text fontSize="$4" fontWeight="bold" color="$blue11">
-            TOTAL (Starters Only)
+          <Text fontSize="$3" fontWeight="bold" color="$blue11">
+            Pitchers Total
           </Text>
         </YStack>
         <YStack width={50} /> {/* Position column spacer */}
