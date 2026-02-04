@@ -128,9 +128,10 @@ async function runRollbackCommand(
     // Create postgres connection string
     const connectionString = `postgresql://${dbConfig.user}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port || 5432}/${dbConfig.database}${dbConfig.ssl ? '?sslmode=require' : ''}`;
 
-    // Create postgres client
+    // Create postgres client - disable prepared statements for DDL operations
     const migrationClient = postgres(connectionString, {
       max: 1, // Use single connection for migrations
+      prepare: false, // Disable prepared statements - they don't work with DDL that references user-defined functions
     });
 
     // Create Drizzle instance
@@ -208,7 +209,7 @@ async function runMigrationsUp(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (migrationModule.up && typeof migrationModule.up === 'function') {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          await migrationModule.up({ db });
+          await migrationModule.up({ db, sql: _sql });
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           await recordMigration(db, migration.filename);
           appliedCount++;
@@ -268,7 +269,7 @@ async function runMigrationDown(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (migrationModule.down && typeof migrationModule.down === 'function') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      await migrationModule.down({ db });
+      await migrationModule.down({ db, sql: _sql });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await unrecordMigration(db, migrationToRollback.filename);
       LOGGER.info(`✅ Rolled back: ${migrationToRollback.filename}`);
