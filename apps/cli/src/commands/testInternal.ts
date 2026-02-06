@@ -1,11 +1,7 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { sql } from 'drizzle-orm';
-
-export const testInternalCommandBuilder = (argv: Argv) =>
-  argv.usage('test-internal');
 
 export async function testInternal(): Promise<void> {
   LOGGER.info('🧪 Testing internal schema state after nuclear reset');

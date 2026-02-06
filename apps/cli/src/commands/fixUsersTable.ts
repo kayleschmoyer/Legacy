@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithInternalClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -7,9 +6,6 @@ import { sql } from 'drizzle-orm';
 interface CountResult {
   count: number;
 }
-
-export const fixUsersTableCommandBuilder = (argv: Argv) =>
-  argv.usage('fix-users-table');
 
 export async function fixUsersTable(): Promise<void> {
   LOGGER.info('🔧 Creating missing app_internal.users table');

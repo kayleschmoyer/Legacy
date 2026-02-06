@@ -1,0 +1,17 @@
+#!/usr/bin/env pwsh
+# Legacy Sports CLI Entrypoint
+# Simple wrapper to run the CLI application
+# 
+# Usage:
+#   .\ls-cli.ps1 --help
+#   .\ls-cli.ps1 test-connection
+#   .\ls-cli.ps1 query-db --query "SELECT * FROM players LIMIT 10"
+#   .\ls-cli.ps1 get-player-batting --player troutmi01
+
+$ErrorActionPreference = "Stop"
+Push-Location "$PSScriptRoot/apps/cli"
+try {
+    & pnpm exec tsx --tsconfig ../../tsconfig.base.json src/main.ts @args
+} finally {
+    Pop-Location
+}

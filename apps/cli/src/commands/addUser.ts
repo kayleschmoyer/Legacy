@@ -1,6 +1,9 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { createUser, InternalSchema, runWithInternalClient } from '@legacy-sports/db-client';
+import {
+  createUser,
+  InternalSchema,
+  runWithInternalClient,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { eq, sql } from 'drizzle-orm';
 import { CommandArgs } from '../utils/loadEnvFile';
@@ -10,27 +13,9 @@ interface AddUserArgs extends CommandArgs {
   accessLevel?: 'none' | 'admin';
 }
 
-export const addUserCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('email', {
-      type: 'string',
-      describe: 'Email address of the user to add',
-      demandOption: true,
-    })
-    .option('access-level', {
-      type: 'string',
-      describe: 'Access level for the user (none or admin)',
-      choices: ['none', 'admin'],
-      default: 'none',
-    })
-    .example('$0 add-user --email user@example.com', 'Add a regular user')
-    .example('$0 add-user --email admin@example.com --access-level admin', 'Add an admin user');
-
-export async function handleAddUser(
-  args: ArgumentsCamelCase<AddUserArgs>,
-): Promise<void> {
+export async function handleAddUser(args: AddUserArgs): Promise<void> {
   const { email, accessLevel = 'none' } = args;
-  
+
   LOGGER.info(`➕ Adding user: ${email} with access level: ${accessLevel}`);
 
   const opts = getDbOptions();
@@ -48,11 +33,15 @@ export async function handleAddUser(
         LOGGER.warn(`⚠️  User with email ${email} already exists!`);
         LOGGER.info(`   User ID: ${existingUsers[0].id}`);
         LOGGER.info(`   Username: ${existingUsers[0].username || 'N/A'}`);
-        LOGGER.info(`   Access Level: ${existingUsers[0].accessLevel || 'none'}`);
-        
+        LOGGER.info(
+          `   Access Level: ${existingUsers[0].accessLevel || 'none'}`,
+        );
+
         // Ask if they want to update the access level
         if (existingUsers[0].accessLevel !== accessLevel) {
-          LOGGER.info(`💡 To update access level, use: set-user-type --email ${email} --access-level ${accessLevel}`);
+          LOGGER.info(
+            `💡 To update access level, use: set-user-type --email ${email} --access-level ${accessLevel}`,
+          );
         }
         return;
       }
@@ -66,12 +55,16 @@ export async function handleAddUser(
           sql`UPDATE "app_internal"."users" 
               SET "access_level" = ${accessLevel}::app_internal.access_level 
               WHERE "id" = ${newUser.id} 
-              RETURNING *`
+              RETURNING *`,
         );
-        
-        LOGGER.info(`✅ User created successfully with access level: ${accessLevel}`);
+
+        LOGGER.info(
+          `✅ User created successfully with access level: ${accessLevel}`,
+        );
       } else {
-        LOGGER.info(`✅ User created successfully with default access level: none`);
+        LOGGER.info(
+          `✅ User created successfully with default access level: none`,
+        );
       }
 
       LOGGER.info('');
@@ -81,15 +74,22 @@ export async function handleAddUser(
       LOGGER.info(`   Username: ${newUser.username || 'N/A'}`);
       LOGGER.info(`   Access Level: ${accessLevel}`);
       LOGGER.info('');
-      LOGGER.info('✅ This user can now authenticate via OAuth in your AWS environment');
+      LOGGER.info(
+        '✅ This user can now authenticate via OAuth in your AWS environment',
+      );
     });
   } catch (error) {
-    LOGGER.error('❌ Error adding user:', error instanceof Error ? error.message : String(error));
-    
+    LOGGER.error(
+      '❌ Error adding user:',
+      error instanceof Error ? error.message : String(error),
+    );
+
     if (error instanceof Error && error.message.includes('unique constraint')) {
-      LOGGER.info('💡 This error usually means the user already exists. Use "list-users" to check.');
+      LOGGER.info(
+        '💡 This error usually means the user already exists. Use "list-users" to check.',
+      );
     }
-    
+
     process.exit(1);
   }
 }

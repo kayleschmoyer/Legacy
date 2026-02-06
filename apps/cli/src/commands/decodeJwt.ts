@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 
 interface DecodeJwtArgs {
@@ -24,27 +23,6 @@ interface JwtPayload {
   iat?: number;
   [key: string]: unknown;
 }
-
-export const decodeJwtCommandBuilder = (yargs: Argv) => {
-  return yargs
-    .option('token', {
-      alias: 't',
-      describe: 'JWT token to decode',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('pretty', {
-      alias: 'p',
-      describe: 'Pretty print the JSON output',
-      type: 'boolean',
-      default: true,
-    })
-    .example('$0 decode-jwt --token eyJhbGciOiJ...', 'Decode a JWT token')
-    .example(
-      '$0 decode-jwt -t eyJhbGciOiJ... --no-pretty',
-      'Decode without pretty printing',
-    );
-};
 
 export const handleDecodeJwt = (args: DecodeJwtArgs): void => {
   try {

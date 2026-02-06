@@ -1,12 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-base-to-string */
 import { sql } from 'drizzle-orm';
 import { runWithPublicClient } from '@legacy-sports/db-client';
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
-
-export const investigateLeague13CommandBuilder = (argv: Argv) =>
-  argv.usage('investigate-league-13');
 
 export async function investigateLeague13() {
   LOGGER.info('🔍 Investigating League 13 Stats Issue');

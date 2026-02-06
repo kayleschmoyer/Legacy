@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { getPlayers, Letter } from '@legacy-sports/bref-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -6,9 +5,6 @@ import {
   bulkCreatePlayers,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
-
-export const loadPlayersCommandBuilder = (argv: Argv) =>
-  argv.usage('load-players');
 
 export async function handleLoadPlayers(): Promise<void> {
   LOGGER.info('Starting player loading process...');
@@ -28,15 +24,41 @@ export async function handleLoadPlayers(): Promise<void> {
 
       // Load all players from A-Z
       const letters: Letter[] = [
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+        'f',
+        'g',
+        'h',
+        'i',
+        'j',
+        'k',
+        'l',
+        'm',
+        'n',
+        'o',
+        'p',
+        'q',
+        'r',
+        's',
+        't',
+        'u',
+        'v',
+        'w',
+        'x',
+        'y',
+        'z',
       ];
 
       for (let i = 0; i < letters.length; i++) {
         const letter = letters[i];
-        
+
         try {
-          LOGGER.info(`[${i + 1}/${letters.length}] Loading players for letter: ${letter.toUpperCase()}`);
+          LOGGER.info(
+            `[${i + 1}/${letters.length}] Loading players for letter: ${letter.toUpperCase()}`,
+          );
           const letterPlayers = await getPlayers(letter);
 
           if (letterPlayers.length === 0) {

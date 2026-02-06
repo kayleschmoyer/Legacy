@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   runWithInternalClient,
@@ -19,9 +18,6 @@ interface MigrationInfo {
   hash: string;
   created_at: Date;
 }
-
-export const inspectDatabaseCommandBuilder = (argv: Argv) =>
-  argv.usage('inspect-database');
 
 export async function inspectDatabase(): Promise<void> {
   LOGGER.info('🔍 Inspecting Database State');
@@ -49,8 +45,12 @@ export async function inspectDatabase(): Promise<void> {
         );
       `);
 
-      LOGGER.info(`Public migration tracking table exists: ${Boolean(publicMigrationResult.rows[0]?.exists)}`);
-      LOGGER.info(`Drizzle schema migration tracking table exists: ${Boolean(drizzleSchemaMigrationResult.rows[0]?.exists)}`);
+      LOGGER.info(
+        `Public migration tracking table exists: ${Boolean(publicMigrationResult.rows[0]?.exists)}`,
+      );
+      LOGGER.info(
+        `Drizzle schema migration tracking table exists: ${Boolean(drizzleSchemaMigrationResult.rows[0]?.exists)}`,
+      );
 
       // List all public tables
       const tablesResult = await db.execute(sql`
@@ -60,7 +60,7 @@ export async function inspectDatabase(): Promise<void> {
         ORDER BY table_name;
       `);
 
-      // List all public views  
+      // List all public views
       const viewsResult = await db.execute(sql`
         SELECT table_name as view_name
         FROM information_schema.views 
@@ -89,7 +89,9 @@ export async function inspectDatabase(): Promise<void> {
         );
       `);
 
-      LOGGER.info(`is_major_league function exists: ${Boolean(functionResult.rows[0]?.exists)}`);
+      LOGGER.info(
+        `is_major_league function exists: ${Boolean(functionResult.rows[0]?.exists)}`,
+      );
 
       // Check migration state in whichever schema has the tracking table
       if (publicMigrationResult.rows[0]?.exists) {
@@ -158,8 +160,6 @@ export async function inspectDatabase(): Promise<void> {
       const exists = existsRow?.exists ?? false;
       LOGGER.info(`Internal migration tracking table exists: ${exists}`);
     });
-
-
 
     LOGGER.info('✅ Database inspection completed');
   } catch (error) {

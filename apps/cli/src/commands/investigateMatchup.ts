@@ -1,20 +1,11 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
-import type { ArgsType } from './ArgsType';
 
-export const investigateMatchupCommandBuilder = (argv: Argv) =>
-  argv.usage('investigate-matchup <matchupId>').positional('matchupId', {
-    type: 'number',
-    description: 'Matchup ID to investigate',
-    demandOption: true,
-  });
-
-type HandleInvestigateMatchupArgs = ArgsType<
-  ReturnType<typeof investigateMatchupCommandBuilder>
->;
+interface HandleInvestigateMatchupArgs {
+  matchupId: number;
+}
 
 export const handleInvestigateMatchup = async (
   args: HandleInvestigateMatchupArgs,

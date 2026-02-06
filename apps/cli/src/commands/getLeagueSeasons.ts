@@ -1,20 +1,11 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { eq, inArray, sql } from 'drizzle-orm';
-import type { ArgsType } from './ArgsType';
 
-export const getLeagueAvailableSeasonsCommandBuilder = (argv: Argv) =>
-  argv.usage('get-league-seasons <leagueId>').positional('leagueId', {
-    type: 'number',
-    description: 'League ID to check available seasons',
-    demandOption: true,
-  });
-
-type HandleGetLeagueSeasonsArgs = ArgsType<
-  ReturnType<typeof getLeagueAvailableSeasonsCommandBuilder>
->;
+interface HandleGetLeagueSeasonsArgs {
+  leagueId: number;
+}
 
 export const handleGetLeagueSeasons = async (
   args: HandleGetLeagueSeasonsArgs,

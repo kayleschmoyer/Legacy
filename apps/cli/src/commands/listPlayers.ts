@@ -1,28 +1,11 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { DatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 
-export const listPlayersCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('list-players')
-    .option('limit', {
-      alias: 'l',
-      describe: 'Number of players to fetch',
-      type: 'number',
-      default: 10,
-    })
-    .option('search', {
-      alias: 's',
-      describe: 'Search for players by name (firstName or lastName)',
-      type: 'string',
-    });
-
-type ArgsType<T> = T extends Argv<infer P> ? P : never;
-
-type HandleListPlayersArgs = ArgsType<
-  ReturnType<typeof listPlayersCommandBuilder>
->;
+interface HandleListPlayersArgs {
+  limit?: number;
+  search?: string;
+}
 
 export async function handleListPlayers(
   args: HandleListPlayersArgs,

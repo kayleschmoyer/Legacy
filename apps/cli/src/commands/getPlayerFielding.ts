@@ -1,42 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { resolveDatabaseCredentials } from '@legacy-sports/db-client';
 import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-export const getPlayerFieldingCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('get-player-fielding --player <bref_id>')
-    .option('player', {
-      alias: 'p',
-      describe: 'Player Baseball Reference ID (bref_id)',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('format', {
-      alias: 'f',
-      describe: 'Output format (table, json)',
-      type: 'string',
-      default: 'table',
-      choices: ['table', 'json'],
-    })
-    .option('position', {
-      describe: 'Filter by specific position (e.g., 1B, SS, OF)',
-      type: 'string',
-    })
-    .option('limit', {
-      alias: 'l',
-      describe: 'Maximum number of seasons to return',
-      type: 'number',
-    });
-
-type ArgsType<T> = T extends Argv<infer P> ? P : never;
-
-type HandleGetPlayerFieldingArgs = ArgsType<
-  ReturnType<typeof getPlayerFieldingCommandBuilder>
->;
+interface HandleGetPlayerFieldingArgs {
+  player?: string;
+  format?: string;
+  position?: string;
+  limit?: number;
+}
 
 export async function handleGetPlayerFielding(
   args: HandleGetPlayerFieldingArgs,

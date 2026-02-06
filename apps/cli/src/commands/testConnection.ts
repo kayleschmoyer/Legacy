@@ -1,11 +1,7 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { sql } from 'drizzle-orm';
-
-export const testConnectionCommandBuilder = (argv: Argv) =>
-  argv.usage('test-connection');
 
 export async function handleTestConnection(): Promise<void> {
   LOGGER.info('Testing database connection...');

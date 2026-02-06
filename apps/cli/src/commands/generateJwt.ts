@@ -1,6 +1,8 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { getUserByEmail, runWithInternalClient } from '@legacy-sports/db-client';
+import {
+  getUserByEmail,
+  runWithInternalClient,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { sign, SignOptions } from 'jsonwebtoken';
 import { CommandArgs } from '../utils/loadEnvFile';
@@ -13,54 +15,25 @@ export interface GenerateJwtArgs extends CommandArgs {
   format?: 'token' | 'header' | 'env' | 'localstorage';
 }
 
-export const generateJwtCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('email', {
-      alias: 'e',
-      describe: 'Email address of the user to generate JWT for',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('expiration', {
-      alias: 'exp',
-      describe: 'JWT expiration time (e.g., "1h", "7d", "30d")',
-      type: 'string',
-      default: '7d',
-    })
-    .option('access-level', {
-      alias: 'a',
-      describe: 'User access level for the JWT',
-      type: 'string',
-      choices: ['none', 'admin'],
-    })
-    .option('format', {
-      alias: 'f',
-      describe: 'Output format for the JWT',
-      type: 'string',
-      choices: ['token', 'header', 'env', 'localstorage'],
-      default: 'token',
-    })
-    .example([
-      ['$0 generate-jwt --email user@example.com', 'Generate JWT for user with 7-day expiration'],
-      ['$0 generate-jwt -e user@example.com --exp 1h', 'Generate JWT with 1-hour expiration'],
-      ['$0 generate-jwt -e admin@example.com -a admin', 'Generate admin JWT'],
-      ['$0 generate-jwt -e user@example.com -f header', 'Generate JWT as Authorization header JSON'],
-      ['$0 generate-jwt -e user@example.com -f env', 'Generate JWT as environment variable'],
-      ['$0 generate-jwt -e user@example.com -f localstorage', 'Generate JWT as localStorage command'],
-    ]);
-
-export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs>): Promise<void> => {
+export const handleGenerateJwt = async (
+  args: GenerateJwtArgs,
+): Promise<void> => {
   try {
     const { email, expiration, accessLevel, format } = args;
-    
+
     LOGGER.info(`🔐 Generating JWT for user: ${email}`);
-    
-    let user: { id: number; email: string; username: string; accessLevel: string } | null = null;
-    
+
+    let user: {
+      id: number;
+      email: string;
+      username: string;
+      accessLevel: string;
+    } | null = null;
+
     // Try to get user from database first
     try {
       const opts = getDbOptions();
-      
+
       await runWithInternalClient(opts, async (dbClient) => {
         const dbUser = await getUserByEmail(dbClient, email);
         if (dbUser) {
@@ -70,14 +43,18 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
             username: dbUser.username || dbUser.email,
             accessLevel: dbUser.accessLevel || 'none',
           };
-          LOGGER.info(`✅ Found user in database: ID ${user.id}, Email: ${user.email}`);
+          LOGGER.info(
+            `✅ Found user in database: ID ${user.id}, Email: ${user.email}`,
+          );
         }
       });
     } catch (dbError) {
-      LOGGER.warn(`⚠️  Database not available: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
+      LOGGER.warn(
+        `⚠️  Database not available: ${dbError instanceof Error ? dbError.message : String(dbError)}`,
+      );
       LOGGER.info('🔧 Falling back to mock user for development testing...');
     }
-    
+
     // If no user found in database, create a mock user for development
     if (!user) {
       user = {
@@ -87,12 +64,14 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
         accessLevel: accessLevel || 'none',
       };
       LOGGER.info(`🧪 Using mock user: ID ${user.id}, Email: ${user.email}`);
-      LOGGER.info('⚠️  This is a development-only token - not connected to real user data');
+      LOGGER.info(
+        '⚠️  This is a development-only token - not connected to real user data',
+      );
     }
-    
+
     // Get JWT secret
     const jwtSecret = getJwtSecret();
-    
+
     // Create JWT payload (same format as OAuth proxy)
     const payload: JWTPayload = {
       id: user.id,
@@ -101,18 +80,18 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
       accessLevel: accessLevel || user.accessLevel,
       iat: Math.floor(Date.now() / 1000),
     };
-    
+
     // Sign JWT with expiration
     const expirationValue = expiration || '7d';
     const expMs = parseExpiration(expirationValue);
     const expSeconds = Math.floor(expMs / 1000);
     const signOptions: SignOptions = { expiresIn: expSeconds };
     const jwtToken = sign(payload, jwtSecret, signOptions);
-    
+
     // Calculate expiration date for display
     const expirationDate = new Date();
     expirationDate.setTime(expirationDate.getTime() + expMs);
-    
+
     // Output based on format
     switch (format) {
       case 'header':
@@ -129,9 +108,11 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
         outputTokenFormat(jwtToken, user, payload, expirationDate);
         break;
     }
-    
   } catch (error) {
-    LOGGER.error('❌ Error generating JWT:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      '❌ Error generating JWT:',
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   }
 };
@@ -141,7 +122,7 @@ export const handleGenerateJwt = async (args: ArgumentsCamelCase<GenerateJwtArgs
  */
 function outputHeaderFormat(jwtToken: string): void {
   const headerJson = {
-    "Authorization": `Bearer ${jwtToken}`
+    Authorization: `Bearer ${jwtToken}`,
   };
   console.log(JSON.stringify(headerJson, null, 2));
 }
@@ -164,10 +145,10 @@ function outputLocalStorageFormat(jwtToken: string): void {
  * Output JWT with full details (default format)
  */
 function outputTokenFormat(
-  jwtToken: string, 
-  user: User, 
-  payload: JWTPayload, 
-  expirationDate: Date
+  jwtToken: string,
+  user: User,
+  payload: JWTPayload,
+  expirationDate: Date,
 ): void {
   LOGGER.info('\n🎉 JWT Generated Successfully!');
   LOGGER.info('================================');
@@ -176,7 +157,7 @@ function outputTokenFormat(
   LOGGER.info(`Expires: ${expirationDate.toISOString()}`);
   LOGGER.info(`\n🔑 JWT Token:`);
   console.log(jwtToken);
-  
+
   LOGGER.info('\n💡 Usage Examples:');
   LOGGER.info('  • Set as environment variable:');
   LOGGER.info(`    export AUTH_JWT="${jwtToken}"`);
@@ -195,15 +176,21 @@ function getJwtSecret(): string {
   try {
     // For development, use a simple secret
     // In production, this would read from AWS Secrets Manager
-    const secret = process.env.JWT_SECRET || 'dev-jwt-secret-key-not-for-production-use-only';
-    
+    const secret =
+      process.env.JWT_SECRET ||
+      'dev-jwt-secret-key-not-for-production-use-only';
+
     if (secret === 'dev-jwt-secret-key-not-for-production-use-only') {
-      LOGGER.warn('⚠️  Using development JWT secret. Do not use in production!');
+      LOGGER.warn(
+        '⚠️  Using development JWT secret. Do not use in production!',
+      );
     }
-    
+
     return secret;
   } catch {
-    LOGGER.warn('⚠️  Could not load JWT secret from environment, using development secret');
+    LOGGER.warn(
+      '⚠️  Could not load JWT secret from environment, using development secret',
+    );
     return 'dev-jwt-secret-key-not-for-production-use-only';
   }
 }
@@ -213,17 +200,19 @@ function getJwtSecret(): string {
  */
 function parseExpiration(exp: string): number {
   const units: Record<string, number> = {
-    's': 1000,
-    'm': 60 * 1000,
-    'h': 60 * 60 * 1000,
-    'd': 24 * 60 * 60 * 1000,
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
   };
-  
+
   const match = exp.match(/^(\d+)([smhd])$/);
   if (!match) {
-    throw new Error(`Invalid expiration format: ${exp}. Use format like "1h", "7d", "30m"`);
+    throw new Error(
+      `Invalid expiration format: ${exp}. Use format like "1h", "7d", "30m"`,
+    );
   }
-  
+
   const [, amount, unit] = match;
   return parseInt(amount, 10) * units[unit];
 }

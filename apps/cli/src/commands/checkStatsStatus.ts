@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -9,26 +8,12 @@ import {
 } from '@legacy-sports/db-client';
 import { GetQueueAttributesCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
-import type { ArgsType } from './ArgsType';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
-export const checkStatsStatusCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('check-stats-status')
-    .option('watch', {
-      default: false,
-      type: 'boolean',
-      description: 'Watch mode - refresh every 30 seconds',
-    })
-    .option('interval', {
-      default: 30,
-      type: 'number',
-      description: 'Refresh interval in seconds (only used with --watch)',
-    });
-
-type HandleCheckStatsStatusArgs = ArgsType<
-  ReturnType<typeof checkStatsStatusCommandBuilder>
->;
+interface HandleCheckStatsStatusArgs {
+  watch?: boolean;
+  interval?: number;
+}
 
 interface QueueStats {
   available: number;

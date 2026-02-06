@@ -1,4 +1,3 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { DraftService } from '@legacy-sports/db-client';
 import { CommandArgs } from '../utils/loadEnvFile';
@@ -13,59 +12,7 @@ export interface StartDraftArgs extends CommandArgs {
   dryRun?: boolean;
 }
 
-export const startDraftCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('leagueId', {
-      alias: 'l',
-      type: 'number',
-      describe: 'League ID to start draft for',
-      demandOption: true,
-    })
-    .option('draftType', {
-      alias: 't',
-      type: 'string',
-      describe: 'Type of draft to start',
-      choices: ['random-draft', 'snake-draft', 'auction'],
-      default: 'random-draft',
-    })
-    .option('user', {
-      alias: 'u',
-      type: 'string',
-      describe: 'Email of user to authenticate as (if multiple users)',
-    })
-    .option('skipUserValidation', {
-      type: 'boolean',
-      describe: 'Skip user access validation (admin operation)',
-      default: false,
-    })
-    .option('dryRun', {
-      type: 'boolean',
-      describe: 'Show what would happen without actually starting the draft',
-      default: false,
-    })
-    .example([
-      ['$0 start-draft --leagueId 1', 'Start random draft for league 1'],
-      ['$0 start-draft -l 1 -t snake-draft', 'Start snake draft for league 1'],
-      [
-        '$0 start-draft -l 1 --user admin@example.com',
-        'Start draft as specific user',
-      ],
-      [
-        '$0 start-draft -l 1 --skipUserValidation',
-        'Start draft without user validation (admin)',
-      ],
-      ['$0 start-draft -l 1 --dryRun', 'Preview draft start without executing'],
-    ])
-    .check((argv) => {
-      if (argv.leagueId <= 0) {
-        throw new Error('League ID must be a positive integer');
-      }
-      return true;
-    });
-
-export async function handleStartDraft(
-  args: ArgumentsCamelCase<StartDraftArgs>,
-): Promise<void> {
+export async function handleStartDraft(args: StartDraftArgs): Promise<void> {
   const {
     leagueId,
     draftType = 'random-draft',

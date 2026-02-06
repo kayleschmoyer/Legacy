@@ -1,11 +1,15 @@
-import { GetQueueAttributesCommand, PurgeQueueCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import {
+  GetQueueAttributesCommand,
+  PurgeQueueCommand,
+  ReceiveMessageCommand,
+  SQSClient,
+} from '@aws-sdk/client-sqs';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
-import { Argv } from 'yargs';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 /**
  * CLI command to inspect and manage the SQS draft queue
- * 
+ *
  * This command allows you to:
  * - Check queue attributes (message count, visibility timeout, etc.)
  * - Peek at messages without consuming them
@@ -67,26 +71,43 @@ class SqsQueueInspector {
           'DelaySeconds',
           'ReceiveMessageWaitTimeSeconds',
           'FifoQueue',
-          'ContentBasedDeduplication'
-        ]
+          'ContentBasedDeduplication',
+        ],
       });
 
       const result = await this.sqsClient.send(command);
-      
+
       if (result.Attributes) {
         console.log('📊 Queue Statistics:');
         console.log('==================');
-        console.log(`🔢 Messages Available: ${result.Attributes.ApproximateNumberOfMessages}`);
-        console.log(`⏳ Messages In Flight: ${result.Attributes.ApproximateNumberOfMessagesNotVisible}`);
-        console.log(`⏱️  Messages Delayed: ${result.Attributes.ApproximateNumberOfMessagesDelayed || '0'}`);
-        console.log(`🏗️  Queue Type: ${result.Attributes.FifoQueue === 'true' ? 'FIFO' : 'Standard'}`);
-        console.log(`⏰ Visibility Timeout: ${result.Attributes.VisibilityTimeout || '0'} seconds`);
-        console.log(`📅 Created: ${new Date(parseInt(result.Attributes.CreatedTimestamp || '0') * 1000).toISOString()}`);
-        console.log(`📝 Last Modified: ${new Date(parseInt(result.Attributes.LastModifiedTimestamp || '0') * 1000).toISOString()}\n`);
+        console.log(
+          `🔢 Messages Available: ${result.Attributes.ApproximateNumberOfMessages}`,
+        );
+        console.log(
+          `⏳ Messages In Flight: ${result.Attributes.ApproximateNumberOfMessagesNotVisible}`,
+        );
+        console.log(
+          `⏱️  Messages Delayed: ${result.Attributes.ApproximateNumberOfMessagesDelayed || '0'}`,
+        );
+        console.log(
+          `🏗️  Queue Type: ${result.Attributes.FifoQueue === 'true' ? 'FIFO' : 'Standard'}`,
+        );
+        console.log(
+          `⏰ Visibility Timeout: ${result.Attributes.VisibilityTimeout || '0'} seconds`,
+        );
+        console.log(
+          `📅 Created: ${new Date(parseInt(result.Attributes.CreatedTimestamp || '0') * 1000).toISOString()}`,
+        );
+        console.log(
+          `📝 Last Modified: ${new Date(parseInt(result.Attributes.LastModifiedTimestamp || '0') * 1000).toISOString()}\n`,
+        );
 
-        const totalMessages = parseInt(result.Attributes.ApproximateNumberOfMessages || '0') + 
-                            parseInt(result.Attributes.ApproximateNumberOfMessagesNotVisible || '0');
-        
+        const totalMessages =
+          parseInt(result.Attributes.ApproximateNumberOfMessages || '0') +
+          parseInt(
+            result.Attributes.ApproximateNumberOfMessagesNotVisible || '0',
+          );
+
         if (totalMessages === 0) {
           console.log('✅ Queue is empty - no messages found');
         } else {
@@ -105,19 +126,21 @@ class SqsQueueInspector {
    */
   async peekMessages(maxMessages = 10): Promise<void> {
     try {
-      console.log(`👀 Peeking at up to ${maxMessages} messages (won't consume them)...`);
-      
+      console.log(
+        `👀 Peeking at up to ${maxMessages} messages (won't consume them)...`,
+      );
+
       const command = new ReceiveMessageCommand({
         QueueUrl: this.queueUrl,
         MaxNumberOfMessages: Math.min(maxMessages, 10), // SQS max is 10
         VisibilityTimeout: 1, // Very short timeout so messages become visible again quickly
         WaitTimeSeconds: 2, // Short polling
         AttributeNames: ['All'],
-        MessageAttributeNames: ['All']
+        MessageAttributeNames: ['All'],
       });
 
       const result = await this.sqsClient.send(command);
-      
+
       if (!result.Messages || result.Messages.length === 0) {
         console.log('📭 No messages found in queue');
         return;
@@ -129,22 +152,35 @@ class SqsQueueInspector {
       result.Messages.forEach((message, index) => {
         console.log(`\n📋 Message ${index + 1}:`);
         console.log(`   🆔 Message ID: ${message.MessageId}`);
-        console.log(`   📅 Sent: ${message.Attributes?.SentTimestamp ? 
-          new Date(parseInt(message.Attributes.SentTimestamp)).toISOString() : 'Unknown'}`);
-        
+        console.log(
+          `   📅 Sent: ${
+            message.Attributes?.SentTimestamp
+              ? new Date(
+                  parseInt(message.Attributes.SentTimestamp),
+                ).toISOString()
+              : 'Unknown'
+          }`,
+        );
+
         // Try to parse the message body as draft message
         try {
-          const parsedBody = JSON.parse(message.Body || '{}') as ParsedDraftMessage;
-          
+          const parsedBody = JSON.parse(
+            message.Body || '{}',
+          ) as ParsedDraftMessage;
+
           if (parsedBody.messageType === 'START_DRAFT') {
             console.log(`   🎯 Message Type: START_DRAFT`);
             console.log(`   🏟️  League ID: ${parsedBody.payload.leagueId}`);
             console.log(`   🎲 Draft Type: ${parsedBody.payload.draftType}`);
-            console.log(`   👤 Requested By: ${parsedBody.payload.requestedBy}`);
+            console.log(
+              `   👤 Requested By: ${parsedBody.payload.requestedBy}`,
+            );
             console.log(`   ⏰ Timestamp: ${parsedBody.payload.timestamp}`);
           } else {
             console.log(`   📄 Message Type: ${parsedBody.messageType}`);
-            console.log(`   📝 Raw Body: ${message.Body?.substring(0, 200)}...`);
+            console.log(
+              `   📝 Raw Body: ${message.Body?.substring(0, 200)}...`,
+            );
           }
         } catch {
           console.log(`   ⚠️  Could not parse message body as JSON`);
@@ -152,8 +188,9 @@ class SqsQueueInspector {
         }
       });
 
-      console.log('\n💡 Note: Messages will become visible again after 1 second (peek mode)');
-      
+      console.log(
+        '\n💡 Note: Messages will become visible again after 1 second (peek mode)',
+      );
     } catch (error) {
       console.error('❌ Failed to peek at messages:', error);
       throw error;
@@ -165,7 +202,9 @@ class SqsQueueInspector {
    */
   async listMessages(maxMessages = 10): Promise<QueueMessage[]> {
     try {
-      console.log(`📋 Listing up to ${maxMessages} messages (will consume them)...`);
+      console.log(
+        `📋 Listing up to ${maxMessages} messages (will consume them)...`,
+      );
       console.log('⚠️  WARNING: This will remove messages from the queue!\n');
 
       const command = new ReceiveMessageCommand({
@@ -174,22 +213,22 @@ class SqsQueueInspector {
         VisibilityTimeout: 300, // 5 minutes to inspect
         WaitTimeSeconds: 5, // Long polling
         AttributeNames: ['All'],
-        MessageAttributeNames: ['All']
+        MessageAttributeNames: ['All'],
       });
 
       const result = await this.sqsClient.send(command);
-      
+
       if (!result.Messages || result.Messages.length === 0) {
         console.log('📭 No messages found in queue');
         return [];
       }
 
-      const messages: QueueMessage[] = result.Messages.map(msg => ({
+      const messages: QueueMessage[] = result.Messages.map((msg) => ({
         messageId: msg.MessageId || '',
         receiptHandle: msg.ReceiptHandle || '',
         body: msg.Body || '',
         attributes: msg.Attributes,
-        messageAttributes: msg.MessageAttributes
+        messageAttributes: msg.MessageAttributes,
       }));
 
       console.log(`📨 Retrieved ${messages.length} message(s) for inspection:`);
@@ -198,8 +237,10 @@ class SqsQueueInspector {
       messages.forEach((message, index) => {
         console.log(`\n📬 Message ${index + 1}:`);
         console.log(`   🆔 ID: ${message.messageId}`);
-        console.log(`   🎫 Receipt Handle: ${message.receiptHandle.substring(0, 50)}...`);
-        
+        console.log(
+          `   🎫 Receipt Handle: ${message.receiptHandle.substring(0, 50)}...`,
+        );
+
         try {
           const parsed = JSON.parse(message.body) as ParsedDraftMessage;
           console.log(`   📄 Parsed Content:`, JSON.stringify(parsed, null, 4));
@@ -216,7 +257,6 @@ class SqsQueueInspector {
       });
 
       return messages;
-      
     } catch (error) {
       console.error('❌ Failed to list messages:', error);
       throw error;
@@ -232,49 +272,21 @@ class SqsQueueInspector {
       console.log('⚠️  This action cannot be undone!');
 
       const command = new PurgeQueueCommand({
-        QueueUrl: this.queueUrl
+        QueueUrl: this.queueUrl,
       });
 
       await this.sqsClient.send(command);
-      
+
       console.log('✅ Queue purge initiated successfully');
-      console.log('💡 It may take up to 60 seconds for all messages to be deleted');
-      
+      console.log(
+        '💡 It may take up to 60 seconds for all messages to be deleted',
+      );
     } catch (error) {
       console.error('❌ Failed to purge queue:', error);
       throw error;
     }
   }
 }
-
-// CLI command builder function
-export const inspectSqsQueueCommandBuilder = (yargs: Argv) => {
-  return yargs
-    .option('action', {
-      type: 'string',
-      choices: ['attributes', 'peek', 'list', 'purge'],
-      default: 'attributes',
-      description: 'Action to perform on the queue'
-    })
-    .option('maxMessages', {
-      type: 'number',
-      alias: 'm',
-      default: 10,
-      description: 'Maximum number of messages to retrieve (peek/list actions)'
-    })
-    .option('queueType', {
-      type: 'string',
-      choices: ['drafts', 'stats'],
-      default: 'drafts',
-      description: 'Which queue to inspect'
-    })
-    .example([
-      ['$0 inspect-sqs-queue', 'Show queue attributes (default)'],
-      ['$0 inspect-sqs-queue --action peek', 'Peek at messages without consuming'],
-      ['$0 inspect-sqs-queue --action list --maxMessages 5', 'List and consume up to 5 messages'],
-      ['$0 inspect-sqs-queue --queueType stats', 'Inspect the stats loading queue instead']
-    ]);
-};
 
 // CLI command handler function
 export const handleInspectSqsQueue = async (argv: CommandArgs) => {
@@ -283,9 +295,10 @@ export const handleInspectSqsQueue = async (argv: CommandArgs) => {
     console.log('=====================\n');
 
     // Determine queue URL based on type
-    const queueUrl = argv.queueType === 'drafts' 
-      ? getEnvVarRequired(EnvironmentVariable.SQS_AUTOMATIC_DRAFTS_URL)
-      : getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
+    const queueUrl =
+      argv.queueType === 'drafts'
+        ? getEnvVarRequired(EnvironmentVariable.SQS_AUTOMATIC_DRAFTS_URL)
+        : getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
 
     const inspector = new SqsQueueInspector(queueUrl);
 
@@ -293,37 +306,40 @@ export const handleInspectSqsQueue = async (argv: CommandArgs) => {
       case 'attributes':
         await inspector.getQueueAttributes();
         break;
-        
+
       case 'peek':
         await inspector.getQueueAttributes();
         await inspector.peekMessages(argv.maxMessages);
         break;
-        
+
       case 'list': {
         await inspector.getQueueAttributes();
         const messages = await inspector.listMessages(argv.maxMessages);
-        
+
         if (messages.length > 0) {
           console.log('\n💡 Messages have been consumed from the queue.');
-          console.log('   They will be deleted automatically unless you process them.');
+          console.log(
+            '   They will be deleted automatically unless you process them.',
+          );
         }
         break;
       }
-        
+
       case 'purge':
         await inspector.getQueueAttributes();
-        
+
         // Safety check for production
         if (process.env.NODE_ENV === 'production') {
-          throw new Error('Queue purging is not allowed in production environment');
+          throw new Error(
+            'Queue purging is not allowed in production environment',
+          );
         }
-        
+
         await inspector.purgeQueue();
         break;
     }
 
     console.log('\n✅ SQS queue inspection completed');
-
   } catch (error) {
     console.error('\n❌ SQS inspection failed:', error);
     process.exit(1);

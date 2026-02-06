@@ -1,6 +1,8 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { InternalSchema, runWithInternalClient } from '@legacy-sports/db-client';
+import {
+  InternalSchema,
+  runWithInternalClient,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { CommandArgs } from '../utils/loadEnvFile';
 
@@ -9,24 +11,9 @@ interface ListUsersArgs extends CommandArgs {
   offset?: number;
 }
 
-export const listUsersCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('limit', {
-      type: 'number',
-      describe: 'Maximum number of users to list',
-      default: 50,
-    })
-    .option('offset', {
-      type: 'number',
-      describe: 'Number of users to skip (for pagination)',
-      default: 0,
-    });
-
-export async function handleListUsers(
-  args: ArgumentsCamelCase<ListUsersArgs>,
-): Promise<void> {
+export async function handleListUsers(args: ListUsersArgs): Promise<void> {
   const { limit = 50, offset = 0 } = args;
-  
+
   LOGGER.info(`📋 Listing users (limit: ${limit}, offset: ${offset})`);
 
   const opts = getDbOptions();
@@ -53,7 +40,7 @@ export async function handleListUsers(
 
       LOGGER.info(`✅ Found ${users.length} user(s):`);
       LOGGER.info('');
-      
+
       // Display header
       LOGGER.info('ID\tEmail\t\t\t\tUsername\t\tAccess Level');
       LOGGER.info('─'.repeat(80));
@@ -64,19 +51,22 @@ export async function handleListUsers(
         const email = (user.email || 'N/A').padEnd(30);
         const username = (user.username || 'N/A').padEnd(15);
         const accessLevel = user.accessLevel || 'none';
-        
+
         LOGGER.info(`${id}\t${email}\t${username}\t${accessLevel}`);
       });
 
       LOGGER.info('');
       LOGGER.info(`📊 Total users shown: ${users.length}`);
-      
+
       if (users.length === limit) {
         LOGGER.info(`💡 Use --offset ${offset + limit} to see more users`);
       }
     });
   } catch (error) {
-    LOGGER.error('❌ Error listing users:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      '❌ Error listing users:',
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   }
 }

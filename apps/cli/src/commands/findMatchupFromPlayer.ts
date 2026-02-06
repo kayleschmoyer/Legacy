@@ -1,23 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
-import type { ArgsType } from './ArgsType';
 
-export const findMatchupFromPlayerCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('find-matchup-from-player <matchupPlayerId>')
-    .positional('matchupPlayerId', {
-      type: 'number',
-      description: 'Matchup Player ID to trace back to matchup',
-      demandOption: true,
-    });
-
-type HandleFindMatchupFromPlayerArgs = ArgsType<
-  ReturnType<typeof findMatchupFromPlayerCommandBuilder>
->;
+interface HandleFindMatchupFromPlayerArgs {
+  matchupPlayerId: number;
+}
 
 export const handleFindMatchupFromPlayer = async (
   args: HandleFindMatchupFromPlayerArgs,

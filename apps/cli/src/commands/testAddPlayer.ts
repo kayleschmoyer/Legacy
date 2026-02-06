@@ -1,10 +1,6 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { DatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-
-export const testAddPlayerCommandBuilder = (argv: Argv) =>
-  argv.usage('test-add-player');
 
 export async function handleTestAddPlayer(): Promise<void> {
   LOGGER.info('Testing adding a single player...');

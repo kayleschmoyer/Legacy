@@ -1,17 +1,9 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { resetDatabase } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 
-export const resetDatabaseCommandBuilder = (argv: Argv) =>
-  argv.usage('reset-database').option('confirm', {
-    type: 'boolean',
-    describe: 'Confirm that you want to reset the database (DESTRUCTIVE)',
-    default: false,
-  });
-
 interface ResetDatabaseArgs {
-  confirm: boolean;
+  confirm?: boolean;
 }
 
 export async function handleResetDatabase(

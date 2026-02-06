@@ -1,23 +1,12 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import axios from 'axios';
-import { ArgsType } from './ArgsType';
 import { AuthMiddleware } from '../services/AuthMiddleware';
 
-export const createMatchupCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('create-matchup')
-    .option('league', {
-      type: 'number',
-    })
-    .demandOption('league')
-    .option('week', { type: 'number' })
-    .demandOption('week');
-
-type HandleCreateMatchupArgs = ArgsType<
-  ReturnType<typeof createMatchupCommandBuilder>
->;
+interface HandleCreateMatchupArgs {
+  league: number;
+  week: number;
+}
 
 export async function handleCreateMatchup(
   args: HandleCreateMatchupArgs,

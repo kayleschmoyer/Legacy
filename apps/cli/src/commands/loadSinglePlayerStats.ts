@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
@@ -10,22 +9,10 @@ import {
 import { getDbOptions } from '@legacy-sports/utils';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
-export const loadSinglePlayerStatsCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('load-single-player-stats')
-    .option('player', {
-      alias: 'p',
-      describe: 'Player brefId to load stats for',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('remote', {
-      default: false,
-      type: 'boolean',
-      describe: 'Send to SQS queue instead of processing locally',
-    });
-
-type ArgsType<T> = T extends Argv<infer P> ? P : never;
+interface HandleLoadSinglePlayerStatsArgs {
+  player: string;
+  remote?: boolean;
+}
 
 async function insertIntoSqs(playerId: string): Promise<void> {
   const queueUrl = getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
@@ -43,10 +30,6 @@ async function insertIntoSqs(playerId: string): Promise<void> {
 
   await sqsClient.send(command);
 }
-
-type HandleLoadSinglePlayerStatsArgs = ArgsType<
-  ReturnType<typeof loadSinglePlayerStatsCommandBuilder>
->;
 
 export async function handleLoadSinglePlayerStats(
   args: HandleLoadSinglePlayerStatsArgs,

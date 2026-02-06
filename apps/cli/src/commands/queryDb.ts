@@ -1,31 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { resolveDatabaseCredentials } from '@legacy-sports/db-client';
 import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-export const queryDbCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('query-db --query "SELECT * FROM table_name LIMIT 10"')
-    .option('query', {
-      alias: 'q',
-      describe: 'SQL query to execute',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('format', {
-      alias: 'f',
-      describe: 'Output format (table, json)',
-      type: 'string',
-      default: 'table',
-      choices: ['table', 'json'],
-    });
-
-type ArgsType<T> = T extends Argv<infer P> ? P : never;
-
-type HandleQueryDbArgs = ArgsType<ReturnType<typeof queryDbCommandBuilder>>;
+interface HandleQueryDbArgs {
+  query: string;
+  format: string;
+}
 
 export async function handleQueryDb(args: HandleQueryDbArgs): Promise<void> {
   const { query, format } = args;

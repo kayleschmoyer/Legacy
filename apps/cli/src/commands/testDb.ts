@@ -1,4 +1,3 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { Pool, PoolConfig } from 'pg';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -9,11 +8,7 @@ import * as fs from 'fs';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 import { CommandArgs, loadEnvFile } from '../utils/loadEnvFile';
 
-export const testDbCommandBuilder = (argv: Argv): Argv => argv.usage('test-db');
-
-export async function handleTestDb(
-  args: ArgumentsCamelCase<CommandArgs>,
-): Promise<void> {
+export async function handleTestDb(args: CommandArgs): Promise<void> {
   loadEnvFile(args);
   LOGGER.info('Testing database connectivity...');
 

@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   getCareerBattingStatsForPlayer,
@@ -15,23 +14,11 @@ import {
   DEFAULT_PITCHING_SCORING,
 } from '@legacy-sports/scoring';
 import { getDbOptions } from '@legacy-sports/utils';
-import { ArgsType } from './ArgsType';
 
-export const computeScoringCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('computeScoring')
-    .option('player', {
-      type: 'string',
-    })
-    .option('league', {
-      type: 'number',
-      describe: 'League ID used to resolve custom scoring multipliers',
-    })
-    .demandOption('player');
-
-type HandleComputeScoringArgs = ArgsType<
-  ReturnType<typeof computeScoringCommandBuilder>
->;
+interface HandleComputeScoringArgs {
+  player: string;
+  league?: number;
+}
 
 export async function handleComputeScoring(
   args: HandleComputeScoringArgs,

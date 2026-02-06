@@ -1,6 +1,8 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-import { InternalSchema, runWithInternalClient } from '@legacy-sports/db-client';
+import {
+  InternalSchema,
+  runWithInternalClient,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { eq, sql } from 'drizzle-orm';
 import { CommandArgs } from '../utils/loadEnvFile';
@@ -10,25 +12,9 @@ interface SetUserTypeArgs extends CommandArgs {
   type: 'none' | 'admin';
 }
 
-export const setUserTypeCommandBuilder = (argv: Argv): Argv => 
-  argv
-    .option('email', {
-      type: 'string',
-      describe: 'Email address of the user to update',
-      demandOption: true,
-    })
-    .option('type', {
-      type: 'string',
-      choices: ['none', 'admin'],
-      describe: 'User access level to set',
-      demandOption: true,
-    });
-
-export async function handleSetUserType(
-  args: ArgumentsCamelCase<SetUserTypeArgs>,
-): Promise<void> {
+export async function handleSetUserType(args: SetUserTypeArgs): Promise<void> {
   const { email, type } = args;
-  
+
   LOGGER.info(`🔧 Setting user type for ${email} to ${type}`);
 
   const opts = getDbOptions();
@@ -48,7 +34,9 @@ export async function handleSetUserType(
       }
 
       const user = existingUser[0];
-      LOGGER.info(`📧 Found user: ${user.username || 'No username'} (ID: ${user.id})`);
+      LOGGER.info(
+        `📧 Found user: ${user.username || 'No username'} (ID: ${user.id})`,
+      );
       LOGGER.info(`🔐 Current access level: ${user.accessLevel}`);
 
       // Update the user's access level using raw SQL
@@ -56,7 +44,7 @@ export async function handleSetUserType(
         sql`UPDATE "app_internal"."users" 
             SET "access_level" = ${type}::app_internal.access_level 
             WHERE "email" = ${email} 
-            RETURNING *`
+            RETURNING *`,
       );
 
       // Check if the update was successful by querying the user again
@@ -79,7 +67,10 @@ export async function handleSetUserType(
       LOGGER.info(`🔐 New access level: ${updatedUser.accessLevel}`);
     });
   } catch (error) {
-    LOGGER.error('❌ Error setting user type:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      '❌ Error setting user type:',
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   }
 }

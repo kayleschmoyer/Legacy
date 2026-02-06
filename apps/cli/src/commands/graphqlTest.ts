@@ -1,4 +1,3 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import fs from 'fs/promises';
 import path from 'path';
@@ -16,66 +15,16 @@ interface GraphQLTestArgs extends CommandArgs {
   headers?: boolean;
 }
 
-export const graphqlTestCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('query', {
-      alias: 'q',
-      type: 'string',
-      describe: 'GraphQL query string to execute',
-    })
-    .option('file', {
-      alias: 'f', 
-      type: 'string',
-      describe: 'Path to file containing GraphQL query',
-    })
-    .option('variables', {
-      alias: 'v',
-      type: 'string',
-      describe: 'JSON string of query variables (e.g. \'{"id": 123}\')',
-    })
-    .option('user', {
-      alias: 'u',
-      type: 'string',
-      describe: 'Email of user to authenticate as (if multiple users)',
-    })
-    .option('raw', {
-      alias: 'r',
-      type: 'boolean',
-      describe: 'Output raw JSON response without formatting',
-      default: false,
-    })
-    .option('pretty', {
-      alias: 'p',
-      type: 'boolean',
-      describe: 'Pretty print JSON output',
-      default: true,
-    })
-    .option('headers', {
-      type: 'boolean',
-      describe: 'Include response headers in output',
-      default: false,
-    })
-    .example([
-      ['$0 graphql-test --query "query { users { id email } }"', 'Execute simple query'],
-      ['$0 graphql-test --file ./queries/users.graphql', 'Execute query from file'],
-      ['$0 graphql-test --query "query GetUser($id: Int!) { user(id: $id) { name } }" --variables \'{"id": 123}\'', 'Query with variables'],
-      ['$0 graphql-test --query "{ users { id } }" --user admin@example.com', 'Use specific authenticated user'],
-      ['$0 graphql-test --query "{ users { id } }" --raw', 'Output raw JSON'],
-    ])
-    .check((argv) => {
-      if (!argv.query && !argv.file) {
-        throw new Error('Either --query or --file must be specified');
-      }
-      if (argv.query && argv.file) {
-        throw new Error('Cannot specify both --query and --file');
-      }
-      return true;
-    });
-
-export async function handleGraphQLTest(
-  args: ArgumentsCamelCase<GraphQLTestArgs>,
-): Promise<void> {
-  const { query: queryString, file, variables, user, raw, pretty, headers } = args;
+export async function handleGraphQLTest(args: GraphQLTestArgs): Promise<void> {
+  const {
+    query: queryString,
+    file,
+    variables,
+    user,
+    raw,
+    pretty,
+    headers,
+  } = args;
 
   try {
     // Get the GraphQL query
@@ -95,15 +44,19 @@ export async function handleGraphQLTest(
     if (variables) {
       try {
         parsedVariables = JSON.parse(variables) as Record<string, unknown>;
-        LOGGER.info(`📝 Using variables: ${JSON.stringify(parsedVariables, null, 2)}`);
+        LOGGER.info(
+          `📝 Using variables: ${JSON.stringify(parsedVariables, null, 2)}`,
+        );
       } catch (error) {
-        throw new Error(`Invalid JSON in variables: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Invalid JSON in variables: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
     // Set up authentication
     const authMiddleware = new AuthMiddleware();
-    
+
     // Check if authenticated
     const currentUser = await authMiddleware.getCurrentUser();
     if (!currentUser) {
@@ -113,14 +66,16 @@ export async function handleGraphQLTest(
     }
 
     const targetUser = user || currentUser.email;
-    LOGGER.info(`🔐 Authenticating as: ${targetUser} (${currentUser.accessLevel})`);
+    LOGGER.info(
+      `🔐 Authenticating as: ${targetUser} (${currentUser.accessLevel})`,
+    );
 
     // Display query info
     LOGGER.info('\n📋 Query Details:');
     LOGGER.info('─'.repeat(60));
     LOGGER.info('Query:');
     console.log(formatQuery(query));
-    
+
     if (Object.keys(parsedVariables).length > 0) {
       LOGGER.info('\nVariables:');
       console.log(JSON.stringify(parsedVariables, null, 2));
@@ -136,16 +91,16 @@ export async function handleGraphQLTest(
         authMiddleware.getGraphQLUrl(),
         {
           method: 'POST',
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             query: query.trim(),
-            variables: parsedVariables 
+            variables: parsedVariables,
           }),
           userEmail: targetUser,
-        }
+        },
       );
 
       const executionTime = Date.now() - startTime;
-      
+
       // Handle response
       if (headers) {
         LOGGER.info('\n📨 Response Headers:');
@@ -161,22 +116,21 @@ export async function handleGraphQLTest(
         LOGGER.info('─'.repeat(40));
       }
 
-      const responseData = await response.json() as GraphQLResponse;
-      
+      const responseData = (await response.json()) as GraphQLResponse;
+
       LOGGER.info(`\n✅ Query completed in ${executionTime}ms`);
       LOGGER.info(`📊 Status: ${response.status} ${response.statusText}`);
-      
+
       // Output results
       if (raw) {
         console.log(JSON.stringify(responseData));
       } else {
         displayGraphQLResponse(responseData, pretty ?? true);
       }
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
       LOGGER.error(`❌ Query failed after ${executionTime}ms`);
-      
+
       if (error instanceof Error) {
         if (error.message.includes('Authentication token is invalid')) {
           LOGGER.error('🔑 Authentication token is invalid or expired');
@@ -192,13 +146,18 @@ export async function handleGraphQLTest(
       }
       throw error;
     }
-
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Authentication required')) {
+    if (
+      error instanceof Error &&
+      error.message.includes('Authentication required')
+    ) {
       // Already handled above
       return;
     }
-    LOGGER.error('Failed to execute GraphQL test:', error instanceof Error ? error.message : String(error));
+    LOGGER.error(
+      'Failed to execute GraphQL test:',
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }
@@ -209,14 +168,16 @@ export async function handleGraphQLTest(
 async function loadQueryFromFile(filePath: string): Promise<string> {
   try {
     // Handle relative paths
-    const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-    
+    const resolvedPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(process.cwd(), filePath);
+
     const query = await fs.readFile(resolvedPath, 'utf-8');
-    
+
     if (!query.trim()) {
       throw new Error('Query file is empty');
     }
-    
+
     return query;
   } catch (error) {
     if (error instanceof Error && error.message.includes('ENOENT')) {
@@ -234,7 +195,7 @@ function formatQuery(query: string): string {
   return query
     .replace(/\s+/g, ' ') // Normalize whitespace
     .replace(/{\s*/g, '{\n  ') // Opening braces
-    .replace(/\s*}/g, '\n}') // Closing braces  
+    .replace(/\s*}/g, '\n}') // Closing braces
     .replace(/,\s*/g, ',\n  ') // Commas
     .trim();
 }
@@ -242,10 +203,13 @@ function formatQuery(query: string): string {
 /**
  * Display GraphQL response with formatting
  */
-function displayGraphQLResponse(responseData: GraphQLResponse, pretty: boolean): void {
+function displayGraphQLResponse(
+  responseData: GraphQLResponse,
+  pretty: boolean,
+): void {
   LOGGER.info('\n📋 Response:');
   LOGGER.info('═'.repeat(60));
-  
+
   // Check for GraphQL errors
   if (responseData.errors && responseData.errors.length > 0) {
     LOGGER.info('❌ GraphQL Errors:');
@@ -253,7 +217,9 @@ function displayGraphQLResponse(responseData: GraphQLResponse, pretty: boolean):
       LOGGER.info(`\n  Error ${index + 1}:`);
       LOGGER.info(`    Message: ${error.message}`);
       if (error.locations) {
-        LOGGER.info(`    Location: Line ${error.locations[0].line}, Column ${error.locations[0].column}`);
+        LOGGER.info(
+          `    Location: Line ${error.locations[0].line}, Column ${error.locations[0].column}`,
+        );
       }
       if (error.path) {
         LOGGER.info(`    Path: ${error.path.join('.')}`);
@@ -261,7 +227,7 @@ function displayGraphQLResponse(responseData: GraphQLResponse, pretty: boolean):
     });
     LOGGER.info('');
   }
-  
+
   // Display data
   if (responseData.data) {
     LOGGER.info('✅ Data:');
@@ -273,12 +239,12 @@ function displayGraphQLResponse(responseData: GraphQLResponse, pretty: boolean):
   } else if (!responseData.errors) {
     LOGGER.info('⚠️  No data returned');
   }
-  
+
   // Display extensions (if any)
   if (responseData.extensions) {
     LOGGER.info('\n📎 Extensions:');
     console.log(JSON.stringify(responseData.extensions, null, 2));
   }
-  
+
   LOGGER.info('═'.repeat(60));
 }

@@ -1,12 +1,4 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
-
-export const runMigrationsCommandBuilder = (argv: Argv) =>
-  argv.usage('runMigrations').option('production', {
-    type: 'boolean',
-    default: false,
-    description: 'Use production AWS credentials',
-  });
 
 export function handleRunMigrations(): void {
   LOGGER.error('❌ This command has been deprecated.');

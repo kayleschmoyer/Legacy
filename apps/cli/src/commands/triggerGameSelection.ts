@@ -1,4 +1,3 @@
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -7,26 +6,11 @@ import {
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { and, eq } from 'drizzle-orm';
-import type { ArgsType } from './ArgsType';
 
-export const triggerGameSelectionCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('trigger-game-selection')
-    .option('matchup-id', {
-      alias: 'm',
-      type: 'number',
-      description:
-        'Specific matchup ID to trigger (default: all matchups with pending stats)',
-    })
-    .option('dry-run', {
-      type: 'boolean',
-      default: false,
-      description: 'Show what would be done without making changes',
-    });
-
-type HandleTriggerGameSelectionArgs = ArgsType<
-  ReturnType<typeof triggerGameSelectionCommandBuilder>
->;
+interface HandleTriggerGameSelectionArgs {
+  matchupId?: number;
+  dryRun?: boolean;
+}
 
 interface MatchupPendingStats {
   matchupId: number;
@@ -162,7 +146,9 @@ async function triggerGameSelection(
 export async function handleTriggerGameSelection(
   args: HandleTriggerGameSelectionArgs,
 ): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const matchupId = args['matchup-id'];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const dryRun = args['dry-run'];
   const opts = getDbOptions();
 
@@ -175,6 +161,7 @@ export async function handleTriggerGameSelection(
 
   await runWithPublicClient(opts, async (db) => {
     // Get matchups with pending stats
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const matchups = await getMatchupsWithPendingStats(db, matchupId);
 
     if (matchups.length === 0) {
@@ -199,6 +186,7 @@ export async function handleTriggerGameSelection(
     let failCount = 0;
 
     for (const matchup of matchups) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const success = await triggerGameSelection(matchup, dryRun ?? false);
       if (success) {
         successCount++;

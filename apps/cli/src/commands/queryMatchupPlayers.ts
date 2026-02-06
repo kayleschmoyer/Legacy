@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -9,13 +8,6 @@ import { and, eq, inArray } from 'drizzle-orm';
 interface QueryMatchupPlayersArgs {
   matchupId: number;
 }
-
-export const queryMatchupPlayersCommandBuilder = (argv: Argv) =>
-  argv.usage('query-matchup-players --matchupId <id>').option('matchupId', {
-    type: 'number',
-    demandOption: true,
-    describe: 'Matchup ID to query',
-  });
 
 export async function queryMatchupPlayers(
   args: QueryMatchupPlayersArgs,

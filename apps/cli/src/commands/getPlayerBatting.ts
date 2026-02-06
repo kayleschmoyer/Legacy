@@ -1,38 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-base-to-string */
-import { Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { resolveDatabaseCredentials } from '@legacy-sports/db-client';
 import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-export const getPlayerBattingCommandBuilder = (argv: Argv) =>
-  argv
-    .usage('get-player-batting --player <bref_id>')
-    .option('player', {
-      alias: 'p',
-      describe: 'Player Baseball Reference ID (bref_id)',
-      type: 'string',
-      demandOption: true,
-    })
-    .option('format', {
-      alias: 'f',
-      describe: 'Output format (table, json)',
-      type: 'string',
-      default: 'table',
-      choices: ['table', 'json'],
-    })
-    .option('limit', {
-      alias: 'l',
-      describe: 'Maximum number of seasons to return',
-      type: 'number',
-    });
-
-type ArgsType<T> = T extends Argv<infer P> ? P : never;
-
-type HandleGetPlayerBattingArgs = ArgsType<
-  ReturnType<typeof getPlayerBattingCommandBuilder>
->;
+interface HandleGetPlayerBattingArgs {
+  player?: string;
+  format?: string;
+  limit?: number;
+}
 
 export async function handleGetPlayerBatting(
   args: HandleGetPlayerBattingArgs,

@@ -1,4 +1,3 @@
-import { ArgumentsCamelCase, Argv } from 'yargs';
 import { LOGGER } from '@legacy-sports/logging';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
@@ -10,30 +9,14 @@ interface AuthenticatedListUsersArgs extends CommandArgs {
   useAuth?: boolean;
 }
 
-export const authenticatedListUsersCommandBuilder = (argv: Argv): Argv =>
-  argv
-    .option('limit', {
-      type: 'number',
-      describe: 'Maximum number of users to list',
-      default: 50,
-    })
-    .option('offset', {
-      type: 'number',
-      describe: 'Number of users to skip (for pagination)',
-      default: 0,
-    })
-    .option('use-auth', {
-      type: 'boolean',
-      describe: 'Use authenticated GraphQL API instead of direct database access',
-      default: true,
-    });
-
 export async function handleAuthenticatedListUsers(
-  args: ArgumentsCamelCase<AuthenticatedListUsersArgs>,
+  args: AuthenticatedListUsersArgs,
 ): Promise<void> {
   const { limit = 50, offset = 0, useAuth = true } = args;
-  
-  LOGGER.info(`📋 Listing users with authentication (limit: ${limit}, offset: ${offset})`);
+
+  LOGGER.info(
+    `📋 Listing users with authentication (limit: ${limit}, offset: ${offset})`,
+  );
 
   const authMiddleware = new AuthMiddleware();
 
@@ -42,7 +25,7 @@ export async function handleAuthenticatedListUsers(
       // Use authenticated GraphQL API
       await authMiddleware.requireAuth();
       await authMiddleware.requireAccessLevel('admin'); // Only admins can list users
-      
+
       const query = `
         query ListUsers($limit: Int!, $offset: Int!) {
           users(limit: $limit, offset: $offset) {
@@ -54,54 +37,68 @@ export async function handleAuthenticatedListUsers(
           }
         }
       `;
-      
-      const data = await authMiddleware.makeGraphQLRequest(query, { limit, offset }) as GraphQLResponse<{ users: User[] }>;
-      
+
+      const data = (await authMiddleware.makeGraphQLRequest(query, {
+        limit,
+        offset,
+      })) as GraphQLResponse<{ users: User[] }>;
+
       if (data.data?.users && data.data.users.length > 0) {
         LOGGER.info(`\n✅ Found ${data.data.users.length} users:`);
         LOGGER.info('─'.repeat(80));
-        LOGGER.info('ID'.padEnd(8) + 'Email'.padEnd(30) + 'Username'.padEnd(25) + 'Access Level');
+        LOGGER.info(
+          'ID'.padEnd(8) +
+            'Email'.padEnd(30) +
+            'Username'.padEnd(25) +
+            'Access Level',
+        );
         LOGGER.info('─'.repeat(80));
-        
+
         data.data.users.forEach((user: User) => {
           LOGGER.info(
             user.id.toString().padEnd(8) +
-            user.email.padEnd(30) +
-            (user.username || 'N/A').padEnd(25) +
-            user.accessLevel
+              user.email.padEnd(30) +
+              (user.username || 'N/A').padEnd(25) +
+              user.accessLevel,
           );
         });
         LOGGER.info('─'.repeat(80));
       } else {
         LOGGER.info('No users found');
       }
-      
     } else {
       // Fall back to direct database access (legacy mode)
       LOGGER.info('Using legacy direct database access...');
-      
+
       // Import and use the original function
       const { handleListUsers } = await import('./listUsers');
       await handleListUsers(args);
     }
-    
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Authentication required')) {
+    if (
+      error instanceof Error &&
+      error.message.includes('Authentication required')
+    ) {
       LOGGER.error('❌ Authentication required to list users');
       LOGGER.info('💡 Run "cli auth login" to authenticate, then try again');
       return;
     }
-    
+
     if (error instanceof Error && error.message.includes('Access denied')) {
-      LOGGER.error('❌ Access denied - admin privileges required to list users');
+      LOGGER.error(
+        '❌ Access denied - admin privileges required to list users',
+      );
       const currentUser = await authMiddleware.getCurrentUser();
       if (currentUser) {
         LOGGER.info(`Current access level: ${currentUser.accessLevel}`);
       }
       return;
     }
-    
-    LOGGER.error('Failed to list users:', error instanceof Error ? error.message : String(error));
+
+    LOGGER.error(
+      'Failed to list users:',
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }
