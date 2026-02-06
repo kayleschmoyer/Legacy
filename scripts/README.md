@@ -45,6 +45,7 @@ Schema changes (ALTER TABLE, CREATE TABLE, CREATE INDEX, etc.) must NEVER be in 
 - `squash-branch.ps1` - Squash commits interactively
 - `resolve-generated-conflicts.ps1` - Auto-resolve generated file conflicts
 - `skip-migration-conflict.ps1` - Skip duplicate migration commits
+- `sync-jira-status.ps1` - Synchronize Jira ticket statuses with Git branches
 
 ### Environment & Configuration
 
