@@ -49,8 +49,18 @@ export function NextStepControl({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation();
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation();
+  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation({
+    refetchQueries: [
+      'GetCurrentMatchupForLeague',
+      'GetMatchupsForLeague',
+      'GetLeagueById',
+    ],
+    awaitRefetchQueries: true,
+  });
+  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
+    refetchQueries: ['GetLeagueById'],
+    awaitRefetchQueries: true,
+  });
   const [triggerGameSelection] = useTriggerGameSelectionMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,

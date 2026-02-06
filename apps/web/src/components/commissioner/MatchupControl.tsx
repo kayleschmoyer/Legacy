@@ -39,7 +39,14 @@ export function MatchupControl({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation();
+  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation({
+    refetchQueries: [
+      'GetCurrentMatchupForLeague',
+      'GetMatchupsForLeague',
+      'GetLeagueById',
+    ],
+    awaitRefetchQueries: true,
+  });
 
   // Get all matchups to determine the next available week
   const { data: allMatchupsData, loading: matchupsLoading } =

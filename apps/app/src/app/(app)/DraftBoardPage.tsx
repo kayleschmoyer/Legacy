@@ -366,22 +366,33 @@ const DraftBoardPage: React.FC = () => {
 
   // Hooks
   const timer = useTimer(90);
-  
-  // GraphQL mutation hook - now returns League object, eliminating need for manual refetch
+
+  // StartDraft mutation - with refetchQueries to ensure UI updates
   const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
+    refetchQueries: ['GetLeagueById'],
+    awaitRefetchQueries: true,
     onCompleted: (data: StartDraftMutation) => {
       console.log('✅ Draft mutation completed successfully:', data);
-      console.log('🎯 Returned League object with updated status:', data.startDraft);
+      console.log(
+        '🎯 Returned League object with updated status:',
+        data.startDraft,
+      );
       console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
-      console.log('🚀 Apollo Client cache automatically updated - no manual refetch needed!');
-      Alert.alert('Success', 'Draft has been started and queued for processing!');
+      Alert.alert(
+        'Success',
+        'Draft has been started and queued for processing!',
+      );
       timer.start();
     },
     onError: (error: unknown) => {
       console.error('Error starting draft:', error);
-      const message = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' 
-        ? error.message 
-        : 'Failed to start draft';
+      const message =
+        error &&
+        typeof error === 'object' &&
+        'message' in error &&
+        typeof error.message === 'string'
+          ? error.message
+          : 'Failed to start draft';
       Alert.alert('Error', message);
     },
   });
@@ -428,11 +439,11 @@ const DraftBoardPage: React.FC = () => {
 
   const handleStartDraft = useCallback(() => {
     console.log('Starting draft...', draftId);
-    
+
     // For now, using a placeholder league ID - this should come from route params or props
     // TODO: Get actual league ID from route parameters or component props
     const leagueId = 1; // Placeholder - replace with actual league ID
-    
+
     startDraft({
       variables: {
         leagueId: leagueId,
