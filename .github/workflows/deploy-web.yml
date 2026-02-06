@@ -99,9 +99,18 @@ jobs:
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-          # Only set Nx Cloud token if DTE is available AND started successfully
-          NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && steps.start-dte.outcome == 'success' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
         run: |
+          # Only enable Nx Cloud if DTE started successfully
+          if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
+            echo "🚀 Building with Nx Cloud DTE enabled"
+            export NX_CLOUD_ACCESS_TOKEN="${{ secrets.NX_CLOUD_ACCESS_TOKEN }}"
+          else
+            echo "📦 Building with local execution (DTE unavailable)"
+            unset NX_CLOUD_ACCESS_TOKEN
+            export NX_CLOUD_NO_TIMEOUTS=true
+            export NX_NO_CLOUD=true
+          fi
+
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then
             if command -v pnpm >/dev/null 2>&1; then
