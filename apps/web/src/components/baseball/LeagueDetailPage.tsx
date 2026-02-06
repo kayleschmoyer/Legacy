@@ -18,7 +18,6 @@ import {
   useGetLeagueByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
-  useStartDraftMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
@@ -105,44 +104,6 @@ function getDraftStatusBgColor(status?: string | null): string {
       return '$green3';
     default:
       return '$gray3';
-  }
-}
-
-function canStartDraft(status?: string | null): boolean {
-  return status === 'not-started';
-}
-
-function getDraftButtonColor(status?: string | null): string {
-  switch (status) {
-    case 'not-started':
-      return '$blue9';
-    case 'queued':
-      return '$orange9';
-    case 'in-progress':
-      return '$gray9';
-    case 'completed':
-      return '$green9';
-    default:
-      return '$gray9';
-  }
-}
-
-function getDraftButtonText(status?: string | null, loading = false): string {
-  if (loading) {
-    return 'Starting...';
-  }
-
-  switch (status) {
-    case 'not-started':
-      return 'Start Draft';
-    case 'queued':
-      return 'Draft Queued';
-    case 'in-progress':
-      return 'Draft In Progress';
-    case 'completed':
-      return 'Draft Completed';
-    default:
-      return 'Draft Unavailable';
   }
 }
 
@@ -340,17 +301,6 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
 
-  // StartDraft mutation - now returns League object, eliminating need for manual refetch
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
-    onCompleted: () => {
-      alert('Draft has been started and queued for processing!');
-    },
-    onError: (error) => {
-      console.error('Error starting draft:', error);
-      alert(`Failed to start draft: ${error.message}`);
-    },
-  });
-
   const {
     settings: scoringSettings,
     loading: scoringLoading,
@@ -376,39 +326,34 @@ export function LeagueDetailPage(): React.JSX.Element {
     null,
   );
 
-  const handleMatchupSuccess = useCallback(() => {
-    setMatchupSuccessMessage(
-      'Game selection triggered! Processing in background...',
-    );
-    setMatchupErrorMessage(null);
-    void refetchMatchup();
-    setTimeout(() => setMatchupSuccessMessage(null), 5000);
-  }, [refetchMatchup]);
+  const handleMatchupSuccess = useCallback(
+    (actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1') => {
+      if (actionType === 'draft') {
+        setMatchupSuccessMessage(
+          'Draft started successfully! You can now create Week 1 matchups.',
+        );
+      } else if (actionType === 'createWeek1') {
+        setMatchupSuccessMessage('Week 1 matchups created successfully!');
+      } else if (actionType === 'advance') {
+        setMatchupSuccessMessage(
+          'Week advanced successfully! New matchups created.',
+        );
+      } else {
+        setMatchupSuccessMessage(
+          'Game selection triggered! Processing in background...',
+        );
+      }
+      setMatchupErrorMessage(null);
+      void refetchMatchup();
+      setTimeout(() => setMatchupSuccessMessage(null), 5000);
+    },
+    [refetchMatchup],
+  );
 
   const handleMatchupError = useCallback((err: Error) => {
     setMatchupErrorMessage(err.message);
     setMatchupSuccessMessage(null);
   }, []);
-
-  const handleStartDraft = useCallback(() => {
-    if (!isCommissioner) {
-      alert('Only league commissioners can start drafts.');
-      return;
-    }
-
-    if (
-      window.confirm(
-        'Are you sure you want to start the draft? This will randomly assign players to all teams.',
-      )
-    ) {
-      void startDraft({
-        variables: {
-          leagueId: leagueId,
-          draftType: 'random-draft',
-        },
-      });
-    }
-  }, [startDraft, leagueId, isCommissioner]);
 
   const handlePlayerAssign = useCallback(
     async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
@@ -832,6 +777,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           leagueId={leagueId}
           currentMatchup={currentMatchup}
           gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
+          draftStatus={league.draftStatus}
           onSuccess={handleMatchupSuccess}
           onError={handleMatchupError}
         />
@@ -846,57 +792,6 @@ export function LeagueDetailPage(): React.JSX.Element {
           await refetchScoringProfile({ leagueId });
         }}
       />
-
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-        <YStack space="$3">
-          <H2 size="$6" color="$blue11">
-            Draft Management
-          </H2>
-          <Text color="$gray11" fontSize="$4">
-            Start a random draft to automatically assign players to all teams in
-            the league.
-          </Text>
-          <XStack
-            justifyContent="space-between"
-            alignItems="center"
-            flexWrap="wrap"
-            gap="$3"
-          >
-            <YStack flex={1} minWidth={300}>
-              <Text
-                fontSize="$5"
-                fontWeight="600"
-                color="$blue11"
-                marginBottom="$2"
-              >
-                Random Draft
-              </Text>
-              <Text fontSize="$3" color="$gray10">
-                Randomly assigns players to roster positions for all teams
-              </Text>
-            </YStack>
-            <Button
-              backgroundColor={getDraftButtonColor(league.draftStatus)}
-              color="white"
-              onPress={handleStartDraft}
-              disabled={startDraftLoading || !canStartDraft(league.draftStatus)}
-              opacity={
-                startDraftLoading || !canStartDraft(league.draftStatus)
-                  ? 0.6
-                  : 1
-              }
-              minWidth={140}
-              size="$4"
-              aria-label={getDraftButtonText(
-                league.draftStatus,
-                startDraftLoading,
-              )}
-            >
-              {getDraftButtonText(league.draftStatus, startDraftLoading)}
-            </Button>
-          </XStack>
-        </YStack>
-      </Card>
 
       <DeleteLeagueControl
         leagueId={leagueId}

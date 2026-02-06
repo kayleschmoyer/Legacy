@@ -19,7 +19,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { handler as selectGameHandler } from './handlers/select-game';
 
 // Initialize Sentry
@@ -115,9 +115,9 @@ async function queueMatchupStatsLoad(
     return;
   }
 
-  // Split players into batches of 10 to avoid Lambda timeouts
-  // Each player takes ~10-12 seconds, so 10 players = ~2 minutes (well under timeout)
-  const BATCH_SIZE = 10;
+  // Split players into batches of 8 to avoid Lambda timeouts
+  // Each player takes ~10-12 seconds, so 8 players = ~90 seconds (safer timeout margin)
+  const BATCH_SIZE = 8;
   const batches: (typeof gameRecords)[] = [];
 
   for (let i = 0; i < gameRecords.length; i += BATCH_SIZE) {
@@ -355,18 +355,89 @@ async function selectGameForMatchup(
       .values(gameRecords)
       .onConflictDoNothing();
     LOGGER.info(`Successfully inserted ${gameRecords.length} game records`);
+  }
 
-    // Queue ONE message for the entire matchup to load all stats sequentially
-    if (playersForStatsLoading.length > 0) {
-      // Update matchup status to 'loading' before queuing
-      await db
-        .update(PublicSchema.matchups)
-        .set({ statsLoadingStatus: 'loading' })
-        .where(eq(PublicSchema.matchups.id, matchupId));
-      LOGGER.info(`Set matchup ${matchupId} stats_loading_status to 'loading'`);
+  // 4.5. Get ALL games for this matchup that need stats loaded (pending status)
+  // This includes both newly created games AND any games from previous runs that never got queued
+  // NOTE: We check ALL game numbers, not just the current one, to catch any missed games
+  const gamesNeedingStats = await db
+    .select({
+      id: PublicSchema.matchupPlayerGames.id,
+      matchupPlayerId: PublicSchema.matchupPlayerGames.matchupPlayerId,
+      playerId: PublicSchema.matchupPlayers.playerId,
+      brefId: PublicSchema.players.brefId,
+      season: PublicSchema.leagueWeekPlayerSeasons.season,
+      battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
+      pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
+      fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
+      fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
+    })
+    .from(PublicSchema.matchupPlayerGames)
+    .innerJoin(
+      PublicSchema.matchupPlayers,
+      eq(
+        PublicSchema.matchupPlayers.id,
+        PublicSchema.matchupPlayerGames.matchupPlayerId,
+      ),
+    )
+    .innerJoin(
+      PublicSchema.players,
+      eq(PublicSchema.players.id, PublicSchema.matchupPlayers.playerId),
+    )
+    .innerJoin(
+      PublicSchema.leagueWeekPlayerSeasons,
+      and(
+        eq(
+          PublicSchema.leagueWeekPlayerSeasons.playerId,
+          PublicSchema.matchupPlayers.playerId,
+        ),
+        eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchupData.leagueId),
+        eq(
+          PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+          matchupData.weekNumber,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayers.matchupId, matchupId),
+        eq(PublicSchema.matchupPlayerGames.statsLoadingStatus, 'pending'),
+      ),
+    );
 
-      await queueMatchupStatsLoad(matchupId, playersForStatsLoading);
-    }
+  if (gamesNeedingStats.length > 0) {
+    LOGGER.info(
+      `Found ${gamesNeedingStats.length} games needing stats (${gameRecords.length} new, ${gamesNeedingStats.length - gameRecords.length} previously pending)`,
+    );
+
+    // Update matchup status to 'loading' before queuing
+    await db
+      .update(PublicSchema.matchups)
+      .set({ statsLoadingStatus: 'loading' })
+      .where(eq(PublicSchema.matchups.id, matchupId));
+    LOGGER.info(`Set matchup ${matchupId} stats_loading_status to 'loading'`);
+
+    // Update individual player game statuses to 'loading'
+    const gameIds = gamesNeedingStats.map((g) => g.id);
+    await db
+      .update(PublicSchema.matchupPlayerGames)
+      .set({ statsLoadingStatus: 'loading' })
+      .where(inArray(PublicSchema.matchupPlayerGames.id, gameIds));
+    LOGGER.info(`Set ${gameIds.length} player games to 'loading' status`);
+
+    // Queue all games that need stats
+    const gamesToQueue = gamesNeedingStats.map((game) => ({
+      matchupPlayerId: game.matchupPlayerId,
+      playerId: game.playerId,
+      brefId: game.brefId || '',
+      season: game.season,
+      battingGameNum: game.battingGameNum || 1,
+      pitchingGameNum: game.pitchingGameNum || 1,
+      fieldingGameNum: game.fieldingGameNum || 1,
+      fieldingGamePos: game.fieldingGamePos || 'XX',
+    }));
+
+    await queueMatchupStatsLoad(matchupId, gamesToQueue);
   }
 
   // 5. Calculate how many games have been selected so far
@@ -449,6 +520,92 @@ async function createMatchupForLeagueWeek(
 
     if (missingRecords.length === 0) {
       LOGGER.info(`No missing records to process for matchup ${matchup.id}`);
+
+      // Even though there are no new records to create, check for existing games with pending stats
+      // This handles the case where games were created but never queued for stats loading
+      const pendingGames = await db
+        .select({
+          id: PublicSchema.matchupPlayerGames.id,
+          matchupPlayerId: PublicSchema.matchupPlayerGames.matchupPlayerId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          brefId: PublicSchema.players.brefId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+          battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
+          pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
+          fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
+          fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
+        })
+        .from(PublicSchema.matchupPlayerGames)
+        .innerJoin(
+          PublicSchema.matchupPlayers,
+          eq(
+            PublicSchema.matchupPlayers.id,
+            PublicSchema.matchupPlayerGames.matchupPlayerId,
+          ),
+        )
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.players.id, PublicSchema.matchupPlayers.playerId),
+        )
+        .innerJoin(
+          PublicSchema.leagueWeekPlayerSeasons,
+          and(
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.playerId,
+              PublicSchema.matchupPlayers.playerId,
+            ),
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              matchup.weekNumber,
+            ),
+          ),
+        )
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, matchup.id),
+            eq(PublicSchema.matchupPlayerGames.statsLoadingStatus, 'pending'),
+          ),
+        );
+
+      if (pendingGames.length > 0) {
+        LOGGER.info(
+          `Found ${pendingGames.length} pending games for matchup ${matchup.id}, queuing for stats loading`,
+        );
+
+        // Update matchup status to 'loading' before queuing
+        await db
+          .update(PublicSchema.matchups)
+          .set({ statsLoadingStatus: 'loading' })
+          .where(eq(PublicSchema.matchups.id, matchup.id));
+        LOGGER.info(
+          `Set matchup ${matchup.id} stats_loading_status to 'loading'`,
+        );
+
+        // Update individual player game statuses to 'loading'
+        const gameIds = pendingGames.map((g) => g.id);
+        await db
+          .update(PublicSchema.matchupPlayerGames)
+          .set({ statsLoadingStatus: 'loading' })
+          .where(inArray(PublicSchema.matchupPlayerGames.id, gameIds));
+        LOGGER.info(`Set ${gameIds.length} player games to 'loading' status`);
+
+        // Queue all games that need stats
+        const gamesToQueue = pendingGames.map((game) => ({
+          matchupPlayerId: game.matchupPlayerId,
+          playerId: game.playerId,
+          brefId: game.brefId || '',
+          season: game.season,
+          battingGameNum: game.battingGameNum || 1,
+          pitchingGameNum: game.pitchingGameNum || 1,
+          fieldingGameNum: game.fieldingGameNum || 1,
+          fieldingGamePos: game.fieldingGamePos || 'XX',
+        }));
+
+        await queueMatchupStatsLoad(matchup.id, gamesToQueue);
+        LOGGER.info(`Queued ${gamesToQueue.length} games for stats loading`);
+      }
+
       matchupsProcessed++;
       continue;
     }
@@ -503,23 +660,78 @@ async function createMatchupForLeagueWeek(
     });
 
     // BATCH 2: Fetch all available seasons for all players in one query
+    // Query both batting and pitching to handle pitcher-only players
+    // Filter to seasons with at least 2x games as matchup requires
+    const minGames = (matchup.gamesPerMatchup ?? 7) * 2;
     LOGGER.info(
-      `Batch fetching available seasons for ${playerIds.length} players`,
+      `Batch fetching available seasons for ${playerIds.length} players (min ${minGames} games)`,
     );
-    const allPlayerSeasons = await db
-      .select()
-      .from(PublicSchema.seasonBatting)
-      .where(inArray(PublicSchema.seasonBatting.playerId, playerIds));
+    const [allBattingSeasons, allPitchingSeasons] = await Promise.all([
+      db
+        .select({
+          playerId: PublicSchema.seasonBatting.playerId,
+          season: PublicSchema.seasonBatting.season,
+          g: PublicSchema.seasonBatting.g,
+        })
+        .from(PublicSchema.seasonBatting)
+        .where(
+          and(
+            inArray(PublicSchema.seasonBatting.playerId, playerIds),
+            isNotNull(PublicSchema.seasonBatting.g),
+          ),
+        ),
+      db
+        .select({
+          playerId: PublicSchema.seasonPitching.playerId,
+          season: PublicSchema.seasonPitching.season,
+          g: PublicSchema.seasonPitching.g,
+        })
+        .from(PublicSchema.seasonPitching)
+        .where(
+          and(
+            inArray(PublicSchema.seasonPitching.playerId, playerIds),
+            isNotNull(PublicSchema.seasonPitching.g),
+          ),
+        ),
+    ]);
 
-    // Group seasons by player ID
+    // Track max games per player-season (batting or pitching)
+    const playerSeasonGames = new Map<string, number>(); // key: "playerId-season"
+
+    allBattingSeasons.forEach((seasonStat) => {
+      const key = `${seasonStat.playerId}-${seasonStat.season}`;
+      const games = seasonStat.g ?? 0;
+      playerSeasonGames.set(
+        key,
+        Math.max(playerSeasonGames.get(key) ?? 0, games),
+      );
+    });
+
+    allPitchingSeasons.forEach((seasonStat) => {
+      const key = `${seasonStat.playerId}-${seasonStat.season}`;
+      const games = seasonStat.g ?? 0;
+      playerSeasonGames.set(
+        key,
+        Math.max(playerSeasonGames.get(key) ?? 0, games),
+      );
+    });
+
+    // Group seasons by player ID, filtering to only those with enough games
     const seasonsByPlayer = new Map<number, number[]>();
-    allPlayerSeasons.forEach((seasonStat) => {
-      if (!seasonsByPlayer.has(seasonStat.playerId)) {
-        seasonsByPlayer.set(seasonStat.playerId, []);
-      }
-      const seasons = seasonsByPlayer.get(seasonStat.playerId);
-      if (seasons && !seasons.includes(seasonStat.season)) {
-        seasons.push(seasonStat.season);
+
+    playerSeasonGames.forEach((games, key) => {
+      if (games >= minGames) {
+        const [playerIdStr, seasonStr] = key.split('-');
+        const playerId = parseInt(playerIdStr, 10);
+        const season = parseInt(seasonStr, 10);
+
+        if (!seasonsByPlayer.has(playerId)) {
+          seasonsByPlayer.set(playerId, []);
+        }
+        const seasons = seasonsByPlayer.get(playerId);
+        if (seasons && !seasons.includes(season)) {
+          seasons.push(season);
+        }
       }
     });
 
@@ -559,7 +771,19 @@ async function createMatchupForLeagueWeek(
         const availableSeasons = seasonsByPlayer.get(player.id) || [];
 
         if (availableSeasons.length === 0) {
-          LOGGER.warn(`No seasons found for player ${player.id}, skipping`);
+          // Log detailed info about why no seasons were found
+          const playerBattingSeasons = allBattingSeasons
+            .filter((s) => s.playerId === player.id)
+            .map((s) => `${s.season}(${s.g}g)`);
+          const playerPitchingSeasons = allPitchingSeasons
+            .filter((s) => s.playerId === player.id)
+            .map((s) => `${s.season}(${s.g}g)`);
+
+          LOGGER.warn(`No eligible seasons for player ${player.id}`, {
+            minGamesRequired: minGames,
+            battingSeasons: playerBattingSeasons,
+            pitchingSeasons: playerPitchingSeasons,
+          });
           continue;
         }
 

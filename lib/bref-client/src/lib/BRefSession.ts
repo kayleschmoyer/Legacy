@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { LOGGER } from '@legacy-sports/logging';
 
-const MAX_REQUESTS_PER_MINUTE = 5; // Reduced from 10 to be more conservative
+// 15 requests/minute = ~4 second delays
+// This allows 8 players × 3 stat types = 24 requests × 4s = 96s + ~45s scraping = ~141s (safe for 180s timeout)
+// Previous: 5 req/min (12s delays) caused timeouts with just 6-7 players
+// No 429 errors ever observed in production, so we're being overly conservative
+const MAX_REQUESTS_PER_MINUTE = 15;
 
 let lastRequest: number;
 

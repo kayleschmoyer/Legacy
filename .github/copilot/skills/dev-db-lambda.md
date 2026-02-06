@@ -337,7 +337,7 @@ pnpm exec nx run db:build
 
 ```powershell
 # Deploy using deployment script
-.\scripts\deploy-lambda.ps1 -FunctionName db
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
 
 # Then apply infrastructure changes
 cd terraform

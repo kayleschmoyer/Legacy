@@ -64,6 +64,16 @@ output "sqs_load_season_stats_url" {
   value       = aws_sqs_queue.load_season_stats.url
 }
 
+output "sqs_load_game_stats_arn" {
+  description = "ARN of the load game stats SQS queue"
+  value       = aws_sqs_queue.load_game_stats.arn
+}
+
+output "sqs_load_game_stats_url" {
+  description = "URL of the load game stats SQS queue"
+  value       = aws_sqs_queue.load_game_stats.url
+}
+
 output "sqs_automatic_drafts_arn" {
   description = "ARN of the automatic drafts SQS queue"
   value       = aws_sqs_queue.automatic_drafts.arn

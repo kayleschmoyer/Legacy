@@ -65,7 +65,7 @@ import {
   handleTestRawConnection,
   testRawConnectionCommandBuilder,
 } from './commands/testRawConnection';
-import { main as testDatabase } from './commands/test-database';
+// Removed testDatabase import - not used as a command handler
 import { decodeJwtCommandBuilder, handleDecodeJwt } from './commands/decodeJwt';
 import {
   handleSetUserType,
@@ -111,6 +111,22 @@ import {
   handleGetLeagueSeasons,
 } from './commands/getLeagueSeasons';
 import { handleQueryDb, queryDbCommandBuilder } from './commands/queryDb';
+import {
+  getPlayerBattingCommandBuilder,
+  handleGetPlayerBatting,
+} from './commands/getPlayerBatting';
+import {
+  getPlayerPitchingCommandBuilder,
+  handleGetPlayerPitching,
+} from './commands/getPlayerPitching';
+import {
+  getPlayerFieldingCommandBuilder,
+  handleGetPlayerFielding,
+} from './commands/getPlayerFielding';
+import {
+  handleTriggerGameSelection,
+  triggerGameSelectionCommandBuilder,
+} from './commands/triggerGameSelection';
 
 async function run(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -204,14 +220,6 @@ async function run(): Promise<void> {
       'Test raw PostgreSQL connection using pg package',
       testRawConnectionCommandBuilder,
       handleTestRawConnection,
-    )
-    .command(
-      'test-database',
-      'Test new database service layer',
-      {},
-      async () => {
-        await testDatabase();
-      },
     )
     .command(
       'fix-users-table',
@@ -308,6 +316,30 @@ async function run(): Promise<void> {
       'Get available seasons with stats for a league',
       getLeagueAvailableSeasonsCommandBuilder,
       handleGetLeagueSeasons,
+    )
+    .command(
+      'get-player-batting',
+      'Get batting stats for a player by bref_id',
+      getPlayerBattingCommandBuilder,
+      handleGetPlayerBatting,
+    )
+    .command(
+      'get-player-pitching',
+      'Get pitching stats for a player by bref_id',
+      getPlayerPitchingCommandBuilder,
+      handleGetPlayerPitching,
+    )
+    .command(
+      'get-player-fielding',
+      'Get fielding stats for a player by bref_id',
+      getPlayerFieldingCommandBuilder,
+      handleGetPlayerFielding,
+    )
+    .command(
+      'trigger-game-selection',
+      'Trigger game selection to queue pending stats loading',
+      triggerGameSelectionCommandBuilder,
+      handleTriggerGameSelection,
     )
     .demandCommand()
     .help()

@@ -1,6 +1,6 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions, isNegroLeague } from '@legacy-sports/utils';
 import {
   SqsDraftMessage,
   DraftProcessingResult,
@@ -466,8 +466,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
     return await db.transaction(async (tx) => {
       addBreadcrumb('Starting optimized draft process', { leagueId });
 
-      // Step 1: Batch fetch all required data in parallel
-      const [teams, leaguePositions] = await Promise.all([
+      // Step 1: Batch fetch all required data in parallel (including league config)
+      const [teams, leaguePositions, leagueConfig] = await Promise.all([
         tx
           .select({
             id: PublicSchema.teams.id,
@@ -484,18 +484,36 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           .from(PublicSchema.leaguePosition)
           .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
           .orderBy(PublicSchema.leaguePosition.id),
+
+        tx
+          .select({
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1),
       ]);
+
+      // Calculate minimum games needed for valid seasons
+      const gamesPerMatchup = leagueConfig[0]?.gamesPerMatchup ?? 5;
+      const minGames = gamesPerMatchup * 2; // Same logic as matchup season selection
+
+      LOGGER.info('Draft season requirements', {
+        gamesPerMatchup,
+        minGames,
+        leagueId,
+      });
 
       // Calculate players needed and fetch with appropriate buffer
       const estimatedPlayersNeeded = teams.length * leaguePositions.length * 2; // 2x buffer
 
-      // Prioritize players with loaded season stats for better projections
+      // Step 1.5: Query ALL candidate players first (before filtering by valid seasons)
       // Query explanation:
       // 1. ORDER BY statsLastFetchedAt to prioritize players WITH stats
       // 2. Most recently fetched stats appear first
       // 3. Players with no stats (NULL) appear last
       // 4. Secondary sort by player ID for consistent ordering
-      const players = await tx
+      const candidatePlayers = await tx
         .select({
           id: PublicSchema.players.id,
           firstName: PublicSchema.players.firstName,
@@ -509,7 +527,102 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`, // Most recently fetched stats first
           PublicSchema.players.id, // Consistent tiebreaker
         )
-        .limit(Math.max(estimatedPlayersNeeded, 1500)); // Minimum 1500 players
+        .limit(Math.max(estimatedPlayersNeeded, 2000)); // Larger buffer since we'll filter
+
+      LOGGER.info(
+        `Loaded ${candidatePlayers.length} candidate players before season filtering`,
+      );
+
+      // Step 1.6: Filter to only players with valid seasons (at least minGames in batting, pitching, OR fielding)
+      const candidatePlayerIds = candidatePlayers.map((p) => p.id);
+
+      // Query player stats to determine which players have valid seasons
+      const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
+        tx
+          .select({
+            playerId: PublicSchema.seasonBatting.playerId,
+            season: PublicSchema.seasonBatting.season,
+            g: PublicSchema.seasonBatting.g,
+            lgId: PublicSchema.seasonBatting.lgId,
+          })
+          .from(PublicSchema.seasonBatting)
+          .where(
+            inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+          )
+          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+        tx
+          .select({
+            playerId: PublicSchema.seasonPitching.playerId,
+            season: PublicSchema.seasonPitching.season,
+            g: PublicSchema.seasonPitching.g,
+            lgId: PublicSchema.seasonPitching.lgId,
+          })
+          .from(PublicSchema.seasonPitching)
+          .where(
+            inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
+          )
+          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+        tx
+          .select({
+            playerId: PublicSchema.seasonFielding.playerId,
+            season: PublicSchema.seasonFielding.season,
+            g: PublicSchema.seasonFielding.g,
+            lgId: PublicSchema.seasonFielding.lgId,
+          })
+          .from(PublicSchema.seasonFielding)
+          .where(
+            inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
+          )
+          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+      ]);
+
+      // Identify players with at least one valid season
+      // Aggregate fielding stats by player+season (since fielding has multiple positions)
+      const fieldingByPlayerSeason = new Map<string, number>();
+      for (const stat of fieldingStats) {
+        const key = `${stat.playerId}-${stat.season}`;
+        const games = stat.g ?? 0;
+        fieldingByPlayerSeason.set(
+          key,
+          (fieldingByPlayerSeason.get(key) ?? 0) + games,
+        );
+      }
+
+      const playersWithValidSeasons = new Set<number>();
+
+      // Check batting seasons
+      for (const stat of battingStats) {
+        if ((stat.g ?? 0) >= minGames) {
+          playersWithValidSeasons.add(stat.playerId);
+        }
+      }
+
+      // Check pitching seasons
+      for (const stat of pitchingStats) {
+        if ((stat.g ?? 0) >= minGames) {
+          playersWithValidSeasons.add(stat.playerId);
+        }
+      }
+
+      // Check fielding seasons (aggregated)
+      for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
+        if (totalGames >= minGames) {
+          const playerId = parseInt(key.split('-')[0]);
+          playersWithValidSeasons.add(playerId);
+        }
+      }
+
+      // Filter to only players with valid seasons
+      const players = candidatePlayers.filter((p) =>
+        playersWithValidSeasons.has(p.id),
+      );
+
+      LOGGER.info(
+        `Filtered to ${players.length} players with valid seasons (≥${minGames} games)`,
+      );
+      LOGGER.info(
+        `Excluded ${candidatePlayers.length - players.length} players without valid seasons`,
+      );
 
       if (teams.length === 0) {
         throw new Error(`No teams found for league ${leagueId}`);

@@ -1,0 +1,9 @@
+{
+  "statusCode": 500,
+  "body": "{\"error\":\"Internal server error\",\"message\":\"Cannot read properties of undefined (reading 'replace')\"}",
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+  }
+}

@@ -63,12 +63,12 @@ export const playoffBrackets = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'playoff_brackets_league_fk',
-      }),
+      }).onDelete('cascade'),
       playoffBracketsChampionFk: foreignKey({
         columns: [table.championTeamId],
         foreignColumns: [teams.id],
         name: 'playoff_brackets_champion_fk',
-      }),
+      }).onDelete('cascade'),
       playoffBracketsLeagueSeasonUk: unique(
         'playoff_brackets_league_season_uk',
       ).on(table.leagueId, table.season),
@@ -101,22 +101,22 @@ export const playoffMatchups = pgTable(
         columns: [table.bracketId],
         foreignColumns: [playoffBrackets.id],
         name: 'playoff_matchups_bracket_fk',
-      }),
+      }).onDelete('cascade'),
       playoffMatchupsHighSeedFk: foreignKey({
         columns: [table.highSeedTeamId],
         foreignColumns: [teams.id],
         name: 'playoff_matchups_high_seed_fk',
-      }),
+      }).onDelete('cascade'),
       playoffMatchupsLowSeedFk: foreignKey({
         columns: [table.lowSeedTeamId],
         foreignColumns: [teams.id],
         name: 'playoff_matchups_low_seed_fk',
-      }),
+      }).onDelete('cascade'),
       playoffMatchupsWinnerFk: foreignKey({
         columns: [table.winnerTeamId],
         foreignColumns: [teams.id],
         name: 'playoff_matchups_winner_fk',
-      }),
+      }).onDelete('cascade'),
     };
   },
 );
@@ -141,12 +141,12 @@ export const playoffSeeds = pgTable(
         columns: [table.bracketId],
         foreignColumns: [playoffBrackets.id],
         name: 'playoff_seeds_bracket_fk',
-      }),
+      }).onDelete('cascade'),
       playoffSeedsTeamFk: foreignKey({
         columns: [table.teamId],
         foreignColumns: [teams.id],
         name: 'playoff_seeds_team_fk',
-      }),
+      }).onDelete('cascade'),
       playoffSeedsBracketTeamUk: unique('playoff_seeds_bracket_team_uk').on(
         table.bracketId,
         table.teamId,
@@ -179,17 +179,17 @@ export const championTrophies = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'champion_trophies_league_fk',
-      }),
+      }).onDelete('cascade'),
       championTrophiesChampionFk: foreignKey({
         columns: [table.teamId],
         foreignColumns: [teams.id],
         name: 'champion_trophies_champion_fk',
-      }),
+      }).onDelete('cascade'),
       championTrophiesRunnerUpFk: foreignKey({
         columns: [table.runnerUpTeamId],
         foreignColumns: [teams.id],
         name: 'champion_trophies_runner_up_fk',
-      }),
+      }).onDelete('cascade'),
       championTrophiesLeagueSeasonUk: unique(
         'champion_trophies_league_season_uk',
       ).on(table.leagueId, table.season),

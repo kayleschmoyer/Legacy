@@ -29,35 +29,41 @@ Each skill provides comprehensive guidance on executing specific development tas
 8. **[Sync Environment](sync-env.md)** - Syncing environment variables from AWS
 9. **[Database Query](db-query.md)** - Execute SQL queries for debugging and verification
 
-### Code & Database Skills### Workflow & Branch Management Skills
+### AWS Authentication Skills
 
-9. **[Complete Workflow: Ticket to PR](workflow-ticket-to-pr.md)** ⭐ **START HERE** - Complete workflow preventing common mistakes
-10. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
-11. **[Jira Ticket Management](jira-ticket.md)** - Managing ticket status and workflow
-12. **[Pull Request Creation](create-pr.md)** - Creating PRs with twig
-13. **[Branch Tree Management](branch-tree.md)** - Managing dependent branch trees
+10. **[AWS SSO Login](aws-sso-login.md)** - Handling AWS SSO authentication and expired sessions
+
+### Workflow & Branch Management Skills
+
+### Workflow & Branch Management Skills
+
+11. **[Complete Workflow: Ticket to PR](workflow-ticket-to-pr.md)** ⭐ **START HERE** - Complete workflow preventing common mistakes
+12. **[Branch Creation](branch-create.md)** - Creating feature branches with Jira integration
+13. **[Jira Ticket Management](jira-ticket.md)** - Managing ticket status and workflow
+14. **[Pull Request Creation](create-pr.md)** - Creating PRs with twig
+15. **[Branch Tree Management](branch-tree.md)** - Managing dependent branch trees
 
 ### Code Generation & Database Skills
 
-14. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
-15. **[Write Database Migration](db-migration-write.md)** - Creating new database migration files
-16. **[Run Database Migration](db-migrate.md)** - Applying pending migrations
-17. **[Database Connection](db-connect.md)** - Testing database connectivity
+16. **[GraphQL Codegen](codegen.md)** - Regenerating GraphQL types
+17. **[Write Database Migration](db-migration-write.md)** - Creating new database migration files
+18. **[Run Database Migration](db-migrate.md)** - Applying pending migrations
+19. **[Database Connection](db-connect.md)** - Testing database connectivity
 
 ### Troubleshooting & Maintenance Skills
 
-18. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
-19. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
-20. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
+20. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
+21. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
+22. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
 
 ### Deployment Skills
 
-21. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
-22. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
+23. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
+24. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
 ### CLI & Administrative Tools
 
-23. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
+25. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
 
 ## Skill Structure
 

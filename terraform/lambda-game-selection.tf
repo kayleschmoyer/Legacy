@@ -57,6 +57,15 @@ resource "aws_iam_policy" "game_selection_lambda_secrets" {
         Resource = [
           aws_sqs_queue.select_game.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = [
+          aws_sqs_queue.load_game_stats.arn
+        ]
       }
     ]
   })
@@ -137,6 +146,9 @@ resource "aws_lambda_function" "game_selection" {
 
       # Legacy support - keep DB_CREDS_PATH as fallback
       DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
+
+      # SQS queue for loading game stats
+      SQS_LOAD_GAME_STATS_URL = aws_sqs_queue.load_game_stats.url
 
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"

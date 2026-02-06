@@ -21,6 +21,7 @@ import {
   rosterLockTiming,
   emergencySubRule,
   schedulingStrategy,
+  weekAdvanceStatus,
 } from './Enums';
 import { players } from './Players';
 
@@ -44,6 +45,9 @@ export const leagues = pgTable(
     schedulingStrategy: schedulingStrategy('scheduling_strategy')
       .notNull()
       .default('round-robin'),
+    weekAdvanceStatus: weekAdvanceStatus('week_advance_status')
+      .notNull()
+      .default('idle'),
   },
   (table) => {
     return {
@@ -65,7 +69,7 @@ export const teams = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'teams_leagues_id_fk',
-      }),
+      }).onDelete('cascade'),
       teamsUkIdLeagueId: unique('teams_uk_id_league_id').on(
         table.id,
         table.leagueId,
@@ -89,7 +93,7 @@ export const drafts = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'drafts_leagues_id_fk',
-      }),
+      }).onDelete('cascade'),
     };
   },
 );
@@ -134,7 +138,7 @@ export const leagueMembers = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_members_leagues_id_fk',
-      }),
+      }).onDelete('cascade'),
       leagueMembersPk: primaryKey({
         columns: [table.leagueId, table.userId],
         name: 'league_members_pk',
@@ -157,7 +161,7 @@ export const draftTeams = pgTable(
         columns: [table.draftId],
         foreignColumns: [drafts.id],
         name: 'draft_teams_drafts_id_fk',
-      }),
+      }).onDelete('cascade'),
       draftTeamsTeamsIdLeagueIdFk: foreignKey({
         columns: [table.teamId, table.leagueId],
         foreignColumns: [teams.id, teams.leagueId],
@@ -208,12 +212,12 @@ export const teamMembers = pgTable(
         columns: [table.teamId],
         foreignColumns: [teams.id],
         name: 'team_members_teams_fk',
-      }),
+      }).onDelete('cascade'),
       teamMembersLeagueFK: foreignKey({
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'team_members_league_fk',
-      }),
+      }).onDelete('cascade'),
 
       teamMembersPlayerFk: foreignKey({
         columns: [table.playerId],

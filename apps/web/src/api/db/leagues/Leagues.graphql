@@ -6,6 +6,7 @@ fragment League on League {
   currentMatchup
   draftStatus
   inviteCode
+  weekAdvanceStatus
   userMembership {
     ...LeagueMember
   }

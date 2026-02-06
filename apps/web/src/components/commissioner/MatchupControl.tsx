@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
 import React, { useState } from 'react';
 import {
   Button,
@@ -12,17 +11,9 @@ import {
 } from 'tamagui';
 import {
   type Matchup,
-  // useAdvanceLeagueWeekMutation,
+  useAdvanceLeagueWeekMutation,
   useGetMatchupsForLeagueQuery,
 } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until useAdvanceLeagueWeekMutation is implemented
-
-const useAdvanceLeagueWeekMutation = () =>
-  [
-    (_params?: any) => Promise.reject(new Error('Not implemented')),
-    { loading: false },
-  ] as const;
 
 export interface MatchupControlProps {
   leagueId: number;
@@ -67,7 +58,8 @@ export function MatchupControl({
   const nextWeek = highestWeek + 1;
 
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
-  const currentWeek = currentMatchup?.weekNumber ?? 0;
+  // Use highestWeek as the current week for display consistency
+  const currentWeek = highestWeek;
 
   const handleButtonClick = () => {
     setShowConfirmDialog(true);

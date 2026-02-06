@@ -4,6 +4,24 @@
 
 Deploy AWS Lambda functions to cloud environment using deployment scripts.
 
+## ⚠️ CRITICAL: Deployment Prerequisites
+
+**ALWAYS follow this order**:
+
+1. **Clear Terraform locks** (if deploying infrastructure)
+2. **Deploy infrastructure first** (if terraform changes exist)
+3. **Then deploy Lambda code**
+
+```powershell
+# Complete deployment workflow:
+node scripts/terraform-unlock.js    # Clear any locks
+cd terraform
+terraform plan                      # Check infrastructure changes
+terraform apply                     # Apply if needed
+cd ..
+.\scripts\deploy-lambda.ps1 -FunctionName graphql  # Deploy code
+```
+
 ## When to Use
 
 - After Lambda code changes are merged
@@ -12,20 +30,31 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 - Updating Lambda configuration
 - Rolling back to previous version
 
-## Command
+## Standard Command
+
+```powershell
+# Deploy specific Lambda function (MOST COMMON)
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+```
+
+**Available Functions**: `graphql`, `oauth-proxy`, `stats`, `game-selection`, `draft-processor`
+
+**Note**: The `graphql` function is built from the `lambdas/db` directory (the db project contains the GraphQL Lambda).
+
+## Alternative Commands
+
+### Deploy All Lambdas
 
 ```powershell
 # Deploy all Lambda functions
 .\scripts\deploy-lambda-all.ps1
 ```
 
-## Alternative Commands
-
 ### Deploy Single Lambda
 
 ```powershell
 # Deploy specific Lambda (db/graphql Lambda)
-.\scripts\deploy-lambda.ps1 -FunctionName db
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
 # Other Lambdas
 .\scripts\deploy-lambda.ps1 -FunctionName oauth-proxy
 .\scripts\deploy-lambda.ps1 -FunctionName stats
@@ -37,10 +66,10 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 
 ```powershell
 # Deploy to specific environment
-.\scripts\deploy-lambda.ps1 -FunctionName db -Environment production
+.\scripts\deploy-lambda.ps1 -FunctionName graphql -Environment production
 
 # Deploy with different AWS region
-.\scripts\deploy-lambda.ps1 -FunctionName db -AwsRegion us-west-2
+.\scripts\deploy-lambda.ps1 -FunctionName graphql -AwsRegion us-west-2
 ```
 
 ## Expected Output
@@ -52,6 +81,47 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 - **Version**: New Lambda version number
 
 ## Common Issues
+
+### Issue: Wrong parameter name ❌
+
+**Symptom**: "A parameter cannot be found that matches parameter name 'LambdaName'"
+**Cause**: Using `-LambdaName` instead of `-FunctionName`
+**Solution**: Use correct parameter name
+
+```powershell
+# ❌ WRONG - will fail
+.\scripts\deploy-lambda.ps1 -LambdaName db
+
+# ✅ CORRECT
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+```
+
+### Issue: Terraform state locked
+
+**Symptom**: Deployment fails with "Error acquiring the state lock"
+**Cause**: Previous terraform operation was interrupted
+**Solution**: Clear the lock first
+
+```powershell
+# Clear lock, then retry deployment
+node scripts/terraform-unlock.js
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+```
+
+### Issue: Build fails before deployment
+
+**Symptom**: "Build failed" or TypeScript compilation errors
+**Cause**: Code doesn't compile or has lint errors
+**Solution**: Fix errors before deploying
+
+```powershell
+# Check for errors
+pnpm exec nx run db:typecheck
+pnpm exec nx run db:lint
+
+# Fix errors, then deploy
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+```
 
 ### Issue: AWS credentials not configured
 
@@ -85,7 +155,7 @@ pnpm exec nx affected -t typecheck
 pnpm exec nx affected -t lint --fix
 
 # Then deploy
-.\scripts\deploy-lambda.ps1 -FunctionName db
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
 ```
 
 ### Issue: Lambda package too large
@@ -132,6 +202,49 @@ cd terraform
 terraform apply
 ```
 
+### Issue: Terraform can't find S3 deployment package
+
+**Symptom**: "Error occurred while GetObject. S3 Error Code: NoSuchKey"
+**Solution**: Verify S3 path matches Terraform expectations
+
+**Root Cause**: The `db` Lambda deploys to `db/` S3 prefix but Terraform expects `graphql/` prefix with filename `graphql-{version}.zip`
+
+```powershell
+# 1. Check what was uploaded
+$version = aws ssm get-parameter --name "/legacy-sports/dev/lambda/graphql/version" --query 'Parameter.Value' --output text
+aws s3 ls s3://legacy-sports-dev-lambdas-cca20ad9/graphql/ | Select-String $version
+
+# 2. If file not found at graphql/ prefix, copy from db/
+aws s3 cp `
+  s3://legacy-sports-dev-lambdas-cca20ad9/db/db-$version.zip `
+  s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
+
+# 3. Now run terraform apply
+cd terraform
+terraform apply -auto-approve
+```
+
+**Prevention**: After deploying db Lambda, always verify S3 location before running Terraform
+
+```powershell
+# Complete deployment workflow for db Lambda:
+# 1. Build and deploy
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+
+# 2. Get version that was just deployed
+$version = aws ssm get-parameter --name "/legacy-sports/dev/lambda/graphql/version" --query 'Parameter.Value' --output text
+
+# 3. Copy to correct S3 location for Terraform
+aws s3 cp `
+  s3://legacy-sports-dev-lambdas-cca20ad9/db/db-$version.zip `
+  s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
+
+# 4. Apply Terraform changes
+cd terraform
+terraform apply -auto-approve
+cd ..
+```
+
 ## Best Practices
 
 1. **Test locally first** - Run Lambda locally before deploying
@@ -149,6 +262,7 @@ terraform apply
 - [ ] Terraform state current (if infrastructure changed)
 - [ ] AWS credentials configured
 - [ ] Correct environment targeted
+- [ ] **(For db Lambda)**: S3 copy step planned (db/ → graphql/ prefix)
 
 ## Deployment Process
 
@@ -161,18 +275,26 @@ pnpm exec nx run db:test   # Run tests
 pnpm exec nx build db      # Test build
 
 # 2. Deploy to dev environment
-.\scripts\deploy-lambda.ps1 -FunctionName db -Environment dev
+.\scripts\deploy-lambda.ps1 -FunctionName graphql -Environment dev
 
-# 3. Test in dev environment
+# 3. For db Lambda: Copy to Terraform-expected S3 location
+$version = aws ssm get-parameter --name "/legacy-sports/dev/lambda/graphql/version" --query 'Parameter.Value' --output text
+aws s3 cp `
+  s3://legacy-sports-dev-lambdas-cca20ad9/db/db-$version.zip `
+  s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
+
+# 4. Apply Terraform to update Lambda function
+cd terraform
+terraform apply -auto-approve
+cd ..
+
+# 5. Test in dev environment
 # Make API calls to dev endpoint
 # Check CloudWatch logs
 
-# 4. If successful, deploy to production
-.\scripts\deploy-lambda.ps1 -FunctionName db -Environment production
-
-# 5. Monitor production
-# Check CloudWatch logs
-# Verify API responses
+# 6. If successful, repeat for production
+.\scripts\deploy-lambda.ps1 -FunctionName graphql -Environment production
+# ... repeat S3 copy and terraform apply for production
 ```
 
 ### Deploy All Lambdas
@@ -199,7 +321,7 @@ git checkout main
 git pull
 
 # 2. Deploy Lambda that changed
-.\scripts\deploy-lambda.ps1 -FunctionName db
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
 
 # 3. Update Jira ticket
 acli jira workitem transition --key LS-1234 --status "Done"

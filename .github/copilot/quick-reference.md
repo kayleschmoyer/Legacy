@@ -66,16 +66,72 @@ git push origin HEAD
 twig github pr create-pr
 ```
 
+### Database Queries
+
+```powershell
+# Run SQL query
+.\scripts\db-query.ps1 -Query "SELECT * FROM leagues WHERE id = 8"
+
+# With JSON output
+.\scripts\db-query.ps1 -Query "SELECT * FROM teams" -Format json
+
+# Interactive psql (for multiple queries)
+pnpm run db:psql
+```
+
 ## Common Issues & Fixes
 
-| Problem             | Solution                                      |
-| ------------------- | --------------------------------------------- |
-| `acli not found`    | Refresh PATH (see Jira section above)         |
-| Module not found    | `pnpm run build:libs`                         |
-| Type errors         | `pnpm exec nx affected -t typecheck` then fix |
-| DB connection fails | `pnpm run sync-env`                           |
-| Port in use         | `pnpm dlx kill-port 3000`                     |
-| Nx cache issues     | `pnpm exec nx reset`                          |
+| Problem                    | Solution                                           |
+| -------------------------- | -------------------------------------------------- |
+| `acli not found`           | Refresh PATH (see Jira section above)              |
+| Module not found           | `pnpm run build:libs`                              |
+| Type errors                | `pnpm exec nx affected -t typecheck` then fix      |
+| DB connection fails        | `pnpm run sync-env`                                |
+| Port in use                | `pnpm dlx kill-port 3000`                          |
+| Nx cache issues            | `pnpm exec nx reset`                               |
+| **AWS CLI encoding error** | **`$env:PYTHONIOENCODING = "utf-8"`** ⚠️           |
+| **Terraform state locked** | **`node scripts/terraform-unlock.js`** ⚠️          |
+| **Wrong deploy parameter** | **Use `-FunctionName` not `-LambdaName`** ⚠️       |
+| Deploy fails               | 1. Clear locks 2. Terraform apply 3. Deploy Lambda |
+
+### AWS CLI Setup (For Viewing Logs)
+
+```powershell
+# Required for viewing CloudWatch logs without errors
+$env:AWS_PAGER = ""                # Disable pagination
+$env:PYTHONIOENCODING = "utf-8"    # Fix Unicode/emoji encoding
+
+# Then view logs
+aws logs tail /aws/lambda/legacy-sports-dev-stats --since 5m --no-cli-pager
+
+# OR use the wrapper script (recommended)
+.\scripts\aws-logs.ps1 -Function stats -Since 5m
+
+# NOTE: Piping to Select-Object may still cause encoding errors
+# If you need to limit output, use --filter-pattern or redirect to file:
+aws logs tail /aws/lambda/legacy-sports-dev-stats --since 5m --no-cli-pager > logs.txt
+```
+
+## Deployment Workflow ⚠️ CRITICAL
+
+**Always follow this order** when deploying:
+
+```powershell
+# 1. Clear any terraform locks FIRST
+node scripts/terraform-unlock.js
+
+# 2. Apply infrastructure changes (if any)
+cd terraform
+terraform plan      # Check what will change
+terraform apply     # Apply changes
+cd ..
+
+# 3. Deploy Lambda code (use -FunctionName, NOT -LambdaName!)
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+
+# 4. Verify
+pnpm exec nx run web:build
+```
 
 ## Complete Workflow (5 Steps)
 

@@ -113,8 +113,8 @@ describe('League Mutations', () => {
         'Successfully deleted league 1 and all associated data',
       );
 
-      // Verify deletes were called in correct order
-      expect(mockDb.delete).toHaveBeenCalledTimes(5);
+      // Verify delete was called once (CASCADE DELETE handles the rest)
+      expect(mockDb.delete).toHaveBeenCalledTimes(1);
     });
 
     it('should successfully delete a league when user is admin', async () => {
@@ -222,7 +222,7 @@ describe('League Mutations', () => {
       );
     });
 
-    it('should delete all associated data in correct order', async () => {
+    it('should delete league using CASCADE DELETE constraints', async () => {
       // Mock league exists and user is owner
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
@@ -230,23 +230,11 @@ describe('League Mutations', () => {
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
 
       const deleteCallOrder: string[] = [];
-      let deleteCallCount = 0;
 
-      // Track delete calls by their sequence
-      // The resolver deletes in this order: teamMembers, leaguePosition, leagueMembers, teams, leagues
+      // Track delete calls - should only delete from leagues table
+      // CASCADE DELETE handles all related data automatically
       mockDb.delete.mockImplementation(() => {
-        // Map call order to table names
-        const tableNames = [
-          'teamMembers',
-          'leaguePosition',
-          'leagueMembers',
-          'teams',
-          'leagues',
-        ];
-        if (deleteCallCount < tableNames.length) {
-          deleteCallOrder.push(tableNames[deleteCallCount]);
-          deleteCallCount++;
-        }
+        deleteCallOrder.push('leagues');
         return mockDb;
       });
 
@@ -263,14 +251,8 @@ describe('League Mutations', () => {
         undefined as never,
       );
 
-      // Verify deletion order respects foreign key constraints
-      expect(deleteCallOrder).toEqual([
-        'teamMembers',
-        'leaguePosition',
-        'leagueMembers',
-        'teams',
-        'leagues',
-      ]);
+      // Verify only leagues table is deleted (CASCADE handles the rest)
+      expect(deleteCallOrder).toEqual(['leagues']);
     });
 
     it('should handle database errors gracefully', async () => {

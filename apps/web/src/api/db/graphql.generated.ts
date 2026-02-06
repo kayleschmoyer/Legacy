@@ -281,6 +281,7 @@ export type League = {
   owner?: Maybe<Scalars['Int']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
+  weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
 };
 
 /** A member of a league */
@@ -350,6 +351,7 @@ export type MatchupPlayerGame = {
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGame?: Maybe<GamePitching>;
   pitchingGameNum?: Maybe<Scalars['Int']['output']>;
+  statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
 export enum MatchupStatus {
@@ -373,6 +375,7 @@ export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  advanceLeagueWeek?: Maybe<Scalars['Boolean']['output']>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -394,6 +397,10 @@ export type Mutation = {
 };
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAdvanceLeagueWeekArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -1121,6 +1128,7 @@ export type LeagueFragment = {
   currentMatchup?: number | null;
   draftStatus?: string | null;
   inviteCode?: string | null;
+  weekAdvanceStatus?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -1160,6 +1168,7 @@ export type GetLeagueByIdQuery = {
     currentMatchup?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
+    weekAdvanceStatus?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1187,6 +1196,7 @@ export type CreateLeagueAndTeamsMutation = {
       currentMatchup?: number | null;
       draftStatus?: string | null;
       inviteCode?: string | null;
+      weekAdvanceStatus?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -1211,6 +1221,7 @@ export type GetUserLeaguesQuery = {
     currentMatchup?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
+    weekAdvanceStatus?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1267,6 +1278,7 @@ export type StartDraftMutation = {
     currentMatchup?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
+    weekAdvanceStatus?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1562,6 +1574,7 @@ export type MatchupPlayerFragment = {
     pitchingGameNum?: number | null;
     fieldingGameNum?: number | null;
     fieldingGamePos?: string | null;
+    statsLoadingStatus?: string | null;
     battingGame?: {
       __typename?: 'GameBatting';
       playerId?: number | null;
@@ -1726,6 +1739,7 @@ export type GetMatchupPlayersQuery = {
       pitchingGameNum?: number | null;
       fieldingGameNum?: number | null;
       fieldingGamePos?: string | null;
+      statsLoadingStatus?: string | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -1808,6 +1822,15 @@ export type TriggerGameSelectionMutationVariables = Exact<{
 export type TriggerGameSelectionMutation = {
   __typename?: 'Mutation';
   triggerGameSelection?: boolean | null;
+};
+
+export type AdvanceLeagueWeekMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type AdvanceLeagueWeekMutation = {
+  __typename?: 'Mutation';
+  advanceLeagueWeek?: boolean | null;
 };
 
 export type NotificationPreferenceFragment = {
@@ -1996,6 +2019,70 @@ export type MarkAllNotificationsAsReadMutationVariables = Exact<{
 export type MarkAllNotificationsAsReadMutation = {
   __typename?: 'Mutation';
   markAllNotificationsAsRead?: boolean | null;
+};
+
+export type GetAllPlayerSeasonStatsQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type GetAllPlayerSeasonStatsQuery = {
+  __typename?: 'Query';
+  playerSeasonBatting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    plateAppearances?: number | null;
+    atBats?: number | null;
+    runs?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    caughtStealing?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+  }> | null;
+  playerSeasonPitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    gamesStarted?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    inningsPitched?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    strikeouts?: number | null;
+    earnedRunAverage?: string | null;
+    whip?: number | null;
+  }> | null;
+  playerSeasonFielding?: Array<{
+    __typename?: 'SeasonFielding';
+    season?: number | null;
+    team?: string | null;
+    position?: string | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    inningsDefended?: number | null;
+    putouts?: number | null;
+    assists?: number | null;
+    errors?: number | null;
+    doublePlays?: number | null;
+    fieldingPercentage?: number | null;
+  }> | null;
 };
 
 export type GetLeagueScoringProfileQueryVariables = Exact<{
@@ -2246,6 +2333,7 @@ export const LeagueFragmentDoc = gql`
     currentMatchup
     draftStatus
     inviteCode
+    weekAdvanceStatus
     userMembership {
       ...LeagueMember
     }
@@ -2356,6 +2444,7 @@ export const MatchupPlayerFragmentDoc = gql`
       pitchingGameNum
       fieldingGameNum
       fieldingGamePos
+      statsLoadingStatus
       battingGame {
         playerId
         season
@@ -4066,6 +4155,54 @@ export type TriggerGameSelectionMutationOptions = Apollo.BaseMutationOptions<
   TriggerGameSelectionMutation,
   TriggerGameSelectionMutationVariables
 >;
+export const AdvanceLeagueWeek = gql`
+  mutation AdvanceLeagueWeek($leagueId: Int!) {
+    advanceLeagueWeek(leagueId: $leagueId)
+  }
+`;
+export type AdvanceLeagueWeekMutationFn = Apollo.MutationFunction<
+  AdvanceLeagueWeekMutation,
+  AdvanceLeagueWeekMutationVariables
+>;
+
+/**
+ * __useAdvanceLeagueWeekMutation__
+ *
+ * To run a mutation, you first call `useAdvanceLeagueWeekMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAdvanceLeagueWeekMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [advanceLeagueWeekMutation, { data, loading, error }] = useAdvanceLeagueWeekMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useAdvanceLeagueWeekMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AdvanceLeagueWeekMutation,
+    AdvanceLeagueWeekMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AdvanceLeagueWeekMutation,
+    AdvanceLeagueWeekMutationVariables
+  >(AdvanceLeagueWeek, options);
+}
+export type AdvanceLeagueWeekMutationHookResult = ReturnType<
+  typeof useAdvanceLeagueWeekMutation
+>;
+export type AdvanceLeagueWeekMutationResult =
+  Apollo.MutationResult<AdvanceLeagueWeekMutation>;
+export type AdvanceLeagueWeekMutationOptions = Apollo.BaseMutationOptions<
+  AdvanceLeagueWeekMutation,
+  AdvanceLeagueWeekMutationVariables
+>;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences($userId: Int!) {
     getUserNotificationPreferences(userId: $userId) {
@@ -4735,6 +4872,159 @@ export type MarkAllNotificationsAsReadMutationOptions =
     MarkAllNotificationsAsReadMutation,
     MarkAllNotificationsAsReadMutationVariables
   >;
+export const GetAllPlayerSeasonStats = gql`
+  query GetAllPlayerSeasonStats($playerId: Int!) {
+    playerSeasonBatting(playerId: $playerId) {
+      season
+      team
+      games
+      plateAppearances
+      atBats
+      runs
+      hits
+      doubles
+      triples
+      homeRuns
+      rbi
+      stolenBases
+      caughtStealing
+      baseOnBalls
+      strikeouts
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    playerSeasonPitching(playerId: $playerId) {
+      season
+      team
+      games
+      wins
+      losses
+      gamesStarted
+      completeGames
+      shutouts
+      saves
+      inningsPitched
+      hits
+      runs
+      earnedRuns
+      homeRuns
+      baseOnBalls
+      strikeouts
+      earnedRunAverage
+      whip
+    }
+    playerSeasonFielding(playerId: $playerId) {
+      season
+      team
+      position
+      games
+      gamesStarted
+      inningsDefended
+      putouts
+      assists
+      errors
+      doublePlays
+      fieldingPercentage
+    }
+  }
+`;
+
+/**
+ * __useGetAllPlayerSeasonStatsQuery__
+ *
+ * To run a query within a React component, call `useGetAllPlayerSeasonStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAllPlayerSeasonStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAllPlayerSeasonStatsQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useGetAllPlayerSeasonStatsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  > &
+    (
+      | { variables: GetAllPlayerSeasonStatsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(GetAllPlayerSeasonStats, options);
+}
+export function useGetAllPlayerSeasonStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(GetAllPlayerSeasonStats, options);
+}
+// @ts-ignore
+export function useGetAllPlayerSeasonStatsSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetAllPlayerSeasonStatsQuery,
+  GetAllPlayerSeasonStatsQueryVariables
+>;
+export function useGetAllPlayerSeasonStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllPlayerSeasonStatsQuery,
+        GetAllPlayerSeasonStatsQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetAllPlayerSeasonStatsQuery | undefined,
+  GetAllPlayerSeasonStatsQueryVariables
+>;
+export function useGetAllPlayerSeasonStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllPlayerSeasonStatsQuery,
+        GetAllPlayerSeasonStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAllPlayerSeasonStatsQuery,
+    GetAllPlayerSeasonStatsQueryVariables
+  >(GetAllPlayerSeasonStats, options);
+}
+export type GetAllPlayerSeasonStatsQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsQuery
+>;
+export type GetAllPlayerSeasonStatsLazyQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsLazyQuery
+>;
+export type GetAllPlayerSeasonStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllPlayerSeasonStatsSuspenseQuery
+>;
+export type GetAllPlayerSeasonStatsQueryResult = Apollo.QueryResult<
+  GetAllPlayerSeasonStatsQuery,
+  GetAllPlayerSeasonStatsQueryVariables
+>;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {
     leagueScoringProfile(leagueId: $leagueId) {

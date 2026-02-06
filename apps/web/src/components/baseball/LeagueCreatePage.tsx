@@ -150,6 +150,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
             draftType: formData.draftType,
+            maxRosterSize: formData.maxRosterSize,
             startDate: formData.draftDate
               ? formData.draftDate.toISOString().split('T')[0]
               : undefined, // Format as YYYY-MM-DD

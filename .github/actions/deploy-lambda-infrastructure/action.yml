@@ -3,15 +3,15 @@ description: Deploy Lambda function infrastructure using Terraform with lock coo
 
 inputs:
   lambda-name:
-    description: 'Name of the Lambda function'
+    description: "Name of the Lambda function"
     required: true
   terraform-target:
-    description: 'Terraform target resource (e.g., aws_lambda_function.draft_processor)'
+    description: "Terraform target resource (e.g., aws_lambda_function.draft_processor)"
     required: true
   aws-region:
-    description: 'AWS region for deployment'
+    description: "AWS region for deployment"
     required: false
-    default: 'us-east-1'
+    default: "us-east-1"
 
 runs:
   using: composite
@@ -38,6 +38,52 @@ runs:
           exit 1
         fi
 
+    - name: Clear Stale Terraform Locks
+      shell: bash
+      working-directory: terraform
+      run: |
+        echo "🔍 Checking for stale Terraform locks..."
+
+        # Try to detect existing lock without bypassing it
+        if terraform plan -refresh=false -detailed-exitcode 2>&1 | tee lock-check.log | grep -q "Error acquiring the state lock"; then
+          echo "⚠️  Detected existing Terraform state lock"
+          
+          # Extract lock information
+          LOCK_ID=$(grep -A 10 "Lock Info:" lock-check.log | grep "ID:" | awk '{print $2}')
+          LOCK_WHO=$(grep -A 10 "Lock Info:" lock-check.log | grep "Who:" | awk '{print $2}')
+          LOCK_CREATED=$(grep -A 10 "Lock Info:" lock-check.log | grep "Created:" | awk '{print $2, $3}')
+          
+          if [ -n "$LOCK_ID" ]; then
+            echo "📋 Lock Details:"
+            echo "  ID: $LOCK_ID"
+            echo "  Who: $LOCK_WHO"
+            echo "  Created: $LOCK_CREATED"
+            
+            # Check if lock is stale (older than 30 minutes)
+            LOCK_AGE_SECONDS=$(( $(date +%s) - $(date -d "$LOCK_CREATED" +%s 2>/dev/null || echo 0) ))
+            LOCK_AGE_MINUTES=$(( LOCK_AGE_SECONDS / 60 ))
+            
+            if [ $LOCK_AGE_MINUTES -gt 30 ] || [ -z "$LOCK_CREATED" ]; then
+              echo "🔓 Lock appears stale (${LOCK_AGE_MINUTES}m old), force-unlocking..."
+              terraform force-unlock -force "$LOCK_ID"
+              echo "✅ Stale lock cleared successfully"
+              echo "## 🔓 Cleared Stale Lock" >> $GITHUB_STEP_SUMMARY
+              echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+              echo "- **Age**: ${LOCK_AGE_MINUTES} minutes" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⏳ Lock is recent (${LOCK_AGE_MINUTES}m old), waiting for it to clear..."
+              echo "## ⏳ Waiting for Active Lock" >> $GITHUB_STEP_SUMMARY
+              echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+              echo "- **Age**: ${LOCK_AGE_MINUTES} minutes" >> $GITHUB_STEP_SUMMARY
+              echo "Will retry with 10-minute timeout..." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        else
+          echo "✅ No stale locks detected"
+        fi
+
+        rm -f lock-check.log
+
     - name: Deploy Infrastructure with Terraform
       id: terraform-deploy
       shell: bash
@@ -45,16 +91,16 @@ runs:
       run: |
         LAMBDA_NAME="${{ inputs.lambda-name }}"
         TF_TARGET="${{ inputs.terraform-target }}"
-        
+
         echo "📋 Planning Terraform changes for $TF_TARGET..."
         echo "⏳ Will wait up to 10 minutes if state is locked by another deployment..."
-        
+
         # Retry logic for terraform plan with lock timeout
         MAX_RETRIES=20
         RETRY_DELAY=30
         RETRY_COUNT=0
         PLAN_SUCCESS=false
-        
+
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
           if terraform plan -target="$TF_TARGET" -lock-timeout=10m 2>&1 | tee plan.log; then
             echo "✅ Terraform plan successful"
@@ -82,7 +128,7 @@ runs:
             fi
           fi
         done
-        
+
         if [ "$PLAN_SUCCESS" = true ]; then
           echo "🚀 Applying Terraform changes..."
           terraform apply -target="$TF_TARGET" -auto-approve -lock-timeout=10m
@@ -101,7 +147,7 @@ runs:
       run: |
         LOCK_ID="${{ steps.terraform-deploy.outputs.lock_id }}"
         STATUS="${{ job.status }}"
-        
+
         if [ "$STATUS" = "cancelled" ]; then
           echo "🔓 Workflow was cancelled - attempting to release Terraform lock: $LOCK_ID"
           echo "⚠️  Cancellation may have left the state locked"
@@ -109,7 +155,7 @@ runs:
           echo "🔓 Attempting to release stuck Terraform lock: $LOCK_ID"
           echo "⚠️  This workflow failed and may have left the state locked"
         fi
-        
+
         # Try to force unlock if we captured a lock ID
         if [ -n "$LOCK_ID" ]; then
           echo "Running: terraform force-unlock -force $LOCK_ID"
@@ -130,7 +176,7 @@ runs:
           echo "## ⚠️  Manual Lock Check Recommended" >> $GITHUB_STEP_SUMMARY
           echo "If state is locked, check DynamoDB table \`terraform-state-locks\`" >> $GITHUB_STEP_SUMMARY
         fi
-    
+
     - name: Capture Current Lock Info for Manual Cleanup
       if: always()
       shell: bash
@@ -138,11 +184,25 @@ runs:
       run: |
         # Save lock info that can be used for manual cleanup if needed
         echo "🔍 Checking for any remaining locks..."
-        
-        # Try to show current lock status (this will fail if locked, but that's ok)
-        if terraform plan -lock=false -refresh=false > /dev/null 2>&1; then
-          echo "✅ No locks detected"
+
+        # Try to detect lock by attempting plan (will fail if locked)
+        if terraform plan -refresh=false -detailed-exitcode > /dev/null 2>&1; then
+          echo "✅ No locks detected - state is clean"
+        elif terraform plan -refresh=false 2>&1 | grep -q "Error acquiring the state lock"; then
+          echo "⚠️  State is still locked after deployment"
+          echo "## ⚠️  Manual Lock Cleanup May Be Required" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract and display lock info
+          LOCK_INFO=$(terraform plan -refresh=false 2>&1 || true)
+          LOCK_ID=$(echo "$LOCK_INFO" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+          
+          if [ -n "$LOCK_ID" ]; then
+            echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Cleanup**: Run \`node scripts/terraform-unlock.js\` locally" >> $GITHUB_STEP_SUMMARY
+            echo "To manually unlock: terraform force-unlock $LOCK_ID"
+          else
+            echo "Check DynamoDB table \`terraform-state-locks\` for lock details" >> $GITHUB_STEP_SUMMARY
+          fi
         else
-          echo "⚠️  State may be locked - check DynamoDB table if deployments are stuck"
-          echo "To manually unlock: terraform force-unlock <LOCK_ID>"
+          echo "✅ No locks detected"
         fi

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { Platform } from '../../platform-components';
 import { StatsTableColumn, StatsTableRow } from '../../types';
 
 export interface StatsTableProps {

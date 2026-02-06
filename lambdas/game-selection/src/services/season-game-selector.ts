@@ -196,12 +196,11 @@ export async function selectGamesForMatchup(
     );
 
     // Insert the selected games into the database
-    // Skip if no valid fielding position was selected
+    // Note: fieldingGamePos may be null for pitchers or players without fielding stats
     if (!selectedGames.fieldingGamePos) {
-      LOGGER.warn(
-        `No valid fielding position for matchup player ${matchupPlayer.id}, game ${gameNumber}. Skipping game selection.`,
+      LOGGER.debug(
+        `No fielding position found for matchup player ${matchupPlayer.id}, game ${gameNumber}. Inserting game with null fielding position.`,
       );
-      continue;
     }
 
     await db.insert(PublicSchema.matchupPlayerGames).values({

@@ -21,7 +21,7 @@ Write-Host "🚀 Starting Lambda deployment for: $FunctionName" -ForegroundColor
 
 # Function-specific configurations
 switch ($FunctionName) {
-    { $_ -in @('graphql', 'db') } {
+    'graphql' {
         $LambdaDir = 'lambdas/db'
         $ProjectName = 'db'
         $SsmParam = "/legacy-sports/${Environment}/lambda/graphql/version"
@@ -47,14 +47,14 @@ switch ($FunctionName) {
         $SsmParam = "/legacy-sports/${Environment}/lambda/draft-processor/version"
     }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, db, stats, oauth-proxy, game-selection, draft-processor"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor"
     }
 }
 
 # Step 1: Build the lambda
 Write-Host '📦 Step 1: Building lambda...' -ForegroundColor Yellow
-if ($FunctionName -in @('graphql', 'db')) {
-    # DB lambda is already built via nx
+if ($FunctionName -eq 'graphql') {
+    # GraphQL lambda (db project) is already built via nx
     Write-Host 'Using pre-built lambda (already compiled via nx)' -ForegroundColor Green
 } else {
     # Build other lambdas using the correct project name

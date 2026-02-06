@@ -244,7 +244,10 @@ const basePopulateGameStatsHandler = async (
       }
 
       for (const game of fieldingGamesToLoad) {
-        if (game.matchup_player_games.fieldingGameNum !== null) {
+        if (
+          game.matchup_player_games.fieldingGameNum !== null &&
+          game.matchup_player_games.fieldingGamePos !== null
+        ) {
           LOGGER.debug(
             `Loading Fielding game ${game.matchup_player_games.fieldingGameNum} at ${game.matchup_player_games.fieldingGamePos} from ${game.league_week_player_seasons.season} for ${game.players.brefId}`,
           );

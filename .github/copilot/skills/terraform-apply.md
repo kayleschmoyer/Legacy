@@ -13,10 +13,24 @@ Apply infrastructure changes using Terraform to manage AWS resources.
 - Updating security groups
 - Managing Route53 DNS records
 
-## Command
+## ⚠️ CRITICAL: Always Check for State Lock First
+
+**Before running any terraform command**, check if the state is locked:
 
 ```powershell
-# Apply Terraform changes
+# STEP 1: Check and clear any state locks
+node scripts/terraform-unlock.js
+
+# STEP 2: Then proceed with terraform commands
+cd terraform
+terraform plan
+```
+
+## Standard Command
+
+```powershell
+# Apply Terraform changes (from project root)
+node scripts/terraform-unlock.js  # Clear any locks first
 cd terraform
 terraform apply
 ```
@@ -71,6 +85,31 @@ terraform state list
 terraform state show aws_lambda_function.db
 ```
 
+## Complete Deployment Workflow
+
+When deploying infrastructure AND Lambda code:
+
+```powershell
+# 1. Clear any state locks
+node scripts/terraform-unlock.js
+
+# 2. Plan infrastructure changes
+cd terraform
+terraform plan
+
+# 3. Apply infrastructure (if changes look good)
+terraform apply
+
+# 4. Deploy Lambda code (return to project root first)
+cd ..
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+
+# 5. Verify deployment
+pnpm exec nx run web:build
+```
+
+**Note**: Always deploy infrastructure (terraform) BEFORE Lambda code.
+
 ## Expected Output
 
 - **Plan**: List of resources to create, update, or destroy
@@ -79,17 +118,35 @@ terraform state show aws_lambda_function.db
 
 ## Common Issues
 
-### Issue: State lock error
+### Issue: State lock error (MOST COMMON)
 
-**Symptom**: "Error acquiring the state lock"
-**Solution**: Wait for lock to release or force unlock
+**Symptom**: "Error acquiring the state lock" or "operation error DynamoDB: PutItem"
+**Cause**: Previous terraform operation was interrupted or crashed
+**Solution**: Use the unlock script (RECOMMENDED)
 
 ```powershell
-# Check who has the lock (if multi-user)
-terraform force-unlock <lock-id>
+# RECOMMENDED: Use the automated unlock script
+node scripts/terraform-unlock.js
 
-# Or use script
-pnpm run terraform:unlock
+# This will:
+# 1. Check if state is locked
+# 2. Show who/when the lock was created
+# 3. Automatically unlock if needed
+# 4. Confirm state is available
+
+# Then retry your terraform command:
+cd terraform
+terraform plan
+# or
+terraform apply
+```
+
+**Manual unlock (if script fails)**:
+
+```powershell
+# Get lock info from error message, then:
+cd terraform
+terraform force-unlock <lock-id-from-error>
 ```
 
 ### Issue: AWS credentials not configured
@@ -148,6 +205,30 @@ terraform version
 # Install correct version or use tfenv
 # See required version in terraform/versions.tf
 ```
+
+### Issue: Lambda S3 package not found
+
+**Symptom**: "Error occurred while GetObject. S3 Error Code: NoSuchKey"
+**Solution**: Verify Lambda package is at expected S3 location
+
+```powershell
+# This occurs with db Lambda which Terraform expects at graphql/ prefix
+# Check version being deployed
+$version = aws ssm get-parameter --name "/legacy-sports/dev/lambda/graphql/version" --query 'Parameter.Value' --output text
+
+# Verify file exists at expected location
+aws s3 ls s3://legacy-sports-dev-lambdas-cca20ad9/graphql/ | Select-String $version
+
+# If not found, copy from actual upload location
+aws s3 cp `
+  s3://legacy-sports-dev-lambdas-cca20ad9/db/db-$version.zip `
+  s3://legacy-sports-dev-lambdas-cca20ad9/graphql/graphql-$version.zip
+
+# Then retry terraform apply
+terraform apply -auto-approve
+```
+
+**Note**: The db Lambda deployment script uploads to `db/` prefix but Terraform expects `graphql/` prefix. Always verify after deploying db Lambda.
 
 ## Best Practices
 

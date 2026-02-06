@@ -188,6 +188,21 @@ pnpm exec nx test shared-components --coverage
 pnpm exec nx storybook shared-components
 ```
 
+### UI Preview Images (Agent-Friendly)
+
+Generate PNG previews of key stories (palette gallery, etc.) so you can compare visual options quickly:
+
+```bash
+pnpm exec nx run shared-components:ui-previews
+```
+
+Outputs are written to `tmp/ui-previews/` at the workspace root.
+
+Notes:
+
+- The preview generator auto-selects an available Storybook port (so it won\'t hang if `6009` is already in use).
+- `@storybook/addon-coverage` is now opt-in for stability. To enable it, set `STORYBOOK_ENABLE_COVERAGE=1` when running Storybook.
+
 ## 🎨 Tamagui Configuration
 
 ### Theme System

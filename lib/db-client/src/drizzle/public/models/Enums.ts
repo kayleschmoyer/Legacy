@@ -87,3 +87,11 @@ export const rosterLockTiming = pgEnum('roster_lock_timing', [
   'week_before',
   'custom',
 ]);
+
+export const weekAdvanceStatus = pgEnum('week_advance_status', [
+  'idle',
+  'queued',
+  'processing',
+  'success',
+  'failed',
+]);

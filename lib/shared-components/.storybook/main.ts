@@ -1,8 +1,13 @@
 import type { StorybookConfig } from '@storybook/react-vite';
 
+const enableCoverageAddon =
+  process.env.STORYBOOK_ENABLE_COVERAGE === '1' ||
+  process.env.STORYBOOK_ENABLE_COVERAGE === 'true';
+
 const config: StorybookConfig = {
   stories: [
     '../src/Welcome.stories.@(js|jsx|ts|tsx|mdx)',
+    '../src/ThemeGallery.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/Layout.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/XStack.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/YStack.stories.@(js|jsx|ts|tsx|mdx)',
@@ -13,6 +18,8 @@ const config: StorybookConfig = {
     '../src/ConditionalProviders.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/features/draft/PlayerCard.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/features/draft/FilterComponents.stories.@(js|jsx|ts|tsx|mdx)',
+    '../src/features/draft/QuickFilters.stories.@(js|jsx|ts|tsx|mdx)',
+    '../src/features/draft/FilterDrawer.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/features/stats/StatsTable.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/features/teams/TeamPicker.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/features/players/PlayerRow.stories.@(js|jsx|ts|tsx|mdx)',
@@ -25,8 +32,7 @@ const config: StorybookConfig = {
     '@storybook/addon-docs',
     '@storybook/addon-controls',
     '@storybook/addon-a11y',
-    '@storybook/addon-viewport',
-    '@storybook/addon-coverage', // For code coverage during testing
+    ...(enableCoverageAddon ? ['@storybook/addon-coverage'] : []),
   ],
   framework: {
     name: '@storybook/react-vite',

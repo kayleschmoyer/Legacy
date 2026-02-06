@@ -1,8 +1,67 @@
 # Legacy Sports Database Tables Documentation
 
+**Last Updated**: February 5, 2026
+
+**Total Tables**: 36 tables + views
+
+**Recent Updates**:
+
+- ✅ Added CASCADE DELETE relationships for leagues and teams (LS-66)
+- ✅ Added week advancement status tracking to leagues
+- ✅ Added stats loading status to matchups for async processing
+- ✅ Removed unique constraint on matchup week numbers to support multiple concurrent matchups
+- ✅ Added game_identifier to matchup_player_games for improved tracking
+- ✅ Added nullable fielding position support
+- ✅ Fixed SF column type in season_batting (changed from INTEGER to VARCHAR)
+- ✅ Added queued status to stats loading workflow
+
 ## Overview
 
 The Legacy Sports database follows a **season-to-career aggregation pattern** with comprehensive baseball statistics tracking. The database stores both granular season-level data and pre-aggregated career statistics through PostgreSQL views.
+
+## Table Categories
+
+### Core Data (Players & Statistics)
+
+1. Players - Master player registry
+   2-4. Season Statistics (batting, pitching, fielding)
+   5-8. Career Views (aggregated statistics)
+   9-11. Game Statistics (game-level performance)
+
+### League Management (12-25)
+
+12. Leagues - League configuration and settings
+13. Teams - Fantasy teams
+14. League Members - User memberships and permissions
+15. Team Members - Player rosters
+    16-17. Drafts & Draft Teams - Draft system
+    18-21. Matchups & Related - Head-to-head competition
+    22-23. Roster Management - Position slots and lock rules
+    24-25. System - Users and messages
+
+### Scoring System (26-29)
+
+26. Scoring Stat Definitions - Available statistics catalog
+27. League Scoring Profiles - Versionable scoring configurations
+28. League Scoring Profile Entries - Per-stat multipliers
+29. League Scoring Change Log - Audit trail
+
+### Playoff System (30-33)
+
+30. Playoff Brackets - Tournament configuration
+31. Playoff Matchups - Individual playoff games
+32. Playoff Seeds - Team seeding and rankings
+33. Champion Trophies - Historical championship records
+
+### Notification System (34-36)
+
+34. Notification Preferences - User notification settings
+35. Device Tokens - Mobile device registration
+36. Notification History - Sent notification audit trail
+
+### Computed Views (37)
+
+37. Player Eligible Positions - Position eligibility derived from career stats
 
 ## Database Architecture
 
@@ -22,18 +81,20 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Master registry of all baseball players in the system
 
-| Column       | Type                 | Description                                |
-| ------------ | -------------------- | ------------------------------------------ |
-| `id`         | SERIAL (PK)          | Unique player identifier                   |
-| `first_name` | TEXT                 | Player's first name                        |
-| `last_name`  | TEXT                 | Player's last name                         |
-| `bref_id`    | VARCHAR(10) (UNIQUE) | Baseball Reference ID for external lookups |
+| Column                  | Type                 | Description                                |
+| ----------------------- | -------------------- | ------------------------------------------ |
+| `id`                    | SERIAL (PK)          | Unique player identifier                   |
+| `first_name`            | TEXT                 | Player's first name                        |
+| `last_name`             | TEXT                 | Player's last name                         |
+| `bref_id`               | VARCHAR(10) (UNIQUE) | Baseball Reference ID for external lookups |
+| `stats_last_fetched_at` | TIMESTAMP            | When statistics were last updated          |
 
 **Key Features**:
 
 - Primary key: `id`
 - Unique constraint: `bref_id` (Baseball Reference integration)
 - Foreign key referenced by all statistics tables
+- `stats_last_fetched_at` tracks data freshness for cache invalidation
 
 ---
 
@@ -259,23 +320,37 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Fantasy league configuration
 
-| Column                 | Type         | Description                                                 |
-| ---------------------- | ------------ | ----------------------------------------------------------- |
-| `id`                   | SERIAL (PK)  | League ID                                                   |
-| `name`                 | VARCHAR      | League name                                                 |
-| `owner`                | INTEGER      | League owner user ID                                        |
-| `max_roster_size`      | INTEGER      | Maximum players per team (default: 25)                      |
-| `current_matchup`      | INTEGER      | Current active matchup                                      |
-| `draft_status`         | draft_status | Status of the league draft (default: 'not-started')         |
-| `invite_code`          | VARCHAR(8)   | Unique 8-character code for inviting users                  |
-| `min_games_per_season` | INTEGER      | Minimum games required for season eligibility (default: 10) |
-| `games_per_matchup`    | INTEGER      | Default number of games per player per matchup (default: 5) |
+| Column                 | Type                | Description                                                 |
+| ---------------------- | ------------------- | ----------------------------------------------------------- |
+| `id`                   | SERIAL (PK)         | League ID                                                   |
+| `name`                 | VARCHAR             | League name                                                 |
+| `owner`                | INTEGER             | League owner user ID                                        |
+| `max_roster_size`      | INTEGER             | Maximum players per team (default: 25)                      |
+| `current_matchup`      | INTEGER             | Current active matchup                                      |
+| `draft_status`         | draft_status        | Status of the league draft (default: 'not-started')         |
+| `invite_code`          | VARCHAR(8)          | Unique 8-character code for inviting users                  |
+| `min_games_per_season` | INTEGER             | Minimum games required for season eligibility (default: 10) |
+| `games_per_matchup`    | INTEGER             | Default number of games per player per matchup (default: 5) |
+| `trade_deadline_week`  | INTEGER             | Week number when trades are locked                          |
+| `roster_lock_timing`   | roster_lock_timing  | When rosters lock (default: 'matchup_start')                |
+| `scheduling_strategy`  | scheduling_strategy | Matchup scheduling algorithm (default: 'round-robin')       |
+| `week_advance_status`  | week_advance_status | Status of week advancement operation (default: 'idle')      |
+
+**Roster Lock Timing Enum**: `matchup_start`, `day_before`, `week_before`, `custom`
+
+**Scheduling Strategy Enum**: `round-robin`, `divisional`, `random`
+
+**Week Advance Status Enum**: `idle`, `queued`, `processing`, `success`, `failed`
 
 **Key Features**:
 
 - `min_games_per_season`: Controls which seasons are eligible for selection in matchups (players must have played this many games)
 - `games_per_matchup`: Default configuration for how many games to select per player in each matchup
+- `roster_lock_timing`: Determines when roster changes are no longer allowed
+- `scheduling_strategy`: Controls how weekly matchups are generated
+- `week_advance_status`: Tracks asynchronous week advancement to prevent race conditions
 - Unique constraint on `invite_code` for secure league joining
+- **CASCADE DELETE**: Deleting a league cascades to teams, matchups, drafts, members, playoff data, and all related entities
 
 ### 13. **Teams** (`teams`)
 
@@ -289,24 +364,28 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Key Features**:
 
-- Foreign key: `league_id` → `leagues.id`
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
 - Unique constraint: `(id, league_id)`
+- **CASCADE DELETE**: Deleting a team cascades to team_members, playoff seeds, and matchup data
 
 ### 14. **League Members** (`league_members`)
 
 **Purpose**: User membership and permissions in leagues
 
-| Column             | Type         | Description                |
-| ------------------ | ------------ | -------------------------- |
-| `league_id`        | INTEGER (FK) | References `leagues.id`    |
-| `user_id`          | INTEGER      | User identifier            |
-| `team_id`          | INTEGER      | Associated team (optional) |
-| `permission_level` | ENUM         | 'owner' or 'commissioner'  |
+| Column             | Type                    | Description                |
+| ------------------ | ----------------------- | -------------------------- |
+| `league_id`        | INTEGER (FK)            | References `leagues.id`    |
+| `user_id`          | INTEGER                 | User identifier            |
+| `team_id`          | INTEGER                 | Associated team (optional) |
+| `permission_level` | league_permission_level | 'owner' or 'commissioner'  |
+
+**Permission Level Enum**: `owner`, `commissioner`
 
 **Key Features**:
 
 - Composite primary key: `(league_id, user_id)`
-- Permission levels: `owner`, `commissioner`
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
+- Permission levels control league management capabilities
 
 ### 15. **Team Members** (`team_members`)
 
@@ -323,7 +402,10 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 **Key Features**:
 
 - Multiple foreign keys for data integrity
+- Foreign key: `team_id` → `teams.id` (CASCADE DELETE)
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
 - Links real players to fantasy teams
+- Unique constraint: `(team_id, position_id)` ensures one player per position per team
 
 ---
 
@@ -333,51 +415,73 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 
 **Purpose**: Draft event configuration
 
-| Column        | Type         | Description                 |
-| ------------- | ------------ | --------------------------- |
-| `id`          | SERIAL (PK)  | Draft ID                    |
-| `league_id`   | INTEGER (FK) | References `leagues.id`     |
-| `draft_type`  | ENUM         | 'blind', 'normal', 'legacy' |
-| `date`        | DATE         | Draft date                  |
-| `draft_order` | ENUM         | 'snake' or 'normal'         |
+| Column        | Type         | Description                              |
+| ------------- | ------------ | ---------------------------------------- |
+| `id`          | SERIAL (PK)  | Draft ID                                 |
+| `league_id`   | INTEGER (FK) | References `leagues.id`                  |
+| `draft_type`  | draft_type   | Type of draft                            |
+| `date`        | DATE         | Draft date                               |
+| `draft_order` | draft_order  | Snake or normal order (default: 'snake') |
+
+**Draft Type Enum**: `blind`, `normal`, `legacy`, `random-draft`
+
+**Draft Order Enum**: `snake`, `normal`
+
+**Key Features**:
+
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
+- Supports multiple draft formats and ordering strategies
 
 ### 17. **Draft Teams** (`draft_teams`)
 
 **Purpose**: Team participation and draft order
 
+| Column        | Type         | Description             |
+| ------------- | ------------ | ----------------------- |
+| `draft_id`    | INTEGER (FK) | References `drafts.id`  |
+| `team_id`     | INTEGER (FK) | References `teams.id`   |
+| `league_id`   | INTEGER (FK) | References `leagues.id` |
+| `draft_order` | INTEGER      | Draft position          |
+
 **Key Features**:
 
 - Composite primary key: `(draft_id, team_id, league_id)`
-- Unique constraint on draft order per draft
+- Unique constraint on `(draft_id, draft_order)` ensures no duplicate draft positions
+- Foreign key: `draft_id` → `drafts.id` (CASCADE DELETE)
 - Links teams to specific drafts with ordering
 
 ### 18. **Matchups** (`matchups`)
 
 **Purpose**: Weekly fantasy matchups with team pairings and scoring
 
-| Column              | Type           | Description                               |
-| ------------------- | -------------- | ----------------------------------------- |
-| `id`                | SERIAL (PK)    | Matchup ID                                |
-| `league_id`         | INTEGER (FK)   | References `leagues.id`                   |
-| `week_number`       | INTEGER        | Week in season                            |
-| `team1_id`          | INTEGER (FK)   | References `teams.id` (first team)        |
-| `team2_id`          | INTEGER (FK)   | References `teams.id` (second team)       |
-| `team1_score`       | NUMERIC(10, 2) | Score for team 1 after matchup completion |
-| `team2_score`       | NUMERIC(10, 2) | Score for team 2 after matchup completion |
-| `status`            | matchup_status | Current status of the matchup             |
-| `selected_season`   | INTEGER        | The single season used for all players    |
-| `games_per_matchup` | INTEGER        | Number of games to select per player      |
-| `start_time`        | TIMESTAMP      | When the matchup period begins            |
-| `end_time`          | TIMESTAMP      | When the matchup period ends              |
+| Column                 | Type                 | Description                               |
+| ---------------------- | -------------------- | ----------------------------------------- |
+| `id`                   | SERIAL (PK)          | Matchup ID                                |
+| `league_id`            | INTEGER (FK)         | References `leagues.id`                   |
+| `week_number`          | INTEGER              | Week in season                            |
+| `team1_id`             | INTEGER (FK)         | References `teams.id` (first team)        |
+| `team2_id`             | INTEGER (FK)         | References `teams.id` (second team)       |
+| `team1_score`          | NUMERIC(10, 2)       | Score for team 1 after matchup completion |
+| `team2_score`          | NUMERIC(10, 2)       | Score for team 2 after matchup completion |
+| `status`               | matchup_status       | Current status of the matchup             |
+| `stats_loading_status` | stats_loading_status | Status of background stats loading        |
+| `games_per_matchup`    | INTEGER              | Number of games to select per player      |
+| `start_time`           | TIMESTAMP            | When the matchup period begins            |
+| `end_time`             | TIMESTAMP            | When the matchup period ends              |
 
 **Matchup Status Enum**: `scheduled`, `in_progress`, `completed`, `cancelled`
 
+**Stats Loading Status Enum**: `not_started`, `queued`, `loading`, `completed`, `failed`
+
 **Key Features**:
 
-- Unique constraint: `(league_id, week_number)`
-- Foreign keys to `leagues`, `teams` (team1_id and team2_id)
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
+- Foreign key: `team1_id` → `teams.id` (CASCADE DELETE)
+- Foreign key: `team2_id` → `teams.id` (CASCADE DELETE)
+- **Note**: Removed unique constraint on `(league_id, week_number)` to support multiple matchups per week
 - Supports head-to-head competition between two teams
 - Tracks scoring and matchup lifecycle
+- `stats_loading_status` tracks asynchronous statistics loading for performance
 - Season selection now managed per league-week-player (see `league_week_player_seasons`)
 
 ### 19. **Matchup Players** (`matchup_players`)
@@ -391,7 +495,12 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 | `player_id`  | INTEGER (FK) | References `players.id`  |
 | `team_id`    | INTEGER (FK) | References `teams.id`    |
 
-**Note**: Season selection moved to `league_week_player_seasons` table for consistency across matchups and to support free agent projections.
+**Key Features**:
+
+- Foreign key: `matchup_id` → `matchups.id` (CASCADE DELETE via matchup cascade)
+- Foreign key: `player_id` → `players.id`
+- Foreign key: `team_id` → `teams.id` (CASCADE DELETE)
+- **Note**: Season selection moved to `league_week_player_seasons` table for consistency across matchups and to support free agent projections
 
 ### 20. **League Week Player Seasons** (`league_week_player_seasons`)
 
@@ -406,28 +515,89 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 | `season`      | INTEGER      | Selected season          |
 | `created_at`  | TIMESTAMP    | When season was selected |
 
-**Features**:
+**Key Features**:
 
-- One season per player per league per week (unique constraint)
+- Unique constraint: `(league_id, week_number, player_id)` ensures one season per player per league per week
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
+- Foreign key: `player_id` → `players.id`
 - Consistent season across all matchups in the same week
 - Supports free agents having projections
-- Cleaner separation: matchup_players tracks "who plays", this table tracks "which season"
+- Cleaner separation: `matchup_players` tracks "who plays", this table tracks "which season"
 
 ### 21. **Matchup Player Games** (`matchup_player_games`)
 
 **Purpose**: Specific games selected for matchup players
 
-**Features**:
+| Column              | Type         | Description                                          |
+| ------------------- | ------------ | ---------------------------------------------------- |
+| `id`                | SERIAL (PK)  | Entry ID                                             |
+| `matchup_player_id` | INTEGER (FK) | References `matchup_players.id`                      |
+| `game_num`          | INTEGER      | Sequential game number                               |
+| `game_identifier`   | VARCHAR(20)  | Unique game identifier (Baseball Reference format)   |
+| `batting_game_num`  | INTEGER      | Game number for batting stats                        |
+| `fielding_game_num` | INTEGER      | Game number for fielding stats                       |
+| `pitching_game_num` | INTEGER      | Game number for pitching stats                       |
+| `fielding_game_pos` | CHAR(2)      | Position specification for fielding games (nullable) |
 
+**Key Features**:
+
+- Foreign key: `matchup_player_id` → `matchup_players.id` (CASCADE DELETE via matchup cascade)
 - Links to individual batting, fielding, and pitching games
+- `fielding_game_pos` can be NULL to support players with no fielding data
 - Position specification for fielding games
 - Granular game-by-game selections
+- **IMPORTANT**: Scores are NOT stored in the database - they are calculated on the frontend using the `@legacy-sports/scoring` package with league-specific settings
+
+---
+
+## Roster Management Tables
+
+### 22. **League Positions** (`league_positions`)
+
+**Purpose**: Position slots configuration per league
+
+| Column          | Type          | Description                     |
+| --------------- | ------------- | ------------------------------- |
+| `id`            | SERIAL (PK)   | Position ID                     |
+| `league_id`     | INTEGER (FK)  | References `leagues.id`         |
+| `position_type` | position_slot | Position type (C, 1B, 2B, etc.) |
+
+**Position Slot Enum**: `SP`, `RP`, `C`, `1B`, `2B`, `3B`, `SS`, `RF`, `LF`, `CF`, `DH`, `XDH`, `OF`, `IF`
+
+**Key Features**:
+
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
+- Flexible position slot configurations per league
+- Includes special slots: `XDH` (extra DH), `OF` (any outfield), `IF` (any infield)
+
+### 23. **Roster Lock Rules** (`roster_lock_rules`)
+
+**Purpose**: Configurable rules for when and how rosters can be modified
+
+| Column                      | Type               | Description                                                  |
+| --------------------------- | ------------------ | ------------------------------------------------------------ |
+| `id`                        | SERIAL (PK)        | Rule ID                                                      |
+| `league_id`                 | INTEGER (FK)       | References `leagues.id`                                      |
+| `allow_emergency_subs`      | BOOLEAN            | Whether emergency substitutions are allowed (default: false) |
+| `emergency_sub_rule`        | emergency_sub_rule | Conditions for emergency subs (default: 'none')              |
+| `custom_lock_time`          | TIMESTAMP          | Custom lock time if using custom timing                      |
+| `lock_hours_before_matchup` | INTEGER            | Hours before matchup start to lock (default: 0)              |
+| `commissioner_can_override` | BOOLEAN            | Whether commissioners can bypass locks (default: true)       |
+
+**Emergency Sub Rule Enum**: `none`, `injury_only`, `injury_or_rest`, `commissioner_approval`
+
+**Key Features**:
+
+- Unique constraint: `league_id` ensures one rule set per league
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
+- Flexible emergency substitution policies
+- Commissioner override capability
 
 ---
 
 ## System Tables
 
-### 22. **Users** (`users` - VIEW)
+### 24. **Users** (`users` - VIEW)
 
 **Purpose**: User authentication and authorization
 
@@ -438,12 +608,33 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 | `id`           | INTEGER      | User ID           |
 | `email`        | VARCHAR(100) | User email        |
 | `username`     | VARCHAR(50)  | Username          |
-| `access_level` | ENUM         | 'none' or 'admin' |
+| `access_level` | access_level | 'none' or 'admin' |
+
+**Access Level Enum**: `none`, `admin`
 
 **Key Features**:
 
-- View into internal authentication system
+- View into internal authentication system (`app_internal.users` table)
 - Access level controls: `none`, `admin`
+- Separates public schema from internal authentication schema
+
+### 25. **League Messages** (`league_messages`)
+
+**Purpose**: League communication system
+
+| Column         | Type         | Description                        |
+| -------------- | ------------ | ---------------------------------- |
+| `id`           | SERIAL (PK)  | Message ID                         |
+| `league_id`    | INTEGER (FK) | References `leagues.id`            |
+| `user_id`      | INTEGER      | Message author                     |
+| `message_text` | VARCHAR      | Message content                    |
+| `timestamp`    | TIMESTAMP    | Message timestamp (auto-generated) |
+
+**Key Features**:
+
+- Indexes: `league_id`, `(league_id, timestamp)`
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
+- Automatic timestamping
 
 ---
 
@@ -463,7 +654,7 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 3. `LeagueScoringProvider` on the client caches the GraphQL response per league and exposes normalized `BaseballScoringSettings` to hooks such as `useTeamMemberProjections`, so projections and UI editors never query tables directly.
 4. Automation flows (CLI scoring calculators, background jobs) re-use the service layer to guarantee identical multiplier math between backend scoring and UI previews.
 
-### 22. **Scoring Stat Definitions** (`scoring_stat_definitions`)
+### 26. **Scoring Stat Definitions** (`scoring_stat_definitions`)
 
 **Purpose**: Canonical catalog of stats that can be scored with allowable multiplier bounds.
 
@@ -492,7 +683,7 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 - Stores per-stat multiplier bounds and requirements
 - Indexed by `stat_key` and `group` for quick lookups
 
-### 23. **League Scoring Profiles** (`league_scoring_profiles`)
+### 27. **League Scoring Profiles** (`league_scoring_profiles`)
 
 **Purpose**: Versionable scoring configuration per league (supports default and draft profiles).
 
@@ -515,7 +706,7 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 - Supports draft editing by toggling `status`
 - Self-referencing FK retains history when cloning profiles
 
-### 24. **League Scoring Profile Entries** (`league_scoring_profile_entries`)
+### 28. **League Scoring Profile Entries** (`league_scoring_profile_entries`)
 
 **Purpose**: Stores multipliers per stat within a given league profile.
 
@@ -535,7 +726,7 @@ The Legacy Sports database follows a **season-to-career aggregation pattern** wi
 - Trigger-enforced bounds derive from definition table
 - `is_enabled` allows optional stats without dropping entries
 
-### 25. **League Scoring Change Log** (`league_scoring_change_log`)
+### 29. **League Scoring Change Log** (`league_scoring_change_log`)
 
 **Purpose**: Audit trail for multiplier changes to support commissioner oversight and rollback.
 
@@ -567,40 +758,201 @@ erDiagram
 	league_scoring_profile_entries ||--o{ league_scoring_change_log : "audits"
 ```
 
-### 22. **League Positions** (`league_positions`)
+---
 
-**Purpose**: Position slots configuration per league
+## Playoff System Tables
 
-| Column          | Type         | Description                     |
-| --------------- | ------------ | ------------------------------- |
-| `id`            | SERIAL (PK)  | Position ID                     |
-| `league_id`     | INTEGER (FK) | References `leagues.id`         |
-| `position_type` | ENUM         | Position type (C, 1B, 2B, etc.) |
+### 30. **Playoff Brackets** (`playoff_brackets`)
 
-**Available Positions**: 'SP', 'RP', 'C', '1B', '2B', '3B', 'SS', 'RF', 'LF', 'CF', 'DH', 'XDH', 'OF', 'IF'
+**Purpose**: Top-level playoff configuration for a league season
 
-### 23. **League Messages** (`league_messages`)
+| Column             | Type                   | Description                    |
+| ------------------ | ---------------------- | ------------------------------ |
+| `id`               | SERIAL (PK)            | Bracket ID                     |
+| `league_id`        | INTEGER (FK)           | References `leagues.id`        |
+| `season`           | INTEGER                | Season year                    |
+| `format`           | playoff_format         | Tournament format              |
+| `start_week`       | INTEGER                | First week of playoffs         |
+| `end_week`         | INTEGER                | Last week of playoffs          |
+| `champion_team_id` | INTEGER (FK)           | References `teams.id` (winner) |
+| `status`           | playoff_matchup_status | Overall bracket status         |
+| `created_at`       | TIMESTAMP              | Creation timestamp             |
 
-**Purpose**: League communication system
+**Playoff Format Enum**: `4-team`, `6-team`, `8-team`
 
-| Column         | Type         | Description                        |
-| -------------- | ------------ | ---------------------------------- |
-| `id`           | SERIAL (PK)  | Message ID                         |
-| `league_id`    | INTEGER (FK) | References `leagues.id`            |
-| `user_id`      | INTEGER      | Message author                     |
-| `message_text` | VARCHAR      | Message content                    |
-| `timestamp`    | TIMESTAMP    | Message timestamp (auto-generated) |
+**Playoff Matchup Status Enum**: `scheduled`, `in_progress`, `completed`
 
 **Key Features**:
 
-- Indexes: `league_id`, `(league_id, timestamp)`
-- Automatic timestamping
+- Unique constraint: `(league_id, season)` ensures one bracket per league per season
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
+- Foreign key: `champion_team_id` → `teams.id` (CASCADE DELETE)
+- Supports multiple tournament formats
+
+### 31. **Playoff Matchups** (`playoff_matchups`)
+
+**Purpose**: Individual matchups within a playoff bracket
+
+| Column              | Type                   | Description                          |
+| ------------------- | ---------------------- | ------------------------------------ |
+| `id`                | SERIAL (PK)            | Matchup ID                           |
+| `bracket_id`        | INTEGER (FK)           | References `playoff_brackets.id`     |
+| `round`             | playoff_round          | Tournament round                     |
+| `matchup_number`    | INTEGER                | Matchup identifier within round      |
+| `high_seed_team_id` | INTEGER (FK)           | References `teams.id` (higher seed)  |
+| `low_seed_team_id`  | INTEGER (FK)           | References `teams.id` (lower seed)   |
+| `winner_team_id`    | INTEGER (FK)           | References `teams.id` (winner)       |
+| `high_seed_score`   | NUMERIC(10, 2)         | Higher seed final score              |
+| `low_seed_score`    | NUMERIC(10, 2)         | Lower seed final score               |
+| `week_number`       | INTEGER                | Week when matchup occurs             |
+| `status`            | playoff_matchup_status | Current matchup status               |
+| `is_multi_week`     | BOOLEAN                | Whether matchup spans multiple weeks |
+
+**Playoff Round Enum**: `wildcard`, `semifinals`, `finals`
+
+**Key Features**:
+
+- Foreign key: `bracket_id` → `playoff_brackets.id` (CASCADE DELETE)
+- Foreign keys to `teams.id` for all team references (CASCADE DELETE)
+- Tracks seeding information for tournament progression
+- Supports multi-week championship matchups
+
+### 32. **Playoff Seeds** (`playoff_seeds`)
+
+**Purpose**: Team seeding information for playoffs
+
+| Column                  | Type           | Description                      |
+| ----------------------- | -------------- | -------------------------------- |
+| `id`                    | SERIAL (PK)    | Seed ID                          |
+| `bracket_id`            | INTEGER (FK)   | References `playoff_brackets.id` |
+| `team_id`               | INTEGER (FK)   | References `teams.id`            |
+| `seed_number`           | INTEGER        | Seed position (1-N)              |
+| `regular_season_wins`   | INTEGER        | Regular season wins              |
+| `regular_season_losses` | INTEGER        | Regular season losses            |
+| `points_for`            | NUMERIC(10, 2) | Total points scored              |
+
+**Key Features**:
+
+- Unique constraint: `(bracket_id, team_id)` ensures one seed per team per bracket
+- Foreign key: `bracket_id` → `playoff_brackets.id` (CASCADE DELETE)
+- Foreign key: `team_id` → `teams.id` (CASCADE DELETE)
+- Stores regular season performance for seeding calculation
+- Tiebreaker data (wins, losses, points for)
+
+### 33. **Champion Trophies** (`champion_trophies`)
+
+**Purpose**: Historical championship records
+
+| Column              | Type           | Description                       |
+| ------------------- | -------------- | --------------------------------- |
+| `id`                | SERIAL (PK)    | Trophy ID                         |
+| `league_id`         | INTEGER (FK)   | References `leagues.id`           |
+| `season`            | INTEGER        | Championship season               |
+| `team_id`           | INTEGER (FK)   | References `teams.id` (champion)  |
+| `championship_week` | INTEGER        | Week of championship              |
+| `final_score`       | NUMERIC(10, 2) | Champion's final score            |
+| `runner_up_team_id` | INTEGER (FK)   | References `teams.id` (runner-up) |
+| `runner_up_score`   | NUMERIC(10, 2) | Runner-up's final score           |
+| `awarded_at`        | TIMESTAMP      | When trophy was awarded           |
+
+**Key Features**:
+
+- Unique constraint: `(league_id, season)` ensures one champion per league per season
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE)
+- Foreign key: `team_id` → `teams.id` (CASCADE DELETE)
+- Foreign key: `runner_up_team_id` → `teams.id` (CASCADE DELETE)
+- Permanent historical record of championships
+
+---
+
+## Notification System Tables
+
+### 34. **Notification Preferences** (`notification_preferences`)
+
+**Purpose**: User notification settings and thresholds
+
+| Column                       | Type           | Description                                           |
+| ---------------------------- | -------------- | ----------------------------------------------------- |
+| `id`                         | SERIAL (PK)    | Preference ID                                         |
+| `user_id`                    | INTEGER (FK)   | References `app_internal.users.id`                    |
+| `matchup_started_enabled`    | BOOLEAN        | Notify when matchup starts (default: true)            |
+| `matchup_ended_enabled`      | BOOLEAN        | Notify when matchup ends (default: true)              |
+| `matchup_close_game_enabled` | BOOLEAN        | Notify for close games (default: true)                |
+| `matchup_reminder_enabled`   | BOOLEAN        | Send matchup reminders (default: true)                |
+| `push_enabled`               | BOOLEAN        | Enable push notifications (default: true)             |
+| `email_enabled`              | BOOLEAN        | Enable email notifications (default: false)           |
+| `close_game_threshold`       | NUMERIC(10, 2) | Score difference for close game alerts (default: 5.0) |
+| `created_at`                 | TIMESTAMP      | Creation timestamp                                    |
+| `updated_at`                 | TIMESTAMP      | Last update timestamp                                 |
+
+**Key Features**:
+
+- Unique constraint: `user_id` ensures one preference set per user
+- Foreign key: `user_id` → `app_internal.users.id` (CASCADE DELETE)
+- Granular notification control per notification type
+- Configurable close game threshold
+
+### 35. **Device Tokens** (`device_tokens`)
+
+**Purpose**: Mobile device registration for push notifications
+
+| Column         | Type         | Description                             |
+| -------------- | ------------ | --------------------------------------- |
+| `id`           | SERIAL (PK)  | Token ID                                |
+| `user_id`      | INTEGER (FK) | References `app_internal.users.id`      |
+| `device_token` | TEXT         | Firebase/APNS device token              |
+| `platform`     | VARCHAR(20)  | Platform (iOS, Android, web)            |
+| `endpoint_arn` | TEXT         | AWS SNS endpoint ARN                    |
+| `enabled`      | BOOLEAN      | Whether token is active (default: true) |
+| `created_at`   | TIMESTAMP    | Registration timestamp                  |
+| `updated_at`   | TIMESTAMP    | Last update timestamp                   |
+
+**Key Features**:
+
+- Unique constraint: `device_token` prevents duplicate registrations
+- Indexes: `user_id`, `enabled` for efficient lookups
+- Foreign key: `user_id` → `app_internal.users.id` (CASCADE DELETE)
+- Stores AWS SNS endpoint ARN for push delivery
+- Supports multiple devices per user
+
+### 36. **Notification History** (`notification_history`)
+
+**Purpose**: Audit trail of all sent notifications
+
+| Column              | Type                 | Description                            |
+| ------------------- | -------------------- | -------------------------------------- |
+| `id`                | SERIAL (PK)          | Notification ID                        |
+| `user_id`           | INTEGER (FK)         | References `app_internal.users.id`     |
+| `notification_type` | notification_type    | Type of notification                   |
+| `channel`           | notification_channel | Delivery channel                       |
+| `matchup_id`        | INTEGER (FK)         | References `matchups.id` (optional)    |
+| `league_id`         | INTEGER (FK)         | References `leagues.id` (optional)     |
+| `title`             | VARCHAR(255)         | Notification title                     |
+| `message`           | TEXT                 | Notification message body              |
+| `metadata`          | JSONB                | Additional structured data             |
+| `read`              | BOOLEAN              | Whether user has read (default: false) |
+| `sent_at`           | TIMESTAMP            | When notification was sent             |
+| `read_at`           | TIMESTAMP            | When notification was read             |
+| `created_at`        | TIMESTAMP            | Creation timestamp                     |
+
+**Notification Type Enum**: `matchup_started`, `matchup_ended`, `matchup_close_game`, `matchup_reminder`
+
+**Notification Channel Enum**: `in_app`, `push`, `email`
+
+**Key Features**:
+
+- Indexes: `user_id`, `matchup_id`, `league_id`, `read`, `sent_at` for efficient queries
+- Foreign key: `user_id` → `app_internal.users.id` (CASCADE DELETE)
+- Foreign key: `matchup_id` → `matchups.id` (CASCADE DELETE via matchup cascade)
+- Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
+- JSONB metadata for flexible notification data
+- Tracks read status and timing for engagement metrics
 
 ---
 
 ## Computed Views
 
-### 24. **Player Eligible Positions** (`player_eligible_positions` - VIEW)
+### 37. **Player Eligible Positions** (`player_eligible_positions` - VIEW)
 
 **Purpose**: Determines which positions players are eligible for based on games played
 
@@ -646,6 +998,62 @@ The database integrates with a GraphQL API through:
 - `playerCareerBatting(playerId)` - Individual player career batting
 - `playerCareerPitching(playerId)` - Individual player career pitching
 - `playerCareerFielding(playerId)` - Individual player career fielding
+
+---
+
+## Database Cascade Delete Relationships
+
+**Migration**: `20260205_210000_add_cascade_deletes_to_leagues_and_teams.ts`
+
+The database implements comprehensive CASCADE DELETE behavior to maintain referential integrity and simplify data cleanup:
+
+### League Deletion Cascades
+
+When a **league** is deleted, the following entities are automatically removed:
+
+- **Direct cascades**:
+  - `teams` (all teams in the league)
+  - `matchups` (all matchups)
+  - `drafts` (all draft configurations)
+  - `league_members` (all memberships)
+  - `playoff_brackets` (all playoff brackets)
+  - `champion_trophies` (championship history)
+
+- **Indirect cascades** (via dependent tables):
+  - `team_members` (via teams)
+  - `matchup_players` (via matchups)
+  - `matchup_player_games` (via matchup_players)
+  - `playoff_matchups` (via playoff_brackets)
+  - `playoff_seeds` (via playoff_brackets)
+  - `draft_teams` (via drafts)
+  - `league_positions` (via league reference)
+  - `roster_lock_rules` (via league reference)
+  - `league_scoring_profiles` (via league reference)
+  - `notification_history` (via league reference)
+
+### Team Deletion Cascades
+
+When a **team** is deleted, the following entities are automatically removed:
+
+- `team_members` (player roster)
+- `matchup_players` (via team_id reference)
+- `playoff_seeds` (playoff seeding data)
+- `playoff_matchups` (where team is high seed, low seed, or winner)
+- `champion_trophies` (where team is champion or runner-up)
+- `matchups` (where team is team1 or team2)
+
+### Benefits
+
+1. **Data Integrity**: Prevents orphaned records across the database
+2. **Simplified Cleanup**: No need for complex deletion scripts
+3. **Atomic Operations**: All related data removed in single transaction
+4. **Prevents Errors**: Eliminates foreign key constraint violations
+
+### Important Notes
+
+- All cascade deletes are transaction-safe
+- Statistics tables (`season_batting`, `season_pitching`, etc.) are **NOT** affected by league/team deletions - they remain as historical data
+- User accounts (`app_internal.users`) are preserved when leagues/teams are deleted
 
 ---
 

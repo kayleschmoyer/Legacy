@@ -13,6 +13,13 @@
         "cwd": "lib/shared-components"
       }
     },
+    "ui-previews": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx scripts/ui-previews.ts --outDir tmp/ui-previews",
+        "cwd": "."
+      }
+    },
     "test": {
       "executor": "nx:noop",
       "dependsOn": ["test:web", "test:mobile"]

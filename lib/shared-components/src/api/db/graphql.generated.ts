@@ -308,6 +308,8 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Number of unique games selected for this matchup */
+  selectedGamesCount?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
   statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
@@ -1352,6 +1354,27 @@ export function useGetAllPlayersLazyQuery(
     options,
   );
 }
+// @ts-ignore
+export function useGetAllPlayersSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetAllPlayersQuery,
+    GetAllPlayersQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetAllPlayersQuery,
+  GetAllPlayersQueryVariables
+>;
+export function useGetAllPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllPlayersQuery,
+        GetAllPlayersQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetAllPlayersQuery | undefined,
+  GetAllPlayersQueryVariables
+>;
 export function useGetAllPlayersSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -1470,6 +1493,27 @@ export function useGetCareerBattingStatsLazyQuery(
     GetCareerBattingStatsQueryVariables
   >(GetCareerBattingStats, options);
 }
+// @ts-ignore
+export function useGetCareerBattingStatsSuspenseQuery(
+  baseOptions?: Apollo.SuspenseQueryHookOptions<
+    GetCareerBattingStatsQuery,
+    GetCareerBattingStatsQueryVariables
+  >,
+): Apollo.UseSuspenseQueryResult<
+  GetCareerBattingStatsQuery,
+  GetCareerBattingStatsQueryVariables
+>;
+export function useGetCareerBattingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCareerBattingStatsQuery,
+        GetCareerBattingStatsQueryVariables
+      >,
+): Apollo.UseSuspenseQueryResult<
+  GetCareerBattingStatsQuery | undefined,
+  GetCareerBattingStatsQueryVariables
+>;
 export function useGetCareerBattingStatsSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken

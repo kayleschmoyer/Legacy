@@ -1,9 +1,11 @@
 # Skill: Database Connection
 
 ## Overview
+
 Test database connectivity and access the PostgreSQL interactive shell.
 
 ## When to Use
+
 - Verifying database credentials are correct
 - Before running migrations
 - Troubleshooting connection issues
@@ -20,10 +22,20 @@ pnpm run db:test
 
 ## Alternative Commands
 
+### Run SQL Queries (Recommended)
+
+```powershell
+# Run SQL query with script (recommended)
+.\scripts\db-query.ps1 -Query "SELECT * FROM players LIMIT 10"
+
+# With JSON output format
+.\scripts\db-query.ps1 -Query "SELECT * FROM leagues" -Format json
+```
+
 ### Interactive PostgreSQL Shell
 
 ```powershell
-# Connect to database with psql
+# Connect to database with psql (for interactive sessions)
 pnpm run db:psql
 
 # For production (careful!)
@@ -64,6 +76,7 @@ pnpm run cli:inspect-database
 ```
 
 ## Expected Output
+
 - **Success**: "Connected to database successfully"
 - **Connection Details**: Host, port, database name
 - **PSQL**: Interactive shell prompt if connecting directly
@@ -71,8 +84,10 @@ pnpm run cli:inspect-database
 ## Common Issues
 
 ### Issue: Connection refused
+
 **Symptom**: "ECONNREFUSED" or "connection refused"
 **Solution**: Check if database is running and accessible
+
 ```powershell
 # 1. Verify credentials are synced
 pnpm run sync-env
@@ -87,8 +102,10 @@ pnpm run db:test
 ```
 
 ### Issue: Authentication failed
+
 **Symptom**: "password authentication failed"
 **Solution**: Resync credentials from AWS
+
 ```powershell
 # Sync environment variables
 pnpm run sync-env
@@ -101,8 +118,10 @@ pnpm run db:test
 ```
 
 ### Issue: Database not found
+
 **Symptom**: "database does not exist"
 **Solution**: Verify database name in connection string
+
 ```powershell
 # Check database URL
 pnpm run db:url
@@ -112,8 +131,10 @@ pnpm run db:url
 ```
 
 ### Issue: Timeout errors
+
 **Symptom**: Connection times out
 **Solution**: Check network connectivity and security groups
+
 ```powershell
 # 1. Check VPN is connected (if required)
 # 2. Verify security groups allow your IP
@@ -122,8 +143,10 @@ pnpm run sync-env:direct  # Try direct connection
 ```
 
 ### Issue: SSL/TLS errors
+
 **Symptom**: SSL certificate verification failed
 **Solution**: Check SSL configuration
+
 ```powershell
 # AWS RDS requires SSL
 # Ensure environment has correct SSL settings
@@ -131,11 +154,13 @@ pnpm run sync-env:direct  # Try direct connection
 ```
 
 ## Best Practices
+
 1. **Test connection first** before running migrations or operations
 2. **Sync environment** before testing connection
-3. **Use test commands** instead of psql for quick checks
-4. **Verify credentials** are for correct environment (dev vs prod)
-5. **Close connections** when done (Ctrl+D in psql)
+3. **Use `db-query.ps1` script** for one-off queries instead of psql
+4. **Use psql only for interactive sessions** that require multiple queries
+5. **Verify credentials** are for correct environment (dev vs prod)
+6. **Close connections** when done (Ctrl+D in psql)
 
 ## Interactive Shell Commands
 
@@ -174,8 +199,8 @@ SELECT COUNT(*) FROM players;
 SELECT * FROM drizzle_migrations ORDER BY created_at DESC;
 
 -- View table structure
-SELECT column_name, data_type 
-FROM information_schema.columns 
+SELECT column_name, data_type
+FROM information_schema.columns
 WHERE table_name = 'players';
 
 -- Check database size
@@ -185,6 +210,7 @@ SELECT pg_size_pretty(pg_database_size('legacy_sports'));
 ## Integration with Workflow
 
 ### Before Running Migrations
+
 ```powershell
 # 1. Sync environment
 pnpm run sync-env
@@ -197,6 +223,7 @@ pnpm run db:migrate
 ```
 
 ### Troubleshooting Database Issues
+
 ```powershell
 # 1. Test connection
 pnpm run db:test
@@ -212,6 +239,7 @@ pnpm run db:test
 ```
 
 ### Daily Development Startup
+
 ```powershell
 # 1. Sync environment (first time or after changes)
 pnpm run sync-env
@@ -226,6 +254,7 @@ pnpm run dev
 ## Connection Types
 
 ### Development Database
+
 ```powershell
 # Default connection (via proxy)
 pnpm run db:test
@@ -236,6 +265,7 @@ pnpm run db:test
 ```
 
 ### Production Database (Careful!)
+
 ```powershell
 # Test production (read-only checks only!)
 pnpm run db:test:production
@@ -249,6 +279,7 @@ pnpm run db:psql:production
 ## Environment Variables
 
 ### Required Variables
+
 - `DATABASE_URL` - Full connection string
 - `DB_HOST` - Database host (optional, extracted from URL)
 - `DB_PORT` - Database port (optional, default 5432)
@@ -257,6 +288,7 @@ pnpm run db:psql:production
 - `DB_PASSWORD` - Database password (in AWS Secrets Manager)
 
 ### Checking Variables
+
 ```powershell
 # View database URL (masked password)
 pnpm run db:url
@@ -268,21 +300,25 @@ pnpm run db:credentials
 ## Connection Pooling
 
 The db-client library uses connection pooling:
+
 - Development: 5-10 connections
 - Production: 20-50 connections (configured in Lambda)
 - Automatic reconnection on failures
 - Timeout handling
 
 ## Exit Codes
+
 - **0**: Connection successful
 - **Non-zero**: Connection failed (check error message)
 
 ## Related Skills
+
 - [Sync Environment](sync-env.md) - Syncing database credentials
 - [Database Migration](db-migrate.md) - Running migrations
 - [Dev DB Lambda](dev-db-lambda.md) - Starting GraphQL server
 
 ## Related Documentation
+
 - [Database Schema](../../../docs/architecture/database-schema.md)
 - [Development Setup](../../../docs/guides/development-setup.md)
 - [Security & Secrets](../../../docs/guides/security-and-secrets.md)
@@ -290,6 +326,7 @@ The db-client library uses connection pooling:
 ## Security Notes
 
 ⚠️ **Important**:
+
 - Never commit database credentials to git
 - Use `.env.local` for local credentials (git-ignored)
 - Production credentials only via AWS Secrets Manager

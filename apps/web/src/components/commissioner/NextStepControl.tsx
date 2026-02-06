@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- LS-53: File contains placeholders for unimplemented GraphQL operations */
 import React, { useState } from 'react';
 import {
   Button,
@@ -13,23 +12,20 @@ import {
 import {
   type Matchup,
   StatsLoadingStatus,
-  // useAdvanceLeagueWeekMutation,
+  useAdvanceLeagueWeekMutation,
   useGetMatchupsForLeagueQuery,
+  useStartDraftMutation,
   useTriggerGameSelectionMutation,
 } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until advanceLeagueWeek mutation is implemented
-const useAdvanceLeagueWeekMutation = () =>
-  [
-    (_params?: any) => Promise.reject(new Error('Not implemented')),
-    { loading: false },
-  ] as const;
 
 export interface NextStepControlProps {
   leagueId: number;
   currentMatchup?: Matchup | null;
   gamesPerMatchup: number;
-  onSuccess?: () => void;
+  draftStatus?: string | null;
+  onSuccess?: (
+    actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1',
+  ) => void;
   onError?: (error: Error) => void;
 }
 
@@ -46,6 +42,7 @@ export function NextStepControl({
   leagueId,
   currentMatchup,
   gamesPerMatchup,
+  draftStatus,
   onSuccess,
   onError,
 }: NextStepControlProps) {
@@ -53,6 +50,7 @@ export function NextStepControl({
   const [loading, setLoading] = useState(false);
 
   const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation();
+  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation();
   const [triggerGameSelection] = useTriggerGameSelectionMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
@@ -73,14 +71,32 @@ export function NextStepControl({
 
   const nextWeek = highestWeek + 1;
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
-  const currentWeek = currentMatchup?.weekNumber ?? 0;
+  const currentWeek = highestWeek;
 
   // Get selected games count from matchup data
   const selectedGamesCount = currentMatchup?.selectedGamesCount ?? 0;
   const nextGameNumber = selectedGamesCount + 1;
   const allGamesSelected = selectedGamesCount >= gamesPerMatchup;
 
-  const actionType = allGamesSelected ? 'advance' : 'selectGame';
+  // Determine action type:
+  // - If no matchups (week 0) and draft not completed -> start draft only
+  // - If draft completed but no matchups -> create week 1
+  // - If games not all selected -> select next game
+  // - If all games selected -> advance week
+  const needsDraft = highestWeek === 0 && draftStatus !== 'completed';
+  const needsWeek1 = highestWeek === 0 && draftStatus === 'completed';
+  const actionType = needsDraft
+    ? 'draft'
+    : needsWeek1
+      ? 'createWeek1'
+      : allGamesSelected
+        ? 'advance'
+        : 'selectGame';
+
+  // Disable draft if already in progress (queued or in-progress) or completed
+  const isDraftInProgress =
+    draftStatus === 'queued' || draftStatus === 'in-progress';
+  const isDraftCompleted = draftStatus === 'completed';
 
   // Disable game selection if already in progress (queued or loading)
   const isGameSelectionInProgress =
@@ -88,8 +104,16 @@ export function NextStepControl({
     currentMatchup?.statsLoadingStatus === StatsLoadingStatus.Loading;
 
   const handleButtonClick = () => {
+    // Prevent clicking while game selection is in progress
     if (isGameSelectionInProgress) {
-      return; // Prevent clicking while queued or loading
+      return;
+    }
+    // Prevent clicking draft button if draft is already in progress, loading, or completed
+    if (
+      actionType === 'draft' &&
+      (startDraftLoading || isDraftInProgress || isDraftCompleted)
+    ) {
+      return;
     }
     setShowConfirmDialog(true);
   };
@@ -99,7 +123,26 @@ export function NextStepControl({
     setLoading(true);
 
     try {
-      if (actionType === 'selectGame') {
+      if (actionType === 'draft') {
+        // Start draft only - commissioner will create week 1 after
+        await startDraft({
+          variables: {
+            leagueId,
+            draftType: 'random-draft',
+          },
+        });
+
+        setLoading(false);
+        onSuccess?.('draft');
+      } else if (actionType === 'createWeek1') {
+        // Create Week 1 matchups after draft is complete
+        await advanceLeagueWeek({
+          variables: { leagueId },
+        });
+
+        setLoading(false);
+        onSuccess?.('createWeek1');
+      } else if (actionType === 'selectGame') {
         // Trigger the game-selection lambda via SQS
         await triggerGameSelection({
           variables: {
@@ -115,7 +158,7 @@ export function NextStepControl({
         // Then confirm status is updated before re-enabling button
         // The button will stay disabled via isGameSelectionInProgress check
         setLoading(false);
-        onSuccess?.();
+        onSuccess?.('selectGame');
       } else {
         // Advance to next week
         await advanceLeagueWeek({
@@ -123,7 +166,7 @@ export function NextStepControl({
         });
 
         setLoading(false);
-        onSuccess?.();
+        onSuccess?.('advance');
       }
     } catch (err) {
       setLoading(false);
@@ -132,7 +175,12 @@ export function NextStepControl({
         err instanceof Error ? err.message : 'Unknown error occurred';
 
       // Provide helpful error messages
-      if (actionType === 'advance') {
+      if (actionType === 'draft') {
+        if (errorMessage.includes('at least 2 teams')) {
+          errorMessage =
+            'Your league needs at least 2 teams to start a draft. Please add more teams first.';
+        }
+      } else if (actionType === 'createWeek1' || actionType === 'advance') {
         if (errorMessage.includes('at least 2 teams')) {
           errorMessage =
             'Your league needs at least 2 teams to create matchups. Please add more teams first.';
@@ -153,10 +201,16 @@ export function NextStepControl({
   };
 
   const getButtonText = () => {
-    if (loading || matchupsLoading) return 'Processing...';
+    if (loading || startDraftLoading || matchupsLoading) return 'Processing...';
     if (isGameSelectionInProgress) return 'Game Selection In Progress...';
+    if (isDraftInProgress) return 'Draft In Progress...';
+    if (isDraftCompleted && actionType === 'draft') return 'Draft Completed';
 
-    if (actionType === 'selectGame') {
+    if (actionType === 'draft') {
+      return startDraftLoading ? 'Starting Draft...' : 'Start Draft';
+    } else if (actionType === 'createWeek1') {
+      return 'Create Week 1 Matchups';
+    } else if (actionType === 'selectGame') {
       return `Select Game ${nextGameNumber} of ${gamesPerMatchup}`;
     } else {
       return 'Advance League Week';
@@ -164,7 +218,11 @@ export function NextStepControl({
   };
 
   const getDialogTitle = () => {
-    if (actionType === 'selectGame') {
+    if (actionType === 'draft') {
+      return 'Start Draft?';
+    } else if (actionType === 'createWeek1') {
+      return 'Create Week 1 Matchups?';
+    } else if (actionType === 'selectGame') {
       return `Select Game ${nextGameNumber}?`;
     }
 
@@ -178,7 +236,11 @@ export function NextStepControl({
   };
 
   const getDialogMessage = () => {
-    if (actionType === 'selectGame') {
+    if (actionType === 'draft') {
+      return 'This will start a random draft to assign players to all teams. Players will be randomly assigned to roster positions. After the draft completes, you can create Week 1 matchups.';
+    } else if (actionType === 'createWeek1') {
+      return 'This will create Week 1 matchups, pairing up all teams in the league. Players will be automatically assigned random historical seasons for their first matchup.';
+    } else if (actionType === 'selectGame') {
       return `This will automatically select game ${nextGameNumber} for all teams in the current matchup. The system will choose games based on the configured rules and selected season.`;
     }
 
@@ -192,7 +254,11 @@ export function NextStepControl({
   };
 
   const getDescriptionText = () => {
-    if (actionType === 'selectGame') {
+    if (actionType === 'draft') {
+      return 'Start the draft to assign players to team rosters.';
+    } else if (actionType === 'createWeek1') {
+      return 'Draft complete! Next: Create matchups for Week 1.';
+    } else if (actionType === 'selectGame') {
       return `Next: Select game ${nextGameNumber} of ${gamesPerMatchup} for all teams in the current matchup.`;
     } else {
       return 'All games selected! Next: Advance to the next league week.';
@@ -286,9 +352,20 @@ export function NextStepControl({
             <Button
               theme="blue"
               onPress={handleButtonClick}
-              disabled={loading || matchupsLoading || isGameSelectionInProgress}
+              disabled={
+                loading ||
+                startDraftLoading ||
+                matchupsLoading ||
+                isGameSelectionInProgress ||
+                isDraftInProgress ||
+                (actionType === 'draft' && isDraftCompleted)
+              }
               icon={
-                loading || matchupsLoading || isGameSelectionInProgress ? (
+                loading ||
+                startDraftLoading ||
+                matchupsLoading ||
+                isGameSelectionInProgress ||
+                isDraftInProgress ? (
                   <Spinner />
                 ) : undefined
               }

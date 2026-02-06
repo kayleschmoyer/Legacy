@@ -440,6 +440,66 @@ terraform validate
 aws sts get-caller-identity
 ```
 
+### Issue: Terraform State Lock Errors (Recurring Deployment Failures)
+
+**Symptoms**:
+
+- Deployment workflows fail with "Error acquiring the state lock"
+- Manual deployments required after CI failures
+- Lock persists between deployments
+
+**Common Causes**:
+
+1. Previous deployment was cancelled mid-execution
+2. Deployment workflow crashed without cleanup
+3. Multiple deployments attempted simultaneously
+4. Stale lock from failed CI run
+
+**Automated Fix** (CI handles this automatically as of 2026-02-04):
+
+- CI now auto-detects and clears stale locks (>30 minutes old) before deploying
+- Active locks (<30 minutes) are respected with 10-minute retry timeout
+- Failed deployments automatically cleanup their own locks
+
+**Manual Fix** (if needed locally):
+
+```bash
+# 1. Check for locks and auto-clear
+node scripts/terraform-unlock.js
+
+# 2. If script doesn't work, force unlock manually
+cd terraform
+terraform force-unlock <LOCK_ID>
+
+# 3. Then retry deployment
+.\scripts\deploy-lambda.ps1 -FunctionName <function-name>
+```
+
+**Prevention**:
+
+- ✅ Don't cancel deployment workflows mid-execution
+- ✅ Let CI complete or fail naturally (cleanup happens automatically)
+- ✅ Use workflow concurrency controls (already configured)
+- ✅ Monitor DynamoDB table `terraform-state-locks` for stuck locks
+
+**Lock Information Sources**:
+
+```bash
+# View lock status in DynamoDB
+aws dynamodb scan --table-name terraform-state-locks --region us-east-1
+
+# Check SSM parameter for deployment versions
+aws ssm get-parameters-by-path --path "/legacy-sports/dev/lambda" --recursive
+```
+
+**Recent Improvements** (2026-02-04):
+
+- ✅ Fixed lock detection in `terraform-unlock.js` (was using `-lock=false` which bypassed checks)
+- ✅ Added auto-unlock feature for scripts (no manual lock ID needed)
+- ✅ CI now clears stale locks before deployment starts
+- ✅ Improved lock detection in CI cleanup step
+- ✅ Updated all deployment documentation with correct workflow
+
 ## 🔄 Error Recovery Patterns
 
 ### Pattern 1: Transient Failures

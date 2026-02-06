@@ -49,6 +49,110 @@ interface LoadMatchupStatsMessage {
   }>;
 }
 
+/**
+ * Select random unique game identifiers and update matchup_player_games
+ * Called after all game stats are loaded for a player
+ */
+async function selectAndAssignGameIdentifiers(
+  db: PublicDb,
+  matchupPlayerId: number,
+  playerId: number,
+  season: number,
+): Promise<void> {
+  LOGGER.info(
+    `Selecting game identifiers for matchup player ${matchupPlayerId}`,
+  );
+
+  // Get all unique game identifiers for this player/season across all stat types
+  const uniqueGames = await db
+    .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
+    .from(PublicSchema.gameBatting)
+    .where(
+      and(
+        eq(PublicSchema.gameBatting.playerId, playerId),
+        eq(PublicSchema.gameBatting.season, season),
+      ),
+    )
+    .union(
+      db
+        .selectDistinct({
+          gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
+        })
+        .from(PublicSchema.gamePitching)
+        .where(
+          and(
+            eq(PublicSchema.gamePitching.playerId, playerId),
+            eq(PublicSchema.gamePitching.season, season),
+          ),
+        ),
+    )
+    .union(
+      db
+        .selectDistinct({
+          gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
+        })
+        .from(PublicSchema.gameFielding)
+        .where(
+          and(
+            eq(PublicSchema.gameFielding.playerId, playerId),
+            eq(PublicSchema.gameFielding.season, season),
+          ),
+        ),
+    );
+
+  if (uniqueGames.length === 0) {
+    LOGGER.warn(
+      `No games found for player ${playerId} season ${season}, cannot select games`,
+    );
+    return;
+  }
+
+  LOGGER.info(
+    `Found ${uniqueGames.length} unique games for player ${playerId} season ${season}`,
+  );
+
+  // Get number of games needed from matchup_player_games records
+  const existingGames = await db
+    .select()
+    .from(PublicSchema.matchupPlayerGames)
+    .where(
+      eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+    );
+
+  const gamesNeeded = existingGames.length;
+
+  if (gamesNeeded === 0) {
+    LOGGER.info(
+      `No game slots found for matchup player ${matchupPlayerId}, skipping game selection`,
+    );
+    return;
+  }
+
+  // Randomly select N unique games
+  const shuffled = uniqueGames
+    .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, gamesNeeded);
+
+  LOGGER.info(
+    `Selected ${shuffled.length} random games from ${uniqueGames.length} available`,
+  );
+
+  // Update each matchup_player_games record with a game_identifier
+  for (let i = 0; i < shuffled.length && i < existingGames.length; i++) {
+    await db
+      .update(PublicSchema.matchupPlayerGames)
+      .set({
+        gameIdentifier: shuffled[i].gameIdentifier,
+      })
+      .where(eq(PublicSchema.matchupPlayerGames.id, existingGames[i].id));
+  }
+
+  LOGGER.info(
+    `Successfully assigned game identifiers for matchup player ${matchupPlayerId}`,
+  );
+}
+
 async function loadPlayerGameStats(
   db: PublicDb,
   player: LoadMatchupStatsMessage['players'][0],
@@ -184,6 +288,30 @@ async function loadPlayerGameStats(
     }
 
     LOGGER.info(`Successfully loaded all stats for player ${playerId}`);
+
+    // After loading all games, select N random unique game identifiers
+    // and update matchup_player_games
+    if (player.matchupPlayerId) {
+      await selectAndAssignGameIdentifiers(
+        db,
+        player.matchupPlayerId,
+        playerId,
+        season,
+      );
+
+      // Mark this player's game as completed
+      await db
+        .update(PublicSchema.matchupPlayerGames)
+        .set({ statsLoadingStatus: 'completed' })
+        .where(
+          eq(
+            PublicSchema.matchupPlayerGames.matchupPlayerId,
+            player.matchupPlayerId,
+          ),
+        );
+
+      LOGGER.info(`Updated player ${playerId} status to 'completed'`);
+    }
   } catch (error) {
     LOGGER.error(`Failed to load stats for player ${playerId}:`, {
       error: error instanceof Error ? error.message : String(error),
@@ -192,6 +320,22 @@ async function loadPlayerGameStats(
       brefId,
       season,
     });
+
+    // Mark this player's game as failed
+    if (player.matchupPlayerId) {
+      await db
+        .update(PublicSchema.matchupPlayerGames)
+        .set({ statsLoadingStatus: 'failed' })
+        .where(
+          eq(
+            PublicSchema.matchupPlayerGames.matchupPlayerId,
+            player.matchupPlayerId,
+          ),
+        );
+
+      LOGGER.info(`Updated player ${playerId} status to 'failed'`);
+    }
+
     throw error;
   }
 }

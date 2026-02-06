@@ -81,6 +81,38 @@ const StatMapping: Record<
   F_DP: 'dpDef',
   F_FIELDING_PERC: 'fieldingPerc',
 
+  // Pitching fields (with p_ prefix from Baseball Reference)
+  P_W: 'w',
+  P_L: 'l',
+  P_WIN_LOSS_PERC: 'winLossPerc',
+  P_EARNED_RUN_AVG: 'earnedRunAvg',
+  P_G: 'g',
+  P_GS: 'gs',
+  P_GF: 'gf',
+  P_CG: 'cg',
+  P_SHO: 'sho',
+  P_SV: 'sv',
+  P_IP: 'ip',
+  P_H: 'h',
+  P_R: 'r',
+  P_ER: 'er',
+  P_HR: 'hr',
+  P_BB: 'bb',
+  P_IBB: 'ibb',
+  P_SO: 'so',
+  P_HBP: 'hbp',
+  P_BK: 'bk',
+  P_WP: 'wp',
+  P_BFP: 'battersFaced',
+  P_EARNED_RUN_AVG_PLUS: 'earnedRunAvgPlus',
+  P_FIP: 'fip',
+  P_WHIP: 'whip',
+  P_HITS_PER_NINE: 'hitsPerNine',
+  P_HR_PER_NINE: 'homeRunsPerNine',
+  P_BB_PER_NINE: 'basesOnBallsPerNine',
+  P_SO_PER_NINE: 'strikeoutsPerNine',
+  P_STRIKEOUTS_PER_BASE_ON_BALLS: 'strikeoutsPerBaseOnBalls',
+
   // Legacy mappings (keeping for backwards compatibility)
   '2B': 'doubles',
   '3B': 'triples',
@@ -296,7 +328,7 @@ export function parseTable<T extends object>(
 
 function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
   const battingStats = getTable(root, 'players_standard_batting');
-  return parseTable<SeasonBatting>(battingStats, (r) => {
+  const allStats = parseTable<SeasonBatting>(battingStats, (r) => {
     const s = parseRow<SeasonBatting & { pos?: string }>(r, playerId);
 
     if (s !== null) {
@@ -305,6 +337,20 @@ function getBattingStats(root: HTMLElement, playerId: number): SeasonBatting[] {
     }
 
     return s;
+  });
+
+  // Filter out records where g (games) is null ("Did not play" records)
+  return allStats.filter((stat) => {
+    return (
+      stat.g != null &&
+      stat.g !== undefined &&
+      stat.team != null &&
+      stat.team !== undefined &&
+      stat.team.trim() !== '' &&
+      stat.rowId != null &&
+      stat.rowId !== undefined &&
+      stat.rowId.trim() !== ''
+    );
   });
 }
 
@@ -339,7 +385,23 @@ function getPitchingStats(
   playerId: number,
 ): SeasonPitching[] {
   const pitchingStats = getTable(root, 'players_standard_pitching');
-  return parseTable(pitchingStats, (r) => parseRow(r, playerId));
+  const allStats = parseTable<SeasonPitching>(pitchingStats, (r) =>
+    parseRow(r, playerId),
+  );
+
+  // Filter out records where g (games) is null ("Did not play" records)
+  return allStats.filter((stat) => {
+    return (
+      stat.g != null &&
+      stat.g !== undefined &&
+      stat.team != null &&
+      stat.team !== undefined &&
+      stat.team.trim() !== '' &&
+      stat.rowId != null &&
+      stat.rowId !== undefined &&
+      stat.rowId.trim() !== ''
+    );
+  });
 }
 
 export interface CareerStats {

@@ -9,6 +9,7 @@ import {
   serial,
   timestamp,
   unique,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { leagues, teams } from './Leagues';
 import { players } from './Players';
@@ -52,17 +53,17 @@ export const matchups = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'matchups_league_fk',
-      }),
+      }).onDelete('cascade'),
       matchupsTeam1Fk: foreignKey({
         columns: [table.team1Id],
         foreignColumns: [teams.id],
         name: 'matchups_team1_fk',
-      }),
+      }).onDelete('cascade'),
       matchupsTeam2Fk: foreignKey({
         columns: [table.team2Id],
         foreignColumns: [teams.id],
         name: 'matchups_team2_fk',
-      }),
+      }).onDelete('cascade'),
       // Note: Removed unique constraint on (leagueId, weekNumber) as a league
       // needs to support multiple matchups per week (one for each team pairing)
     };
@@ -93,7 +94,7 @@ export const matchupPlayers = pgTable(
         columns: [table.teamId],
         foreignColumns: [teams.id],
         name: 'matchup_players_team_fk',
-      }),
+      }).onDelete('cascade'),
     };
   },
 );
@@ -133,10 +134,14 @@ export const matchupPlayerGames = pgTable(
     id: serial('id').primaryKey().notNull(),
     matchupPlayerId: integer('matchup_player_id').notNull(),
     gameNum: integer('game_num').notNull(),
+    gameIdentifier: varchar('game_identifier', { length: 20 }),
     battingGameNum: integer('batting_game_num'),
     fieldingGameNum: integer('fielding_game_num'),
     pitchingGameNum: integer('pitching_game_num'),
-    fieldingGamePos: char('fielding_game_pos', { length: 2 }).notNull(),
+    fieldingGamePos: char('fielding_game_pos', { length: 2 }),
+    statsLoadingStatus: varchar('stats_loading_status', { length: 20 }).default(
+      'pending',
+    ),
     // NOTE: Scores are NOT stored in DB - they are calculated on the frontend
     // using the @legacy-sports/scoring package with league-specific settings
   },

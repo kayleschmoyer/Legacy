@@ -7,25 +7,13 @@ import {
   ScrollView,
   Spinner,
   Text,
+  Tooltip,
   XStack,
   YStack,
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-// import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until useGetAllPlayerSeasonStatsQuery is implemented
-/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
-const useGetAllPlayerSeasonStatsQuery = (_params?: any) => ({
-  data: {
-    playerSeasonBatting: [] as any[],
-    playerSeasonPitching: [] as any[],
-    playerSeasonFielding: [] as any[],
-  },
-  loading: false,
-  error: { message: '' } as any,
-});
-/* eslint-enable */
+import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
 
 export interface PlayerSeasonStatsModalProps {
   /** Player ID to load stats for */
@@ -68,6 +56,70 @@ interface SeasonRow {
 }
 
 /**
+ * PositionDisplay - Shows positions with overflow (max 2 visible, rest on hover)
+ */
+function PositionDisplay({ positions }: { positions: string }) {
+  const posArray = positions.split(',').map((p) => p.trim());
+
+  if (posArray.length <= 2) {
+    // Show all if 2 or fewer
+    return (
+      <Text fontSize="$3" fontWeight="600" color="$blue10">
+        {positions}
+      </Text>
+    );
+  }
+
+  // Show first 2 and indicate more
+  const visible = posArray.slice(0, 2).join(', ');
+  const hidden = posArray.slice(2);
+
+  return (
+    <Tooltip placement="top">
+      <Tooltip.Trigger>
+        <XStack gap="$1" alignItems="center">
+          <Text fontSize="$3" fontWeight="600" color="$blue10">
+            {visible}
+          </Text>
+          <Text
+            fontSize="$2"
+            color="$gray10"
+            fontWeight="500"
+            backgroundColor="$gray4"
+            paddingHorizontal="$1.5"
+            paddingVertical="$0.5"
+            borderRadius="$2"
+          >
+            +{hidden.length}
+          </Text>
+        </XStack>
+      </Tooltip.Trigger>
+      <Tooltip.Content
+        enterStyle={{ x: 0, y: -5, opacity: 0, scale: 0.9 }}
+        exitStyle={{ x: 0, y: -5, opacity: 0, scale: 0.9 }}
+        scale={1}
+        x={0}
+        y={0}
+        opacity={1}
+        animation={[
+          'quick',
+          {
+            opacity: {
+              overshootClamping: true,
+            },
+          },
+        ]}
+      >
+        <Tooltip.Arrow />
+        <Text fontSize="$3" fontWeight="600" color="$blue11">
+          All Positions: {positions}
+        </Text>
+      </Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+/**
  * PlayerSeasonStatsModal - Modal showing season-by-season statistics for a player
  * Similar to the Jake Tonges modal in the design
  */
@@ -106,11 +158,9 @@ export function PlayerSeasonStatsModal({
     const seasons = new Map<number, SeasonRow>();
 
     // Add batting stats
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
-    data.playerSeasonBatting?.forEach((batting: any) => {
+    data.playerSeasonBatting?.forEach((batting) => {
       if (!batting?.season) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       const season: SeasonRow = seasons.get(batting.season) || {
         season: batting.season,
       };
@@ -127,16 +177,13 @@ export function PlayerSeasonStatsModal({
         rbi: batting.rbi ?? 0,
         avg,
       };
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(batting.season, season);
     });
 
     // Add pitching stats
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
-    data.playerSeasonPitching?.forEach((pitching: any) => {
+    data.playerSeasonPitching?.forEach((pitching) => {
       if (!pitching?.season) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       const season: SeasonRow = seasons.get(pitching.season) || {
         season: pitching.season,
       };
@@ -152,16 +199,13 @@ export function PlayerSeasonStatsModal({
         ip,
         so: pitching.strikeouts ?? 0,
       };
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(pitching.season, season);
     });
 
     // Add fielding stats (aggregate across multiple positions if player played multiple positions in a season)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder type
-    data.playerSeasonFielding?.forEach((fielding: any) => {
+    data.playerSeasonFielding?.forEach((fielding) => {
       if (!fielding?.season) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       const season: SeasonRow = seasons.get(fielding.season) || {
         season: fielding.season,
       };
@@ -175,7 +219,6 @@ export function PlayerSeasonStatsModal({
         season.fielding.e += fielding.errors ?? 0;
         // Add position to the list if not already there
         const pos = fielding.position ?? '';
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
         if (pos && !season.fielding.position.includes(pos)) {
           season.fielding.position +=
             (season.fielding.position ? ', ' : '') + pos;
@@ -192,7 +235,6 @@ export function PlayerSeasonStatsModal({
         };
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: using placeholder data
       seasons.set(fielding.season, season);
     });
 
@@ -580,7 +622,7 @@ export function PlayerSeasonStatsModal({
                             YEAR
                           </Text>
                           <Text
-                            width={50}
+                            width={100}
                             fontSize="$2"
                             fontWeight="bold"
                             color="$blue11"
@@ -644,14 +686,11 @@ export function PlayerSeasonStatsModal({
                               <Text width={70} fontSize="$3" fontWeight="600">
                                 {season.season}
                               </Text>
-                              <Text
-                                width={50}
-                                fontSize="$3"
-                                fontWeight="600"
-                                color="$blue10"
-                              >
-                                {season.fielding?.position}
-                              </Text>
+                              <XStack width={100} alignItems="center">
+                                <PositionDisplay
+                                  positions={season.fielding?.position ?? ''}
+                                />
+                              </XStack>
                               <Text width={50} fontSize="$3">
                                 {season.fielding?.games}
                               </Text>

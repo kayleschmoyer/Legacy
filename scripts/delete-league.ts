@@ -88,23 +88,60 @@ async function deleteLeague(leagueId: number) {
         sql.raw(`DELETE FROM drafts WHERE league_id = ${leagueId}`),
       );
 
-      LOGGER.info(`Step 8: Deleting team_players...`);
+      LOGGER.info(`Step 8: Deleting draft_teams...`);
+      await db.db.execute(
+        sql.raw(`DELETE FROM draft_teams WHERE league_id = ${leagueId}`),
+      );
+
+      LOGGER.info(`Step 9: Deleting team_players...`);
       await db.db
         .delete(PublicSchema.teamPlayers)
         .where(inArray(PublicSchema.teamPlayers.teamId, teamIds));
 
-      LOGGER.info(`Step 9: Deleting teams...`);
+      LOGGER.info(`Step 10: Deleting playoff_seeds...`);
+      if (teamIds.length > 0) {
+        await db.db.execute(
+          sql.raw(
+            `DELETE FROM playoff_seeds WHERE team_id IN (${teamIds.join(',')})`,
+          ),
+        );
+      }
+
+      LOGGER.info(`Step 10: Deleting playoff_matchups...`);
+      if (teamIds.length > 0) {
+        await db.db.execute(
+          sql.raw(
+            `DELETE FROM playoff_matchups WHERE high_seed_team_id IN (${teamIds.join(',')}) OR low_seed_team_id IN (${teamIds.join(',')}) OR winner_team_id IN (${teamIds.join(',')})`,
+          ),
+        );
+      }
+
+      LOGGER.info(`Step 11: Deleting champion_trophies...`);
+      if (teamIds.length > 0) {
+        await db.db.execute(
+          sql.raw(
+            `DELETE FROM champion_trophies WHERE team_id IN (${teamIds.join(',')}) OR runner_up_team_id IN (${teamIds.join(',')})`,
+          ),
+        );
+      }
+
+      LOGGER.info(`Step 12: Deleting playoff_brackets...`);
+      await db.db.execute(
+        sql.raw(`DELETE FROM playoff_brackets WHERE league_id = ${leagueId}`),
+      );
+
+      LOGGER.info(`Step 13: Deleting teams...`);
       await db.db
         .delete(PublicSchema.teams)
         .where(eq(PublicSchema.teams.leagueId, leagueId));
     }
 
-    LOGGER.info(`Step 10: Deleting league_members...`);
+    LOGGER.info(`Step 14: Deleting league_members...`);
     await db.db
       .delete(PublicSchema.leagueMembers)
       .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
 
-    LOGGER.info(`Step 11: Deleting league...`);
+    LOGGER.info(`Step 15: Deleting league...`);
     await db.db
       .delete(PublicSchema.leagues)
       .where(eq(PublicSchema.leagues.id, leagueId));

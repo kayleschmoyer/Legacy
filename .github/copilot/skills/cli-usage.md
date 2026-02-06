@@ -1,9 +1,11 @@
 # Skill: CLI Usage
 
 ## Overview
+
 Use the Legacy Sports CLI tool to perform database operations, data loading, user management, authentication, debugging, and administrative tasks.
 
 ## When to Use
+
 - Testing database connectivity and configuration
 - Loading player data and statistics
 - Managing users and authentication
@@ -33,6 +35,7 @@ pnpm exec nx start cli -- <command-name> [options]
 ### Database Connectivity & Testing
 
 #### Test Database Connection
+
 ```powershell
 # Test standard connection
 pnpm run cli:test-connection
@@ -47,6 +50,7 @@ pnpm run cli:test-db
 **When to use**: Before other operations to verify database access and credentials.
 
 #### Inspect Database Schema
+
 ```powershell
 # View current database state and migration status
 pnpm run cli:inspect-database
@@ -55,16 +59,25 @@ pnpm run cli:inspect-database
 **Output**: Lists all tables, schemas, and migration status.
 
 #### Execute SQL Queries
+
 ```powershell
-# Run ad-hoc SQL queries
+# Run SQL queries with wrapper script (recommended)
+.\scripts\db-query.ps1 -Query "SELECT * FROM players LIMIT 5"
+
+# With JSON output
+.\scripts\db-query.ps1 -Query "SELECT COUNT(*) FROM leagues" -Format json
+
+# Using CLI directly (alternative)
 pnpm exec nx start cli -- query-db --query "SELECT * FROM players LIMIT 5"
 ```
 
 **Use case**: Quick database queries without opening psql.
+**Recommended**: Use `db-query.ps1` script for simplicity.
 
 ### Data Loading & Management
 
 #### Load Player Data
+
 ```powershell
 # Load all players from external sources
 pnpm run cli:load-players
@@ -76,6 +89,7 @@ pnpm run cli:list-players
 **When to use**: Initial data population or updating player roster.
 
 #### Load Statistics
+
 ```powershell
 # Load career statistics for all players
 pnpm run cli:load-career-stats
@@ -92,6 +106,7 @@ pnpm exec nx start cli -- check-stats-status
 ### User Management
 
 #### Add User
+
 ```powershell
 # Add new user (required for OAuth)
 pnpm exec nx start cli -- add-user \
@@ -103,6 +118,7 @@ pnpm exec nx start cli -- add-user \
 **Required for**: Enabling OAuth authentication for new users.
 
 #### List Users
+
 ```powershell
 # List all users (direct database query)
 pnpm exec nx start cli -- list-users
@@ -112,6 +128,7 @@ pnpm exec nx start cli -- list-users-auth
 ```
 
 #### Set User Access Level
+
 ```powershell
 # Set user as admin
 pnpm exec nx start cli -- set-user-type \
@@ -129,6 +146,7 @@ pnpm exec nx start cli -- set-user-type \
 ### Authentication (CLI)
 
 #### Authenticate CLI
+
 ```powershell
 # Login to CLI
 pnpm exec nx start cli -- auth login
@@ -149,6 +167,7 @@ pnpm exec nx start cli -- auth logout
 **Use case**: Required before using authenticated GraphQL commands.
 
 #### JWT Management
+
 ```powershell
 # Generate JWT for testing
 pnpm exec nx start cli -- generate-jwt --user-id 1
@@ -162,18 +181,21 @@ pnpm run cli:decode-jwt --token "eyJhbGc..."
 ### Matchup & Draft Management
 
 #### Create Matchup
+
 ```powershell
 # Create matchup records
 pnpm run cli:create-matchup --matchup-id 1
 ```
 
 #### Start Draft
+
 ```powershell
 # Start draft for a league
 pnpm run cli:start-draft --league-id 1 --draft-id 1
 ```
 
 #### Inspect Draft Queue
+
 ```powershell
 # Inspect SQS draft queue
 pnpm exec nx start cli -- inspect-sqs-queue
@@ -188,6 +210,7 @@ pnpm run draft:inspect
 ### Debugging & Investigation
 
 #### Investigate Matchup Issues
+
 ```powershell
 # Investigate specific matchup
 pnpm exec nx start cli -- investigate-matchup 7
@@ -197,12 +220,14 @@ pnpm exec nx start cli -- find-matchup-from-player 123
 ```
 
 #### Get Available Seasons
+
 ```powershell
 # Get seasons with stats for a league
 pnpm exec nx start cli -- get-league-seasons 1
 ```
 
 #### Investigate Data Issues
+
 ```powershell
 # Investigate league 13 stats issue
 pnpm exec nx start cli -- investigate-league-13
@@ -211,6 +236,7 @@ pnpm exec nx start cli -- investigate-league-13
 ### Database Administration
 
 #### Run Migrations
+
 ```powershell
 # Run all pending migrations
 pnpm exec nx start cli -- run-migrations
@@ -219,6 +245,7 @@ pnpm exec nx start cli -- run-migrations
 **When to use**: After pulling schema changes or deploying.
 
 #### Reset Database (DESTRUCTIVE)
+
 ```powershell
 # Drop all tables and schemas
 pnpm exec nx start cli -- reset-database
@@ -227,6 +254,7 @@ pnpm exec nx start cli -- reset-database
 **⚠️ WARNING**: This destroys all data. Development only!
 
 #### Fix Users Table
+
 ```powershell
 # Create missing app_internal.users table
 pnpm run cli:fix-users-table
@@ -237,6 +265,7 @@ pnpm run cli:fix-users-table
 ### GraphQL Operations
 
 #### Test GraphQL Queries
+
 ```powershell
 # Execute arbitrary GraphQL query
 pnpm exec nx start cli -- graphql-test \
@@ -246,6 +275,7 @@ pnpm exec nx start cli -- graphql-test \
 **Requires**: CLI authentication (`auth login` first).
 
 #### Compute Scoring
+
 ```powershell
 # Compute matchup scoring
 pnpm exec nx start cli -- compute-scoring --matchup-id 1
@@ -254,6 +284,7 @@ pnpm exec nx start cli -- compute-scoring --matchup-id 1
 ## Common Workflows
 
 ### Initial Setup Workflow
+
 ```powershell
 # 1. Test connection
 pnpm run cli:test-connection
@@ -272,6 +303,7 @@ pnpm run cli:load-career-stats
 ```
 
 ### User Onboarding Workflow
+
 ```powershell
 # 1. Add user
 pnpm exec nx start cli -- add-user \
@@ -289,6 +321,7 @@ pnpm exec nx start cli -- list-users
 ```
 
 ### Debugging Workflow
+
 ```powershell
 # 1. Check authentication
 pnpm exec nx start cli -- auth status
@@ -311,6 +344,7 @@ pnpm exec nx start cli -- investigate-matchup 7
 ### Issue: "Module not found" or import errors
 
 **Solution**: Build the CLI project first
+
 ```powershell
 pnpm exec nx build cli
 ```
@@ -318,20 +352,26 @@ pnpm exec nx build cli
 ### Issue: Database connection fails
 
 **Solutions**:
+
 ```powershell
-# 1. Sync environment variables
+# 1. Check for AWS SSO expiration
+# If you see "SSO session associated with this profile has expired"
+aws sso login
+
+# 2. Sync environment variables
 pnpm run sync-env
 
-# 2. Test connection
+# 3. Test connection
 pnpm run cli:test-connection
 
-# 3. Check credentials
+# 4. Check credentials
 pnpm run db:credentials
 ```
 
 ### Issue: "Command not found"
 
 **Solution**: Use full Nx command
+
 ```powershell
 # Instead of:
 pnpm run cli:some-command
@@ -343,6 +383,7 @@ pnpm exec nx start cli -- some-command
 ### Issue: Authentication required errors
 
 **Solution**: Authenticate the CLI first
+
 ```powershell
 pnpm exec nx start cli -- auth login
 ```
@@ -350,6 +391,7 @@ pnpm exec nx start cli -- auth login
 ### Issue: Permission denied errors
 
 **Solution**: Check user access level
+
 ```powershell
 # List users and check access_level
 pnpm exec nx start cli -- list-users
@@ -387,15 +429,19 @@ AWS_ACCOUNT_ID=123456789012
 ```
 
 ## Exit Codes
+
 - **0**: Command succeeded
 - **1**: Command failed (check error message)
 
 ## Performance Notes
+
 - Database operations can take several minutes for large datasets
 - Use `--limit` flags when available to speed up operations
 - Consider running data loading operations during off-peak hours
 
 ## Related Skills
+
+- [AWS SSO Login](aws-sso-login.md) - Handling AWS authentication issues
 - [Database Migration](db-migrate.md) - Running database migrations
 - [Database Connection](db-connect.md) - Testing database connectivity
 - [Sync Environment](sync-env.md) - Environment variable management

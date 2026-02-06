@@ -451,11 +451,11 @@ export function BaseballLandingPage() {
 
   if (error) {
     return (
-  <PageContainer
-    role="main"
-    aria-live="assertive"
-    style={pageBackgroundStyle}
-  >
+      <PageContainer
+        role="main"
+        aria-live="assertive"
+        style={pageBackgroundStyle}
+      >
         <ContentContainer>
           <YStack
             alignItems="center"
@@ -759,6 +759,7 @@ export function BaseballLandingPage() {
                           leagueName: leagueName.trim(),
                           numberOfTeams: teamCount,
                           draftType: 'NORMAL',
+                          maxRosterSize: 25,
                           startDate,
                           isPublic: false,
                           tradingEnabled: true,

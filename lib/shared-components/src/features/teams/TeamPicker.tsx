@@ -1,7 +1,16 @@
 import React from 'react';
-import { Picker } from '@react-native-picker/picker';
 import { Select, YStack } from 'tamagui';
-import { Platform } from '../../platform-components';
+import { Picker as PickerComponent, Platform } from '../../platform-components';
+
+// Type for Picker with Item property
+type PickerType = typeof PickerComponent & {
+  Item: React.ComponentType<{
+    label: string;
+    value: string | number;
+    color?: string;
+  }>;
+};
+const Picker = PickerComponent as PickerType;
 
 // Generic team interface
 export interface TeamData {

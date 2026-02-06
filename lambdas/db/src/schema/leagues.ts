@@ -95,6 +95,7 @@ const League = builder.objectRef<{
   currentMatchup: number | null;
   draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
   inviteCode: string;
+  weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -113,6 +114,7 @@ League.implement({
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
     draftStatus: t.exposeString('draftStatus'),
     inviteCode: t.exposeString('inviteCode'),
+    weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
     scoringProfile: t.field({
       type: ScoringConfigRef,
       resolve: async (parent, args, context) => {
@@ -340,6 +342,7 @@ builder.queryField('league', (t) =>
             currentMatchup: PublicSchema.leagues.currentMatchup,
             draftStatus: PublicSchema.leagues.draftStatus,
             inviteCode: PublicSchema.leagues.inviteCode,
+            weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -379,6 +382,7 @@ builder.queryField('league', (t) =>
           currentMatchup: league.currentMatchup,
           draftStatus: league.draftStatus,
           inviteCode: league.inviteCode,
+          weekAdvanceStatus: league.weekAdvanceStatus,
           userMembership,
         };
       } catch (error) {
@@ -422,6 +426,7 @@ builder.queryField('userLeagues', (t) =>
               currentMatchup: PublicSchema.leagues.currentMatchup,
               draftStatus: PublicSchema.leagues.draftStatus,
               inviteCode: PublicSchema.leagues.inviteCode,
+              weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
             })
             .from(PublicSchema.leagues)
             .limit(5);
@@ -448,6 +453,7 @@ builder.queryField('userLeagues', (t) =>
               currentMatchup: PublicSchema.leagues.currentMatchup,
               draftStatus: PublicSchema.leagues.draftStatus,
               inviteCode: PublicSchema.leagues.inviteCode,
+              weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
             })
             .from(PublicSchema.leagues)
             .innerJoin(
@@ -467,6 +473,7 @@ builder.queryField('userLeagues', (t) =>
             currentMatchup: league.currentMatchup,
             draftStatus: league.draftStatus,
             inviteCode: league.inviteCode,
+            weekAdvanceStatus: league.weekAdvanceStatus,
           }));
 
           return userLeagues;
@@ -649,102 +656,70 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         }
         let leagueMembers: LeagueMemberInsert[] = [];
 
-        if (draftType === 'RANDOM-DRAFT') {
-          // For random draft leagues, create multiple teams automatically
-          const teamNames = [
-            `${username}'s Team`, // Owner's team first
-            'Team Alpha',
-            'Team Beta',
-            'Team Gamma',
-            'Team Delta',
-            'Team Epsilon',
-            'Team Zeta',
-            'Team Eta',
-            'Team Theta',
-            'Team Iota',
-            'Team Kappa',
-            'Team Lambda',
-            'Team Mu',
-            'Team Nu',
-            'Team Xi',
-            'Team Omicron',
-          ];
+        // Always create the specified number of teams, regardless of draft type
+        // Teams can exist without users assigned to them
+        const teamNames = [
+          `${username}'s Team`, // Owner's team first
+          'Team Alpha',
+          'Team Beta',
+          'Team Gamma',
+          'Team Delta',
+          'Team Epsilon',
+          'Team Zeta',
+          'Team Eta',
+          'Team Theta',
+          'Team Iota',
+          'Team Kappa',
+          'Team Lambda',
+          'Team Mu',
+          'Team Nu',
+          'Team Xi',
+          'Team Omicron',
+        ];
 
-          // Create teams up to numberOfTeams
-          const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-          interface TeamInsertData {
-            name: string;
-            leagueId: number;
-          }
-          const teamData: TeamInsertData[] = [];
-
-          for (let i = 0; i < teamsToCreate; i++) {
-            teamData.push({
-              name: teamNames[i],
-              leagueId: league.id,
-            });
-          }
-
-          // Insert all teams
-          const insertedTeams = await context.db
-            .insert(PublicSchema.teams)
-            .values(teamData)
-            .returning({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            });
-
-          teams = insertedTeams;
-
-          // Create league member for owner (assign to first team)
-          const ownerLeagueMember = {
-            leagueId: league.id,
-            userId: userId,
-            teamId: teams[0].id,
-            permissionLevel: 'owner' as const,
-          };
-
-          await context.db
-            .insert(PublicSchema.leagueMembers)
-            .values(ownerLeagueMember);
-
-          leagueMembers = [ownerLeagueMember];
-
-          // NOTE: Draft processing is now handled asynchronously via SQS
-          // Use the startDraft mutation to trigger draft processing after league creation
-        } else {
-          // For other draft types, create single team for owner (existing behavior)
-          const teamData = {
-            name: `${username}'s Team`,
-            leagueId: league.id,
-          };
-
-          const insertedTeams = await context.db
-            .insert(PublicSchema.teams)
-            .values(teamData)
-            .returning({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-            });
-
-          teams = insertedTeams;
-
-          // Create league member for owner
-          const leagueMemberData = {
-            leagueId: league.id,
-            userId: userId,
-            teamId: teams[0].id,
-            permissionLevel: 'owner' as const,
-          };
-
-          await context.db
-            .insert(PublicSchema.leagueMembers)
-            .values(leagueMemberData);
-
-          leagueMembers = [leagueMemberData];
+        // Create teams up to numberOfTeams
+        const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
+        interface TeamInsertData {
+          name: string;
+          leagueId: number;
         }
+        const teamData: TeamInsertData[] = [];
+
+        for (let i = 0; i < teamsToCreate; i++) {
+          teamData.push({
+            name: teamNames[i],
+            leagueId: league.id,
+          });
+        }
+
+        // Insert all teams
+        const insertedTeams = await context.db
+          .insert(PublicSchema.teams)
+          .values(teamData)
+          .returning({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+          });
+
+        teams = insertedTeams;
+
+        // Create league member for owner (assign to first team)
+        const ownerLeagueMember = {
+          leagueId: league.id,
+          userId: userId,
+          teamId: teams[0].id,
+          permissionLevel: 'owner' as const,
+        };
+
+        await context.db
+          .insert(PublicSchema.leagueMembers)
+          .values(ownerLeagueMember);
+
+        leagueMembers = [ownerLeagueMember];
+
+        // NOTE: For RANDOM-DRAFT leagues, draft processing is handled asynchronously via SQS
+        // Use the startDraft mutation to trigger draft processing after league creation
 
         // Create roster positions for the league
         // Only create the defined starter positions, bench spots are inferred
@@ -1475,28 +1450,15 @@ builder.mutationField('deleteLeague', (t) =>
           );
         }
 
-        // Delete in correct order due to foreign key constraints
-        // 1. Delete team members
-        await context.db
-          .delete(PublicSchema.teamMembers)
-          .where(eq(PublicSchema.teamMembers.leagueId, args.leagueId));
-
-        // 2. Delete league positions
-        await context.db
-          .delete(PublicSchema.leaguePosition)
-          .where(eq(PublicSchema.leaguePosition.leagueId, args.leagueId));
-
-        // 3. Delete league members
-        await context.db
-          .delete(PublicSchema.leagueMembers)
-          .where(eq(PublicSchema.leagueMembers.leagueId, args.leagueId));
-
-        // 4. Delete teams
-        await context.db
-          .delete(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
-
-        // 5. Finally delete the league
+        // Delete the league - CASCADE DELETE constraints handle the rest
+        // See migration: 20260205_210000_add_cascade_deletes_to_leagues_and_teams.ts
+        // This automatically cascades to:
+        // - teams (which cascades to team_members, draft_teams, playoff data, etc.)
+        // - matchups (which cascades to matchup_players, matchup_player_games)
+        // - drafts (which cascades to draft_teams, draft_picks)
+        // - league_members, league_positions
+        // - playoff_brackets (which cascades to playoff_seeds, playoff_matchups)
+        // - champion_trophies
         await context.db
           .delete(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, args.leagueId));
