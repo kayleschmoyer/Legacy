@@ -352,7 +352,8 @@ export const WithCustomStyle: Story = {
 };
 
 // Advanced Team Picker Stories
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Used via StoryObj<typeof AdvancedMeta> type definition below
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used as type parameter only
 const AdvancedMeta: Meta<typeof AdvancedTeamPicker> = {
   title: 'Features/Teams/AdvancedTeamPicker',
   component: AdvancedTeamPicker,

@@ -447,12 +447,12 @@ export function exportToCSV(data: TeamStats[] | PowerRanking[]): string {
   const csvRows = data.map((item) => {
     return headers
       .map((header) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const value = item[header as keyof typeof item] as unknown;
         // Handle nested objects and arrays
         if (typeof value === 'object' && value !== null) {
           return JSON.stringify(value);
         }
+        // Safe to convert to string after checking it's not an object
         // eslint-disable-next-line @typescript-eslint/no-base-to-string
         return String(value ?? '');
       })

@@ -109,8 +109,7 @@ async function unrecordMigration(db: ReturnType<typeof drizzle>, hash: string) {
 
 async function runRollbackCommand(
   command: Command,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _options: string[] = [],
+  _options: string[] = [], // eslint-disable-line @typescript-eslint/no-unused-vars -- Reserved for future use
 ) {
   try {
     LOGGER.info(
@@ -185,7 +184,6 @@ async function runRollbackCommand(
 
 async function runMigrationsUp(
   db: ReturnType<typeof drizzle>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _sql: postgres.Sql,
 ) {
   const migrationFiles = getMigrationFiles();
@@ -238,7 +236,6 @@ async function runMigrationsUp(
 
 async function runMigrationDown(
   db: ReturnType<typeof drizzle>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _sql: postgres.Sql,
 ) {
   const allFiles = getMigrationFiles();
@@ -289,8 +286,7 @@ async function runMigrationDown(
 
 async function runFreshMigrations(
   db: ReturnType<typeof drizzle>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _sql: postgres.Sql,
+  _sql: postgres.Sql, // eslint-disable-line @typescript-eslint/no-unused-vars -- Required for consistent function signature
 ) {
   LOGGER.info('🧹 Rolling back all migrations...');
 

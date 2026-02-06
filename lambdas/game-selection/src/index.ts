@@ -888,11 +888,12 @@ async function createMatchupForLeagueWeek(
 /**
  * Main Lambda handler that routes API Gateway requests
  */
+/* eslint-disable @typescript-eslint/no-unused-vars -- AWS Lambda context parameter required but not used */
 const baseGameSelectionHandler = async (
   event: APIGatewayEvent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _context: Context,
 ): Promise<APIGatewayProxyResult> => {
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   LOGGER.info(
     `Game Selection Handler - Method: ${event.httpMethod}, Path: ${event.path}`,
   );

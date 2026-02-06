@@ -337,7 +337,6 @@ const BATTING_POSITIONS = Object.freeze(
 function canPlayerPlayPosition(
   playerEligiblePositions: string[],
   requiredPosition: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _positionDetails?: Record<
     string,
     { games: number; gamesStarted: number; position: string }

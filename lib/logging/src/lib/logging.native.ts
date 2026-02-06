@@ -47,12 +47,10 @@ class MobileLogger implements Logger {
               if (typeof arg === 'string') {
                 return arg;
               } else if (typeof arg === 'number' || typeof arg === 'boolean') {
-                // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 return String(arg);
               } else if (typeof arg === 'object' && arg !== null) {
-                return JSON.stringify(arg);
+                return JSON.stringify(arg, null, 2);
               } else if (arg === null || arg === undefined) {
-                // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 return String(arg);
               } else {
                 return '[Unknown Type]';

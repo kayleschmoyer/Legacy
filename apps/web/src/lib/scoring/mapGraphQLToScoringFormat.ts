@@ -12,9 +12,11 @@
 // } from '../../api/db/graphql.generated';
 
 // TODO(LS-53): Placeholders until GraphQL schema implements these types
-/* eslint-disable -- LS-53: Temporary placeholders for unimplemented GraphQL operations */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
 type GameBatting = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
 type GameFielding = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
 type GamePitching = any;
 
 export interface ScoringBattingStats {
@@ -72,15 +74,14 @@ export interface ScoringFieldingStats {
 
 /**
  * Maps GraphQL GameBatting to scoring format
+ * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53: GameBatting is placeholder type
 export function mapBattingStats(
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GameBatting | null | undefined,
 ): ScoringBattingStats | null {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- LS-53: GameBatting is placeholder type
   if (!graphqlStats) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- LS-53: GameBatting is placeholder type
   return {
     pa: graphqlStats.plateAppearances,
     ab: graphqlStats.atBats,
@@ -99,7 +100,8 @@ export function mapBattingStats(
     sh: graphqlStats.sacrificeHits,
     // sacrificeFlies is typed as string in GraphQL for some reason, so we need to parse it
     sf: graphqlStats.sacrificeFlies
-      ? parseInt(graphqlStats.sacrificeFlies, 10) || null
+      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: GraphQL placeholder type
+        parseInt(graphqlStats.sacrificeFlies, 10) || null
       : null,
     ibb: graphqlStats.intentionalBaseOnBalls,
   };
@@ -107,15 +109,14 @@ export function mapBattingStats(
 
 /**
  * Maps GraphQL GamePitching to scoring format
+ * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53: GamePitching is placeholder type
 export function mapPitchingStats(
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GamePitching | null | undefined,
 ): ScoringPitchingStats | null {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- LS-53: GamePitching is placeholder type
   if (!graphqlStats) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- LS-53: GamePitching is placeholder type
   return {
     w: graphqlStats.wins,
     l: graphqlStats.losses,
@@ -140,15 +141,14 @@ export function mapPitchingStats(
 
 /**
  * Maps GraphQL GameFielding to scoring format
+ * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53: GameFielding is placeholder type
 export function mapFieldingStats(
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GameFielding | null | undefined,
 ): ScoringFieldingStats | null {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- LS-53: GameFielding is placeholder type
   if (!graphqlStats) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- LS-53: GameFielding is placeholder type
   return {
     innDef: graphqlStats.inningsPlayed,
     chances: null, // Not available in GraphQL
@@ -158,5 +158,3 @@ export function mapFieldingStats(
     dpDef: graphqlStats.doublePlays,
   };
 }
-
-/* eslint-enable */

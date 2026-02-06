@@ -298,12 +298,12 @@ function getNotificationTypeEnabled(
  * @param _teamIds - Team IDs (unused in placeholder)
  * @returns Empty array until implementation is complete
  */
+/* eslint-disable @typescript-eslint/no-unused-vars -- Placeholder function parameters */
 function getTeamMemberUserIds(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _db: PublicDb,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _teamIds: number[],
 ): Promise<number[]> {
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   // TODO: Implement actual team member query
   // For now, return empty array
   logger.warn('getTeamMemberUserIds not implemented - returning empty array');
@@ -318,14 +318,13 @@ function getTeamMemberUserIds(
  * @param _leagueId - League ID (unused in placeholder)
  * @returns Null until implementation is complete
  */
+/* eslint-disable @typescript-eslint/no-unused-vars -- Placeholder function parameters */
 function getUserTeamId(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _db: PublicDb,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _userId: number,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _leagueId: number,
 ): Promise<number | null> {
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   // TODO: Implement actual user team query
   logger.warn('getUserTeamId not implemented - returning null');
   return Promise.resolve(null);

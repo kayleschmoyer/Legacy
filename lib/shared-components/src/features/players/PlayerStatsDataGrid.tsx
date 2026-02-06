@@ -359,7 +359,11 @@ export function PlayerStatsDataGrid({
     (columnKey: string, orderDirection: 'asc' | 'desc') => {
       // Map UI column key to GraphQL sort field
       const sortField = COLUMN_TO_SORT_FIELD_MAP[columnKey] || columnKey;
-      updateQueryParams({ orderBy: sortField, orderDirection, after: undefined }); // Reset to first page
+      updateQueryParams({
+        orderBy: sortField,
+        orderDirection,
+        after: undefined,
+      }); // Reset to first page
     },
     [updateQueryParams],
   );
@@ -392,19 +396,43 @@ export function PlayerStatsDataGrid({
     (direction: 'next' | 'prev') => {
       if (direction === 'next' && hasNextPage) {
         // Use endCursor from current page as the 'after' cursor for next page
-        const endCursor = data?.length > 0 ? 
-          Buffer.from((((queryParams.after ? parseInt(Buffer.from(queryParams.after, 'base64').toString()) : 0) + (queryParams.first ?? 25)) - 1).toString()).toString('base64') : undefined;
+        const endCursor =
+          data?.length > 0
+            ? Buffer.from(
+                (
+                  (queryParams.after
+                    ? parseInt(
+                        Buffer.from(queryParams.after, 'base64').toString(),
+                      )
+                    : 0) +
+                  (queryParams.first ?? 25) -
+                  1
+                ).toString(),
+              ).toString('base64')
+            : undefined;
         updateQueryParams({ after: endCursor });
       } else if (direction === 'prev' && hasPreviousPage) {
         // For previous page, calculate the cursor based on current position
-        const currentOffset = queryParams.after ? parseInt(Buffer.from(queryParams.after, 'base64').toString()) : 0;
+        const currentOffset = queryParams.after
+          ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
+          : 0;
         const pageSize = queryParams.first ?? 25;
         const newOffset = Math.max(0, currentOffset - pageSize);
-        const prevCursor = newOffset > 0 ? Buffer.from(newOffset.toString()).toString('base64') : undefined;
+        const prevCursor =
+          newOffset > 0
+            ? Buffer.from(newOffset.toString()).toString('base64')
+            : undefined;
         updateQueryParams({ after: prevCursor });
       }
     },
-    [queryParams.after, queryParams.first, hasNextPage, hasPreviousPage, data?.length, updateQueryParams],
+    [
+      queryParams.after,
+      queryParams.first,
+      hasNextPage,
+      hasPreviousPage,
+      data?.length,
+      updateQueryParams,
+    ],
   );
 
   /**
@@ -480,10 +508,9 @@ export function PlayerStatsDataGrid({
               <select
                 value={`${queryParams.orderBy}-${queryParams.orderDirection}`}
                 onChange={(e) => {
-                  const [orderBy, orderDirection] = e.target.value.split('-') as [
-                    string,
-                    'asc' | 'desc',
-                  ];
+                  const [orderBy, orderDirection] = e.target.value.split(
+                    '-',
+                  ) as [string, 'asc' | 'desc'];
                   handleSort(orderBy, orderDirection);
                 }}
                 style={{
@@ -718,8 +745,9 @@ export function PlayerStatsDataGrid({
                   <Text fontSize="$3" color="$color11" numberOfLines={1}>
                     {column.formatter
                       ? column.formatter(player[column.key])
-                      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-                      : String(player[column.key] ?? '--')}
+                      : // Safe conversion after null coalescing, but player[column.key] could be an object
+                        // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                        String(player[column.key] ?? '--')}
                   </Text>
                 </XStack>
               ))}
@@ -807,9 +835,9 @@ export function PlayerStatsDataGrid({
 
       {/* Total Count */}
       {!loading && !error && (
-        <Text 
-          color="$color11" 
-          textAlign="center" 
+        <Text
+          color="$color11"
+          textAlign="center"
           fontSize="$4"
           fontWeight="600"
         >
@@ -835,8 +863,7 @@ export function PlayerStatsDataGrid({
           <AlertCircle size={32} color="$red10" />
           <H3 color="$red11">Error Loading Statistics</H3>
           <Text color="$red10" textAlign="center">
-            {error?.message ||
-              'Failed to load player statistics'}
+            {error?.message || 'Failed to load player statistics'}
           </Text>
           <Button onPress={handleRefresh}>
             <Text>Try Again</Text>

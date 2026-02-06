@@ -37,12 +37,10 @@ if (isNode && typeof process !== 'undefined') {
     } else if (typeof reason === 'string') {
       reasonString = reason;
     } else if (typeof reason === 'number' || typeof reason === 'boolean') {
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       reasonString = String(reason);
     } else if (typeof reason === 'object' && reason !== null) {
       reasonString = JSON.stringify(reason);
     } else if (reason === null || reason === undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       reasonString = String(reason);
     } else {
       reasonString = '[Unknown rejection reason]';

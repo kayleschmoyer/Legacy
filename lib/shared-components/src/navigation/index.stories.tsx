@@ -180,7 +180,8 @@ export const WithInteraction: Story = {
 };
 
 // Tab Navigation Stories
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Used via StoryObj<typeof TabMeta> type definition below
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used as type parameter only
 const TabMeta: Meta<typeof TabNavigation> = {
   title: 'Navigation/TabNavigation',
   component: TabNavigation,
@@ -276,6 +277,7 @@ export const TabManyItems: TabStory = {
     currentRoute: '/teams',
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <TabNavigation {...(args as any)} />,
 };
@@ -287,9 +289,11 @@ export const TabWithInteraction: TabStory = {
     currentRoute: '/roster',
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <TabNavigation {...(args as any)} />,
   play: async ({ args, canvasElement }) => {
+    if (!args) return;
     const canvas = within(canvasElement);
 
     // Test tab click
@@ -300,7 +304,8 @@ export const TabWithInteraction: TabStory = {
 };
 
 // Breadcrumb Navigation Stories
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Used via StoryObj<typeof BreadcrumbMeta> type definition below
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used as type parameter only
 const BreadcrumbMeta: Meta<typeof BreadcrumbNavigation> = {
   title: 'Navigation/BreadcrumbNavigation',
   component: BreadcrumbNavigation,
@@ -328,6 +333,7 @@ export const BreadcrumbDefault: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
@@ -340,6 +346,7 @@ export const BreadcrumbShort: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
@@ -349,6 +356,7 @@ export const BreadcrumbSingle: BreadcrumbStory = {
     items: [{ title: 'Home', route: '/' }],
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };
@@ -369,6 +377,7 @@ export const BreadcrumbLong: BreadcrumbStory = {
     ],
     onNavigate: fn(),
   },
+  // Storybook args typing requires cast for proper component props spreading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render: (args) => <BreadcrumbNavigation {...(args as any)} />,
 };

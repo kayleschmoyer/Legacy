@@ -51,12 +51,10 @@ class UniversalLogger implements Logger {
               if (typeof arg === 'string') {
                 return arg;
               } else if (typeof arg === 'number' || typeof arg === 'boolean') {
-                // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 return String(arg);
               } else if (typeof arg === 'object' && arg !== null) {
                 return JSON.stringify(arg, null, 2);
               } else if (arg === null || arg === undefined) {
-                // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 return String(arg);
               } else {
                 return '[Unknown Type]';
@@ -151,12 +149,10 @@ if (isNode && typeof process !== 'undefined') {
     } else if (typeof reason === 'string') {
       reasonString = reason;
     } else if (typeof reason === 'number' || typeof reason === 'boolean') {
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       reasonString = String(reason);
     } else if (typeof reason === 'object' && reason !== null) {
       reasonString = JSON.stringify(reason);
     } else if (reason === null || reason === undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       reasonString = String(reason);
     } else {
       reasonString = '[Unknown rejection reason]';

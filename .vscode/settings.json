@@ -42,5 +42,11 @@
     "**/*.log": true
   },
   "typescript.tsserver.maxTsServerMemory": 8192,
-  "typescript.preferences.excludeLibrarySymbolsInNavTo": true
+  "typescript.preferences.excludeLibrarySymbolsInNavTo": true,
+  "chat.tools.terminal.autoApprove": {
+    "/^make pre-commit$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
 }
