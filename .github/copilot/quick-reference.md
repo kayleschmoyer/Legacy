@@ -2,10 +2,11 @@
 
 ## 🚨 Critical Rules
 
-1. **NEVER commit to main** - Always create feature branch: `twig switch LS-####`
-2. **Always use `pnpm exec nx`** - Never use direct npm/pnpm commands
-3. **Validation order** - typecheck → lint → test → build
-4. **PowerShell syntax** - Use `;` for chaining, `$env:` for variables
+1. **NEVER commit to main** - Always create feature branch first
+2. **Choose correct parent** - Use `-p main` for new work, `-p current` for dependent tickets
+3. **Always use `pnpm exec nx`** - Never use direct npm/pnpm commands
+4. **Validation order** - typecheck → lint → test → build
+5. **PowerShell syntax** - Use `;` for chaining, `$env:` for variables
 
 ## Essential Commands
 
@@ -25,11 +26,11 @@ make pre-commit   # All 4 validation steps
 ### Branch & Workflow
 
 ```powershell
-# Create branch (NEW ticket from main)
+# Create branch (NEW independent ticket from main)
 git checkout main; git pull
-twig switch LS-1234
+twig switch LS-1234 -p main
 
-# Create branch (follow-up from current)
+# Create branch (dependent/follow-up from current)
 twig switch LS-1234 -p current
 
 # View branch tree

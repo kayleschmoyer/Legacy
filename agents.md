@@ -7,6 +7,7 @@ Welcome! If you're an AI agent working on the Legacy Sports codebase, this is yo
 **NEVER COMMIT DIRECTLY TO MAIN**
 
 Always create a feature branch before making changes:
+
 ```powershell
 git branch              # Check current branch
 twig switch LS-####     # Create feature branch
@@ -53,6 +54,7 @@ This comprehensive guide covers the complete development lifecycle:
 Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/copilot/skills/):
 
 **Workflow & Branch Management**:
+
 - [Complete Workflow: Ticket to PR](.github/copilot/skills/workflow-ticket-to-pr.md) ⭐ **READ THIS FIRST**
 - [Branch Creation](.github/copilot/skills/branch-create.md) - Creating feature branches
 - [Jira Tickets](.github/copilot/skills/jira-ticket.md) - Managing ticket status
@@ -60,6 +62,7 @@ Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/co
 - [Branch Trees](.github/copilot/skills/branch-tree.md) - Managing dependent branches
 
 **Validation & Quality**:
+
 - [Type Checking](.github/copilot/skills/typecheck.md) - TypeScript validation
 - [Linting](.github/copilot/skills/lint.md) - ESLint code quality
 - [Testing](.github/copilot/skills/test.md) - Jest testing
@@ -67,21 +70,25 @@ Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/co
 - [Formatting](.github/copilot/skills/format.md) - Prettier formatting
 
 **Development Servers**:
+
 - [Dev Web Server](.github/copilot/skills/dev-web.md) - Next.js dev server
 - [Dev DB Lambda](.github/copilot/skills/dev-db-lambda.md) - Local GraphQL Lambda
 - [Sync Environment](.github/copilot/skills/sync-env.md) - AWS env sync
 
 **Code & Database**:
+
 - [GraphQL Codegen](.github/copilot/skills/codegen.md) - Regenerating types
 - [DB Migration](.github/copilot/skills/db-migrate.md) - Running migrations
 - [DB Connection](.github/copilot/skills/db-connect.md) - Testing connectivity
 
 **Troubleshooting**:
+
 - [Nx Reset](.github/copilot/skills/nx-reset.md) - Clearing cache
 - [Affected Check](.github/copilot/skills/affected-check.md) - Dependency graph
 - [Workspace Validation](.github/copilot/skills/validate-workspace.md) - Validating workspace
 
 **Deployment**:
+
 - [Lambda Deploy](.github/copilot/skills/deploy-lambda.md) - Deploying Lambdas
 - [Terraform](.github/copilot/skills/terraform-apply.md) - Infrastructure changes
 
@@ -145,8 +152,10 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Smart branch creation (automated workflow)
-.\scripts\branch-create.ps1 -TicketKey LS-1234           # Create from main + update Jira
-.\scripts\branch-create.ps1 -TicketKey LS-1234 -FromCurrent  # Create from current
+# Script auto-detects if you're on a feature branch and prompts for parent
+.\scripts\branch-create.ps1 -TicketKey LS-1234           # Auto-detects or from main
+.\scripts\branch-create.ps1 -TicketKey LS-1234 -FromCurrent  # Explicitly from current
+.\scripts\branch-create.ps1 -TicketKey LS-1234 -NonInteractive  # For agent (auto-detects parent)
 
 # Manual Jira ticket management
 acli jira workitem view LS-1234                          # View ticket
@@ -154,10 +163,11 @@ acli jira workitem transition --key LS-1234 --status "In Progress"      # Start 
 acli jira workitem transition --key LS-1234 --status "In Review"        # PR created
 acli jira workitem transition --key LS-1234 --status "Done"             # PR merged
 
-# Branch management
-git checkout main; git pull                      # For new ticket
-twig switch LS-1234                              # Create branch from main
-twig switch LS-1234 -p current                   # Create branch from current
+# Manual branch creation (choose parent based on context)
+git checkout main; git pull                      # For new independent ticket
+twig switch LS-1234 -p main                      # Create from main
+# OR stay on current feature branch for dependent work
+twig switch LS-1234 -p current                   # Create from current (series of tickets)
 make branch-tree                                 # View branch tree structure
 
 # Verify branch tree structure
@@ -208,6 +218,7 @@ twig github pr create-pr
 - Use **Nx commands** (`pnpm exec nx affected -t test`) not direct npm commands
 - Use **pnpm exec nx** prefix for all Nx commands (not just `nx`)
 - Use **PowerShell syntax** (`;` for chaining, `$env:` for variables)
+- **Choose correct parent branch**: `-p main` for independent work, `-p current` for dependent tickets
 - Add every **new ticket to the current sprint** before you start coding (move it on the Jira board)
 - Update **Jira ticket status** at each workflow stage
 - Run validation checks **in order**: typecheck → lint → test → build
@@ -223,6 +234,7 @@ twig github pr create-pr
 - Don't suppress errors with `@ts-ignore` or `eslint-disable` without justification
 - Don't skip pre-commit validation checks
 - Don't create PRs without updating Jira status
+- **Don't create branches without explicitly setting parent** (use `-p main` or `-p current`)
 - **Don't create dependent branches without verifying unique commits only**
 - **Don't ignore duplicate commits** in branch tree (shown by high `[+N]` counts)
 - **Don't cascade after squashing without using skip-commits** (causes conflicts + re-squashing)

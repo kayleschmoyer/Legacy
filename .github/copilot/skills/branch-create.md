@@ -1,9 +1,11 @@
 # Skill: Branch Creation
 
 ## Overview
+
 Create feature branches with automatic Jira integration using the branch-create script or twig.
 
 ## When to Use
+
 - Starting work on a new Jira ticket
 - Creating a feature branch from main
 - Creating a dependent branch from current branch
@@ -17,6 +19,10 @@ Create feature branches with automatic Jira integration using the branch-create 
 
 # Create branch from current branch (follow-up work)
 .\scripts\branch-create.ps1 -TicketKey LS-1234 -FromCurrent
+
+# For agent/automation (no interactive prompts)
+.\scripts\branch-create.ps1 -TicketKey LS-1234 -NonInteractive
+.\scripts\branch-create.ps1 -TicketKey LS-1234 -NonInteractive -AddToSprint
 ```
 
 ## Alternative Commands
@@ -24,10 +30,10 @@ Create feature branches with automatic Jira integration using the branch-create 
 ### Using Twig Directly
 
 ```powershell
-# From main branch
+# From main branch - Always set parent explicitly!
 git checkout main
 git pull
-twig switch LS-1234
+twig switch LS-1234 -p main
 
 # From current branch (dependent work)
 twig switch LS-1234 -p current
@@ -41,6 +47,7 @@ git checkout -b feature/LS-1234-description
 ```
 
 ## Expected Output
+
 - **Success**: Branch created and checked out
 - **Jira Update**: Ticket status updated to "In Progress" (with branch-create.ps1)
 - **Console**: Branch name and Jira confirmation
@@ -48,19 +55,25 @@ git checkout -b feature/LS-1234-description
 ## Common Issues
 
 ### Issue: acli command not found
+
 **Solution**: Refresh PowerShell PATH variables
+
 ```powershell
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 ```
 
 ### Issue: Jira ticket not found
+
 **Solution**: Verify ticket exists and you have access
+
 ```powershell
 acli jira workitem view LS-1234
 ```
 
 ### Issue: Already on a feature branch
+
 **Solution**: Commit or stash changes, checkout main first
+
 ```powershell
 git stash
 git checkout main
@@ -69,22 +82,44 @@ git pull
 ```
 
 ### Issue: Twig not installed
+
 **Solution**: Install twig globally
+
 ```powershell
 npm install -g @rongierlach/git-twig
 twig init
 ```
 
 ## Best Practices
-1. **Always create from main** for new tickets (not dependent work)
-2. **Use -FromCurrent flag** for dependent branches
-3. **Verify ticket exists** before creating branch
-4. **Pull latest main** before branching (script does this automatically)
-5. **Check branch name** follows convention: feature/LS-####-description
+
+### Choosing the Right Parent Branch
+
+**Use `-p main` (default without `-FromCurrent`) when:**
+
+- Starting a NEW independent feature
+- Working on unrelated tickets
+- First ticket in a new sprint
+
+**Use `-p current` (with `-FromCurrent` flag) when:**
+
+- Creating a follow-up ticket to current work
+- Building on changes in the current branch
+- Working on a series of dependent tickets
+
+**The script will prompt you** if you're already on a feature branch to help you decide.
+
+### Other Best Practices
+
+1. **Always set parent explicitly** with `-p main` or `-p current` to avoid incorrect parent tracking
+2. **Verify ticket exists** before creating branch
+3. **Pull latest main** before branching from main (script does this automatically)
+4. **Check branch name** follows convention: feature/LS-####-description
+5. **Verify parent with `twig tree`** after creating branch
 
 ## Branch Naming Convention
 
 The script automatically generates proper names:
+
 - `feature/LS-####-short-description` for features
 - `bugfix/LS-####-short-description` for bugs
 - `hotfix/LS-####-short-description` for hotfixes
@@ -92,6 +127,7 @@ The script automatically generates proper names:
 ## Integration with Workflow
 
 ### Pre-branch Creation
+
 ```powershell
 # 1. Verify ticket exists
 acli jira workitem view LS-1234
@@ -104,6 +140,7 @@ acli jira workitem view LS-1234
 ```
 
 ### After Branch Creation
+
 ```powershell
 # Verify you're on the correct branch
 git status
@@ -119,6 +156,7 @@ make quick-check  # or make pre-commit
 ## Script Features (branch-create.ps1)
 
 The PowerShell script provides:
+
 - ✅ Automatic git pull from main
 - ✅ Branch creation with proper naming
 - ✅ Jira ticket status update to "In Progress"
@@ -126,14 +164,17 @@ The PowerShell script provides:
 - ✅ Support for dependent branches with -FromCurrent
 
 ## Exit Codes
+
 - **0**: Branch created successfully
 - **1**: Error occurred (check error message)
 
 ## Related Skills
+
 - [Jira Ticket Management](jira-ticket.md) - Managing ticket status
 - [Branch Tree Management](branch-tree.md) - Managing dependent branches
 - [Pull Request Creation](create-pr.md) - Creating PRs after work
 
 ## Related Documentation
+
 - [AI Agent Contribution Workflow](../../../docs/guides/ai-agent-contribution-workflow.md#step-2-create-feature-branch)
 - [Branch Tree Management Guide](../../../docs/guides/branch-tree-management.md)
