@@ -72,6 +72,86 @@ try {
     exit 1
 }
 
+# Check if gh (GitHub CLI) is available
+try {
+    $null = Get-Command gh -ErrorAction Stop
+    Write-Success "GitHub CLI (gh) found"
+    $ghAvailable = $true
+} catch {
+    Write-Warning "GitHub CLI (gh) not found - PR status detection will be skipped"
+    Write-Info "Install from: https://cli.github.com/"
+    $ghAvailable = $false
+}
+
+# Function to get PR status for a branch
+function Get-PRStatus {
+    param([string]$Branch)
+    
+    if (-not $ghAvailable) {
+        return @{ Exists = $false; State = "unknown"; Merged = $false }
+    }
+    
+    try {
+        # Clean branch name
+        $cleanBranch = $Branch -replace '^remotes/origin/', ''
+        
+        # Method 1: Try direct PR list with branch head
+        $prJson = gh pr list --head $cleanBranch --state all --json state,mergedAt,number --limit 10 2>$null
+        
+        if ($prJson) {
+            $prs = $prJson | ConvertFrom-Json
+            if ($prs -and $prs.Count -gt 0) {
+                $pr = $prs[0]
+                return @{
+                    Exists = $true
+                    State = $pr.state
+                    Merged = ($pr.state -eq "MERGED" -or $pr.mergedAt)
+                    Number = $pr.number
+                }
+            }
+        }
+        
+        # Method 2: Search all PRs and filter by branch name in search
+        $searchJson = gh pr list --search "head:$cleanBranch" --state all --json state,mergedAt,number,headRefName --limit 10 2>$null
+        
+        if ($searchJson) {
+            $prs = $searchJson | ConvertFrom-Json
+            $matchingPr = $prs | Where-Object { $_.headRefName -eq $cleanBranch } | Select-Object -First 1
+            
+            if ($matchingPr) {
+                return @{
+                    Exists = $true
+                    State = $matchingPr.state
+                    Merged = ($matchingPr.state -eq "MERGED" -or $matchingPr.mergedAt)
+                    Number = $matchingPr.number
+                }
+            }
+        }
+        
+        # Method 3: Try all recent PRs and match branch name
+        $allPrsJson = gh pr list --state all --json state,mergedAt,number,headRefName --limit 100 2>$null
+        
+        if ($allPrsJson) {
+            $allPrs = $allPrsJson | ConvertFrom-Json
+            $matchingPr = $allPrs | Where-Object { $_.headRefName -eq $cleanBranch } | Select-Object -First 1
+            
+            if ($matchingPr) {
+                return @{
+                    Exists = $true
+                    State = $matchingPr.state
+                    Merged = ($matchingPr.state -eq "MERGED" -or $matchingPr.mergedAt)
+                    Number = $matchingPr.number
+                }
+            }
+        }
+        
+        return @{ Exists = $false; State = "none"; Merged = $false }
+    } catch {
+        Write-Verbose "Error checking PR status: $($_.Exception.Message)"
+        return @{ Exists = $false; State = "unknown"; Merged = $false }
+    }
+}
+
 # Get all branches
 Write-Header "Fetching branches..."
 $branches = git branch -a | ForEach-Object { $_.Trim() -replace '^\*\s*', '' -replace '^remotes/origin/', '' } | Where-Object { $_ -notmatch '^HEAD' } | Select-Object -Unique
@@ -117,6 +197,7 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
                 Ticket = $ticketKey
                 Branches = $branchList -join ', '
                 JiraStatus = "NOT FOUND"
+                PRStatus = "N/A"
                 Merged = "N/A"
                 Recommendation = "Consider deleting branches"
             }
@@ -130,22 +211,44 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             $status = "UNKNOWN"
         }
         
-        # Check if branches are merged
+        # Check if branches are merged and PR status
         $mergedBranches = @()
         $activeBranches = @()
+        $prInfo = $null
         
+        # Check PR status first for all branches (more reliable than git merge check)
         foreach ($branch in $branchList) {
             $cleanBranch = $branch -replace '^remotes/origin/', ''
-            $mergedCheck = git branch --merged main | Where-Object { $_.Trim() -eq $cleanBranch }
+            $branchPRInfo = Get-PRStatus -Branch $cleanBranch
             
-            if ($mergedCheck) {
+            # Use PR merged status as source of truth if available
+            if ($branchPRInfo.Exists -and $branchPRInfo.Merged) {
                 $mergedBranches += $cleanBranch
+                if (-not $prInfo) {
+                    $prInfo = $branchPRInfo
+                }
             } else {
-                $activeBranches += $cleanBranch
+                # Fall back to git branch merge check
+                $mergedCheck = git branch --merged main 2>$null | Where-Object { $_.Trim() -eq $cleanBranch }
+                
+                if ($mergedCheck) {
+                    $mergedBranches += $cleanBranch
+                } else {
+                    $activeBranches += $cleanBranch
+                    # Store PR info for active branches
+                    if (-not $prInfo -and $branchPRInfo.Exists) {
+                        $prInfo = $branchPRInfo
+                    }
+                }
             }
         }
         
         Write-Info "Status: $status"
+        
+        if ($prInfo -and $prInfo.Exists) {
+            $prStateText = if ($prInfo.Merged) { "merged" } else { $prInfo.State }
+            Write-Info "PR #$($prInfo.Number): $prStateText"
+        }
         
         if ($mergedBranches.Count -gt 0) {
             Write-Info "Merged branches: $($mergedBranches -join ', ')"
@@ -155,18 +258,33 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             Write-Info "Active branches: $($activeBranches -join ', ')"
         }
         
-        # Determine recommendation
+        # Determine recommendation based on PR and branch state
         $recommendation = ""
         $shouldUpdate = $false
         $targetStatus = ""
         
-        if ($mergedBranches.Count -gt 0 -and $status -ne "Done") {
+        # Priority 1: PR merged → Done
+        if ($prInfo -and $prInfo.Merged -and $status -ne "Done") {
+            $recommendation = "PR merged but ticket not Done"
+            $shouldUpdate = $true
+            $targetStatus = "Done"
+        }
+        # Priority 2: Branch merged to main → Done
+        elseif ($mergedBranches.Count -gt 0 -and $status -ne "Done") {
             $recommendation = "Branch merged but ticket not Done"
             $shouldUpdate = $true
             $targetStatus = "Done"
-        } elseif ($mergedBranches.Count -eq 0 -and $activeBranches.Count -gt 0) {
+        }
+        # Priority 3: PR open → In Review
+        elseif ($prInfo -and $prInfo.Exists -and $prInfo.State -eq "OPEN" -and $status -ne "In Review" -and $status -ne "Done") {
+            $recommendation = "PR open but ticket not In Review"
+            $shouldUpdate = $true
+            $targetStatus = "In Review"
+        }
+        # Priority 4: Active branch with no PR → In Progress
+        elseif ($activeBranches.Count -gt 0 -and -not ($prInfo -and $prInfo.Exists)) {
             if ($status -eq "To Do") {
-                $recommendation = "Active branch but ticket in To Do - consider updating to In Progress"
+                $recommendation = "Active branch but ticket in To Do - should be In Progress"
                 $shouldUpdate = $true
                 $targetStatus = "In Progress"
             } elseif ($status -eq "Done") {
@@ -174,7 +292,15 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             } else {
                 $recommendation = "Branch active and ticket in progress - OK"
             }
-        } elseif ($mergedBranches.Count -gt 0 -and $status -eq "Done") {
+        }
+        # All good
+        elseif (($mergedBranches.Count -gt 0 -or ($prInfo -and $prInfo.Merged)) -and $status -eq "Done") {
+            $recommendation = "[OK] In sync"
+        }
+        elseif ($prInfo -and $prInfo.Exists -and $prInfo.State -eq "OPEN" -and $status -eq "In Review") {
+            $recommendation = "[OK] In sync"
+        }
+        elseif ($activeBranches.Count -gt 0 -and $status -in @("In Progress", "In Review")) {
             $recommendation = "[OK] In sync"
         }
         
@@ -202,6 +328,7 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             Ticket = $ticketKey
             Branches = $branchList -join ', '
             JiraStatus = $status
+            PRStatus = if ($prInfo -and $prInfo.Exists) { if ($prInfo.Merged) { "Merged" } else { $prInfo.State } } else { "None" }
             Merged = if ($mergedBranches.Count -gt 0) { "Yes" } else { "No" }
             Recommendation = $recommendation
         }
@@ -213,6 +340,7 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             Ticket = $ticketKey
             Branches = $branchList -join ', '
             JiraStatus = "ERROR"
+            PRStatus = "N/A"
             Merged = "N/A"
             Recommendation = "Error: $errorMsg"
         }

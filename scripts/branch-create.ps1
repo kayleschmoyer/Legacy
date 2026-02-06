@@ -64,7 +64,7 @@ if (-not $FromCurrent -and $isOnFeatureBranch -and -not $NonInteractive) {
     }
 } elseif (-not $FromCurrent -and $isOnFeatureBranch -and $NonInteractive) {
     # In non-interactive mode on a feature branch, default to current
-    Write-Host "[INFO] On feature branch $currentBranch - defaulting to -p current" -ForegroundColor Yellow
+    Write-Host "[INFO] On feature branch $currentBranch - defaulting to create from current" -ForegroundColor Yellow
     $FromCurrent = $true
 }
 
@@ -86,12 +86,12 @@ if ($AddToSprint) {
 # Create branch
 if ($FromCurrent) {
     Write-Host "`n[INFO] Creating branch from current branch ($currentBranch)..." -ForegroundColor Cyan
-    twig switch $TicketKey -p current
+    twig switch $TicketKey -p
 } else {
     Write-Host "`n[INFO] Creating branch from main..." -ForegroundColor Cyan
     git checkout main
     git pull
-    twig switch $TicketKey -p main
+    twig switch $TicketKey -p=main
 }
 
 if ($LASTEXITCODE -ne 0) {
