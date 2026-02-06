@@ -178,6 +178,11 @@ jobs:
               
               // Validate check runs
               for (const check of checks.data.check_runs) {
+                // Skip merge queue checks to avoid circular dependency
+                if (check.name === 'process-merge-queue' || check.name === 'manage-merge-queue') {
+                  continue;
+                }
+                
                 // Only consider it failing if it's completed with a non-success conclusion
                 if (check.status === 'completed' && check.conclusion !== 'success') {
                   // Explicitly failed checks
