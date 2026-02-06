@@ -9,6 +9,7 @@ export interface SentryConfig {
   tracesSampleRate?: number;
   debug?: boolean;
   beforeSend?: (event: any) => any | null;
+  release?: string;
 }
 
 export interface SentryBreadcrumb {

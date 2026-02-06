@@ -122,6 +122,9 @@ jobs:
 
       - name: Build iOS App for Simulator
         if: steps.version.outputs.build_config == 'Debug'
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
         run: |
           cd apps/app/ios
           xcodebuild \
@@ -135,6 +138,9 @@ jobs:
 
       - name: Build iOS App for Device (Archive)
         if: steps.version.outputs.build_config == 'Release'
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
         run: |
           cd apps/app/ios
 

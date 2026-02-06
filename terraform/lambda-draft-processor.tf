@@ -173,6 +173,7 @@ resource "aws_lambda_function" "draft_processor" {
       SENTRY_DSN                = var.sentry_dsn
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
       SENTRY_DEBUG              = "false"
+      SENTRY_RELEASE            = "legacy-sports-draft-processor@${data.aws_ssm_parameter.draft_processor_lambda_version.value}"
     }
   }
 

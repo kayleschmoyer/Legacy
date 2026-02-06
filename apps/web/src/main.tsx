@@ -13,9 +13,15 @@ import '@tamagui/font-inter/css/700.css';
 import './styles.css';
 
 import {
+  captureError,
+  getSentryConfigFromEnv,
+  initSentry,
+} from '@legacy-sports/sentry/web';
+import {
   AppProvider,
   AuthProvider,
   EnhancedAuthGuard,
+  ErrorBoundary,
 } from '@legacy-sports/shared-components';
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
@@ -24,6 +30,12 @@ import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
+
+// Initialize Sentry for web app
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 // Create secure OAuth configuration (single-lambda architecture)
 const authConfig: OAuthConfig = {
@@ -70,29 +82,34 @@ console.log('Environment config:', env);
 try {
   root.render(
     <StrictMode>
-      <TamaguiProvider
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        config={tamaguiConfig}
-      >
-        <AuthProvider config={authConfig}>
-          <EnhancedAuthGuard
-            loginTitle="Welcome to Legacy Sports!"
-            loginSubtitle="Sign in to access your fantasy leagues and stats"
-            testMode={env.authTestMode}
-            onLoginSuccess={() => {
-              console.log('Web app login successful!');
-            }}
-            onLoginFailure={(error) => {
-              console.error('Web app login failed:', error);
-            }}
-          >
-            <AuthenticatedApp />
-          </EnhancedAuthGuard>
-        </AuthProvider>
-      </TamaguiProvider>
+      <ErrorBoundary reportError={captureError}>
+        <TamaguiProvider
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          config={tamaguiConfig}
+        >
+          <AuthProvider config={authConfig}>
+            <EnhancedAuthGuard
+              loginTitle="Welcome to Legacy Sports!"
+              loginSubtitle="Sign in to access your fantasy leagues and stats"
+              testMode={env.authTestMode}
+              onLoginSuccess={() => {
+                console.log('Web app login successful!');
+              }}
+              onLoginFailure={(error: string) => {
+                console.error('Web app login failed:', error);
+                captureError(new Error(error), { context: 'web-app-login' });
+              }}
+            >
+              <AuthenticatedApp />
+            </EnhancedAuthGuard>
+          </AuthProvider>
+        </TamaguiProvider>
+      </ErrorBoundary>
     </StrictMode>,
   );
   console.log('App rendered successfully with unified auth!');
-} catch (error) {
-  console.error('Error rendering app:', error);
+} catch (error: unknown) {
+  const err = error instanceof Error ? error : new Error(JSON.stringify(error));
+  console.error('Error rendering app:', err);
+  captureError(err, { context: 'web-app-render' });
 }

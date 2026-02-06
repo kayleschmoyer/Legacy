@@ -101,6 +101,7 @@ export * from './features/players/PlayersScreen';
 export * from './features/common/SearchBar';
 export * from './components/DatePicker';
 export * from './components/DateTimePicker';
+export * from './components/ErrorBoundary';
 
 // Team components
 export * from './features/teams/TeamPicker';

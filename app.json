@@ -10,6 +10,7 @@
   },
   "extra": {
     "googleClientId": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com",
-    "oauthProxyUrl": "http://localhost:5001"
+    "oauthProxyUrl": "http://localhost:5001",
+    "sentryDsn": "https://9cde57d0dba3d0dd1e85a797ef980e97@o4509922239315968.ingest.us.sentry.io/4510161844043776"
   }
 }

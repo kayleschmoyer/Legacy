@@ -2,6 +2,11 @@ import './.startup';
 import { Command } from 'commander';
 import { logError } from '@legacy-sports/utils';
 import { LOGGER } from 'lib/logging/src/lib/logging';
+import {
+  captureError,
+  getSentryConfigFromEnv,
+  initSentry,
+} from '@legacy-sports/sentry';
 import { handleLoadPlayers } from './commands/loadPlayers';
 import { handleLoadCareerStats } from './commands/loadCareerStats';
 import { handleLoadSinglePlayerStats } from './commands/loadSinglePlayerStats';
@@ -37,6 +42,13 @@ import { handleGetPlayerBatting } from './commands/getPlayerBatting';
 import { handleGetPlayerPitching } from './commands/getPlayerPitching';
 import { handleGetPlayerFielding } from './commands/getPlayerFielding';
 import { handleTriggerGameSelection } from './commands/triggerGameSelection';
+
+// Initialize Sentry for CLI
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+  LOGGER.info('Sentry initialized for CLI');
+}
 
 async function run(): Promise<void> {
   const program = new Command();
@@ -296,6 +308,8 @@ run()
     LOGGER.info('CLI application ran successfully');
   })
   .catch((err: unknown) => {
-    logError(err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    logError(error);
+    captureError(error, { context: 'cli-application' });
     process.exit(1);
   });

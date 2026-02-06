@@ -16,6 +16,7 @@ class WebSentryImplementation implements SentryInterface {
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
         beforeSend: config.beforeSend,
+        release: config.release,
         integrations: [
           // Add web-specific integrations as needed
         ],
@@ -23,6 +24,7 @@ class WebSentryImplementation implements SentryInterface {
       LOGGER.info('Sentry initialized for Web environment', {
         environment: config.environment,
         dsn: config.dsn ? 'SET' : 'NOT_SET',
+        release: config.release || 'NOT_SET',
       });
     } catch (error) {
       LOGGER.error(
@@ -91,6 +93,13 @@ class WebSentryImplementation implements SentryInterface {
       return null;
     }
 
+    // Build release string from available version info
+    const release =
+      process.env.VITE_COMMIT_SHA ||
+      process.env.VITE_APP_VERSION ||
+      process.env.NEXT_PUBLIC_COMMIT_SHA ||
+      undefined;
+
     return {
       dsn,
       environment,
@@ -98,6 +107,7 @@ class WebSentryImplementation implements SentryInterface {
         ? parseFloat(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE)
         : 0.1,
       debug: process.env.NODE_ENV === 'development',
+      release,
     };
   }
 }

@@ -195,6 +195,9 @@ jobs:
 
       - name: Generate React Native Bundle
         timeout-minutes: 10
+        env:
+          APP_VERSION: ${{ needs.setup.outputs.version }}
+          EXPO_PUBLIC_APP_VERSION: ${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
         run: |
           cd apps/app
 
@@ -247,6 +250,9 @@ jobs:
       - name: Build Android APK
         id: build
         timeout-minutes: 25
+        env:
+          APP_VERSION: ${{ needs.setup.outputs.version }}
+          EXPO_PUBLIC_APP_VERSION: ${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
         run: |
           cd apps/app/android
 

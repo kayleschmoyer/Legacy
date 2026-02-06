@@ -16,6 +16,7 @@ class NodeSentryImplementation implements SentryInterface {
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
         beforeSend: config.beforeSend,
+        release: config.release,
         integrations: [
           // Add Node.js specific integrations
         ],
@@ -23,6 +24,7 @@ class NodeSentryImplementation implements SentryInterface {
       LOGGER.info('Sentry initialized for Node.js environment', {
         environment: config.environment,
         dsn: config.dsn ? 'SET' : 'NOT_SET',
+        release: config.release || 'NOT_SET',
       });
     } catch (error) {
       LOGGER.error('Failed to initialize Sentry', error as Error);
@@ -83,6 +85,13 @@ class NodeSentryImplementation implements SentryInterface {
       return null;
     }
 
+    // Build release string from available version info
+    const release =
+      process.env.SENTRY_RELEASE ||
+      process.env.APP_VERSION ||
+      process.env.COMMIT_SHA ||
+      undefined;
+
     return {
       dsn,
       environment,
@@ -90,6 +99,7 @@ class NodeSentryImplementation implements SentryInterface {
         ? parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE)
         : 0.1,
       debug: process.env.SENTRY_DEBUG === 'true',
+      release,
     };
   }
 }

@@ -16,6 +16,8 @@ export interface EnvironmentConfig {
   readonly appVersion: string;
   readonly commitSha: string;
   readonly buildDate: string;
+  readonly sentryDsn?: string;
+  readonly sentryTracesSampleRate?: number;
 }
 
 /**
@@ -37,6 +39,10 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   appVersion: (import.meta.env.VITE_APP_VERSION as string) || 'unknown',
   commitSha: (import.meta.env.VITE_COMMIT_SHA as string) || 'unknown',
   buildDate: (import.meta.env.VITE_BUILD_DATE as string) || 'unknown',
+  sentryDsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
+  sentryTracesSampleRate: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
+    ? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE as string)
+    : 0.1,
 });
 
 /**

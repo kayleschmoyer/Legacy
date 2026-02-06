@@ -1,6 +1,13 @@
 import { EventBridgeEvent } from 'aws-lambda';
 import memoizeOne from 'memoize-one';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  addBreadcrumb,
+  captureError,
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import { getDbOptions } from '@legacy-sports/utils';
 import { getDbConnection, PublicSchema } from '@legacy-sports/db-client';
 import {
@@ -9,6 +16,12 @@ import {
   sendMatchupEndedNotifications,
   sendMatchupStartedNotifications,
 } from '../services/notification-service';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 // Initialize database connection (memoized)
 const getDb = memoizeOne(async () => {
@@ -36,9 +49,15 @@ interface MatchupNotificationEvent {
  * Main Lambda handler for matchup notifications
  * Can be triggered by EventBridge or manually
  */
-export async function handler(
+const baseHandler = async (
   event: EventBridgeEvent<string, MatchupNotificationEvent>,
-): Promise<{ statusCode: number; body: string }> {
+): Promise<{ statusCode: number; body: string }> => {
+  addBreadcrumb('Processing matchup notification', {
+    type: event['detail-type'],
+    source: event.source,
+    matchupId: event.detail?.matchupId,
+  });
+
   LOGGER.info('Processing matchup notification event', {
     type: event['detail-type'],
     source: event.source,
@@ -82,7 +101,15 @@ export async function handler(
       body: JSON.stringify({ message: 'Notifications sent successfully' }),
     };
   } catch (error: unknown) {
-    LOGGER.error('Error processing matchup notification', { error });
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Error processing matchup notification', { error: err });
+    captureError(err, {
+      context: 'matchup-notifications',
+      notificationType: event.detail?.type,
+      matchupId: event.detail?.matchupId,
+    });
     throw error;
   }
-}
+};
+
+export const handler = withSentry(baseHandler);

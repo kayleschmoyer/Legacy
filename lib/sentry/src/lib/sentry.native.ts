@@ -16,6 +16,7 @@ class ReactNativeSentryImplementation implements SentryInterface {
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
         beforeSend: config.beforeSend,
+        release: config.release,
         integrations: [
           // Add React Native specific integrations as needed
           // Note: ReactNativeTracing might need different import or setup
@@ -24,6 +25,7 @@ class ReactNativeSentryImplementation implements SentryInterface {
       LOGGER.info('Sentry initialized for React Native environment', {
         environment: config.environment,
         dsn: config.dsn ? 'SET' : 'NOT_SET',
+        release: config.release || 'NOT_SET',
       });
     } catch (error) {
       LOGGER.error(
@@ -97,11 +99,18 @@ class ReactNativeSentryImplementation implements SentryInterface {
       return null;
     }
 
+    // Build release string from available version info
+    const release =
+      process.env.APP_VERSION ||
+      process.env.EXPO_PUBLIC_APP_VERSION ||
+      undefined;
+
     return {
       dsn,
       environment,
       tracesSampleRate: 0.1, // Lower sample rate for mobile
       debug: isDev,
+      release,
     };
   }
 }

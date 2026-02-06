@@ -169,6 +169,7 @@ resource "aws_lambda_function" "stats" {
       SENTRY_DSN                = var.sentry_dsn
       SENTRY_TRACES_SAMPLE_RATE = var.environment == "dev" ? "1.0" : "0.1"
       SENTRY_DEBUG              = var.environment == "dev" ? "true" : "false"
+      SENTRY_RELEASE            = "legacy-sports-stats@${data.aws_ssm_parameter.stats_lambda_version.value}"
     }
   }
 

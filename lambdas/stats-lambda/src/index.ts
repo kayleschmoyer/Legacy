@@ -1,10 +1,27 @@
 // Lambda entry point for AWS - routes to appropriate handler based on message type
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  addBreadcrumb,
+  captureError,
+  getSentryConfigFromEnv,
+  initSentry,
+  withSentry,
+} from '@legacy-sports/sentry';
 import { handler as careerHandler } from './load-career';
 import { handler as gameHandler } from './load-game';
 
-export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
+
+const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  addBreadcrumb('Processing stats lambda event', {
+    recordsCount: event.Records.length,
+  });
+
   // Detect message type from first record
   if (event.Records.length === 0) {
     return { batchItemFailures: [] };
@@ -19,6 +36,7 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
       firstChar: body?.[0],
       firstCharCode: body?.[0]?.charCodeAt(0),
     });
+    addBreadcrumb('Parsed message body', { bodyLength: body?.length });
 
     const firstMessage: unknown = JSON.parse(body);
 
@@ -51,17 +69,27 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     }
 
     LOGGER.error('Unknown message format', { firstMessage });
+    const unknownFormatError = new Error('Unknown message format');
+    captureError(unknownFormatError, {
+      messageFormat: firstMessage,
+      recordsCount: event.Records.length,
+    });
     return {
       batchItemFailures: event.Records.map((r) => ({
         itemIdentifier: r.messageId,
       })),
     };
   } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
     LOGGER.error('Failed to route message', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      error: err.message,
+      stack: err.stack,
       recordsCount: event.Records.length,
       firstRecordBody: event.Records[0]?.body?.substring(0, 200),
+    });
+    captureError(err, {
+      context: 'stats-lambda-routing',
+      recordsCount: event.Records.length,
     });
     return {
       batchItemFailures: event.Records.map((r) => ({
@@ -70,3 +98,5 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     };
   }
 };
+
+export const handler = withSentry(baseHandler);
