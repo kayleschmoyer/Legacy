@@ -282,6 +282,27 @@ jobs:
                 
                 console.log(`✅ Successfully merged PR #${pr.number}`);
                 
+                // Trigger CI orchestrator workflow for integration build
+                // This is necessary because GITHUB_TOKEN doesn't trigger workflows automatically
+                // (GitHub security feature to prevent infinite workflow loops)
+                try {
+                  console.log(`🔄 Triggering CI orchestrator for integration build...`);
+                  await github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: 'ci-orchestrator.yml',
+                    ref: pr.base.ref,
+                    inputs: {
+                      debug_mode: 'false'
+                    }
+                  });
+                  console.log(`✅ CI orchestrator triggered successfully`);
+                } catch (triggerError) {
+                  console.error(`⚠️ Failed to trigger CI orchestrator: ${triggerError.message}`);
+                  console.error(`Integration build may need to be triggered manually`);
+                  // Don't fail the merge if CI trigger fails - the merge already happened
+                }
+                
                 // Post success comment (reuse existing comment if available)
                 const successComment = "## 🎉 Successfully Merged!\n\n" +
                       "This PR has been automatically merged via the merge queue.\n\n" +
