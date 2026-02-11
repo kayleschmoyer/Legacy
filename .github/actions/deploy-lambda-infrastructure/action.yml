@@ -140,6 +140,57 @@ runs:
           echo "- **Terraform Target**: $TF_TARGET" >> $GITHUB_STEP_SUMMARY
         fi
 
+    - name: Ensure Terraform Lock Release
+      if: always()
+      shell: bash
+      working-directory: terraform
+      run: |
+        echo "🔍 Ensuring Terraform lock is released..."
+
+        # Check if state is currently locked
+        if terraform plan -refresh=false -detailed-exitcode > /dev/null 2>&1; then
+          echo "✅ No lock detected - state is clean"
+          exit 0
+        fi
+
+        # State appears locked - try to detect lock details
+        LOCK_CHECK_OUTPUT=$(terraform plan -refresh=false 2>&1 || true)
+
+        if echo "$LOCK_CHECK_OUTPUT" | grep -q "Error acquiring the state lock"; then
+          LOCK_ID=$(echo "$LOCK_CHECK_OUTPUT" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+          LOCK_WHO=$(echo "$LOCK_CHECK_OUTPUT" | grep -A 10 "Lock Info:" | grep "Who:" | awk '{print $2}')
+          
+          if [ -n "$LOCK_ID" ]; then
+            echo "🔓 Detected lock - attempting to release..."
+            echo "  Lock ID: $LOCK_ID"
+            echo "  Held by: $LOCK_WHO"
+
+            # Check if this lock belongs to this workflow
+            WORKFLOW_ID="${{ github.run_id }}-${{ github.job }}"
+            
+            if echo "$LOCK_WHO" | grep -q "$WORKFLOW_ID" || echo "$LOCK_WHO" | grep -q "GitHubActions"; then
+              echo "✅ Lock appears to be from this workflow - force unlocking"
+              if terraform force-unlock -force "$LOCK_ID" 2>&1; then
+                echo "✅ Successfully released Terraform lock"
+                echo "## 🔓 Lock Cleanup" >> $GITHUB_STEP_SUMMARY
+                echo "- **Status**: Successfully released lock" >> $GITHUB_STEP_SUMMARY
+                echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "⚠️ Could not release lock (may have been released already)"
+              fi
+            else
+              echo "⚠️ Lock appears to be from another workflow/process"
+              echo "   Not automatically unlocking to prevent conflicts"
+              echo "## ⚠️ Manual Lock Check Required" >> $GITHUB_STEP_SUMMARY
+              echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+              echo "- **Held by**: $LOCK_WHO" >> $GITHUB_STEP_SUMMARY
+              echo "- If safe to unlock: \`terraform force-unlock $LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        else
+          echo "✅ No lock detected"
+        fi
+
     - name: Cleanup Terraform Lock on Failure or Cancellation
       if: (failure() || cancelled()) && steps.terraform-deploy.outputs.lock_id != ''
       shell: bash
@@ -177,32 +228,31 @@ runs:
           echo "If state is locked, check DynamoDB table \`terraform-state-locks\`" >> $GITHUB_STEP_SUMMARY
         fi
 
-    - name: Capture Current Lock Info for Manual Cleanup
+    - name: Verify Lock Status
       if: always()
       shell: bash
       working-directory: terraform
       run: |
-        # Save lock info that can be used for manual cleanup if needed
-        echo "🔍 Checking for any remaining locks..."
+        echo "🔍 Final verification of Terraform lock status..."
 
-        # Try to detect lock by attempting plan (will fail if locked)
+        # Quick check to verify state is accessible
         if terraform plan -refresh=false -detailed-exitcode > /dev/null 2>&1; then
-          echo "✅ No locks detected - state is clean"
-        elif terraform plan -refresh=false 2>&1 | grep -q "Error acquiring the state lock"; then
-          echo "⚠️  State is still locked after deployment"
-          echo "## ⚠️  Manual Lock Cleanup May Be Required" >> $GITHUB_STEP_SUMMARY
-          
-          # Extract and display lock info
-          LOCK_INFO=$(terraform plan -refresh=false 2>&1 || true)
-          LOCK_ID=$(echo "$LOCK_INFO" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
-          
-          if [ -n "$LOCK_ID" ]; then
-            echo "- **Lock ID**: \`$LOCK_ID\`" >> $GITHUB_STEP_SUMMARY
-            echo "- **Cleanup**: Run \`node scripts/terraform-unlock.js\` locally" >> $GITHUB_STEP_SUMMARY
-            echo "To manually unlock: terraform force-unlock $LOCK_ID"
-          else
-            echo "Check DynamoDB table \`terraform-state-locks\` for lock details" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "✅ Terraform state is clean and accessible"
+          echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lock Status**: Clean" >> $GITHUB_STEP_SUMMARY
         else
-          echo "✅ No locks detected"
+          # State still locked - this shouldn't happen after cleanup step
+          LOCK_CHECK=$(terraform plan -refresh=false 2>&1 || true)
+          
+          if echo "$LOCK_CHECK" | grep -q "Error acquiring the state lock"; then
+            echo "⚠️  WARNING: State is still locked after cleanup attempts"
+            LOCK_ID=$(echo "$LOCK_CHECK" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+            
+            echo "## ⚠️  Manual Intervention Required" >> $GITHUB_STEP_SUMMARY
+            echo "State remains locked despite automatic cleanup." >> $GITHUB_STEP_SUMMARY
+            echo "- **Lock ID**: \`${LOCK_ID:-Unknown}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Action**: Run \`node scripts/terraform-unlock.js\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ State is accessible"
+          fi
         fi

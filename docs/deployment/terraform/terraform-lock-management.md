@@ -4,7 +4,28 @@
 
 This document describes how Terraform state locks are managed in CI/CD pipelines and how to handle stuck locks manually.
 
-## 🎉 Recent Improvements (2026-02-04)
+## 🎉 Recent Improvements
+
+### 2026-02-11: Mandatory Lock Release
+
+**Critical Fix: Locks Now Released in ALL Scenarios**
+
+1. ✅ **New "Ensure Lock Release" Step**: Always runs after terraform operations
+2. ✅ **Ownership Detection**: Only releases locks from the current workflow
+3. ✅ **Final Verification**: Confirms state is accessible after deployment
+4. ✅ **Safety First**: Won't steal locks from other active workflows
+5. ✅ **Clear Reporting**: Enhanced GitHub Step Summary with lock status
+
+**Key Improvement**: Previously, locks were only cleaned up on failure/cancellation. Now they're explicitly released even when:
+
+- Terraform succeeds but a later step fails
+- Workflow times out after terraform completes
+- Process hangs during cleanup
+- Any other edge case occurs
+
+See: [Terraform Lock Release Fix - 2026-02-11](../../fixes/terraform-lock-release-fix-2026-02-11.md)
+
+### 2026-02-04: Auto-Detection and Stale Lock Clearing
 
 **Major Fixes to Prevent Recurring Deployment Issues:**
 
@@ -20,9 +41,9 @@ This document describes how Terraform state locks are managed in CI/CD pipelines
 
 ### CI/CD Auto-Cleanup (GitHub Actions)
 
-The `deploy-lambda-infrastructure` action now includes **three-stage** lock management:
+The `deploy-lambda-infrastructure` action now includes **four-stage** lock management:
 
-#### Stage 1: Pre-Deployment Stale Lock Clearing (NEW!)
+#### Stage 1: Pre-Deployment Stale Lock Clearing
 
 - **When**: Before any terraform commands run
 - **What**: Detects locks older than 30 minutes and auto-clears them
@@ -40,10 +61,28 @@ The `deploy-lambda-infrastructure` action now includes **three-stage** lock mana
 - **Retry Logic**: 20 attempts with 30-second delays
 - **Concurrency**: GitHub Actions concurrency groups prevent multiple simultaneous deploys
 
-#### Stage 3: Post-Deployment Cleanup
+#### Stage 3: Mandatory Lock Release (NEW! 2026-02-11)
 
-1. **On Failure/Cancellation** - Automatically releases locks from this workflow
-2. **Final Check** - Verifies no locks remain after deployment
+- **When**: ALWAYS runs after terraform operations (regardless of success/failure)
+- **What**: Explicitly checks and releases locks from this workflow
+- **Why**: Ensures locks are released even if later steps fail
+- **How**:
+
+  ```bash
+  # Detect current lock
+  terraform plan -refresh=false -detailed-exitcode
+
+  # Check if lock belongs to this workflow
+  if [lock owner contains workflow_id]; then
+    terraform force-unlock -force $LOCK_ID
+  fi
+  ```
+
+#### Stage 4: Post-Deployment Cleanup and Verification
+
+1. **On Failure/Cancellation** - Backup cleanup for captured lock IDs
+2. **Final Verification** (always runs) - Confirms state is accessible
+3. **Clear Reporting** - Adds lock status to GitHub Step Summary
 
 ### Implementation Details
 
@@ -55,14 +94,23 @@ The action includes multiple cleanup steps:
    - Force-unlocks stale locks
    - Waits for active locks to clear
 
-2. **Cleanup on Error/Cancellation** (runs on `failure()` or `cancelled()`)
+2. **Ensure Lock Release** (NEW! runs ALWAYS via `if: always()`)
+   - Checks for locks after terraform operations complete
+   - Identifies lock ownership (workflow ID matching)
+   - Releases locks from this workflow only
+   - Skips locks from other workflows to prevent conflicts
+   - Most important step for preventing stuck locks!
+
+3. **Cleanup on Error/Cancellation** (runs on `failure()` or `cancelled()`)
    - Detects workflow status
    - Runs `terraform force-unlock` if lock detected
+   - Backup for step 2 if lock ID was captured
    - Provides manual cleanup instructions if automatic cleanup fails
 
-3. **Capture Lock Info** (always runs)
-   - Checks for any remaining locks (WITHOUT using `-lock=false`)
-   - Displays current lock status
+4. **Verify Lock Status** (runs ALWAYS via `if: always()`)
+   - Final check that state is accessible
+   - Reports if locks remain after cleanup
+   - Provides manual intervention instructions if needed
    - Helps with post-mortem debugging
 
 ## Manual Lock Management
