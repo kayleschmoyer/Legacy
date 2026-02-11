@@ -454,10 +454,26 @@ diagnose: ## Diagnose common issues
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch pre-commit
+.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch cleanup-merged-branches pre-commit
 
 branch-tree: ## Show current branch tree structure
 	@twig tree
+
+cleanup-merged-branches: ## List merged remote branches (use DELETE=1 to remove them)
+	@$(call echo_blue,Checking for merged remote branches...)
+ifeq ($(OS),Windows_NT)
+ifdef DELETE
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\cleanup-merged-branches.ps1" -Delete
+else
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\cleanup-merged-branches.ps1"
+endif
+else
+ifdef DELETE
+	@./scripts/cleanup-merged-branches.sh --delete
+else
+	@./scripts/cleanup-merged-branches.sh
+endif
+endif
 
 squash-branch: ## Squash all commits on current branch from parent (optional: MESSAGE="commit message")
 	@$(call echo_blue,Squashing branch commits...)
