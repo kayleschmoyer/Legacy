@@ -244,7 +244,7 @@
     "@nx/react": "21.5.3",
     "@nx/react-native": "21.5.2",
     "@nx/vite": "21.5.2",
-    "@nx/web": "22.4.4",
+    "@nx/web": "22.5.0",
     "@nx/workspace": "21.6.3",
     "@playwright/test": "^1.55.0",
     "@react-native/metro-config": "0.79.7",
