@@ -8,10 +8,10 @@ on:
       - "lambdas/draft-processor/**"
       - ".github/workflows/deploy-draft-processor.yml"
 
-# Prevent concurrent deployments of the same Lambda
-# Terraform state locking (DynamoDB) handles cross-Lambda conflicts
+# Prevent concurrent Lambda deployments to avoid Terraform state lock contention
+# All Lambdas share the same Terraform state, so they must deploy sequentially
 concurrency:
-  group: lambda-deployment-draft-processor
+  group: terraform-lambda-deployment
   cancel-in-progress: false
 
 # IMPORTANT: Infrastructure Configuration
