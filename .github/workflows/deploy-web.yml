@@ -26,7 +26,6 @@ env:
   NX_CACHE_DIRECTORY: .nx-cache
   NX_SKIP_NX_CACHE: false
   NODE_OPTIONS: "--max_old_space_size=4096"
-  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 jobs:
   build-and-deploy:

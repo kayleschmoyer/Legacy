@@ -18,7 +18,6 @@ env:
   AWS_REGION: us-east-1
   AWS_SERVICE_NAME: legacy-sports-stats
   AWS_STAGE: dev
-  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 permissions:
   id-token: write
@@ -43,6 +42,34 @@ jobs:
         with:
           node-version: 22
           install-dependencies: true
+          set-nx-shas: true
+
+      - name: "☁️ Detect DTE Availability"
+        id: detect-dte
+        uses: ./.github/actions/detect-dte
+        with:
+          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
+      - name: "☁️ Start Nx Cloud CI Run"
+        id: start-dte
+        if: steps.detect-dte.outputs.dte-available == 'true'
+        continue-on-error: true
+        run: |
+          echo "🚀 Starting Nx Cloud DTE..."
+          DTE_START_OUTPUT=$(mktemp)
+          DTE_START_RESULT=0
+
+          pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
+
+          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$DTE_START_OUTPUT"; then
+            echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable. Build will proceed with local execution."
+            cat "$DTE_START_OUTPUT"
+            rm -f "$DTE_START_OUTPUT"
+            exit 1
+          fi
+
+          rm -f "$DTE_START_OUTPUT"
+          echo "✅ DTE session started"
 
       - name: Validate Deployment Readiness
         uses: ./.github/actions/deployment-gate
@@ -61,7 +88,15 @@ jobs:
 
       - name: Build Stats Lambda
         run: |
-          echo "🚀 Building Stats Lambda specifically..."
+          # Only enable Nx Cloud if DTE started successfully
+          if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
+            echo "🚀 Building Stats Lambda with Nx Cloud DTE enabled"
+            export NX_CLOUD_ACCESS_TOKEN="${{ secrets.NX_CLOUD_ACCESS_TOKEN }}"
+          else
+            echo "📦 Building Stats Lambda with local execution (DTE unavailable)"
+            unset NX_CLOUD_ACCESS_TOKEN
+          fi
+
           echo "::notice::Building only stats-lambda project for targeted deployment"
 
           # Build only the stats-lambda and its dependencies
