@@ -398,23 +398,18 @@ runs:
 
         echo "✅ Dependencies verified successfully!"
 
-    - name: Cache Nx Build Artifacts
-      uses: actions/cache@v4
-      with:
-        path: |
-          .nx-cache
-          node_modules/.cache/nx
-        key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}-${{ hashFiles('nx.json', 'workspace.json', 'tsconfig.base.json') }}
-        restore-keys: |
-          ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}-
-          ${{ runner.os }}-nx-
-
     - name: Set NX SHAs
       if: inputs.set-nx-shas == 'true'
       uses: nrwl/nx-set-shas@v4
       with:
         main-branch-name: "main"
         error-on-no-successful-workflow: false
+
+    - name: "Setup Nx Remote Cache"
+      uses: ./.github/actions/nx-cache
+      with:
+        restore-only: ${{ github.event_name == 'pull_request' }}
+        base-branch: "main"
 
     - name: Configure Basic Nx Environment
       shell: bash

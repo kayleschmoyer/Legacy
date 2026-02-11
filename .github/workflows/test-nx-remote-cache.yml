@@ -1,0 +1,319 @@
+name: "Test Nx Remote Cache"
+
+# Test workflow to validate Nx remote caching implementation
+# Run this manually to verify cache restoration and performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-scenario:
+        description: "Test scenario"
+        required: true
+        type: choice
+        options:
+          - "cache-main-branch"
+          - "cache-pr-branch"
+          - "cache-miss"
+        default: "cache-pr-branch"
+      force-rebuild:
+        description: "Force rebuild (ignore cache)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  NX_DAEMON: false
+  NX_PARALLEL: 4
+
+jobs:
+  test-cache-setup:
+    name: "Test: ${{ inputs.test-scenario }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: "📋 Test Configuration"
+        run: |
+          echo "🧪 Testing Nx Remote Cache"
+          echo "Scenario: ${{ inputs.test-scenario }}"
+          echo "Force Rebuild: ${{ inputs.force-rebuild }}"
+          echo ""
+
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: "Setup Workspace (With Nx Cache)"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Test: Cache Main Branch"
+        if: inputs.test-scenario == 'cache-main-branch'
+        run: |
+          echo "🧪 Testing main branch cache creation..."
+          echo ""
+          echo "Running: pnpm exec nx run-many -t build --all"
+
+          time pnpm exec nx run-many -t build --all --skip-nx-cache=${{ inputs.force-rebuild }}
+
+          echo ""
+          echo "✅ Main branch cache test complete"
+
+          # Show cache statistics
+          if [ -d ".nx-cache" ]; then
+            echo "📦 Cache statistics:"
+            echo "  Entries: $(find .nx-cache -type f | wc -l)"
+            echo "  Size: $(du -sh .nx-cache | cut -f1)"
+          fi
+
+      - name: "Test: PR Branch Cache Restoration"
+        if: inputs.test-scenario == 'cache-pr-branch'
+        run: |
+          echo "🧪 Testing PR branch cache restoration..."
+          echo ""
+
+          # Simulate PR by checking which projects are affected
+          echo "📊 Analyzing affected projects..."
+          pnpm exec nx show projects --affected
+
+          echo ""
+          echo "Running: pnpm exec nx affected -t build"
+
+          time pnpm exec nx affected -t build --skip-nx-cache=${{ inputs.force-rebuild }}
+
+          echo ""
+          echo "✅ PR cache restoration test complete"
+
+          # Show what was cached vs rebuilt
+          echo ""
+          echo "📊 Build Analysis:"
+          pnpm exec nx show projects --affected | while read -r project; do
+            if [ -n "$project" ]; then
+              echo "  - $project: $([ -f ".nx-cache/${project}/terminal-outputs" ] && echo 'cached' || echo 'rebuilt')"
+            fi
+          done
+
+      - name: "Test: Cache Miss Scenario"
+        if: inputs.test-scenario == 'cache-miss'
+        run: |
+          echo "🧪 Testing cache miss scenario..."
+          echo ""
+
+          # Clear cache to simulate miss
+          echo "🗑️  Clearing cache to simulate miss..."
+          rm -rf .nx-cache node_modules/.cache/nx
+
+          echo "Running: pnpm exec nx run-many -t build,test,lint"
+
+          time pnpm exec nx run-many -t build,test,lint --projects=web,api,utils
+
+          echo ""
+          echo "✅ Cache miss test complete"
+
+          # Show new cache created
+          if [ -d ".nx-cache" ]; then
+            echo "📦 New cache created:"
+            echo "  Entries: $(find .nx-cache -type f | wc -l)"
+            echo "  Size: $(du -sh .nx-cache | cut -f1)"
+          fi
+
+      - name: "Verify Cache Configuration"
+        if: always()
+        run: |
+          echo "🔍 Verifying Nx cache configuration..."
+          echo ""
+
+          echo "Environment Variables:"
+          echo "  NX_CACHE_DIRECTORY: ${NX_CACHE_DIRECTORY:-not set}"
+          echo "  NX_SKIP_NX_CACHE: ${NX_SKIP_NX_CACHE:-not set}"
+          echo "  NX_DAEMON: ${NX_DAEMON:-not set}"
+          echo ""
+
+          echo "Cache Directories:"
+          echo "  .nx-cache exists: $([ -d ".nx-cache" ] && echo 'yes' || echo 'no')"
+          echo "  node_modules/.cache/nx exists: $([ -d "node_modules/.cache/nx" ] && echo 'yes' || echo 'no')"
+          echo ""
+
+          if [ -d ".nx-cache" ]; then
+            echo "Cache Structure:"
+            ls -lh .nx-cache | head -10
+          fi
+
+      - name: "Performance Report"
+        if: always()
+        run: |
+          echo "📈 Performance Report"
+          echo "===================="
+          echo ""
+
+          # Check if report.json was created
+          if [ -f ".nx-cache/report.json" ]; then
+            echo "Nx Performance Report:"
+            cat .nx-cache/report.json | jq '.' || cat .nx-cache/report.json
+          fi
+
+          echo ""
+          echo "GitHub Actions Cache:"
+          echo "  This run's cache will be available for:"
+          echo "  - Future PR builds (base branch cache)"
+          echo "  - Incremental builds on same branch"
+
+  test-cache-comparison:
+    name: "Compare: With vs Without Cache"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Benchmark: Without Cache"
+        run: |
+          echo "🏃 Running WITHOUT cache..."
+
+          # Clear cache
+          rm -rf .nx-cache node_modules/.cache/nx
+
+          # Time the build
+          START_TIME=$(date +%s)
+          pnpm exec nx run-many -t build --projects=web,api,db-client,utils --skip-nx-cache=true
+          END_TIME=$(date +%s)
+
+          NO_CACHE_TIME=$((END_TIME - START_TIME))
+          echo "⏱️  Time without cache: ${NO_CACHE_TIME}s"
+          echo "no-cache-time=${NO_CACHE_TIME}" >> $GITHUB_ENV
+
+      - name: "Benchmark: With Cache (Second Run)"
+        run: |
+          echo "🏃 Running WITH cache (second run)..."
+
+          # Time the build (should be much faster)
+          START_TIME=$(date +%s)
+          pnpm exec nx run-many -t build --projects=web,api,db-client,utils --skip-nx-cache=false
+          END_TIME=$(date +%s)
+
+          WITH_CACHE_TIME=$((END_TIME - START_TIME))
+          echo "⏱️  Time with cache: ${WITH_CACHE_TIME}s"
+          echo "with-cache-time=${WITH_CACHE_TIME}" >> $GITHUB_ENV
+
+      - name: "Performance Comparison"
+        if: always()
+        run: |
+          echo "📊 Performance Comparison"
+          echo "========================"
+          echo ""
+          echo "Without Cache: ${{ env.no-cache-time }}s"
+          echo "With Cache: ${{ env.with-cache-time }}s"
+          echo ""
+
+          if [ -n "${{ env.no-cache-time }}" ] && [ -n "${{ env.with-cache-time }}" ]; then
+            SAVINGS=$((100 - (100 * ${{ env.with-cache-time }} / ${{ env.no-cache-time }})))
+            echo "⚡ Speed Improvement: ${SAVINGS}%"
+            echo "⏰ Time Saved: $((${{ env.no-cache-time }} - ${{ env.with-cache-time }}))s"
+          fi
+
+  test-pr-simulation:
+    name: "Simulate PR Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: "Checkout Repository (Main)"
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: "Setup & Build Main Branch"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Build Main Branch (Create Cache)"
+        run: |
+          echo "🏗️  Building main branch to populate cache..."
+          pnpm exec nx run-many -t build --all --skip-nx-cache=false
+
+          echo "📦 Main branch cache created:"
+          du -sh .nx-cache
+
+      - name: "Save Main Branch Cache"
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .nx-cache
+            node_modules/.cache/nx
+          key: test-main-cache-${{ github.sha }}
+
+      - name: "Checkout Feature Branch"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: "Restore Main Branch Cache"
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .nx-cache
+            node_modules/.cache/nx
+          key: test-main-cache-${{ github.sha }}
+
+      - name: "Setup Feature Branch"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          include-optional-deps: false
+
+      - name: "Build Affected Projects Only"
+        run: |
+          echo "🎯 Building only affected projects..."
+
+          echo "Affected projects:"
+          pnpm exec nx show projects --affected
+
+          echo ""
+          echo "Running affected build:"
+          pnpm exec nx affected -t build --verbose
+
+          echo ""
+          echo "✅ PR build simulation complete!"
+
+      - name: "Report Results"
+        if: always()
+        run: |
+          echo "📊 PR Build Simulation Results"
+          echo "=============================="
+          echo ""
+          echo "This simulates:"
+          echo "1. ✅ Main branch builds and caches outputs"
+          echo "2. ✅ PR branch restores cache from main"
+          echo "3. ✅ Only affected projects are rebuilt"
+          echo ""
+          echo "In real PR workflows:"
+          echo "- GitHub Actions cache handles this automatically"
+          echo "- Cache is restored from base branch"
+          echo "- Significant time savings for most PRs"

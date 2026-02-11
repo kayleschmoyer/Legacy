@@ -1,0 +1,193 @@
+name: "Nx Remote Cache Management"
+description: "Restore Nx cache from base branch and save outputs for future runs"
+
+inputs:
+  restore-only:
+    description: "Only restore cache, don't save (useful for PR builds)"
+    required: false
+    default: "false"
+  base-branch:
+    description: "Base branch to restore cache from (typically 'main')"
+    required: false
+    default: "main"
+
+outputs:
+  cache-hit:
+    description: "Whether cache was restored from base branch"
+    value: ${{ steps.restore-base-cache.outputs.cache-hit }}
+  cache-source:
+    description: "Source of cache (base-branch, current-branch, or none)"
+    value: ${{ steps.determine-source.outputs.source }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Determine Cache Strategy"
+      id: determine-source
+      shell: bash
+      run: |
+        echo "🔍 Determining Nx cache strategy..."
+
+        # Determine if this is a PR build
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          IS_PR="true"
+          BASE_REF="${{ github.base_ref }}"
+          HEAD_REF="${{ github.head_ref }}"
+          echo "📋 PR Build Detected"
+          echo "  Base: $BASE_REF"
+          echo "  Head: $HEAD_REF"
+        else
+          IS_PR="false"
+          BASE_REF="${{ inputs.base-branch }}"
+          HEAD_REF="${{ github.ref_name }}"
+          echo "📋 Direct Branch Build"
+          echo "  Branch: $HEAD_REF"
+        fi
+
+        echo "is-pr=$IS_PR" >> $GITHUB_OUTPUT
+        echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
+        echo "head-ref=$HEAD_REF" >> $GITHUB_OUTPUT
+
+        # Determine cache strategy
+        if [ "$IS_PR" = "true" ]; then
+          echo "source=base-branch" >> $GITHUB_OUTPUT
+          echo "📦 Strategy: Restore cache from base branch ($BASE_REF)"
+        else
+          echo "source=current-branch" >> $GITHUB_OUTPUT
+          echo "📦 Strategy: Use current branch cache"
+        fi
+
+    - name: "Generate Cache Keys"
+      id: cache-keys
+      shell: bash
+      run: |
+        echo "🔑 Generating cache keys..."
+
+        BASE_REF="${{ steps.determine-source.outputs.base-ref }}"
+        HEAD_REF="${{ steps.determine-source.outputs.head-ref }}"
+
+        # Hash of dependencies and Nx configuration
+        DEPS_HASH="${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}"
+        NX_CONFIG_HASH="${{ hashFiles('nx.json', 'tsconfig.base.json') }}"
+
+        # Current branch cache key (for saving)
+        CURRENT_KEY="nx-cache-${HEAD_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"
+
+        # Base branch cache key (for restoring on PRs)
+        BASE_KEY="nx-cache-${BASE_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"
+
+        echo "current-key=$CURRENT_KEY" >> $GITHUB_OUTPUT
+        echo "base-key=$BASE_KEY" >> $GITHUB_OUTPUT
+        echo "deps-hash=$DEPS_HASH" >> $GITHUB_OUTPUT
+
+        echo "✅ Cache Keys Generated:"
+        echo "  Current: $CURRENT_KEY"
+        echo "  Base:    $BASE_KEY"
+
+    - name: "Restore Nx Cache from Base Branch"
+      id: restore-base-cache
+      if: steps.determine-source.outputs.is-pr == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          .nx-cache
+          node_modules/.cache/nx
+        key: ${{ steps.cache-keys.outputs.base-key }}
+        restore-keys: |
+          nx-cache-${{ steps.determine-source.outputs.base-ref }}-${{ steps.cache-keys.outputs.deps-hash }}-
+          nx-cache-${{ steps.determine-source.outputs.base-ref }}-
+
+    - name: "Restore Nx Cache from Current Branch"
+      id: restore-current-cache
+      if: steps.determine-source.outputs.is-pr != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          .nx-cache
+          node_modules/.cache/nx
+        key: ${{ steps.cache-keys.outputs.current-key }}
+        restore-keys: |
+          nx-cache-${{ steps.determine-source.outputs.head-ref }}-${{ steps.cache-keys.outputs.deps-hash }}-
+          nx-cache-${{ steps.determine-source.outputs.head-ref }}-
+          nx-cache-${{ inputs.base-branch }}-
+
+    - name: "Cache Restoration Summary"
+      shell: bash
+      run: |
+        echo "📊 Nx Cache Restoration Summary"
+        echo "================================"
+
+        if [ "${{ steps.determine-source.outputs.is-pr }}" = "true" ]; then
+          if [ "${{ steps.restore-base-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache HIT from base branch (${{ steps.determine-source.outputs.base-ref }})"
+            echo "⚡ Nx will only rebuild affected projects!"
+          elif [ -n "${{ steps.restore-base-cache.outputs.cache-matched-key }}" ]; then
+            echo "⚠️  Partial cache restored from base branch"
+            echo "🔄 Some tasks may need to rebuild"
+          else
+            echo "❌ No cache available from base branch"
+            echo "🔨 Full rebuild required"
+          fi
+        else
+          if [ "${{ steps.restore-current-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache HIT from current branch"
+          elif [ -n "${{ steps.restore-current-cache.outputs.cache-matched-key }}" ]; then
+            echo "⚠️  Partial cache restored"
+          else
+            echo "❌ No cache available"
+            echo "🔨 Full build required"
+          fi
+        fi
+
+        # Show cache size if available
+        if [ -d ".nx-cache" ]; then
+          CACHE_SIZE=$(du -sh .nx-cache 2>/dev/null | cut -f1 || echo "unknown")
+          echo "📦 Cache size: $CACHE_SIZE"
+        fi
+
+    - name: "Save Nx Cache"
+      # Only save cache if:
+      # 1. Not restore-only mode
+      # 2. This is a push to main or a successful merge
+      if: |
+        inputs.restore-only != 'true' &&
+        (github.event_name == 'push' || github.event_name == 'merge_group')
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          .nx-cache
+          node_modules/.cache/nx
+        key: ${{ steps.cache-keys.outputs.current-key }}
+
+    - name: "Configure Nx for Remote Cache"
+      shell: bash
+      run: |
+        echo "⚙️  Configuring Nx to use GitHub Actions cache..."
+
+        # Ensure cache directory exists
+        mkdir -p .nx-cache
+
+        # Set environment variables for Nx
+        echo "NX_CACHE_DIRECTORY=.nx-cache" >> $GITHUB_ENV
+        echo "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV
+
+        echo "✅ Nx configured to use local cache at .nx-cache"
+
+    - name: "Cache Statistics"
+      if: always()
+      shell: bash
+      run: |
+        echo "📈 Final Cache Statistics"
+        echo "========================="
+
+        if [ -d ".nx-cache" ]; then
+          echo "Cache directory exists: ✅"
+          echo "Cache entries: $(find .nx-cache -type f 2>/dev/null | wc -l)"
+          echo "Cache size: $(du -sh .nx-cache 2>/dev/null | cut -f1)"
+        else
+          echo "Cache directory exists: ❌"
+        fi
+
+        if [ -d "node_modules/.cache/nx" ]; then
+          echo "Nx internal cache: $(du -sh node_modules/.cache/nx 2>/dev/null | cut -f1)"
+        fi

@@ -50,6 +50,21 @@ jobs:
         with:
           nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
+      - name: Validate Deployment Readiness
+        uses: ./.github/actions/deployment-gate
+        with:
+          artifacts-ready: "true"
+          quality-passed: "true"
+          required-components: ""
+          environment: "production"
+
+      - name: "☁️ Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          role-session-name: GitHubActions-DeployStats
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: "☁️ Start Nx Cloud CI Run"
         id: start-dte
         if: steps.detect-dte.outputs.dte-available == 'true'
@@ -71,30 +86,17 @@ jobs:
           rm -f "$DTE_START_OUTPUT"
           echo "✅ DTE session started"
 
-      - name: Validate Deployment Readiness
-        uses: ./.github/actions/deployment-gate
-        with:
-          artifacts-ready: "true"
-          quality-passed: "true"
-          required-components: ""
-          environment: "production"
-
-      - name: "☁️ Configure AWS Credentials"
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
-          role-session-name: GitHubActions-DeployStats
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Build Stats Lambda
         run: |
           # Only enable Nx Cloud if DTE started successfully
           if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
             echo "🚀 Building Stats Lambda with Nx Cloud DTE enabled"
             export NX_CLOUD_ACCESS_TOKEN="${{ secrets.NX_CLOUD_ACCESS_TOKEN }}"
+            NX_CLOUD_FLAG=""
           else
             echo "📦 Building Stats Lambda with local execution (DTE unavailable)"
             unset NX_CLOUD_ACCESS_TOKEN
+            NX_CLOUD_FLAG="--no-cloud"
           fi
 
           echo "::notice::Building only stats-lambda project for targeted deployment"
@@ -109,7 +111,7 @@ jobs:
             fi
           fi
 
-          if $NX_CMD build stats-lambda --verbose 2>&1 | tee build.log; then
+          if $NX_CMD build stats-lambda $NX_CLOUD_FLAG --verbose 2>&1 | tee build.log; then
             echo "✅ Stats Lambda built successfully"
             
             # Verify build artifacts exist
