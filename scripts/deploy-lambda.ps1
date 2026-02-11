@@ -46,8 +46,13 @@ switch ($FunctionName) {
         $ProjectName = 'draft-processor'
         $SsmParam = "/legacy-sports/${Environment}/lambda/draft-processor/version"
     }
+    'websocket' {
+        $LambdaDir = 'lambdas/websocket'
+        $ProjectName = 'websocket'
+        $SsmParam = "/legacy-sports/${Environment}/lambda/websocket/version"
+    }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket"
     }
 }
 
@@ -92,13 +97,23 @@ try {
 
 $PackageName = "${FunctionName}-${Version}.zip"
 
-# Change to lambda directory
-Push-Location $LambdaDir
-Write-Host "Working in: $(Get-Location)"
+# Determine dist directory location
+$LocationPushed = $false
+if ($FunctionName -eq 'websocket') {
+    # Websocket lambda uses root-level dist
+    $DistPath = "dist/lambdas/websocket"
+    Write-Host "Using dist path: $DistPath"
+} else {
+    # Other lambdas have dist in their directory
+    Push-Location $LambdaDir
+    $LocationPushed = $true
+    Write-Host "Working in: $(Get-Location)"
+    $DistPath = "dist"
+}
 
 # Create zip from dist directory
-if (-not (Test-Path 'dist')) {
-    Write-Error "Dist directory not found in $LambdaDir"
+if (-not (Test-Path $DistPath)) {
+    Write-Error "Dist directory not found at $DistPath"
 }
 
 # Create version info file in dist directory for inclusion in package
@@ -110,11 +125,13 @@ $VersionInfo = @{
     environment = $Environment
 } | ConvertTo-Json -Depth 2
 
-$VersionInfo | Out-File -FilePath "dist/version-info.json" -Encoding UTF8
+$VersionInfo | Out-File -FilePath "$DistPath/version-info.json" -Encoding UTF8
 Write-Host "Created version info: $Version (commit: $CommitSha)" -ForegroundColor Cyan
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory("$(Get-Location)\dist", "$(Get-Location)\$PackageName")
+$FullDistPath = (Resolve-Path $DistPath).Path
+$ZipPath = Join-Path (Get-Location) $PackageName
+[System.IO.Compression.ZipFile]::CreateFromDirectory($FullDistPath, $ZipPath)
 Write-Host "Created package: $PackageName" -ForegroundColor Green
 
 # Step 4: Upload to S3
@@ -138,7 +155,9 @@ Write-Host "Updated parameter: $SsmParam = $Version" -ForegroundColor Green
 
 # Cleanup
 Remove-Item $PackageName -Force -ErrorAction SilentlyContinue
-Pop-Location
+if ($LocationPushed) {
+    Pop-Location
+}
 
 Write-Host '✅ Deployment completed successfully!' -ForegroundColor Green
-Write-Host "Next: Run 'terraform apply' to deploy version $Version"
+Write-Host "Next: Run 'terraform apply' to deploy version $Version" -ForegroundColor Cyan

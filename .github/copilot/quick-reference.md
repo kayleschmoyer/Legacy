@@ -80,6 +80,50 @@ twig github pr create-pr
 pnpm run db:psql
 ```
 
+### Database Migrations
+
+**⚠️ CRITICAL: All new tables MUST include timestamps + triggers**
+
+```powershell
+# Run migrations
+pnpm run db:migrate
+
+# Create new migration (see .github/copilot/skills/db-migration-write.md)
+# 1. Add timestamps to table definition:
+#    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+#    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+# 2. Create trigger for auto-updates:
+#    CREATE TRIGGER table_updated_at_trigger
+#    BEFORE UPDATE ON table FOR EACH ROW
+#    EXECUTE FUNCTION update_updated_at_column();
+# 3. Add to Drizzle schema with timestamp columns
+
+# See: docs/database/automatic-timestamps.md for full details
+```
+
+### Game Selection & Data Scraping
+
+```powershell
+# Trigger game selection (calls remote Lambda)
+pnpm run cli trigger-game-selection --matchup-id 71
+pnpm run cli trigger-game-selection  # All pending matchups
+
+# Test game selection locally (requires dev server running)
+# Terminal 1:
+pnpm exec nx run game-selection:dev  # Starts on port 5003
+
+# Terminal 2:
+$env:GAME_SELECTION_ENDPOINT = "http://localhost:5003"
+pnpm run cli trigger-game-selection --matchup-id 71
+
+# Load game stats from Baseball-Reference
+pnpm run cli load-game-stats --player-id 8698 --season 1907
+
+# CRITICAL: Baseball-Reference HTML uses data-stat="date" (not "date_game")
+# Game identifiers extracted from boxscore hrefs: /boxes/BSN/BSN190704200.shtml
+# If game_identifier is empty, check lib/bref-client parser for correct attribute
+```
+
 ## Common Issues & Fixes
 
 | Problem                    | Solution                                           |
@@ -102,13 +146,29 @@ pnpm run db:psql
 $env:AWS_PAGER = ""                # Disable pagination
 $env:PYTHONIOENCODING = "utf-8"    # Fix Unicode/emoji encoding
 
-# Then view logs
-aws logs tail /aws/lambda/legacy-sports-dev-stats --since 5m --no-cli-pager
-
-# OR use the wrapper script (recommended)
+# View recent logs
 .\scripts\aws-logs.ps1 -Function stats -Since 5m
 
-# NOTE: Piping to Select-Object may still cause encoding errors
+# CRITICAL: Use database timestamps when debugging (not just recent logs!)
+# Example: Game stats show last_updated = 3 hours ago
+# 1. Query database for timestamp
+.\scripts\db-query.ps1 -Query "SELECT id, last_updated FROM app_internal.game_stats WHERE game_id = 123 ORDER BY last_updated DESC LIMIT 1"
+# Result: 2026-02-08 14:35:42
+
+# 2. Calculate time range (±5 minutes around 14:35:42 = 14:30 to 14:40)
+
+# 3. View logs from that time period
+aws logs tail /aws/lambda/legacy-sports-dev-stats --start-time 1707405000 --end-time 1707405600 --no-cli-pager
+
+# Common timestamp columns to check:
+# - last_updated, updated_at (when record changed)
+# - created_at (when record created)
+# - draft_started_at (league drafts)
+# - occurred_at (events)
+
+# Tip: Use https://www.epochconverter.com/ to convert timestamps to epoch
+
+# NOTE: Piping to Select-Object may cause encoding errors
 # If you need to limit output, use --filter-pattern or redirect to file:
 aws logs tail /aws/lambda/legacy-sports-dev-stats --since 5m --no-cli-pager > logs.txt
 ```
@@ -176,6 +236,21 @@ pnpm exec nx run-many -t <target> --projects=tag:scope:lib
 pnpm exec nx graph
 ```
 
+## Build System Architecture
+
+**Libraries (lib/\*)**: TypeScript source only - NO build targets
+
+- ✅ Have: `typecheck`, `lint`, `test` targets
+- ❌ Don't have: `build` target
+- Compiled by consuming apps/lambdas during their build process
+
+**Applications & Lambdas (apps/\*, lambdas/\*)**: Include build targets
+
+- ✅ Have: `typecheck`, `lint`, `test`, `build` targets
+- Compile their own code + all imported library code
+
+**Build Command**: `pnpm exec nx affected -t build` only builds apps/lambdas, not libraries
+
 ## Environment
 
 - **Platform**: Windows PowerShell
@@ -188,13 +263,15 @@ pnpm exec nx graph
 
 Load these files on-demand based on your task:
 
-| Task                   | Load File                                         |
-| ---------------------- | ------------------------------------------------- |
-| Common patterns        | `docs/agents/quick-patterns.yml`                  |
-| Type errors            | `docs/agents/type-fixes.yml`                      |
-| Linting issues         | `docs/agents/lint-fixes.yml`                      |
-| Full workflow          | `.github/copilot/skills/workflow-ticket-to-pr.md` |
-| Branch management      | `docs/guides/branch-tree-management.md`           |
-| Database work          | `docs/architecture/database-schema.md` (excerpt)  |
-| Architecture questions | `docs/architecture/` (specific file)              |
-| Troubleshooting        | `docs/guides/troubleshooting.md`                  |
+| Task                    | Load File                                             |
+| ----------------------- | ----------------------------------------------------- |
+| Common patterns         | `docs/agents/quick-patterns.yml`                      |
+| Type errors             | `docs/agents/type-fixes.yml`                          |
+| Linting issues          | `docs/agents/lint-fixes.yml`                          |
+| Full workflow           | `.github/copilot/skills/workflow-ticket-to-pr.md`     |
+| Branch management       | `docs/guides/branch-tree-management.md`               |
+| **Database migrations** | **`.github/copilot/skills/db-migration-write.md`** ⭐ |
+| **Database timestamps** | **`docs/database/automatic-timestamps.md`** ⭐        |
+| Database work           | `docs/architecture/database-schema.md` (excerpt)      |
+| Architecture questions  | `docs/architecture/` (specific file)                  |
+| Troubleshooting         | `docs/guides/troubleshooting.md`                      |

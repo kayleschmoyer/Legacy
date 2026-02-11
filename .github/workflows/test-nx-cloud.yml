@@ -6,7 +6,7 @@ on:
       verbose:
         description: "Enable verbose logging"
         required: false
-        default: "false"
+        default: false
         type: boolean
 
 jobs:

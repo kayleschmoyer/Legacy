@@ -14,12 +14,14 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import {
   getMissingMatchupRecords,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { MIN_SEASON_WITH_GAME_DATA } from '@legacy-sports/utils';
+import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { handler as selectGameHandler } from './handlers/select-game';
 
 // Initialize Sentry
@@ -90,6 +92,9 @@ const sqsClient = new SQSClient({
 });
 const GAME_STATS_QUEUE_URL = process.env.SQS_LOAD_GAME_STATS_URL;
 
+// Initialize WebSocket notification service
+const notificationService = createNotificationService();
+
 /**
  * Queue a matchup stats loading job to SQS
  * Splits large player lists into batches to avoid Lambda timeouts
@@ -97,6 +102,7 @@ const GAME_STATS_QUEUE_URL = process.env.SQS_LOAD_GAME_STATS_URL;
  */
 async function queueMatchupStatsLoad(
   matchupId: number,
+  leagueId: number,
   gameRecords: Array<{
     matchupPlayerId: number;
     playerId: number;
@@ -159,6 +165,30 @@ async function queueMatchupStatsLoad(
       LOGGER.debug(
         `Queued batch ${batchIndex + 1}/${batches.length} for matchup ${matchupId} with ${batch.length} players`,
       );
+
+      // Send notification only for the first batch to indicate stats loading has started
+      if (batchIndex === 0 && notificationService) {
+        try {
+          // Send initial loading notification with 0 playerId to indicate matchup-level start
+          await notificationService.notifyPlayerStatsLoading(
+            0, // playerId = 0 indicates matchup-level start
+            matchupId,
+            leagueId,
+            { loaded: 0, total: gameRecords.length },
+          );
+          LOGGER.debug(
+            `Sent initial stats loading notification for matchup ${matchupId}`,
+          );
+        } catch (notifyError) {
+          LOGGER.warn('Failed to send stats loading notification', {
+            error:
+              notifyError instanceof Error
+                ? notifyError.message
+                : String(notifyError),
+            matchupId,
+          });
+        }
+      }
     }
 
     LOGGER.info(
@@ -437,7 +467,7 @@ async function selectGameForMatchup(
       fieldingGamePos: game.fieldingGamePos || 'XX',
     }));
 
-    await queueMatchupStatsLoad(matchupId, gamesToQueue);
+    await queueMatchupStatsLoad(matchupId, matchupData.leagueId, gamesToQueue);
   }
 
   // 5. Calculate how many games have been selected so far
@@ -602,7 +632,7 @@ async function createMatchupForLeagueWeek(
           fieldingGamePos: game.fieldingGamePos || 'XX',
         }));
 
-        await queueMatchupStatsLoad(matchup.id, gamesToQueue);
+        await queueMatchupStatsLoad(matchup.id, matchup.leagueId, gamesToQueue);
         LOGGER.info(`Queued ${gamesToQueue.length} games for stats loading`);
       }
 
@@ -662,9 +692,10 @@ async function createMatchupForLeagueWeek(
     // BATCH 2: Fetch all available seasons for all players in one query
     // Query both batting and pitching to handle pitcher-only players
     // Filter to seasons with at least 2x games as matchup requires
+    // Only consider seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
     const minGames = (matchup.gamesPerMatchup ?? 7) * 2;
     LOGGER.info(
-      `Batch fetching available seasons for ${playerIds.length} players (min ${minGames} games)`,
+      `Batch fetching available seasons for ${playerIds.length} players (min ${minGames} games, seasons ${MIN_SEASON_WITH_GAME_DATA}+)`,
     );
     const [allBattingSeasons, allPitchingSeasons] = await Promise.all([
       db
@@ -678,6 +709,7 @@ async function createMatchupForLeagueWeek(
           and(
             inArray(PublicSchema.seasonBatting.playerId, playerIds),
             isNotNull(PublicSchema.seasonBatting.g),
+            gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
           ),
         ),
       db
@@ -691,6 +723,7 @@ async function createMatchupForLeagueWeek(
           and(
             inArray(PublicSchema.seasonPitching.playerId, playerIds),
             isNotNull(PublicSchema.seasonPitching.g),
+            gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
           ),
         ),
     ]);

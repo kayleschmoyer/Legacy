@@ -48,6 +48,12 @@ export const leagues = pgTable(
     weekAdvanceStatus: weekAdvanceStatus('week_advance_status')
       .notNull()
       .default('idle'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -62,6 +68,12 @@ export const teams = pgTable(
     id: serial('id').primaryKey().notNull(),
     name: varchar('name').notNull(),
     leagueId: integer('league_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -82,6 +94,12 @@ export const drafts = pgTable(
   'drafts',
   {
     id: serial('id').primaryKey().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     leagueId: integer('league_id').notNull(),
     draftType: draftType('draft_type').notNull(),
     date: date('date'),
@@ -131,6 +149,12 @@ export const leagueMembers = pgTable(
     teamId: integer('team_id'),
     permissionLevel: leaguePermissionLevel('permission_level').notNull(),
     userId: integer('user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -193,6 +217,12 @@ export const leaguePosition = pgTable(
         foreignColumns: [leagues.id],
         name: 'league_position_league_fk',
       }),
+      createdAt: timestamp('created_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+      updatedAt: timestamp('updated_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
     };
   },
 );

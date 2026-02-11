@@ -47,6 +47,10 @@
     "/^make pre-commit$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^make quick-check$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }

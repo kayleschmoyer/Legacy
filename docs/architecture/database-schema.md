@@ -1,6 +1,6 @@
 # Legacy Sports Database Tables Documentation
 
-**Last Updated**: February 5, 2026
+**Last Updated**: February 8, 2026
 
 **Total Tables**: 36 tables + views
 
@@ -14,6 +14,41 @@
 - ✅ Added nullable fielding position support
 - ✅ Fixed SF column type in season_batting (changed from INTEGER to VARCHAR)
 - ✅ Added queued status to stats loading workflow
+
+---
+
+## 🚨 CRITICAL: Database Query Guide
+
+**FOR AI AGENTS**: Before writing database queries, read [Database Query Guide for AI Agents](../agents/database-query-guide.md)
+
+### Two Separate Schemas
+
+Legacy Sports uses **TWO PostgreSQL schemas**:
+
+1. **`public`** - Fantasy league data (leagues, teams, matchups, players, statistics)
+2. **`app_internal`** - Authentication and system internals (users table)
+
+```sql
+-- ❌ WRONG - Missing schema prefix
+SELECT * FROM users WHERE id = 123;
+
+-- ✅ CORRECT - Always specify schema
+SELECT * FROM app_internal.users WHERE id = 123;
+SELECT * FROM public.leagues WHERE id = 16;
+```
+
+### Common Query Mistakes
+
+| ❌ Wrong                               | ✅ Correct                             | Issue                 |
+| -------------------------------------- | -------------------------------------- | --------------------- |
+| `SELECT * FROM users`                  | `SELECT * FROM app_internal.users`     | Missing schema prefix |
+| `SELECT status FROM leagues`           | `SELECT draft_status FROM leagues`     | Wrong column name     |
+| `SELECT selected_season FROM matchups` | Use `league_week_player_seasons` table | Column removed/moved  |
+| `UPDATE career_batting SET hr = 500`   | Update `season_batting` instead        | View is read-only     |
+
+**See**: [Database Query Guide](../agents/database-query-guide.md) for complete examples and patterns.
+
+---
 
 ## Overview
 

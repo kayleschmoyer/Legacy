@@ -142,10 +142,6 @@ export class WebOAuthProvider implements OAuthProvider {
   }
 
   async signIn(): Promise<OAuthResponse> {
-    console.log(
-      'WebOAuthProvider.signIn() called - using Google Identity Services authorization code flow',
-    );
-
     if (!this.isConfigured || !this.config) {
       throw this.createOAuthError(
         OAuthErrorCode.CONFIGURATION_ERROR,

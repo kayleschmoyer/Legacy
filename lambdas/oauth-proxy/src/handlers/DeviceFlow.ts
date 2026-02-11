@@ -10,8 +10,22 @@ interface User {
   accessLevel: string;
 }
 
-// In-memory storage for device authorization flows
-// In production, this should use DynamoDB for persistence across Lambda instances
+/**
+ * DEVELOPMENT ONLY: In-memory storage for device authorization flows
+ *
+ * ⚠️ LIMITATION: This implementation uses in-memory storage which is NOT suitable for production.
+ *
+ * Issues in production:
+ * - Lambda cold starts clear all stored flows
+ * - Multiple Lambda instances don't share state
+ * - No persistence across deployments
+ *
+ * Production solution:
+ * - Migrate to DynamoDB with TTL for automatic expiration
+ * - Or use ElastiCache Redis for shared state
+ *
+ * Current usage: Development/testing only
+ */
 interface DeviceAuthFlow {
   deviceCode: string;
   userCode: string;
@@ -26,7 +40,7 @@ interface DeviceAuthFlow {
   };
 }
 
-// Simple in-memory storage (would use DynamoDB in production)
+// Simple in-memory storage (DEV ONLY - would use DynamoDB in production)
 const deviceFlows = new Map<string, DeviceAuthFlow>();
 const userCodeToDeviceCode = new Map<string, string>();
 
@@ -117,7 +131,10 @@ export const handleDeviceAuthorize = (
     const baseUrl = getBaseUrl(event);
     const verificationUri = `${baseUrl}/oauth/device/verify`;
 
-    LOGGER.info(`Device authorization created: ${userCode} -> ${deviceCode}`);
+    LOGGER.info('Device authorization created', {
+      userCodeSuffix: userCode.slice(-2),
+      deviceCodePrefix: deviceCode.slice(0, 6),
+    });
 
     return {
       statusCode: 200,
@@ -195,7 +212,9 @@ export const handleDeviceToken = (
     }
 
     // Authorization complete - return tokens
-    LOGGER.info(`Device token granted for: ${flow.tokenResponse.user.email}`);
+    LOGGER.info(
+      `Device token granted (user ID: ${flow.tokenResponse.user.id})`,
+    );
 
     // Clean up the flow
     deviceFlows.delete(body.device_code);
@@ -301,7 +320,7 @@ export const completeDeviceFlow = (
   if (flow && !flow.completed && Date.now() <= flow.expiresAt) {
     flow.completed = true;
     flow.tokenResponse = tokenResponse;
-    LOGGER.info(`Device flow completed for: ${tokenResponse.user.email}`);
+    LOGGER.info(`Device flow completed (user ID: ${tokenResponse.user.id})`);
   }
 };
 

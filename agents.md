@@ -48,6 +48,7 @@ This comprehensive guide covers the complete development lifecycle:
 - **[Branch Tree Management](docs/guides/branch-tree-management.md)** 🌳 - Twig tree management for clean dependent branches
 - **[Development Setup](docs/guides/development-setup.md)** - Environment configuration
 - **[Troubleshooting Guide](docs/guides/troubleshooting.md)** - Common issues and solutions
+- **[Debugging with Database Timestamps](docs/guides/debugging-with-database-timestamps.md)** - Correlating CloudWatch logs with DB events
 
 ### 🛠️ Development Skills
 
@@ -77,6 +78,8 @@ Detailed skill guides for common tasks in [`.github/copilot/skills/`](.github/co
 
 **Code & Database**:
 
+- [Database Query Guide](docs/agents/database-query-guide.md) 🆕⭐ **CRITICAL for DB queries**
+- [Baseball-Reference Scraping](docs/guides/baseball-reference-scraping.md) 🆕⭐ **CRITICAL for data scraping**
 - [GraphQL Codegen](.github/copilot/skills/codegen.md) - Regenerating types
 - [DB Migration](.github/copilot/skills/db-migrate.md) - Running migrations
 - [DB Connection](.github/copilot/skills/db-connect.md) - Testing connectivity
@@ -109,10 +112,11 @@ All CSV files are located in [`docs/agents/`](docs/agents/):
 
 ### 🏗️ Architecture & Systems
 
+- **[Database Query Guide](docs/agents/database-query-guide.md)** 🆕⭐ - **CRITICAL**: Two schemas, common mistakes, query patterns
 - **[Cross-Platform System](docs/architecture/cross-platform-system.md)** - Magic strings and platform resolution
 - **[Build System](docs/architecture/build-system.md)** - Nx monorepo structure
 - **[GraphQL Integration](docs/architecture/graphql-integration.md)** - API design
-- **[Database Schema](docs/architecture/database-schema.md)** - Data models
+- **[Database Schema](docs/architecture/database-schema.md)** - Complete data models
 
 ### 🔐 Authentication & Security
 
@@ -289,6 +293,8 @@ twig github pr create-pr
 | **Running tests**            | [Step 4: Validation](docs/guides/ai-agent-contribution-workflow.md#step-4-pre-commit-validation)                 |
 | **Fixing lint errors**       | [ESLint Standards CSV](docs/agents/eslint-standards.csv)                                                         |
 | **Type errors**              | [Type Safety CSV](docs/agents/type-safety.csv)                                                                   |
+| **Writing database queries** | [Database Query Guide](docs/agents/database-query-guide.md) 🆕⭐                                                 |
+| **Data scraping issues**     | [Baseball-Reference Scraping](docs/guides/baseball-reference-scraping.md) 🆕⭐                                   |
 | **Database migrations**      | [Database Schema](docs/architecture/database-schema.md)                                                          |
 | **Adding GraphQL resolvers** | [GraphQL Integration](docs/architecture/graphql-integration.md)                                                  |
 | **Cross-platform code**      | [Platform Components CSV](docs/agents/platform-components.csv)                                                   |

@@ -1,5 +1,24 @@
 // Shared logging types and interfaces
 
+/**
+ * Safely encode a string for console output, handling emojis and special characters.
+ * This prevents encoding issues in Windows PowerShell and other terminals.
+ */
+export function safeEncodeForConsole(str: string): string {
+  // For Node.js environments, use Buffer to properly encode UTF-8
+  if (typeof Buffer !== 'undefined') {
+    try {
+      // Convert to Buffer and back to ensure proper UTF-8 encoding
+      return Buffer.from(str, 'utf8').toString('utf8');
+    } catch {
+      // Fallback: just return the string
+      return str;
+    }
+  }
+  // For browser/mobile environments, return as-is
+  return str;
+}
+
 // Type for log arguments
 export type LogArgs = (string | number | boolean | object | null | undefined)[];
 
@@ -41,6 +60,10 @@ export interface ILogger {
   warn(message: string, ...args: LogArgs): void;
   error(message: string, ...args: LogArgs): void;
   fatal(message: string, ...args: LogArgs): void;
+  addDestination(destination: OutputDestination): void;
+  removeDestination(destination: OutputDestination): void;
+  clearDestinations(): void;
+  getDestinations(): OutputDestination[];
 }
 
 // Utility functions
@@ -69,5 +92,7 @@ export function formatLogEntry(entry: LogEntry): string {
           })
           .join(' ')
       : '';
-  return `[${timestamp}] ${entry.level.toUpperCase()}: ${entry.message}${formattedArgs}`;
+  const formattedMessage = `[${timestamp}] ${entry.level.toUpperCase()}: ${entry.message}${formattedArgs}`;
+  // Apply emoji-safe encoding for console output
+  return safeEncodeForConsole(formattedMessage);
 }

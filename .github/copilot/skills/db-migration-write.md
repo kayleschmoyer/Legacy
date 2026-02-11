@@ -62,6 +62,42 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
 
 ### 3. Common Migration Patterns
 
+**⚠️ IMPORTANT: Always Add Timestamps to New Tables**
+
+All new tables MUST include `created_at` and `updated_at` columns with automatic triggers:
+
+```typescript
+export const up = async ({ db }: { db: PgDatabase<any> }) => {
+  // 1. Create the table with timestamps
+  await db.execute(`
+    CREATE TABLE my_new_table (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      -- Always include these timestamps:
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    );
+  `);
+
+  // 2. Create trigger to auto-update updated_at
+  await db.execute(`
+    CREATE TRIGGER my_new_table_updated_at_trigger
+    BEFORE UPDATE ON public.my_new_table
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+  `);
+};
+
+export const down = async ({ db }: { db: PgDatabase<any> }) => {
+  await db.execute(`
+    DROP TRIGGER IF EXISTS my_new_table_updated_at_trigger ON public.my_new_table;
+    DROP TABLE IF EXISTS my_new_table;
+  `);
+};
+```
+
+**Why?** The `update_updated_at_column()` function exists database-wide and automatically updates `updated_at` on any row modification. See [automatic-timestamps.md](../../docs/database/automatic-timestamps.md) for details.
+
 **Add Enum Value**:
 
 ```typescript
@@ -97,25 +133,7 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
 };
 ```
 
-**Create Table**:
-
-```typescript
-export const up = async ({ db }: { db: PgDatabase<any> }) => {
-  await db.execute(`
-    CREATE TABLE table_name (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-  `);
-};
-
-export const down = async ({ db }: { db: PgDatabase<any> }) => {
-  await db.execute(`
-    DROP TABLE IF EXISTS table_name;
-  `);
-};
-```
+**Create Table** (see "Always Add Timestamps" section above for full example with triggers)
 
 **Add Index**:
 
@@ -157,18 +175,37 @@ export const statsLoadingStatus = pgEnum('stats_loading_status', [
 
 Update enum definitions and TypeScript types:
 
+**⚠️ For New Tables: Always include timestamp columns in schema definition:**
+
+```typescript
+export const myNewTable = pgTable('my_new_table', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  // ALWAYS include these:
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+```
+
 ```typescript
 const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
   values: ['not_started', 'queued', 'loading', 'completed', 'failed'] as const,
-});
+})**ALWAYS add timestamps** (`created_at`, `updated_at`) to new tables
+✅ **ALWAYS create trigger** for `updated_at` auto-updates
+✅ Use `IF NOT EXISTS` / `IF EXISTS` for idempotent operations
+✅ Add detailed comments explaining purpose
+✅ Test migration on local database first
+✅ Provide rollback (`down`) when possible
+✅ Use transactions implicitly (each migration runs in transaction)
+✅ Include data migrations with schema changes
 
-interface Matchup {
-  statsLoadingStatus:
-    | 'not_started'
-    | 'queued'
-    | 'loading'
-    | 'completed'
-    | 'failed';
+### Don'ts
+
+❌ **Don't create tables without timestamps** (except lookup/junction tables)    | 'failed';
 }
 ```
 

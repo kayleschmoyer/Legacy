@@ -18,6 +18,10 @@ This directory contains step-by-step guides for setting up and working with the 
 ### Reference
 
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
+- **[Baseball-Reference Scraping](baseball-reference-scraping.md)** - Data scraping patterns and troubleshooting
+- **[Debugging with Database Timestamps](debugging-with-database-timestamps.md)** - Correlating logs with DB events
+- **[WebSocket Notifications](websocket-notifications.md)** - Real-time notification system
+- **[Branch Tree Management](branch-tree-management.md)** - Twig tree management for clean dependent branches
 
 ## 🎯 Quick Start for New Developers
 

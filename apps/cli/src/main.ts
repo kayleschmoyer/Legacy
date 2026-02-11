@@ -1,7 +1,7 @@
 import './.startup';
 import { Command } from 'commander';
 import { logError } from '@legacy-sports/utils';
-import { LOGGER } from 'lib/logging/src/lib/logging';
+import { FileOutputDestination, LOGGER } from '@legacy-sports/logging';
 import {
   captureError,
   getSentryConfigFromEnv,
@@ -10,6 +10,7 @@ import {
 import { handleLoadPlayers } from './commands/loadPlayers';
 import { handleLoadCareerStats } from './commands/loadCareerStats';
 import { handleLoadSinglePlayerStats } from './commands/loadSinglePlayerStats';
+import { handleLoadGameStats } from './commands/loadGameStats';
 import { handleCheckStatsStatus } from './commands/checkStatsStatus';
 import { handleListPlayers } from './commands/listPlayers';
 import { handleTestAddPlayer } from './commands/testAddPlayer';
@@ -42,6 +43,7 @@ import { handleGetPlayerBatting } from './commands/getPlayerBatting';
 import { handleGetPlayerPitching } from './commands/getPlayerPitching';
 import { handleGetPlayerFielding } from './commands/getPlayerFielding';
 import { handleTriggerGameSelection } from './commands/triggerGameSelection';
+import { handleTestWorkflow } from './commands/testWorkflow';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -60,7 +62,19 @@ async function run(): Promise<void> {
       '--use-dotenv-file',
       'Whether to load environment from .env file',
       true,
-    );
+    )
+    .option(
+      '--log-file <path>',
+      'Write logs to the specified file (in addition to console)',
+    )
+    .hook('preAction', (thisCommand) => {
+      // Add file destination if --log-file option is provided
+      const logFile = thisCommand.opts().logFile as string | undefined;
+      if (logFile) {
+        LOGGER.addDestination(new FileOutputDestination(logFile));
+        LOGGER.info(`📝 Logging to file: ${logFile}`);
+      }
+    });
 
   // Simple commands without options
   program.command('load-players').action(handleLoadPlayers);
@@ -70,6 +84,29 @@ async function run(): Promise<void> {
     .command('load-single-player-stats')
     .description('Load career stats for a specific player')
     .action(handleLoadSinglePlayerStats);
+
+  program
+    .command('load-game-stats')
+    .description('Load game-level stats for a specific player and season')
+    .option('-p, --player <bref_id>', 'Player Baseball Reference ID (bref_id)')
+    .option('-s, --season <year>', 'Season year', parseInt)
+    .option(
+      '--position <pos>',
+      'Fielding position (optional, use null to test null handling)',
+    )
+    .action(
+      (options: { player?: string; season?: number; position?: string }) => {
+        if (!options.player || !options.season) {
+          LOGGER.error('Both --player and --season are required');
+          process.exit(1);
+        }
+        return handleLoadGameStats({
+          player: options.player,
+          season: options.season,
+          position: options.position,
+        });
+      },
+    );
 
   program
     .command('check-stats-status')
@@ -297,6 +334,20 @@ async function run(): Promise<void> {
     .command('trigger-game-selection')
     .description('Trigger game selection to queue pending stats loading')
     .action(handleTriggerGameSelection);
+
+  program
+    .command('test-workflow')
+    .description(
+      'Run end-to-end workflow test: create league → draft → create matchups → trigger game selection',
+    )
+    .option('--user <email>', 'User email to run as (defaults to current user)')
+    .option(
+      '--skip-cleanup',
+      'Keep the test league after completion for inspection',
+    )
+    .action((options: { user?: string; skipCleanup?: boolean }) =>
+      handleTestWorkflow(options),
+    );
 
   await program.parseAsync(process.argv);
 }

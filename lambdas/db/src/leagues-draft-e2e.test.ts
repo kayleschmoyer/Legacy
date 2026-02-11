@@ -35,18 +35,13 @@ describe('Draft Status E2E Integration Tests', () => {
 
       // Parse league ID from output (this would need to be implemented)
       testLeagueId = 1; // Hardcode for now
-      console.log('✅ Created test league with ID:', testLeagueId);
     } catch {
-      console.warn(
-        'Could not set up test data via CLI, using existing league ID 1',
-      );
       testLeagueId = 1;
     }
   }
 
   function cleanupTestData(): void {
     // Clean up would be handled by CLI script
-    console.log('✅ Test cleanup completed');
   }
 
   // Helper interfaces for GraphQL responses
@@ -69,10 +64,19 @@ describe('Draft Status E2E Integration Tests', () => {
     startDraft: League;
   }
 
-  async function makeGraphQLRequest(
+  function assertDefined<T>(
+    value: T | null | undefined,
+    message: string,
+  ): asserts value is T {
+    if (value == null) {
+      throw new Error(message);
+    }
+  }
+
+  async function makeGraphQLRequest<TData = unknown>(
     query: string,
     variables: Record<string, unknown> = {},
-  ): Promise<GraphQLResponse> {
+  ): Promise<GraphQLResponse<TData>> {
     const { default: fetch } = await import('node-fetch');
 
     const response = await fetch(serverUrl, {
@@ -85,7 +89,7 @@ describe('Draft Status E2E Integration Tests', () => {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    return (await response.json()) as GraphQLResponse<TData>;
   }
 
   async function getLeagueFromAPI(
@@ -101,9 +105,9 @@ describe('Draft Status E2E Integration Tests', () => {
       }
     `;
 
-    const result = (await makeGraphQLRequest(query, {
+    const result = await makeGraphQLRequest<LeagueQueryResponse>(query, {
       id: leagueId,
-    })) as GraphQLResponse<LeagueQueryResponse>;
+    });
     return result.data?.league;
   }
 
@@ -113,15 +117,11 @@ describe('Draft Status E2E Integration Tests', () => {
       try {
         await makeGraphQLRequest('{ __typename }');
       } catch {
-        console.log(
-          '⚠️  Skipping E2E test - GraphQL server not running on localhost:5000',
-        );
         return;
       }
 
       // Check initial state
       const initialLeague = await getLeagueFromAPI(testLeagueId);
-      console.log('Initial league state:', initialLeague);
 
       // Execute startDraft mutation
       const mutationQuery = `
@@ -134,12 +134,13 @@ describe('Draft Status E2E Integration Tests', () => {
         }
       `;
 
-      const mutationResult = (await makeGraphQLRequest(mutationQuery, {
-        leagueId: testLeagueId,
-        draftType: 'random-draft',
-      })) as GraphQLResponse<StartDraftResponse>;
-
-      console.log('Mutation result:', mutationResult);
+      const mutationResult = await makeGraphQLRequest<StartDraftResponse>(
+        mutationQuery,
+        {
+          leagueId: testLeagueId,
+          draftType: 'random-draft',
+        },
+      );
 
       // Verify mutation response
       expect(mutationResult.errors).toBeUndefined();
@@ -152,7 +153,11 @@ describe('Draft Status E2E Integration Tests', () => {
 
       // CRITICAL TEST: Query again to verify persistence
       const persistentLeague = await getLeagueFromAPI(testLeagueId);
-      console.log('League state after mutation:', persistentLeague);
+
+      assertDefined(
+        persistentLeague,
+        'League not found after startDraft mutation',
+      );
 
       // This is the assertion that was failing before our fix
       expect(persistentLeague.draftStatus).toBe('queued');
@@ -163,9 +168,6 @@ describe('Draft Status E2E Integration Tests', () => {
       try {
         await makeGraphQLRequest('{ __typename }');
       } catch {
-        console.log(
-          '⚠️  Skipping E2E test - GraphQL server not running on localhost:5000',
-        );
         return;
       }
 
@@ -182,21 +184,32 @@ describe('Draft Status E2E Integration Tests', () => {
       `;
 
       // Execute mutation
-      const mutationResult = (await makeGraphQLRequest(mutationQuery, {
-        leagueId: testLeagueId,
-        draftType: 'random-draft',
-      })) as GraphQLResponse<StartDraftResponse>;
+      const mutationResult = await makeGraphQLRequest<StartDraftResponse>(
+        mutationQuery,
+        {
+          leagueId: testLeagueId,
+          draftType: 'random-draft',
+        },
+      );
 
       const mutationStatus = mutationResult.data?.startDraft?.draftStatus;
       expect(mutationStatus).toBe('queued');
 
       // Query immediately after (this was the failing scenario)
       const immediateQuery = await getLeagueFromAPI(testLeagueId);
+      assertDefined(
+        immediateQuery,
+        'League not found immediately after startDraft mutation',
+      );
       const immediateStatus = immediateQuery.draftStatus;
 
       // Wait and query again
       await new Promise((resolve) => setTimeout(resolve, 300));
       const delayedQuery = await getLeagueFromAPI(testLeagueId);
+      assertDefined(
+        delayedQuery,
+        'League not found after delay following startDraft mutation',
+      );
       const delayedStatus = delayedQuery.draftStatus;
 
       // All should be consistent - this is the key test
@@ -204,12 +217,6 @@ describe('Draft Status E2E Integration Tests', () => {
       expect(delayedStatus).toBe('queued');
       expect(immediateStatus).toBe(mutationStatus);
       expect(delayedStatus).toBe(mutationStatus);
-
-      console.log('✅ Consistency test passed:', {
-        mutation: mutationStatus,
-        immediate: immediateStatus,
-        delayed: delayedStatus,
-      });
     });
 
     it('should handle error cases gracefully', async () => {
@@ -217,9 +224,6 @@ describe('Draft Status E2E Integration Tests', () => {
       try {
         await makeGraphQLRequest('{ __typename }');
       } catch {
-        console.log(
-          '⚠️  Skipping E2E test - GraphQL server not running on localhost:5000',
-        );
         return;
       }
 
@@ -241,16 +245,10 @@ describe('Draft Status E2E Integration Tests', () => {
 
         if (result.errors) {
           expect(result.errors).toBeDefined();
-          console.log(
-            '✅ Error handling test passed - invalid league rejected',
-          );
         }
       } catch (err) {
         // Expected error
         expect(err).toBeDefined();
-        console.log(
-          '✅ Error handling test passed - invalid league rejected with HTTP error',
-        );
       }
     });
   });
@@ -263,9 +261,6 @@ describe('Draft Status E2E Integration Tests', () => {
       try {
         await makeGraphQLRequest('{ __typename }');
       } catch {
-        console.log(
-          '⚠️  Skipping E2E test - GraphQL server not running on localhost:5000',
-        );
         return;
       }
 
@@ -279,14 +274,16 @@ describe('Draft Status E2E Integration Tests', () => {
       `;
 
       // This should work even if SQS is configured but AWS credentials are not available
-      const result = (await makeGraphQLRequest(mutationQuery, {
-        leagueId: testLeagueId,
-        draftType: 'random-draft',
-      })) as GraphQLResponse<StartDraftResponse>;
+      const result = await makeGraphQLRequest<StartDraftResponse>(
+        mutationQuery,
+        {
+          leagueId: testLeagueId,
+          draftType: 'random-draft',
+        },
+      );
 
       // Should succeed in local development mode
       expect(result.data?.startDraft?.draftStatus).toBe('queued');
-      console.log('✅ Local development mode test passed');
     });
   });
 });

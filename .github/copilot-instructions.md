@@ -29,6 +29,7 @@ Contains: Complete 5-step workflow, commands, troubleshooting, when to load deta
 - Branch issues → `tasks/start-ticket.md`
 - Type errors → `tasks/fix-types.md` + `agents/type-safety.csv`
 - Linting → `tasks/fix-lint.md` + `agents/eslint-standards.csv`
+- **Database queries** → `docs/agents/database-query-guide.md` 🆕⭐ **CRITICAL**
 - PR creation → `tasks/create-pr.md`
 
 **For complex issues**: Load detailed guides selectively

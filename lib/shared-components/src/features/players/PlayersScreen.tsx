@@ -24,7 +24,7 @@ function PlayersScreen({
 }: PlayersScreenProps) {
   const handlePlayerSelect = useCallback(
     (player: PlayerFragment) => {
-      LOGGER.info('Selected player:', player);
+      LOGGER.debug('Selected player:', player);
       onPlayerSelect?.(player);
     },
     [onPlayerSelect],

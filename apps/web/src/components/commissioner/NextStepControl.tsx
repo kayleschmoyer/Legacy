@@ -10,6 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  type LeagueFragment,
   type Matchup,
   StatsLoadingStatus,
   useAdvanceLeagueWeekMutation,
@@ -27,6 +28,7 @@ export interface NextStepControlProps {
     actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1',
   ) => void;
   onError?: (error: Error) => void;
+  onLeagueUpdate?: (league: LeagueFragment) => void;
 }
 
 /**
@@ -45,6 +47,7 @@ export function NextStepControl({
   draftStatus,
   onSuccess,
   onError,
+  onLeagueUpdate,
 }: NextStepControlProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -57,10 +60,7 @@ export function NextStepControl({
     ],
     awaitRefetchQueries: true,
   });
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
-    refetchQueries: ['GetLeagueById'],
-    awaitRefetchQueries: true,
-  });
+  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation();
   const [triggerGameSelection] = useTriggerGameSelectionMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
@@ -135,12 +135,17 @@ export function NextStepControl({
     try {
       if (actionType === 'draft') {
         // Start draft only - commissioner will create week 1 after
-        await startDraft({
+        const result = await startDraft({
           variables: {
             leagueId,
             draftType: 'random-draft',
           },
         });
+
+        // Update parent with new league data from mutation response
+        if (result.data?.startDraft) {
+          onLeagueUpdate?.(result.data.startDraft);
+        }
 
         setLoading(false);
         onSuccess?.('draft');

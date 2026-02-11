@@ -29,7 +29,7 @@ export async function getUserFromGoogleJwt(
 
   // No user exists, let's create one
   if (user === null) {
-    LOGGER.info(`Creating user ${googleJwt.email}`);
+    LOGGER.info('Creating new user from Google JWT');
     user = await createUser(db, googleJwt.email);
   }
 

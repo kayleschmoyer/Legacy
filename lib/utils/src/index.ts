@@ -3,5 +3,6 @@ export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
 export * from './lib/LambdaHelpers';
 export * from './lib/league-utils';
+export * from './lib/season-constants';
 // Sentry exports moved to separate import to prevent @sentry/node from being bundled in React Native
 // Import directly from '@legacy-sports/utils/sentry' when needed

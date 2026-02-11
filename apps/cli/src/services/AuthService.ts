@@ -33,7 +33,7 @@ interface AuthStorageFile {
 
 /**
  * CLI Authentication Service
- * 
+ *
  * Handles OAuth authentication for CLI operations using a device flow pattern.
  * Stores tokens securely in user's home directory and provides automatic refresh.
  */
@@ -45,7 +45,7 @@ export class CLIAuthService {
   constructor() {
     // Get OAuth URL from environment with fallbacks
     this.oauthUrl = this.getOAuthUrl();
-    
+
     // Set up secure token storage location
     this.configDir = path.join(os.homedir(), '.legacy-sports');
     this.tokenFile = path.join(this.configDir, 'auth.json');
@@ -59,7 +59,9 @@ export class CLIAuthService {
       return getEnvVarRequired('VITE_OAUTH_PROXY_URL');
     } catch {
       // Fallback for development
-      return process.env.OAUTH_PROXY_URL || 'https://api.legacysports.dev/oauth';
+      return (
+        process.env.OAUTH_PROXY_URL || 'https://api.legacysports.dev/oauth'
+      );
     }
   }
 
@@ -72,9 +74,11 @@ export class CLIAuthService {
     try {
       // Step 1: Request device authorization
       const deviceAuth = await this.requestDeviceAuth();
-      
+
       LOGGER.info('Authentication required:');
-      LOGGER.info(`1. Open this URL in your browser: ${deviceAuth.verification_uri}`);
+      LOGGER.info(
+        `1. Open this URL in your browser: ${deviceAuth.verification_uri}`,
+      );
       LOGGER.info(`2. Enter this code: ${deviceAuth.user_code}`);
       LOGGER.info('3. Complete the OAuth flow in your browser');
       LOGGER.info('');
@@ -82,14 +86,18 @@ export class CLIAuthService {
 
       // Step 2: Poll for token
       const tokenResponse = await this.pollForToken(deviceAuth);
-      
+
       // Step 3: Store token securely
       await this.storeToken(tokenResponse);
-      
-      LOGGER.info(`✅ Authentication successful! Logged in as: ${tokenResponse.user.email}`);
-      
+
+      LOGGER.info(
+        `✅ Authentication successful! Logged in as: ${tokenResponse.user.email}`,
+      );
     } catch (error) {
-      LOGGER.error('Authentication failed:', error instanceof Error ? error.message : String(error));
+      LOGGER.error(
+        'Authentication failed:',
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -120,7 +128,9 @@ export class CLIAuthService {
   /**
    * Poll OAuth service for token after user completes authentication
    */
-  private async pollForToken(deviceAuth: DeviceAuthRequest): Promise<TokenResponse> {
+  private async pollForToken(
+    deviceAuth: DeviceAuthRequest,
+  ): Promise<TokenResponse> {
     const startTime = Date.now();
     const maxWaitTime = deviceAuth.expires_in * 1000; // Convert to milliseconds
     const pollInterval = (deviceAuth.interval || 5) * 1000; // Convert to milliseconds
@@ -141,8 +151,10 @@ export class CLIAuthService {
           return response.json() as Promise<TokenResponse>;
         }
 
-        const errorData = await response.json().catch(() => ({})) as { error?: string };
-        
+        const errorData = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+
         if (response.status === 428) {
           // Authorization pending - continue polling
           await this.sleep(pollInterval);
@@ -155,10 +167,14 @@ export class CLIAuthService {
           continue;
         }
 
-        throw new Error(`Token request failed: ${errorData.error || response.statusText}`);
-
+        throw new Error(
+          `Token request failed: ${errorData.error || response.statusText}`,
+        );
       } catch (error) {
-        if (error instanceof Error && error.message.includes('Token request failed')) {
+        if (
+          error instanceof Error &&
+          error.message.includes('Token request failed')
+        ) {
           throw error;
         }
         // Network error - retry after interval
@@ -175,7 +191,7 @@ export class CLIAuthService {
   async getAuthToken(userEmail?: string): Promise<string | null> {
     try {
       const authData = await this.loadAuthData();
-      
+
       if (!authData.tokens || Object.keys(authData.tokens).length === 0) {
         return null;
       }
@@ -192,16 +208,29 @@ export class CLIAuthService {
       }
 
       // Check if token is expired
-      if (Date.now() >= token.expiresAt) {
+      const now = Date.now();
+      const isExpired = now >= token.expiresAt;
+      LOGGER.debug('Token expiration check:', {
+        now,
+        expiresAt: token.expiresAt,
+        isExpired,
+        hoursUntilExpiry: ((token.expiresAt - now) / (60 * 60 * 1000)).toFixed(
+          2,
+        ),
+      });
+
+      if (isExpired) {
         LOGGER.info('Token expired, removing from storage');
         await this.removeToken(targetUser);
         return null;
       }
 
       return token.jwt;
-
     } catch (error) {
-      LOGGER.debug('Error getting auth token:', error instanceof Error ? error.message : String(error));
+      LOGGER.debug(
+        'Error getting auth token:',
+        error instanceof Error ? error.message : String(error),
+      );
       return null;
     }
   }
@@ -217,7 +246,10 @@ export class CLIAuthService {
   /**
    * Get current authenticated user info
    */
-  async getCurrentUser(): Promise<{ email: string; accessLevel: string } | null> {
+  async getCurrentUser(): Promise<{
+    email: string;
+    accessLevel: string;
+  } | null> {
     const token = await this.getAuthToken();
     if (!token) {
       return null;
@@ -225,13 +257,18 @@ export class CLIAuthService {
 
     try {
       // Decode JWT to get user info (without verification since we trust our stored tokens)
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as JWTPayload;
+      const payload = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64').toString(),
+      ) as JWTPayload;
       return {
         email: payload.email,
         accessLevel: payload.accessLevel,
       };
     } catch (error) {
-      LOGGER.debug('Error decoding token:', error instanceof Error ? error.message : String(error));
+      LOGGER.debug(
+        'Error decoding token:',
+        error instanceof Error ? error.message : String(error),
+      );
       return null;
     }
   }
@@ -253,14 +290,14 @@ export class CLIAuthService {
    */
   async switchUser(email: string): Promise<void> {
     const authData = await this.loadAuthData();
-    
+
     if (!authData.tokens || !authData.tokens[email]) {
       throw new Error(`No authentication found for user: ${email}`);
     }
 
     authData.defaultUser = email;
     await this.saveAuthData(authData);
-    
+
     LOGGER.info(`Switched to user: ${email}`);
   }
 
@@ -269,7 +306,7 @@ export class CLIAuthService {
    */
   async logout(userEmail?: string): Promise<void> {
     const authData = await this.loadAuthData();
-    
+
     if (!authData.tokens) {
       LOGGER.info('No users to logout');
       return;
@@ -282,7 +319,8 @@ export class CLIAuthService {
         if (authData.defaultUser === userEmail) {
           // Set new default if available
           const remainingUsers = Object.keys(authData.tokens);
-          authData.defaultUser = remainingUsers.length > 0 ? remainingUsers[0] : undefined;
+          authData.defaultUser =
+            remainingUsers.length > 0 ? remainingUsers[0] : undefined;
         }
         LOGGER.info(`Logged out user: ${userEmail}`);
       }
@@ -301,21 +339,29 @@ export class CLIAuthService {
    */
   private async storeToken(tokenResponse: TokenResponse): Promise<void> {
     const authData = await this.loadAuthData();
-    
+
     // Initialize tokens object if it doesn't exist
     if (!authData.tokens) {
       authData.tokens = {};
     }
 
     // Calculate expiration (JWT standard is typically 1 hour, but we'll decode to be sure)
-    let expiresAt = Date.now() + (60 * 60 * 1000); // Default 1 hour
+    let expiresAt = Date.now() + 60 * 60 * 1000; // Default 1 hour
     try {
-      const payload = JSON.parse(Buffer.from(tokenResponse.jwt.split('.')[1], 'base64').toString()) as JWTPayload;
+      const payload = JSON.parse(
+        Buffer.from(tokenResponse.jwt.split('.')[1], 'base64').toString(),
+      ) as JWTPayload;
+      LOGGER.debug('Decoded JWT payload:', {
+        exp: payload.exp,
+        iat: payload.iat,
+      });
       if (payload.exp) {
         expiresAt = payload.exp * 1000; // Convert from seconds to milliseconds
+        const expiresInHours = (expiresAt - Date.now()) / (60 * 60 * 1000);
+        LOGGER.debug(`Token expires in ${expiresInHours.toFixed(2)} hours`);
       }
-    } catch {
-      LOGGER.debug('Could not decode JWT expiration, using default');
+    } catch (error) {
+      LOGGER.debug('Could not decode JWT expiration, using default', { error });
     }
 
     // Store token for this user
@@ -339,16 +385,17 @@ export class CLIAuthService {
    */
   private async removeToken(email: string): Promise<void> {
     const authData = await this.loadAuthData();
-    
+
     if (authData.tokens && authData.tokens[email]) {
       delete authData.tokens[email];
-      
+
       // Update default user if needed
       if (authData.defaultUser === email) {
         const remainingUsers = Object.keys(authData.tokens);
-        authData.defaultUser = remainingUsers.length > 0 ? remainingUsers[0] : undefined;
+        authData.defaultUser =
+          remainingUsers.length > 0 ? remainingUsers[0] : undefined;
       }
-      
+
       await this.saveAuthData(authData);
     }
   }
@@ -379,9 +426,9 @@ export class CLIAuthService {
 
     // Set restrictive permissions (user only)
     const jsonData = JSON.stringify(data, null, 2);
-    await fs.writeFile(this.tokenFile, jsonData, { 
+    await fs.writeFile(this.tokenFile, jsonData, {
       encoding: 'utf8',
-      mode: 0o600 // Read/write for owner only
+      mode: 0o600, // Read/write for owner only
     });
   }
 
@@ -389,6 +436,6 @@ export class CLIAuthService {
    * Sleep for specified milliseconds
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -31,6 +31,12 @@ export type Scalars = {
   Float: { input: number; output: number };
 };
 
+export type AdvanceLeagueWeekResponse = {
+  __typename?: 'AdvanceLeagueWeekResponse';
+  currentMatchupId?: Maybe<Scalars['Int']['output']>;
+  matchups?: Maybe<Array<Matchup>>;
+};
+
 export type CareerBatting = {
   __typename?: 'CareerBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
@@ -153,14 +159,14 @@ export type CreateMatchupInput = {
   weekNumber: Scalars['Int']['input'];
 };
 
-/** Mobile device token for push notifications */
 export type DeviceToken = {
   __typename?: 'DeviceToken';
   createdAt?: Maybe<Scalars['String']['output']>;
   deviceToken?: Maybe<Scalars['String']['output']>;
   enabled?: Maybe<Scalars['Boolean']['output']>;
   endpointArn?: Maybe<Scalars['String']['output']>;
-  id?: Maybe<Scalars['ID']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isActive?: Maybe<Scalars['Boolean']['output']>;
   platform?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
@@ -168,9 +174,7 @@ export type DeviceToken = {
 
 export type DeviceTokenInput = {
   deviceToken: Scalars['String']['input'];
-  endpointArn?: InputMaybe<Scalars['String']['input']>;
   platform: Scalars['String']['input'];
-  userId: Scalars['Int']['input'];
 };
 
 export type GameBatting = {
@@ -375,7 +379,7 @@ export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<Scalars['Boolean']['output']>;
+  advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -435,10 +439,6 @@ export type MutationJoinLeagueByCodeArgs = {
   teamName: Scalars['String']['input'];
 };
 
-export type MutationMarkAllNotificationsAsReadArgs = {
-  userId: Scalars['Int']['input'];
-};
-
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
@@ -475,7 +475,6 @@ export type MutationUpdateMatchupStatusArgs = {
 
 export type MutationUpdateNotificationPreferencesArgs = {
   input: NotificationPreferenceInput;
-  userId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateTeamMemberPositionArgs = {
@@ -483,37 +482,33 @@ export type MutationUpdateTeamMemberPositionArgs = {
   teamMemberId: Scalars['Int']['input'];
 };
 
-export enum NotificationChannel {
-  Email = 'email',
-  InApp = 'in_app',
-  Push = 'push',
-}
-
-/** Historical record of a sent notification */
 export type NotificationHistoryItem = {
   __typename?: 'NotificationHistoryItem';
-  channel?: Maybe<NotificationChannel>;
+  body?: Maybe<Scalars['String']['output']>;
+  channel?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
-  id?: Maybe<Scalars['ID']['output']>;
+  data?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isRead?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
   message?: Maybe<Scalars['String']['output']>;
   metadata?: Maybe<Scalars['String']['output']>;
-  notificationType?: Maybe<NotificationType>;
+  notificationType?: Maybe<Scalars['String']['output']>;
   read?: Maybe<Scalars['Boolean']['output']>;
   readAt?: Maybe<Scalars['String']['output']>;
   sentAt?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
-/** User notification preferences */
 export type NotificationPreference = {
   __typename?: 'NotificationPreference';
-  closeGameThreshold?: Maybe<Scalars['Float']['output']>;
+  closeGameThreshold?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   emailEnabled?: Maybe<Scalars['Boolean']['output']>;
-  id?: Maybe<Scalars['ID']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
   matchupCloseGameEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupEndedEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupReminderEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -524,7 +519,7 @@ export type NotificationPreference = {
 };
 
 export type NotificationPreferenceInput = {
-  closeGameThreshold?: InputMaybe<Scalars['Float']['input']>;
+  closeGameThreshold?: InputMaybe<Scalars['Int']['input']>;
   emailEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupCloseGameEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupEndedEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -532,13 +527,6 @@ export type NotificationPreferenceInput = {
   matchupStartedEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   pushEnabled?: InputMaybe<Scalars['Boolean']['input']>;
 };
-
-export enum NotificationType {
-  MatchupCloseGame = 'matchup_close_game',
-  MatchupEnded = 'matchup_ended',
-  MatchupReminder = 'matchup_reminder',
-  MatchupStarted = 'matchup_started',
-}
 
 export type PageInfo = {
   __typename?: 'PageInfo';
@@ -698,7 +686,7 @@ export type QueryGetMatchupsForLeagueArgs = {
 
 export type QueryGetNotificationHistoryArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
-  userId: Scalars['Int']['input'];
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetPlayoffRaceArgs = {
@@ -720,18 +708,6 @@ export type QueryGetSeasonResultsArgs = {
 export type QueryGetTeamRecentMatchupsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   teamId: Scalars['Int']['input'];
-};
-
-export type QueryGetUnreadNotificationCountArgs = {
-  userId: Scalars['Int']['input'];
-};
-
-export type QueryGetUserDeviceTokensArgs = {
-  userId: Scalars['Int']['input'];
-};
-
-export type QueryGetUserNotificationPreferencesArgs = {
-  userId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueArgs = {
@@ -1054,14 +1030,17 @@ export enum StatsLoadingStatus {
   Loading = 'loading',
   NotStarted = 'not_started',
   Queued = 'queued',
+  Retry = 'retry',
 }
 
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
+  createdAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
 /** A member of a team */
@@ -1830,12 +1809,31 @@ export type AdvanceLeagueWeekMutationVariables = Exact<{
 
 export type AdvanceLeagueWeekMutation = {
   __typename?: 'Mutation';
-  advanceLeagueWeek?: boolean | null;
+  advanceLeagueWeek?: {
+    __typename?: 'AdvanceLeagueWeekResponse';
+    currentMatchupId?: number | null;
+    matchups?: Array<{
+      __typename?: 'Matchup';
+      id?: string | null;
+      weekNumber?: number | null;
+      leagueId?: number | null;
+      team1Id?: number | null;
+      team2Id?: number | null;
+      team1Score?: number | null;
+      team2Score?: number | null;
+      status?: MatchupStatus | null;
+      statsLoadingStatus?: StatsLoadingStatus | null;
+      gamesPerMatchup?: number | null;
+      selectedGamesCount?: number | null;
+      startTime?: string | null;
+      endTime?: string | null;
+    }> | null;
+  } | null;
 };
 
 export type NotificationPreferenceFragment = {
   __typename?: 'NotificationPreference';
-  id?: string | null;
+  id?: number | null;
   userId?: number | null;
   matchupStartedEnabled?: boolean | null;
   matchupEndedEnabled?: boolean | null;
@@ -1850,7 +1848,7 @@ export type NotificationPreferenceFragment = {
 
 export type DeviceTokenFragment = {
   __typename?: 'DeviceToken';
-  id?: string | null;
+  id?: number | null;
   userId?: number | null;
   deviceToken?: string | null;
   platform?: string | null;
@@ -1862,10 +1860,10 @@ export type DeviceTokenFragment = {
 
 export type NotificationHistoryItemFragment = {
   __typename?: 'NotificationHistoryItem';
-  id?: string | null;
+  id?: number | null;
   userId?: number | null;
-  notificationType?: NotificationType | null;
-  channel?: NotificationChannel | null;
+  notificationType?: string | null;
+  channel?: string | null;
   matchupId?: number | null;
   leagueId?: number | null;
   title?: string | null;
@@ -1878,14 +1876,14 @@ export type NotificationHistoryItemFragment = {
 };
 
 export type GetUserNotificationPreferencesQueryVariables = Exact<{
-  userId: Scalars['Int']['input'];
+  [key: string]: never;
 }>;
 
 export type GetUserNotificationPreferencesQuery = {
   __typename?: 'Query';
   getUserNotificationPreferences?: {
     __typename?: 'NotificationPreference';
-    id?: string | null;
+    id?: number | null;
     userId?: number | null;
     matchupStartedEnabled?: boolean | null;
     matchupEndedEnabled?: boolean | null;
@@ -1900,18 +1898,18 @@ export type GetUserNotificationPreferencesQuery = {
 };
 
 export type GetNotificationHistoryQueryVariables = Exact<{
-  userId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetNotificationHistoryQuery = {
   __typename?: 'Query';
   getNotificationHistory?: Array<{
     __typename?: 'NotificationHistoryItem';
-    id?: string | null;
+    id?: number | null;
     userId?: number | null;
-    notificationType?: NotificationType | null;
-    channel?: NotificationChannel | null;
+    notificationType?: string | null;
+    channel?: string | null;
     matchupId?: number | null;
     leagueId?: number | null;
     title?: string | null;
@@ -1925,7 +1923,7 @@ export type GetNotificationHistoryQuery = {
 };
 
 export type GetUnreadNotificationCountQueryVariables = Exact<{
-  userId: Scalars['Int']['input'];
+  [key: string]: never;
 }>;
 
 export type GetUnreadNotificationCountQuery = {
@@ -1933,15 +1931,13 @@ export type GetUnreadNotificationCountQuery = {
   getUnreadNotificationCount?: number | null;
 };
 
-export type GetUserDeviceTokensQueryVariables = Exact<{
-  userId: Scalars['Int']['input'];
-}>;
+export type GetUserDeviceTokensQueryVariables = Exact<{ [key: string]: never }>;
 
 export type GetUserDeviceTokensQuery = {
   __typename?: 'Query';
   getUserDeviceTokens?: Array<{
     __typename?: 'DeviceToken';
-    id?: string | null;
+    id?: number | null;
     userId?: number | null;
     deviceToken?: string | null;
     platform?: string | null;
@@ -1953,7 +1949,6 @@ export type GetUserDeviceTokensQuery = {
 };
 
 export type UpdateNotificationPreferencesMutationVariables = Exact<{
-  userId: Scalars['Int']['input'];
   input: NotificationPreferenceInput;
 }>;
 
@@ -1961,7 +1956,7 @@ export type UpdateNotificationPreferencesMutation = {
   __typename?: 'Mutation';
   updateNotificationPreferences?: {
     __typename?: 'NotificationPreference';
-    id?: string | null;
+    id?: number | null;
     userId?: number | null;
     matchupStartedEnabled?: boolean | null;
     matchupEndedEnabled?: boolean | null;
@@ -1983,7 +1978,7 @@ export type RegisterDeviceTokenMutation = {
   __typename?: 'Mutation';
   registerDeviceToken?: {
     __typename?: 'DeviceToken';
-    id?: string | null;
+    id?: number | null;
     userId?: number | null;
     deviceToken?: string | null;
     platform?: string | null;
@@ -2013,7 +2008,7 @@ export type MarkNotificationAsReadMutation = {
 };
 
 export type MarkAllNotificationsAsReadMutationVariables = Exact<{
-  userId: Scalars['Int']['input'];
+  [key: string]: never;
 }>;
 
 export type MarkAllNotificationsAsReadMutation = {
@@ -4157,8 +4152,14 @@ export type TriggerGameSelectionMutationOptions = Apollo.BaseMutationOptions<
 >;
 export const AdvanceLeagueWeek = gql`
   mutation AdvanceLeagueWeek($leagueId: Int!) {
-    advanceLeagueWeek(leagueId: $leagueId)
+    advanceLeagueWeek(leagueId: $leagueId) {
+      matchups {
+        ...Matchup
+      }
+      currentMatchupId
+    }
   }
+  ${MatchupFragmentDoc}
 `;
 export type AdvanceLeagueWeekMutationFn = Apollo.MutationFunction<
   AdvanceLeagueWeekMutation,
@@ -4204,8 +4205,8 @@ export type AdvanceLeagueWeekMutationOptions = Apollo.BaseMutationOptions<
   AdvanceLeagueWeekMutationVariables
 >;
 export const GetUserNotificationPreferences = gql`
-  query GetUserNotificationPreferences($userId: Int!) {
-    getUserNotificationPreferences(userId: $userId) {
+  query GetUserNotificationPreferences {
+    getUserNotificationPreferences {
       ...NotificationPreference
     }
   }
@@ -4224,22 +4225,14 @@ export const GetUserNotificationPreferences = gql`
  * @example
  * const { data, loading, error } = useGetUserNotificationPreferencesQuery({
  *   variables: {
- *      userId: // value for 'userId'
  *   },
  * });
  */
 export function useGetUserNotificationPreferencesQuery(
-  baseOptions: Apollo.QueryHookOptions<
+  baseOptions?: Apollo.QueryHookOptions<
     GetUserNotificationPreferencesQuery,
     GetUserNotificationPreferencesQueryVariables
-  > &
-    (
-      | {
-          variables: GetUserNotificationPreferencesQueryVariables;
-          skip?: boolean;
-        }
-      | { skip: boolean }
-    ),
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -4311,8 +4304,8 @@ export type GetUserNotificationPreferencesQueryResult = Apollo.QueryResult<
   GetUserNotificationPreferencesQueryVariables
 >;
 export const GetNotificationHistory = gql`
-  query GetNotificationHistory($userId: Int!, $limit: Int) {
-    getNotificationHistory(userId: $userId, limit: $limit) {
+  query GetNotificationHistory($limit: Int, $offset: Int) {
+    getNotificationHistory(limit: $limit, offset: $offset) {
       ...NotificationHistoryItem
     }
   }
@@ -4331,20 +4324,16 @@ export const GetNotificationHistory = gql`
  * @example
  * const { data, loading, error } = useGetNotificationHistoryQuery({
  *   variables: {
- *      userId: // value for 'userId'
  *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
  *   },
  * });
  */
 export function useGetNotificationHistoryQuery(
-  baseOptions: Apollo.QueryHookOptions<
+  baseOptions?: Apollo.QueryHookOptions<
     GetNotificationHistoryQuery,
     GetNotificationHistoryQueryVariables
-  > &
-    (
-      | { variables: GetNotificationHistoryQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -4416,8 +4405,8 @@ export type GetNotificationHistoryQueryResult = Apollo.QueryResult<
   GetNotificationHistoryQueryVariables
 >;
 export const GetUnreadNotificationCount = gql`
-  query GetUnreadNotificationCount($userId: Int!) {
-    getUnreadNotificationCount(userId: $userId)
+  query GetUnreadNotificationCount {
+    getUnreadNotificationCount
   }
 `;
 
@@ -4433,19 +4422,14 @@ export const GetUnreadNotificationCount = gql`
  * @example
  * const { data, loading, error } = useGetUnreadNotificationCountQuery({
  *   variables: {
- *      userId: // value for 'userId'
  *   },
  * });
  */
 export function useGetUnreadNotificationCountQuery(
-  baseOptions: Apollo.QueryHookOptions<
+  baseOptions?: Apollo.QueryHookOptions<
     GetUnreadNotificationCountQuery,
     GetUnreadNotificationCountQueryVariables
-  > &
-    (
-      | { variables: GetUnreadNotificationCountQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -4517,8 +4501,8 @@ export type GetUnreadNotificationCountQueryResult = Apollo.QueryResult<
   GetUnreadNotificationCountQueryVariables
 >;
 export const GetUserDeviceTokens = gql`
-  query GetUserDeviceTokens($userId: Int!) {
-    getUserDeviceTokens(userId: $userId) {
+  query GetUserDeviceTokens {
+    getUserDeviceTokens {
       ...DeviceToken
     }
   }
@@ -4537,19 +4521,14 @@ export const GetUserDeviceTokens = gql`
  * @example
  * const { data, loading, error } = useGetUserDeviceTokensQuery({
  *   variables: {
- *      userId: // value for 'userId'
  *   },
  * });
  */
 export function useGetUserDeviceTokensQuery(
-  baseOptions: Apollo.QueryHookOptions<
+  baseOptions?: Apollo.QueryHookOptions<
     GetUserDeviceTokensQuery,
     GetUserDeviceTokensQueryVariables
-  > &
-    (
-      | { variables: GetUserDeviceTokensQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
+  >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
@@ -4621,11 +4600,8 @@ export type GetUserDeviceTokensQueryResult = Apollo.QueryResult<
   GetUserDeviceTokensQueryVariables
 >;
 export const UpdateNotificationPreferences = gql`
-  mutation UpdateNotificationPreferences(
-    $userId: Int!
-    $input: NotificationPreferenceInput!
-  ) {
-    updateNotificationPreferences(userId: $userId, input: $input) {
+  mutation UpdateNotificationPreferences($input: NotificationPreferenceInput!) {
+    updateNotificationPreferences(input: $input) {
       ...NotificationPreference
     }
   }
@@ -4649,7 +4625,6 @@ export type UpdateNotificationPreferencesMutationFn = Apollo.MutationFunction<
  * @example
  * const [updateNotificationPreferencesMutation, { data, loading, error }] = useUpdateNotificationPreferencesMutation({
  *   variables: {
- *      userId: // value for 'userId'
  *      input: // value for 'input'
  *   },
  * });
@@ -4824,8 +4799,8 @@ export type MarkNotificationAsReadMutationOptions = Apollo.BaseMutationOptions<
   MarkNotificationAsReadMutationVariables
 >;
 export const MarkAllNotificationsAsRead = gql`
-  mutation MarkAllNotificationsAsRead($userId: Int!) {
-    markAllNotificationsAsRead(userId: $userId)
+  mutation MarkAllNotificationsAsRead {
+    markAllNotificationsAsRead
   }
 `;
 export type MarkAllNotificationsAsReadMutationFn = Apollo.MutationFunction<
@@ -4846,7 +4821,6 @@ export type MarkAllNotificationsAsReadMutationFn = Apollo.MutationFunction<
  * @example
  * const [markAllNotificationsAsReadMutation, { data, loading, error }] = useMarkAllNotificationsAsReadMutation({
  *   variables: {
- *      userId: // value for 'userId'
  *   },
  * });
  */

@@ -15,6 +15,9 @@ _Start here if you're new to the project_
 - [🌳 Branch Tree Management](guides/branch-tree-management.md) - Twig tree management for clean dependent branches
 - [🔐 Authentication Guide](guides/authentication-guide.md) - OAuth and user management
 - [🛠️ Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
+- [⚡ WebSocket Notifications](guides/websocket-notifications.md) - Real-time notification system
+- [🐛 Debugging with Database Timestamps](guides/debugging-with-database-timestamps.md) - Correlating logs with DB events
+- [⚾ Baseball-Reference Scraping](guides/baseball-reference-scraping.md) - Data scraping patterns
 - [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices
 - [🤖 Agent Commands](guides/agent-commands.md) - AI assistant commands reference
 
@@ -27,6 +30,7 @@ _Understanding how the system works_
 - [💾 Database Schema](architecture/database-schema.md) - Complete database documentation
 - [🔗 GraphQL Integration](architecture/graphql-integration.md) - API design and implementation
 - [✅ Schema Validation](architecture/schema-validation.md) - Drizzle schema patterns
+- [🎯 Season Selection Architecture](architecture/season-selection-architecture.md) - Per-player season assignment
 
 ### 🔐 **Authentication** → [`/authentication/`](authentication/)
 

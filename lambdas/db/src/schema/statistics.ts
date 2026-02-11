@@ -336,11 +336,10 @@ CareerBattingRef.implement({
 
           return null;
         } catch (error) {
-          console.warn(
-            'Error getting primary position for player:',
-            stats.playerId,
-            error,
-          );
+          LOGGER.warn('Error getting primary position for player', {
+            playerId: stats.playerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
           return null;
         }
       },
@@ -370,11 +369,10 @@ CareerBattingRef.implement({
 
           return null;
         } catch (error) {
-          console.warn(
-            'Error getting positions played for player:',
-            stats.playerId,
-            error,
-          );
+          LOGGER.warn('Error getting positions played for player', {
+            playerId: stats.playerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
           return null;
         }
       },

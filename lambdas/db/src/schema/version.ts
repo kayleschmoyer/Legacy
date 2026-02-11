@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import * as fs from 'fs';
 import * as path from 'path';
 import { builder } from './builder';
@@ -29,11 +30,13 @@ const getVersionInfo = () => {
         '/var/task/version-info.json', // Lambda runtime path
         './version-info.json',
       ];
-      
+
       for (const versionInfoPath of possiblePaths) {
         if (fs.existsSync(versionInfoPath)) {
-          console.log(`Found version info at: ${versionInfoPath}`);
-          const versionData = JSON.parse(fs.readFileSync(versionInfoPath, 'utf8')) as VersionData;
+          LOGGER.debug('Found version info file', { versionInfoPath });
+          const versionData = JSON.parse(
+            fs.readFileSync(versionInfoPath, 'utf8'),
+          ) as VersionData;
           return {
             version: versionData.version || 'unknown',
             gitCommit: versionData.gitCommit || 'unknown',
@@ -42,18 +45,23 @@ const getVersionInfo = () => {
           };
         }
       }
-      console.log('version-info.json not found in any expected location');
+      LOGGER.debug('version-info.json not found in expected locations');
     } catch (fileError) {
-      console.error('Error reading version-info.json:', fileError);
+      LOGGER.warn('Error reading version-info.json', {
+        error:
+          fileError instanceof Error ? fileError.message : String(fileError),
+      });
     }
 
     // Fallback to environment variables and package.json
     const gitCommit = process.env.GIT_COMMIT_HASH || 'dev-local';
     const deployedAt = process.env.DEPLOYED_AT || new Date().toISOString();
-    
+
     let packageVersion = 'unknown';
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf8')) as { version?: string };
+      const pkg = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf8'),
+      ) as { version?: string };
       packageVersion = pkg.version || 'unknown';
     } catch {
       packageVersion = 'dev';
@@ -66,10 +74,12 @@ const getVersionInfo = () => {
       environment: process.env.NODE_ENV || 'development',
     };
   } catch (error) {
-    console.error('Error getting version info:', error);
+    LOGGER.error('Error getting version info', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       version: 'error',
-      gitCommit: 'unknown', 
+      gitCommit: 'unknown',
       deployedAt: new Date().toISOString(),
       environment: 'unknown',
     };
@@ -88,16 +98,16 @@ VersionInfo.implement({
   description: 'Version and deployment information for the GraphQL API',
   fields: (t) => ({
     version: t.exposeString('version', {
-      description: 'Package version from package.json'
+      description: 'Package version from package.json',
     }),
     gitCommit: t.exposeString('gitCommit', {
-      description: 'Git commit hash (short)'
+      description: 'Git commit hash (short)',
     }),
     deployedAt: t.exposeString('deployedAt', {
-      description: 'Deployment timestamp (ISO 8601)'
+      description: 'Deployment timestamp (ISO 8601)',
     }),
     environment: t.exposeString('environment', {
-      description: 'Runtime environment (development, production, etc.)'
+      description: 'Runtime environment (development, production, etc.)',
     }),
   }),
 });
@@ -109,8 +119,8 @@ builder.queryField('version', (t) =>
     description: 'Get version and deployment information for the GraphQL API',
     resolve: () => {
       const versionInfo = getVersionInfo();
-      console.log('Version query called:', versionInfo);
+      LOGGER.debug('Version query called', { versionInfo });
       return versionInfo;
     },
-  })
+  }),
 );

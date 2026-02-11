@@ -6,6 +6,7 @@ import {
   serial,
   varchar,
   char,
+  timestamp,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -23,6 +24,12 @@ export const usersInAppInternal = appInternal.table(
     email: varchar('email', { length: 100 }).notNull(),
     passwordHash: char('password_hash', { length: 128 }),
     accessLevel: accessLevelInAppInternal('access_level').default('none'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {

@@ -41,34 +41,31 @@ fragment NotificationHistoryItem on NotificationHistoryItem {
 }
 
 # Queries
-query GetUserNotificationPreferences($userId: Int!) {
-  getUserNotificationPreferences(userId: $userId) {
+query GetUserNotificationPreferences {
+  getUserNotificationPreferences {
     ...NotificationPreference
   }
 }
 
-query GetNotificationHistory($userId: Int!, $limit: Int) {
-  getNotificationHistory(userId: $userId, limit: $limit) {
+query GetNotificationHistory($limit: Int, $offset: Int) {
+  getNotificationHistory(limit: $limit, offset: $offset) {
     ...NotificationHistoryItem
   }
 }
 
-query GetUnreadNotificationCount($userId: Int!) {
-  getUnreadNotificationCount(userId: $userId)
+query GetUnreadNotificationCount {
+  getUnreadNotificationCount
 }
 
-query GetUserDeviceTokens($userId: Int!) {
-  getUserDeviceTokens(userId: $userId) {
+query GetUserDeviceTokens {
+  getUserDeviceTokens {
     ...DeviceToken
   }
 }
 
 # Mutations
-mutation UpdateNotificationPreferences(
-  $userId: Int!
-  $input: NotificationPreferenceInput!
-) {
-  updateNotificationPreferences(userId: $userId, input: $input) {
+mutation UpdateNotificationPreferences($input: NotificationPreferenceInput!) {
+  updateNotificationPreferences(input: $input) {
     ...NotificationPreference
   }
 }
@@ -87,6 +84,6 @@ mutation MarkNotificationAsRead($notificationId: Int!) {
   markNotificationAsRead(notificationId: $notificationId)
 }
 
-mutation MarkAllNotificationsAsRead($userId: Int!) {
-  markAllNotificationsAsRead(userId: $userId)
+mutation MarkAllNotificationsAsRead {
+  markAllNotificationsAsRead
 }

@@ -47,6 +47,7 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 
 | Topic                            | File                                                                                   | Description                                                         |
 | -------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Database Query Guide** 🆕⭐    | [`docs/agents/database-query-guide.md`](./database-query-guide.md)                     | **CRITICAL**: Two schemas, common mistakes, query patterns          |
 | **GraphQL API**                  | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration         |
 | **Database Schema**              | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management                |
 | **Migration Policy** ⚠️          | [`docs/database/migration-policy.md`](../database/migration-policy.md)                 | **CRITICAL**: All schema changes MUST use migrations, never scripts |

@@ -11,6 +11,7 @@ This epic implements a comprehensive head-to-head matchup system for fantasy bas
 ### Key Design Principles
 
 **Season-Based Game Selection:**
+
 - Each matchup selects a **single historical season** for all players
 - Seasons are filtered by league configuration (minimum games threshold)
 - The selected season determines player projections and available games
@@ -18,6 +19,7 @@ This epic implements a comprehensive head-to-head matchup system for fantasy bas
 - Players accumulate stats from selected games throughout the matchup
 
 **Dual Projection System:**
+
 - **Career Projection:** Based on career-average stats across all seasons
 - **Matchup Projection:** Based on average stats from the matchup's selected season
 - Both projections displayed side-by-side on roster views
@@ -38,6 +40,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 1: Foundation (Database & API)
 
 #### **LS-18** - Extend matchup database schema to support team pairings and scoring
+
 **Type:** Story  
 **Priority:** Highest  
 **Dependencies:** None
@@ -45,6 +48,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Add team1_id, team2_id, team1_score, team2_score, status, and selected_season fields to matchups table. Add league configuration for season eligibility and games per matchup. Include database migration and Drizzle schema updates.
 
 **Key Deliverables:**
+
 - Team pairing columns (team1_id, team2_id)
 - Scoring columns (team1_score, team2_score)
 - Status enum field (scheduled, in_progress, completed, cancelled)
@@ -60,6 +64,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Relations updates
 
 **Files:**
+
 - `lib/db-client/src/drizzle/public/models/Matchups.ts`
 - `lib/db-client/src/drizzle/public/models/Leagues.ts` (add config fields)
 - `lib/db-client/src/drizzle/public/relations.ts`
@@ -69,6 +74,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-19** - Build GraphQL schema and resolvers for matchup operations
+
 **Type:** Story  
 **Priority:** Highest  
 **Dependencies:** LS-18
@@ -76,6 +82,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create comprehensive GraphQL types, queries, and mutations for matchup management including team pairing, season selection, game tracking, and scoring.
 
 **Key Deliverables:**
+
 - Extended Matchup GraphQL type with selectedSeason and gamesRemaining fields
 - Queries:
   - `getMatchupById(id: Int!)` - includes selected season and games remaining
@@ -94,6 +101,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Season eligibility validation
 
 **Files:**
+
 - `lambdas/db/src/schema/matchups.ts`
 - `lib/db-client/src/lib/client/PublicDbClient.ts`
 - All `graphql.generated.ts` files (via codegen)
@@ -103,6 +111,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 2: Business Logic
 
 #### **LS-20** - Implement matchup scheduling algorithm for fantasy leagues
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-18, LS-19
@@ -110,6 +119,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create algorithm to generate head-to-head matchups between teams with automatic season selection based on league configuration.
 
 **Key Deliverables:**
+
 - Round-robin scheduling for even number of teams
 - Bye week handling for odd number of teams
 - Multiple scheduling strategies:
@@ -128,6 +138,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Integration with league creation flow
 
 **Files:**
+
 - `lib/scheduling/` (new library)
 - `lib/scheduling/src/matchup-scheduler.ts`
 - `lib/scheduling/src/season-selector.ts` (NEW - season selection logic)
@@ -139,6 +150,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-21** - Build matchup score calculation engine
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-7, LS-18
@@ -146,6 +158,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Implement score calculation logic that aggregates individual player performances based on selected games from the matchup's chosen season. Calculate both matchup-specific and career projections.
 
 **Key Deliverables:**
+
 - Calculate team scores from rostered players' performances in selected games
 - Integration with league scoring settings (LS-7)
 - Support multiple scoring categories (batting, pitching, fielding)
@@ -164,6 +177,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Integration with matchup_player_games table
 
 **Files:**
+
 - `lib/scoring/src/matchup-scoring.ts`
 - `lib/scoring/src/matchup-projections.ts` (NEW - matchup vs career projections)
 - `lambdas/stats-lambda/src/handlers/calculate-matchup-scores.ts`
@@ -172,6 +186,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-22** - Create matchup history and results tracking system
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-18, LS-19, LS-21
@@ -179,6 +194,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Build system to track historical matchup results, head-to-head records between teams, and season standings.
 
 **Key Deliverables:**
+
 - Query historical matchups by league and season
 - Head-to-head records between specific teams
 - Win/loss/tie record tracking
@@ -190,6 +206,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Unit and integration tests
 
 **Files:**
+
 - `lib/db-client/src/lib/client/matchup-history.ts`
 - `lambdas/db/src/schema/matchup-queries.ts`
 - `lambdas/db/src/services/standings-service.ts`
@@ -197,6 +214,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-36** - Implement dual projection system (matchup vs career)
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-7, LS-18, LS-19
@@ -204,6 +222,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Build projection system that displays both season-specific matchup projections and career projections for players on roster views.
 
 **Key Deliverables:**
+
 - Calculate career projections using career average stats
 - Calculate matchup projections using season average stats from matchup's selected_season
 - Display both projections side-by-side on roster views:
@@ -219,11 +238,13 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Integration tests for GraphQL queries
 
 **Projection Calculation:**
+
 - Career Projection: Average stats across all career seasons × scoring multipliers
 - Matchup Projection: Average stats from selected_season only × scoring multipliers
 - Both use same scoring multipliers from league config
 
 **Files:**
+
 - `lib/scoring/src/projections/dual-projections.ts`
 - `lib/scoring/src/projections/season-projections.ts`
 - `lambdas/db/src/schema/projection-queries.ts`
@@ -235,6 +256,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 3: User Interface
 
 #### **LS-23** - Build mobile matchup UI components (React Native)
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-19
@@ -242,6 +264,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create React Native components for displaying and managing matchups with season-specific projections and game tracking.
 
 **Key Deliverables:**
+
 - MatchupCard component showing team matchup details with selected season
 - MatchupScoreboard component with live scores and games remaining counter
 - MatchupList component for viewing all matchups in a week
@@ -259,6 +282,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Proper TypeScript types from generated GraphQL
 
 **Files:**
+
 - `apps/app/src/components/matchup/MatchupCard.tsx`
 - `apps/app/src/components/matchup/MatchupScoreboard.tsx`
 - `apps/app/src/components/matchup/MatchupList.tsx`
@@ -273,6 +297,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-24** - Build web matchup UI components (Next.js)
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** LS-19
@@ -280,6 +305,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create Next.js/React components for displaying and managing matchups with commissioner controls for game selection.
 
 **Key Deliverables:**
+
 - MatchupCard component for matchup previews with selected season info
 - MatchupScoreboard component with live scores and games remaining
 - MatchupGrid component for weekly matchup overview
@@ -304,6 +330,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Proper TypeScript types from generated GraphQL
 
 **Files:**
+
 - `apps/web/src/components/matchup/MatchupCard.tsx`
 - `apps/web/src/components/matchup/MatchupScoreboard.tsx`
 - `apps/web/src/components/matchup/MatchupGrid.tsx`
@@ -322,6 +349,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 4: Automation & Notifications
 
 #### **LS-25** - Implement matchup notification system
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-18, LS-19, LS-21
@@ -329,6 +357,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Build notification system to alert users about matchup events (start, end, close games, wins/losses).
 
 **Key Deliverables:**
+
 - Notifications for matchup start/end
 - Close matchup alerts
 - In-app notifications
@@ -340,13 +369,15 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Unit and integration tests
 
 **Files:**
-- `lambdas/notifications/` (new Lambda)
-- `lambdas/notifications/src/handlers/matchup-notifications.ts`
+
+- `lambdas/websocket/` (WebSocket connection handler)
+- `lib/aws-utils/src/notification/WebSocketNotificationService.ts`
 - `lib/db-client/src/lib/notification-preferences.ts`
 
 ---
 
 #### **LS-26** - Build automated matchup progression system
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-18, LS-19, LS-20, LS-21
@@ -354,6 +385,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Update game selection Lambda to work with season-specific matchups triggered by commissioner action.
 
 **Key Deliverables:**
+
 - Lambda function triggered by commissioner via GraphQL mutation
 - Accept matchupId and gameNumber as parameters
 - Use matchup's selected_season to query player stats
@@ -374,6 +406,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Refactor existing game-selection Lambda handlers
 
 **Files:**
+
 - `lambdas/game-selection/src/handlers/select-game.ts` (update logic)
 - `lambdas/game-selection/src/handlers/create-matchup.ts` (update to use selected_season)
 - `lambdas/game-selection/src/services/season-game-selector.ts` (NEW)
@@ -385,6 +418,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 5: Advanced Features
 
 #### **LS-27** - Add matchup analytics and statistics dashboard
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-22
@@ -392,6 +426,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create analytics system to provide insights into matchup performance, trends, and team comparisons.
 
 **Key Deliverables:**
+
 - Average points per matchup by team
 - Win/losing streak tracking
 - Head-to-head records
@@ -404,6 +439,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Visualization components
 
 **Files:**
+
 - `lib/analytics/` (new library)
 - `lib/analytics/src/matchup-analytics.ts`
 - `lib/analytics/src/playoff-projections.ts`
@@ -414,6 +450,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-28** - Implement playoffs and championship system
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-22
@@ -421,6 +458,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Build playoff bracket system with automatic seeding, tournament progression, and championship determination.
 
 **Key Deliverables:**
+
 - Automatic playoff seeding
 - Configurable playoff formats (4/6/8 team)
 - Bracket visualization
@@ -433,6 +471,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - GraphQL mutations for playoff management
 
 **Files:**
+
 - `lib/scheduling/src/playoff-scheduler.ts`
 - `lambdas/db/src/schema/playoff-schema.ts`
 - Create `playoff_brackets` table schema
@@ -443,6 +482,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-29** - Add trade deadline and roster lock features for matchups
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-18, LS-26
@@ -450,6 +490,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Implement roster lock functionality that prevents lineup changes once a matchup begins, with configurable trade deadlines.
 
 **Key Deliverables:**
+
 - Rosters lock when matchup starts (configurable)
 - Trade deadline configuration per league
 - Block roster moves during active matchups
@@ -461,6 +502,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Integration with matchup status transitions
 
 **Files:**
+
 - `lambdas/db/src/schema/leagues.ts` (add deadline config)
 - `lambdas/db/src/services/roster-management.ts`
 - `lib/db-client/src/lib/client/PublicDbClient.ts`
@@ -471,6 +513,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-30** - Build matchup preview and predictions feature
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-19, LS-21, LS-7
@@ -478,6 +521,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create matchup preview system showing projected scores, player matchups, and win probability before matchup starts.
 
 **Key Deliverables:**
+
 - Projected scores based on player averages
 - Win probability calculation
 - Key player comparisons
@@ -489,6 +533,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - UI components for web and mobile
 
 **Files:**
+
 - `lib/analytics/src/matchup-predictions.ts`
 - `lib/analytics/src/win-probability.ts`
 - `lambdas/db/src/schema/prediction-queries.ts`
@@ -499,6 +544,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-31** - Add matchup-specific chat and trash talk feature
+
 **Type:** Story  
 **Priority:** Low  
 **Dependencies:** LS-18, LS-19
@@ -506,6 +552,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Implement chat system for matchup participants to communicate, with moderation and reporting features.
 
 **Key Deliverables:**
+
 - Matchup-specific chat rooms
 - Real-time messaging (WebSocket or polling)
 - Message history storage
@@ -519,6 +566,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Mobile and web UI components
 
 **Files:**
+
 - Create `matchup_messages` table schema
 - `lib/db-client/src/drizzle/public/models/MatchupMessages.ts`
 - `lambdas/db/src/schema/message-schema.ts`
@@ -529,6 +577,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-32** - Implement tiebreaker rules system for matchups
+
 **Type:** Story  
 **Priority:** Low  
 **Dependencies:** LS-18, LS-21
@@ -536,6 +585,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Build configurable tiebreaker system to resolve matchups that end in a tie, with multiple tiebreaker methods.
 
 **Key Deliverables:**
+
 - Configurable tiebreaker rules per league
 - Tiebreaker methods:
   - Highest scoring category
@@ -551,6 +601,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - GraphQL mutations for rule configuration
 
 **Files:**
+
 - `lib/db-client/src/drizzle/public/models/TiebreakerRules.ts`
 - `lambdas/db/src/services/tiebreaker-service.ts`
 - `apps/web/src/components/league/TiebreakerConfig.tsx`
@@ -561,6 +612,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ### Phase 6: Quality Assurance
 
 #### **LS-33** - Add end-to-end tests for complete matchup system
+
 **Type:** Story  
 **Priority:** High  
 **Dependencies:** All other LS-17 stories
@@ -568,6 +620,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Create comprehensive E2E tests using Playwright covering the entire matchup lifecycle from scheduling to completion.
 
 **Key Deliverables:**
+
 - E2E test: Create league and schedule matchups
 - E2E test: View matchup schedule
 - E2E test: Watch matchup progress through states
@@ -581,6 +634,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Test data fixtures and cleanup
 
 **Files:**
+
 - `apps/web-e2e/src/matchup-system.spec.ts`
 - `apps/app-e2e/src/matchup-system.spec.ts`
 - `tests/fixtures/matchup-data.ts`
@@ -588,6 +642,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-34** - Performance optimization for matchup queries and operations
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** LS-18, LS-19, LS-21, LS-22
@@ -595,6 +650,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Optimize database queries, add caching, and implement performance improvements for matchup system at scale.
 
 **Key Deliverables:**
+
 - Database indexes on matchup queries
 - Redis caching for standings/rankings
 - DataLoader implementation for N+1 prevention
@@ -609,6 +665,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Sub-second response times for critical queries
 
 **Files:**
+
 - `lib/db-client/src/lib/client/matchup-queries-optimized.ts`
 - `lambdas/db/src/dataloaders/matchup-loader.ts`
 - Database migration for indexes
@@ -618,6 +675,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ---
 
 #### **LS-35** - Create comprehensive documentation for matchup system
+
 **Type:** Story  
 **Priority:** Medium  
 **Dependencies:** Should be done throughout development
@@ -625,6 +683,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 **Description:** Write complete technical and user documentation for the matchup system including architecture, APIs, and user guides.
 
 **Key Deliverables:**
+
 - Architecture documentation with diagrams
 - Database schema documentation updates
 - GraphQL API documentation
@@ -637,6 +696,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - Update all relevant docs
 
 **Files:**
+
 - `docs/architecture/matchup-system.md`
 - `docs/guides/matchup-system-guide.md`
 - `docs/guides/commissioner-matchup-management.md`
@@ -649,6 +709,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ## Implementation Order
 
 ### Critical Path (Must be done first):
+
 1. **LS-18** - Database schema
 2. **LS-19** - GraphQL API
 3. **LS-20** - Scheduling algorithm
@@ -658,18 +719,21 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 7. **LS-24** - Web UI
 
 ### Parallel Development (Can be done in parallel after critical path):
+
 - **LS-25** - Notifications (after LS-18, LS-19, LS-21)
 - **LS-26** - Automated progression (after LS-18, LS-19, LS-21)
 - **LS-27** - Analytics (after LS-22)
 - **LS-28** - Playoffs (after LS-22)
 
 ### Enhancement Features (Can be done later):
+
 - **LS-29** - Roster lock features
 - **LS-30** - Matchup previews
 - **LS-31** - Chat feature
 - **LS-32** - Tiebreaker rules
 
 ### Final Phase:
+
 - **LS-33** - E2E tests (after all features complete)
 - **LS-34** - Performance optimization (ongoing, finalize late)
 - **LS-35** - Documentation (ongoing throughout)
@@ -679,11 +743,13 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ## Technical Dependencies
 
 ### External Dependencies:
+
 - **LS-7**: League scoring data model (for LS-21)
 - MLB schedule data API (for LS-26)
 - AWS SNS/SES (for LS-25)
 
 ### Infrastructure:
+
 - PostgreSQL database
 - AWS Lambda
 - AWS EventBridge (for scheduling)
@@ -695,12 +761,14 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ## Database Schema Changes
 
 ### New Tables:
+
 - `matchup_messages` (LS-31)
 - `tiebreaker_rules` (LS-32)
 - `playoff_brackets` (LS-28)
 - `roster_lock_rules` (LS-29)
 
 ### Modified Tables:
+
 - `matchups` - Add team1_id, team2_id, scores, status, timestamps (LS-18)
 - `leagues` - Add trade deadline, roster lock config (LS-29)
 
@@ -709,6 +777,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ## API Surface
 
 ### GraphQL Queries:
+
 - `getMatchupById`
 - `getMatchupsForLeague`
 - `getCurrentMatchupForLeague`
@@ -721,6 +790,7 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 - `getMatchupPreview`
 
 ### GraphQL Mutations:
+
 - `createMatchup`
 - `updateMatchupScore`
 - `updateMatchupStatus`
@@ -734,22 +804,26 @@ Implement a comprehensive matchup system that handles head-to-head competition b
 ## Testing Strategy
 
 ### Unit Tests:
+
 - All business logic functions
 - Score calculation algorithms
 - Scheduling algorithms
 - Tiebreaker logic
 
 ### Integration Tests:
+
 - GraphQL resolvers
 - Database operations
 - Lambda functions
 
 ### E2E Tests (LS-33):
+
 - Full user workflows
 - Mobile and web flows
 - Critical path scenarios
 
 ### Performance Tests (LS-34):
+
 - Load testing
 - Stress testing
 - Query optimization validation
@@ -778,6 +852,7 @@ When working on any LS-17 ticket:
 8. **Cross-platform:** Ensure consistency between web and mobile
 
 ### Key Files to Reference:
+
 - `docs/guides/ai-agent-contribution-workflow.md` - Full workflow
 - `docs/agents/` - CSV guidelines
 - `lib/db-client/src/drizzle/public/models/Matchups.ts` - Current schema
@@ -785,6 +860,7 @@ When working on any LS-17 ticket:
 - `lib/scoring/` - Scoring logic (reference for LS-21)
 
 ### Common Commands:
+
 ```powershell
 # Validation (in order)
 npx nx affected -t typecheck

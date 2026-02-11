@@ -27,6 +27,7 @@ export const statsLoadingStatus = pgEnum('stats_loading_status', [
   'loading',
   'completed',
   'failed',
+  'retry',
 ]);
 
 export const matchups = pgTable(
@@ -46,6 +47,12 @@ export const matchups = pgTable(
     gamesPerMatchup: integer('games_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
     endTime: timestamp('end_time', { mode: 'string' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -77,6 +84,12 @@ export const matchupPlayers = pgTable(
     matchupId: integer('matchup_id').notNull(),
     playerId: integer('player_id').notNull(),
     teamId: integer('team_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -142,6 +155,12 @@ export const matchupPlayerGames = pgTable(
     statsLoadingStatus: varchar('stats_loading_status', { length: 20 }).default(
       'pending',
     ),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     // NOTE: Scores are NOT stored in DB - they are calculated on the frontend
     // using the @legacy-sports/scoring package with league-specific settings
   },

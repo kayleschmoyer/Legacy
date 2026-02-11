@@ -5,6 +5,7 @@ import {
   type LogEntry,
   type LoggerConfig,
   type LogLevel,
+  type OutputDestination,
   shouldLog,
 } from './types';
 import { EnvironmentVariable } from '../EnvironmentVariable';
@@ -20,6 +21,29 @@ export class Logger implements ILogger {
     const envLogLevel =
       getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
     this.minimumLevel = config.minimumLevel || envLogLevel;
+  }
+
+  // Method to add additional output destinations at runtime
+  addDestination(destination: LoggerConfig['outputDestinations'][0]): void {
+    this.config.outputDestinations.push(destination);
+  }
+
+  // Method to remove a specific output destination
+  removeDestination(destination: LoggerConfig['outputDestinations'][0]): void {
+    const index = this.config.outputDestinations.indexOf(destination);
+    if (index > -1) {
+      this.config.outputDestinations.splice(index, 1);
+    }
+  }
+
+  // Method to clear all output destinations
+  clearDestinations(): void {
+    this.config.outputDestinations = [];
+  }
+
+  // Method to get current destinations (for inspection)
+  getDestinations(): OutputDestination[] {
+    return [...this.config.outputDestinations];
   }
 
   private logToDestinations(

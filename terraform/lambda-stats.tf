@@ -72,6 +72,26 @@ resource "aws_iam_policy" "stats_lambda_sqs" {
           aws_sqs_queue.load_season_stats.arn,
           aws_sqs_queue.load_game_stats.arn
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.websocket_connections.arn,
+          "${aws_dynamodb_table.websocket_connections.arn}/index/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "execute-api:ManageConnections"
+        ]
+        Resource = [
+          "${aws_apigatewayv2_api.websocket.execution_arn}/*/*/@connections/*"
+        ]
       }
     ]
   })
@@ -161,7 +181,12 @@ resource "aws_lambda_function" "stats" {
       SQS_LOAD_SEASON_STATS_URL = aws_sqs_queue.load_season_stats.url
       SQS_LOAD_GAME_STATS_URL   = aws_sqs_queue.load_game_stats.url
       # Legacy support - keep SQS_QUEUE_URL for backward compatibility
-      SQS_QUEUE_URL                       = aws_sqs_queue.load_season_stats.url
+      SQS_QUEUE_URL = aws_sqs_queue.load_season_stats.url
+
+      # WebSocket configuration
+      CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
+      WEBSOCKET_ENDPOINT     = replace(aws_apigatewayv2_stage.websocket.invoke_url, "wss://", "https://")
+
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 

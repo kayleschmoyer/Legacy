@@ -11,6 +11,10 @@ import {
   StatisticsService,
 } from './StatisticsService';
 import { createScoringService, ScoringService } from './ScoringService';
+import {
+  createNotificationService,
+  NotificationService,
+} from './NotificationService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
 
@@ -19,6 +23,7 @@ export class DatabaseService {
   public readonly players: PlayerService;
   public readonly statistics: StatisticsService;
   public readonly scoring: ScoringService;
+  public readonly notifications: NotificationService;
   private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
 
   constructor(private options: DbOptions) {
@@ -26,6 +31,7 @@ export class DatabaseService {
     this.players = createPlayerService(options);
     this.statistics = createStatisticsService(options);
     this.scoring = createScoringService(options);
+    this.notifications = createNotificationService(options);
   }
 
   /**
@@ -65,6 +71,10 @@ export {
   createStatisticsService,
 } from './StatisticsService';
 export { ScoringService, createScoringService } from './ScoringService';
+export {
+  NotificationService,
+  createNotificationService,
+} from './NotificationService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
@@ -74,3 +84,9 @@ export type {
   StatisticsQueryOptions,
 } from './StatisticsService';
 export type { LeagueScoringMultiplierUpdate } from './ScoringService';
+export type {
+  NotificationPreference,
+  DeviceToken,
+  NotificationHistoryItem,
+  NotificationPreferenceUpdate,
+} from './NotificationService';

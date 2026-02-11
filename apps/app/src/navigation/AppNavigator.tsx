@@ -12,7 +12,7 @@ const Stack = createStackNavigator();
 
 function HomeStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="home-stack">
       <Stack.Screen
         name="Home"
         component={HomeScreen}
@@ -41,6 +41,7 @@ export function AppNavigator() {
   return (
     <NavigationContainer>
       <Drawer.Navigator
+        id="main-drawer"
         initialRouteName="HomeStack"
         screenOptions={{
           headerStyle: { backgroundColor: '#1E1E1E' },

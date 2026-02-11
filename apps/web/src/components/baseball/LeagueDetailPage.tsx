@@ -13,6 +13,7 @@ import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { env } from '../../config/environment';
 import {
+  LeagueFragment,
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
@@ -354,6 +355,14 @@ export function LeagueDetailPage(): React.JSX.Element {
     setMatchupErrorMessage(err.message);
     setMatchupSuccessMessage(null);
   }, []);
+
+  const handleLeagueUpdate = useCallback(
+    (updatedLeague: LeagueFragment) => {
+      // Update Redux state with the league data from mutation response
+      dispatch(setLeagueData(updatedLeague));
+    },
+    [dispatch],
+  );
 
   const handlePlayerAssign = useCallback(
     async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
@@ -780,6 +789,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           draftStatus={league.draftStatus}
           onSuccess={handleMatchupSuccess}
           onError={handleMatchupError}
+          onLeagueUpdate={handleLeagueUpdate}
         />
       )}
 

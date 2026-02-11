@@ -4,7 +4,7 @@ import { GraphQLResponse } from '../types/cli-types';
 
 /**
  * Authentication middleware for CLI commands
- * 
+ *
  * Ensures the user is authenticated before running database operations
  * and provides the authentication token for API calls
  */
@@ -19,23 +19,27 @@ export class AuthMiddleware {
    * Require authentication before running a command
    * Returns the JWT token if authenticated, throws error if not
    */
-  async requireAuth(options: {
-    userEmail?: string;
-    skipIfNotConfigured?: boolean;
-  } = {}): Promise<string> {
+  async requireAuth(
+    options: {
+      userEmail?: string;
+      skipIfNotConfigured?: boolean;
+    } = {},
+  ): Promise<string> {
     const { userEmail, skipIfNotConfigured = false } = options;
 
     try {
       const token = await this.authService.getAuthToken(userEmail);
-      
+
       if (!token) {
         if (skipIfNotConfigured) {
-          LOGGER.info('⚠️  No authentication configured, proceeding without auth');
+          LOGGER.info(
+            '⚠️  No authentication configured, proceeding without auth',
+          );
           return '';
         }
-        
+
         throw new Error(
-          'Authentication required. Please run "cli auth login" first.'
+          'Authentication required. Please run "cli auth login" first.',
         );
       }
 
@@ -43,13 +47,14 @@ export class AuthMiddleware {
       const currentUser = await this.authService.getCurrentUser();
       if (!currentUser) {
         throw new Error(
-          'Authentication token is invalid. Please run "cli auth login" again.'
+          'Authentication token is invalid. Please run "cli auth login" again.',
         );
       }
 
-      LOGGER.debug(`✅ Authenticated as: ${currentUser.email} (${currentUser.accessLevel})`);
+      LOGGER.debug(
+        `✅ Authenticated as: ${currentUser.email} (${currentUser.accessLevel})`,
+      );
       return token;
-
     } catch (error) {
       if (error instanceof Error) {
         throw error;
@@ -61,16 +66,21 @@ export class AuthMiddleware {
   /**
    * Get current user information if authenticated
    */
-  async getCurrentUser(): Promise<{ email: string; accessLevel: string } | null> {
+  async getCurrentUser(): Promise<{
+    email: string;
+    accessLevel: string;
+  } | null> {
     return await this.authService.getCurrentUser();
   }
 
   /**
    * Check if user has required access level
    */
-  async requireAccessLevel(minLevel: 'admin' | 'user' | 'readonly'): Promise<void> {
+  async requireAccessLevel(
+    minLevel: 'admin' | 'user' | 'readonly',
+  ): Promise<void> {
     const currentUser = await this.getCurrentUser();
-    
+
     if (!currentUser) {
       throw new Error('Authentication required');
     }
@@ -81,7 +91,7 @@ export class AuthMiddleware {
 
     if (userLevelIndex < requiredLevelIndex) {
       throw new Error(
-        `Access denied. Required: ${minLevel}, Current: ${currentUser.accessLevel}`
+        `Access denied. Required: ${minLevel}, Current: ${currentUser.accessLevel}`,
       );
     }
   }
@@ -91,13 +101,13 @@ export class AuthMiddleware {
    */
   async getAuthHeaders(userEmail?: string): Promise<Record<string, string>> {
     const token = await this.authService.getAuthToken(userEmail);
-    
+
     if (!token) {
       return {};
     }
 
     return {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
   }
@@ -112,12 +122,12 @@ export class AuthMiddleware {
       body?: string;
       headers?: Record<string, string>;
       userEmail?: string;
-    } = {}
+    } = {},
   ): Promise<Response> {
     const { method = 'POST', body, headers = {}, userEmail } = options;
 
     const authHeaders = await this.getAuthHeaders(userEmail);
-    
+
     const response = await fetch(url, {
       method,
       headers: {
@@ -129,11 +139,15 @@ export class AuthMiddleware {
 
     // Handle authentication errors
     if (response.status === 401) {
-      throw new Error('Authentication token is invalid. Please run "cli auth login" again.');
+      throw new Error(
+        'Authentication token is invalid. Please run "cli auth login" again.',
+      );
     }
 
     if (response.status === 403) {
-      throw new Error('Access denied. You do not have permission for this operation.');
+      throw new Error(
+        'Access denied. You do not have permission for this operation.',
+      );
     }
 
     return response;
@@ -145,7 +159,7 @@ export class AuthMiddleware {
   async makeGraphQLRequest(
     query: string,
     variables: Record<string, unknown> = {},
-    userEmail?: string
+    userEmail?: string,
   ): Promise<GraphQLResponse> {
     // Get GraphQL endpoint from environment
     const graphqlUrl = this.getGraphQLUrl();
@@ -158,11 +172,13 @@ export class AuthMiddleware {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`GraphQL request failed: ${response.status} ${errorText}`);
+      throw new Error(
+        `GraphQL request failed: ${response.status} ${errorText}`,
+      );
     }
 
-    const result = await response.json() as GraphQLResponse;
-    
+    const result = (await response.json()) as GraphQLResponse;
+
     if (result.errors && result.errors.length > 0) {
       throw new Error(`GraphQL error: ${result.errors[0].message}`);
     }
@@ -175,6 +191,7 @@ export class AuthMiddleware {
    */
   getGraphQLUrl(): string {
     return (
+      process.env.VITE_GRAPHQL_HOST ||
       process.env.VITE_GRAPHQL_URL ||
       process.env.GRAPHQL_URL ||
       'https://api.legacysports.dev/graphql'

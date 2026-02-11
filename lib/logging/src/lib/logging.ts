@@ -11,11 +11,19 @@ interface Logger {
   warn(message: string, ...args: LogArgs): void;
   error(message: string, ...args: LogArgs): void;
   fatal(message: string, ...args: LogArgs): void;
+  addDestination(filePath: string): void;
 }
 
 // Check if we're in a Node.js environment
 const isNode =
   typeof process !== 'undefined' && process.versions && process.versions.node;
+
+// Get the directory where the CLI was invoked from (set by ls-cli.ps1)
+// Fall back to process.cwd() if not set
+const invokeDir =
+  isNode && typeof process !== 'undefined'
+    ? process.env.CLI_INVOKE_DIR || process.cwd()
+    : '';
 
 // Get log level from environment or default to 'info'
 const logLevel = getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
@@ -33,8 +41,33 @@ const currentLogLevel = LOG_LEVELS[logLevel.toLowerCase()] || LOG_LEVELS.info;
 
 // Create a universal logger that works in both browser and Node.js
 class UniversalLogger implements Logger {
+  private additionalLogFiles: string[] = [];
+
   private shouldLog(level: string): boolean {
     return LOG_LEVELS[level] >= currentLogLevel;
+  }
+
+  addDestination(filePath: string): void {
+    if (!isNode) {
+      console.warn('addDestination is only supported in Node.js environments');
+      return;
+    }
+    this.additionalLogFiles.push(filePath);
+  }
+
+  private safeEncodeForConsole(str: string): string {
+    // For Node.js environments, use Buffer to properly encode UTF-8
+    if (typeof Buffer !== 'undefined') {
+      try {
+        // Convert to Buffer and back to ensure proper UTF-8 encoding
+        return Buffer.from(str, 'utf8').toString('utf8');
+      } catch {
+        // Fallback: just return the string
+        return str;
+      }
+    }
+    // For browser/mobile environments, return as-is
+    return str;
   }
 
   private formatMessage(
@@ -62,14 +95,20 @@ class UniversalLogger implements Logger {
             })
             .join(' ')
         : '';
-    return `[${timestamp}] ${level.toUpperCase()}: ${message}${formattedArgs}`;
+    const formattedMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}${formattedArgs}`;
+    // Apply emoji-safe encoding for console output
+    return this.safeEncodeForConsole(formattedMessage);
   }
 
   private writeToFile(level: string, message: string, ...args: LogArgs): void {
     if (!isNode) return;
 
     const logFile = getEnvVarOptional(EnvironmentVariable.LOG_LOCATION);
-    if (!logFile) return;
+    const filesToWrite = logFile
+      ? [logFile, ...this.additionalLogFiles]
+      : this.additionalLogFiles;
+
+    if (filesToWrite.length === 0) return;
 
     try {
       // Use import() for dynamic imports in Node.js environments
@@ -77,19 +116,31 @@ class UniversalLogger implements Logger {
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
-      const fullPath = path.resolve(process.cwd(), logFile);
+
       const formattedMessage =
         this.formatMessage(level, message, ...args) + '\n';
 
-      // Ensure directory exists
-      const dir = path.dirname(fullPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+      for (const file of filesToWrite) {
+        // Resolve relative to the invoke directory, not current process directory
+        const fullPath = path.isAbsolute(file)
+          ? file
+          : path.resolve(invokeDir, file);
 
-      fs.appendFileSync(fullPath, formattedMessage);
+        // Ensure directory exists
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        fs.appendFileSync(fullPath, formattedMessage, 'utf8');
+      }
     } catch (error) {
-      console.error('Failed to write to log file:', error);
+      // Write to stderr instead of using console.error to avoid recursion
+      if (typeof process !== 'undefined' && process.stderr) {
+        process.stderr.write(`Failed to write to log file: ${String(error)}\n`);
+      } else {
+        console.error('Failed to write to log file:', error);
+      }
     }
   }
 

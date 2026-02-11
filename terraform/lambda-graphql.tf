@@ -169,6 +169,9 @@ resource "aws_lambda_function" "graphql" {
       LOG_LEVEL                           = "debug"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
+      # Auth configuration
+      JWT_SECRET_NAME = aws_secretsmanager_secret.jwt_secret.name
+
       # SQS Queue URLs
       SQS_LOAD_SEASON_STATS_URL = aws_sqs_queue.load_season_stats.url
       SQS_AUTOMATIC_DRAFTS_URL  = aws_sqs_queue.automatic_drafts.url

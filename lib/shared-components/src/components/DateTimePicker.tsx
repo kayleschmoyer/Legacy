@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { Button, Popover, Text, XStack, YStack } from 'tamagui';
-import { Calendar, ChevronLeft, ChevronRight, Clock } from '@tamagui/lucide-icons';
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+} from '@tamagui/lucide-icons';
 import { Platform } from '../platform-components';
 
 export interface DateTimePickerProps {
@@ -21,7 +26,7 @@ export interface DateTimePickerProps {
 export function DateTimePicker({
   value,
   onChange,
-  placeholder = "Select date and time",
+  placeholder = 'Select date and time',
   disabled = false,
   minDate,
   maxDate,
@@ -29,12 +34,14 @@ export function DateTimePicker({
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(
-    value ? new Date(value.getFullYear(), value.getMonth(), 1) : new Date()
+    value ? new Date(value.getFullYear(), value.getMonth(), 1) : new Date(),
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(value || null);
   const [hour, setHour] = useState(value ? value.getHours() : 12);
   const [minute, setMinute] = useState(value ? value.getMinutes() : 0);
-  const [ampm, setAmpm] = useState(value ? (value.getHours() >= 12 ? 'PM' : 'AM') : 'PM');
+  const [ampm, setAmpm] = useState(
+    value ? (value.getHours() >= 12 ? 'PM' : 'AM') : 'PM',
+  );
 
   const formatDateTime = (date: Date): string => {
     return date.toLocaleString('en-US', {
@@ -77,32 +84,32 @@ export function DateTimePicker({
     const monthIndex = month.getMonth();
     const firstDay = new Date(year, monthIndex, 1);
     const lastDay = new Date(year, monthIndex + 1, 0);
-    
+
     const days: Date[] = [];
-    
+
     // Add empty cells for days before the first day of the month
     const firstDayOfWeek = firstDay.getDay();
     for (let i = 0; i < firstDayOfWeek; i++) {
       days.push(new Date(year, monthIndex, -firstDayOfWeek + i + 1));
     }
-    
+
     // Add all days of the current month
     for (let day = 1; day <= lastDay.getDate(); day++) {
       days.push(new Date(year, monthIndex, day));
     }
-    
+
     // Add days from next month to fill the grid
     const totalCells = Math.ceil(days.length / 7) * 7;
     const remainingCells = totalCells - days.length;
     for (let day = 1; day <= remainingCells; day++) {
       days.push(new Date(year, monthIndex + 1, day));
     }
-    
+
     return days;
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
+    setCurrentMonth((prev) => {
       const newMonth = new Date(prev);
       if (direction === 'prev') {
         newMonth.setMonth(prev.getMonth() - 1);
@@ -122,10 +129,9 @@ export function DateTimePicker({
   const applyDateTime = () => {
     if (selectedDate) {
       const newDateTime = new Date(selectedDate);
-      const adjustedHour = ampm === 'AM' ? 
-        (hour === 12 ? 0 : hour) : 
-        (hour === 12 ? 12 : hour + 12);
-      
+      const adjustedHour =
+        ampm === 'AM' ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12;
+
       newDateTime.setHours(adjustedHour, minute, 0, 0);
       onChange(newDateTime);
       setIsOpen(false);
@@ -138,11 +144,16 @@ export function DateTimePicker({
   };
 
   const isSameMonth = (date: Date, month: Date): boolean => {
-    return date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
+    return (
+      date.getMonth() === month.getMonth() &&
+      date.getFullYear() === month.getFullYear()
+    );
   };
 
   const isSelected = (date: Date): boolean => {
-    return selectedDate ? date.toDateString() === selectedDate.toDateString() : false;
+    return selectedDate
+      ? date.toDateString() === selectedDate.toDateString()
+      : false;
   };
 
   // On web, optionally use native datetime-local input
@@ -178,7 +189,13 @@ export function DateTimePicker({
 
   // Custom date and time picker popup for both web and mobile
   return (
-    <Popover size="$5" allowFlip placement="bottom" open={isOpen} onOpenChange={setIsOpen}>
+    <Popover
+      size="$5"
+      allowFlip
+      placement="bottom"
+      open={isOpen}
+      onOpenChange={setIsOpen}
+    >
       <Popover.Trigger asChild>
         <Button
           size="$4"
@@ -189,11 +206,10 @@ export function DateTimePicker({
           disabled={disabled}
           pressStyle={{ opacity: 0.8 }}
           onPress={() => {
-            console.log('DateTimePicker trigger pressed, opening picker');
             setIsOpen(!isOpen);
           }}
         >
-          <Text color={value ? "$color" : "$placeholderColor"}>
+          <Text color={value ? '$color' : '$placeholderColor'}>
             {value ? formatDateTime(value) : placeholder}
           </Text>
           <XStack alignItems="center" space="$1">
@@ -227,7 +243,7 @@ export function DateTimePicker({
             <Text fontSize="$4" fontWeight="600" color="$color">
               Select Date
             </Text>
-            
+
             {/* Month Navigation */}
             <XStack justifyContent="space-between" alignItems="center">
               <Button
@@ -240,11 +256,14 @@ export function DateTimePicker({
               >
                 <ChevronLeft size="$1" />
               </Button>
-              
+
               <Text fontSize="$4" fontWeight="600" color="$color">
-                {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {currentMonth.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
               </Text>
-              
+
               <Button
                 size="$2"
                 chromeless
@@ -256,10 +275,10 @@ export function DateTimePicker({
                 <ChevronRight size="$1" />
               </Button>
             </XStack>
-            
+
             {/* Weekday Headers */}
             <XStack>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <Button key={day} size="$2" chromeless flex={1}>
                   <Text fontSize="$2" color="$color10" fontWeight="600">
                     {day}
@@ -267,51 +286,62 @@ export function DateTimePicker({
                 </Button>
               ))}
             </XStack>
-            
+
             {/* Calendar Grid */}
             <YStack space="$1">
-              {Array.from({ length: Math.ceil(getDaysInMonth(currentMonth).length / 7) }, (_, weekIndex) => (
-                <XStack key={weekIndex} space="$1">
-                  {getDaysInMonth(currentMonth)
-                    .slice(weekIndex * 7, (weekIndex + 1) * 7)
-                    .map((date, dayIndex) => {
-                      const disabled = isDateDisabled(date);
-                      const selected = isSelected(date);
-                      const today = isToday(date);
-                      const currentMonthDay = isSameMonth(date, currentMonth);
-                      
-                      return (
-                        <Button
-                          key={`${weekIndex}-${dayIndex}`}
-                          size="$2"
-                          flex={1}
-                          chromeless={!selected}
-                          backgroundColor={
-                            selected ? '$blue9' : today ? '$blue4' : 'transparent'
-                          }
-                          opacity={currentMonthDay ? 1 : 0.3}
-                          disabled={disabled}
-                          onPress={() => {
-                            selectDate(date);
-                          }}
-                          pressStyle={{ opacity: 0.7 }}
-                        >
-                          <Text
-                            fontSize="$2"
-                            color={
-                              selected ? 'white' : 
-                              disabled ? '$color6' : 
-                              today ? '$blue11' : '$color'
+              {Array.from(
+                { length: Math.ceil(getDaysInMonth(currentMonth).length / 7) },
+                (_, weekIndex) => (
+                  <XStack key={weekIndex} space="$1">
+                    {getDaysInMonth(currentMonth)
+                      .slice(weekIndex * 7, (weekIndex + 1) * 7)
+                      .map((date, dayIndex) => {
+                        const disabled = isDateDisabled(date);
+                        const selected = isSelected(date);
+                        const today = isToday(date);
+                        const currentMonthDay = isSameMonth(date, currentMonth);
+
+                        return (
+                          <Button
+                            key={`${weekIndex}-${dayIndex}`}
+                            size="$2"
+                            flex={1}
+                            chromeless={!selected}
+                            backgroundColor={
+                              selected
+                                ? '$blue9'
+                                : today
+                                  ? '$blue4'
+                                  : 'transparent'
                             }
-                            fontWeight={today || selected ? '600' : '400'}
+                            opacity={currentMonthDay ? 1 : 0.3}
+                            disabled={disabled}
+                            onPress={() => {
+                              selectDate(date);
+                            }}
+                            pressStyle={{ opacity: 0.7 }}
                           >
-                            {date.getDate()}
-                          </Text>
-                        </Button>
-                      );
-                    })}
-                </XStack>
-              ))}
+                            <Text
+                              fontSize="$2"
+                              color={
+                                selected
+                                  ? 'white'
+                                  : disabled
+                                    ? '$color6'
+                                    : today
+                                      ? '$blue11'
+                                      : '$color'
+                              }
+                              fontWeight={today || selected ? '600' : '400'}
+                            >
+                              {date.getDate()}
+                            </Text>
+                          </Button>
+                        );
+                      })}
+                  </XStack>
+                ),
+              )}
             </YStack>
           </YStack>
 
@@ -320,52 +350,76 @@ export function DateTimePicker({
             <Text fontSize="$4" fontWeight="600" color="$color">
               Select Time
             </Text>
-            
+
             <XStack space="$2" alignItems="center" justifyContent="center">
               {/* Hour */}
               <YStack alignItems="center" space="$1">
-                <Text fontSize="$2" color="$color10">Hour</Text>
+                <Text fontSize="$2" color="$color10">
+                  Hour
+                </Text>
                 <XStack alignItems="center" space="$1">
                   <Button
                     size="$1"
                     chromeless
-                    onPress={() => setHour(prev => prev === 1 ? 12 : prev - 1)}
+                    onPress={() =>
+                      setHour((prev) => (prev === 1 ? 12 : prev - 1))
+                    }
                   >
                     <Text>-</Text>
                   </Button>
-                  <Text fontSize="$4" minWidth="$3" textAlign="center" fontWeight="600">
+                  <Text
+                    fontSize="$4"
+                    minWidth="$3"
+                    textAlign="center"
+                    fontWeight="600"
+                  >
                     {hour}
                   </Text>
                   <Button
                     size="$1"
                     chromeless
-                    onPress={() => setHour(prev => prev === 12 ? 1 : prev + 1)}
+                    onPress={() =>
+                      setHour((prev) => (prev === 12 ? 1 : prev + 1))
+                    }
                   >
                     <Text>+</Text>
                   </Button>
                 </XStack>
               </YStack>
 
-              <Text fontSize="$4" fontWeight="600">:</Text>
+              <Text fontSize="$4" fontWeight="600">
+                :
+              </Text>
 
               {/* Minute */}
               <YStack alignItems="center" space="$1">
-                <Text fontSize="$2" color="$color10">Min</Text>
+                <Text fontSize="$2" color="$color10">
+                  Min
+                </Text>
                 <XStack alignItems="center" space="$1">
                   <Button
                     size="$1"
                     chromeless
-                    onPress={() => setMinute(prev => prev === 0 ? 45 : prev - 15)}
+                    onPress={() =>
+                      setMinute((prev) => (prev === 0 ? 45 : prev - 15))
+                    }
                   >
                     <Text>-</Text>
                   </Button>
-                  <Text fontSize="$4" minWidth="$3" textAlign="center" fontWeight="600">
+                  <Text
+                    fontSize="$4"
+                    minWidth="$3"
+                    textAlign="center"
+                    fontWeight="600"
+                  >
                     {String(minute).padStart(2, '0')}
                   </Text>
                   <Button
                     size="$1"
                     chromeless
-                    onPress={() => setMinute(prev => prev === 45 ? 0 : prev + 15)}
+                    onPress={() =>
+                      setMinute((prev) => (prev === 45 ? 0 : prev + 15))
+                    }
                   >
                     <Text>+</Text>
                   </Button>
@@ -374,14 +428,19 @@ export function DateTimePicker({
 
               {/* AM/PM */}
               <YStack alignItems="center" space="$1">
-                <Text fontSize="$2" color="$color10">Period</Text>
+                <Text fontSize="$2" color="$color10">
+                  Period
+                </Text>
                 <Button
                   size="$2"
                   backgroundColor={ampm === 'AM' ? '$blue9' : '$color1'}
                   onPress={() => setAmpm(ampm === 'AM' ? 'PM' : 'AM')}
                   minWidth="$4"
                 >
-                  <Text color={ampm === 'AM' ? 'white' : '$color'} fontWeight="600">
+                  <Text
+                    color={ampm === 'AM' ? 'white' : '$color'}
+                    fontWeight="600"
+                  >
                     {ampm}
                   </Text>
                 </Button>
@@ -391,11 +450,7 @@ export function DateTimePicker({
 
           {/* Action Buttons */}
           <XStack space="$2" justifyContent="flex-end">
-            <Button
-              size="$3"
-              chromeless
-              onPress={() => setIsOpen(false)}
-            >
+            <Button size="$3" chromeless onPress={() => setIsOpen(false)}>
               <Text color="$color10">Cancel</Text>
             </Button>
             <Button
@@ -404,7 +459,9 @@ export function DateTimePicker({
               disabled={!selectedDate}
               onPress={applyDateTime}
             >
-              <Text color="white" fontWeight="600">Apply</Text>
+              <Text color="white" fontWeight="600">
+                Apply
+              </Text>
             </Button>
           </XStack>
         </YStack>

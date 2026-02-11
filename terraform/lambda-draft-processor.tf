@@ -134,6 +134,44 @@ resource "aws_iam_role_policy_attachment" "draft_processor_lambda_sqs" {
   role       = aws_iam_role.draft_processor_lambda.name
 }
 
+# WebSocket/DynamoDB permissions for notifications
+resource "aws_iam_policy" "draft_processor_lambda_websocket" {
+  name        = "${local.name_prefix}-draft-processor-lambda-websocket"
+  description = "Allow draft processor lambda to send WebSocket notifications"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "execute-api:ManageConnections"
+        ]
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = [
+          aws_dynamodb_table.websocket_connections.arn,
+          "${aws_dynamodb_table.websocket_connections.arn}/index/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "draft_processor_lambda_websocket" {
+  policy_arn = aws_iam_policy.draft_processor_lambda_websocket.arn
+  role       = aws_iam_role.draft_processor_lambda.name
+}
+
 # Draft processor Lambda function
 resource "aws_lambda_function" "draft_processor" {
   function_name = "${local.name_prefix}-draft-processor"
@@ -174,6 +212,10 @@ resource "aws_lambda_function" "draft_processor" {
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
       SENTRY_DEBUG              = "false"
       SENTRY_RELEASE            = "legacy-sports-draft-processor@${data.aws_ssm_parameter.draft_processor_lambda_version.value}"
+
+      # WebSocket configuration for notifications
+      CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
+      WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
     }
   }
 

@@ -1,9 +1,14 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions, isNegroLeague } from '@legacy-sports/utils';
+import {
+  getDbOptions,
+  isNegroLeague,
+  MIN_SEASON_WITH_GAME_DATA,
+} from '@legacy-sports/utils';
 import {
   SqsDraftMessage,
   DraftProcessingResult,
+  createNotificationService,
 } from '@legacy-sports/aws-utils';
 import {
   getSentryConfigFromEnv,
@@ -20,13 +25,16 @@ import {
   updateLeagueDraftStatus,
   validateDraftType,
 } from '@legacy-sports/db-client';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Initialize notification service
+const notificationService = createNotificationService();
 
 /**
  * Draft Processing Lambda
@@ -533,6 +541,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       );
 
       // Step 1.6: Filter to only players with valid seasons (at least minGames in batting, pitching, OR fielding)
+      // Only consider seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
       const candidatePlayerIds = candidatePlayers.map((p) => p.id);
 
       // Query player stats to determine which players have valid seasons
@@ -546,7 +555,10 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           })
           .from(PublicSchema.seasonBatting)
           .where(
-            inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+            and(
+              inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+              gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
+            ),
           )
           .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
         tx
@@ -558,7 +570,13 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           })
           .from(PublicSchema.seasonPitching)
           .where(
-            inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
+            and(
+              inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
+              gte(
+                PublicSchema.seasonPitching.season,
+                MIN_SEASON_WITH_GAME_DATA,
+              ),
+            ),
           )
           .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
         tx
@@ -570,7 +588,13 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           })
           .from(PublicSchema.seasonFielding)
           .where(
-            inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
+            and(
+              inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
+              gte(
+                PublicSchema.seasonFielding.season,
+                MIN_SEASON_WITH_GAME_DATA,
+              ),
+            ),
           )
           .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
       ]);
@@ -1085,6 +1109,31 @@ async function processDraftMessage(
       'completed',
       'draft processing completed successfully',
     );
+
+    // Step 5: Send WebSocket notification
+    try {
+      if (notificationService) {
+        await notificationService.notifyDraftCompleted(leagueId, draftType);
+        addBreadcrumb('WebSocket notification sent', { leagueId, draftType });
+      } else {
+        LOGGER.warn('Notification service not available');
+      }
+    } catch (notificationError) {
+      // Don't fail the draft if notification fails
+      LOGGER.error('Failed to send draft completion notification', {
+        error: notificationError,
+        leagueId,
+      });
+      captureError(
+        notificationError instanceof Error
+          ? notificationError
+          : new Error(String(notificationError)),
+        {
+          tags: { lambda: 'draft-processor', operation: 'notification' },
+          extra: { leagueId, draftType },
+        },
+      );
+    }
 
     LOGGER.info(`Successfully completed ${draftType} for league ${leagueId}`);
 

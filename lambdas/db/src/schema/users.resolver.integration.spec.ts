@@ -32,12 +32,12 @@ interface LeagueMemberRow {
 }
 
 describe('Users Resolver - Integration Tests', () => {
-  let db: ReturnType<typeof getTestDatabase>;
-  let client: Database;
+  let db: Awaited<ReturnType<typeof getTestDatabase>>;
+  let client: Awaited<ReturnType<typeof getTestClient>>;
 
-  beforeAll(() => {
-    db = getTestDatabase();
-    client = getTestClient();
+  beforeAll(async () => {
+    db = await getTestDatabase();
+    client = await getTestClient();
   });
 
   beforeEach(async () => {

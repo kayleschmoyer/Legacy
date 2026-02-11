@@ -242,7 +242,7 @@ export const handleSecureGoogleAuth = async (
         // This avoids re-validation and matches the authorization code pattern
         event._credential = body.credential;
 
-        LOGGER.debug(`Extracted email from ID token: ${userEmail}`);
+        LOGGER.debug('Email extracted from ID token successfully');
       } catch (error) {
         LOGGER.error(
           'Failed to decode ID token for email extraction:',
@@ -286,7 +286,7 @@ export const handleSecureGoogleAuth = async (
         event._exchangedTokens = tokens;
 
         LOGGER.debug(
-          `Extracted email from authorization code flow: ${userEmail}`,
+          'Email extracted from authorization code flow successfully',
         );
       } catch (error) {
         LOGGER.error(
@@ -314,11 +314,11 @@ export const handleSecureGoogleAuth = async (
 
     // Step 2: Get or create user in the database
     // This automatically creates new users with default access level on first login
-    LOGGER.info(`Getting or creating user: ${userEmail}`);
+    LOGGER.info('Getting or creating user from OAuth flow');
 
     const user = await getOrCreateUser(userEmail);
 
-    LOGGER.info(`User ready for authentication: ${userEmail} (ID: ${user.id})`);
+    LOGGER.info(`User ready for authentication (ID: ${user.id})`);
 
     // Step 3: NOW do full OAuth validation since user exists
     LOGGER.debug(
@@ -467,7 +467,11 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
 
       const user = await getUserFromGoogleJwt(db, idToken);
 
-      LOGGER.debug('User retrieved from database, creating internal JWT...');
+      LOGGER.debug('User retrieved from database:', {
+        id: user.id,
+        username: user.username,
+        accessLevel: user.accessLevel,
+      });
 
       // Extract picture from Google JWT for inclusion in our internal JWT
       const { jwtDecode } = await import('jwt-decode');
@@ -506,21 +510,14 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       username: payload.name || payload.email || 'Unknown User',
       passwordHash: null,
       accessLevel: 'none' as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
-    // Create JWT directly from user info
-    const jwt = await import('jsonwebtoken');
-    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
-
-    const jwtPayload = {
-      accessLevel: userInfo.accessLevel,
-      email: userInfo.email,
-      id: userInfo.id,
-      username: userInfo.username,
-      ...(payload.picture && { picture: payload.picture }),
-    };
-
-    internalJwt = jwt.sign(jwtPayload, jwtSecret, { expiresIn: '24h' });
+    // Create JWT directly from user info (fallback when DB unavailable)
+    internalJwt = await createJwt(userInfo, {
+      picture: payload.picture,
+    });
   }
 
   const cookies = {

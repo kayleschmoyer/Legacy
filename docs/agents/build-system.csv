@@ -1,4 +1,5 @@
 Category,Subcategory,Rule_Type,Pattern_Concept,Description,Code_Example,File_Path
+build_system,nx_workspace,CRITICAL,library_build_targets,Libraries should NOT have build targets - they are TypeScript source compiled by consumers,"Libraries: typecheck/lint/test only. Apps/Lambdas: build targets included","lib/*/project.json"
 build_system,nx_workspace,CRITICAL,dependency_order,Build shared packages before consuming apps,"nx run-many --target=build --projects=tag:buildable","package.json"
 build_system,nx_workspace,CRITICAL,module_resolution,Fix @legacy-sports/* import errors by building packages first,"pnpm run build:packages or nx build lib-name","lib/*/package.json"
 build_system,nx_workspace,DO,affected_builds,Use nx affected for incremental builds,"nx affected --target=build --base=origin/main","nx.json"

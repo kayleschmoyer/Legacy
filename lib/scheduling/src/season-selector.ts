@@ -5,8 +5,10 @@
  * - League's min_games_per_season configuration
  * - All rostered players must have sufficient games in the season
  * - Random selection from eligible seasons for variety
+ * - Only seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
  */
 
+import { MIN_SEASON_WITH_GAME_DATA } from '@legacy-sports/utils';
 import type { PlayerGameCount, SeasonInfo, TeamRoster } from './types';
 
 export interface SeasonEligibilityParams {
@@ -42,10 +44,12 @@ export function determineEligibleSeasons(
     }
   }
 
-  // Get all unique seasons from player game counts
+  // Get all unique seasons from player game counts (1901+ only)
   const allSeasons = new Set<number>();
   for (const pgc of playerGameCounts) {
-    allSeasons.add(pgc.season);
+    if (pgc.season >= MIN_SEASON_WITH_GAME_DATA) {
+      allSeasons.add(pgc.season);
+    }
   }
 
   // For each season, check if all players on all teams meet the threshold

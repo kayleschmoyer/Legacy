@@ -6,6 +6,7 @@
 import * as Sentry from '@sentry/react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { SentryInterface, SentryConfig, SentryBreadcrumb } from './types';
+import { sanitizeSentryContext } from './sanitize-context';
 
 class ReactNativeSentryImplementation implements SentryInterface {
   init(config: SentryConfig): void {
@@ -38,9 +39,16 @@ class ReactNativeSentryImplementation implements SentryInterface {
   captureError(error: Error, context?: Record<string, any>): void {
     try {
       if (context) {
+        const safeContext = sanitizeSentryContext(context);
         Sentry.withScope((scope) => {
-          Object.keys(context).forEach((key) => {
-            scope.setContext(key, context[key]);
+          Object.keys(safeContext).forEach((key) => {
+            const value = safeContext[key];
+            scope.setContext(
+              key,
+              typeof value === 'object' && value !== null
+                ? (value as Record<string, unknown>)
+                : { value },
+            );
           });
           Sentry.captureException(error);
         });

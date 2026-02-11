@@ -6,6 +6,7 @@
 import * as Sentry from '@sentry/browser';
 import { LOGGER } from '@legacy-sports/logging';
 import { SentryInterface, SentryConfig, SentryBreadcrumb } from './types';
+import { sanitizeSentryContext } from './sanitize-context';
 
 class WebSentryImplementation implements SentryInterface {
   init(config: SentryConfig): void {
@@ -37,9 +38,16 @@ class WebSentryImplementation implements SentryInterface {
   captureError(error: Error, context?: Record<string, any>): void {
     try {
       if (context) {
+        const safeContext = sanitizeSentryContext(context);
         Sentry.withScope((scope) => {
-          Object.keys(context).forEach((key) => {
-            scope.setContext(key, context[key]);
+          Object.keys(safeContext).forEach((key) => {
+            const value = safeContext[key];
+            scope.setContext(
+              key,
+              (typeof value === 'object' && value !== null
+                ? (value as Record<string, unknown>)
+                : { value }) as any,
+            );
           });
           Sentry.captureException(error);
         });

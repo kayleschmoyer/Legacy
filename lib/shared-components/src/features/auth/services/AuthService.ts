@@ -104,12 +104,7 @@ export class AuthService {
    */
   async authenticateWithOAuth(oauthResponse: OAuthResponse): Promise<User> {
     try {
-      console.log(
-        'AuthService: Processing OAuth response through secure single-lambda flow',
-      );
-
       // Single call to secure OAuth lambda (checks user exists + validates OAuth)
-      console.log('Calling secure OAuth Lambda...');
       const authResult = await this.callSecureOAuth(oauthResponse);
 
       // Store authentication tokens securely
@@ -121,7 +116,6 @@ export class AuthService {
       // Extract user from response or decode from JWT
       const user = authResult.user || this.getUserFromToken(authResult.jwt);
 
-      console.log('AuthService: Secure OAuth authentication successful');
       return user;
     } catch (error) {
       console.error('AuthService: Secure OAuth authentication failed:', error);
@@ -137,8 +131,6 @@ export class AuthService {
    */
   async authenticateWithEmail(email: string, password: string): Promise<User> {
     try {
-      console.log('AuthService: Processing email/password login');
-
       const response = await fetch(`${this.oauthProxyUrl}/login`, {
         method: 'POST',
         headers: {
@@ -188,9 +180,6 @@ export class AuthService {
       throw new Error('Invalid OAuth response - missing code or credential');
     }
 
-    console.log('Calling Secure OAuth Lambda:', this.oauthProxyUrl);
-    console.log('Request body:', requestBody);
-
     const response = await fetch(`${this.oauthProxyUrl}/google`, {
       method: 'POST',
       headers: {
@@ -199,14 +188,10 @@ export class AuthService {
       body: JSON.stringify(requestBody),
     });
 
-    console.log('OAuth Lambda response status:', response.status);
-    console.log('OAuth Lambda response headers:', response.headers);
-
     // Handle different response scenarios
     if (response.status === 403) {
       // User not pre-authorized
       const errorData = (await response.json()) as UnauthorizedUserError;
-      console.log('403 response data:', errorData);
       throw new Error(
         errorData.message || 'User not authorized for this application',
       );
@@ -214,7 +199,6 @@ export class AuthService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('Non-OK response text:', errorText);
       try {
         const errorData = JSON.parse(errorText) as { message?: string };
         throw new Error(
@@ -228,16 +212,13 @@ export class AuthService {
     }
 
     const responseText = await response.text();
-    console.log('OAuth Lambda success response:', responseText);
 
     const result = JSON.parse(responseText) as SecureOAuthResponse;
 
     if (!result.jwt) {
-      console.log('No JWT in response:', result);
       throw new Error('Secure OAuth did not return JWT');
     }
 
-    console.log('OAuth Lambda returned JWT successfully');
     return result;
   }
 
@@ -306,10 +287,6 @@ export class AuthService {
         accessLevel?: 'none' | 'user' | 'admin';
       };
 
-      // DEBUG: Log the payload and extracted picture field
-      console.log('[AuthService] JWT Payload:', payload);
-      console.log('[AuthService] Picture field from JWT:', payload.picture);
-
       const user = {
         id: payload.id ?? 0,
         email: payload.email ?? '',
@@ -317,10 +294,6 @@ export class AuthService {
         picture: payload.picture,
         accessLevel: payload.accessLevel ?? 'user',
       };
-
-      // DEBUG: Log the final user object
-      console.log('[AuthService] Final user object:', user);
-      console.log('[AuthService] Picture in final user object:', user.picture);
 
       return user;
     } catch (error) {
@@ -341,13 +314,8 @@ export class AuthService {
         if (tokens.refreshToken) {
           localStorage.setItem('auth_refresh_token', tokens.refreshToken);
         }
-      } else {
-        // Mobile storage would use SecureStorageProvider
-        console.log('Tokens would be stored in secure storage:', {
-          hasJwt: !!tokens.jwt,
-          hasRefresh: !!tokens.refreshToken,
-        });
       }
+      // Mobile storage would use SecureStorageProvider
     } catch (error) {
       console.error('Failed to store auth tokens:', error);
       // Don't throw here - authentication was successful, storage is optional
@@ -451,7 +419,6 @@ export class AuthService {
       // Check if token is expired (exp is in seconds, Date.now() is in milliseconds)
       const currentTime = Math.floor(Date.now() / 1000);
       if (payload.exp <= currentTime) {
-        console.log('JWT token has expired');
         return false;
       }
 

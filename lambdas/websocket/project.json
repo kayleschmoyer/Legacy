@@ -1,0 +1,44 @@
+{
+  "name": "websocket",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lambdas/websocket/src",
+  "projectType": "application",
+  "tags": ["type:lambda", "scope:backend"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/lambdas/websocket",
+        "main": "lambdas/websocket/src/index.ts",
+        "tsConfig": "lambdas/websocket/tsconfig.json",
+        "assets": [],
+        "bundle": true,
+        "thirdParty": true,
+        "format": ["cjs"],
+        "platform": "node",
+        "target": "node20",
+        "external": ["@aws-sdk/*"],
+        "esbuildOptions": {
+          "sourcemap": true,
+          "outExtension": {
+            ".js": ".js"
+          }
+        }
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p lambdas/websocket/tsconfig.json"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["lambdas/websocket/**/*.ts"]
+      }
+    }
+  }
+}

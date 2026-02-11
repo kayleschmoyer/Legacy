@@ -152,7 +152,7 @@ aws logs get-log-events --log-group-name /aws/lambda/legacy-sports-dev-graphql -
 - `/aws/lambda/legacy-sports-dev-graphql` - GraphQL API
 - `/aws/lambda/legacy-sports-dev-db` - Database Lambda
 - `/aws/lambda/legacy-sports-dev-oauth-proxy` - OAuth authentication
-- `/aws/lambda/legacy-sports-dev-notifications` - Notification service
+- `/aws/lambda/legacy-sports-dev-websocket` - WebSocket connection handler
 - `/aws/lambda/legacy-sports-dev-stats-lambda` - Statistics processing
 - `/aws/lambda/legacy-sports-dev-game-selection` - Game selection logic
 - `/aws/lambda/legacy-sports-dev-draft-processor` - Draft processing

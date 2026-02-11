@@ -1,6 +1,6 @@
 import { ConsoleLogger } from './console-logger';
 import { FileLogger } from './file-logger';
-import { type ILogger, type LogArgs } from './types';
+import { type ILogger, type LogArgs, type OutputDestination } from './types';
 
 // Composite logger that combines console and file logging
 // Used in server/Node.js environments where file logging is desired
@@ -13,6 +13,28 @@ export class CompositeLogger implements ILogger {
     this.consoleLogger = new ConsoleLogger();
     this.fileLogger = new FileLogger();
     this.isNode = typeof process !== 'undefined' && !!process.versions?.node;
+  }
+
+  // Stub implementation - CompositeLogger doesn't support dynamic destinations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  addDestination(_destination: OutputDestination): void {
+    // No-op: CompositeLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - CompositeLogger doesn't support dynamic destinations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  removeDestination(_destination: OutputDestination): void {
+    // No-op: CompositeLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - CompositeLogger doesn't support dynamic destinations
+  clearDestinations(): void {
+    // No-op: CompositeLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - CompositeLogger doesn't support dynamic destinations
+  getDestinations(): OutputDestination[] {
+    return []; // CompositeLogger doesn't support dynamic destinations
   }
 
   debug(message: string, ...args: LogArgs): void {

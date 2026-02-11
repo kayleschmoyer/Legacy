@@ -230,5 +230,10 @@ mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
 }
 
 mutation AdvanceLeagueWeek($leagueId: Int!) {
-  advanceLeagueWeek(leagueId: $leagueId)
+  advanceLeagueWeek(leagueId: $leagueId) {
+    matchups {
+      ...Matchup
+    }
+    currentMatchupId
+  }
 }

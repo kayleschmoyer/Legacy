@@ -8,6 +8,7 @@ import {
   APIGatewayProxyResult,
   Context,
 } from 'aws-lambda';
+import { verify } from 'jsonwebtoken';
 import {
   addBreadcrumb,
   captureError,
@@ -15,6 +16,8 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { LOGGER } from '@legacy-sports/logging';
+import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -22,18 +25,56 @@ import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
 interface JWTPayload {
-  id: number;
-  email: string;
+  id: number | string;
+  email?: string;
   username: string;
+  accessLevel?: string;
   isAdmin?: boolean;
   [key: string]: unknown; // For other JWT standard fields
 }
 
 interface User {
   id: number;
-  email: string;
+  email?: string;
   username: string;
   isAdmin: boolean;
+}
+
+const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] || '';
+let jwtSecretPromise: Promise<string> | null = null;
+
+async function getJwtSecret(): Promise<string> {
+  if (!JWT_SECRET_NAME) {
+    throw new Error('JWT_SECRET_NAME is not set');
+  }
+
+  if (!jwtSecretPromise) {
+    jwtSecretPromise = retrieveSecretParameterValue(JWT_SECRET_NAME);
+  }
+
+  return jwtSecretPromise;
+}
+
+function parseUserFromJwtPayload(payload: JWTPayload): User {
+  const idRaw = payload.id;
+  const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
+  if (!Number.isFinite(id)) {
+    throw new Error('Invalid JWT payload: id must be a number');
+  }
+
+  if (typeof payload.username !== 'string' || payload.username.length === 0) {
+    throw new Error('Invalid JWT payload: username is required');
+  }
+
+  const accessLevel =
+    typeof payload.accessLevel === 'string' ? payload.accessLevel : undefined;
+
+  return {
+    id,
+    email: typeof payload.email === 'string' ? payload.email : undefined,
+    username: payload.username,
+    isAdmin: payload.isAdmin === true || accessLevel === 'admin',
+  };
 }
 
 // Initialize Sentry
@@ -165,12 +206,11 @@ const server = new ApolloServer({
   ],
   formatError: (formattedError, error) => {
     // Log all errors with full context
-    console.error('GraphQL Error:', {
+    LOGGER.error('GraphQL error', {
       message: formattedError.message,
       path: formattedError.path,
       extensions: formattedError.extensions,
       locations: formattedError.locations,
-      originalError: error,
       stack: error instanceof Error ? error.stack : undefined,
     });
 
@@ -194,27 +234,16 @@ const baseHandler = startServerAndCreateLambdaHandler(
         try {
           const token = authorization.substring(7); // Remove 'Bearer ' prefix
 
-          // Decode JWT payload (simple base64 decode - no signature verification for lambda)
-          const parts = token.split('.');
-          if (parts.length === 3) {
-            const payload = JSON.parse(
-              Buffer.from(
-                parts[1].replace(/-/g, '+').replace(/_/g, '/'),
-                'base64',
-              ).toString(),
-            ) as JWTPayload;
+          const jwtSecret = await getJwtSecret();
+          const decoded = verify(token, jwtSecret, {
+            algorithms: ['HS256'],
+          }) as JWTPayload;
 
-            user = {
-              id: payload.id,
-              email: payload.email,
-              username: payload.username,
-              isAdmin: payload.isAdmin || false,
-            };
-          }
+          user = parseUserFromJwtPayload(decoded);
         } catch (error) {
-          console.warn(
-            `Failed to decode JWT: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          LOGGER.warn('Failed to decode JWT', {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
 
@@ -236,7 +265,10 @@ const baseGraphQLHandler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ): Promise<APIGatewayProxyResult> => {
-  console.log('Lambda handler invoked with method:', event.httpMethod);
+  LOGGER.debug('GraphQL lambda invoked', {
+    httpMethod: event.httpMethod,
+    path: event.path,
+  });
   addBreadcrumb(`GraphQL request: ${event.httpMethod} ${event.path}`);
 
   // Ensure Lambda doesn't wait for empty event loop
@@ -244,7 +276,7 @@ const baseGraphQLHandler = async (
 
   // Handle preflight OPTIONS requests
   if (event.httpMethod === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
+    LOGGER.debug('Handling OPTIONS preflight request');
     addBreadcrumb('Handling OPTIONS preflight request');
     return {
       statusCode: 200,
@@ -254,7 +286,7 @@ const baseGraphQLHandler = async (
   }
 
   try {
-    console.log('Calling Apollo Server handler...');
+    LOGGER.debug('Calling Apollo Server handler');
 
     // Call Apollo Server handler - it may be callback-based despite returning a Promise
     const result = await new Promise<APIGatewayProxyResult>(
@@ -312,7 +344,7 @@ const baseGraphQLHandler = async (
       },
     );
 
-    console.log('Apollo Server result received, adding CORS headers');
+    LOGGER.debug('Apollo Server result received, adding CORS headers');
 
     // Ensure result is valid
     if (!result) {
@@ -328,7 +360,9 @@ const baseGraphQLHandler = async (
       },
     };
   } catch (error) {
-    console.error('Lambda handler error:', error);
+    LOGGER.error('GraphQL lambda handler error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
 
     // Capture error with request context
     captureError(error as Error, {

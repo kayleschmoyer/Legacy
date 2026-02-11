@@ -6,6 +6,7 @@ import {
 import type { Team as DbTeam } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { DraftService } from '@legacy-sports/db-client';
+import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from './scoring';
@@ -142,6 +143,12 @@ Team.implement({
     id: t.exposeInt('id'),
     name: t.exposeString('name'),
     leagueId: t.exposeInt('leagueId'),
+    createdAt: t.string({
+      resolve: (team) => team.createdAt.toISOString(),
+    }),
+    updatedAt: t.string({
+      resolve: (team) => team.updatedAt.toISOString(),
+    }),
   }),
 });
 
@@ -176,6 +183,8 @@ LeagueMember.implement({
               id: PublicSchema.teams.id,
               name: PublicSchema.teams.name,
               leagueId: PublicSchema.teams.leagueId,
+              createdAt: PublicSchema.teams.createdAt,
+              updatedAt: PublicSchema.teams.updatedAt,
             })
             .from(PublicSchema.teams)
             .where(eq(PublicSchema.teams.id, parent.teamId ?? 0))
@@ -183,7 +192,10 @@ LeagueMember.implement({
 
           return results.length > 0 ? results[0] : null;
         } catch (error) {
-          console.error('Error fetching team for LeagueMember:', error);
+          LOGGER.error('Error fetching team for LeagueMember', {
+            teamId: parent.teamId,
+            error: error instanceof Error ? error.message : String(error),
+          });
           return null;
         }
       },
@@ -266,6 +278,8 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     id: number;
     name: string;
     leagueId: number;
+    createdAt: Date;
+    updatedAt: Date;
   }>;
   leagueMembers?: Array<{
     leagueId: number;
@@ -386,7 +400,9 @@ builder.queryField('league', (t) =>
           userMembership,
         };
       } catch (error) {
-        console.error('Error fetching league:', error);
+        LOGGER.error('Error fetching league', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         if (error instanceof Error && error.message.includes('Access denied')) {
           throw error;
         }
@@ -409,93 +425,41 @@ builder.queryField('userLeagues', (t) =>
       const userId = context.user.id;
 
       try {
-        console.log(`Fetching leagues for userId: ${userId}`);
+        const results = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            currentMatchup: PublicSchema.leagues.currentMatchup,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            inviteCode: PublicSchema.leagues.inviteCode,
+            weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
+          })
+          .from(PublicSchema.leagues)
+          .innerJoin(
+            PublicSchema.leagueMembers,
+            eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+          )
+          .where(eq(PublicSchema.leagueMembers.userId, userId))
+          .orderBy(PublicSchema.leagues.id);
 
-        // First try to get basic database connection and check if tables exist
-        const db = context.db;
-        console.log('Database connection established, checking tables...');
-
-        try {
-          // First check if we have any leagues at all
-          const allLeagues = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-              currentMatchup: PublicSchema.leagues.currentMatchup,
-              draftStatus: PublicSchema.leagues.draftStatus,
-              inviteCode: PublicSchema.leagues.inviteCode,
-              weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
-            })
-            .from(PublicSchema.leagues)
-            .limit(5);
-
-          console.log(`Found ${allLeagues.length} total leagues in database`);
-
-          // Check if leagueMembers table has any data
-          const membershipCount = await db
-            .select()
-            .from(PublicSchema.leagueMembers)
-            .limit(5);
-
-          console.log(
-            `Found ${membershipCount.length} league memberships in database`,
-          );
-
-          // Try the actual query
-          const results = await db
-            .select({
-              id: PublicSchema.leagues.id,
-              name: PublicSchema.leagues.name,
-              owner: PublicSchema.leagues.owner,
-              maxRosterSize: PublicSchema.leagues.maxRosterSize,
-              currentMatchup: PublicSchema.leagues.currentMatchup,
-              draftStatus: PublicSchema.leagues.draftStatus,
-              inviteCode: PublicSchema.leagues.inviteCode,
-              weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
-            })
-            .from(PublicSchema.leagues)
-            .innerJoin(
-              PublicSchema.leagueMembers,
-              eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
-            )
-            .where(eq(PublicSchema.leagueMembers.userId, userId))
-            .orderBy(PublicSchema.leagues.id);
-
-          console.log(`Found ${results.length} leagues for user ${userId}`);
-
-          const userLeagues = results.map((league) => ({
-            id: league.id,
-            name: league.name,
-            owner: league.owner,
-            maxRosterSize: league.maxRosterSize,
-            currentMatchup: league.currentMatchup,
-            draftStatus: league.draftStatus,
-            inviteCode: league.inviteCode,
-            weekAdvanceStatus: league.weekAdvanceStatus,
-          }));
-
-          return userLeagues;
-        } catch (dbError) {
-          console.error('Database query error:', dbError);
-          // Return empty array instead of throwing to help diagnose
-          return [];
-        }
+        return results.map((league) => ({
+          id: league.id,
+          name: league.name,
+          owner: league.owner,
+          maxRosterSize: league.maxRosterSize,
+          currentMatchup: league.currentMatchup,
+          draftStatus: league.draftStatus,
+          inviteCode: league.inviteCode,
+          weekAdvanceStatus: league.weekAdvanceStatus,
+        }));
       } catch (error) {
-        console.error('Error fetching user leagues:', error);
-        console.error('Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined,
+        LOGGER.error('Failed to fetch user leagues', {
           userId,
-          context: context.user
-            ? 'User authenticated'
-            : 'User not authenticated',
+          error: error instanceof Error ? error.message : String(error),
         });
-
-        // For now, return empty array instead of throwing to help with debugging
-        console.log('Returning empty array due to error');
-        return [];
+        throw new Error('Failed to fetch user leagues');
       }
     },
   }),
@@ -528,7 +492,7 @@ async function randomlyAssignPlayers(
     .limit(teams.length * maxPlayersPerTeam); // Get enough players for all teams
 
   if (availablePlayers.length === 0) {
-    console.log('No players available for random assignment');
+    LOGGER.info('No players available for random assignment', { leagueId });
     return [];
   }
 
@@ -568,9 +532,11 @@ async function randomlyAssignPlayers(
   // Insert all team members at once
   if (teamMembers.length > 0) {
     await db.insert(PublicSchema.teamMembers).values(teamMembers);
-    console.log(
-      `Randomly assigned ${teamMembers.length} players to ${teams.length} teams`,
-    );
+    LOGGER.info('Randomly assigned players to teams', {
+      leagueId,
+      teamCount: teams.length,
+      assignedCount: teamMembers.length,
+    });
   }
 
   return teamMembers;
@@ -584,7 +550,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       input: t.arg({ type: CreateLeagueAndTeamsInput, required: true }),
     },
     resolve: async (parent, args, context) => {
-      console.log('CreateLeagueAndTeams resolver called with context:', {
+      LOGGER.debug('CreateLeagueAndTeams resolver called', {
         hasUser: !!context.user,
         userId: context.user?.id,
         username: context.user?.username,
@@ -646,6 +612,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           id: number;
           name: string;
           leagueId: number;
+          createdAt: Date;
+          updatedAt: Date;
         }
         let teams: InsertedTeam[] = [];
         interface LeagueMemberInsert {
@@ -700,6 +668,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           });
 
         teams = insertedTeams;
@@ -746,10 +716,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           leagueMembers: leagueMembers,
         };
       } catch (error) {
-        console.error('Error creating league and teams:', error);
-        console.error('Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : 'No stack trace',
+        LOGGER.error('Error creating league and teams', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           userId: context.user?.id,
           leagueName,
           numberOfTeams,
@@ -818,7 +787,11 @@ builder.queryField('leaguePositions', (t) =>
 
         return positions;
       } catch (error) {
-        console.error('Error fetching league positions:', error);
+        LOGGER.error('Error fetching league positions', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error('Failed to fetch league positions');
       }
     },
@@ -888,7 +861,11 @@ builder.queryField('teamMembers', (t) =>
 
         return members;
       } catch (error) {
-        console.error('Error fetching team members:', error);
+        LOGGER.error('Error fetching team members', {
+          teamId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error('Failed to fetch team members');
       }
     },
@@ -929,7 +906,11 @@ builder.queryField('userTeamId', (t) =>
 
         return membership.length > 0 ? membership[0].teamId : null;
       } catch (error) {
-        console.error('Error fetching user team ID:', error);
+        LOGGER.error('Error fetching user team ID', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error('Failed to fetch user team ID');
       }
     },
@@ -975,6 +956,8 @@ builder.queryField('leagueTeams', (t) =>
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.leagueId, leagueId))
@@ -982,7 +965,11 @@ builder.queryField('leagueTeams', (t) =>
 
         return teams;
       } catch (error) {
-        console.error('Error fetching league teams:', error);
+        LOGGER.error('Error fetching league teams', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error('Failed to fetch league teams');
       }
     },
@@ -1069,7 +1056,11 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
 
         return insertedPositions;
       } catch (error) {
-        console.error('Error adding positions to league:', error);
+        LOGGER.error('Error adding positions to league', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw error;
       }
     },
@@ -1108,10 +1099,10 @@ builder.mutationField('startDraft', (t) =>
           throw new Error(result.error || 'Failed to start draft');
         }
 
-        console.log(
-          '✅ Draft queued successfully via shared service:',
-          result.league,
-        );
+        LOGGER.info('Draft queued successfully via shared service', {
+          leagueId: result.league?.id,
+          draftStatus: result.league?.draftStatus,
+        });
 
         // Return with proper typing for GraphQL resolver
         return {
@@ -1123,7 +1114,11 @@ builder.mutationField('startDraft', (t) =>
             | 'completed',
         };
       } catch (error) {
-        console.error('Error starting draft:', error);
+        LOGGER.error('Error starting draft', {
+          leagueId: args.leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error(
           `Failed to start draft: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
@@ -1198,6 +1193,8 @@ builder.mutationField('joinLeagueByCode', (t) =>
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           });
 
         const team = insertedTeams[0];
@@ -1219,13 +1216,19 @@ builder.mutationField('joinLeagueByCode', (t) =>
           .insert(PublicSchema.leagueMembers)
           .values(leagueMemberData);
 
-        console.log(
-          `✅ User ${userId} joined league ${league.id} with team ${team.id}`,
-        );
+        LOGGER.info('User joined league', {
+          userId,
+          leagueId: league.id,
+          teamId: team.id,
+        });
 
         return team;
       } catch (error) {
-        console.error('Error joining league:', error);
+        LOGGER.error('Error joining league', {
+          userId,
+          inviteCode: args.inviteCode,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error(
           `Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
@@ -1305,7 +1308,10 @@ builder.mutationField('createLeague', (t) =>
 
         return leagues[0];
       } catch (error) {
-        console.error('Error creating league:', error);
+        LOGGER.error('Error creating league', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error(
           `Failed to create league: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
@@ -1379,6 +1385,8 @@ builder.mutationField('joinLeague', (t) =>
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           });
 
         if (teams.length === 0) {
@@ -1402,7 +1410,11 @@ builder.mutationField('joinLeague', (t) =>
           teamId: team.id,
         };
       } catch (error) {
-        console.error('Error joining league:', error);
+        LOGGER.error('Error joining league', {
+          userId,
+          inviteCode,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error(
           `Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
@@ -1465,7 +1477,11 @@ builder.mutationField('deleteLeague', (t) =>
 
         return `Successfully deleted league ${args.leagueId} and all associated data`;
       } catch (error) {
-        console.error('Error deleting league:', error);
+        LOGGER.error('Error deleting league', {
+          leagueId: args.leagueId,
+          userId: context.user?.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         throw new Error('Failed to delete league: ' + errorMessage);
@@ -1541,7 +1557,10 @@ builder.mutationField('deleteAllLeagues', (t) =>
 
         return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {
-        console.error('Error deleting leagues:', error);
+        LOGGER.error('Error deleting leagues', {
+          userId: context.user?.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         throw new Error('Failed to delete leagues: ' + errorMessage);
@@ -1625,7 +1644,12 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
 
         return updated[0];
       } catch (error) {
-        console.error('Error updating team member position:', error);
+        LOGGER.error('Error updating team member position', {
+          teamMemberId,
+          positionId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw new Error('Failed to update team member position');
       }
     },

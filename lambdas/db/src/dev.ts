@@ -10,7 +10,7 @@ import { createLoaders } from './schema/dataloaders';
 
 interface JWTPayload {
   id: number;
-  email: string;
+  email?: string;
   username: string;
   isAdmin?: boolean;
   [key: string]: unknown; // For other JWT standard fields
@@ -18,7 +18,7 @@ interface JWTPayload {
 
 interface User {
   id: number;
-  email: string;
+  email?: string;
   username: string;
   isAdmin: boolean;
 }
@@ -64,7 +64,7 @@ async function startServer() {
     introspection: true,
     formatError: (formattedError, error) => {
       // Log all errors with full context
-      console.error('GraphQL Error:', {
+      LOGGER.error('GraphQL Error', {
         message: formattedError.message,
         path: formattedError.path,
         extensions: formattedError.extensions,

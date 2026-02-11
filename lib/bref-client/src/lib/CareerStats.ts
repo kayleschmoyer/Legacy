@@ -506,6 +506,14 @@ export async function getAllGameFieldingStats(
   season: number,
   pos: string,
 ): Promise<GameFielding[]> {
+  // Handle null/undefined position (e.g., pitchers without fielding stats)
+  if (!pos || pos === null || pos === undefined) {
+    LOGGER.debug(
+      `No position provided for player ${player.brefId} season ${season} - returning empty array`,
+    );
+    return [];
+  }
+
   const data = await getGameStats(player.brefId, 'f', season);
 
   const root = htmlParser(data, { comment: true });
@@ -677,7 +685,7 @@ export async function getAllGameBattingStats(
 
     const identifierCell = gameRow
       .getElementsByTagName('td')
-      .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+      .find((cell) => cell.getAttribute('data-stat') === 'date');
 
     const link = identifierCell
       ?.getElementsByTagName('a')[0]
@@ -744,7 +752,7 @@ export async function getGamePitchingStats(
   const cells = gameRow.getElementsByTagName('td');
 
   const identifierCell = cells.find(
-    (cell) => cell.getAttribute('data-stat') === 'date_game',
+    (cell) => cell.getAttribute('data-stat') === 'date',
   );
 
   const link = identifierCell
@@ -848,7 +856,7 @@ export async function getAllGamePitchingStats(
     const cells = gameRow.getElementsByTagName('td');
 
     const identifierCell = cells.find(
-      (cell) => cell.getAttribute('data-stat') === 'date_game',
+      (cell) => cell.getAttribute('data-stat') === 'date',
     );
 
     const link = identifierCell
@@ -916,6 +924,14 @@ export async function getGameFieldingStats(
   gameNumber: number,
   pos: string,
 ): Promise<GameFielding | null> {
+  // Handle null/undefined position (e.g., pitchers without fielding stats)
+  if (!pos || pos === null || pos === undefined) {
+    LOGGER.debug(
+      `No position provided for player ${player.brefId} game ${gameNumber} season ${season} - returning null`,
+    );
+    return null;
+  }
+
   const data = await getGameStats(player.brefId, 'f', season);
 
   const root = htmlParser(data, { comment: true });
@@ -1004,7 +1020,7 @@ export async function getGameFieldingStats(
 
   const identifierCell = gameRow
     .getElementsByTagName('td')
-    .find((cell) => cell.getAttribute('data-stat') === 'date_game');
+    .find((cell) => cell.getAttribute('data-stat') === 'date');
 
   const link = identifierCell
     ?.getElementsByTagName('a')[0]

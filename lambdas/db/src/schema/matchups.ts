@@ -22,7 +22,14 @@ const MatchupStatus = builder.enumType('MatchupStatus', {
 
 // Stats loading status enum
 const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
-  values: ['not_started', 'queued', 'loading', 'completed', 'failed'] as const,
+  values: [
+    'not_started',
+    'queued',
+    'loading',
+    'completed',
+    'failed',
+    'retry',
+  ] as const,
 });
 
 // Extended Matchup type with all new fields
@@ -40,7 +47,8 @@ const Matchup = builder.objectRef<{
     | 'queued'
     | 'loading'
     | 'completed'
-    | 'failed';
+    | 'failed'
+    | 'retry';
   gamesPerMatchup: number | null;
   startTime: string | null;
   endTime: string | null;
@@ -86,6 +94,8 @@ builder.objectType(Matchup, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, matchup.team1Id ?? 0))
@@ -103,6 +113,8 @@ builder.objectType(Matchup, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, matchup.team2Id ?? 0))
@@ -448,10 +460,45 @@ builder.mutationField('triggerGameSelection', (t) =>
   }),
 );
 
+// Response type for advanceLeagueWeek
+const AdvanceLeagueWeekResponse = builder.objectRef<{
+  matchups: Array<{
+    id: number;
+    weekNumber: number;
+    leagueId: number;
+    team1Id: number | null;
+    team2Id: number | null;
+    team1Score: string | null;
+    team2Score: string | null;
+    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    statsLoadingStatus:
+      | 'not_started'
+      | 'queued'
+      | 'loading'
+      | 'completed'
+      | 'failed'
+      | 'retry';
+    gamesPerMatchup: number | null;
+    startTime: string | null;
+    endTime: string | null;
+  }>;
+  currentMatchupId: number | null;
+}>('AdvanceLeagueWeekResponse');
+
+builder.objectType(AdvanceLeagueWeekResponse, {
+  fields: (t) => ({
+    matchups: t.field({
+      type: [Matchup],
+      resolve: (parent) => parent.matchups,
+    }),
+    currentMatchupId: t.exposeInt('currentMatchupId', { nullable: true }),
+  }),
+});
+
 // Mutation: advanceLeagueWeek - Complete current week and create next week matchups
 builder.mutationField('advanceLeagueWeek', (t) =>
   t.field({
-    type: 'Boolean',
+    type: AdvanceLeagueWeekResponse,
     args: {
       leagueId: t.arg.int({ required: true }),
     },
@@ -501,6 +548,9 @@ builder.mutationField('advanceLeagueWeek', (t) =>
           .select({
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.leagueId, args.leagueId));
@@ -762,16 +812,32 @@ builder.mutationField('advanceLeagueWeek', (t) =>
         });
 
         // Set status to success and update currentMatchup to first matchup of new week
+        const currentMatchupId =
+          newMatchups.length > 0 ? newMatchups[0].id : null;
+
         await context.db
           .update(PublicSchema.leagues)
           .set({
             weekAdvanceStatus: 'success',
-            currentMatchup:
-              newMatchups.length > 0 ? newMatchups[0].id : undefined,
+            currentMatchup: currentMatchupId ?? undefined,
           })
           .where(eq(PublicSchema.leagues.id, args.leagueId));
 
-        return true;
+        // Fetch full matchup data to return
+        const createdMatchups = await context.db
+          .select()
+          .from(PublicSchema.matchups)
+          .where(
+            inArray(
+              PublicSchema.matchups.id,
+              newMatchups.map((m) => m.id),
+            ),
+          );
+
+        return {
+          matchups: createdMatchups,
+          currentMatchupId,
+        };
       } catch (error) {
         // Set status to failed on error
         await context.db

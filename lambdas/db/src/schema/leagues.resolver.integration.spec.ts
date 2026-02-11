@@ -14,12 +14,12 @@ function generateInviteCode(): string {
 }
 
 describe('League Resolver - Integration Tests', () => {
-  let db: ReturnType<typeof getTestDatabase>;
-  let client: Database;
+  let db: Awaited<ReturnType<typeof getTestDatabase>>;
+  let client: Awaited<ReturnType<typeof getTestClient>>;
 
-  beforeAll(() => {
-    db = getTestDatabase();
-    client = getTestClient();
+  beforeAll(async () => {
+    db = await getTestDatabase();
+    client = await getTestClient();
   });
 
   beforeEach(async () => {
@@ -519,8 +519,6 @@ describe('League Resolver - Integration Tests', () => {
 
       // Performance check (should be fast with in-memory SQLite)
       expect(duration).toBeLessThan(1000); // Less than 1 second
-
-      console.log(`✅ Bulk insert of 100 leagues took ${duration}ms`);
     });
   });
 });

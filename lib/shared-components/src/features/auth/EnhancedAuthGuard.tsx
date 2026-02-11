@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './LoginPage';
@@ -53,33 +53,10 @@ export function EnhancedAuthGuard({
   onLoginFailure,
   onLogoutSuccess,
 }: EnhancedAuthGuardProps) {
-  const { isAuthenticated, isLoading, config, loginWithOAuth, user } =
-    useAuth();
-
-  // Debug logging
-  console.log('EnhancedAuthGuard render:', {
-    isAuthenticated,
-    isLoading,
-    hasUser: !!user,
-    userId: user?.id,
-    testMode,
-  });
-
-  // Track authentication state changes
-  useEffect(() => {
-    console.log('EnhancedAuthGuard - Auth state changed:', {
-      isAuthenticated,
-      isLoading,
-      hasUser: !!user,
-      testMode,
-    });
-  }, [isAuthenticated, isLoading, user, testMode]);
+  const { isAuthenticated, isLoading, config, loginWithOAuth } = useAuth();
 
   // In test mode, bypass authentication and show content directly
   if (testMode) {
-    console.log(
-      'EnhancedAuthGuard - Test mode enabled, showing authenticated content',
-    );
     return children;
   }
 
@@ -108,10 +85,11 @@ export function EnhancedAuthGuard({
         <LoginPage
           config={config}
           loginWithOAuth={loginWithOAuth}
-          appName={loginTitle ? loginTitle.replace('Welcome to ', '') : 'Legacy Sports'}
+          appName={
+            loginTitle ? loginTitle.replace('Welcome to ', '') : 'Legacy Sports'
+          }
           onSuccess={(user: { id: number; email: string; name?: string }) => {
             try {
-              console.log('EnhancedAuthGuard - Login successful, user:', user);
               // The authentication state should already be updated by loginWithOAuth
               // Call the optional callback if provided
               onLoginSuccess?.();

@@ -9,6 +9,10 @@
 #   .\ls-cli.ps1 get-player-batting --player troutmi01
 
 $ErrorActionPreference = "Stop"
+
+# Store the original working directory so log files can be resolved correctly
+$env:CLI_INVOKE_DIR = $PWD.Path
+
 Push-Location "$PSScriptRoot/apps/cli"
 try {
     & pnpm exec tsx --tsconfig ../../tsconfig.base.json src/main.ts @args

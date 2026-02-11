@@ -1,181 +1,94 @@
 import {
-  boolean,
-  foreignKey,
-  index,
-  integer,
-  jsonb,
-  numeric,
-  pgEnum,
   pgTable,
   serial,
-  text,
+  integer,
+  boolean,
   timestamp,
-  unique,
+  text,
   varchar,
+  jsonb,
+  index,
+  unique,
+  foreignKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { matchups } from './Matchups';
-import { leagues } from './Leagues';
-import { usersInAppInternal } from '../../internal/schema';
 
-// Enums
-export const notificationType = pgEnum('notification_type', [
-  'matchup_started',
-  'matchup_ended',
-  'matchup_close_game',
-  'matchup_reminder',
-]);
-
-export const notificationChannel = pgEnum('notification_channel', [
-  'in_app',
-  'push',
-  'email',
-]);
-
-// Notification Preferences Table
+/**
+ * User notification preferences
+ */
 export const notificationPreferences = pgTable(
   'notification_preferences',
   {
-    id: serial('id').primaryKey().notNull(),
+    id: serial('id').primaryKey(),
     userId: integer('user_id').notNull(),
     matchupStartedEnabled: boolean('matchup_started_enabled')
-      .default(true)
-      .notNull(),
+      .notNull()
+      .default(true),
     matchupEndedEnabled: boolean('matchup_ended_enabled')
-      .default(true)
-      .notNull(),
+      .notNull()
+      .default(true),
     matchupCloseGameEnabled: boolean('matchup_close_game_enabled')
-      .default(true)
-      .notNull(),
+      .notNull()
+      .default(true),
     matchupReminderEnabled: boolean('matchup_reminder_enabled')
-      .default(true)
-      .notNull(),
-    pushEnabled: boolean('push_enabled').default(true).notNull(),
-    emailEnabled: boolean('email_enabled').default(false).notNull(),
-    closeGameThreshold: numeric('close_game_threshold', {
-      precision: 10,
-      scale: 2,
-    }).default('5.0'),
-    createdAt: timestamp('created_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
-    updatedAt: timestamp('updated_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
+      .notNull()
+      .default(true),
+    pushEnabled: boolean('push_enabled').notNull().default(true),
+    emailEnabled: boolean('email_enabled').notNull().default(false),
+    closeGameThreshold: integer('close_game_threshold').notNull().default(50),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      notificationPreferencesUserUk: unique(
-        'notification_preferences_user_uk',
-      ).on(table.userId),
-      notificationPreferencesUserFk: foreignKey({
-        columns: [table.userId],
-        foreignColumns: [usersInAppInternal.id],
-        name: 'notification_preferences_user_fk',
-      })
-        .onDelete('cascade')
-        .onUpdate('cascade'),
-    };
-  },
+  (table) => ({
+    userIdUnique: unique('notification_preferences_user_id_unique').on(
+      table.userId,
+    ),
+  }),
 );
 
-// Device Tokens Table
+/**
+ * Device tokens for push notifications
+ */
 export const deviceTokens = pgTable(
   'device_tokens',
   {
-    id: serial('id').primaryKey().notNull(),
+    id: serial('id').primaryKey(),
     userId: integer('user_id').notNull(),
     deviceToken: text('device_token').notNull(),
-    platform: varchar('platform', { length: 20 }).notNull(),
-    endpointArn: text('endpoint_arn'),
-    enabled: boolean('enabled').default(true).notNull(),
-    createdAt: timestamp('created_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
-    updatedAt: timestamp('updated_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
+    platform: varchar('platform', { length: 10 }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      deviceTokensTokenUk: unique('device_tokens_token_uk').on(
-        table.deviceToken,
-      ),
-      deviceTokensUserIdx: index('device_tokens_user_idx').on(table.userId),
-      deviceTokensEnabledIdx: index('device_tokens_enabled_idx').on(
-        table.enabled,
-      ),
-      deviceTokensUserFk: foreignKey({
-        columns: [table.userId],
-        foreignColumns: [usersInAppInternal.id],
-        name: 'device_tokens_user_fk',
-      })
-        .onDelete('cascade')
-        .onUpdate('cascade'),
-    };
-  },
+  (table) => ({
+    deviceTokenUnique: unique('device_tokens_device_token_unique').on(
+      table.deviceToken,
+    ),
+    userIdIdx: index('device_tokens_user_id_idx').on(table.userId),
+  }),
 );
 
-// Notification History Table
+/**
+ * Notification history - record of all sent notifications
+ */
 export const notificationHistory = pgTable(
   'notification_history',
   {
-    id: serial('id').primaryKey().notNull(),
+    id: serial('id').primaryKey(),
     userId: integer('user_id').notNull(),
-    notificationType: notificationType('notification_type').notNull(),
-    channel: notificationChannel('channel').notNull(),
-    matchupId: integer('matchup_id'),
-    leagueId: integer('league_id'),
-    title: varchar('title', { length: 255 }).notNull(),
-    message: text('message').notNull(),
-    metadata: jsonb('metadata'),
-    read: boolean('read').default(false).notNull(),
-    sentAt: timestamp('sent_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
-    readAt: timestamp('read_at', { mode: 'string' }),
-    createdAt: timestamp('created_at', { mode: 'string' })
-      .default(sql`now()`)
-      .notNull(),
+    notificationType: varchar('notification_type', { length: 50 }).notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    data: jsonb('data'),
+    isRead: boolean('is_read').notNull().default(false),
+    sentAt: timestamp('sent_at').notNull().defaultNow(),
+    readAt: timestamp('read_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      notificationHistoryUserIdx: index('notification_history_user_idx').on(
-        table.userId,
-      ),
-      notificationHistoryMatchupIdx: index(
-        'notification_history_matchup_idx',
-      ).on(table.matchupId),
-      notificationHistoryLeagueIdx: index('notification_history_league_idx').on(
-        table.leagueId,
-      ),
-      notificationHistoryReadIdx: index('notification_history_read_idx').on(
-        table.read,
-      ),
-      notificationHistorySentAtIdx: index(
-        'notification_history_sent_at_idx',
-      ).on(table.sentAt),
-      notificationHistoryUserFk: foreignKey({
-        columns: [table.userId],
-        foreignColumns: [usersInAppInternal.id],
-        name: 'notification_history_user_fk',
-      })
-        .onDelete('cascade')
-        .onUpdate('cascade'),
-      notificationHistoryMatchupFk: foreignKey({
-        columns: [table.matchupId],
-        foreignColumns: [matchups.id],
-        name: 'notification_history_matchup_fk',
-      })
-        .onDelete('set null')
-        .onUpdate('cascade'),
-      notificationHistoryLeagueFk: foreignKey({
-        columns: [table.leagueId],
-        foreignColumns: [leagues.id],
-        name: 'notification_history_league_fk',
-      })
-        .onDelete('set null')
-        .onUpdate('cascade'),
-    };
-  },
+  (table) => ({
+    userIdIdx: index('notification_history_user_id_idx').on(table.userId),
+    isReadIdx: index('notification_history_is_read_idx').on(table.isRead),
+    sentAtIdx: index('notification_history_sent_at_idx').on(table.sentAt),
+  }),
 );

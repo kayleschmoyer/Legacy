@@ -16,7 +16,11 @@ export class FileOutputDestination implements OutputDestination {
 
   write(entry: LogEntry): void {
     try {
-      const fullPath = path.resolve(process.cwd(), this.filePath);
+      // Use CLI_INVOKE_DIR if set (by ls-cli.ps1), otherwise use process.cwd()
+      const baseDir = process.env['CLI_INVOKE_DIR'] || process.cwd();
+      const fullPath = path.isAbsolute(this.filePath)
+        ? this.filePath
+        : path.resolve(baseDir, this.filePath);
       const formattedMessage = formatLogEntry(entry) + '\n';
 
       // Ensure directory exists

@@ -6,6 +6,7 @@ import {
   type LogArgs,
   type LogEntry,
   type LogLevel,
+  type OutputDestination,
   shouldLog,
 } from './types';
 import { EnvironmentVariable } from '../EnvironmentVariable';
@@ -18,6 +19,28 @@ export class ConsoleLogger implements ILogger {
     const logLevel = getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
     this.currentLogLevel =
       logLevel.toLowerCase() in LOG_LEVELS ? logLevel.toLowerCase() : 'info';
+  }
+
+  // Stub implementation - ConsoleLogger doesn't support dynamic destinations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  addDestination(_destination: OutputDestination): void {
+    // No-op: ConsoleLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - ConsoleLogger doesn't support dynamic destinations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  removeDestination(_destination: OutputDestination): void {
+    // No-op: ConsoleLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - ConsoleLogger doesn't support dynamic destinations
+  clearDestinations(): void {
+    // No-op: ConsoleLogger doesn't support dynamic destinations
+  }
+
+  // Stub implementation - ConsoleLogger doesn't support dynamic destinations
+  getDestinations(): OutputDestination[] {
+    return []; // ConsoleLogger doesn't support dynamic destinations
   }
 
   private formatMessage(

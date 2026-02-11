@@ -14,7 +14,7 @@ let db: BetterSQLite3Database<typeof integrationTestSchema>;
 async function createTestSchema(
   db: BetterSQLite3Database<typeof integrationTestSchema>,
 ) {
-  console.log('🔄 Creating test database schema...');
+  // Intentionally quiet: Jest treats noisy console output as signal.
 
   // For now, let's create the minimal tables needed for existing integration tests
   // We'll expand this as we add more integration tests
@@ -157,7 +157,7 @@ async function createTestSchema(
     )
   `);
 
-  console.log('✅ Test schema created successfully');
+  // Schema created
 }
 
 /**
@@ -171,15 +171,11 @@ export async function setupIntegrationTestDatabase(): Promise<void> {
     return;
   }
 
-  console.log('🗄️  Creating in-memory SQLite database...');
-
   // Create in-memory SQLite database
   sqliteDb = new Database(':memory:');
 
   // Enable foreign keys (required for constraint enforcement)
   sqliteDb.pragma('foreign_keys = ON');
-
-  console.log('✅ In-memory database created');
 
   // Initialize Drizzle ORM with SQLite schema for integration tests
   db = drizzle(sqliteDb, { schema: integrationTestSchema });
@@ -192,15 +188,10 @@ export async function setupIntegrationTestDatabase(): Promise<void> {
  * Get the database instance for use in tests
  * Auto-initializes on first access (lazy initialization)
  */
-export function getTestDatabase() {
+export async function getTestDatabase() {
+  await setupIntegrationTestDatabase();
   if (!db) {
-    // Auto-initialize on first access (each test worker creates its own database)
-    setupIntegrationTestDatabase();
-  }
-  if (!db) {
-    throw new Error(
-      'Test database not initialized. Did you call setupIntegrationTestDatabase()?',
-    );
+    throw new Error('Test database not initialized after setup');
   }
   return db;
 }
@@ -209,15 +200,10 @@ export function getTestDatabase() {
  * Get the database client for direct SQL queries
  * Auto-initializes on first access (lazy initialization)
  */
-export function getTestClient(): Database.Database {
+export async function getTestClient(): Promise<Database.Database> {
+  await setupIntegrationTestDatabase();
   if (!sqliteDb) {
-    // Auto-initialize on first access (each test worker creates its own database)
-    setupIntegrationTestDatabase();
-  }
-  if (!sqliteDb) {
-    throw new Error(
-      'Test client not initialized. Did you call setupIntegrationTestDatabase()?',
-    );
+    throw new Error('Test client not initialized after setup');
   }
   return sqliteDb;
 }
@@ -257,8 +243,12 @@ export async function cleanupTestData(): Promise<void> {
     try {
       sqliteDb.prepare(`DELETE FROM ${table}`).run();
     } catch (error) {
-      // Some tables might not exist yet - that's okay
-      console.warn(`Warning: Could not clean table ${table}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      // Some tables are not part of the minimal integration schema.
+      if (/no such table/i.test(message)) {
+        continue;
+      }
+      throw error;
     }
   }
 
@@ -275,14 +265,9 @@ export async function cleanupTestData(): Promise<void> {
  * Called once after all integration tests
  */
 export async function teardownIntegrationTestDatabase(): Promise<void> {
-  console.log('🧹 Shutting down integration test environment...');
-
   if (sqliteDb) {
     sqliteDb.close();
-    console.log('✅ Database closed');
   }
-
-  console.log('✅ Integration test environment cleaned up');
 }
 
 // Export the schema for use in integration tests

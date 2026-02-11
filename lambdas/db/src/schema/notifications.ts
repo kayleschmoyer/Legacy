@@ -1,36 +1,35 @@
-import {
-  disableDeviceToken,
-  getUnreadNotificationCount,
-  getUserDeviceTokens,
-  getUserNotificationHistory,
-  getUserNotificationPreferences,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-  registerDeviceToken,
-  updateNotificationPreferences,
-} from '@legacy-sports/db-client';
-import type {
-  DeviceTokenInput as DeviceTokenInputType,
-  NotificationPreferenceInput as NotificationPreferenceInputType,
-} from '@legacy-sports/db-client';
+import { createDatabaseService } from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 
-// Enums
-const NotificationType = builder.enumType('NotificationType', {
-  values: [
-    'matchup_started',
-    'matchup_ended',
-    'matchup_close_game',
-    'matchup_reminder',
-  ] as const,
+// Create a single database service instance to reuse across all resolvers
+const dbService = createDatabaseService(getDbOptions());
+
+// Input types
+const NotificationPreferenceInput = builder.inputType(
+  'NotificationPreferenceInput',
+  {
+    fields: (t) => ({
+      matchupStartedEnabled: t.boolean({ required: false }),
+      matchupEndedEnabled: t.boolean({ required: false }),
+      matchupCloseGameEnabled: t.boolean({ required: false }),
+      matchupReminderEnabled: t.boolean({ required: false }),
+      pushEnabled: t.boolean({ required: false }),
+      emailEnabled: t.boolean({ required: false }),
+      closeGameThreshold: t.int({ required: false }),
+    }),
+  },
+);
+
+const DeviceTokenInput = builder.inputType('DeviceTokenInput', {
+  fields: (t) => ({
+    deviceToken: t.string({ required: true }),
+    platform: t.string({ required: true }),
+  }),
 });
 
-const NotificationChannel = builder.enumType('NotificationChannel', {
-  values: ['in_app', 'push', 'email'] as const,
-});
-
-// NotificationPreference Type
-const NotificationPreference = builder.objectRef<{
+// NotificationPreference type
+const NotificationPreferenceRef = builder.objectRef<{
   id: number;
   userId: number;
   matchupStartedEnabled: boolean;
@@ -39,15 +38,14 @@ const NotificationPreference = builder.objectRef<{
   matchupReminderEnabled: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
-  closeGameThreshold: string | null;
-  createdAt: string;
-  updatedAt: string;
+  closeGameThreshold: number;
+  createdAt: Date;
+  updatedAt: Date;
 }>('NotificationPreference');
 
-builder.objectType(NotificationPreference, {
-  description: 'User notification preferences',
+NotificationPreferenceRef.implement({
   fields: (t) => ({
-    id: t.exposeID('id'),
+    id: t.exposeInt('id'),
     userId: t.exposeInt('userId'),
     matchupStartedEnabled: t.exposeBoolean('matchupStartedEnabled'),
     matchupEndedEnabled: t.exposeBoolean('matchupEndedEnabled'),
@@ -55,165 +53,216 @@ builder.objectType(NotificationPreference, {
     matchupReminderEnabled: t.exposeBoolean('matchupReminderEnabled'),
     pushEnabled: t.exposeBoolean('pushEnabled'),
     emailEnabled: t.exposeBoolean('emailEnabled'),
-    closeGameThreshold: t.float({
-      nullable: true,
-      resolve: (pref) =>
-        pref.closeGameThreshold ? parseFloat(pref.closeGameThreshold) : null,
+    closeGameThreshold: t.exposeInt('closeGameThreshold'),
+    createdAt: t.string({
+      resolve: (parent) => parent.createdAt.toISOString(),
     }),
-    createdAt: t.exposeString('createdAt'),
-    updatedAt: t.exposeString('updatedAt'),
+    updatedAt: t.string({
+      resolve: (parent) => parent.updatedAt.toISOString(),
+    }),
   }),
 });
 
-// DeviceToken Type
-const DeviceToken = builder.objectRef<{
+// DeviceToken type
+const DeviceTokenRef = builder.objectRef<{
   id: number;
   userId: number;
   deviceToken: string;
   platform: string;
-  endpointArn: string | null;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }>('DeviceToken');
 
-builder.objectType(DeviceToken, {
-  description: 'Mobile device token for push notifications',
+DeviceTokenRef.implement({
   fields: (t) => ({
-    id: t.exposeID('id'),
+    id: t.exposeInt('id'),
     userId: t.exposeInt('userId'),
     deviceToken: t.exposeString('deviceToken'),
     platform: t.exposeString('platform'),
-    endpointArn: t.exposeString('endpointArn', { nullable: true }),
-    enabled: t.exposeBoolean('enabled'),
-    createdAt: t.exposeString('createdAt'),
-    updatedAt: t.exposeString('updatedAt'),
+    isActive: t.exposeBoolean('isActive'),
+    // Map isActive to enabled for frontend compatibility
+    enabled: t.boolean({ resolve: (parent) => parent.isActive }),
+    // endpointArn not in database yet, return null
+    endpointArn: t.string({ nullable: true, resolve: () => null }),
+    createdAt: t.string({
+      resolve: (parent) => parent.createdAt.toISOString(),
+    }),
+    updatedAt: t.string({
+      resolve: (parent) => parent.updatedAt.toISOString(),
+    }),
   }),
 });
 
-// NotificationHistoryItem Type
-const NotificationHistoryItem = builder.objectRef<{
+// NotificationHistoryItem type
+const NotificationHistoryItemRef = builder.objectRef<{
   id: number;
   userId: number;
-  notificationType:
-    | 'matchup_started'
-    | 'matchup_ended'
-    | 'matchup_close_game'
-    | 'matchup_reminder';
-  channel: 'in_app' | 'push' | 'email';
-  matchupId: number | null;
-  leagueId: number | null;
+  notificationType: string;
   title: string;
-  message: string;
-  metadata: Record<string, unknown> | null;
-  read: boolean;
-  sentAt: string;
-  readAt: string | null;
-  createdAt: string;
+  body: string;
+  data: unknown;
+  isRead: boolean;
+  sentAt: Date;
+  readAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }>('NotificationHistoryItem');
 
-builder.objectType(NotificationHistoryItem, {
-  description: 'Historical record of a sent notification',
+NotificationHistoryItemRef.implement({
   fields: (t) => ({
-    id: t.exposeID('id'),
+    id: t.exposeInt('id'),
     userId: t.exposeInt('userId'),
-    notificationType: t.field({
-      type: NotificationType,
-      resolve: (item) => item.notificationType,
+    notificationType: t.exposeString('notificationType'),
+    // Frontend-expected fields extracted from data JSON
+    channel: t.string({ resolve: () => 'push' }), // Default channel
+    matchupId: t.int({
+      nullable: true,
+      resolve: (parent) => {
+        if (!parent.data || typeof parent.data !== 'object') return null;
+        const data = parent.data as Record<string, unknown>;
+        return typeof data.matchupId === 'number' ? data.matchupId : null;
+      },
     }),
-    channel: t.field({
-      type: NotificationChannel,
-      resolve: (item) => item.channel,
+    leagueId: t.int({
+      nullable: true,
+      resolve: (parent) => {
+        if (!parent.data || typeof parent.data !== 'object') return null;
+        const data = parent.data as Record<string, unknown>;
+        return typeof data.leagueId === 'number' ? data.leagueId : null;
+      },
     }),
-    matchupId: t.exposeInt('matchupId', { nullable: true }),
-    leagueId: t.exposeInt('leagueId', { nullable: true }),
     title: t.exposeString('title'),
-    message: t.exposeString('message'),
+    message: t.string({ resolve: (parent) => parent.body }), // Map body to message
+    body: t.exposeString('body'),
     metadata: t.string({
       nullable: true,
-      resolve: (item) => (item.metadata ? JSON.stringify(item.metadata) : null),
+      resolve: (parent) => (parent.data ? JSON.stringify(parent.data) : null),
     }),
-    read: t.exposeBoolean('read'),
-    sentAt: t.exposeString('sentAt'),
-    readAt: t.exposeString('readAt', { nullable: true }),
-    createdAt: t.exposeString('createdAt'),
-  }),
-});
-
-// Input Types
-const NotificationPreferenceInput = builder.inputType(
-  'NotificationPreferenceInput',
-  {
-    fields: (t) => ({
-      matchupStartedEnabled: t.boolean(),
-      matchupEndedEnabled: t.boolean(),
-      matchupCloseGameEnabled: t.boolean(),
-      matchupReminderEnabled: t.boolean(),
-      pushEnabled: t.boolean(),
-      emailEnabled: t.boolean(),
-      closeGameThreshold: t.float(),
+    data: t.string({
+      nullable: true,
+      resolve: (parent) => (parent.data ? JSON.stringify(parent.data) : null),
     }),
-  },
-);
-
-const DeviceTokenInput = builder.inputType('DeviceTokenInput', {
-  fields: (t) => ({
-    userId: t.int({ required: true }),
-    deviceToken: t.string({ required: true }),
-    platform: t.string({ required: true }),
-    endpointArn: t.string(),
+    read: t.boolean({ resolve: (parent) => parent.isRead }), // Map isRead to read
+    isRead: t.exposeBoolean('isRead'),
+    sentAt: t.string({
+      resolve: (parent) => parent.sentAt.toISOString(),
+    }),
+    readAt: t.string({
+      nullable: true,
+      resolve: (parent) => (parent.readAt ? parent.readAt.toISOString() : null),
+    }),
+    createdAt: t.string({
+      resolve: (parent) => parent.createdAt.toISOString(),
+    }),
+    updatedAt: t.string({
+      resolve: (parent) => parent.updatedAt.toISOString(),
+    }),
   }),
 });
 
 // Queries
 builder.queryField('getUserNotificationPreferences', (t) =>
   t.field({
-    type: NotificationPreference,
-    args: {
-      userId: t.arg.int({ required: true }),
-    },
-    resolve: async (_parent, args, context) => {
-      return await getUserNotificationPreferences(context.db, args.userId);
+    type: NotificationPreferenceRef,
+    nullable: true,
+    resolve: async (parent, args, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+
+      const prefs =
+        await dbService.notifications.getUserNotificationPreferences(userId);
+      if (!prefs) return null;
+      return {
+        id: Number(prefs.id),
+        userId: Number(prefs.userId),
+        matchupStartedEnabled: prefs.matchupStartedEnabled,
+        matchupEndedEnabled: prefs.matchupEndedEnabled,
+        matchupCloseGameEnabled: prefs.matchupCloseGameEnabled,
+        matchupReminderEnabled: prefs.matchupReminderEnabled,
+        pushEnabled: prefs.pushEnabled,
+        emailEnabled: prefs.emailEnabled,
+        closeGameThreshold: prefs.closeGameThreshold,
+        createdAt: prefs.createdAt,
+        updatedAt: prefs.updatedAt,
+      };
     },
   }),
 );
 
 builder.queryField('getNotificationHistory', (t) =>
   t.field({
-    type: [NotificationHistoryItem],
+    type: [NotificationHistoryItemRef],
     args: {
-      userId: t.arg.int({ required: true }),
-      limit: t.arg.int({ defaultValue: 50 }),
+      limit: t.arg.int({ required: false }),
+      offset: t.arg.int({ required: false }),
     },
-    resolve: async (_parent, args, context) => {
-      return await getUserNotificationHistory(
-        context.db,
-        args.userId,
-        args.limit ?? undefined,
+    resolve: async (parent, { limit, offset }, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+      const history = await dbService.notifications.getNotificationHistory(
+        userId,
+        limit || 50,
+        offset || 0,
       );
+      return history.map((item) => ({
+        id: Number(item.id),
+        userId: Number(item.userId),
+        notificationType: item.notificationType,
+        title: item.title,
+        body: item.body,
+        data: item.data,
+        isRead: item.isRead,
+        sentAt: item.sentAt,
+        readAt: item.readAt,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
     },
   }),
 );
 
 builder.queryField('getUnreadNotificationCount', (t) =>
-  t.int({
-    args: {
-      userId: t.arg.int({ required: true }),
-    },
-    resolve: async (_parent, args, context) => {
-      return await getUnreadNotificationCount(context.db, args.userId);
+  t.field({
+    type: 'Int',
+    resolve: async (parent, args, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+
+      return await dbService.notifications.getUnreadNotificationCount(userId);
     },
   }),
 );
 
 builder.queryField('getUserDeviceTokens', (t) =>
   t.field({
-    type: [DeviceToken],
-    args: {
-      userId: t.arg.int({ required: true }),
-    },
-    resolve: async (_parent, args, context) => {
-      return await getUserDeviceTokens(context.db, args.userId);
+    type: [DeviceTokenRef],
+    resolve: async (parent, args, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+
+      const tokens = await dbService.notifications.getUserDeviceTokens(userId);
+      return tokens.map((token) => ({
+        id: Number(token.id),
+        userId: Number(token.userId),
+        deviceToken: token.deviceToken,
+        platform: token.platform,
+        isActive: token.isActive,
+        createdAt: token.createdAt,
+        updatedAt: token.updatedAt,
+      }));
     },
   }),
 );
@@ -221,80 +270,123 @@ builder.queryField('getUserDeviceTokens', (t) =>
 // Mutations
 builder.mutationField('updateNotificationPreferences', (t) =>
   t.field({
-    type: NotificationPreference,
+    type: NotificationPreferenceRef,
     args: {
-      userId: t.arg.int({ required: true }),
       input: t.arg({ type: NotificationPreferenceInput, required: true }),
     },
-    resolve: async (_parent, args, context) => {
-      const input: NotificationPreferenceInputType = {
-        matchupStartedEnabled: args.input.matchupStartedEnabled ?? undefined,
-        matchupEndedEnabled: args.input.matchupEndedEnabled ?? undefined,
-        matchupCloseGameEnabled:
-          args.input.matchupCloseGameEnabled ?? undefined,
-        matchupReminderEnabled: args.input.matchupReminderEnabled ?? undefined,
-        pushEnabled: args.input.pushEnabled ?? undefined,
-        emailEnabled: args.input.emailEnabled ?? undefined,
-        closeGameThreshold: args.input.closeGameThreshold ?? undefined,
-      };
-      return await updateNotificationPreferences(
-        context.db,
-        args.userId,
-        input,
+    resolve: async (parent, { input }, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+      // Filter out undefined values and cast null to undefined
+      const cleanedUpdates = Object.fromEntries(
+        Object.entries(input).filter(([, v]) => v !== undefined && v !== null),
       );
+      const prefs = await dbService.notifications.updateNotificationPreferences(
+        userId,
+        cleanedUpdates,
+      );
+      return {
+        id: Number(prefs.id),
+        userId: Number(prefs.userId),
+        matchupStartedEnabled: prefs.matchupStartedEnabled,
+        matchupEndedEnabled: prefs.matchupEndedEnabled,
+        matchupCloseGameEnabled: prefs.matchupCloseGameEnabled,
+        matchupReminderEnabled: prefs.matchupReminderEnabled,
+        pushEnabled: prefs.pushEnabled,
+        emailEnabled: prefs.emailEnabled,
+        closeGameThreshold: prefs.closeGameThreshold,
+        createdAt: prefs.createdAt,
+        updatedAt: prefs.updatedAt,
+      };
     },
   }),
 );
 
 builder.mutationField('registerDeviceToken', (t) =>
   t.field({
-    type: DeviceToken,
+    type: DeviceTokenRef,
     args: {
       input: t.arg({ type: DeviceTokenInput, required: true }),
     },
-    resolve: async (_parent, args, context) => {
-      const input: DeviceTokenInputType = {
-        userId: args.input.userId,
-        deviceToken: args.input.deviceToken,
-        platform: args.input.platform as 'ios' | 'android' | 'expo',
-        endpointArn: args.input.endpointArn ?? undefined,
+    resolve: async (parent, { input }, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+      const { deviceToken, platform } = input;
+      const token = await dbService.notifications.registerDeviceToken(
+        userId,
+        deviceToken,
+        platform,
+      );
+      return {
+        id: Number(token.id),
+        userId: Number(token.userId),
+        deviceToken: token.deviceToken,
+        platform: token.platform,
+        isActive: token.isActive,
+        createdAt: token.createdAt,
+        updatedAt: token.updatedAt,
       };
-      return await registerDeviceToken(context.db, input);
     },
   }),
 );
 
 builder.mutationField('disableDeviceToken', (t) =>
-  t.boolean({
+  t.field({
+    type: 'Boolean',
     args: {
       deviceToken: t.arg.string({ required: true }),
     },
-    resolve: async (_parent, args, context) => {
-      await disableDeviceToken(context.db, args.deviceToken);
+    resolve: async (parent, { deviceToken }, context) => {
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+
+      await dbService.notifications.disableDeviceToken(
+        context.user.id,
+        deviceToken,
+      );
       return true;
     },
   }),
 );
 
 builder.mutationField('markNotificationAsRead', (t) =>
-  t.boolean({
+  t.field({
+    type: 'Boolean',
     args: {
       notificationId: t.arg.int({ required: true }),
     },
-    resolve: async (_parent, args, context) => {
-      await markNotificationAsRead(context.db, args.notificationId);
+    resolve: async (parent, { notificationId }, context) => {
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+
+      await dbService.notifications.markNotificationAsRead(
+        context.user.id,
+        notificationId,
+      );
       return true;
     },
   }),
 );
 
 builder.mutationField('markAllNotificationsAsRead', (t) =>
-  t.boolean({
-    args: {
-      userId: t.arg.int({ required: true }),
-    },
-    resolve: async (_parent, args, context) => {
-      await markAllNotificationsAsRead(context.db, args.userId);
+  t.field({
+    type: 'Boolean',
+    resolve: async (parent, args, context) => {
+      // Security: Derive userId from authenticated context (not from arguments)
+      if (!context.user) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      const userId = context.user.id;
+
+      await dbService.notifications.markAllNotificationsAsRead(userId);
       return true;
     },
   }),

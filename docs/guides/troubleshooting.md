@@ -91,6 +91,66 @@ cat apps/web/vite.config.mts
 - Inspect the GraphQL terminal for resolver errors referencing `scoring` or `LeagueScoringService`.
 - Call `refetch()` on `useLeagueScoringSettings` or clear local storage to reset the cached provider state.
 
+### Data Scraping Issues (Baseball-Reference)
+
+**Game stats fail to load / game_identifier is empty:**
+
+```powershell
+# 1. Check if issue is systemic (affects all games)
+.\scripts\db-query.ps1 -Query "SELECT COUNT(*) as total, COUNT(game_identifier) as with_id FROM public.game_batting"
+
+# 2. Verify Baseball-Reference HTML format hasn't changed
+Invoke-WebRequest "https://www.baseball-reference.com/players/gl.fcgi?id=hannija01&t=b&year=1907" -OutFile test.html
+# Check for data-stat="date" in game rows (NOT "date_game")
+
+# 3. Test with CLI to verify parser works
+pnpm run cli load-game-stats --player-id 8698 --season 1907
+
+# 4. Check bref-client parser uses correct attribute
+# File: lib/bref-client/src/lib/CareerStats.ts
+# Look for: cell.getAttribute('data-stat') === 'date'
+# WRONG: === 'date_game' (old format, no longer used)
+```
+
+**Known Baseball-Reference HTML changes:**
+
+- **Feb 2026**: Changed from `data-stat="date_game"` to `data-stat="date"` for game identifier cells
+- **Game identifier format**: Extracted from boxscore href `/boxes/BSN/BSN190704200.shtml` → `BSN190704200`
+- **Regex pattern**: `/^\/boxes\/\w{3}\/(?<gameIdentifier>\w{12}).shtml$/`
+
+**Game selection not populating games:**
+
+```powershell
+# Check if game_identifier exists (required for selection)
+.\scripts\db-query.ps1 -Query "SELECT COUNT(*) FROM public.matchup_player_games WHERE game_identifier IS NULL OR game_identifier = ''"
+
+# Trigger game selection for specific matchup
+pnpm run cli trigger-game-selection --matchup-id 71
+
+# Test locally with dev server
+pnpm exec nx run game-selection:dev  # Terminal 1
+$env:GAME_SELECTION_ENDPOINT = "http://localhost:5003"  # Terminal 2
+pnpm run cli trigger-game-selection --matchup-id 71
+```
+
+**Debugging with database timestamps:**
+
+When CloudWatch logs show "recent" activity but you need exact timing:
+
+```powershell
+# 1. Query database for actual timestamp
+.\scripts\db-query.ps1 -Query "SELECT id, last_updated FROM app_internal.game_stats WHERE game_id = 123 ORDER BY last_updated DESC LIMIT 1"
+# Result: 2026-02-08 14:35:42
+
+# 2. Calculate time range (±5 minutes around event)
+# 14:35:42 → 14:30:00 to 14:40:00
+
+# 3. View logs from that specific time (use epoch converter)
+aws logs tail /aws/lambda/legacy-sports-dev-stats --start-time 1707405000 --end-time 1707405600 --no-cli-pager
+```
+
+See: [Debugging with Database Timestamps](debugging-with-database-timestamps.md) for complete guide.
+
 ### Build System Issues
 
 **Wrong build order:**
@@ -171,6 +231,25 @@ aws logs tail /aws/lambda/legacy-sports-dev-stats --since 5m --no-cli-pager
 # OR use the wrapper script (recommended)
 .\scripts\aws-logs.ps1 -Function stats -Since 5m
 
+# CRITICAL: Use database timestamps when debugging (not just recent logs!)
+# Example: Game stats show last_updated = 3 hours ago
+# 1. Query database for timestamp
+.\scripts\db-query.ps1 -Query "SELECT id, last_updated FROM app_internal.game_stats WHERE game_id = 123 ORDER BY last_updated DESC LIMIT 1"
+# Result: 2026-02-08 14:35:42
+
+# 2. Calculate time range (±5 minutes around 14:35:42 = 14:30 to 14:40)
+
+# 3. View logs from that time period
+aws logs tail /aws/lambda/legacy-sports-dev-stats --start-time 1707405000 --end-time 1707405600 --no-cli-pager
+
+# Common timestamp columns to check:
+# - last_updated, updated_at (when record changed)
+# - created_at (when record created)
+# - draft_started_at (league drafts)
+# - occurred_at (events)
+
+# Tip: Use https://www.epochconverter.com/ to convert timestamps to epoch
+
 # Add to PowerShell profile to make permanent:
 echo '$env:PYTHONIOENCODING = "utf-8"' >> $PROFILE
 echo '$env:AWS_PAGER = ""' >> $PROFILE
@@ -178,6 +257,103 @@ echo '$env:AWS_PAGER = ""' >> $PROFILE
 # Note: Piping to Select-Object may still cause errors
 # Use --filter-pattern or redirect to file instead
 ```
+
+**CloudWatch Logs: Querying Specific Time Ranges:**
+
+CloudWatch logs can be queried for specific timeframes using two methods:
+
+**Method 1: `aws logs tail` (for recent logs only)**
+
+```powershell
+# Recent logs (relative time)
+aws logs tail /aws/lambda/legacy-sports-dev-websocket --since 5m --no-cli-pager
+aws logs tail /aws/lambda/legacy-sports-dev-stats --since 1h --no-cli-pager
+aws logs tail /aws/lambda/legacy-sports-dev-graphql --since 30m --no-cli-pager
+```
+
+**Method 2: `aws logs filter-log-events` (for specific date ranges)**
+
+For precise time ranges, use `filter-log-events` with epoch timestamps in milliseconds:
+
+```powershell
+# PowerShell: Query specific timeframe
+$startTime = [DateTimeOffset]::Parse("2026-02-10T01:08:00Z").ToUnixTimeMilliseconds()
+$endTime = [DateTimeOffset]::Parse("2026-02-10T01:45:00Z").ToUnixTimeMilliseconds()
+
+aws logs filter-log-events `
+  --log-group-name "/aws/lambda/legacy-sports-dev-websocket" `
+  --start-time $startTime `
+  --end-time $endTime `
+  --no-cli-pager
+
+# With pattern filtering
+aws logs filter-log-events `
+  --log-group-name "/aws/lambda/legacy-sports-dev-stats" `
+  --start-time $startTime `
+  --end-time $endTime `
+  --filter-pattern "ERROR" `
+  --no-cli-pager
+
+# Search for specific text
+aws logs filter-log-events `
+  --log-group-name "/aws/lambda/legacy-sports-dev-websocket" `
+  --start-time $startTime `
+  --end-time $endTime `
+  --filter-pattern "matchupId" `
+  --no-cli-pager
+```
+
+**Parsing CloudWatch JSON Output:**
+
+```powershell
+# Extract just the messages
+$startTime = [DateTimeOffset]::Parse("2026-02-10T01:08:00Z").ToUnixTimeMilliseconds()
+$endTime = [DateTimeOffset]::Parse("2026-02-10T01:45:00Z").ToUnixTimeMilliseconds()
+
+aws logs filter-log-events `
+  --log-group-name "/aws/lambda/legacy-sports-dev-websocket" `
+  --start-time $startTime `
+  --end-time $endTime `
+  --no-cli-pager 2>&1 | ConvertFrom-Json | Select-Object -ExpandProperty events | ForEach-Object { $_.message }
+
+# Search within messages
+aws logs filter-log-events `
+  --log-group-name "/aws/lambda/legacy-sports-dev-websocket" `
+  --start-time $startTime `
+  --end-time $endTime `
+  --no-cli-pager 2>&1 | ConvertFrom-Json | Select-Object -ExpandProperty events | Select-Object -ExpandProperty message | Select-String -Pattern "connection established"
+```
+
+**Calculating Relative Time Ranges:**
+
+```powershell
+# Last 30 minutes from now
+$startTime = [DateTimeOffset]::UtcNow.AddMinutes(-30).ToUnixTimeMilliseconds()
+$endTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+# Last hour
+$startTime = [DateTimeOffset]::UtcNow.AddHours(-1).ToUnixTimeMilliseconds()
+$endTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+# Specific window around known event time
+$eventTime = [DateTimeOffset]::Parse("2026-02-10T14:35:42Z")
+$startTime = $eventTime.AddMinutes(-5).ToUnixTimeMilliseconds()
+$endTime = $eventTime.AddMinutes(5).ToUnixTimeMilliseconds()
+```
+
+**Common CloudWatch Log Groups:**
+
+```powershell
+# Lambda functions
+/aws/lambda/legacy-sports-dev-websocket
+/aws/lambda/legacy-sports-dev-stats
+/aws/lambda/legacy-sports-dev-graphql
+/aws/lambda/legacy-sports-dev-oauth-proxy
+/aws/lambda/legacy-sports-dev-game-selection
+/aws/lambda/legacy-sports-dev-draft-processor
+```
+
+**Tip**: When debugging issues from database timestamps, use `filter-log-events` with calculated time ranges instead of `tail --since`. See the example above for correlating database `last_updated` timestamps with CloudWatch logs.
 
 **Lambda deployment failures:**
 

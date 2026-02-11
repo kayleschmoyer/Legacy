@@ -14,7 +14,7 @@ importers:
     dependencies:
       '@apollo/client':
         specifier: ^3.11.4
-        version: 3.14.0(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 3.14.0(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@apollo/server':
         specifier: ^5.0.0
         version: 5.3.0(graphql@16.12.0)
@@ -191,7 +191,7 @@ importers:
         version: 0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0)
       grafserv:
         specifier: ^0.1.1-beta.28
-        version: 0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       graphile-build:
         specifier: 5.0.0-1.3
         version: 5.0.0-1.3(@envelop/core@5.5.0)(eslint@8.57.1)(graphql@16.12.0)(pg-sql2@5.0.0-rc.3)(tamedevil@0.0.0-beta.9)
@@ -236,7 +236,7 @@ importers:
         version: 11.3.0
       postgraphile:
         specifier: ^5.0.0-beta.47
-        version: 5.0.0-rc.4(pwbond34jtogtobcr6vu2x6a24)
+        version: 5.0.0-rc.4(rrzjxexmnauj6h3vxrmhgv3zgq)
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -291,6 +291,9 @@ importers:
       utf-8-validate:
         specifier: ^6.0.5
         version: 6.0.6
+      ws:
+        specifier: ^8.18.0
+        version: 8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
       '@nx/storybook':
         specifier: ^21.5.2
@@ -494,6 +497,9 @@ importers:
       '@types/webdriverio':
         specifier: ^4.13.3
         version: 4.13.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.53.1
         version: 8.54.0(@typescript-eslint/parser@8.54.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
@@ -855,49 +861,6 @@ importers:
         specifier: '*'
         version: 6.4.1(@types/node@24.10.0)(jiti@2.4.2)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
-  lambdas/notifications:
-    dependencies:
-      '@aws-sdk/client-sns':
-        specifier: '*'
-        version: 3.980.0
-      '@legacy-sports/db-client':
-        specifier: workspace:*
-        version: link:../../lib/db-client
-      '@legacy-sports/env-utilities':
-        specifier: workspace:*
-        version: link:../../lib/env-utilities
-      '@legacy-sports/logging':
-        specifier: workspace:*
-        version: link:../../lib/logging
-      '@legacy-sports/sentry':
-        specifier: workspace:*
-        version: link:../../lib/sentry
-      '@legacy-sports/utils':
-        specifier: workspace:*
-        version: link:../../lib/utils
-      aws-lambda:
-        specifier: '*'
-        version: 1.0.7
-    devDependencies:
-      '@types/aws-lambda':
-        specifier: '*'
-        version: 8.10.160
-      '@types/node':
-        specifier: '*'
-        version: 24.10.0
-      jest:
-        specifier: '*'
-        version: 30.2.0(@types/node@24.10.0)(babel-plugin-macros@3.1.0)(esbuild-register@3.6.0(esbuild@0.27.2))(ts-node@10.9.2(@swc/core@1.15.10(@swc/helpers@0.5.18))(@types/node@24.10.0)(typescript@5.9.3))
-      tsx:
-        specifier: '*'
-        version: 4.21.0
-      typescript:
-        specifier: '*'
-        version: 5.9.3
-      vite:
-        specifier: '*'
-        version: 6.4.1(@types/node@24.10.0)(jiti@2.4.2)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
-
   lambdas/oauth-proxy:
     dependencies:
       '@apollo/client':
@@ -1020,7 +983,14 @@ importers:
         specifier: '*'
         version: 19.2.4
 
-  lib/aws-utils: {}
+  lib/aws-utils:
+    dependencies:
+      '@aws-sdk/client-apigatewaymanagementapi':
+        specifier: ^3.984.0
+        version: 3.984.0
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.984.0
+        version: 3.984.0
 
   lib/bref-client:
     dependencies:
@@ -1349,6 +1319,14 @@ packages:
   '@aws-crypto/util@5.2.0':
     resolution: {integrity: sha512-4RkU9EsI6ZpBve5fseQlGNUWKMa1RLPQ1dnjnQoe07ldfIzcsGb5hC5W0Dm7u423KWzawlrpbjXBrXCEv9zazQ==}
 
+  '@aws-sdk/client-apigatewaymanagementapi@3.984.0':
+    resolution: {integrity: sha512-8AWsh/T+kOssfMuIOCf9fmefK9m9CjLAwGOAiqIeFmTBe/5oVMG4LfW98+tiCf9Ngij7crTh4kbOmnz2SM0q8g==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-dynamodb@3.984.0':
+    resolution: {integrity: sha512-8/Oft9MWQtbG6p9f8eY5fsKC2CcO5YVDlwive8eUYS9mEbgnyQxm68OyH26WvsSTykQ9QkIbR+fOG56RsIBODw==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-lambda@3.984.0':
     resolution: {integrity: sha512-kqwNBIGNxGVhINwgN/UQfdsQkaMjbu9PFV2EhATWouV+RT60uMjK9JENgLDwbgJmEVbbnPsh9HaZ5KKwPSdiDg==}
     engines: {node: '>=20.0.0'}
@@ -1443,6 +1421,18 @@ packages:
 
   '@aws-sdk/credential-provider-web-identity@3.972.4':
     resolution: {integrity: sha512-hIzw2XzrG8jzsUSEatehmpkd5rWzASg5IHUfA+m01k/RtvfAML7ZJVVohuKdhAYx+wV2AThLiQJVzqn7F0khrw==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/dynamodb-codec@3.972.7':
+    resolution: {integrity: sha512-oo1g22IhIvZiBNTqV2DwBh39+pwo7Tz6aBZjA+eTNFJ1jfxD84tTycVPOwaYLb2ZYhgsxOT9bTAj/EHEPoKbLQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/endpoint-cache@3.972.2':
+    resolution: {integrity: sha512-3L7mwqSLJ6ouZZKtCntoNF0HTYDNs1FDQqkGjoPWXcv1p0gnLotaDmLq1rIDqfu4ucOit0Re3ioLyYDUTpSroA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-endpoint-discovery@3.972.3':
+    resolution: {integrity: sha512-xAxA8/TOygQmMrzcw9CrlpTHCGWSG/lvzrHCySfSZpDN4/yVSfXO+gUwW9WxeskBmuv9IIFATOVpzc9EzfTZ0Q==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-host-header@3.972.3':
@@ -7823,9 +7813,6 @@ packages:
   '@types/node@24.10.0':
     resolution: {integrity: sha512-qzQZRBqkFsYyaSWXuEHc2WR9c0a0CXwiE5FWUvn7ZM+vdy1uZLfCunD38UzhuB7YN/J11ndbDBcTmOdxJo9Q7A==}
 
-  '@types/node@25.0.10':
-    resolution: {integrity: sha512-zWW5KPngR/yvakJgGOmZ5vTBemDoSqF3AcV/LrO5u5wTWyEAVVh+IT39G4gtyAkh3CtTZs8aX/yRM82OfzHJRg==}
-
   '@types/node@25.2.0':
     resolution: {integrity: sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w==}
 
@@ -13948,6 +13935,9 @@ packages:
   mlly@1.8.0:
     resolution: {integrity: sha512-l8D9ODSRWLe2KHJSifWGwBqpTZXIXTeo8mlKjY+E2HAakaTeNpqAyBZ8GSqLzHgw4XmHmC8whvpjJNMbFZN7/g==}
 
+  mnemonist@0.38.3:
+    resolution: {integrity: sha512-2K9QYubXx/NAjv4VLq1d1Ly8pWNC5L3BrixtdkyTegXWJIqY+zLNDhhX/A+ZwWt70tB1S8H4BE8FLYEFyNoOBw==}
+
   mocha@10.8.2:
     resolution: {integrity: sha512-VZlYo/WE8t1tstuRmqgeyBgCbJc/lEdopaa+axcKzTBJ+UIdlAB9XnmvTCAH4pwR4ElNInaedhEBmZD8iCSVEg==}
     engines: {node: '>= 14.0.0'}
@@ -14348,6 +14338,9 @@ packages:
   object.values@1.2.1:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
+
+  obliterator@1.6.1:
+    resolution: {integrity: sha512-9WXswnqINnnhOG/5SLimUlzuU1hFJUc8zkwyD59Sd+dPOMf05PmnYG/d6Q7HZ+KmgkZJa1PxRso6QdM3sTNHig==}
 
   obuf@1.1.2:
     resolution: {integrity: sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg==}
@@ -17879,29 +17872,6 @@ snapshots:
     dependencies:
       graphql: 16.12.0
 
-  '@apollo/client@3.14.0(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@graphql-typed-document-node/core': 3.2.0(graphql@16.12.0)
-      '@wry/caches': 1.0.1
-      '@wry/equality': 0.5.7
-      '@wry/trie': 0.5.0
-      graphql: 16.12.0
-      graphql-tag: 2.12.6(graphql@16.12.0)
-      hoist-non-react-statics: 3.3.2
-      optimism: 0.18.1
-      prop-types: 15.8.1
-      rehackt: 0.1.0(@types/react@19.2.10)(react@19.2.4)
-      symbol-observable: 4.0.0
-      ts-invariant: 0.10.3
-      tslib: 2.8.1
-      zen-observable-ts: 1.2.5
-    optionalDependencies:
-      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-    transitivePeerDependencies:
-      - '@types/react'
-
   '@apollo/client@3.14.0(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.12.0)
@@ -18240,6 +18210,97 @@ snapshots:
       '@smithy/util-utf8': 2.3.0
       tslib: 2.8.1
 
+  '@aws-sdk/client-apigatewaymanagementapi@3.984.0':
+    dependencies:
+      '@aws-crypto/sha256-browser': 5.2.0
+      '@aws-crypto/sha256-js': 5.2.0
+      '@aws-sdk/core': 3.973.6
+      '@aws-sdk/credential-provider-node': 3.972.5
+      '@aws-sdk/middleware-host-header': 3.972.3
+      '@aws-sdk/middleware-logger': 3.972.3
+      '@aws-sdk/middleware-recursion-detection': 3.972.3
+      '@aws-sdk/middleware-user-agent': 3.972.6
+      '@aws-sdk/region-config-resolver': 3.972.3
+      '@aws-sdk/types': 3.973.1
+      '@aws-sdk/util-endpoints': 3.984.0
+      '@aws-sdk/util-user-agent-browser': 3.972.3
+      '@aws-sdk/util-user-agent-node': 3.972.4
+      '@smithy/config-resolver': 4.4.6
+      '@smithy/core': 3.22.0
+      '@smithy/fetch-http-handler': 5.3.9
+      '@smithy/hash-node': 4.2.8
+      '@smithy/invalid-dependency': 4.2.8
+      '@smithy/middleware-content-length': 4.2.8
+      '@smithy/middleware-endpoint': 4.4.12
+      '@smithy/middleware-retry': 4.4.29
+      '@smithy/middleware-serde': 4.2.9
+      '@smithy/middleware-stack': 4.2.8
+      '@smithy/node-config-provider': 4.3.8
+      '@smithy/node-http-handler': 4.4.8
+      '@smithy/protocol-http': 5.3.8
+      '@smithy/smithy-client': 4.11.1
+      '@smithy/types': 4.12.0
+      '@smithy/url-parser': 4.2.8
+      '@smithy/util-base64': 4.3.0
+      '@smithy/util-body-length-browser': 4.2.0
+      '@smithy/util-body-length-node': 4.2.1
+      '@smithy/util-defaults-mode-browser': 4.3.28
+      '@smithy/util-defaults-mode-node': 4.2.31
+      '@smithy/util-endpoints': 3.2.8
+      '@smithy/util-middleware': 4.2.8
+      '@smithy/util-retry': 4.2.8
+      '@smithy/util-utf8': 4.2.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - aws-crt
+
+  '@aws-sdk/client-dynamodb@3.984.0':
+    dependencies:
+      '@aws-crypto/sha256-browser': 5.2.0
+      '@aws-crypto/sha256-js': 5.2.0
+      '@aws-sdk/core': 3.973.6
+      '@aws-sdk/credential-provider-node': 3.972.5
+      '@aws-sdk/dynamodb-codec': 3.972.7
+      '@aws-sdk/middleware-endpoint-discovery': 3.972.3
+      '@aws-sdk/middleware-host-header': 3.972.3
+      '@aws-sdk/middleware-logger': 3.972.3
+      '@aws-sdk/middleware-recursion-detection': 3.972.3
+      '@aws-sdk/middleware-user-agent': 3.972.6
+      '@aws-sdk/region-config-resolver': 3.972.3
+      '@aws-sdk/types': 3.973.1
+      '@aws-sdk/util-endpoints': 3.984.0
+      '@aws-sdk/util-user-agent-browser': 3.972.3
+      '@aws-sdk/util-user-agent-node': 3.972.4
+      '@smithy/config-resolver': 4.4.6
+      '@smithy/core': 3.22.0
+      '@smithy/fetch-http-handler': 5.3.9
+      '@smithy/hash-node': 4.2.8
+      '@smithy/invalid-dependency': 4.2.8
+      '@smithy/middleware-content-length': 4.2.8
+      '@smithy/middleware-endpoint': 4.4.12
+      '@smithy/middleware-retry': 4.4.29
+      '@smithy/middleware-serde': 4.2.9
+      '@smithy/middleware-stack': 4.2.8
+      '@smithy/node-config-provider': 4.3.8
+      '@smithy/node-http-handler': 4.4.8
+      '@smithy/protocol-http': 5.3.8
+      '@smithy/smithy-client': 4.11.1
+      '@smithy/types': 4.12.0
+      '@smithy/url-parser': 4.2.8
+      '@smithy/util-base64': 4.3.0
+      '@smithy/util-body-length-browser': 4.2.0
+      '@smithy/util-body-length-node': 4.2.1
+      '@smithy/util-defaults-mode-browser': 4.3.28
+      '@smithy/util-defaults-mode-node': 4.2.31
+      '@smithy/util-endpoints': 3.2.8
+      '@smithy/util-middleware': 4.2.8
+      '@smithy/util-retry': 4.2.8
+      '@smithy/util-utf8': 4.2.0
+      '@smithy/util-waiter': 4.2.8
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - aws-crt
+
   '@aws-sdk/client-lambda@3.984.0':
     dependencies:
       '@aws-crypto/sha256-browser': 5.2.0
@@ -18427,16 +18488,16 @@ snapshots:
     dependencies:
       '@aws-crypto/sha256-browser': 5.2.0
       '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/middleware-host-header': 3.972.3
       '@aws-sdk/middleware-logger': 3.972.3
       '@aws-sdk/middleware-recursion-detection': 3.972.3
-      '@aws-sdk/middleware-user-agent': 3.972.5
+      '@aws-sdk/middleware-user-agent': 3.972.6
       '@aws-sdk/region-config-resolver': 3.972.3
       '@aws-sdk/types': 3.973.1
       '@aws-sdk/util-endpoints': 3.980.0
       '@aws-sdk/util-user-agent-browser': 3.972.3
-      '@aws-sdk/util-user-agent-node': 3.972.3
+      '@aws-sdk/util-user-agent-node': 3.972.4
       '@smithy/config-resolver': 4.4.6
       '@smithy/core': 3.22.0
       '@smithy/fetch-http-handler': 5.3.9
@@ -18543,7 +18604,7 @@ snapshots:
 
   '@aws-sdk/credential-provider-env@3.972.3':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
       '@smithy/types': 4.12.0
@@ -18559,7 +18620,7 @@ snapshots:
 
   '@aws-sdk/credential-provider-http@3.972.5':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/types': 3.973.1
       '@smithy/fetch-http-handler': 5.3.9
       '@smithy/node-http-handler': 4.4.8
@@ -18585,13 +18646,13 @@ snapshots:
 
   '@aws-sdk/credential-provider-ini@3.972.3':
     dependencies:
-      '@aws-sdk/core': 3.973.5
-      '@aws-sdk/credential-provider-env': 3.972.3
-      '@aws-sdk/credential-provider-http': 3.972.5
+      '@aws-sdk/core': 3.973.6
+      '@aws-sdk/credential-provider-env': 3.972.4
+      '@aws-sdk/credential-provider-http': 3.972.6
       '@aws-sdk/credential-provider-login': 3.972.3
-      '@aws-sdk/credential-provider-process': 3.972.3
-      '@aws-sdk/credential-provider-sso': 3.972.3
-      '@aws-sdk/credential-provider-web-identity': 3.972.3
+      '@aws-sdk/credential-provider-process': 3.972.4
+      '@aws-sdk/credential-provider-sso': 3.972.4
+      '@aws-sdk/credential-provider-web-identity': 3.972.4
       '@aws-sdk/nested-clients': 3.980.0
       '@aws-sdk/types': 3.973.1
       '@smithy/credential-provider-imds': 4.2.8
@@ -18623,7 +18684,7 @@ snapshots:
 
   '@aws-sdk/credential-provider-login@3.972.3':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/nested-clients': 3.980.0
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
@@ -18683,7 +18744,7 @@ snapshots:
 
   '@aws-sdk/credential-provider-process@3.972.3':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
       '@smithy/shared-ini-file-loader': 4.4.3
@@ -18702,7 +18763,7 @@ snapshots:
   '@aws-sdk/credential-provider-sso@3.972.3':
     dependencies:
       '@aws-sdk/client-sso': 3.980.0
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/token-providers': 3.980.0
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
@@ -18727,7 +18788,7 @@ snapshots:
 
   '@aws-sdk/credential-provider-web-identity@3.972.3':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/nested-clients': 3.980.0
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
@@ -18748,6 +18809,29 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
+
+  '@aws-sdk/dynamodb-codec@3.972.7':
+    dependencies:
+      '@aws-sdk/core': 3.973.6
+      '@smithy/core': 3.22.0
+      '@smithy/smithy-client': 4.11.1
+      '@smithy/types': 4.12.0
+      '@smithy/util-base64': 4.3.0
+      tslib: 2.8.1
+
+  '@aws-sdk/endpoint-cache@3.972.2':
+    dependencies:
+      mnemonist: 0.38.3
+      tslib: 2.8.1
+
+  '@aws-sdk/middleware-endpoint-discovery@3.972.3':
+    dependencies:
+      '@aws-sdk/endpoint-cache': 3.972.2
+      '@aws-sdk/types': 3.973.1
+      '@smithy/node-config-provider': 4.3.8
+      '@smithy/protocol-http': 5.3.8
+      '@smithy/types': 4.12.0
+      tslib: 2.8.1
 
   '@aws-sdk/middleware-host-header@3.972.3':
     dependencies:
@@ -18781,7 +18865,7 @@ snapshots:
 
   '@aws-sdk/middleware-user-agent@3.972.5':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/types': 3.973.1
       '@aws-sdk/util-endpoints': 3.980.0
       '@smithy/core': 3.22.0
@@ -18803,16 +18887,16 @@ snapshots:
     dependencies:
       '@aws-crypto/sha256-browser': 5.2.0
       '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/middleware-host-header': 3.972.3
       '@aws-sdk/middleware-logger': 3.972.3
       '@aws-sdk/middleware-recursion-detection': 3.972.3
-      '@aws-sdk/middleware-user-agent': 3.972.5
+      '@aws-sdk/middleware-user-agent': 3.972.6
       '@aws-sdk/region-config-resolver': 3.972.3
       '@aws-sdk/types': 3.973.1
       '@aws-sdk/util-endpoints': 3.980.0
       '@aws-sdk/util-user-agent-browser': 3.972.3
-      '@aws-sdk/util-user-agent-node': 3.972.3
+      '@aws-sdk/util-user-agent-node': 3.972.4
       '@smithy/config-resolver': 4.4.6
       '@smithy/core': 3.22.0
       '@smithy/fetch-http-handler': 5.3.9
@@ -18895,7 +18979,7 @@ snapshots:
 
   '@aws-sdk/token-providers@3.980.0':
     dependencies:
-      '@aws-sdk/core': 3.973.5
+      '@aws-sdk/core': 3.973.6
       '@aws-sdk/nested-clients': 3.980.0
       '@aws-sdk/types': 3.973.1
       '@smithy/property-provider': 4.2.8
@@ -18959,7 +19043,7 @@ snapshots:
 
   '@aws-sdk/util-user-agent-node@3.972.3':
     dependencies:
-      '@aws-sdk/middleware-user-agent': 3.972.5
+      '@aws-sdk/middleware-user-agent': 3.972.6
       '@aws-sdk/types': 3.973.1
       '@smithy/node-config-provider': 4.3.8
       '@smithy/types': 4.12.0
@@ -21545,9 +21629,9 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@graphiql/plugin-doc-explorer@0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
+  '@graphiql/plugin-doc-explorer@0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
     dependencies:
-      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
       '@headlessui/react': 2.2.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       graphql: 16.12.0
       react: 19.2.4
@@ -21559,18 +21643,18 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@graphiql/plugin-explorer@5.1.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@graphiql/plugin-explorer@5.1.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
       graphiql-explorer: 0.9.0(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       graphql: 16.12.0
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@graphiql/plugin-history@0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
+  '@graphiql/plugin-history@0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
     dependencies:
-      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
+      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
       react: 19.2.4
       react-compiler-runtime: 19.1.0-rc.1(react@19.2.4)
       react-dom: 19.2.4(react@19.2.4)
@@ -21583,9 +21667,9 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
+  '@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))':
     dependencies:
-      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
+      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
       '@radix-ui/react-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-dropdown-menu': 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-tooltip': 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -21614,13 +21698,13 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@graphiql/toolkit@0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)':
+  '@graphiql/toolkit@0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)':
     dependencies:
       '@n1ru4l/push-pull-async-iterable-iterator': 3.2.0
       graphql: 16.12.0
       meros: 1.3.2(@types/node@24.10.0)
     optionalDependencies:
-      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
     transitivePeerDependencies:
       - '@types/node'
 
@@ -29858,14 +29942,10 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
-  '@types/node@25.0.10':
-    dependencies:
-      undici-types: 7.16.0
-    optional: true
-
   '@types/node@25.2.0':
     dependencies:
       undici-types: 7.16.0
+    optional: true
 
   '@types/normalize-package-data@2.4.4': {}
 
@@ -29967,7 +30047,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 25.2.0
+      '@types/node': 24.10.0
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.54.0(@typescript-eslint/parser@8.54.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)':
@@ -31034,7 +31114,7 @@ snapshots:
     dependencies:
       '@appium/strongbox': 1.0.1
       '@appium/support': 7.0.5
-      '@types/node': 25.0.10
+      '@types/node': 25.2.0
       '@xmldom/xmldom': 0.9.8
       appium-ios-tuntap: 0.1.2
       axios: 1.12.2
@@ -32315,7 +32395,7 @@ snapshots:
 
   chrome-launcher@0.15.2:
     dependencies:
-      '@types/node': 25.2.0
+      '@types/node': 24.10.0
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -32326,7 +32406,7 @@ snapshots:
 
   chromium-edge-launcher@0.2.0:
     dependencies:
-      '@types/node': 25.2.0
+      '@types/node': 24.10.0
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -35136,7 +35216,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  grafserv@0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  grafserv@0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       '@graphile/lru': 5.0.0-rc.3
       debug: 4.4.3(supports-color@5.5.0)
@@ -35144,12 +35224,12 @@ snapshots:
       grafast: 0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0)
       graphile-config: 0.0.1-beta.18
       graphql: 16.12.0
-      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      ruru: 2.0.0-rc.4(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(debug@4.4.3)(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      ruru: 2.0.0-rc.4(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(debug@4.4.3)(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       tslib: 2.8.1
     optionalDependencies:
       '@envelop/core': 5.5.0
-      ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@fastify/websocket'
       - '@types/react'
@@ -35275,11 +35355,11 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  graphiql@5.2.2(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)):
+  graphiql@5.2.2(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)):
     dependencies:
-      '@graphiql/plugin-doc-explorer': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/plugin-history': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/plugin-doc-explorer': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/plugin-history': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
       graphql: 16.12.0
       react: 19.2.4
       react-compiler-runtime: 19.1.0-rc.1(react@19.2.4)
@@ -35335,12 +35415,6 @@ snapshots:
     dependencies:
       graphql: 16.12.0
       tslib: 2.8.1
-
-  graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
-    dependencies:
-      graphql: 16.12.0
-    optionalDependencies:
-      ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
@@ -36660,7 +36734,7 @@ snapshots:
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 25.2.0
+      '@types/node': 24.10.0
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -37986,6 +38060,10 @@ snapshots:
       pkg-types: 1.3.1
       ufo: 1.6.3
 
+  mnemonist@0.38.3:
+    dependencies:
+      obliterator: 1.6.1
+
   mocha@10.8.2:
     dependencies:
       ansi-colors: 4.1.3
@@ -38697,6 +38775,8 @@ snapshots:
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
+
+  obliterator@1.6.1: {}
 
   obuf@1.1.2:
     optional: true
@@ -39443,7 +39523,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postgraphile@5.0.0-rc.4(pwbond34jtogtobcr6vu2x6a24):
+  postgraphile@5.0.0-rc.4(rrzjxexmnauj6h3vxrmhgv3zgq):
     dependencies:
       '@dataplan/json': 0.0.1-beta.33(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))
       '@dataplan/pg': 0.0.1-beta.37(@dataplan/json@0.0.1-beta.33(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0)))(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(pg-sql2@5.0.0-rc.3)(pg@8.17.2)
@@ -39452,7 +39532,7 @@ snapshots:
       '@types/pg': 8.16.0
       debug: 4.4.3(supports-color@5.5.0)
       grafast: 0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0)
-      grafserv: 0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      grafserv: 0.1.1-beta.29(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0))(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       graphile-build: 5.0.0-1.3(@envelop/core@5.5.0)(eslint@8.57.1)(graphql@16.12.0)(pg-sql2@5.0.0-rc.3)(tamedevil@0.0.0-beta.9)
       graphile-build-pg: 5.0.0-1.3(@dataplan/json@0.0.1-beta.33(grafast@0.1.1-beta.27(@envelop/core@5.5.0)(graphql@16.12.0)))(@envelop/core@5.5.0)(eslint@8.57.1)(graphql@16.12.0)(pg@8.17.2)
       graphile-config: 0.0.1-beta.18
@@ -40461,18 +40541,18 @@ snapshots:
     dependencies:
       queue-microtask: 1.2.3
 
-  ruru-components@2.0.0-rc.4(@emotion/is-prop-valid@1.4.0)(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  ruru-components@2.0.0-rc.4(@emotion/is-prop-valid@1.4.0)(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
-      '@graphiql/plugin-doc-explorer': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/plugin-explorer': 5.1.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@graphiql/plugin-history': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
+      '@graphiql/plugin-doc-explorer': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/plugin-explorer': 5.1.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(graphql@16.12.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@graphiql/plugin-history': 0.4.1(@graphiql/react@0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)))(@types/node@22.19.7)(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/react': 0.37.3(@emotion/is-prop-valid@1.4.0)(@types/node@24.10.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      '@graphiql/toolkit': 0.11.3(@types/node@24.10.0)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)
       '@types/node': 22.19.7
       grafast: 1.0.0-rc.4(@envelop/core@5.5.0)(graphql@16.12.0)
-      graphiql: 5.2.2(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+      graphiql: 5.2.2(@emotion/is-prop-valid@1.4.0)(@types/node@22.19.7)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql-ws@6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(graphql@16.12.0)(immer@11.1.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
       graphql: 16.12.0
-      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      graphql-ws: 6.0.7(graphql@16.12.0)(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       mermaid: 11.12.2
       prettier: 3.8.1
       react: 19.2.4
@@ -40492,13 +40572,13 @@ snapshots:
       - use-sync-external-store
       - ws
 
-  ruru@2.0.0-rc.4(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(debug@4.4.3)(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  ruru@2.0.0-rc.4(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(debug@4.4.3)(graphile-config@0.0.1-beta.18)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       '@emotion/is-prop-valid': 1.4.0
       graphile-config: 0.0.1-beta.18
       graphql: 16.12.0
       http-proxy: 1.18.1(debug@4.4.3)
-      ruru-components: 2.0.0-rc.4(@emotion/is-prop-valid@1.4.0)(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      ruru-components: 2.0.0-rc.4(@emotion/is-prop-valid@1.4.0)(@envelop/core@5.5.0)(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(graphql@16.12.0)(immer@11.1.3)(react-compiler-runtime@19.1.0-rc.1(react@19.2.4))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       tslib: 2.8.1
       yargs: 17.7.2
     transitivePeerDependencies:

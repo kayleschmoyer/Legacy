@@ -77,6 +77,8 @@ builder.objectType(PlayoffBracket, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, bracket.championTeamId ?? 0))
@@ -160,6 +162,8 @@ builder.objectType(PlayoffMatchup, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId ?? 0))
@@ -177,6 +181,8 @@ builder.objectType(PlayoffMatchup, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId ?? 0))
@@ -194,6 +200,8 @@ builder.objectType(PlayoffMatchup, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, matchup.winnerTeamId ?? 0))
@@ -238,6 +246,8 @@ builder.objectType(PlayoffSeed, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, seed.teamId))
@@ -290,6 +300,8 @@ builder.objectType(ChampionTrophy, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, trophy.teamId))
@@ -307,6 +319,8 @@ builder.objectType(ChampionTrophy, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId ?? 0))

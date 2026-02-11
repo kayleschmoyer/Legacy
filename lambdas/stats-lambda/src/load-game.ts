@@ -1,5 +1,5 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -9,6 +9,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import {
   PublicDb,
   PublicSchema,
@@ -27,6 +28,9 @@ const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Initialize WebSocket notification service
+const notificationService = createNotificationService();
 
 /**
  * Message format for matchup stats loading
@@ -153,9 +157,31 @@ async function selectAndAssignGameIdentifiers(
   );
 }
 
+/**
+ * Check if an error is a retryable Baseball-Reference timeout
+ */
+function isRetryableTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const errorMessage = error.message.toLowerCase();
+
+  // Check for HTTP 504 (Gateway Timeout) or 524 (Cloudflare timeout)
+  const isTimeoutStatus =
+    errorMessage.includes('status code 504') ||
+    errorMessage.includes('status code 524');
+
+  // Also check for generic timeout messages
+  const isTimeoutMessage =
+    errorMessage.includes('timeout') || errorMessage.includes('timed out');
+
+  return isTimeoutStatus || isTimeoutMessage;
+}
+
 async function loadPlayerGameStats(
   db: PublicDb,
   player: LoadMatchupStatsMessage['players'][0],
+  matchupId: number,
+  leagueId: number | null,
 ): Promise<void> {
   const { playerId, brefId, season, fieldingGamePos } = player;
 
@@ -311,6 +337,29 @@ async function loadPlayerGameStats(
         );
 
       LOGGER.info(`Updated player ${playerId} status to 'completed'`);
+
+      // Send notification that player stats are updated (using cached leagueId)
+      try {
+        if (notificationService && leagueId !== null) {
+          await notificationService.notifyPlayerStatsUpdated(
+            playerId,
+            matchupId,
+            leagueId,
+            { playerId, status: 'completed' },
+          );
+          LOGGER.debug(
+            `Sent player stats updated notification for player ${playerId}`,
+          );
+        }
+      } catch (notifyError) {
+        LOGGER.warn('Failed to send player stats updated notification', {
+          error:
+            notifyError instanceof Error
+              ? notifyError.message
+              : String(notifyError),
+          playerId,
+        });
+      }
     }
   } catch (error) {
     LOGGER.error(`Failed to load stats for player ${playerId}:`, {
@@ -319,10 +368,13 @@ async function loadPlayerGameStats(
       playerId,
       brefId,
       season,
+      isRetryableTimeout: isRetryableTimeoutError(error),
     });
 
     // Mark this player's game as failed
     if (player.matchupPlayerId) {
+      // Determine retry count from context (passed from baseHandler)
+      // For now, mark as failed - the matchup-level logic will handle retry state
       await db
         .update(PublicSchema.matchupPlayerGames)
         .set({ statsLoadingStatus: 'failed' })
@@ -333,7 +385,22 @@ async function loadPlayerGameStats(
           ),
         );
 
-      LOGGER.info(`Updated player ${playerId} status to 'failed'`);
+      LOGGER.info(`Updated player ${playerId} game status to 'failed'`);
+    }
+
+    // Re-throw with a marker if this is a retryable timeout error
+    if (isRetryableTimeoutError(error)) {
+      // Create a retryable error with custom properties
+      interface RetryableError extends Error {
+        originalError: unknown;
+        isRetryableTimeout: boolean;
+      }
+      const retryableError = new Error(
+        `RETRYABLE_TIMEOUT: ${error instanceof Error ? error.message : String(error)}`,
+      ) as RetryableError;
+      retryableError.originalError = error;
+      retryableError.isRetryableTimeout = true;
+      throw retryableError;
     }
 
     throw error;
@@ -341,7 +408,11 @@ async function loadPlayerGameStats(
 }
 
 const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  LOGGER.debug(JSON.stringify(event));
+  // Security: Log only safe metadata (not full event payload which can be large and contain sensitive data)
+  LOGGER.debug('Processing SQS event', {
+    recordCount: event.Records.length,
+    messageIds: event.Records.map((r) => r.messageId),
+  });
   addBreadcrumb(`Processing ${event.Records.length} matchup stats SQS records`);
 
   return await runWithPublicClient(getDbOptions(), async (db) => {
@@ -411,6 +482,28 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           continue;
         }
 
+        // Fetch leagueId once per message (all players in this message belong to the same matchup)
+        let leagueId: number | null = null;
+        try {
+          const matchupInfo = await db
+            .select({ leagueId: PublicSchema.matchups.leagueId })
+            .from(PublicSchema.matchups)
+            .where(eq(PublicSchema.matchups.id, message.matchupId))
+            .limit(1);
+
+          if (matchupInfo[0]) {
+            leagueId = matchupInfo[0].leagueId;
+          }
+        } catch (leagueIdError) {
+          LOGGER.warn('Failed to fetch leagueId for notifications', {
+            error:
+              leagueIdError instanceof Error
+                ? leagueIdError.message
+                : String(leagueIdError),
+            matchupId: message.matchupId,
+          });
+        }
+
         // Clean up expired cache entries before processing
         const removedEntries = cleanupCache();
         const cacheStatsBefore = getCacheStats();
@@ -433,19 +526,48 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             removedExpiredEntries: removedEntries,
           },
         );
+
+        // Get retry count from SQS message attributes
+        const retryCount = record.attributes?.ApproximateReceiveCount
+          ? parseInt(record.attributes.ApproximateReceiveCount, 10)
+          : 1;
+        const maxRetries = 5;
+
+        LOGGER.info(
+          `Processing message with retry count: ${retryCount}/${maxRetries}`,
+          {
+            messageId: record.messageId,
+            matchupId: message.matchupId,
+          },
+        );
+
         let failedPlayerCount = 0;
+        let timeoutPlayerCount = 0;
+
         for (const player of message.players) {
           try {
             addBreadcrumb(`Loading stats for player ${player.playerId}`);
-            await loadPlayerGameStats(db, player);
+            await loadPlayerGameStats(db, player, message.matchupId, leagueId);
           } catch (error) {
             failedPlayerCount++;
+
+            // Check if this is a retryable timeout error
+            const isTimeout =
+              error &&
+              typeof error === 'object' &&
+              'isRetryableTimeout' in error &&
+              error.isRetryableTimeout === true;
+            if (isTimeout) {
+              timeoutPlayerCount++;
+            }
+
             LOGGER.error(
               `Failed to load stats for player ${player.playerId} in matchup ${message.matchupId}`,
               {
                 error: error instanceof Error ? error.message : String(error),
                 playerId: player.playerId,
                 brefId: player.brefId,
+                isRetryableTimeout: isTimeout,
               },
             );
             // Continue processing other players even if one fails
@@ -464,6 +586,40 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               )
             : 0;
 
+        // Determine if we should retry this message
+        // If we have timeout failures and haven't exceeded retry limit, return as batch failure
+        const shouldRetry = timeoutPlayerCount > 0 && retryCount < maxRetries;
+
+        if (shouldRetry) {
+          LOGGER.warn(
+            `Returning message to queue for retry (${timeoutPlayerCount} timeout failures, attempt ${retryCount}/${maxRetries})`,
+            {
+              messageId: record.messageId,
+              matchupId: message.matchupId,
+              timeoutPlayerCount,
+              totalFailedPlayers: failedPlayerCount,
+              retryCount,
+            },
+          );
+          batchItemFailures.push({ itemIdentifier: record.messageId });
+
+          // Update matchup status to 'retry' so consumers know it's being retried
+          await db
+            .update(PublicSchema.matchups)
+            .set({ statsLoadingStatus: 'retry' })
+            .where(eq(PublicSchema.matchups.id, message.matchupId));
+
+          LOGGER.info(
+            `Set matchup ${message.matchupId} stats_loading_status to 'retry' (attempt ${retryCount}/${maxRetries})`,
+            {
+              timeoutPlayerCount,
+              totalFailedPlayers: failedPlayerCount,
+            },
+          );
+
+          continue;
+        }
+
         // Update matchup status only on the last batch or if there's only one batch
         const isLastBatch =
           message.totalBatches === undefined ||
@@ -471,14 +627,73 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           message.batchIndex === message.totalBatches - 1;
 
         if (isLastBatch) {
-          const finalStatus =
-            failedPlayerCount === message.players.length
-              ? 'failed'
-              : 'completed';
+          // Determine final status based on results and retry state
+          let finalStatus: 'completed' | 'failed';
+
+          if (failedPlayerCount === 0) {
+            finalStatus = 'completed';
+          } else if (failedPlayerCount === message.players.length) {
+            // Mark as failed if all players failed
+            finalStatus = 'failed';
+          } else {
+            // Partial success - mark as completed
+            finalStatus = 'completed';
+          }
+
           await db
             .update(PublicSchema.matchups)
             .set({ statsLoadingStatus: finalStatus })
             .where(eq(PublicSchema.matchups.id, message.matchupId));
+
+          LOGGER.info(
+            `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'`,
+            {
+              successfulPlayers: message.players.length - failedPlayerCount,
+              failedPlayers: failedPlayerCount,
+              timeoutPlayers: timeoutPlayerCount,
+              retryCount,
+              maxRetries,
+            },
+          );
+
+          // Send notification that all matchup stats are complete (using cached leagueId)
+          if (
+            finalStatus === 'completed' &&
+            notificationService &&
+            leagueId !== null
+          ) {
+            try {
+              // Get total player count using COUNT(*)
+              const totalPlayersResult = await db
+                .select({ count: count() })
+                .from(PublicSchema.matchupPlayers)
+                .where(
+                  eq(PublicSchema.matchupPlayers.matchupId, message.matchupId),
+                );
+
+              const totalPlayers = totalPlayersResult[0]?.count ?? 0;
+
+              await notificationService.notifyMatchupStatsComplete(
+                message.matchupId,
+                leagueId,
+                totalPlayers,
+              );
+              LOGGER.debug(
+                `Sent matchup stats complete notification for matchup ${message.matchupId}`,
+              );
+            } catch (notifyError) {
+              LOGGER.warn(
+                'Failed to send matchup stats complete notification',
+                {
+                  error:
+                    notifyError instanceof Error
+                      ? notifyError.message
+                      : String(notifyError),
+                  matchupId: message.matchupId,
+                },
+              );
+            }
+          }
 
           LOGGER.info(
             `Successfully processed matchup ${message.matchupId} (final batch)`,
@@ -487,6 +702,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               totalBatches: message.totalBatches,
               batchPlayers: message.players.length,
               failedPlayers: failedPlayerCount,
+              timeoutPlayers: timeoutPlayerCount,
+              retryCount,
               finalStatus,
               cacheHitRate: `${cacheHitRate}%`,
               finalCacheSize: cacheStatsAfter.totalEntries,
@@ -502,6 +719,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             {
               batchPlayers: message.players.length,
               failedPlayers: failedPlayerCount,
+              timeoutPlayers: timeoutPlayerCount,
+              retryCount,
               cacheHitRate: `${cacheHitRate}%`,
               currentCacheSize: cacheStatsAfter.totalEntries,
             },
@@ -522,18 +741,70 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           // Ignore parsing errors in error handler
         }
 
-        // Update matchup status to 'failed' if we have a matchupId
+        // Check if this is a retryable error and we haven't exceeded retry limit
+        const retryCount = record.attributes?.ApproximateReceiveCount
+          ? parseInt(record.attributes.ApproximateReceiveCount, 10)
+          : 1;
+        const maxRetries = 5;
+        const isRetryable = isRetryableTimeoutError(error);
+
+        if (isRetryable && retryCount < maxRetries) {
+          LOGGER.warn(
+            `Returning message to queue for retry due to timeout error (attempt ${retryCount}/${maxRetries})`,
+            {
+              messageId: record.messageId,
+              matchupId: parsedMessage?.matchupId,
+              error: error instanceof Error ? error.message : String(error),
+              retryCount,
+            },
+          );
+
+          // Update matchup status to 'retry' before returning to queue
+          if (parsedMessage?.matchupId) {
+            try {
+              await db
+                .update(PublicSchema.matchups)
+                .set({ statsLoadingStatus: 'retry' })
+                .where(eq(PublicSchema.matchups.id, parsedMessage.matchupId));
+
+              LOGGER.info(
+                `Set matchup ${parsedMessage.matchupId} stats_loading_status to 'retry' (attempt ${retryCount}/${maxRetries})`,
+              );
+            } catch (updateError) {
+              LOGGER.error('Failed to update matchup status to retry', {
+                updateError:
+                  updateError instanceof Error
+                    ? updateError.message
+                    : String(updateError),
+                matchupId: parsedMessage.matchupId,
+              });
+            }
+          }
+
+          // Return as batch failure - SQS will automatically retry
+          batchItemFailures.push({ itemIdentifier: record.messageId });
+          continue;
+        }
+
+        // Update matchup status to failed (retries exhausted or non-retryable error)
         if (parsedMessage?.matchupId) {
           try {
             await db
               .update(PublicSchema.matchups)
               .set({ statsLoadingStatus: 'failed' })
               .where(eq(PublicSchema.matchups.id, parsedMessage.matchupId));
+
             LOGGER.info(
               `Set matchup ${parsedMessage.matchupId} stats_loading_status to 'failed'`,
+              {
+                reason: isRetryable
+                  ? `Exceeded max retries (${retryCount}/${maxRetries})`
+                  : 'Non-retryable error',
+                error: error instanceof Error ? error.message : String(error),
+              },
             );
           } catch (updateError) {
-            LOGGER.error('Failed to update matchup status to failed', {
+            LOGGER.error('Failed to update matchup status', {
               updateError:
                 updateError instanceof Error
                   ? updateError.message

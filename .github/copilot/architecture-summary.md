@@ -48,12 +48,19 @@
 6. Apps: `web`, `app`, `cli`
 7. Lambdas: `db`, `oauth-proxy`, etc.
 
+**Library vs App Build Targets**:
+
+- **Libraries** (lib/\*): TypeScript source only - NO build targets
+  - Have: `typecheck`, `lint`, `test` targets
+  - Compiled by consuming apps/lambdas during their build process
+- **Apps/Lambdas**: Include `build` targets that compile their own code + imported libraries
+
 **Commands**:
 
 ```powershell
-pnpm run build:libs    # Libraries only
-pnpm run build:apps    # Applications only
-pnpm exec nx affected -t build  # Only changed projects
+pnpm run build:libs    # NOTE: This is a misnomer - only builds api/shared-components which have build targets
+pnpm run build:apps    # Applications and lambdas only
+pnpm exec nx affected -t build  # Only builds apps/lambdas with build targets
 ```
 
 ### 4. GraphQL API
