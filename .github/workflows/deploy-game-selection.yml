@@ -53,7 +53,7 @@ jobs:
           environment: "production"
 
       - name: "☁️ Configure AWS Credentials"
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           role-session-name: GitHubActions-DeployGameSelection
