@@ -66,10 +66,58 @@ All major tables include these timestamp columns:
 - `scoring_stat_definitions` - Available statistics
 - `league_scoring_profiles` - Scoring configurations
 - `league_scoring_profile_entries` - Per-stat multipliers
+- `league_scoring_change_log` - Audit log for scoring changes
 
 ### User Management
 
 - `app_internal.users` - User accounts
+
+### Chat & Messaging
+
+- `matchup_messages` - Messages in matchup chat
+- `matchup_chat_blocks` - User blocking relationships
+- `matchup_message_reactions` - Reactions to messages
+- `matchup_message_reports` - Message moderation reports
+- `league_messages` - League-wide announcements
+
+### Playoff & Tiebreaker System
+
+- `tiebreaker_rules` - League tiebreaker configurations
+- `tiebreaker_history` - Tiebreaker resolution log
+- `playoff_brackets` - Playoff bracket definitions
+- `champion_trophies` - Championship records
+
+### Player Data
+
+- `players` - Master player registry
+- `league_week_player_seasons` - Weekly player season tracking
+
+## Tables WITHOUT Automatic Timestamps
+
+### Historical Stats (Intentionally Excluded)
+
+The following tables contain **read-only historical data** loaded from external sources. They are not modified after initial creation, so automatic timestamp tracking would not provide meaningful audit value:
+
+#### Game-Level Stats
+
+- `game_batting` - Baseball game batting statistics
+- `game_fielding` - Baseball game fielding statistics
+- `game_pitching` - Baseball game pitching statistics
+
+#### Season-Level Stats
+
+- `season_batting` - Baseball season batting statistics
+- `season_fielding` - Baseball season fielding statistics
+- `season_pitching` - Baseball season pitching statistics
+
+#### Playoff Reference Data
+
+- `playoff_matchups` - Playoff matchup records
+- `playoff_seeds` - Playoff seeding records
+
+#### Configuration Data
+
+- `league_positions` - Position configuration (rarely changes)
 
 ## Usage Examples
 
@@ -146,12 +194,20 @@ const oldestFirst = await db
 
 ### Migration
 
-The automatic timestamp system was implemented in migration `20260208_000000_add_automatic_timestamps.ts`:
+The automatic timestamp system was implemented in two migrations:
 
-1. Creates the `update_updated_at_column()` trigger function
-2. Adds `created_at` and `updated_at` columns to existing tables
-3. Creates triggers for all tables with these columns
-4. Idempotent - safe to run multiple times
+1. **`20260208_000000_add_automatic_timestamps.ts`** - Initial implementation
+   - Creates the `update_updated_at_column()` trigger function
+   - Adds `created_at` and `updated_at` columns to core tables
+   - Creates triggers for all initial tables
+
+2. **`20260211_000000_fix_missing_timestamp_triggers.ts`** - Comprehensive fixes
+   - Adds missing triggers to tables with existing timestamp columns
+   - Adds complete timestamps to audit and user-generated content tables
+   - Completes partial implementations (adds `updated_at` where only `created_at` existed)
+   - Documents policy on historical stats tables (intentionally excluded)
+
+Both migrations are idempotent - safe to run multiple times.
 
 ### Running the Migration
 

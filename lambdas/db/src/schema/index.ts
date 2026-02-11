@@ -9,6 +9,7 @@ import './matchups';
 import './version';
 import './scoring';
 import './notifications';
+import './chat-and-tiebreakers';
 
 // Export the final schema
 export const schema = builder.toSchema();

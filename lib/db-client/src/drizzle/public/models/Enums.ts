@@ -95,3 +95,35 @@ export const weekAdvanceStatus = pgEnum('week_advance_status', [
   'success',
   'failed',
 ]);
+
+// Chat system enums
+export const matchupChatBlockScope = pgEnum('matchup_chat_block_scope', [
+  'matchup',
+  'league',
+  'global',
+]);
+
+export const matchupMessageReactionType = pgEnum(
+  'matchup_message_reaction_type',
+  ['like', 'fire', 'laugh', 'wow', 'trophy', 'thumbs_down'],
+);
+
+export const matchupMessageReportStatus = pgEnum(
+  'matchup_message_report_status',
+  ['pending', 'reviewing', 'resolved', 'dismissed'],
+);
+
+export const matchupMessageType = pgEnum('matchup_message_type', [
+  'text',
+  'gif',
+  'system',
+]);
+
+// Tiebreaker system enums
+export const tiebreakerMethod = pgEnum('tiebreaker_method', [
+  'highest_category',
+  'total_season_points',
+  'head_to_head_record',
+  'random',
+  'co_champion',
+]);

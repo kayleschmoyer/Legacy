@@ -1,4 +1,5 @@
-import { createDatabaseService } from '@legacy-sports/db-client';
+import { createDatabaseService, PublicSchema } from '@legacy-sports/db-client';
+import { and, eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
@@ -28,6 +29,54 @@ interface PositionGames {
   games: number;
   position?: string;
 }
+
+/**
+ * Player Game Scores - Pre-computed fantasy scores per game
+ */
+export const PlayerGameScoreRef = builder.objectRef<{
+  id: number;
+  playerId: number;
+  season: number;
+  gameNum: number;
+  battingScore: string | null;
+  pitchingScore: string | null;
+  fieldingScore: string | null;
+  totalScore: string | null;
+  battingStats: Record<string, unknown> | null;
+  pitchingStats: Record<string, unknown> | null;
+  fieldingStats: Record<string, unknown> | null;
+  computedAt: string | null;
+}>('PlayerGameScore');
+
+PlayerGameScoreRef.implement({
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    playerId: t.exposeInt('playerId'),
+    season: t.exposeInt('season'),
+    gameNum: t.exposeInt('gameNum'),
+    battingScore: t.float({
+      nullable: true,
+      resolve: (score) =>
+        score.battingScore ? parseFloat(score.battingScore) : null,
+    }),
+    pitchingScore: t.float({
+      nullable: true,
+      resolve: (score) =>
+        score.pitchingScore ? parseFloat(score.pitchingScore) : null,
+    }),
+    fieldingScore: t.float({
+      nullable: true,
+      resolve: (score) =>
+        score.fieldingScore ? parseFloat(score.fieldingScore) : null,
+    }),
+    totalScore: t.float({
+      nullable: true,
+      resolve: (score) =>
+        score.totalScore ? parseFloat(score.totalScore) : null,
+    }),
+    computedAt: t.exposeString('computedAt', { nullable: true }),
+  }),
+});
 
 // Game Batting type - stats from a single game
 export const GameBattingRef = builder.objectRef<{
@@ -1123,6 +1172,68 @@ builder.queryField('playerSeasonFielding', (t) =>
         `[playerSeasonFielding] Returned ${results.length} records for playerId=${playerId}`,
       );
       return results;
+    },
+  }),
+);
+
+/**
+ * Player Game Scores Query
+ * Gets pre-computed fantasy scores for one or more games
+ */
+builder.queryField('getPlayerGameScores', (t) =>
+  t.field({
+    type: [PlayerGameScoreRef],
+    args: {
+      playerId: t.arg.int({ required: true }),
+      season: t.arg.int({ required: false }),
+      gameNum: t.arg.int({ required: false }),
+    },
+    resolve: async (parent, args, context) => {
+      LOGGER.debug(
+        `[getPlayerGameScores] Query for playerId=${args.playerId}, season=${args.season}, gameNum=${args.gameNum}`,
+      );
+
+      const conditions = [
+        eq(PublicSchema.playerGameScores.playerId, args.playerId),
+      ];
+
+      if (args.season) {
+        conditions.push(eq(PublicSchema.playerGameScores.season, args.season));
+      }
+
+      if (args.gameNum) {
+        conditions.push(
+          eq(PublicSchema.playerGameScores.gameNum, args.gameNum),
+        );
+      }
+
+      const results = await context.db
+        .select()
+        .from(PublicSchema.playerGameScores)
+        .where(and(...conditions))
+        .orderBy(
+          PublicSchema.playerGameScores.season,
+          PublicSchema.playerGameScores.gameNum,
+        );
+
+      LOGGER.debug(
+        `[getPlayerGameScores] Returned ${results.length} records for playerId=${args.playerId}`,
+      );
+
+      return results.map((row) => ({
+        id: row.id,
+        playerId: row.playerId,
+        season: row.season,
+        gameNum: row.gameNum,
+        battingScore: row.battingScore,
+        pitchingScore: row.pitchingScore,
+        fieldingScore: row.fieldingScore,
+        totalScore: row.totalScore,
+        battingStats: row.battingStats as Record<string, unknown> | null,
+        pitchingStats: row.pitchingStats as Record<string, unknown> | null,
+        fieldingStats: row.fieldingStats as Record<string, unknown> | null,
+        computedAt: row.computedAt,
+      }));
     },
   }),
 );

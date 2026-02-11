@@ -1,18 +1,28 @@
 import {
+  boolean,
   char,
   decimal,
   foreignKey,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
   serial,
+  text,
   timestamp,
   unique,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { leagues, teams } from './Leagues';
 import { players } from './Players';
+import { users } from './Users';
+import {
+  matchupChatBlockScope,
+  matchupMessageReactionType,
+  matchupMessageReportStatus,
+  matchupMessageType,
+} from './Enums';
 
 export const matchupStatus = pgEnum('matchup_status', [
   'scheduled',
@@ -171,6 +181,197 @@ export const matchupPlayerGames = pgTable(
         foreignColumns: [matchupPlayers.id],
         name: 'matchup_player_games_matchup_player_fk',
       }),
+    };
+  },
+);
+
+/**
+ * Matchup Chat System (LS-37)
+ *
+ * Real-time messaging system for matchup participants with moderation,
+ * reactions, blocking, and WebSocket connection tracking.
+ */
+
+export const matchupMessages = pgTable(
+  'matchup_messages',
+  {
+    id: serial('id').primaryKey().notNull(),
+    matchupId: integer('matchup_id').notNull(),
+    leagueId: integer('league_id').notNull(),
+    senderId: integer('sender_id').notNull(),
+    messageType: matchupMessageType('message_type').notNull().default('text'),
+    message: text('message').notNull().default(''),
+    gifUrl: text('gif_url'),
+    metadata: jsonb('metadata').notNull().default({}),
+    containsProfanity: boolean('contains_profanity').notNull().default(false),
+    isFlagged: boolean('is_flagged').notNull().default(false),
+    flaggedBy: integer('flagged_by'),
+    flaggedReason: text('flagged_reason'),
+    moderatedAt: timestamp('moderated_at', { mode: 'string' }),
+    deletedAt: timestamp('deleted_at', { mode: 'string' }),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    replyToMessageId: integer('reply_to_message_id'),
+    pinnedAt: timestamp('pinned_at', { mode: 'string' }),
+  },
+  (table) => {
+    return {
+      matchupMessagesMatchupFk: foreignKey({
+        columns: [table.matchupId],
+        foreignColumns: [matchups.id],
+        name: 'matchup_messages_matchup_fk',
+      }).onDelete('cascade'),
+      matchupMessagesLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'matchup_messages_league_fk',
+      }).onDelete('cascade'),
+      matchupMessagesSenderFk: foreignKey({
+        columns: [table.senderId],
+        foreignColumns: [users.id],
+        name: 'matchup_messages_sender_fk',
+      }).onDelete('cascade'),
+      matchupMessagesReplyFk: foreignKey({
+        columns: [table.replyToMessageId],
+        foreignColumns: [table.id],
+        name: 'matchup_messages_reply_fk',
+      }).onDelete('set null'),
+      matchupMessagesFlaggerFk: foreignKey({
+        columns: [table.flaggedBy],
+        foreignColumns: [users.id],
+        name: 'matchup_messages_flagger_fk',
+      }).onDelete('set null'),
+    };
+  },
+);
+
+export const matchupChatBlocks = pgTable(
+  'matchup_chat_blocks',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    matchupId: integer('matchup_id'),
+    blockingUserId: integer('blocking_user_id').notNull(),
+    blockedUserId: integer('blocked_user_id').notNull(),
+    scope: matchupChatBlockScope('scope').notNull().default('matchup'),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp('expires_at', { mode: 'string' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      matchupChatBlocksBlockingFk: foreignKey({
+        columns: [table.blockingUserId],
+        foreignColumns: [users.id],
+        name: 'matchup_chat_blocks_blocking_fk',
+      }).onDelete('cascade'),
+      matchupChatBlocksBlockedFk: foreignKey({
+        columns: [table.blockedUserId],
+        foreignColumns: [users.id],
+        name: 'matchup_chat_blocks_blocked_fk',
+      }).onDelete('cascade'),
+    };
+  },
+);
+
+export const matchupMessageConnections = pgTable(
+  'matchup_message_connections',
+  {
+    connectionId: varchar('connection_id', { length: 128 })
+      .primaryKey()
+      .notNull(),
+    leagueId: integer('league_id').notNull(),
+    matchupId: integer('matchup_id').notNull(),
+    userId: integer('user_id').notNull(),
+    platform: varchar('platform', { length: 32 }).notNull().default('web'),
+    connectedAt: timestamp('connected_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp('last_seen_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const matchupMessageReactions = pgTable(
+  'matchup_message_reactions',
+  {
+    id: serial('id').primaryKey().notNull(),
+    messageId: integer('message_id').notNull(),
+    userId: integer('user_id').notNull(),
+    reactionType: matchupMessageReactionType('reaction_type')
+      .notNull()
+      .default('like'),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      matchupMessageReactionsMessageFk: foreignKey({
+        columns: [table.messageId],
+        foreignColumns: [matchupMessages.id],
+        name: 'matchup_message_reactions_message_fk',
+      }).onDelete('cascade'),
+      matchupMessageReactionsUserFk: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+        name: 'matchup_message_reactions_user_fk',
+      }).onDelete('cascade'),
+      matchupMessageReactionsUnique: unique(
+        'matchup_message_reactions_unique',
+      ).on(table.messageId, table.userId, table.reactionType),
+    };
+  },
+);
+
+export const matchupMessageReports = pgTable(
+  'matchup_message_reports',
+  {
+    id: serial('id').primaryKey().notNull(),
+    messageId: integer('message_id').notNull(),
+    reportedBy: integer('reported_by').notNull(),
+    reason: text('reason').notNull(),
+    status: matchupMessageReportStatus('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp('resolved_at', { mode: 'string' }),
+    reviewedBy: integer('reviewed_by'),
+    moderatorNotes: text('moderator_notes'),
+    resolution: text('resolution'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      matchupMessageReportsMessageFk: foreignKey({
+        columns: [table.messageId],
+        foreignColumns: [matchupMessages.id],
+        name: 'matchup_message_reports_message_fk',
+      }).onDelete('cascade'),
+      matchupMessageReportsReporterFk: foreignKey({
+        columns: [table.reportedBy],
+        foreignColumns: [users.id],
+        name: 'matchup_message_reports_reporter_fk',
+      }).onDelete('cascade'),
+      matchupMessageReportsReviewerFk: foreignKey({
+        columns: [table.reviewedBy],
+        foreignColumns: [users.id],
+        name: 'matchup_message_reports_reviewer_fk',
+      }).onDelete('set null'),
     };
   },
 );

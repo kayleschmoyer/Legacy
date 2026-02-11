@@ -21,6 +21,55 @@ import {
 import { sql } from 'drizzle-orm';
 import { players } from './Players';
 
+/**
+ * Player Game Scores
+ *
+ * Pre-computed fantasy scores for every player's individual games.
+ * Eliminates the need for on-demand score calculation during matchups.
+ */
+export const playerGameScores = pgTable(
+  'player_game_scores',
+  {
+    id: serial('id').primaryKey().notNull(),
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    gameNum: integer('game_num').notNull(),
+    battingScore: numeric('batting_score', { precision: 10, scale: 3 }),
+    pitchingScore: numeric('pitching_score', { precision: 10, scale: 3 }),
+    fieldingScore: numeric('fielding_score', { precision: 10, scale: 3 }),
+    // Note: total_score is a GENERATED column in the database
+    // COALESCE(batting_score, 0) + COALESCE(pitching_score, 0) + COALESCE(fielding_score, 0)
+    totalScore: numeric('total_score', { precision: 10, scale: 3 }),
+    battingStats: jsonb('batting_stats'),
+    pitchingStats: jsonb('pitching_stats'),
+    fieldingStats: jsonb('fielding_stats'),
+    computedAt: timestamp('computed_at', { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      playerGameScoresPlayerFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'player_game_scores_player_fk',
+      }).onDelete('cascade'),
+      playerGameScoresUnique: unique('player_game_scores_unique').on(
+        table.playerId,
+        table.season,
+        table.gameNum,
+      ),
+      playerSeasonIdx: index('idx_player_game_scores_player_season').on(
+        table.playerId,
+        table.season,
+      ),
+      lookupIdx: index('idx_player_game_scores_lookup').on(
+        table.playerId,
+        table.season,
+        table.gameNum,
+      ),
+    };
+  },
+);
+
 export const seasonFielding = pgTable(
   'season_fielding',
   {

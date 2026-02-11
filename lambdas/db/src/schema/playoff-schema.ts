@@ -46,6 +46,7 @@ const PlayoffBracket = builder.objectRef<{
   championTeamId: number | null;
   status: 'scheduled' | 'in_progress' | 'completed';
   createdAt: string;
+  updatedAt: string;
 }>('PlayoffBracket');
 
 builder.objectType(PlayoffBracket, {
@@ -65,6 +66,7 @@ builder.objectType(PlayoffBracket, {
       type: PlayoffMatchupStatus,
       resolve: (bracket) => bracket.status,
     }),
+    updatedAt: t.exposeString('updatedAt'),
     createdAt: t.exposeString('createdAt'),
     // Relational field: champion team
     championTeam: t.field({
@@ -271,6 +273,8 @@ const ChampionTrophy = builder.objectRef<{
   runnerUpTeamId: number | null;
   runnerUpScore: string | null; // Decimal
   awardedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }>('ChampionTrophy');
 
 builder.objectType(ChampionTrophy, {
@@ -291,6 +295,8 @@ builder.objectType(ChampionTrophy, {
         trophy.runnerUpScore ? parseFloat(trophy.runnerUpScore) : null,
     }),
     awardedAt: t.exposeString('awardedAt'),
+    createdAt: t.exposeString('createdAt'),
+    updatedAt: t.exposeString('updatedAt'),
     // Relational fields
     championTeam: t.field({
       type: Team,
@@ -364,7 +370,9 @@ builder.queryField('getPlayoffBracket', (t) =>
           )
           .orderBy(desc(PublicSchema.playoffBrackets.season))
           .limit(1);
-        return results[0] || null;
+        const bracket = results[0];
+        if (!bracket) return null;
+        return bracket;
       }
 
       const results = await query
@@ -411,7 +419,11 @@ builder.queryField('getChampionshipTrophies', (t) =>
         .from(PublicSchema.championTrophies)
         .where(eq(PublicSchema.championTrophies.leagueId, args.leagueId))
         .orderBy(desc(PublicSchema.championTrophies.season));
-      return results;
+      return results.map((trophy) => ({
+        ...trophy,
+        createdAt: trophy.createdAt.toISOString(),
+        updatedAt: trophy.updatedAt.toISOString(),
+      }));
     },
   }),
 );
@@ -541,7 +553,11 @@ builder.mutationField('awardChampionship', (t) =>
         context.db,
         args.bracketId,
       );
-      return trophy;
+      return {
+        ...trophy,
+        createdAt: trophy.createdAt.toISOString(),
+        updatedAt: trophy.updatedAt.toISOString(),
+      };
     },
   }),
 );

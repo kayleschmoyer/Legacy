@@ -1,15 +1,20 @@
 import {
+  boolean,
   decimal,
   foreignKey,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
+  text,
   timestamp,
-  boolean,
   unique,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { leagues, teams } from './Leagues';
+import { users } from './Users';
+import { tiebreakerMethod } from './Enums';
 
 /**
  * Playoff System Database Tables (LS-28)
@@ -54,6 +59,9 @@ export const playoffBrackets = pgTable(
     championTeamId: integer('champion_team_id'),
     status: playoffMatchupStatus('status').notNull().default('scheduled'),
     createdAt: timestamp('created_at', { mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'string' })
       .defaultNow()
       .notNull(),
   },
@@ -172,6 +180,12 @@ export const championTrophies = pgTable(
     awardedAt: timestamp('awarded_at', { mode: 'string' })
       .defaultNow()
       .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => {
     return {
@@ -193,6 +207,84 @@ export const championTrophies = pgTable(
       championTrophiesLeagueSeasonUk: unique(
         'champion_trophies_league_season_uk',
       ).on(table.leagueId, table.season),
+    };
+  },
+);
+
+/**
+ * Tiebreaker System (LS-39)
+ *
+ * Configurable tiebreaker rules and historical tracking for resolving
+ * matchup ties in head-to-head fantasy baseball leagues.
+ */
+
+export const tiebreakerRules = pgTable(
+  'tiebreaker_rules',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    primaryMethod: tiebreakerMethod('primary_method').notNull(),
+    secondaryMethod: tiebreakerMethod('secondary_method'),
+    tertiaryMethod: tiebreakerMethod('tertiary_method'),
+    allowCommissionerOverride: boolean('allow_commissioner_override')
+      .notNull()
+      .default(true),
+    config: jsonb('config'),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      tiebreakerRulesLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'tiebreaker_rules_league_fk',
+      }).onDelete('cascade'),
+      tiebreakerRulesLeagueUk: unique('tiebreaker_rules_league_uk').on(
+        table.leagueId,
+      ),
+    };
+  },
+);
+
+export const tiebreakerHistory = pgTable(
+  'tiebreaker_history',
+  {
+    id: serial('id').primaryKey().notNull(),
+    matchupId: integer('matchup_id').notNull(),
+    appliedMethod: tiebreakerMethod('applied_method').notNull(),
+    wasCommissionerOverride: boolean('was_commissioner_override')
+      .notNull()
+      .default(false),
+    commissionerUserId: integer('commissioner_user_id'),
+    winnerId: integer('winner_id'),
+    reason: varchar('reason', { length: 500 }),
+    resolvedAt: timestamp('resolved_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      tiebreakerHistoryCommissionerFk: foreignKey({
+        columns: [table.commissionerUserId],
+        foreignColumns: [users.id],
+        name: 'tiebreaker_history_commissioner_fk',
+      }).onDelete('set null'),
+      tiebreakerHistoryWinnerFk: foreignKey({
+        columns: [table.winnerId],
+        foreignColumns: [teams.id],
+        name: 'tiebreaker_history_winner_fk',
+      }).onDelete('set null'),
     };
   },
 );
