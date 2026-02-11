@@ -63,13 +63,10 @@ concurrency:
   group: orchestrator-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Workflow-level permissions follow least-privilege principle
+# Individual jobs and called workflows define their own required permissions
 permissions:
-  actions: read
   contents: read
-  pull-requests: write
-  checks: read
-  issues: write
-  security-events: write
 
 jobs:
   warmup:

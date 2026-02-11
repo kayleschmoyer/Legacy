@@ -14,13 +14,24 @@ concurrency:
   group: lambda-deployment-graphql
   cancel-in-progress: false
 
+# IMPORTANT: Infrastructure Configuration
+# These values are currently hardcoded for the dev environment.
+# FUTURE IMPROVEMENT: Move to AWS Systems Manager Parameter Store or Terraform outputs
+# to support multiple environments (dev, staging, prod) and avoid inline secrets.
+#
+# Note on environment/stage naming:
+# - AWS_STAGE: 'dev' = actual AWS deployment stage
+# - GitHub environment: 'production' = branch protection setting (confusing naming)
+# TODO: Align GitHub environment names with AWS stages for clarity
 env:
   AWS_REGION: us-east-1
   AWS_SERVICE_NAME: legacy-sports-gql
-  AWS_STAGE: dev
+  AWS_STAGE: dev # TODO: Parameterize for multi-environment support
+  # VPC Configuration - TODO: Move to SSM Parameter Store
   AWS_VPC_SECURITY_GROUP_IDS: sg-0d21d72d3c1c004c2,sg-07083f37d7e8e24c5
   AWS_VPC_SUBNET_IDS: subnet-06f49eeff089ef92d
   DATABASE_SCHEMAS: public
+  # Database Host - TODO: Retrieve from Secrets Manager or Terraform output
   DB_HOST: legacy-sports.cep4b6aynyet.us-east-1.rds.amazonaws.com
 
 permissions:
@@ -33,6 +44,8 @@ jobs:
     name: Deploy GraphQL Lambda
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Note: GitHub 'environment' is used for branch protection, not AWS stage
+    # This creates confusion with AWS_STAGE. Consider renaming to match AWS stages.
     environment: production
 
     # Steps represent a sequence of tasks that will be executed as part of the job

@@ -29,7 +29,7 @@ inputs:
 outputs:
   cache-hit:
     description: "Whether dependencies were restored from cache"
-    value: ${{ steps.cached-dependencies.outputs.cache-hit || steps.cache-pnpm-store.outputs.cache-hit }}
+    value: ${{ steps.cache-pnpm-store.outputs.cache-hit }}
 
 runs:
   using: "composite"
@@ -65,29 +65,29 @@ runs:
 
         echo "Preparing pnpm@${PNPM_VERSION} for immediate activation..."
 
-    - name: Detect Package Manager
+    - name: Validate Package Manager (pnpm-only)
       id: detect-pm
       shell: bash
       run: |
-        if [ -f "pnpm-lock.yaml" ]; then
-          echo "manager=pnpm" >> "$GITHUB_OUTPUT"
-          echo "✅ Detected pnpm (pnpm-lock.yaml found)"
-        elif [ -f "package-lock.json" ]; then
-          echo "manager=npm" >> "$GITHUB_OUTPUT"
-          echo "✅ Detected npm (package-lock.json found)"
-        else
-          echo "manager=npm" >> "$GITHUB_OUTPUT"
-          echo "⚠️  No lockfile found, defaulting to npm"
+        # This repository is pnpm-based (pnpm-lock.yaml + pnpm-workspace.yaml)
+        # Fail fast if lockfile is missing - no npm fallback supported
+        if [ ! -f "pnpm-lock.yaml" ]; then
+          echo "❌ pnpm-lock.yaml not found"
+          echo "This repository requires pnpm. Expected lockfile: pnpm-lock.yaml"
+          exit 1
         fi
+        echo "manager=pnpm" >> "$GITHUB_OUTPUT"
+        echo "✅ Validated pnpm workspace (pnpm-lock.yaml found)"
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: ${{ steps.detect-pm.outputs.manager }}
+        cache: pnpm
 
     - name: Cache pnpm Store
-      if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'pnpm'
+      if: inputs.install-dependencies == 'true'
+      id: cache-pnpm-store
       uses: actions/cache@v4
       with:
         path: ~/.local/share/pnpm/store
@@ -95,151 +95,11 @@ runs:
         restore-keys: |
           ${{ runner.os }}-pnpm-store-
 
-    - name: Cache Node Modules (with partial restore)
-      if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'npm'
-      uses: actions/cache@v4
-      id: cached-dependencies
-      with:
-        path: node_modules
-        # Primary key: exact match on package-lock.json
-        key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
-        # Fallback keys: restore previous node_modules even if package-lock changed
-        # This allows npm to do incremental updates instead of full reinstall
-        restore-keys: |
-          ${{ runner.os }}-node-modules-
-
-    - name: Install Dependencies (Incremental)
-      if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'npm' && steps.cached-dependencies.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
-
-        # Check if node_modules already exists and is valid (from cache restore-key)
-        if [ -d "node_modules" ] && [ -d "node_modules/nx" ]; then
-          echo "✅ node_modules already present from cache (restored via restore-key)"
-          echo "📦 Verifying critical packages..."
-
-          # Quick validation that key packages exist
-          if [ -d "node_modules/@nx" ] || [ -d "node_modules/nx" ]; then
-            echo "✅ Nx packages found - skipping install to save time"
-            echo "⚡ Saved ~15 minutes by reusing cached dependencies"
-            exit 0
-          fi
-        fi
-
-        # Check package-lock.json integrity first
-        if [ ! -f "package-lock.json" ]; then
-          echo "❌ package-lock.json not found"
-          exit 1
-        fi
-
-        if [ -n "${{ steps.cached-dependencies.outputs.cache-matched-key }}" ] && [ "${{ steps.cached-dependencies.outputs.cache-matched-key }}" != "${{ steps.cached-dependencies.outputs.cache-primary-key }}" ]; then
-          echo "📦 Partial cache restored - updating dependencies incrementally..."
-          echo "Restored: ${{ steps.cached-dependencies.outputs.cache-matched-key }}"
-          echo "Target: ${{ steps.cached-dependencies.outputs.cache-primary-key }}"
-          echo "Using 'pnpm install --frozen-lockfile' for incremental update (2-5 min)..."
-          # --frozen-lockfile: Respects package-lock.json exactly (like npm ci)
-          # But doesn't delete node_modules first, so can do incremental updates
-          if [ "${{ inputs.include-optional-deps }}" == "false" ]; then
-            echo "⚡ Skipping optional dependencies (Storybook, Appium) for faster CI..."
-            pnpm install --frozen-lockfile --prefer-offline --no-audit --no-fund --omit=optional --loglevel verbose
-          else
-            pnpm install --frozen-lockfile --prefer-offline --no-audit --no-fund --loglevel verbose
-          fi
-        else
-          echo "📦 No cache available - full install required (10-15 min)..."
-
-          NPM_CI_CMD=(npm ci --prefer-offline --no-audit --no-fund --loglevel verbose)
-          NPM_CI_DRY_RUN_CMD=(npm ci --dry-run)
-          NPM_INSTALL_CMD=(npm install --no-audit --no-fund --loglevel verbose)
-
-          if [ "${{ inputs.include-optional-deps }}" == "false" ]; then
-            echo "⚡ Skipping optional dependencies (Storybook, Appium) for faster CI..."
-            NPM_CI_CMD+=(--omit=optional)
-            NPM_CI_DRY_RUN_CMD+=(--omit=optional)
-            NPM_INSTALL_CMD+=(--omit=optional)
-          fi
-
-          # Allow up to 15 minutes for dependency installation to accommodate cold caches on CI
-          if command -v timeout >/dev/null 2>&1; then
-            TIMEOUT_CMD="timeout 900s"
-          elif command -v gtimeout >/dev/null 2>&1; then
-            TIMEOUT_CMD="gtimeout 900s"
-          else
-            echo "⚠️  No timeout command available, proceeding without timeout..."
-            TIMEOUT_CMD=""
-          fi
-
-          echo "🔧 Installing dependencies (node_modules not found or incomplete)..."
-
-          if $TIMEOUT_CMD "${NPM_CI_CMD[@]}"; then
-            echo "✅ Dependencies installed successfully!"
-          else
-            echo "⚠️  Primary npm ci failed, analyzing error..."
-
-            # Check if this is a lock file sync issue (common with Sharp/platform-specific deps)
-            if "${NPM_CI_DRY_RUN_CMD[@]}" 2>&1 | grep -q "package.json and package-lock.json.*are in sync"; then
-              echo "🔧 Detected lock file sync issue - regenerating with npm install..."
-
-              if command -v timeout >/dev/null 2>&1; then
-                INSTALL_TIMEOUT_CMD="timeout 900s"
-              elif command -v gtimeout >/dev/null 2>&1; then
-                INSTALL_TIMEOUT_CMD="gtimeout 900s"
-              else
-                INSTALL_TIMEOUT_CMD=""
-              fi
-
-              if $INSTALL_TIMEOUT_CMD "${NPM_INSTALL_CMD[@]}"; then
-                echo "✅ Dependencies synchronized successfully with npm install!"
-              else
-                echo "❌ npm install also failed - trying cache reset..."
-                npm cache clean --force
-
-                if $INSTALL_TIMEOUT_CMD "${NPM_INSTALL_CMD[@]}"; then
-                  echo "✅ Dependencies installed after cache reset!"
-                else
-                  echo "❌ All installation methods failed"
-                  echo "Debug info:"
-                  echo "  - npm version: $(npm --version)"
-                  echo "  - node version: $(node --version)"
-                  echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
-                  echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
-                  exit 1
-                fi
-              fi
-            fi
-          else
-            echo "⚠️  Non-sync error detected, retrying npm ci with cache reset..."
-            npm cache clean --force
-
-              if command -v timeout >/dev/null 2>&1; then
-                RETRY_TIMEOUT_CMD="timeout 900s"
-              elif command -v gtimeout >/dev/null 2>&1; then
-                RETRY_TIMEOUT_CMD="gtimeout 900s"
-              else
-                RETRY_TIMEOUT_CMD=""
-              fi
-
-              if $RETRY_TIMEOUT_CMD "${NPM_CI_CMD[@]}"; then
-                echo "✅ Dependencies installed on retry!"
-              else
-                echo "❌ npm ci retry also failed"
-                echo "Debug info:"
-                echo "  - npm version: $(npm --version)"
-                echo "  - node version: $(node --version)"
-                echo "  - package-lock.json exists: $([ -f package-lock.json ] && echo 'yes' || echo 'no')"
-                echo "  - available disk space: $(df -h . | tail -1 | awk '{print $4}')"
-                exit 1
-              fi
-            fi
-          fi
-        fi
-
-        echo "✅ Dependencies installed - cached for future runs!"
+    # Note: npm support removed as this repository is pnpm-only
+    # Legacy npm cache and install steps consolidated into pnpm-only workflow
 
     - name: Install Dependencies with pnpm
-      if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'pnpm'
+      if: inputs.install-dependencies == 'true'
       shell: bash
       run: |
         echo "Node version: $(node --version)"
@@ -272,27 +132,15 @@ runs:
           echo "⚠️  Fix script not found, skipping..."
         fi
 
-    - name: Skip Install (Cache Hit)
-      if: inputs.install-dependencies == 'true' && steps.detect-pm.outputs.manager == 'npm' && steps.cached-dependencies.outputs.cache-hit == 'true'
-      shell: bash
-      run: |
-        echo "⚡ Using cached node_modules - skipped pnpm install!"
-        echo "✅ Saved ~10-15 minutes by using cache"
-        ls -la node_modules/.bin/nx || echo "Warning: nx binary not found in cache"
+    # Note: Skip install step removed - pnpm install handles cache efficiently
 
     - name: Verify Dependencies
       if: inputs.install-dependencies == 'true'
       shell: bash
       run: |
         CACHE_SOURCE="fresh install"
-        if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-          if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
-            CACHE_SOURCE="pnpm store cache"
-          fi
-        else
-          if [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
-            CACHE_SOURCE="node_modules cache"
-          fi
+        if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+          CACHE_SOURCE="pnpm store cache"
         fi
 
         echo "✅ Dependencies ready via $CACHE_SOURCE"
@@ -329,28 +177,13 @@ runs:
           echo "📦 Available binaries:"
           ls -la node_modules/.bin/ | grep nx || echo "No nx-related binaries"
           echo "🔧 Attempting to check package manager linking..."
-          if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-            pnpm ls nx 2>/dev/null || echo "pnpm ls nx failed"
-          else
-            npm ls nx 2>/dev/null || echo "npm ls nx failed"
-          fi
+          pnpm ls nx 2>/dev/null || echo "pnpm ls nx failed"
           
           # If we had a cache hit but nx binary is missing, force reinstall
-          if [ "${PACKAGE_MANAGER}" = "pnpm" ] && [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+          if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
             echo "🔄 pnpm store cache hit but nx binary missing - forcing pnpm reinstall..."
             rm -rf node_modules
             pnpm install "${PNPM_REINSTALL_FLAGS[@]}"
-          elif [ "${PACKAGE_MANAGER}" != "pnpm" ] && [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
-            echo "🔄 Cache hit but nx binary missing - forcing fresh pnpm install..."
-            rm -rf node_modules
-            npm ci --prefer-offline --no-audit --no-fund
-            
-            # Re-verify after reinstall
-            if [ ! -f "node_modules/.bin/nx" ]; then
-              echo "❌ nx binary still missing after fresh install"
-              exit 1
-            fi
-            echo "✅ Fresh install completed, nx binary now available"
           fi
         else
           # Test if the nx binary actually works
@@ -375,21 +208,10 @@ runs:
             echo "⚠️ nx binary exists but not functional or timed out"
             
             # If cache hit but nx is broken, force reinstall
-            if [ "${PACKAGE_MANAGER}" = "pnpm" ] && [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+            if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
               echo "🔄 pnpm cache hit but nx broken - forcing pnpm reinstall..."
               rm -rf node_modules
               pnpm install "${PNPM_REINSTALL_FLAGS[@]}"
-            elif [ "${PACKAGE_MANAGER}" != "pnpm" ] && [[ "${{ steps.cached-dependencies.outputs.cache-hit }}" == "true" ]]; then
-              echo "🔄 Cache hit but nx broken - forcing fresh pnpm install..."
-              rm -rf node_modules
-              npm ci --prefer-offline --no-audit --no-fund
-              
-              # Re-verify after reinstall
-              if ! node_modules/.bin/nx --version >/dev/null 2>&1; then
-                echo "❌ nx still not functional after fresh install"
-                exit 1
-              fi
-              echo "✅ Fresh install completed, nx now functional"
             fi
           else
             echo "✅ nx binary is functional"
@@ -445,24 +267,14 @@ runs:
         NX_COMMAND=""
         echo "🔍 Attempting Nx CLI detection..."
 
-        # Method 1: use the detected package manager's exec helper
+        # Method 1: pnpm exec nx (preferred for pnpm workspace)
         if [ -z "$NX_COMMAND" ]; then
-          if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-            echo "  Testing Method 1: pnpm exec nx"
-            if pnpm exec nx --version >/dev/null 2>&1; then
-              NX_COMMAND="pnpm exec nx"
-              echo "  ✅ Nx accessible via: pnpm exec nx"
-            else
-              echo "  ❌ pnpm exec nx failed"
-            fi
+          echo "  Testing Method 1: pnpm exec nx"
+          if pnpm exec nx --version >/dev/null 2>&1; then
+            NX_COMMAND="pnpm exec nx"
+            echo "  ✅ Nx accessible via: pnpm exec nx"
           else
-            echo "  Testing Method 1: npx nx"
-            if npx nx --version >/dev/null 2>&1; then
-              NX_COMMAND="npx nx"
-              echo "  ✅ Nx accessible via: npx nx"
-            else
-              echo "  ❌ npx nx failed"
-            fi
+            echo "  ❌ pnpm exec nx failed"
           fi
         fi
 
@@ -481,8 +293,8 @@ runs:
           fi
         fi
 
-        # Method 3: pnpm exec with explicit separator (when available)
-        if [ -z "$NX_COMMAND" ] && [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
+        # Method 3: pnpm exec with explicit separator
+        if [ -z "$NX_COMMAND" ]; then
           echo "  Testing Method 3: pnpm exec nx --"
           if pnpm exec nx -- --version >/dev/null 2>&1; then
             NX_COMMAND="pnpm exec nx --"
@@ -531,12 +343,10 @@ runs:
           ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "    No nx directory found"
           echo "  @nx packages:"
           ls -la node_modules/@nx/ 2>/dev/null | head -5 || echo "    No @nx directory found"
-          echo "  NPX debug:"
+          echo "  pnpm exec debug:"
           pnpm exec nx --version 2>&1 || echo "    pnpm exec nx failed"
-          if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-            echo "  pnpm exec debug:"
-            pnpm exec nx -- --version 2>&1 || echo "    pnpm exec nx failed"
-          fi
+          echo "  pnpm exec with separator debug:"
+          pnpm exec nx -- --version 2>&1 || echo "    pnpm exec nx -- failed"
           echo ""
           exit 1
         fi
@@ -607,14 +417,8 @@ runs:
       run: |
         echo "✅ Workspace setup complete"
         echo "   Node.js: $(node --version)"
-        echo "   Package manager: ${PACKAGE_MANAGER}"
-        if [ "${PACKAGE_MANAGER}" = "pnpm" ]; then
-          echo "   pnpm: $(pnpm --version)"
-        else
-          echo "   npm: $(npm --version)"
-        fi
-        echo "   NPM: $(npm --version)" 
-        echo "   Dependencies: ${{ steps.cached-dependencies.outputs.cache-hit == 'true' && 'Restored from cache' || 'Installed fresh' }}"
+        echo "   pnpm: $(pnpm --version)"
+        echo "   Dependencies: ${{ steps.cache-pnpm-store.outputs.cache-hit == 'true' && 'Restored from cache' || 'Installed fresh' }}"
         echo "   Cache Key Suffix: ${{ inputs.cache-key-suffix != '' && inputs.cache-key-suffix || 'none' }}"
         echo "   System Dependencies: ${{ inputs.skip-system-deps == 'true' && 'Skipped' || 'Installed' }}"
         echo ""

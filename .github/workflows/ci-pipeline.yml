@@ -17,6 +17,11 @@ on:
         type: boolean
         default: false
 
+# Required permissions for CI operations:
+# - pull-requests: write (for ci-reporting action PR comments)
+# - issues: write (for ci-reporting action issue creation on failures)
+# - contents: read (checkout code)
+# - actions/checks: read (for status checks)
 permissions:
   actions: read
   contents: read

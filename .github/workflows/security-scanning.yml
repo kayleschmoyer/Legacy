@@ -194,7 +194,7 @@ jobs:
 
           # Authenticate if token available
           if [ -n "${SNYK_TOKEN}" ]; then
-            pnpm dlx snyk@latest auth "${SNYK_TOKEN}"
+            pnpm dlx snyk@1.1293.1 auth "${SNYK_TOKEN}"
             echo "✅ Snyk authenticated"
           else
             echo "ℹ️ Running Snyk in anonymous mode (limited features)"
@@ -203,7 +203,7 @@ jobs:
           # Run Snyk test
           SNYK_LOG="snyk-results-$(date +%s).json"
 
-          if pnpm dlx snyk@latest test --json > "$SNYK_LOG" 2>&1; then
+          if pnpm dlx snyk@1.1293.1 test --json > "$SNYK_LOG" 2>&1; then
             echo "✅ Snyk scan completed - no critical vulnerabilities"
             SNYK_STATUS="clean"
           else

@@ -14,10 +14,14 @@ concurrency:
   group: lambda-deployment-game-selection
   cancel-in-progress: false
 
+# IMPORTANT: Infrastructure Configuration
+# These values are currently hardcoded for the dev environment.
+# FUTURE IMPROVEMENT: Move to AWS Systems Manager Parameter Store
+# See deploy-gql.yml for detailed improvement recommendations.
 env:
   AWS_REGION: us-east-1
   AWS_SERVICE_NAME: legacy-sports-game-selection
-  AWS_STAGE: dev
+  AWS_STAGE: dev # TODO: Parameterize for multi-environment support
 
 permissions:
   id-token: write
