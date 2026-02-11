@@ -16,7 +16,7 @@
     "drizzle-orm": "*"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.159",
+    "@types/aws-lambda": "*",
     "@types/node": "*",
     "typescript": "*",
     "vite": "*"
