@@ -45,6 +45,7 @@ function startService(service) {
     cwd: path.join(__dirname, '..'), // Use root directory for pnpm commands
     stdio: 'pipe',
     shell: true,
+    windowsHide: true, // LS-102: Prevent console flashing on Windows
     env: { ...process.env, NODE_PATH: path.join(__dirname, '../node_modules') },
   });
 

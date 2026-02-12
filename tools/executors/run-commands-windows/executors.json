@@ -1,0 +1,9 @@
+{
+  "executors": {
+    "run-commands-windows": {
+      "implementation": "./executor",
+      "schema": "./schema.json",
+      "description": "Run commands with windowsHide support to prevent console flashing on Windows"
+    }
+  }
+}

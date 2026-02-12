@@ -129,6 +129,7 @@ async function killProcessTree(pid: number): Promise<void> {
       const killer = spawn('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
         stdio: 'ignore',
         shell: false,
+        windowsHide: true, // LS-102: Prevent console flashing on Windows
       });
       killer.once('exit', (code) => {
         if (code === 0) resolve();

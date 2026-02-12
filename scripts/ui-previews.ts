@@ -126,6 +126,7 @@ function spawnLogged(
     env: { ...process.env, ...env },
     stdio: 'inherit',
     shell: process.platform === 'win32',
+    windowsHide: true, // LS-102: Prevent console flashing on Windows
   });
 
   return child;
@@ -137,6 +138,7 @@ async function killProcessTree(pid: number): Promise<void> {
       const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
         stdio: 'ignore',
         shell: true,
+        windowsHide: true, // LS-102: Prevent console flashing on Windows
       });
       killer.once('exit', (code) => {
         if (code === 0) resolve();

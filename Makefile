@@ -529,46 +529,21 @@ endif
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
 	@$(call echo_plain,1/5 Type checking...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t typecheck --base=main"
-else
 	@npx nx affected -t typecheck --base=main
-endif
 	@$(call echo_plain,2/5 Formatting...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx format:write"
-else
 	@npx nx format:write
-endif
 	@$(call echo_plain,3/5 Linting...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t lint --fix --base=main"
-else
 	@npx nx affected -t lint --fix --base=main
-endif
 	@$(call echo_plain,4/5 Testing...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t test --base=main"
-else
 	@npx nx affected -t test --base=main
-endif
 	@$(call echo_plain,5/5 Building...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t build --base=main"
-else
 	@npx nx affected -t build --base=main
-endif
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
 pc: pre-commit ## Alias for pre-commit
 
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
-ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t typecheck --base=main"
-	@powershell -NoProfile -WindowStyle Hidden -Command "npx nx affected -t lint --fix --base=main"
-else
 	@npx nx affected -t typecheck --base=main
 	@npx nx affected -t lint --fix --base=main
-endif
 	@$(call echo_green,✓ Quick checks passed!)

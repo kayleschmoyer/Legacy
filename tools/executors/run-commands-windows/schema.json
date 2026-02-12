@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "version": 2,
+  "title": "Run Commands (Windows-optimized)",
+  "description": "Run any custom commands with windowsHide support to prevent console flashing on Windows",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string",
+      "description": "Command to run"
+    },
+    "commands": {
+      "type": "array",
+      "description": "Commands to run",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Current working directory for the command"
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables to set",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "parallel": {
+      "type": "boolean",
+      "description": "Run commands in parallel",
+      "default": false
+    },
+    "color": {
+      "type": "boolean",
+      "description": "Use colors in output",
+      "default": false
+    }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": ["command"]
+    },
+    {
+      "required": ["commands"]
+    }
+  ]
+}
