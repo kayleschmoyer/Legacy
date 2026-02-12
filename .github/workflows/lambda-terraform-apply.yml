@@ -1,0 +1,195 @@
+name: Apply Lambda Infrastructure
+
+# Central Terraform workflow - applies ALL pending Lambda changes
+# Triggered by individual Lambda upload workflows completing
+# Uses cancel-in-progress to batch multiple Lambda updates into one apply
+
+on:
+  workflow_run:
+    workflows:
+      - "Upload GraphQL Lambda"
+      - "Upload Stats Lambda"
+      - "Upload Draft Processor Lambda"
+      - "Upload Game Selection Lambda"
+      - "Upload OAuth Proxy Lambda"
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip-debounce:
+        description: "Skip debounce delay (for manual runs)"
+        required: false
+        default: "false"
+        type: boolean
+
+# CRITICAL: cancel-in-progress allows batching multiple Lambda updates
+# If Lambda A and B both upload, the first Terraform run gets cancelled
+# and the second run deploys BOTH changes (Terraform detects via SSM)
+concurrency:
+  group: terraform-lambda-infrastructure
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  AWS_STAGE: dev
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  apply-infrastructure:
+    name: Apply Lambda Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only run if trigger workflow succeeded
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Debounce Multiple Triggers
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip-debounce }}
+        run: |
+          echo "::notice::⏳ Debouncing for 30 seconds to batch multiple Lambda updates..."
+          echo "This allows multiple concurrent uploads to complete before applying infrastructure."
+          sleep 30
+
+      - name: Check Pending Lambda Updates
+        id: check-updates
+        run: |
+          echo "🔍 Checking SSM parameters for pending Lambda updates..."
+
+          # Get all Lambda version SSM parameters
+          PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/legacy-sports/${AWS_STAGE}/lambda/" \
+            --recursive \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
+            --output json)
+
+          echo "📋 Current Lambda Versions:"
+          echo "$PARAMS" | jq -r '.[] | "  \(.Name | split("/") | .[-2]): \(.Value)"'
+
+          # Count how many lambdas will be updated
+          UPDATE_COUNT=$(echo "$PARAMS" | jq 'length')
+          echo "total_lambdas=$UPDATE_COUNT" >> $GITHUB_OUTPUT
+
+          echo "## 📦 Pending Lambda Updates" >> $GITHUB_STEP_SUMMARY
+          echo "$PARAMS" | jq -r '.[] | "- **\(.Name | split("/") | .[-2])**: `\(.Value)`"' >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.13"
+
+      - name: Initialize Terraform
+        working-directory: terraform
+        run: |
+          echo "🔧 Initializing Terraform..."
+          terraform init
+
+      - name: Clear Stale Locks
+        working-directory: terraform
+        run: |
+          echo "🔍 Checking for stale Terraform locks..."
+
+          # Check if state is locked
+          if ! terraform plan -refresh=false -detailed-exitcode > /dev/null 2>&1; then
+            # Try to get lock info
+            LOCK_OUTPUT=$(terraform plan -refresh=false 2>&1 || true)
+            
+            if echo "$LOCK_OUTPUT" | grep -q "Error acquiring the state lock"; then
+              LOCK_ID=$(echo "$LOCK_OUTPUT" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+              
+              if [ -n "$LOCK_ID" ]; then
+                echo "🔓 Clearing stale lock: $LOCK_ID"
+                terraform force-unlock -force "$LOCK_ID"
+                echo "✅ Stale lock cleared"
+              fi
+            fi
+          else
+            echo "✅ No stale locks detected"
+          fi
+
+      - name: Plan Infrastructure Changes
+        id: plan
+        working-directory: terraform
+        run: |
+          echo "📋 Planning Terraform changes..."
+          echo "⏳ Acquiring state lock (wait up to 5 minutes)..."
+
+          # Plan changes with lock timeout
+          if terraform plan -out=tfplan -lock-timeout=5m 2>&1 | tee plan.log; then
+            echo "✅ Terraform plan successful"
+            
+            # Check if there are any changes
+            if grep -q "No changes" plan.log; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "::notice::No infrastructure changes needed"
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              
+              # Extract what's changing
+              echo "## 📝 Planned Changes" >> $GITHUB_STEP_SUMMARY
+              grep -A 50 "Terraform will perform" plan.log >> $GITHUB_STEP_SUMMARY || true
+            fi
+          else
+            echo "❌ Terraform plan failed"
+            cat plan.log
+            exit 1
+          fi
+
+      - name: Apply Infrastructure Changes
+        if: steps.plan.outputs.has_changes == 'true'
+        working-directory: terraform
+        run: |
+          echo "🚀 Applying Terraform changes..."
+
+          terraform apply -auto-approve -lock-timeout=5m tfplan
+
+          echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
+          echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify Deployment
+        if: steps.plan.outputs.has_changes == 'true'
+        run: |
+          echo "🔍 Verifying Lambda deployments..."
+
+          # Get list of Lambda functions
+          FUNCTIONS=$(aws lambda list-functions \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Functions[?starts_with(FunctionName, `legacy-sports-`)].{Name:FunctionName,Updated:LastModified}' \
+            --output json)
+
+          echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "### Updated Functions:" >> $GITHUB_STEP_SUMMARY
+          echo "$FUNCTIONS" | jq -r '.[] | "- **\(.Name)**: \(.Updated)"' >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup on Failure
+        if: failure() || cancelled()
+        working-directory: terraform
+        run: |
+          echo "🔓 Ensuring lock is released..."
+
+          # Try to detect and release any locks we might hold
+          LOCK_CHECK=$(terraform plan -refresh=false 2>&1 || true)
+
+          if echo "$LOCK_CHECK" | grep -q "Error acquiring the state lock"; then
+            LOCK_ID=$(echo "$LOCK_CHECK" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+            
+            if [ -n "$LOCK_ID" ]; then
+              echo "Releasing lock: $LOCK_ID"
+              terraform force-unlock -force "$LOCK_ID" || true
+            fi
+          fi
