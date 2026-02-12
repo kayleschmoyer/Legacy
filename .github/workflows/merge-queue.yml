@@ -1,9 +1,8 @@
 name: Enhanced Merge Queue
 
 on:
-  schedule:
-    - cron: "*/10 * * * *" # Run every 10 minutes (reduced frequency for efficiency)
-  workflow_dispatch: # Allow manual triggering
+  # Manual trigger for on-demand queue processing
+  workflow_dispatch:
     inputs:
       dry_run:
         description: "Run in dry-run mode (no actual merging)"
@@ -13,13 +12,20 @@ on:
         description: "Force check all PRs even if not labeled"
         type: boolean
         default: false
+  # Trigger on pull request events for immediate response
+  pull_request:
+    types:
+      - labeled # When merge-when-ready label is added
+      - unlabeled # When label is removed
+      - synchronize # When new commits are pushed
+      - reopened # When PR is reopened
+  # Trigger on PR review events
+  pull_request_review:
+    types: [submitted] # When someone approves/requests changes
   # Trigger on status check completion for faster response
   status:
   check_run:
     types: [completed]
-  # Trigger when merge-when-ready label is added for immediate processing
-  pull_request:
-    types: [labeled]
 
 # Ensure only one merge queue run processes at a time to prevent race conditions
 concurrency:
@@ -30,7 +36,15 @@ jobs:
   process-merge-queue:
     if: |
       github.repository_owner == 'bkrupa' && 
-      (github.event_name != 'pull_request' || github.event.label.name == 'merge-when-ready')
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'status' ||
+        github.event_name == 'check_run' ||
+        github.event_name == 'pull_request_review' ||
+        (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready') ||
+        (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'merge-when-ready') ||
+        (github.event_name == 'pull_request' && contains(fromJSON('["synchronize", "reopened"]'), github.event.action))
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write

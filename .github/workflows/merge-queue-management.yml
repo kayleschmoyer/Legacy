@@ -36,7 +36,7 @@ jobs:
                     '- All status checks pass ✅\n' +
                     '- No merge conflicts exist ✅\n' +
                     '- Required reviews are approved ✅\n\n' +
-                    'The merge queue processes every 10 minutes and responds to status changes. ' +
+                    'The merge queue responds immediately to status changes, new commits, and reviews. ' +
                     'Remove the `merge-when-ready` label to exit the queue.'
             });
 
