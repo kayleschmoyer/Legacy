@@ -58,6 +58,7 @@ export default function CreateLeagueModal(
 
   useEffect(() => {
     if (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       handleError(error.message);
     }
   }, [error]);
@@ -73,20 +74,24 @@ export default function CreateLeagueModal(
   };
 
   const submit = () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     createLeague().catch(handleError);
   };
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (data?.createLeagueAndTeams?.league) {
       onOpenChange(false);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
       router.navigate({
         params: {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
           leagueId: data.createLeagueAndTeams.league.id,
         },
         pathname: './league/[leagueId]',
       });
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   }, [data?.createLeagueAndTeams?.league, router, onOpenChange]);
 
   return (

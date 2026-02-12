@@ -57,9 +57,12 @@ export function MatchupControl({
 
   // Find the highest week number that exists in the database
   const highestWeek =
-    allMatchupsData?.getMatchupsForLeague?.reduce((max, matchup) => {
-      return Math.max(max, matchup.weekNumber ?? 0);
-    }, 0) ?? 0;
+    allMatchupsData?.getMatchupsForLeague?.reduce(
+      (max: number, matchup: { weekNumber?: number | null }) => {
+        return Math.max(max, matchup.weekNumber ?? 0);
+      },
+      0,
+    ) ?? 0;
 
   // The next week to create is always highest + 1
   const nextWeek = highestWeek + 1;

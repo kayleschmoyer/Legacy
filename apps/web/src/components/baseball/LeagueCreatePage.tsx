@@ -79,16 +79,6 @@ export function LeagueCreatePage(): React.JSX.Element {
           query: GetUserLeagues,
         },
       ],
-      onCompleted: (data) => {
-        if (data.createLeagueAndTeams?.league?.id) {
-          // Navigate to the newly created league
-          navigate(`/baseball/league/${data.createLeagueAndTeams.league.id}`);
-        }
-      },
-      onError: (error) => {
-        console.error('Error creating league:', error);
-        alert(error.message || 'Failed to create league');
-      },
     });
 
   const handleInputChange = (
@@ -144,7 +134,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     }
 
     try {
-      await createLeagueAndTeams({
+      const result = await createLeagueAndTeams({
         variables: {
           input: {
             leagueName: formData.leagueName.trim(),
@@ -160,9 +150,19 @@ export function LeagueCreatePage(): React.JSX.Element {
           },
         },
       });
+
+      // Handle successful creation
+      if (result.data?.createLeagueAndTeams?.league?.id) {
+        navigate(
+          `/baseball/league/${result.data.createLeagueAndTeams.league.id}`,
+        );
+      }
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      alert('Failed to create league. Please try again.');
+      console.error('Error creating league:', error);
+      alert(
+        (error as Error).message ||
+          'Failed to create league. Please try again.',
+      );
     }
   };
 

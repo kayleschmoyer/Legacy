@@ -13,7 +13,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { gql, useQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 
 // GraphQL Queries
 const GET_LEAGUE_ANALYTICS = gql`
@@ -114,8 +115,51 @@ export function AnalyticsPage() {
     skip: !leagueIdNum || !team1Id || !team2Id,
   });
 
-  const analytics = data?.getLeagueAnalytics;
-  const h2hRecord = h2hData?.getHeadToHeadRecord;
+  const analytics = (
+    data as {
+      getLeagueAnalytics?: {
+        leagueName?: string;
+        currentWeek?: number;
+        totalTeams?: number;
+        averagePointsPerMatchup?: number;
+        teamStats?: Array<{
+          teamId?: number;
+          teamName?: string;
+          wins?: number;
+          losses?: number;
+          pointsFor?: number;
+          pointsAgainst?: number;
+          weeklyScores?: number[];
+        }>;
+        powerRankings?: Array<{
+          teamId?: number;
+          teamName?: string;
+          rank?: number;
+          rating?: number;
+        }>;
+        playoffProjections?: Array<{
+          teamId?: number;
+          teamName?: string;
+          playoffChance?: number;
+          expectedWins?: number;
+        }>;
+      };
+    }
+  )?.getLeagueAnalytics as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const h2hRecord = (
+    h2hData as {
+      getHeadToHeadRecord?: {
+        team1Name?: string;
+        team2Name?: string;
+        totalMatchups?: number;
+        team1Wins?: number;
+        team2Wins?: number;
+        ties?: number;
+        team1AveragePoints?: number;
+        team2AveragePoints?: number;
+      };
+    }
+  )?.getHeadToHeadRecord as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (loading) {
     return (

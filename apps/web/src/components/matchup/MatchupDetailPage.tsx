@@ -31,6 +31,7 @@ export function MatchupDetailPage() {
   );
   const { matchups: nextWeekMatchups } = useMatchupsByWeek(
     leagueIdNum,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     currentWeek ? currentWeek + 1 : null,
   );
 
@@ -168,7 +169,9 @@ export function MatchupDetailPage() {
           disabled={!adjacentMatchups.prev}
           onPress={() => {
             if (adjacentMatchups.prev?.id) {
-              handleNavigateToWeek(parseInt(adjacentMatchups.prev.id, 10));
+              handleNavigateToWeek(
+                parseInt(String(adjacentMatchups.prev.id), 10),
+              );
             }
           }}
           icon={ChevronLeft}
@@ -184,7 +187,9 @@ export function MatchupDetailPage() {
           disabled={!adjacentMatchups.next}
           onPress={() => {
             if (adjacentMatchups.next?.id) {
-              handleNavigateToWeek(parseInt(adjacentMatchups.next.id, 10));
+              handleNavigateToWeek(
+                parseInt(String(adjacentMatchups.next.id), 10),
+              );
             }
           }}
           iconAfter={ChevronRight}
@@ -213,12 +218,12 @@ export function MatchupDetailPage() {
         <YStack space="$1">
           {matchup.startTime && (
             <Text fontSize="$3" color="$gray11">
-              Start: {new Date(matchup.startTime).toLocaleString()}
+              Start: {new Date(String(matchup.startTime)).toLocaleString()}
             </Text>
           )}
           {matchup.endTime && (
             <Text fontSize="$3" color="$gray11">
-              End: {new Date(matchup.endTime).toLocaleString()}
+              End: {new Date(String(matchup.endTime)).toLocaleString()}
             </Text>
           )}
         </YStack>

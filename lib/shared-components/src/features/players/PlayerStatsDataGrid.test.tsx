@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MockedResponse } from '@apollo/client/testing';
+import { MockedResponse } from '@apollo/client/testing/react';
 import {
   PlayerStatsDataGrid,
   type PlayerStatsDataGridProps,
@@ -552,8 +552,9 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
   });
 
   test('should handle error recovery with retry button', async () => {
-    const { rerender } = render(
-      <TestWrapper mocks={[errorMock, playersQueryMock]}>
+    // Provide error mock first, then success mock for refetch
+    render(
+      <TestWrapper mocks={[errorMock, defaultMock, playersQueryMock]}>
         <PlayerStatsDataGrid {...defaultProps} />
       </TestWrapper>,
     );
@@ -562,15 +563,8 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       expect(screen.getByText('Error Loading Statistics')).toBeInTheDocument();
     });
 
-    // Click retry and provide successful mock
+    // Click retry button to refetch
     const retryButton = screen.getByText('Try Again');
-
-    rerender(
-      <TestWrapper mocks={[defaultMock]}>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
     fireEvent.click(retryButton);
 
     await waitFor(() => {

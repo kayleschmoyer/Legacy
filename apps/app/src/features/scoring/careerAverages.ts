@@ -143,6 +143,7 @@ function normalizePlayerIds(
 export function useCareerAverageStats(
   playerIds?: readonly number[] | null,
 ): CareerAverageStatsResult {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const client = useApolloClient();
   const [records, setRecords] = useState<Map<number, PlayerCareerStats>>(
     () => new Map(),
@@ -150,7 +151,10 @@ export function useCareerAverageStats(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
 
-  const normalizedIds = useMemo(() => normalizePlayerIds(playerIds), [playerIds]);
+  const normalizedIds = useMemo(
+    () => normalizePlayerIds(playerIds),
+    [playerIds],
+  );
 
   useEffect(() => {
     if (normalizedIds.length === 0) {
@@ -170,7 +174,9 @@ export function useCareerAverageStats(
     setError(undefined);
 
     void Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       missingIds.map(async (playerId) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const response = await client.query<
           GetPlayerCareerStatsQuery,
           GetPlayerCareerStatsQueryVariables
@@ -180,6 +186,7 @@ export function useCareerAverageStats(
           fetchPolicy: 'cache-first',
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         return { playerId, data: response.data };
       }),
     )
@@ -190,7 +197,9 @@ export function useCareerAverageStats(
 
         setRecords((previous) => {
           const next = new Map(previous);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
           for (const { playerId, data } of results) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             next.set(playerId, transformCareerStats(data));
           }
           return next;

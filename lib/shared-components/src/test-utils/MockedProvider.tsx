@@ -1,8 +1,6 @@
 import React from 'react';
-import {
-  MockedProvider as ApolloMockedProvider,
-  MockedProviderProps,
-} from '@apollo/client/testing';
+import type { MockedProviderProps } from '@apollo/client/testing/react';
+import { MockedProvider as ApolloMockedProvider } from '@apollo/client/testing/react';
 import { InMemoryCache } from '@apollo/client';
 
 /**

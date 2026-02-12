@@ -15,7 +15,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { gql, useQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 import { useRoute } from '@react-navigation/native';
 
 // GraphQL Queries

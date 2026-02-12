@@ -192,14 +192,16 @@ export function MatchupRosterComparison({
   // Create position lookup map
   const positionMap = useMemo(() => {
     const map = new Map<number, string>();
-    positionsData?.leaguePositions?.forEach((pos) => {
-      if (pos.id && pos.positionType) {
-        map.set(
-          typeof pos.id === 'string' ? parseInt(pos.id, 10) : pos.id,
-          pos.positionType,
-        );
-      }
-    });
+    positionsData?.leaguePositions?.forEach(
+      (pos: { id?: string | number | null; positionType?: string | null }) => {
+        if (pos.id && pos.positionType) {
+          map.set(
+            typeof pos.id === 'string' ? parseInt(pos.id, 10) : pos.id,
+            pos.positionType,
+          );
+        }
+      },
+    );
     return map;
   }, [positionsData]);
 

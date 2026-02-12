@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Spinner, Text, YStack } from 'tamagui';
 import {
+  TeamMemberFragment,
   useGetLeagueTeamsQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
@@ -48,7 +49,9 @@ export function TeamDetailPage() {
   if (!membersData?.teamMembers) return <Text>Team not found</Text>;
 
   // Find the team from leagueTeams
-  const team = teamsData?.leagueTeams?.find((t) => t?.id === teamIdNum);
+  const team = teamsData?.leagueTeams?.find(
+    (t: { id?: number | null }) => t?.id === teamIdNum,
+  );
   const teamMembers = membersData.teamMembers;
 
   return (
@@ -73,7 +76,7 @@ export function TeamDetailPage() {
           Roster
         </Text>
         {teamMembers.map(
-          (member) =>
+          (member: TeamMemberFragment | null) =>
             member && (
               <YStack
                 key={member.id}

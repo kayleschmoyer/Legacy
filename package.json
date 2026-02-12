@@ -26,7 +26,7 @@
     "cli:load-career-stats": "nx load-career-stats cli",
     "cli:load-single-player-stats": "nx load-single-player-stats cli",
     "cli:list-players": "nx list-players cli",
-    "codegen": "nx run-many -t codegen",
+    "codegen": "nx run-many -t codegen && node scripts/fix-apollo-codegen.js",
     "db:test": "cd lib/db-client && pnpm run db:test",
     "db:test:production": "cd lib/db-client && pnpm run db:test:production",
     "db:url": "cd lib/db-client && pnpm run db:url",
@@ -97,7 +97,7 @@
   },
   "private": true,
   "dependencies": {
-    "@apollo/client": "^3.11.4",
+    "@apollo/client": "^4.1.3",
     "@apollo/server": "^5.0.0",
     "@as-integrations/aws-lambda": "^4.0.1",
     "@aws-sdk/client-lambda": "^3.987.0",

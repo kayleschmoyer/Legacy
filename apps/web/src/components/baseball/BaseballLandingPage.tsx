@@ -14,6 +14,7 @@ import { Dialog, Input, Separator, styled, Text } from 'tamagui';
 import { League, LeagueCard } from './LeagueCard';
 import {
   GetUserLeagues,
+  GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
@@ -322,7 +323,7 @@ export function BaseballLandingPage() {
         const newLeague = data?.createLeagueAndTeams?.league;
         if (!newLeague) return;
         try {
-          const existing = cache.readQuery<{ userLeagues: League[] }>({
+          const existing = cache.readQuery<GetUserLeaguesQuery>({
             query: GetUserLeagues,
           });
           if (existing?.userLeagues) {
@@ -335,23 +336,19 @@ export function BaseballLandingPage() {
           // ignore; query may not be in cache yet
         }
       },
-      onCompleted: (res) => {
-        const id = res.createLeagueAndTeams?.league?.id;
-        if (id) navigate(`/baseball/league/${id}`);
-      },
     },
   );
 
   // Map GraphQL data to our League interface
   const leagues: League[] =
-    data?.userLeagues?.map((league) => ({
+    (data?.userLeagues?.map((league) => ({
       id: league.id || 0,
       name: league.name || '',
       owner: league.owner || 0,
       maxRosterSize: league.maxRosterSize || 25,
       currentMatchup: league.currentMatchup,
       draftStatus: league.draftStatus || undefined,
-    })) || [];
+    })) as League[]) || [];
 
   const leaguesCount = leagues.length;
   const averageRosterSize =
@@ -766,6 +763,9 @@ export function BaseballLandingPage() {
                           waiverEnabled: true,
                         },
                       },
+                    }).then((result) => {
+                      const id = result.data?.createLeagueAndTeams?.league?.id;
+                      if (id) navigate(`/baseball/league/${id}`);
                     });
                   }}
                 >

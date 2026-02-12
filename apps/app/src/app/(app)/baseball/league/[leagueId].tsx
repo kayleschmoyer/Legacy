@@ -5,7 +5,8 @@ import { HeaderTitleProps } from '@react-navigation/elements';
 import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { Alert } from 'react-native';
-import { gql, useLazyQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { useLazyQuery } from '@apollo/client/react';
 import {
   LeaguePositionFragment,
   StartDraftMutation,

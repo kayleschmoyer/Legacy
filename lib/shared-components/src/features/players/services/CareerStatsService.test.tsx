@@ -10,7 +10,7 @@
  */
 
 import { renderHook, waitFor } from '@testing-library/react';
-import { MockedResponse } from '@apollo/client/testing';
+import { MockedResponse } from '@apollo/client/testing/react';
 import React from 'react';
 import { MockedProvider } from '../../../test-utils/MockedProvider';
 import {

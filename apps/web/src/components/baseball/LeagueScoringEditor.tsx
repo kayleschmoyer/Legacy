@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ApolloError } from '@apollo/client';
 import {
   Button,
   Card,
@@ -63,7 +62,7 @@ interface LeagueScoringEditorProps {
   leagueId: number;
   profile: LeagueScoringProfile | null | undefined;
   loading: boolean;
-  error?: ApolloError | null;
+  error?: Error | null;
   onRefetch: () => Promise<void>;
 }
 
@@ -76,7 +75,10 @@ function formatMultiplier(value: number): string {
     return value.toString();
   }
 
-  return value.toFixed(3).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  return value
+    .toFixed(3)
+    .replace(/\.0+$/, '')
+    .replace(/(\.\d*?)0+$/, '$1');
 }
 
 function parseInput(value: string | undefined): number | null {
@@ -94,7 +96,10 @@ function parseInput(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function validateStat(stat: ProfileStat, value: string | undefined): string | null {
+function validateStat(
+  stat: ProfileStat,
+  value: string | undefined,
+): string | null {
   const parsed = parseInput(value);
 
   if (parsed === null) {
@@ -109,8 +114,10 @@ function validateStat(stat: ProfileStat, value: string | undefined): string | nu
     return 'Value must be less than zero';
   }
 
-  const min = typeof stat.minMultiplier === 'number' ? stat.minMultiplier : null;
-  const max = typeof stat.maxMultiplier === 'number' ? stat.maxMultiplier : null;
+  const min =
+    typeof stat.minMultiplier === 'number' ? stat.minMultiplier : null;
+  const max =
+    typeof stat.maxMultiplier === 'number' ? stat.maxMultiplier : null;
 
   if (min !== null && !(stat.defaultMultiplier < min) && parsed < min) {
     return `Must be >= ${min}`;
@@ -196,10 +203,7 @@ function createInitialErrors(stats: ProfileStat[]): FieldErrorState {
   return next;
 }
 
-function valuesToUpdates(
-  stats: ProfileStat[],
-  values: FormValueState,
-) {
+function valuesToUpdates(stats: ProfileStat[], values: FormValueState) {
   return stats
     .map((stat) => {
       const value = values[stat.id];
@@ -220,10 +224,14 @@ function valuesToUpdates(
         multiplier: Number(parsed.toFixed(4)),
       };
     })
-    .filter((update): update is {
-      statDefinitionId: number;
-      multiplier: number;
-    } => Boolean(update));
+    .filter(
+      (
+        update,
+      ): update is {
+        statDefinitionId: number;
+        multiplier: number;
+      } => Boolean(update),
+    );
 }
 
 export function LeagueScoringEditor(
@@ -250,9 +258,7 @@ export function LeagueScoringEditor(
     }
 
     for (const group of GROUP_ORDER) {
-      groups[group].sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
-      );
+      groups[group].sort((a, b) => a.displayName.localeCompare(b.displayName));
     }
 
     return groups;
@@ -372,7 +378,8 @@ export function LeagueScoringEditor(
     const statId = stat.id;
     const value = formValues[statId] ?? '';
     const errorMessage = fieldErrors[statId];
-    const isOverride = Math.abs(stat.multiplier - stat.defaultMultiplier) > 0.0001;
+    const isOverride =
+      Math.abs(stat.multiplier - stat.defaultMultiplier) > 0.0001;
     const helperText = stat.description;
 
     return (
@@ -430,19 +437,29 @@ export function LeagueScoringEditor(
   };
 
   return (
-    <Card backgroundColor="$surfacePanel" borderColor="$surfacePanelBorder" padding="$5">
+    <Card
+      backgroundColor="$surfacePanel"
+      borderColor="$surfacePanelBorder"
+      padding="$5"
+    >
       <YStack space="$4">
         <YStack space="$1">
           <Text fontSize="$5" fontWeight="700">
             Commissioner Scoring Controls
           </Text>
           <Text fontSize="$3" color="$gray10">
-            Adjust multipliers to fine-tune how stats translate into fantasy points. Changes apply instantly for all teams.
+            Adjust multipliers to fine-tune how stats translate into fantasy
+            points. Changes apply instantly for all teams.
           </Text>
         </YStack>
 
         {error ? (
-          <Card backgroundColor="$red2" borderColor="$red7" padding="$3" role="alert">
+          <Card
+            backgroundColor="$red2"
+            borderColor="$red7"
+            padding="$3"
+            role="alert"
+          >
             <Text fontSize="$3" color="$red11">
               Failed to load scoring profile: {error.message}
             </Text>
@@ -499,7 +516,12 @@ export function LeagueScoringEditor(
             })
           : null}
 
-        <XStack justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$3">
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap="$3"
+        >
           <YStack space="$1">
             {saveSuccess ? (
               <Text fontSize="$3" color="$green10" role="status">

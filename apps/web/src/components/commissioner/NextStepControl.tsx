@@ -75,9 +75,12 @@ export function NextStepControl({
 
   // Find the highest week number
   const highestWeek =
-    allMatchupsData?.getMatchupsForLeague?.reduce((max, matchup) => {
-      return Math.max(max, matchup.weekNumber ?? 0);
-    }, 0) ?? 0;
+    allMatchupsData?.getMatchupsForLeague?.reduce(
+      (max: number, matchup: { weekNumber?: number | null }) => {
+        return Math.max(max, matchup.weekNumber ?? 0);
+      },
+      0,
+    ) ?? 0;
 
   const nextWeek = highestWeek + 1;
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
@@ -144,6 +147,7 @@ export function NextStepControl({
 
         // Update parent with new league data from mutation response
         if (result.data?.startDraft) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           onLeagueUpdate?.(result.data.startDraft);
         }
 

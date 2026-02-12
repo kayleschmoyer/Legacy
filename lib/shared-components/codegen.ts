@@ -3,14 +3,16 @@ import type { CodegenConfig } from '@graphql-codegen/cli';
 // Determine the GraphQL schema endpoint from environment variables
 const getGraphQLSchemaEndpoint = (): string => {
   // Try multiple environment variable patterns to support different deployment contexts
-  const endpoint = 
+  const endpoint =
     process.env.GRAPHQL_HOST ||
-    process.env.VITE_GRAPHQL_HOST || 
+    process.env.VITE_GRAPHQL_HOST ||
     process.env.EXPO_PUBLIC_GRAPHQL_HOST ||
     process.env.REACT_APP_GRAPHQL_HOST ||
     'http://localhost:5000/graphql'; // fallback for local development
 
-  console.log(`🔗 Shared Components GraphQL CodeGen using schema endpoint: ${endpoint}`);
+  console.log(
+    `🔗 Shared Components GraphQL CodeGen using schema endpoint: ${endpoint}`,
+  );
   return endpoint;
 };
 
@@ -33,6 +35,11 @@ const config: CodegenConfig = {
           JSON: 'any',
           UUID: 'string',
         },
+        // Apollo Client 4.x configuration
+        apolloClientVersion: 4,
+        withHooks: true,
+        reactApolloImportFrom: '@apollo/client/react',
+        apolloReactCommonImportFrom: '@apollo/client/react',
       },
       plugins: [
         {

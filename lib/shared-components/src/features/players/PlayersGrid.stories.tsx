@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
-import { MockedProvider } from '@apollo/client/testing';
+import { MockedProvider } from '@apollo/client/testing/react';
 import { PlayersGrid } from './PlayersGrid';
 import { GET_ALL_PLAYERS } from './PlayersApi';
 

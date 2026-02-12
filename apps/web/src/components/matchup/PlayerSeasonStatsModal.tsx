@@ -158,85 +158,115 @@ export function PlayerSeasonStatsModal({
     const seasons = new Map<number, SeasonRow>();
 
     // Add batting stats
-    data.playerSeasonBatting?.forEach((batting) => {
-      if (!batting?.season) return;
+    data.playerSeasonBatting?.forEach(
+      (batting: {
+        season?: number | null;
+        atBats?: number | null;
+        hits?: number | null;
+        games?: number | null;
+        plateAppearances?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+      }) => {
+        if (!batting?.season) return;
 
-      const season: SeasonRow = seasons.get(batting.season) || {
-        season: batting.season,
-      };
-      const ab = batting.atBats ?? 0;
-      const h = batting.hits ?? 0;
-      const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
+        const season: SeasonRow = seasons.get(batting.season) || {
+          season: batting.season,
+        };
+        const ab = batting.atBats ?? 0;
+        const h = batting.hits ?? 0;
+        const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
 
-      season.batting = {
-        games: batting.games ?? 0,
-        pa: batting.plateAppearances ?? 0,
-        ab,
-        h,
-        hr: batting.homeRuns ?? 0,
-        rbi: batting.rbi ?? 0,
-        avg,
-      };
-      seasons.set(batting.season, season);
-    });
+        season.batting = {
+          games: batting.games ?? 0,
+          pa: batting.plateAppearances ?? 0,
+          ab,
+          h,
+          hr: batting.homeRuns ?? 0,
+          rbi: batting.rbi ?? 0,
+          avg,
+        };
+        seasons.set(batting.season, season);
+      },
+    );
 
     // Add pitching stats
-    data.playerSeasonPitching?.forEach((pitching) => {
-      if (!pitching?.season) return;
+    data.playerSeasonPitching?.forEach(
+      (pitching: {
+        season?: number | null;
+        inningsPitched?: number | null;
+        earnedRuns?: number | null;
+        games?: number | null;
+        wins?: number | null;
+        losses?: number | null;
+        strikeouts?: number | null;
+      }) => {
+        if (!pitching?.season) return;
 
-      const season: SeasonRow = seasons.get(pitching.season) || {
-        season: pitching.season,
-      };
-      const ip = pitching.inningsPitched ?? 0;
-      const er = pitching.earnedRuns ?? 0;
-      const era = ip > 0 ? ((er * 9) / ip).toFixed(2) : '0.00';
+        const season: SeasonRow = seasons.get(pitching.season) || {
+          season: pitching.season,
+        };
+        const ip = pitching.inningsPitched ?? 0;
+        const er = pitching.earnedRuns ?? 0;
+        const era = ip > 0 ? ((er * 9) / ip).toFixed(2) : '0.00';
 
-      season.pitching = {
-        games: pitching.games ?? 0,
-        wins: pitching.wins ?? 0,
-        losses: pitching.losses ?? 0,
-        era,
-        ip,
-        so: pitching.strikeouts ?? 0,
-      };
-      seasons.set(pitching.season, season);
-    });
+        season.pitching = {
+          games: pitching.games ?? 0,
+          wins: pitching.wins ?? 0,
+          losses: pitching.losses ?? 0,
+          era,
+          ip,
+          so: pitching.strikeouts ?? 0,
+        };
+        seasons.set(pitching.season, season);
+      },
+    );
 
     // Add fielding stats (aggregate across multiple positions if player played multiple positions in a season)
-    data.playerSeasonFielding?.forEach((fielding) => {
-      if (!fielding?.season) return;
+    data.playerSeasonFielding?.forEach(
+      (fielding: {
+        season?: number | null;
+        games?: number | null;
+        inningsDefended?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        position?: string | null;
+      }) => {
+        if (!fielding?.season) return;
 
-      const season: SeasonRow = seasons.get(fielding.season) || {
-        season: fielding.season,
-      };
-
-      if (season.fielding) {
-        // Player has multiple positions for this season - aggregate the stats
-        season.fielding.games += fielding.games ?? 0;
-        season.fielding.inn += fielding.inningsDefended ?? 0;
-        season.fielding.po += fielding.putouts ?? 0;
-        season.fielding.a += fielding.assists ?? 0;
-        season.fielding.e += fielding.errors ?? 0;
-        // Add position to the list if not already there
-        const pos = fielding.position ?? '';
-        if (pos && !season.fielding.position.includes(pos)) {
-          season.fielding.position +=
-            (season.fielding.position ? ', ' : '') + pos;
-        }
-      } else {
-        // First position for this season
-        season.fielding = {
-          games: fielding.games ?? 0,
-          inn: fielding.inningsDefended ?? 0,
-          po: fielding.putouts ?? 0,
-          a: fielding.assists ?? 0,
-          e: fielding.errors ?? 0,
-          position: fielding.position ?? '',
+        const season: SeasonRow = seasons.get(fielding.season) || {
+          season: fielding.season,
         };
-      }
 
-      seasons.set(fielding.season, season);
-    });
+        if (season.fielding) {
+          // Player has multiple positions for this season - aggregate the stats
+          season.fielding.games += fielding.games ?? 0;
+          season.fielding.inn += fielding.inningsDefended ?? 0;
+          season.fielding.po += fielding.putouts ?? 0;
+          season.fielding.a += fielding.assists ?? 0;
+          season.fielding.e += fielding.errors ?? 0;
+          // Add position to the list if not already there
+          const pos = fielding.position ?? '';
+          if (pos && !season.fielding.position.includes(pos)) {
+            season.fielding.position +=
+              (season.fielding.position ? ', ' : '') + pos;
+          }
+        } else {
+          // First position for this season
+          season.fielding = {
+            games: fielding.games ?? 0,
+            inn: fielding.inningsDefended ?? 0,
+            po: fielding.putouts ?? 0,
+            a: fielding.assists ?? 0,
+            e: fielding.errors ?? 0,
+            position: fielding.position ?? '',
+          };
+        }
+
+        seasons.set(fielding.season, season);
+      },
+    );
 
     // Sort by season descending (most recent first)
     return Array.from(seasons.values()).sort((a, b) => b.season - a.season);

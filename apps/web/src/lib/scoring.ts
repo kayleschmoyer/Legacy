@@ -100,6 +100,7 @@ export function useLeagueScoringSettings(leagueId?: number) {
 
   const settings = useMemo(
     () =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       applyMultiplierGroups(query.data?.leagueScoringProfile?.multiplierGroups),
     [query.data?.leagueScoringProfile?.multiplierGroups],
   );

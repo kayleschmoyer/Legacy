@@ -2,7 +2,7 @@ import {
   ApolloClient,
   InMemoryCache,
   NormalizedCacheObject,
-} from '@apollo/client/core';
+} from '@apollo/client';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 import { GetUserById, UserFragment } from '../../api/db/graphql.generated';
@@ -15,6 +15,7 @@ export class DbClient {
       cache: new InMemoryCache(),
       uri: (op) =>
         `${getEnvVarRequired(EnvironmentVariable.GRAPHQL_HOST)}?ref=${
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           op.operationName
         }`,
     });
@@ -23,7 +24,9 @@ export class DbClient {
   public async getUserById(
     id: number,
   ): Promise<UserFragment | undefined | null> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const response = await this.apolloClient.query({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       query: GetUserById,
       variables: {
         id: id,

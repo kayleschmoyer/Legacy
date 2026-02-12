@@ -8,7 +8,8 @@ import {
 } from '@legacy-sports/shared-components';
 import { Card, H1, H2, Spinner, Text } from 'tamagui';
 import { Check, Copy } from '@tamagui/lucide-icons';
-import { gql, useLazyQuery } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { useLazyQuery } from '@apollo/client/react';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { env } from '../../config/environment';
@@ -183,59 +184,75 @@ export function LeagueDetailPage(): React.JSX.Element {
     skip: isNaN(leagueId) || !!reduxLeagueData,
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
-    onCompleted: (data) => {
-      if (data.league) {
-        dispatch(setLeagueData(data.league));
-        dispatch(setIsCommissioner(data.league.owner === user?.id));
-      }
-    },
   });
+
+  // Handle league data when it arrives
+  useEffect(() => {
+    if (data?.league) {
+      dispatch(setLeagueData(data.league));
+      dispatch(setIsCommissioner(data.league.owner === user?.id));
+    }
+  }, [data, dispatch, user?.id]);
 
   // Fetch league positions only if not in Redux
   const { data: positionsData, loading: positionsLoading } =
     useGetPositionsForLeagueQuery({
       skip: isNaN(leagueId) || reduxPositions.length > 0,
       variables: { leagueId },
-      onCompleted: (data) => {
-        if (data.leaguePositions) {
-          dispatch(
-            setLeaguePositions(
-              data.leaguePositions as LeaguePositionFragment[],
-            ),
-          );
-        }
-      },
     });
+
+  // Handle positions data when it arrives
+  useEffect(() => {
+    if (positionsData?.leaguePositions) {
+      dispatch(
+        setLeaguePositions(
+          positionsData.leaguePositions as LeaguePositionFragment[],
+        ),
+      );
+    }
+  }, [positionsData, dispatch]);
 
   // Use the proper userTeamId GraphQL query to get the user's team in this league
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID, {
-      onCompleted: (data) => {
-        if (data.userTeamId !== undefined) {
-          dispatch(setUserTeamId(data.userTeamId as number | null));
-        }
-      },
-    });
+    useLazyQuery(GET_USER_TEAM_ID);
 
   // Fetch league teams for standings
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS, {
-    onCompleted: (data) => {
-      if (data.leagueTeams) {
-        dispatch(
-          setLeagueTeams(
-            data.leagueTeams as Array<{
-              id: number;
-              name: string;
-              leagueId: number;
-            }>,
-          ),
-        );
-      }
-    },
-  });
+  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+
+  // Handle userTeamId data when it arrives
+  useEffect(() => {
+    if (
+      userTeamData &&
+      typeof userTeamData === 'object' &&
+      'userTeamId' in userTeamData &&
+      userTeamData.userTeamId !== undefined
+    ) {
+      dispatch(setUserTeamId(userTeamData.userTeamId as number | null));
+    }
+  }, [userTeamData, dispatch]);
+
+  // Handle league teams data when it arrives
+  useEffect(() => {
+    if (
+      leagueTeamsData &&
+      typeof leagueTeamsData === 'object' &&
+      'leagueTeams' in leagueTeamsData &&
+      leagueTeamsData.leagueTeams
+    ) {
+      dispatch(
+        setLeagueTeams(
+          leagueTeamsData.leagueTeams as Array<{
+            id: number;
+            name: string;
+            leagueId: number;
+          }>,
+        ),
+      );
+    }
+  }, [leagueTeamsData, dispatch]);
 
   // Effect to fetch user's team ID when league ID changes (only if not in Redux)
   useEffect(() => {
@@ -261,7 +278,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [activeTab, leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
 
   // Use Redux data or fallback to GraphQL data
-  const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId;
+  const userTeamId =
+    reduxUserTeamId ??
+    (userTeamData &&
+    typeof userTeamData === 'object' &&
+    'userTeamId' in userTeamData
+      ? (userTeamData.userTeamId as number | null)
+      : null);
   const league = reduxLeagueData ?? data?.league;
   const positions =
     reduxPositions.length > 0
@@ -270,7 +293,12 @@ export function LeagueDetailPage(): React.JSX.Element {
   const leagueTeams =
     reduxLeagueTeams.length > 0
       ? reduxLeagueTeams
-      : leagueTeamsData?.leagueTeams || [];
+      : leagueTeamsData &&
+          typeof leagueTeamsData === 'object' &&
+          'leagueTeams' in leagueTeamsData &&
+          Array.isArray(leagueTeamsData.leagueTeams)
+        ? leagueTeamsData.leagueTeams
+        : [];
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
   // Fetch team members only if not in Redux
@@ -280,24 +308,26 @@ export function LeagueDetailPage(): React.JSX.Element {
       variables: {
         teamId: userTeamId || 0,
       },
-      onCompleted: (data) => {
-        if (data.teamMembers) {
-          dispatch(
-            setTeamMembers(
-              data.teamMembers.filter(
-                (m) => m !== null,
-              ) as TeamMemberFragment[],
-            ),
-          );
-        }
-      },
     });
+
+  // Handle team members data when it arrives
+  useEffect(() => {
+    if (teamMembersData?.teamMembers) {
+      dispatch(
+        setTeamMembers(
+          teamMembersData.teamMembers.filter(
+            (m: TeamMemberFragment | null) => m !== null,
+          ) as TeamMemberFragment[],
+        ),
+      );
+    }
+  }, [teamMembersData, dispatch]);
 
   const teamMembers =
     reduxTeamMembers.length > 0
       ? reduxTeamMembers
       : (teamMembersData?.teamMembers?.filter(
-          (m) => m !== null,
+          (m: TeamMemberFragment | null) => m !== null,
         ) as TeamMemberFragment[]) || [];
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
@@ -390,7 +420,8 @@ export function LeagueDetailPage(): React.JSX.Element {
       try {
         // Find the player assigned to this position
         const assignedPlayer = teamMembersData?.teamMembers?.find(
-          (member) => member?.positionId === position.id,
+          (member: TeamMemberFragment | null) =>
+            member?.positionId === position.id,
         );
 
         if (assignedPlayer?.id) {
@@ -424,7 +455,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         alert('Invite code not available');
         return;
       }
-      await navigator.clipboard.writeText(inviteCode);
+      await navigator.clipboard.writeText(String(inviteCode));
       setLinkCopied(true);
 
       // Reset the copied state after 2 seconds
@@ -535,20 +566,22 @@ export function LeagueDetailPage(): React.JSX.Element {
             <XStack justifyContent="space-between" alignItems="center">
               <Text color="$gray11">Draft Status:</Text>
               <XStack
-                backgroundColor={getDraftStatusBgColor(league.draftStatus)}
-                borderColor={getDraftStatusColor(league.draftStatus)}
+                backgroundColor={getDraftStatusBgColor(
+                  String(league.draftStatus),
+                )}
+                borderColor={getDraftStatusColor(String(league.draftStatus))}
                 borderWidth={1}
                 borderRadius="$3"
                 paddingHorizontal="$2"
                 paddingVertical="$1"
               >
                 <Text
-                  color={getDraftStatusColor(league.draftStatus)}
+                  color={getDraftStatusColor(String(league.draftStatus))}
                   fontWeight="600"
                   fontSize="$3"
                   textTransform="capitalize"
                 >
-                  {formatDraftStatus(league.draftStatus)}
+                  {formatDraftStatus(String(league.draftStatus))}
                 </Text>
               </XStack>
             </XStack>
@@ -1011,12 +1044,17 @@ export function LeagueDetailPage(): React.JSX.Element {
                     {currentMatchup.startTime && (
                       <Text fontSize="$3" color="$gray11">
                         Start:{' '}
-                        {new Date(currentMatchup.startTime).toLocaleString()}
+                        {new Date(
+                          String(currentMatchup.startTime),
+                        ).toLocaleString()}
                       </Text>
                     )}
                     {currentMatchup.endTime && (
                       <Text fontSize="$3" color="$gray11">
-                        End: {new Date(currentMatchup.endTime).toLocaleString()}
+                        End:{' '}
+                        {new Date(
+                          String(currentMatchup.endTime),
+                        ).toLocaleString()}
                       </Text>
                     )}
                   </YStack>

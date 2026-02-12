@@ -81,6 +81,7 @@ function AuthenticatedContent(): React.JSX.Element {
 
   return (
     <AppProvider
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       apolloClient={client.apolloClient}
       colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
       isLoading={false}

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ApolloClient, ApolloProvider } from '@apollo/client';
+import { ApolloClient } from '@apollo/client';
+import { ApolloProvider } from '@apollo/client/react';
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
