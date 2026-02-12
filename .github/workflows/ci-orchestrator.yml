@@ -63,10 +63,27 @@ concurrency:
   group: orchestrator-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Workflow-level permissions follow least-privilege principle
-# Individual jobs and called workflows define their own required permissions
+# IMPORTANT: Orchestrator permissions must include ALL permissions required by called workflows
+# When using workflow_call, the calling workflow's permissions apply to ALL called workflows,
+# even if called workflows declare their own permissions. This is a GitHub Actions limitation.
+# See: https://docs.github.com/en/actions/using-workflows/reusing-workflows#supported-keywords-for-jobs-that-call-a-reusable-workflow
+#
+# Required permissions breakdown:
+# - contents: read        → Required for checkout and code access
+# - actions: read         → Required for workflow run queries (ci-pipeline needs this)
+# - pull-requests: write  → Required for PR comments (ci-reporting action in ci-pipeline)
+# - checks: read          → Required for status check queries (ci-pipeline validation)
+# - issues: write         → Required for issue creation on failures (ci-reporting action)
+# - security-events: write → Required for SARIF uploads (security-scanning workflow)
+#
+# Reducing these permissions causes startup_failure in called workflows (LS-106)
 permissions:
+  actions: read
   contents: read
+  pull-requests: write
+  checks: read
+  issues: write
+  security-events: write
 
 jobs:
   warmup:
