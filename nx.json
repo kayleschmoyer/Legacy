@@ -170,6 +170,48 @@
         "command": "tsc --noEmit"
       },
       "parallelism": false
+    },
+    "build-android": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{projectRoot}/android/**/*",
+        "{projectRoot}/index.js",
+        "{projectRoot}/metro.config.js",
+        "{projectRoot}/babel.config.js",
+        "{workspaceRoot}/android/**/*",
+        "{workspaceRoot}/app.json",
+        "{workspaceRoot}/babel.config.json",
+        {
+          "externalDependencies": ["gradle", "java"]
+        }
+      ],
+      "outputs": [
+        "{projectRoot}/android/app/build/outputs/apk",
+        "{projectRoot}/android/app/build/intermediates/merged_assets"
+      ]
+    },
+    "build-android-debug": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{projectRoot}/android/**/*",
+        "{projectRoot}/index.js",
+        "{projectRoot}/metro.config.js",
+        "{projectRoot}/babel.config.js",
+        "{workspaceRoot}/android/**/*",
+        "{workspaceRoot}/app.json",
+        "{workspaceRoot}/babel.config.json",
+        {
+          "externalDependencies": ["gradle", "java"]
+        }
+      ],
+      "outputs": [
+        "{projectRoot}/android/app/build/outputs/apk",
+        "{projectRoot}/android/app/build/intermediates/merged_assets"
+      ]
     }
   },
   "generators": {

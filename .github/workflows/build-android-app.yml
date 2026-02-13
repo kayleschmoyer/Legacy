@@ -125,6 +125,18 @@ jobs:
           echo "- **NDK Version**: ${{ env.NDK_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **React Native**: $(node -p "require('./apps/app/package.json').dependencies['react-native'] || require('./package.json').dependencies['react-native']")" >> $GITHUB_STEP_SUMMARY
 
+      # Android SDK caching - improves SDK download times
+      - name: Cache Android SDK
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.android/sdk
+            /usr/local/lib/android/sdk
+          key: ${{ runner.os }}-android-sdk-${{ env.ANDROID_API_LEVEL }}-${{ env.NDK_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-${{ env.ANDROID_API_LEVEL }}-
+            ${{ runner.os }}-android-sdk-
+
       # Android-specific caching for Gradle artifacts
       - name: Cache Gradle Dependencies
         uses: actions/cache@v5
@@ -133,9 +145,36 @@ jobs:
             ~/.gradle/wrapper
             ~/.gradle/caches/modules-2
             ~/.gradle/caches/jars-9
-          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/app/build.gradle') }}
+            ~/.gradle/caches/transforms-3
+            ~/.gradle/caches/build-cache-1
+            ${{ github.workspace }}/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/app/build.gradle', 'apps/app/android/build.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+
+      # Metro bundler cache - speeds up JS bundle generation
+      - name: Cache Metro Bundler
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.metro
+            ${{ github.workspace }}/node_modules/.cache/metro
+            /tmp/metro-*
+            /tmp/haste-map-*
+          key: ${{ runner.os }}-metro-${{ hashFiles('apps/app/package.json', 'apps/app/metro.config.js') }}
+          restore-keys: |
+            ${{ runner.os }}-metro-
+
+      # Hermes compiler cache
+      - name: Cache Hermes Compiler
+        uses: actions/cache@v5
+        with:
+          path: |
+            apps/app/android/app/build/generated/assets/react
+            apps/app/android/app/build/intermediates/merged_assets
+          key: ${{ runner.os }}-hermes-${{ hashFiles('apps/app/src/**/*.{js,jsx,ts,tsx}', 'lib/**/*.{js,jsx,ts,tsx}') }}
+          restore-keys: |
+            ${{ runner.os }}-hermes-
 
       - name: Setup Gradle Wrapper Permissions
         run: |
@@ -189,9 +228,13 @@ jobs:
           echo "📊 Current cache status:"
           echo "  Gradle wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) files"
           echo "  Gradle caches: $(ls ~/.gradle/caches/ 2>/dev/null | wc -l) entries"
+          echo "  Gradle build cache: $(ls ~/.gradle/caches/build-cache-1/ 2>/dev/null | wc -l) entries"
+          echo "  Metro cache: $(ls ~/.metro/ 2>/dev/null | wc -l) files"
           echo "  Node modules: $(ls node_modules/ 2>/dev/null | wc -l) packages"
+          echo "  Android SDK: $(ls ~/.android/sdk/ 2>/dev/null | wc -l) components"
           echo ""
           echo "💡 Dependencies will be downloaded during build if not cached"
+          echo "🚀 Nx computation caching enabled for faster incremental builds"
 
       - name: Generate React Native Bundle
         timeout-minutes: 10
@@ -269,8 +312,10 @@ jobs:
           echo "📊 Cache Status Summary:"
           echo "  Gradle Wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) items"
           echo "  Gradle Dependencies: $(ls ~/.gradle/caches/modules-2/ 2>/dev/null | wc -l) items"
+          echo "  Gradle Build Cache: $(ls ~/.gradle/caches/build-cache-1/ 2>/dev/null | wc -l) items"
           echo "  Kotlin Cache: $(ls ~/.gradle/kotlin/ 2>/dev/null | wc -l) items"
-          echo "  Build Cache: $(ls ~/.gradle/caches/build-cache-* 2>/dev/null | wc -l) items"
+          echo "  Metro Cache: $(ls ~/.metro/ 2>/dev/null | wc -l) items"
+          echo "  Hermes Cache: $(ls apps/app/android/app/build/generated/assets/react/ 2>/dev/null | wc -l) items"
 
           # Determine build type
           BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
@@ -316,21 +361,23 @@ jobs:
       - name: Cache Cleanup & Optimization
         if: always()
         run: |
-          echo "🧹 Cleaning up cache for optimal performance..."
+          echo "🧹 Optimizing caches for next run..."
 
-          # Remove large temporary files but keep useful caches
+          # Remove lock files but keep the actual caches
           find ~/.gradle/caches -name "*.lock" -delete 2>/dev/null || true
           find ~/.gradle/caches -name "gc.properties" -delete 2>/dev/null || true
 
-          # Clean up old build outputs but preserve dependencies
+          # Clean up old build intermediates but preserve dependencies and build cache
           rm -rf apps/app/android/build/intermediates/incremental 2>/dev/null || true
           rm -rf apps/app/android/app/build/intermediates/incremental 2>/dev/null || true
 
-          # Show final cache sizes
+          # Show final cache sizes for monitoring
           echo "📊 Final Cache Summary:"
           du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Not found"
           du -sh ~/.gradle/wrapper 2>/dev/null || echo "  Gradle wrapper: Not found"
+          du -sh ~/.gradle/caches/build-cache-1 2>/dev/null || echo "  Gradle build cache: Not found"
           du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Not found"
+          du -sh ~/.android/sdk 2>/dev/null || echo "  Android SDK: Not found"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v6
@@ -342,28 +389,29 @@ jobs:
       - name: Cache Cleanup for Faster Compression
         if: always()
         run: |
-          echo "🧹 Cleaning up large cache directories to speed up post-job cleanup..."
+          echo "🧹 Cleaning up large temporary files to speed up post-job cache save..."
 
           # Remove large temporary build artifacts that don't need to be cached
           rm -rf apps/app/android/app/build/intermediates/merged_assets/ || true
           rm -rf apps/app/android/app/build/intermediates/incremental/ || true
           rm -rf apps/app/android/app/build/outputs/logs/ || true
-          rm -rf ~/.gradle/caches/build-cache-* || true
-          rm -rf ~/.android/build-cache || true
           rm -rf /tmp/metro-* /tmp/haste-map-* || true
 
-          # Clean up large node_modules that can be restored from npm cache
+          # Clean up temporary node_modules artifacts
           find node_modules -name "*.log" -delete || true
           find node_modules -name ".DS_Store" -delete || true
 
-          # Compress remaining gradle caches to reduce cleanup time
+          # Clean duplicate lock files
           find ~/.gradle/caches -name "*.lock" -delete || true
 
           echo "✅ Cache cleanup completed. Remaining cache sizes:"
           du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Cleaned"
+          du -sh ~/.gradle/caches/build-cache-1 2>/dev/null || echo "  Gradle build cache: Cleaned"
+          du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Cleaned"
           du -sh node_modules 2>/dev/null || echo "  Node modules: $(du -sh node_modules | cut -f1)"
 
           echo "💡 Post-job cache compression should be much faster now"
+          echo "🚀 Nx cache will be used for incremental builds when code hasn't changed"
 
   create-release:
     name: Create GitHub Release

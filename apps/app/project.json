@@ -14,17 +14,51 @@
     },
     "build-android": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
         "cwd": "apps/app"
-      }
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{projectRoot}/android/**/*",
+        "{projectRoot}/index.js",
+        "{projectRoot}/metro.config.js",
+        "{projectRoot}/babel.config.js",
+        "{workspaceRoot}/android/**/*",
+        "{workspaceRoot}/app.json",
+        "{workspaceRoot}/babel.config.json"
+      ],
+      "outputs": [
+        "{projectRoot}/android/app/build/outputs/apk",
+        "{projectRoot}/android/app/build/intermediates/merged_assets"
+      ]
     },
     "build-android-debug": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
         "cwd": "apps/app"
-      }
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{projectRoot}/android/**/*",
+        "{projectRoot}/index.js",
+        "{projectRoot}/metro.config.js",
+        "{projectRoot}/babel.config.js",
+        "{workspaceRoot}/android/**/*",
+        "{workspaceRoot}/app.json",
+        "{workspaceRoot}/babel.config.json"
+      ],
+      "outputs": [
+        "{projectRoot}/android/app/build/outputs/apk",
+        "{projectRoot}/android/app/build/intermediates/merged_assets"
+      ]
     },
     "test-android": {
       "executor": "nx:run-commands",
