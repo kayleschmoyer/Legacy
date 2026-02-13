@@ -72,8 +72,9 @@ const NativeIcons: React.FC<IconProps> = ({
         }
         accessibilityLabel="Loading gear"
       >
-        {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-        ⚙️
+        <span role="img" aria-label="Loading gear">
+          ⚙️
+        </span>
       </Text>
     );
   }

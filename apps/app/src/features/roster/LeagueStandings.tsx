@@ -143,7 +143,6 @@ export function LeagueStandings({
           borderWidth={1}
         >
           <Text fontSize="$2" color="$yellow11" textAlign="center">
-            {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
             <Text role="img" aria-label="info">
               ℹ️
             </Text>{' '}

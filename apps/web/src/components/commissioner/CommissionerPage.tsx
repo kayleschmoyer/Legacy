@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, H3, Separator, Text, XStack, YStack } from 'tamagui';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { NextStepControl } from '../commissioner/NextStepControl';
+import { announcePolite } from '../../utils/a11y';
 
 /**
  * CommissionerPage - Commissioner controls for league management
@@ -18,8 +19,10 @@ export function CommissionerPage() {
   const { matchup, loading, error, refetch } = useCurrentMatchup(leagueIdNum);
 
   const handleSuccess = () => {
-    setSuccessMessage('Game selection triggered successfully!');
+    const message = 'Game selection triggered successfully!';
+    setSuccessMessage(message);
     setErrorMessage(null);
+    announcePolite(message);
     void refetch();
     setTimeout(() => setSuccessMessage(null), 5000);
   };
@@ -27,6 +30,7 @@ export function CommissionerPage() {
   const handleError = (err: Error) => {
     setErrorMessage(err.message);
     setSuccessMessage(null);
+    announcePolite(`Error: ${err.message}`);
   };
 
   return (
@@ -55,6 +59,8 @@ export function CommissionerPage() {
 
       {successMessage && (
         <YStack
+          role="status"
+          aria-live="polite"
           padding="$3"
           backgroundColor="$green3"
           borderRadius="$3"
@@ -69,6 +75,8 @@ export function CommissionerPage() {
 
       {errorMessage && (
         <YStack
+          role="alert"
+          aria-live="assertive"
           padding="$3"
           backgroundColor="$red3"
           borderRadius="$3"

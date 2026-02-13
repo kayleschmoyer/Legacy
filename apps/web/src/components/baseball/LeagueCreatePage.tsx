@@ -204,7 +204,12 @@ export function LeagueCreatePage(): React.JSX.Element {
             <YStack padding="$4" space="$5">
               {/* League Name */}
               <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
+                <Text
+                  size="$4"
+                  fontWeight="600"
+                  color="$gray12"
+                  nativeID="label-league-name"
+                >
                   League Name *
                 </Text>
                 <Input
@@ -217,6 +222,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                   borderColor="$borderColor"
                   backgroundColor="$color1"
                   disabled={loading}
+                  aria-labelledby="label-league-name"
+                  aria-required="true"
                 />
               </YStack>
 

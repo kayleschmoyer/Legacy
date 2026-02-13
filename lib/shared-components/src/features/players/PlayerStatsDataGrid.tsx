@@ -29,20 +29,23 @@ import {
 // Icons - using simple text icons for cross-platform compatibility
 const Search = ({ size, color }: { size?: number; color?: string }) => (
   <Text fontSize={size} color={color} accessibilityLabel="Search">
-    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-    🔍
+    <span role="img" aria-label="Search">
+      🔍
+    </span>
   </Text>
 );
 const RefreshCw = () => (
   <Text accessibilityLabel="Refresh">
-    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-    🔄
+    <span role="img" aria-label="Refresh">
+      🔄
+    </span>
   </Text>
 );
 const AlertCircle = ({ size, color }: { size?: number; color?: string }) => (
   <Text fontSize={size} color={color} accessibilityLabel="Error">
-    {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-    ⚠️
+    <span role="img" aria-label="Error">
+      ⚠️
+    </span>
   </Text>
 );
 

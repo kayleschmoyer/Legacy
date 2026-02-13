@@ -31,6 +31,7 @@ import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
 import { GamesRemaining } from '../matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../matchup/MatchupRosterComparison';
+import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   setIsCommissioner,
@@ -359,22 +360,20 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const handleMatchupSuccess = useCallback(
     (actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1') => {
+      let message: string;
       if (actionType === 'draft') {
-        setMatchupSuccessMessage(
-          'Draft started successfully! You can now create Week 1 matchups.',
-        );
+        message =
+          'Draft started successfully! You can now create Week 1 matchups.';
       } else if (actionType === 'createWeek1') {
-        setMatchupSuccessMessage('Week 1 matchups created successfully!');
+        message = 'Week 1 matchups created successfully!';
       } else if (actionType === 'advance') {
-        setMatchupSuccessMessage(
-          'Week advanced successfully! New matchups created.',
-        );
+        message = 'Week advanced successfully! New matchups created.';
       } else {
-        setMatchupSuccessMessage(
-          'Game selection triggered! Processing in background...',
-        );
+        message = 'Game selection triggered! Processing in background...';
       }
+      setMatchupSuccessMessage(message);
       setMatchupErrorMessage(null);
+      announcePolite(message);
       void refetchMatchup();
       setTimeout(() => setMatchupSuccessMessage(null), 5000);
     },
@@ -384,6 +383,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const handleMatchupError = useCallback((err: Error) => {
     setMatchupErrorMessage(err.message);
     setMatchupSuccessMessage(null);
+    announcePolite(`Error: ${err.message}`);
   }, []);
 
   const handleLeagueUpdate = useCallback(
@@ -785,7 +785,13 @@ export function LeagueDetailPage(): React.JSX.Element {
     >
       {/* Success/Error Messages */}
       {matchupSuccessMessage && (
-        <Card backgroundColor="$green3" borderColor="$green8" padding="$3">
+        <Card
+          role="status"
+          aria-live="polite"
+          backgroundColor="$green3"
+          borderColor="$green8"
+          padding="$3"
+        >
           <Text color="$green11" fontWeight="bold">
             {matchupSuccessMessage}
           </Text>
@@ -793,7 +799,13 @@ export function LeagueDetailPage(): React.JSX.Element {
       )}
 
       {matchupErrorMessage && (
-        <Card backgroundColor="$red3" borderColor="$red8" padding="$3">
+        <Card
+          role="alert"
+          aria-live="assertive"
+          backgroundColor="$red3"
+          borderColor="$red8"
+          padding="$3"
+        >
           <Text color="$red11" fontWeight="bold">
             Error: {matchupErrorMessage}
           </Text>

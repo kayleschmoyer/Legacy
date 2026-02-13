@@ -26,10 +26,12 @@ export default function PlayerStatsScreen() {
           fontWeight="bold"
           textAlign="center"
           color="$color12"
-          accessibilityLabel="Chart icon Player Statistics"
+          accessibilityLabel="Player Statistics"
         >
-          {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-          📊 Player Statistics
+          <span role="img" aria-label="chart">
+            📊
+          </span>{' '}
+          Player Statistics
         </Text>
         <Text textAlign="center" color="$color10" fontSize="$4">
           Component implementation needed
@@ -57,9 +59,16 @@ export function PlayerStatsScreenHeader() {
       borderBottomColor="$borderColor"
       paddingVertical="$2"
     >
-      <Text fontSize="$6" fontWeight="600" color="$color12">
-        {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-        📊 Player Statistics
+      <Text
+        fontSize="$6"
+        fontWeight="600"
+        color="$color12"
+        accessibilityLabel="Player Statistics"
+      >
+        <span role="img" aria-label="chart">
+          📊
+        </span>{' '}
+        Player Statistics
       </Text>
     </XStack>
   );

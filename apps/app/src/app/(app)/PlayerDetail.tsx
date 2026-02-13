@@ -40,9 +40,14 @@ function PlayerDetail() {
 
       {/* Placeholder content */}
       <YStack flex={1} justifyContent="center" alignItems="center" space="$4">
-        <Text fontSize="$7" textAlign="center">
-          {/* eslint-disable-next-line jsx-a11y/accessible-emoji */}
-          📊
+        <Text
+          fontSize="$7"
+          textAlign="center"
+          accessibilityLabel="Player statistics chart"
+        >
+          <span role="img" aria-label="chart">
+            📊
+          </span>
         </Text>
         <Text fontSize="$6" fontWeight="600" textAlign="center">
           Player Details
