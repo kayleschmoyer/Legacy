@@ -25,6 +25,7 @@ import AboutPage from '../components/AboutPage';
 import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../components/matchup/MatchupDetailPage';
+import { usePageTracking } from '../hooks/usePageTracking';
 
 // Styled Tamagui components for navigation
 const NavContainer = styled(YStack, {
@@ -194,6 +195,9 @@ const MainLayout = styled(YStack, {
  * This component only renders authenticated content.
  */
 function App() {
+  // Track page views automatically on route changes
+  usePageTracking();
+
   console.log('Rendering authenticated app content...');
 
   return (

@@ -18,6 +18,7 @@ export interface EnvironmentConfig {
   readonly buildDate: string;
   readonly sentryDsn?: string;
   readonly sentryTracesSampleRate?: number;
+  readonly googleAnalyticsMeasurementId?: string;
 }
 
 /**
@@ -43,6 +44,9 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   sentryTracesSampleRate: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
     ? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE as string)
     : 0.1,
+  googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
+    | string
+    | undefined,
 });
 
 /**

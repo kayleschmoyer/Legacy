@@ -30,12 +30,16 @@ import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
+import { initializeAnalytics, trackLogin } from './utils/analytics';
 
 // Initialize Sentry for web app
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Initialize Google Analytics
+initializeAnalytics();
 
 // Create secure OAuth configuration (single-lambda architecture)
 const authConfig: OAuthConfig = {
@@ -94,6 +98,7 @@ try {
               testMode={env.authTestMode}
               onLoginSuccess={() => {
                 console.log('Web app login successful!');
+                trackLogin('google');
               }}
               onLoginFailure={(error: string) => {
                 console.error('Web app login failed:', error);
