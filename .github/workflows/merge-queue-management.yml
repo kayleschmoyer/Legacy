@@ -16,6 +16,13 @@ jobs:
       issues: write
 
     steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
+          private-key: ${{ secrets.MERGE_QUEUE_APP_PRIVATE_KEY }}
+
       - name: Handle Merge Queue Label Added
         if: |
           github.event_name == 'pull_request' && 
@@ -23,6 +30,7 @@ jobs:
           github.event.label.name == 'merge-when-ready'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             const pr = context.payload.pull_request;
 
@@ -47,6 +55,7 @@ jobs:
           github.event.label.name == 'merge-when-ready'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             const pr = context.payload.pull_request;
 
@@ -66,6 +75,7 @@ jobs:
           github.event.review.state == 'approved'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             // Optional: Automatically add to queue when approved
             // Uncomment the code below if you want this behavior

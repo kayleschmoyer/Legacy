@@ -54,15 +54,22 @@ jobs:
       statuses: read
 
     steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
+          private-key: ${{ secrets.MERGE_QUEUE_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v6
         with:
-          # Using GITHUB_TOKEN with proper permissions configured in repository settings
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.generate-token.outputs.token }}
           persist-credentials: true
 
       - name: Process Enhanced Merge Queue
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             const { owner, repo } = context.repo;
             const isDryRun = ${{ github.event.inputs.dry_run || false }};
@@ -301,26 +308,8 @@ jobs:
                 
                 console.log(`✅ Successfully merged PR #${pr.number}`);
                 
-                // Trigger CI orchestrator workflow for integration build
-                // This is necessary because GITHUB_TOKEN doesn't trigger workflows automatically
-                // (GitHub security feature to prevent infinite workflow loops)
-                try {
-                  console.log(`🔄 Triggering CI orchestrator for integration build...`);
-                  await github.rest.actions.createWorkflowDispatch({
-                    owner,
-                    repo,
-                    workflow_id: 'ci-orchestrator.yml',
-                    ref: pr.base.ref,
-                    inputs: {
-                      debug_mode: 'false'
-                    }
-                  });
-                  console.log(`✅ CI orchestrator triggered successfully`);
-                } catch (triggerError) {
-                  console.error(`⚠️ Failed to trigger CI orchestrator: ${triggerError.message}`);
-                  console.error(`Integration build may need to be triggered manually`);
-                  // Don't fail the merge if CI trigger fails - the merge already happened
-                }
+                // Note: GitHub App tokens automatically trigger workflows after merge
+                // No manual workflow dispatch needed
                 
                 // Post success comment (reuse existing comment if available)
                 const successComment = "## 🎉 Successfully Merged!\n\n" +
