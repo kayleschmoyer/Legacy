@@ -6,12 +6,28 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { Card, H1, H2, Spinner, Text } from 'tamagui';
-import { Check, Copy } from '@tamagui/lucide-icons';
+import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
+import {
+  Check,
+  ChevronLeft,
+  ClipboardList,
+  Copy,
+  Info,
+  LayoutGrid,
+  Link2,
+  Settings,
+  Share2,
+  Swords,
+  Trophy,
+  UserPlus,
+  Users,
+} from '@tamagui/lucide-icons';
 import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
+import { LeagueActivityFeed } from './LeagueActivityFeed';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
+import { LeagueTradeBlock } from './LeagueTradeBlock';
 import { env } from '../../config/environment';
 import {
   LeagueFragment,
@@ -44,14 +60,14 @@ import {
   setUserTeamId,
 } from '../../store/leagueSlice';
 
-// Manual GraphQL query for getting user's team ID in a league
+// ── GraphQL ──────────────────────────────────────────────────────────────────
+
 const GET_USER_TEAM_ID = gql`
   query GetUserTeamId($leagueId: Int!) {
     userTeamId(leagueId: $leagueId)
   }
 `;
 
-// Manual GraphQL query for getting league teams (for standings)
 const GET_LEAGUE_TEAMS = gql`
   query GetLeagueTeams($leagueId: Int!) {
     leagueTeams(leagueId: $leagueId) {
@@ -62,53 +78,148 @@ const GET_LEAGUE_TEAMS = gql`
   }
 `;
 
-// Helper functions for draft status display
+// ── Styled Components ────────────────────────────────────────────────────────
+
+const PageContainer = styled(YStack, {
+  flex: 1,
+  minHeight: '100vh',
+  backgroundColor: '$background',
+  paddingBottom: '$8',
+});
+
+const HeroBar = styled(XStack, {
+  position: 'relative',
+  overflow: 'hidden',
+  paddingHorizontal: '$6',
+  paddingVertical: '$6',
+  gap: '$5',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  flexWrap: 'wrap',
+  $sm: {
+    paddingHorizontal: '$4',
+    paddingVertical: '$4',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+});
+
+const ContentArea = styled(YStack, {
+  maxWidth: 1200,
+  width: '100%',
+  alignSelf: 'center',
+  paddingHorizontal: '$6',
+  $sm: { paddingHorizontal: '$3' },
+});
+
+const TabBar = styled(XStack, {
+  borderBottomWidth: 1,
+  borderBottomColor: '$borderColor',
+  gap: 0,
+  overflow: 'auto',
+  maxWidth: 1200,
+  width: '100%',
+  alignSelf: 'center',
+  paddingHorizontal: '$6',
+  $sm: { paddingHorizontal: '$3' },
+});
+
+const DraftBadge = styled(XStack, {
+  alignItems: 'center',
+  gap: '$1.5',
+  paddingHorizontal: '$3',
+  paddingVertical: '$1.5',
+  borderRadius: '$10',
+  borderWidth: 1,
+});
+
+const QuickStatCard = styled(YStack, {
+  flex: 1,
+  minWidth: 140,
+  backgroundColor: '$surfaceCard',
+  borderColor: '$surfacePanelBorder',
+  borderWidth: 1,
+  borderRadius: '$5',
+  padding: '$3',
+  gap: '$1',
+});
+
+const InviteCard = styled(Card, {
+  backgroundColor: '$surfacePanel',
+  borderColor: '$surfacePanelBorder',
+  borderWidth: 1,
+  borderRadius: '$6',
+  padding: '$5',
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatDraftStatus(status?: string | null): string {
   if (!status) return 'Unknown';
-
   switch (status) {
     case 'not-started':
-      return 'Not Started';
+      return 'Pre-Draft';
     case 'queued':
       return 'Queued';
     case 'in-progress':
-      return 'In Progress';
+      return 'Drafting';
     case 'completed':
-      return 'Completed';
+      return 'Season Active';
     default:
       return status.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   }
 }
 
-function getDraftStatusColor(status?: string | null): string {
+function getDraftBadgeColors(status?: string | null) {
   switch (status) {
     case 'not-started':
-      return '$gray11';
+      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
     case 'queued':
-      return '$orange11';
+      return { bg: '$amber3', border: '$amber7', text: '$amber11' };
     case 'in-progress':
-      return '$blue11';
+      return { bg: '$blue3', border: '$blue7', text: '$blue11' };
     case 'completed':
-      return '$green11';
+      return { bg: '$green3', border: '$green7', text: '$green11' };
     default:
-      return '$gray11';
+      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
   }
 }
 
-function getDraftStatusBgColor(status?: string | null): string {
-  switch (status) {
-    case 'not-started':
-      return '$gray3';
-    case 'queued':
-      return '$orange3';
-    case 'in-progress':
-      return '$blue3';
-    case 'completed':
-      return '$green3';
-    default:
-      return '$gray3';
-  }
+// ── Tab Definitions ──────────────────────────────────────────────────────────
+
+type TabId = 'overview' | 'roster' | 'standings' | 'matchup' | 'commissioner';
+
+interface TabDef {
+  id: TabId;
+  label: string;
+  icon: React.ReactNode;
+  commissionerOnly?: boolean;
 }
+
+const TABS: TabDef[] = [
+  { id: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
+  { id: 'roster', label: 'My Roster', icon: <ClipboardList size={16} /> },
+  { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
+  { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
+  {
+    id: 'commissioner',
+    label: 'Commissioner',
+    icon: <Settings size={16} />,
+    commissionerOnly: true,
+  },
+];
+
+// Backward-compatible URL mapping (old "info" tab → new "overview")
+const TAB_ALIASES: Record<string, TabId> = {
+  info: 'overview',
+  overview: 'overview',
+  roster: 'roster',
+  standings: 'standings',
+  matchup: 'matchup',
+  commissioner: 'commissioner',
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function LeagueDetailPage(): React.JSX.Element {
   const { id, tab: tabParam } = useParams<{ id: string; tab?: string }>();
@@ -116,7 +227,6 @@ export function LeagueDetailPage(): React.JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  // Redux state
   const {
     leagueData: reduxLeagueData,
     positions: reduxPositions,
@@ -126,44 +236,26 @@ export function LeagueDetailPage(): React.JSX.Element {
     isCommissioner: reduxIsCommissioner,
   } = useAppSelector((state) => state.league);
 
-  // Get initial tab from URL or default to 'info'
-  const getTabFromUrl = useCallback(():
-    | 'info'
-    | 'roster'
-    | 'commissioner'
-    | 'standings'
-    | 'matchup' => {
-    const validTabs = [
-      'info',
-      'roster',
-      'commissioner',
-      'standings',
-      'matchup',
-    ] as const;
-    if (
-      tabParam &&
-      validTabs.includes(tabParam as (typeof validTabs)[number])
-    ) {
-      return tabParam as (typeof validTabs)[number];
+  const getTabFromUrl = useCallback((): TabId => {
+    if (tabParam && tabParam in TAB_ALIASES) {
+      return TAB_ALIASES[tabParam];
     }
-    return 'info';
+    return 'overview';
   }, [tabParam]);
 
-  const [activeTab, setActiveTab] = useState<
-    'info' | 'roster' | 'commissioner' | 'standings' | 'matchup'
-  >(getTabFromUrl());
+  const [activeTab, setActiveTab] = useState<TabId>(getTabFromUrl());
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const { user } = useAuth();
 
-  // Initialize Redux state when league changes
+  // ── Effects ──
+
   useEffect(() => {
     if (!isNaN(leagueId)) {
       dispatch(setLeagueId(leagueId));
     }
   }, [leagueId, dispatch]);
 
-  // Update active tab when URL changes (e.g., back/forward navigation)
   useEffect(() => {
     const tabFromUrl = getTabFromUrl();
     if (tabFromUrl !== activeTab) {
@@ -171,23 +263,22 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [getTabFromUrl, activeTab]);
 
-  // Helper function to change tab and update URL
   const changeTab = useCallback(
-    (newTab: 'info' | 'roster' | 'commissioner' | 'standings' | 'matchup') => {
+    (newTab: TabId) => {
       setActiveTab(newTab);
       navigate(`/baseball/league/${leagueId}/${newTab}`, { replace: false });
     },
     [navigate, leagueId],
   );
 
-  // Fetch league data only if not in Redux
+  // ── Data Fetching ──
+
   const { data, loading, error } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId) || !!reduxLeagueData,
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
   });
 
-  // Handle league data when it arrives
   useEffect(() => {
     if (data?.league) {
       dispatch(setLeagueData(data.league));
@@ -195,14 +286,12 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [data, dispatch, user?.id]);
 
-  // Fetch league positions only if not in Redux
   const { data: positionsData, loading: positionsLoading } =
     useGetPositionsForLeagueQuery({
       skip: isNaN(leagueId) || reduxPositions.length > 0,
       variables: { leagueId },
     });
 
-  // Handle positions data when it arrives
   useEffect(() => {
     if (positionsData?.leaguePositions) {
       dispatch(
@@ -213,17 +302,14 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [positionsData, dispatch]);
 
-  // Use the proper userTeamId GraphQL query to get the user's team in this league
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
     useLazyQuery(GET_USER_TEAM_ID);
 
-  // Fetch league teams for standings
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
   ] = useLazyQuery(GET_LEAGUE_TEAMS);
 
-  // Handle userTeamId data when it arrives
   useEffect(() => {
     if (
       userTeamData &&
@@ -235,7 +321,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [userTeamData, dispatch]);
 
-  // Handle league teams data when it arrives
   useEffect(() => {
     if (
       leagueTeamsData &&
@@ -255,30 +340,22 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [leagueTeamsData, dispatch]);
 
-  // Effect to fetch user's team ID when league ID changes (only if not in Redux)
   useEffect(() => {
     if (!isNaN(leagueId) && user?.id && reduxUserTeamId === null) {
-      void getUserTeamId({
-        variables: { leagueId },
-      });
+      void getUserTeamId({ variables: { leagueId } });
     }
   }, [leagueId, user?.id, reduxUserTeamId, getUserTeamId]);
 
-  // Effect to fetch league teams when on standings tab (only if not in Redux)
+  // Eagerly fetch league teams (needed for overview sidebar + standings)
   useEffect(() => {
-    if (
-      activeTab === 'standings' &&
-      !isNaN(leagueId) &&
-      reduxLeagueTeams.length === 0
-    ) {
+    if (!isNaN(leagueId) && reduxLeagueTeams.length === 0) {
       dispatch(setTeamsLoading(true));
-      void getLeagueTeams({
-        variables: { leagueId },
-      });
+      void getLeagueTeams({ variables: { leagueId } });
     }
-  }, [activeTab, leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
+  }, [leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
 
-  // Use Redux data or fallback to GraphQL data
+  // ── Derived Data ──
+
   const userTeamId =
     reduxUserTeamId ??
     (userTeamData &&
@@ -302,16 +379,12 @@ export function LeagueDetailPage(): React.JSX.Element {
         : [];
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
-  // Fetch team members only if not in Redux
   const { data: teamMembersData, loading: teamMembersLoading } =
     useGetTeamMembersQuery({
       skip: !userTeamId || reduxTeamMembers.length > 0,
-      variables: {
-        teamId: userTeamId || 0,
-      },
+      variables: { teamId: userTeamId || 0 },
     });
 
-  // Handle team members data when it arrives
   useEffect(() => {
     if (teamMembersData?.teamMembers) {
       dispatch(
@@ -342,7 +415,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     refetch: refetchScoringProfile,
   } = useLeagueScoringSettings(leagueId);
 
-  // Fetch current matchup for commissioner tools
   const {
     matchup: currentMatchup,
     loading: matchupLoading,
@@ -350,13 +422,14 @@ export function LeagueDetailPage(): React.JSX.Element {
     refetch: refetchMatchup,
   } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
 
-  // State for matchup operation messages
   const [matchupSuccessMessage, setMatchupSuccessMessage] = useState<
     string | null
   >(null);
   const [matchupErrorMessage, setMatchupErrorMessage] = useState<string | null>(
     null,
   );
+
+  // ── Callbacks ──
 
   const handleMatchupSuccess = useCallback(
     (actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1') => {
@@ -388,7 +461,6 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const handleLeagueUpdate = useCallback(
     (updatedLeague: LeagueFragment) => {
-      // Update Redux state with the league data from mutation response
       dispatch(setLeagueData(updatedLeague));
     },
     [dispatch],
@@ -400,13 +472,9 @@ export function LeagueDetailPage(): React.JSX.Element {
         console.error('Player ID is required');
         return;
       }
-
       try {
         await updateTeamMemberPosition({
-          variables: {
-            teamMemberId: player.id,
-            positionId: position.id,
-          },
+          variables: { teamMemberId: player.id, positionId: position.id },
         });
       } catch (error) {
         console.error('Error assigning player:', error);
@@ -418,18 +486,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const handlePlayerRemove = useCallback(
     async (position: LeaguePositionFragment) => {
       try {
-        // Find the player assigned to this position
         const assignedPlayer = teamMembersData?.teamMembers?.find(
           (member: TeamMemberFragment | null) =>
             member?.positionId === position.id,
         );
-
         if (assignedPlayer?.id) {
           await updateTeamMemberPosition({
-            variables: {
-              teamMemberId: assignedPlayer.id,
-              positionId: null,
-            },
+            variables: { teamMemberId: assignedPlayer.id, positionId: null },
           });
         }
       } catch (error) {
@@ -439,7 +502,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     [updateTeamMemberPosition, teamMembersData?.teamMembers],
   );
 
-  // Generate the full invite URL for display and copying
   const inviteUrl = useMemo(() => {
     if (!data?.league?.inviteCode) return null;
     const baseUrl = env.baseUrl.endsWith('/')
@@ -457,11 +519,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
       await navigator.clipboard.writeText(String(inviteCode));
       setLinkCopied(true);
-
-      // Reset the copied state after 2 seconds
-      setTimeout(() => {
-        setLinkCopied(false);
-      }, 2000);
+      setTimeout(() => setLinkCopied(false), 2000);
     } catch (error) {
       console.error('Error copying invite code:', error);
       alert('Failed to copy invite code to clipboard');
@@ -474,290 +532,540 @@ export function LeagueDetailPage(): React.JSX.Element {
         alert('Invite code not available');
         return;
       }
-
       await navigator.clipboard.writeText(inviteUrl);
       setInviteLinkCopied(true);
-
-      // Reset the copied state after 2 seconds
-      setTimeout(() => {
-        setInviteLinkCopied(false);
-      }, 2000);
+      setTimeout(() => setInviteLinkCopied(false), 2000);
     } catch (error) {
       console.error('Error copying invite link:', error);
       alert('Failed to copy invite link to clipboard');
     }
   }, [inviteUrl]);
 
+  // ── Computed values ──
+
+  const assignedCount = teamMembers.filter((p) => p?.positionId).length;
+  const benchCount = teamMembers.length - assignedCount;
+  const teamCount = leagueTeams.length;
+  const draftColors = getDraftBadgeColors(String(league?.draftStatus));
+
+  // ── Loading / Error States ──
+
   if (loading || positionsLoading || teamMembersLoading) {
     return (
-      <YStack
-        flex={1}
-        alignItems="center"
-        justifyContent="center"
-        padding="$6"
-        role="main"
-        aria-busy="true"
-      >
-        <Spinner size="large" />
-        <Text marginTop="$4" color="$gray10" role="status" aria-live="polite">
-          Loading league...
-        </Text>
-      </YStack>
+      <PageContainer>
+        <YStack
+          flex={1}
+          alignItems="center"
+          justifyContent="center"
+          padding="$10"
+          gap="$4"
+          role="main"
+          aria-busy="true"
+        >
+          <Spinner size="large" color="$blue10" />
+          <Text
+            color="$textMuted"
+            fontSize="$4"
+            role="status"
+            aria-live="polite"
+          >
+            Loading league...
+          </Text>
+        </YStack>
+      </PageContainer>
     );
   }
 
   if (error || !league) {
     return (
-      <YStack
-        flex={1}
-        alignItems="center"
-        justifyContent="center"
-        padding="$6"
-        role="main"
-        aria-live="assertive"
-      >
-        <Text color="$red10" fontSize="$5" textAlign="center" role="alert">
-          {error ? `Error: ${error.message}` : `League not found`}
-        </Text>
-        <Button
-          marginTop="$4"
-          onPress={() => window.history.back()}
-          aria-label="Go back"
+      <PageContainer>
+        <YStack
+          flex={1}
+          alignItems="center"
+          justifyContent="center"
+          padding="$10"
+          gap="$5"
+          role="main"
+          aria-live="assertive"
         >
-          Go Back
-        </Button>
-      </YStack>
+          <YStack
+            backgroundColor="$red3"
+            borderColor="$red7"
+            borderWidth={1}
+            borderRadius="$6"
+            padding="$6"
+            alignItems="center"
+            gap="$3"
+            maxWidth={480}
+          >
+            <Text color="$red11" fontSize="$6" fontWeight="700" role="alert">
+              {error ? 'Something went wrong' : 'League not found'}
+            </Text>
+            <Text color="$red10" fontSize="$4" textAlign="center">
+              {error
+                ? error.message
+                : "This league doesn't exist or you don't have access."}
+            </Text>
+            <Button
+              marginTop="$2"
+              onPress={() => navigate('/baseball')}
+              aria-label="Back to leagues"
+              backgroundColor="$red9"
+              color="white"
+              borderRadius="$4"
+            >
+              Back to Leagues
+            </Button>
+          </YStack>
+        </YStack>
+      </PageContainer>
     );
   }
 
-  const renderLeagueInfo = () => (
-    <YStack
-      space="$4"
-      role="tabpanel"
-      id="panel-info"
-      aria-labelledby="tab-info"
-    >
-      {/* League Info Cards */}
-      <XStack gap="$4" flexWrap="wrap">
-        {/* Basic Info Card */}
-        <Card
-          flex={1}
-          minWidth={300}
-          backgroundColor="$blue2"
-          borderColor="$blue6"
-          padding="$4"
-        >
-          <H2 size="$6" color="$blue11" marginBottom="$3">
-            League Information
-          </H2>
-          <YStack space="$2">
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Owner:</Text>
-              <Text color="$gray12" fontWeight="600">
-                User {league.owner}
-              </Text>
-            </XStack>
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Max Roster:</Text>
-              <Text color="$gray12" fontWeight="600">
-                {league.maxRosterSize} players
-              </Text>
-            </XStack>
-            <XStack justifyContent="space-between" alignItems="center">
-              <Text color="$gray11">Draft Status:</Text>
-              <XStack
-                backgroundColor={getDraftStatusBgColor(
-                  String(league.draftStatus),
-                )}
-                borderColor={getDraftStatusColor(String(league.draftStatus))}
-                borderWidth={1}
-                borderRadius="$3"
-                paddingHorizontal="$2"
-                paddingVertical="$1"
-              >
-                <Text
-                  color={getDraftStatusColor(String(league.draftStatus))}
-                  fontWeight="600"
-                  fontSize="$3"
-                  textTransform="capitalize"
-                >
-                  {formatDraftStatus(String(league.draftStatus))}
-                </Text>
-              </XStack>
-            </XStack>
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Current Matchup:</Text>
-              <Text color="$gray12" fontWeight="600">
-                {league.currentMatchup || 'None'}
-              </Text>
-            </XStack>
-          </YStack>
-        </Card>
+  // ── Tab Content Renderers ──
 
-        {/* Stats Card */}
-        <Card
-          flex={1}
-          minWidth={300}
-          backgroundColor="$green2"
-          borderColor="$green6"
-          padding="$4"
-        >
-          <H2 size="$6" color="$green11" marginBottom="$3">
-            Roster Stats
-          </H2>
-          <YStack space="$2">
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Total Positions:</Text>
-              <Text color="$gray12" fontWeight="600">
-                {positions.length}
-              </Text>
-            </XStack>
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Players:</Text>
-              <Text color="$gray12" fontWeight="600">
-                {teamMembers.length}
-              </Text>
-            </XStack>
-            <XStack justifyContent="space-between">
-              <Text color="$gray11">Assigned:</Text>
-              <Text color="$gray12" fontWeight="600">
-                {teamMembers.filter((p) => p?.positionId).length}
-              </Text>
-            </XStack>
-          </YStack>
-        </Card>
+  const renderOverview = () => (
+    <YStack
+      gap="$5"
+      role="tabpanel"
+      id="panel-overview"
+      aria-labelledby="tab-overview"
+    >
+      {/* Quick Stats */}
+      <XStack gap="$3" flexWrap="wrap">
+        <QuickStatCard>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
+            Teams
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$blue11">
+            {teamCount}
+          </Text>
+        </QuickStatCard>
+        <QuickStatCard>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
+            Roster Size
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$color">
+            {league.maxRosterSize}
+          </Text>
+        </QuickStatCard>
+        <QuickStatCard>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
+            My Starters
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$green11">
+            {assignedCount}
+          </Text>
+        </QuickStatCard>
+        <QuickStatCard>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
+            On Bench
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$amber11">
+            {benchCount}
+          </Text>
+        </QuickStatCard>
+        <QuickStatCard>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+          >
+            Week
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$color">
+            {league.currentMatchup || '\u2014'}
+          </Text>
+        </QuickStatCard>
       </XStack>
 
-      {/* Invite Friends Card */}
-      <Card backgroundColor="$purple2" borderColor="$purple6" padding="$4">
-        <YStack space="$3">
-          <H2 size="$6" color="$purple11" marginBottom="$2">
-            <span role="img" aria-label="people">
-              👥
-            </span>{' '}
-            Invite Friends
-          </H2>
-          <Text color="$gray11" fontSize="$4" marginBottom="$2">
-            Share this link or code with friends to join your league:
-          </Text>
-
-          {/* Invite Link Section */}
-          <YStack space="$2">
-            <Text color="$purple11" fontSize="$3" fontWeight="600">
-              Invite Link (Click to Join)
-            </Text>
-            <XStack gap="$3" alignItems="center" flexWrap="wrap">
-              <Card
-                flex={1}
-                minWidth={250}
-                backgroundColor="$purple3"
-                borderColor="$purple7"
-                padding="$3"
-                borderRadius="$3"
+      {/* Two-column layout */}
+      <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
+        {/* Main column */}
+        <YStack flex={2} minWidth={360} gap="$5">
+          {/* Matchup Preview */}
+          {currentMatchup && !matchupLoading && (
+            <Card
+              backgroundColor="$surfacePanel"
+              borderColor="$surfacePanelBorder"
+              borderWidth={1}
+              borderRadius="$6"
+              padding="$5"
+            >
+              <XStack
+                justifyContent="space-between"
+                alignItems="center"
+                marginBottom="$3"
               >
-                <Text
-                  color="$purple11"
-                  fontSize="$3"
-                  fontFamily="$mono"
-                  textAlign="center"
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
+                <XStack alignItems="center" gap="$2">
+                  <Swords size={18} color="var(--blue11)" />
+                  <Text fontSize="$5" fontWeight="700" color="$color">
+                    Current Matchup
+                  </Text>
+                </XStack>
+                <Button
+                  size="$3"
+                  backgroundColor="transparent"
+                  borderColor="$blue7"
+                  borderWidth={1}
+                  borderRadius="$4"
+                  color="$blue11"
+                  onPress={() => changeTab('matchup')}
                 >
-                  {inviteUrl || 'Loading...'}
-                </Text>
-              </Card>
-              <Button
-                backgroundColor={inviteLinkCopied ? '$green9' : '$purple9'}
-                color="white"
-                onPress={handleCopyInviteLink}
-                minWidth={120}
-                size="$4"
-                icon={
-                  inviteLinkCopied ? <Check size={20} /> : <Copy size={20} />
+                  <Text fontSize="$2" fontWeight="600" color="$blue11">
+                    View Details
+                  </Text>
+                </Button>
+              </XStack>
+              <MatchupScoreboard
+                matchup={currentMatchup}
+                gamesRemaining={
+                  (currentMatchup.gamesPerMatchup ?? 0) -
+                  (currentMatchup.selectedGamesCount ?? 0)
                 }
-                aria-label="Copy invite link"
-              >
-                {inviteLinkCopied ? 'Copied!' : 'Copy Link'}
-              </Button>
-              {/* Live region to announce copy status */}
-              <Text className="sr-only" aria-live="polite" role="status">
-                {inviteLinkCopied ? 'Invite link copied to clipboard' : ''}
-              </Text>
-            </XStack>
-            <Text color="$gray10" fontSize="$2" fontStyle="italic">
-              Friends can click this link to automatically join your league
-            </Text>
-          </YStack>
+              />
+            </Card>
+          )}
 
-          {/* Divider */}
-          <YStack height={1} backgroundColor="$purple6" marginVertical="$2" />
+          {/* Activity Feed */}
+          <LeagueActivityFeed
+            leagueId={leagueId}
+            draftStatus={String(league.draftStatus)}
+            currentMatchup={league.currentMatchup}
+            teamCount={teamCount}
+          />
 
-          {/* Invite Code Section */}
-          <YStack space="$2">
-            <Text color="$purple11" fontSize="$3" fontWeight="600">
-              Invite Code (Manual Entry)
-            </Text>
-            <XStack gap="$3" alignItems="center" flexWrap="wrap">
-              <Card
-                flex={1}
-                minWidth={200}
-                backgroundColor="$purple3"
-                borderColor="$purple7"
-                padding="$3"
-                borderRadius="$3"
-              >
-                <Text
-                  color="$purple12"
-                  fontSize="$7"
-                  fontFamily="$mono"
-                  fontWeight="700"
-                  letterSpacing={2}
-                  textAlign="center"
-                >
-                  {league.inviteCode || 'Loading...'}
-                </Text>
-              </Card>
-              <Button
-                backgroundColor={linkCopied ? '$green9' : '$purple9'}
-                color="white"
-                onPress={handleCopyInviteCode}
-                minWidth={120}
-                size="$4"
-                icon={linkCopied ? <Check size={20} /> : <Copy size={20} />}
-                aria-label="Copy invite code"
-              >
-                {linkCopied ? 'Copied!' : 'Copy Code'}
-              </Button>
-              <Text className="sr-only" aria-live="polite" role="status">
-                {linkCopied ? 'Invite code copied to clipboard' : ''}
-              </Text>
-            </XStack>
-            <Text color="$gray10" fontSize="$2" fontStyle="italic">
-              Friends can enter this code on the join league page
-            </Text>
-          </YStack>
+          {/* Scoring Summary */}
+          <LeagueScoringSummary
+            loading={scoringLoading}
+            error={scoringError}
+            profileName={scoringProfileName}
+            settings={scoringSettings}
+          />
         </YStack>
-      </Card>
 
-      {/* Development Notice */}
-      <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
-        <H2 size="$5" color="$yellow11" marginBottom="$2">
-          <span role="img" aria-label="tools">
-            🛠️
-          </span>{' '}
-          League Features
-        </H2>
-        <Text color="$yellow11">
-          Use the "My Roster" tab to manage your team's lineup and player
-          positions. Additional league features like standings, member
-          management, and draft tools are coming soon.
-        </Text>
-      </Card>
+        {/* Sidebar */}
+        <YStack flex={1} minWidth={280} maxWidth={380} gap="$5">
+          {/* League Details */}
+          <Card
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            borderWidth={1}
+            borderRadius="$6"
+            padding="$5"
+          >
+            <XStack alignItems="center" gap="$2" marginBottom="$4">
+              <Info size={18} color="var(--color)" />
+              <Text fontSize="$5" fontWeight="700" color="$color">
+                League Details
+              </Text>
+            </XStack>
+            <YStack gap="$3">
+              <XStack justifyContent="space-between" alignItems="center">
+                <Text color="$textMuted" fontSize="$3">
+                  Draft Status
+                </Text>
+                <DraftBadge
+                  backgroundColor={draftColors.bg}
+                  borderColor={draftColors.border}
+                >
+                  <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
+                    {formatDraftStatus(String(league.draftStatus))}
+                  </Text>
+                </DraftBadge>
+              </XStack>
+              <Separator borderColor="$outlineSubtle" />
+              <XStack justifyContent="space-between">
+                <Text color="$textMuted" fontSize="$3">
+                  Roster Limit
+                </Text>
+                <Text color="$color" fontWeight="600" fontSize="$3">
+                  {league.maxRosterSize} players
+                </Text>
+              </XStack>
+              <Separator borderColor="$outlineSubtle" />
+              <XStack justifyContent="space-between">
+                <Text color="$textMuted" fontSize="$3">
+                  Positions
+                </Text>
+                <Text color="$color" fontWeight="600" fontSize="$3">
+                  {positions.length} slots
+                </Text>
+              </XStack>
+              <Separator borderColor="$outlineSubtle" />
+              <XStack justifyContent="space-between">
+                <Text color="$textMuted" fontSize="$3">
+                  Week
+                </Text>
+                <Text color="$color" fontWeight="600" fontSize="$3">
+                  {league.currentMatchup || 'Pre-season'}
+                </Text>
+              </XStack>
+              {isCommissioner && (
+                <>
+                  <Separator borderColor="$outlineSubtle" />
+                  <XStack justifyContent="space-between" alignItems="center">
+                    <Text color="$textMuted" fontSize="$3">
+                      Role
+                    </Text>
+                    <XStack
+                      backgroundColor="$amber3"
+                      borderColor="$amber7"
+                      borderWidth={1}
+                      borderRadius="$10"
+                      paddingHorizontal="$2"
+                      paddingVertical="$1"
+                    >
+                      <Text fontSize="$2" fontWeight="700" color="$amber11">
+                        Commissioner
+                      </Text>
+                    </XStack>
+                  </XStack>
+                </>
+              )}
+            </YStack>
+          </Card>
+
+          {/* Quick Standings */}
+          {leagueTeams.length > 0 && (
+            <Card
+              backgroundColor="$surfacePanel"
+              borderColor="$surfacePanelBorder"
+              borderWidth={1}
+              borderRadius="$6"
+              padding="$5"
+            >
+              <XStack
+                justifyContent="space-between"
+                alignItems="center"
+                marginBottom="$3"
+              >
+                <XStack alignItems="center" gap="$2">
+                  <Trophy size={18} color="var(--color)" />
+                  <Text fontSize="$5" fontWeight="700" color="$color">
+                    Teams
+                  </Text>
+                </XStack>
+                <Button
+                  size="$3"
+                  backgroundColor="transparent"
+                  borderColor="$blue7"
+                  borderWidth={1}
+                  borderRadius="$4"
+                  color="$blue11"
+                  onPress={() => changeTab('standings')}
+                >
+                  <Text fontSize="$2" fontWeight="600" color="$blue11">
+                    Full Standings
+                  </Text>
+                </Button>
+              </XStack>
+              <YStack gap="$2">
+                {leagueTeams.slice(0, 6).map((team, idx) => (
+                  <XStack
+                    key={team.id}
+                    justifyContent="space-between"
+                    alignItems="center"
+                    paddingVertical="$2"
+                    paddingHorizontal="$2"
+                    borderRadius="$3"
+                    backgroundColor={
+                      userTeamId === team.id ? '$blue3' : 'transparent'
+                    }
+                  >
+                    <XStack alignItems="center" gap="$2">
+                      <Text
+                        fontSize="$3"
+                        fontWeight="700"
+                        color="$textMuted"
+                        width={20}
+                      >
+                        {idx + 1}
+                      </Text>
+                      <Text
+                        fontSize="$3"
+                        fontWeight={userTeamId === team.id ? '700' : '500'}
+                        color="$color"
+                      >
+                        {team.name}
+                      </Text>
+                    </XStack>
+                    {userTeamId === team.id && (
+                      <Text fontSize="$1" fontWeight="700" color="$blue11">
+                        YOU
+                      </Text>
+                    )}
+                  </XStack>
+                ))}
+                {leagueTeams.length > 6 && (
+                  <Text
+                    fontSize="$2"
+                    color="$textMuted"
+                    textAlign="center"
+                    marginTop="$1"
+                  >
+                    +{leagueTeams.length - 6} more teams
+                  </Text>
+                )}
+              </YStack>
+            </Card>
+          )}
+
+          {/* Invite Friends */}
+          <InviteCard>
+            <XStack alignItems="center" gap="$2" marginBottom="$4">
+              <UserPlus size={18} color="var(--blue11)" />
+              <Text fontSize="$5" fontWeight="700" color="$color">
+                Invite Friends
+              </Text>
+            </XStack>
+            <YStack gap="$3">
+              {/* Invite Link */}
+              <YStack gap="$2">
+                <Text
+                  fontSize="$2"
+                  color="$textMuted"
+                  fontWeight="600"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Share Link
+                </Text>
+                <XStack gap="$2" alignItems="center">
+                  <YStack
+                    flex={1}
+                    backgroundColor="$surfaceSubtle"
+                    borderColor="$outlineSubtle"
+                    borderWidth={1}
+                    borderRadius="$3"
+                    paddingHorizontal="$3"
+                    paddingVertical="$2"
+                  >
+                    <Text
+                      fontSize="$2"
+                      color="$textMuted"
+                      fontFamily="$mono"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {inviteUrl || 'Loading...'}
+                    </Text>
+                  </YStack>
+                  <Button
+                    size="$3"
+                    backgroundColor={inviteLinkCopied ? '$green9' : '$blue9'}
+                    color="white"
+                    borderRadius="$3"
+                    onPress={handleCopyInviteLink}
+                    icon={
+                      inviteLinkCopied ? (
+                        <Check size={16} />
+                      ) : (
+                        <Link2 size={16} />
+                      )
+                    }
+                    aria-label="Copy invite link"
+                  >
+                    <Text fontSize="$2" fontWeight="600" color="white">
+                      {inviteLinkCopied ? 'Copied' : 'Copy'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text className="sr-only" aria-live="polite" role="status">
+                  {inviteLinkCopied ? 'Invite link copied to clipboard' : ''}
+                </Text>
+              </YStack>
+
+              <Separator borderColor="$outlineSubtle" />
+
+              {/* Invite Code */}
+              <YStack gap="$2">
+                <Text
+                  fontSize="$2"
+                  color="$textMuted"
+                  fontWeight="600"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Manual Code
+                </Text>
+                <XStack gap="$2" alignItems="center">
+                  <YStack
+                    flex={1}
+                    backgroundColor="$surfaceSubtle"
+                    borderColor="$outlineSubtle"
+                    borderWidth={1}
+                    borderRadius="$3"
+                    paddingHorizontal="$3"
+                    paddingVertical="$2.5"
+                    alignItems="center"
+                  >
+                    <Text
+                      fontSize="$6"
+                      fontWeight="800"
+                      color="$color"
+                      fontFamily="$mono"
+                      letterSpacing={3}
+                    >
+                      {league.inviteCode || '...'}
+                    </Text>
+                  </YStack>
+                  <Button
+                    size="$3"
+                    backgroundColor={linkCopied ? '$green9' : '$blue9'}
+                    color="white"
+                    borderRadius="$3"
+                    onPress={handleCopyInviteCode}
+                    icon={linkCopied ? <Check size={16} /> : <Copy size={16} />}
+                    aria-label="Copy invite code"
+                  >
+                    <Text fontSize="$2" fontWeight="600" color="white">
+                      {linkCopied ? 'Copied' : 'Copy'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text className="sr-only" aria-live="polite" role="status">
+                  {linkCopied ? 'Invite code copied to clipboard' : ''}
+                </Text>
+              </YStack>
+            </YStack>
+          </InviteCard>
+
+          {/* Trade Block */}
+          <LeagueTradeBlock leagueId={leagueId} teamMembers={teamMembers} />
+        </YStack>
+      </XStack>
     </YStack>
   );
 
   const renderRosterManagement = () => (
-    <YStack space="$5">
+    <YStack
+      gap="$5"
+      role="tabpanel"
+      id="panel-roster"
+      aria-labelledby="tab-roster"
+    >
       <LeagueRosterManagement
         positions={positions}
         teamPlayers={teamMembers}
@@ -778,12 +1086,11 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const renderCommissionerSettings = () => (
     <YStack
-      space="$4"
+      gap="$4"
       role="tabpanel"
       id="panel-commissioner"
       aria-labelledby="tab-commissioner"
     >
-      {/* Success/Error Messages */}
       {matchupSuccessMessage && (
         <Card
           role="status"
@@ -791,6 +1098,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           backgroundColor="$green3"
           borderColor="$green8"
           padding="$3"
+          borderRadius="$4"
         >
           <Text color="$green11" fontWeight="bold">
             {matchupSuccessMessage}
@@ -805,6 +1113,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           backgroundColor="$red3"
           borderColor="$red8"
           padding="$3"
+          borderRadius="$4"
         >
           <Text color="$red11" fontWeight="bold">
             Error: {matchupErrorMessage}
@@ -812,16 +1121,25 @@ export function LeagueDetailPage(): React.JSX.Element {
         </Card>
       )}
 
-      {/* Matchup Management */}
       {matchupLoading ? (
-        <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-          <YStack space="$3" alignItems="center">
+        <Card
+          backgroundColor="$surfacePanel"
+          borderColor="$surfacePanelBorder"
+          padding="$6"
+          borderRadius="$6"
+        >
+          <YStack gap="$3" alignItems="center">
             <Spinner size="large" />
-            <Text color="$gray11">Loading matchup data...</Text>
+            <Text color="$textMuted">Loading matchup data...</Text>
           </YStack>
         </Card>
       ) : matchupError ? (
-        <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
+        <Card
+          backgroundColor="$red2"
+          borderColor="$red6"
+          padding="$4"
+          borderRadius="$6"
+        >
           <Text color="$red11">
             Error loading matchup: {matchupError.message}
           </Text>
@@ -852,241 +1170,301 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         leagueName={league.name ?? 'Unknown League'}
         onSuccess={() => {
-          // Success message and redirect handled by DeleteLeagueControl
+          // Handled by DeleteLeagueControl
         }}
-        onError={(error) => {
-          console.error('Delete league error:', error);
-          alert(`Error deleting league: ${error.message}`);
+        onError={(deleteError) => {
+          console.error('Delete league error:', deleteError);
+          alert(`Error deleting league: ${deleteError.message}`);
         }}
       />
-
-      <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$4">
-        <YStack space="$3">
-          <H2 size="$5" color="$yellow11">
-            <span role="img" aria-label="Warning">
-              ⚠️
-            </span>{' '}
-            Commissioner Features
-          </H2>
-          <Text color="$yellow11" fontSize="$4">
-            Additional commissioner features like member management, league
-            settings, and advanced draft options are coming soon.
-          </Text>
-        </YStack>
-      </Card>
     </YStack>
   );
 
-  return (
-    <YStack
-      flex={1}
-      padding="$6"
-      maxWidth={1200}
-      alignSelf="center"
-      width="100%"
-      role="main"
-      aria-labelledby="league-title"
-    >
-      <XStack justifyContent="flex-start" marginBottom="$4">
-        <Button
-          backgroundColor="$gray9"
-          onPress={() => window.history.back()}
-          aria-label="Back to leagues"
-        >
-          <Text color="white">Back to Leagues</Text>
-        </Button>
-      </XStack>
+  // ── Render ──
 
-      {/* Header */}
-      <YStack marginBottom="$6">
-        <H1 size="$9" color="$blue11" marginBottom="$2" id="league-title">
-          {league.name}
-        </H1>
-        <Text color="$gray10" fontSize="$4">
-          League ID: {league.id} • Max Roster Size: {league.maxRosterSize}
-        </Text>
-      </YStack>
+  return (
+    <PageContainer role="main" aria-labelledby="league-title">
+      {/* Hero Header */}
+      <HeroBar
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 64, 175, 0.55) 100%)',
+        }}
+      >
+        <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
+          <Button
+            size="$3"
+            backgroundColor="rgba(255,255,255,0.08)"
+            borderColor="rgba(255,255,255,0.15)"
+            borderWidth={1}
+            borderRadius="$4"
+            onPress={() => navigate('/baseball')}
+            icon={<ChevronLeft size={18} color="white" />}
+            aria-label="Back to leagues"
+            hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
+          />
+          <YStack gap="$1">
+            <H1
+              id="league-title"
+              fontSize="$8"
+              fontWeight="800"
+              color="white"
+              lineHeight="$8"
+            >
+              {league.name}
+            </H1>
+            <XStack alignItems="center" gap="$3">
+              <XStack alignItems="center" gap="$1.5">
+                <Users size={14} color="rgba(255,255,255,0.6)" />
+                <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                  {teamCount} teams
+                </Text>
+              </XStack>
+              <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                |
+              </Text>
+              <DraftBadge
+                backgroundColor={draftColors.bg}
+                borderColor={draftColors.border}
+              >
+                <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
+                  {formatDraftStatus(String(league.draftStatus))}
+                </Text>
+              </DraftBadge>
+              {league.currentMatchup && (
+                <>
+                  <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                    |
+                  </Text>
+                  <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                    Week {league.currentMatchup}
+                  </Text>
+                </>
+              )}
+            </XStack>
+          </YStack>
+        </XStack>
+
+        {/* Header quick-share */}
+        <XStack gap="$2">
+          <Button
+            size="$3"
+            backgroundColor="rgba(59, 130, 246, 0.16)"
+            borderColor="rgba(59, 130, 246, 0.4)"
+            borderWidth={1}
+            borderRadius="$4"
+            onPress={handleCopyInviteLink}
+            icon={
+              inviteLinkCopied ? (
+                <Check size={16} color="rgb(34, 197, 94)" />
+              ) : (
+                <Share2 size={16} color="rgb(96, 165, 250)" />
+              )
+            }
+            hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.24)' }}
+            aria-label="Share invite link"
+          >
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              color={inviteLinkCopied ? '$green11' : '$blue11'}
+            >
+              {inviteLinkCopied ? 'Copied!' : 'Invite'}
+            </Text>
+          </Button>
+        </XStack>
+      </HeroBar>
 
       {/* Tab Navigation */}
-      <XStack
-        marginBottom="$4"
-        gap="$2"
-        role="tablist"
-        aria-label="League sections"
-      >
-        <Button
-          size="$4"
-          variant={activeTab === 'info' ? 'primary' : 'secondary'}
-          backgroundColor={activeTab === 'info' ? '$blue9' : '$gray6'}
-          color={activeTab === 'info' ? 'white' : '$gray12'}
-          onPress={() => changeTab('info')}
-          role="tab"
-          id="tab-info"
-          aria-selected={activeTab === 'info'}
-          aria-controls="panel-info"
-        >
-          League Info
-        </Button>
-        <Button
-          size="$4"
-          variant={activeTab === 'roster' ? 'primary' : 'secondary'}
-          backgroundColor={activeTab === 'roster' ? '$blue9' : '$gray6'}
-          color={activeTab === 'roster' ? 'white' : '$gray12'}
-          onPress={() => changeTab('roster')}
-          role="tab"
-          id="tab-roster"
-          aria-selected={activeTab === 'roster'}
-          aria-controls="panel-roster"
-        >
-          My Roster
-        </Button>
-        <Button
-          size="$4"
-          variant={activeTab === 'standings' ? 'primary' : 'secondary'}
-          backgroundColor={activeTab === 'standings' ? '$blue9' : '$gray6'}
-          color={activeTab === 'standings' ? 'white' : '$gray12'}
-          onPress={() => changeTab('standings')}
-          role="tab"
-          id="tab-standings"
-          aria-selected={activeTab === 'standings'}
-          aria-controls="panel-standings"
-        >
-          Standings
-        </Button>
-        <Button
-          size="$4"
-          variant={activeTab === 'matchup' ? 'primary' : 'secondary'}
-          backgroundColor={activeTab === 'matchup' ? '$blue9' : '$gray6'}
-          color={activeTab === 'matchup' ? 'white' : '$gray12'}
-          onPress={() => changeTab('matchup')}
-          role="tab"
-          id="tab-matchup"
-          aria-selected={activeTab === 'matchup'}
-          aria-controls="panel-matchup"
-        >
-          Current Matchup
-        </Button>
-        {isCommissioner && (
-          <Button
-            size="$4"
-            variant={activeTab === 'commissioner' ? 'primary' : 'secondary'}
-            backgroundColor={activeTab === 'commissioner' ? '$blue9' : '$gray6'}
-            color={activeTab === 'commissioner' ? 'white' : '$gray12'}
-            onPress={() => changeTab('commissioner')}
-            role="tab"
-            id="tab-commissioner"
-            aria-selected={activeTab === 'commissioner'}
-            aria-controls="panel-commissioner"
-          >
-            Commissioner
-          </Button>
-        )}
-      </XStack>
+      <TabBar role="tablist" aria-label="League sections">
+        {TABS.map((tab) => {
+          if (tab.commissionerOnly && !isCommissioner) return null;
+          const isActive = activeTab === tab.id;
+          return (
+            <Button
+              key={tab.id}
+              backgroundColor="transparent"
+              borderWidth={0}
+              borderBottomWidth={2}
+              borderBottomColor={isActive ? '$blue9' : 'transparent'}
+              borderRadius={0}
+              paddingHorizontal="$4"
+              paddingVertical="$3"
+              onPress={() => changeTab(tab.id)}
+              role="tab"
+              id={`tab-${tab.id}`}
+              aria-selected={isActive}
+              aria-controls={`panel-${tab.id}`}
+              hoverStyle={{
+                backgroundColor: 'rgba(59, 130, 246, 0.06)',
+              }}
+              pressStyle={{
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              }}
+            >
+              <XStack alignItems="center" gap="$2">
+                <YStack opacity={isActive ? 1 : 0.5}>{tab.icon}</YStack>
+                <Text
+                  fontSize="$3"
+                  fontWeight={isActive ? '700' : '500'}
+                  color={isActive ? '$blue11' : '$textMuted'}
+                >
+                  {tab.label}
+                </Text>
+              </XStack>
+            </Button>
+          );
+        })}
+      </TabBar>
 
       {/* Tab Content */}
-      {activeTab === 'info' && renderLeagueInfo()}
-      {activeTab === 'roster' && (
-        <YStack role="tabpanel" id="panel-roster" aria-labelledby="tab-roster">
-          {renderRosterManagement()}
-        </YStack>
-      )}
-      {activeTab === 'standings' && (
-        <YStack
-          role="tabpanel"
-          id="panel-standings"
-          aria-labelledby="tab-standings"
-        >
-          <LeagueStandings
-            teams={leagueTeams}
-            loading={leagueTeamsLoading}
-            userTeamId={userTeamId}
-          />
-        </YStack>
-      )}
-      {activeTab === 'matchup' && (
-        <YStack
-          role="tabpanel"
-          id="panel-matchup"
-          aria-labelledby="tab-matchup"
-          space="$4"
-        >
-          {matchupLoading ? (
-            <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-              <YStack space="$3" alignItems="center">
-                <Spinner size="large" />
-                <Text color="$gray11">Loading matchup...</Text>
-              </YStack>
-            </Card>
-          ) : matchupError ? (
-            <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
-              <Text color="$red11">
-                Error loading matchup: {matchupError.message}
-              </Text>
-            </Card>
-          ) : currentMatchup ? (
-            <>
-              <MatchupScoreboard
-                matchup={currentMatchup}
-                gamesRemaining={
-                  (currentMatchup.gamesPerMatchup ?? 0) -
-                  (currentMatchup.selectedGamesCount ?? 0)
-                }
-              />
-
-              <MatchupRosterComparison matchup={currentMatchup} />
-
-              {currentMatchup.gamesPerMatchup && (
-                <GamesRemaining
+      <ContentArea marginTop="$5">
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'roster' && renderRosterManagement()}
+        {activeTab === 'standings' && (
+          <YStack
+            role="tabpanel"
+            id="panel-standings"
+            aria-labelledby="tab-standings"
+          >
+            <LeagueStandings
+              teams={leagueTeams}
+              loading={leagueTeamsLoading}
+              userTeamId={userTeamId}
+            />
+          </YStack>
+        )}
+        {activeTab === 'matchup' && (
+          <YStack
+            role="tabpanel"
+            id="panel-matchup"
+            aria-labelledby="tab-matchup"
+            gap="$4"
+          >
+            {matchupLoading ? (
+              <Card
+                backgroundColor="$surfacePanel"
+                borderColor="$surfacePanelBorder"
+                padding="$6"
+                borderRadius="$6"
+              >
+                <YStack gap="$3" alignItems="center">
+                  <Spinner size="large" />
+                  <Text color="$textMuted">Loading matchup...</Text>
+                </YStack>
+              </Card>
+            ) : matchupError ? (
+              <Card
+                backgroundColor="$red2"
+                borderColor="$red6"
+                padding="$4"
+                borderRadius="$6"
+              >
+                <Text color="$red11">
+                  Error loading matchup: {matchupError.message}
+                </Text>
+              </Card>
+            ) : currentMatchup ? (
+              <>
+                <MatchupScoreboard
+                  matchup={currentMatchup}
                   gamesRemaining={
                     (currentMatchup.gamesPerMatchup ?? 0) -
                     (currentMatchup.selectedGamesCount ?? 0)
                   }
-                  totalGames={currentMatchup.gamesPerMatchup}
                 />
-              )}
-              <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-                <YStack space="$2">
-                  <Text fontSize="$4" fontWeight="bold" color="$blue11">
-                    Matchup Information
-                  </Text>
-                  <YStack space="$1">
-                    <Text fontSize="$3" color="$gray11">
-                      Week: {currentMatchup.weekNumber}
+                <MatchupRosterComparison matchup={currentMatchup} />
+                {currentMatchup.gamesPerMatchup && (
+                  <GamesRemaining
+                    gamesRemaining={
+                      (currentMatchup.gamesPerMatchup ?? 0) -
+                      (currentMatchup.selectedGamesCount ?? 0)
+                    }
+                    totalGames={currentMatchup.gamesPerMatchup}
+                  />
+                )}
+                <Card
+                  backgroundColor="$surfacePanel"
+                  borderColor="$surfacePanelBorder"
+                  borderWidth={1}
+                  padding="$4"
+                  borderRadius="$6"
+                >
+                  <YStack gap="$2">
+                    <Text fontSize="$4" fontWeight="bold" color="$color">
+                      Matchup Details
                     </Text>
-                    {currentMatchup.startTime && (
-                      <Text fontSize="$3" color="$gray11">
-                        Start:{' '}
-                        {new Date(
-                          String(currentMatchup.startTime),
-                        ).toLocaleString()}
+                    <YStack gap="$1">
+                      <Text fontSize="$3" color="$textMuted">
+                        Week {currentMatchup.weekNumber}
                       </Text>
-                    )}
-                    {currentMatchup.endTime && (
-                      <Text fontSize="$3" color="$gray11">
-                        End:{' '}
-                        {new Date(
-                          String(currentMatchup.endTime),
-                        ).toLocaleString()}
-                      </Text>
-                    )}
+                      {currentMatchup.startTime && (
+                        <Text fontSize="$3" color="$textMuted">
+                          Start:{' '}
+                          {new Date(
+                            String(currentMatchup.startTime),
+                          ).toLocaleString()}
+                        </Text>
+                      )}
+                      {currentMatchup.endTime && (
+                        <Text fontSize="$3" color="$textMuted">
+                          End:{' '}
+                          {new Date(
+                            String(currentMatchup.endTime),
+                          ).toLocaleString()}
+                        </Text>
+                      )}
+                    </YStack>
                   </YStack>
+                </Card>
+              </>
+            ) : (
+              <Card
+                backgroundColor="$surfacePanel"
+                borderColor="$surfacePanelBorder"
+                borderWidth={1}
+                padding="$6"
+                borderRadius="$6"
+                alignItems="center"
+              >
+                <YStack alignItems="center" gap="$3">
+                  <Swords size={32} color="var(--textMuted)" />
+                  <Text color="$textMuted" fontSize="$5" fontWeight="600">
+                    No Active Matchup
+                  </Text>
+                  <Text
+                    color="$textMuted"
+                    fontSize="$3"
+                    textAlign="center"
+                    maxWidth={400}
+                  >
+                    {isCommissioner
+                      ? 'Head to the Commissioner tab to start the draft and create matchups.'
+                      : "The commissioner hasn't created matchups yet. Check back soon!"}
+                  </Text>
+                  {isCommissioner && (
+                    <Button
+                      marginTop="$2"
+                      backgroundColor="$blue9"
+                      color="white"
+                      borderRadius="$4"
+                      onPress={() => changeTab('commissioner')}
+                    >
+                      <Text fontWeight="600" color="white">
+                        Go to Commissioner
+                      </Text>
+                    </Button>
+                  )}
                 </YStack>
               </Card>
-            </>
-          ) : (
-            <Card backgroundColor="$gray2" borderColor="$gray6" padding="$4">
-              <Text color="$gray11" fontSize="$4">
-                No active matchup found. Commissioner can create one in the
-                Commissioner tab.
-              </Text>
-            </Card>
-          )}
-        </YStack>
-      )}
-      {activeTab === 'commissioner' &&
-        isCommissioner &&
-        renderCommissionerSettings()}
-    </YStack>
+            )}
+          </YStack>
+        )}
+        {activeTab === 'commissioner' &&
+          isCommissioner &&
+          renderCommissionerSettings()}
+      </ContentArea>
+    </PageContainer>
   );
 }
 

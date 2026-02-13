@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, XStack, YStack } from '@legacy-sports/shared-components';
-import { H4, Text } from 'tamagui';
+import { Separator, Spinner, styled, Text } from 'tamagui';
+import { Trophy } from '@tamagui/lucide-icons';
 
 interface Team {
   id: number;
@@ -13,6 +14,32 @@ export interface LeagueStandingsProps {
   teams: readonly Team[];
   loading?: boolean;
   userTeamId?: number | null;
+}
+
+const RankBadge = styled(YStack, {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+});
+
+function getRankStyle(rank: number) {
+  switch (rank) {
+    case 1:
+      return { bg: '$amber3', border: '$amber7', color: '$amber11' };
+    case 2:
+      return { bg: '$gray3', border: '$gray7', color: '$gray11' };
+    case 3:
+      return { bg: '$amber3', border: '$amber8', color: '$amber11' };
+    default:
+      return {
+        bg: '$surfaceSubtle',
+        border: '$outlineSubtle',
+        color: '$textMuted',
+      };
+  }
 }
 
 export function LeagueStandings({
@@ -28,138 +55,191 @@ export function LeagueStandings({
 
   if (loading) {
     return (
-      <YStack padding="$4" alignItems="center" role="status" aria-live="polite">
-        <Text>Loading standings...</Text>
+      <YStack
+        padding="$6"
+        alignItems="center"
+        gap="$3"
+        role="status"
+        aria-live="polite"
+      >
+        <Spinner size="large" color="$blue10" />
+        <Text color="$textMuted" fontSize="$4">
+          Loading standings...
+        </Text>
       </YStack>
     );
   }
 
   if (!teams || teams.length === 0) {
     return (
-      <YStack padding="$4" alignItems="center">
-        <Text color="$gray10">No teams in this league yet.</Text>
-      </YStack>
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$6"
+        padding="$8"
+        alignItems="center"
+      >
+        <YStack alignItems="center" gap="$3">
+          <Trophy size={32} color="var(--textMuted)" />
+          <Text color="$textMuted" fontSize="$5" fontWeight="600">
+            No teams yet
+          </Text>
+          <Text color="$textMuted" fontSize="$3" textAlign="center">
+            Teams will appear here once managers join the league.
+          </Text>
+        </YStack>
+      </Card>
     );
   }
 
   return (
-    <div
-      style={{ maxHeight: '80vh', overflowY: 'auto' }}
-      role="region"
-      aria-label="League standings"
-    >
-      <YStack padding="$4" space="$4" maxWidth={1200} alignSelf="center">
-        <H4 id="standings-title">League Standings</H4>
-
-        <Card
-          padding="$3"
-          backgroundColor="$gray2"
-          borderColor="$gray6"
-          borderWidth={1}
-        >
-          <Text fontSize="$3" color="$gray11" marginBottom="$2">
-            {teams.length} {teams.length === 1 ? 'team' : 'teams'} in this
-            league
+    <YStack gap="$4" role="region" aria-label="League standings">
+      <XStack justifyContent="space-between" alignItems="center">
+        <XStack alignItems="center" gap="$2">
+          <Trophy size={20} color="var(--color)" />
+          <Text
+            fontSize="$6"
+            fontWeight="700"
+            color="$color"
+            id="standings-title"
+          >
+            Standings
           </Text>
-        </Card>
+        </XStack>
+        <Text fontSize="$3" color="$textMuted">
+          {teams.length} {teams.length === 1 ? 'team' : 'teams'}
+        </Text>
+      </XStack>
 
-        {/* Header Row */}
-        <Card backgroundColor="$blue2" borderColor="$blue6" borderWidth={1}>
-          <XStack padding="$3" justifyContent="space-between">
-            <Text flex={0.5} fontSize="$3" fontWeight="600" color="$blue11">
-              Rank
-            </Text>
-            <Text flex={2} fontSize="$3" fontWeight="600" color="$blue11">
-              Team Name
-            </Text>
-            <Text
-              flex={1}
-              fontSize="$3"
-              fontWeight="600"
-              color="$blue11"
-              textAlign="right"
+      {/* Table Header */}
+      <XStack paddingHorizontal="$4" paddingVertical="$2">
+        <Text
+          width={48}
+          fontSize="$2"
+          color="$textMuted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing={0.5}
+        >
+          Rank
+        </Text>
+        <Text
+          flex={2}
+          fontSize="$2"
+          color="$textMuted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing={0.5}
+        >
+          Team
+        </Text>
+        <Text
+          flex={1}
+          fontSize="$2"
+          color="$textMuted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing={0.5}
+          textAlign="right"
+        >
+          Points
+        </Text>
+      </XStack>
+
+      <Separator borderColor="$outlineSubtle" />
+
+      {/* Team Rows */}
+      <YStack gap="$1" role="list">
+        {teams.map((team, index) => {
+          const isUserTeam = userTeamId === team.id;
+          const rank = index + 1;
+          const rankStyle = getRankStyle(rank);
+
+          return (
+            <Card
+              key={team.id}
+              paddingHorizontal="$4"
+              paddingVertical="$3"
+              borderWidth={1}
+              borderColor={isUserTeam ? '$blue7' : 'transparent'}
+              backgroundColor={isUserTeam ? '$blue2' : 'transparent'}
+              borderRadius="$4"
+              role="listitem"
+              cursor="pointer"
+              hoverStyle={{
+                backgroundColor: isUserTeam ? '$blue3' : '$surfaceSubtle',
+              }}
+              pressStyle={{
+                backgroundColor: isUserTeam ? '$blue3' : '$surfaceInteractive',
+              }}
+              onPress={() => handleTeamClick(team.id)}
+              onClick={() => handleTeamClick(team.id)}
+              animation="quick"
             >
-              Points
-            </Text>
-          </XStack>
-        </Card>
-
-        {/* Team Rows */}
-        <YStack space="$2" role="list">
-          {teams.map((team, index) => {
-            const isUserTeam = userTeamId === team.id;
-            return (
-              <Card
-                key={team.id}
-                padding="$3"
-                borderWidth={1}
-                borderColor={isUserTeam ? '$blue8' : '$gray4'}
-                backgroundColor={isUserTeam ? '$blue2' : '$background'}
-                role="listitem"
-                cursor="pointer"
-                hoverStyle={{
-                  backgroundColor: isUserTeam ? '$blue3' : '$gray2',
-                  transform: 'scale(0.99)',
-                }}
-                pressStyle={{
-                  backgroundColor: isUserTeam ? '$blue3' : '$gray3',
-                }}
-                onPress={() => handleTeamClick(team.id)}
-                onClick={() => handleTeamClick(team.id)}
-              >
-                <XStack justifyContent="space-between" alignItems="center">
-                  <Text
-                    flex={0.5}
-                    fontSize="$4"
-                    fontWeight="600"
-                    color="$blue10"
+              <XStack alignItems="center">
+                {/* Rank */}
+                <YStack width={48} alignItems="flex-start">
+                  <RankBadge
+                    backgroundColor={rankStyle.bg}
+                    borderColor={rankStyle.border}
+                    borderWidth={1}
                   >
-                    {index + 1}
-                  </Text>
-                  <YStack flex={2}>
-                    <XStack alignItems="center" space="$2">
-                      <Text fontSize="$4" fontWeight="500" color="$gray12">
-                        {team.name}
-                      </Text>
-                      {isUserTeam && (
-                        <Text fontSize="$2" color="$blue10" fontWeight="600">
-                          (Your Team)
-                        </Text>
-                      )}
-                    </XStack>
-                    <Text fontSize="$2" color="$gray10">
-                      Click to view roster
+                    <Text
+                      fontSize="$3"
+                      fontWeight="800"
+                      color={rankStyle.color}
+                    >
+                      {rank}
                     </Text>
-                  </YStack>
-                  <Text
-                    flex={1}
-                    fontSize="$4"
-                    fontWeight="600"
-                    color="$gray12"
-                    textAlign="right"
-                  >
-                    -
-                  </Text>
-                </XStack>
-              </Card>
-            );
-          })}
-        </YStack>
+                  </RankBadge>
+                </YStack>
 
-        <Card
-          padding="$3"
-          backgroundColor="$yellow2"
-          borderColor="$yellow6"
-          borderWidth={1}
-        >
-          <Text fontSize="$2" color="$yellow11" textAlign="center">
-            <span role="img" aria-label="info">
-              ℹ️
-            </span>{' '}
-            Stats and scoring coming soon!
-          </Text>
-        </Card>
+                {/* Team info */}
+                <YStack flex={2} gap="$1">
+                  <XStack alignItems="center" gap="$2">
+                    <Text
+                      fontSize="$4"
+                      fontWeight={isUserTeam ? '700' : '500'}
+                      color="$color"
+                    >
+                      {team.name}
+                    </Text>
+                    {isUserTeam && (
+                      <XStack
+                        backgroundColor="$blue3"
+                        borderColor="$blue7"
+                        borderWidth={1}
+                        borderRadius="$10"
+                        paddingHorizontal="$2"
+                        paddingVertical="$0.5"
+                      >
+                        <Text fontSize="$1" fontWeight="700" color="$blue11">
+                          YOU
+                        </Text>
+                      </XStack>
+                    )}
+                  </XStack>
+                  <Text fontSize="$2" color="$textMuted">
+                    View roster
+                  </Text>
+                </YStack>
+
+                {/* Points */}
+                <Text
+                  flex={1}
+                  fontSize="$4"
+                  fontWeight="600"
+                  color="$textMuted"
+                  textAlign="right"
+                >
+                  —
+                </Text>
+              </XStack>
+            </Card>
+          );
+        })}
       </YStack>
-    </div>
+    </YStack>
   );
 }

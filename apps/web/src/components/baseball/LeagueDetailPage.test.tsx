@@ -47,6 +47,18 @@ jest.mock('../commissioner/DeleteLeagueControl', () => ({
   DeleteLeagueControl: () => <div>Delete League Control</div>,
 }));
 
+jest.mock('./LeagueActivityFeed', () => ({
+  LeagueActivityFeed: () => <div>League Activity Feed</div>,
+}));
+
+jest.mock('./LeagueTradeBlock', () => ({
+  LeagueTradeBlock: () => <div>League Trade Block</div>,
+}));
+
+jest.mock('./LeagueScoringEditor', () => ({
+  LeagueScoringEditor: () => <div>League Scoring Editor</div>,
+}));
+
 // Mock auth hook
 jest.mock('@legacy-sports/shared-components', () => {
   const actual = jest.requireActual('@legacy-sports/shared-components');
@@ -448,7 +460,7 @@ describe('LeagueDetailPage with Redux', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Error:/i)).toBeInTheDocument();
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     });
   });
 

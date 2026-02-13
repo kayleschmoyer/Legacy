@@ -7,7 +7,11 @@ export const View = ({ children, ...props }) =>
 export const Text = ({ children, ...props }) =>
   React.createElement('span', props, children);
 export const Button = ({ children, onPress, onClick, ...props }) =>
-  React.createElement('button', { ...props, onClick: onClick || onPress }, children);
+  React.createElement(
+    'button',
+    { ...props, onClick: onClick || onPress },
+    children,
+  );
 export const Input = ({ ...props }) => React.createElement('input', props);
 export const XStack = ({ children, ...props }) =>
   React.createElement(
@@ -140,13 +144,12 @@ export const createTamagui = () => ({});
 export const config = {};
 
 // Styled function mock
-export const styled = (component) => {
-  return (styles) => {
-    const StyledComponent = ({ children, ...props }) => {
-      return React.createElement(component, props, children);
-    };
-    return StyledComponent;
+export const styled = (component, _styles) => {
+  const StyledComponent = ({ children, ...props }) => {
+    return React.createElement(component, props, children);
   };
+  StyledComponent.displayName = `Styled(${component?.displayName || component?.name || 'Component'})`;
+  return StyledComponent;
 };
 
 // Default export

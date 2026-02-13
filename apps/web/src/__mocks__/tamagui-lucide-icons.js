@@ -39,6 +39,19 @@ export const AlertCircle = () => 'AlertCircle';
 export const CheckCircle = () => 'CheckCircle';
 export const XCircle = () => 'XCircle';
 
+// Additional icons used by LeagueDetailPage
+export const ClipboardList = () => 'ClipboardList';
+export const LayoutGrid = () => 'LayoutGrid';
+export const Link2 = () => 'Link2';
+export const Share2 = () => 'Share2';
+export const Swords = () => 'Swords';
+export const UserPlus = () => 'UserPlus';
+export const ArrowLeftRight = () => 'ArrowLeftRight';
+export const CalendarCheck = () => 'CalendarCheck';
+export const Play = () => 'Play';
+export const TrendingUp = () => 'TrendingUp';
+export const Zap = () => 'Zap';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
