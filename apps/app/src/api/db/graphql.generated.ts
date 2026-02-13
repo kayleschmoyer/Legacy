@@ -333,6 +333,115 @@ export type Matchup = {
   weekNumber?: Maybe<Scalars['Int']['output']>;
 };
 
+/** User blocking relationship for chat */
+export type MatchupChatBlock = {
+  __typename?: 'MatchupChatBlock';
+  blockedUserId?: Maybe<Scalars['Int']['output']>;
+  blockingUserId?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  scope?: Maybe<MatchupChatBlockScope>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Scope of chat block (matchup-specific, league-wide, or global) */
+export enum MatchupChatBlockScope {
+  Global = 'global',
+  League = 'league',
+  Matchup = 'matchup',
+}
+
+/** Chat message in matchup with moderation features */
+export type MatchupMessage = {
+  __typename?: 'MatchupMessage';
+  containsProfanity?: Maybe<Scalars['Boolean']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  deletedAt?: Maybe<Scalars['String']['output']>;
+  flaggedBy?: Maybe<Scalars['Int']['output']>;
+  flaggedReason?: Maybe<Scalars['String']['output']>;
+  gifUrl?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  isFlagged?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  messageType?: Maybe<MatchupMessageType>;
+  moderatedAt?: Maybe<Scalars['String']['output']>;
+  pinnedAt?: Maybe<Scalars['String']['output']>;
+  replyToMessage?: Maybe<MatchupMessage>;
+  replyToMessageId?: Maybe<Scalars['Int']['output']>;
+  sender?: Maybe<User>;
+  senderId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** WebSocket connection tracking for real-time chat */
+export type MatchupMessageConnection = {
+  __typename?: 'MatchupMessageConnection';
+  connectedAt?: Maybe<Scalars['String']['output']>;
+  connectionId?: Maybe<Scalars['String']['output']>;
+  lastSeenAt?: Maybe<Scalars['String']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  platform?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Reaction to a matchup message */
+export type MatchupMessageReaction = {
+  __typename?: 'MatchupMessageReaction';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  messageId?: Maybe<Scalars['Int']['output']>;
+  reactionType?: Maybe<MatchupMessageReactionType>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Available reaction types for messages */
+export enum MatchupMessageReactionType {
+  Fire = 'fire',
+  Laugh = 'laugh',
+  Like = 'like',
+  ThumbsDown = 'thumbs_down',
+  Trophy = 'trophy',
+  Wow = 'wow',
+}
+
+/** Message moderation report */
+export type MatchupMessageReport = {
+  __typename?: 'MatchupMessageReport';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  messageId?: Maybe<Scalars['Int']['output']>;
+  moderatorNotes?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  reportedBy?: Maybe<Scalars['Int']['output']>;
+  resolution?: Maybe<Scalars['String']['output']>;
+  resolvedAt?: Maybe<Scalars['String']['output']>;
+  reviewedBy?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<MatchupMessageReportStatus>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Status of message moderation report */
+export enum MatchupMessageReportStatus {
+  Dismissed = 'dismissed',
+  Pending = 'pending',
+  Resolved = 'resolved',
+  Reviewing = 'reviewing',
+}
+
+/** Type of matchup message */
+export enum MatchupMessageType {
+  Gif = 'gif',
+  System = 'system',
+  Text = 'text',
+}
+
 /** A player selected for a specific matchup */
 export type MatchupPlayer = {
   __typename?: 'MatchupPlayer';
@@ -352,15 +461,13 @@ export type MatchupPlayer = {
 export type MatchupPlayerGame = {
   __typename?: 'MatchupPlayerGame';
   battingGame?: Maybe<GameBatting>;
-  battingGameNum?: Maybe<Scalars['Int']['output']>;
   fieldingGame?: Maybe<GameFielding>;
-  fieldingGameNum?: Maybe<Scalars['Int']['output']>;
   fieldingGamePos?: Maybe<Scalars['String']['output']>;
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
   gameNum?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGame?: Maybe<GamePitching>;
-  pitchingGameNum?: Maybe<Scalars['Int']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -389,6 +496,7 @@ export type Mutation = {
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
+  createTiebreakerRules?: Maybe<TiebreakerRule>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -397,6 +505,7 @@ export type Mutation = {
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
@@ -427,6 +536,14 @@ export type MutationCreateMatchupArgs = {
   input: CreateMatchupInput;
 };
 
+export type MutationCreateTiebreakerRulesArgs = {
+  allowCommissionerOverride?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueId: Scalars['Int']['input'];
+  primaryMethod: TiebreakerMethod;
+  secondaryMethod?: InputMaybe<TiebreakerMethod>;
+  tertiaryMethod?: InputMaybe<TiebreakerMethod>;
+};
+
 export type MutationDeleteLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -451,6 +568,13 @@ export type MutationMarkNotificationAsReadArgs = {
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationSendMatchupMessageArgs = {
+  gifUrl?: InputMaybe<Scalars['String']['input']>;
+  matchupId: Scalars['Int']['input'];
+  message: Scalars['String']['input'];
+  replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationStartDraftArgs = {
@@ -551,6 +675,19 @@ export type Player = {
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
+export type PlayerGameScore = {
+  __typename?: 'PlayerGameScore';
+  battingScore?: Maybe<Scalars['Float']['output']>;
+  computedAt?: Maybe<Scalars['String']['output']>;
+  fieldingScore?: Maybe<Scalars['Float']['output']>;
+  gameNum?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  pitchingScore?: Maybe<Scalars['Float']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  totalScore?: Maybe<Scalars['Float']['output']>;
+};
+
 /** Playoff qualification status for a team */
 export type PlayoffQualification = {
   __typename?: 'PlayoffQualification';
@@ -572,15 +709,19 @@ export type Query = {
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
+  getMatchupMessages?: Maybe<Array<MatchupMessage>>;
   getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
+  getPlayerGameScores?: Maybe<Array<PlayerGameScore>>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
   getTeamRecentMatchups?: Maybe<Array<Matchup>>;
+  getTiebreakerHistory?: Maybe<Array<TiebreakerHistory>>;
+  getTiebreakerRules?: Maybe<TiebreakerRule>;
   getUnreadNotificationCount?: Maybe<Scalars['Int']['output']>;
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
@@ -671,6 +812,11 @@ export type QueryGetMatchupHistoryArgs = {
   teamId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type QueryGetMatchupMessagesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  matchupId: Scalars['Int']['input'];
+};
+
 export type QueryGetMatchupPlayersArgs = {
   matchupId: Scalars['Int']['input'];
 };
@@ -695,6 +841,12 @@ export type QueryGetNotificationHistoryArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type QueryGetPlayerGameScoresArgs = {
+  gameNum?: InputMaybe<Scalars['Int']['input']>;
+  playerId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryGetPlayoffRaceArgs = {
   leagueId: Scalars['Int']['input'];
   playoffSpots: Scalars['Int']['input'];
@@ -714,6 +866,15 @@ export type QueryGetSeasonResultsArgs = {
 export type QueryGetTeamRecentMatchupsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+export type QueryGetTiebreakerHistoryArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  matchupId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetTiebreakerRulesArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueArgs = {
@@ -1075,6 +1236,45 @@ export type TeamStanding = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Historical record of tiebreaker resolution */
+export type TiebreakerHistory = {
+  __typename?: 'TiebreakerHistory';
+  appliedMethod?: Maybe<TiebreakerMethod>;
+  commissionerUserId?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  matchupId?: Maybe<Scalars['Int']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  resolvedAt?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  wasCommissionerOverride?: Maybe<Scalars['Boolean']['output']>;
+  winner?: Maybe<Team>;
+  winnerId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Method for resolving tiebreaker scenarios */
+export enum TiebreakerMethod {
+  CoChampion = 'co_champion',
+  HeadToHeadRecord = 'head_to_head_record',
+  HighestCategory = 'highest_category',
+  Random = 'random',
+  TotalSeasonPoints = 'total_season_points',
+}
+
+/** Tiebreaker configuration for a league */
+export type TiebreakerRule = {
+  __typename?: 'TiebreakerRule';
+  allowCommissionerOverride?: Maybe<Scalars['Boolean']['output']>;
+  config?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  primaryMethod?: Maybe<TiebreakerMethod>;
+  secondaryMethod?: Maybe<TiebreakerMethod>;
+  tertiaryMethod?: Maybe<TiebreakerMethod>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
 export type UpdateLeagueScoringMultiplierInput = {

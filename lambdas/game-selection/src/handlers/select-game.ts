@@ -10,7 +10,7 @@ import {
 } from '@legacy-sports/sentry';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
@@ -32,12 +32,19 @@ interface SelectGameEvent {
 }
 
 /**
- * Queue stats loading for all players in a matchup after game selection completes
+ * Queue stats loading for players that don't have cached stats.
+ * Only called for players where game selection could not find cached game data.
  */
 async function queueStatsLoadingForMatchup(
   db: PublicDb,
   matchupId: number,
   gameNumber: number,
+  playersNeedingLoading: Array<{
+    matchupPlayerId: number;
+    playerId: number;
+    season: number;
+    fieldingGamePos: string | null;
+  }>,
 ): Promise<void> {
   if (!GAME_STATS_QUEUE_URL) {
     LOGGER.warn(
@@ -46,70 +53,41 @@ async function queueStatsLoadingForMatchup(
     return;
   }
 
-  // Get the matchup details
-  const [matchup] = await db
-    .select()
-    .from(PublicSchema.matchups)
-    .where(eq(PublicSchema.matchups.id, matchupId));
-
-  if (!matchup) {
-    throw new Error(`Matchup ${matchupId} not found`);
-  }
-
-  // Get all players with their selected games for this game number
-  const playerGames = await db
-    .select({
-      matchupPlayerId: PublicSchema.matchupPlayerGames.matchupPlayerId,
-      playerId: PublicSchema.matchupPlayers.playerId,
-      brefId: PublicSchema.players.brefId,
-      battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
-      pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
-      fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
-      fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
-      season: PublicSchema.leagueWeekPlayerSeasons.season,
-    })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
-      eq(
-        PublicSchema.matchupPlayerGames.matchupPlayerId,
-        PublicSchema.matchupPlayers.id,
-      ),
-    )
-    .innerJoin(
-      PublicSchema.players,
-      eq(PublicSchema.matchupPlayers.playerId, PublicSchema.players.id),
-    )
-    .innerJoin(
-      PublicSchema.leagueWeekPlayerSeasons,
-      and(
-        eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
-        eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, matchup.weekNumber),
-        eq(
-          PublicSchema.leagueWeekPlayerSeasons.playerId,
-          PublicSchema.matchupPlayers.playerId,
-        ),
-      ),
-    )
-    .where(eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber));
-
-  if (playerGames.length === 0) {
-    LOGGER.warn(
-      `No player games found for matchup ${matchupId}, game ${gameNumber}`,
-    );
+  if (playersNeedingLoading.length === 0) {
+    LOGGER.info('No players need stats loading, skipping queue');
     return;
   }
 
+  // Look up brefId for each player that needs loading
+  const playerIds = playersNeedingLoading.map((p) => p.playerId);
+  const playerRecords = await db
+    .select({
+      id: PublicSchema.players.id,
+      brefId: PublicSchema.players.brefId,
+    })
+    .from(PublicSchema.players)
+    .where(inArray(PublicSchema.players.id, playerIds));
+
+  const brefIdMap = new Map(playerRecords.map((p) => [p.id, p.brefId]));
+
+  const playersWithBrefId = playersNeedingLoading.map((p) => ({
+    matchupPlayerId: p.matchupPlayerId,
+    playerId: p.playerId,
+    brefId: brefIdMap.get(p.playerId) ?? '',
+    season: p.season,
+    fieldingGamePos: p.fieldingGamePos ?? '',
+  }));
+
   // Split players into batches of 8 to avoid Lambda timeouts
   const BATCH_SIZE = 8;
-  const batches: (typeof playerGames)[] = [];
+  const batches: (typeof playersWithBrefId)[] = [];
 
-  for (let i = 0; i < playerGames.length; i += BATCH_SIZE) {
-    batches.push(playerGames.slice(i, i + BATCH_SIZE));
+  for (let i = 0; i < playersWithBrefId.length; i += BATCH_SIZE) {
+    batches.push(playersWithBrefId.slice(i, i + BATCH_SIZE));
   }
 
   LOGGER.info(
-    `Queueing ${batches.length} batches for matchup ${matchupId}, game ${gameNumber} (${playerGames.length} total players)`,
+    `Queueing ${batches.length} batches for matchup ${matchupId}, game ${gameNumber} (${playersWithBrefId.length} uncached players)`,
   );
 
   // Queue all batches sequentially
@@ -170,17 +148,28 @@ const baseSelectGameHandler = async (
           gameNumber: matchup.game,
         });
 
-        // Use the new season-game-selector service which automatically
-        // uses the matchup's selected_season field
-        await selectGamesForMatchup(db, matchup.matchupId, matchup.game);
+        // Use game_identifier-based selection - picks real games from cached stats
+        const result = await selectGamesForMatchup(
+          db,
+          matchup.matchupId,
+          matchup.game,
+        );
 
         LOGGER.info('Successfully selected games for matchup', {
           matchupId: matchup.matchupId,
           gameNumber: matchup.game,
+          playersNeedingLoading: result.playersNeedingStatsLoading.length,
         });
 
-        // After game selection, queue stats loading for the selected games
-        await queueStatsLoadingForMatchup(db, matchup.matchupId, matchup.game);
+        // Only queue stats loading for players that don't have cached stats
+        if (result.playersNeedingStatsLoading.length > 0) {
+          await queueStatsLoadingForMatchup(
+            db,
+            matchup.matchupId,
+            matchup.game,
+            result.playersNeedingStatsLoading,
+          );
+        }
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
 

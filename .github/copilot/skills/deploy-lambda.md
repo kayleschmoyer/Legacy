@@ -84,16 +84,20 @@ cd ..
 
 ### Issue: Wrong parameter name ❌
 
-**Symptom**: "A parameter cannot be found that matches parameter name 'LambdaName'"
-**Cause**: Using `-LambdaName` instead of `-FunctionName`
-**Solution**: Use correct parameter name
+**Symptom**: "A parameter cannot be found that matches parameter name"
+**Cause**: Using wrong parameter name like `-Lambda`, `-LambdaName`, or `-Name`
+**Solution**: Use `-FunctionName` (the only correct parameter name)
 
 ```powershell
-# ❌ WRONG - will fail
+# ❌ WRONG - all of these will fail
+.\scripts\deploy-lambda.ps1 -Lambda stats
 .\scripts\deploy-lambda.ps1 -LambdaName db
+.\scripts\deploy-lambda.ps1 -Name graphql
 
 # ✅ CORRECT
 .\scripts\deploy-lambda.ps1 -FunctionName graphql
+.\scripts\deploy-lambda.ps1 -FunctionName stats
+.\scripts\deploy-lambda.ps1 -FunctionName game-selection
 ```
 
 ### Issue: Terraform state locked

@@ -108,9 +108,6 @@ async function queueMatchupStatsLoad(
     playerId: number;
     brefId: string;
     season: number;
-    battingGameNum: number;
-    pitchingGameNum: number;
-    fieldingGameNum: number;
     fieldingGamePos: string;
   }>,
 ): Promise<void> {
@@ -205,6 +202,7 @@ async function queueMatchupStatsLoad(
 
 /**
  * Select a random game for all players in a matchup
+ * Delegates to the season-game-selector service which uses real game_identifiers.
  */
 async function selectGameForMatchup(
   db: PublicDb,
@@ -240,231 +238,39 @@ async function selectGameForMatchup(
     `Selecting game ${gameNumber} of ${gamesPerMatchup} for matchup ${matchupId}`,
   );
 
-  // 2. Get all matchup_players for this matchup with their selected seasons
-  const matchupPlayersWithSeasons = await db
-    .select({
-      matchupPlayerId: PublicSchema.matchupPlayers.id,
-      playerId: PublicSchema.matchupPlayers.playerId,
-      teamId: PublicSchema.matchupPlayers.teamId,
-      season: PublicSchema.leagueWeekPlayerSeasons.season,
-      brefId: PublicSchema.players.brefId,
-    })
+  // 2. Count players before selection
+  const matchupPlayersCount = await db
+    .select({ count: sql<number>`count(*)` })
     .from(PublicSchema.matchupPlayers)
-    .innerJoin(
-      PublicSchema.leagueWeekPlayerSeasons,
-      and(
-        eq(
-          PublicSchema.leagueWeekPlayerSeasons.playerId,
-          PublicSchema.matchupPlayers.playerId,
-        ),
-        eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchupData.leagueId),
-        eq(
-          PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-          matchupData.weekNumber,
-        ),
-      ),
-    )
-    .innerJoin(
-      PublicSchema.players,
-      eq(PublicSchema.players.id, PublicSchema.matchupPlayers.playerId),
-    )
     .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
 
-  if (matchupPlayersWithSeasons.length === 0) {
-    throw new Error(`No players found for matchup ${matchupId}`);
-  }
+  const totalPlayers = Number(matchupPlayersCount[0]?.count || 0);
 
-  LOGGER.info(
-    `Found ${matchupPlayersWithSeasons.length} players to select games for`,
-  );
+  // 3. Delegate to season-game-selector which uses game_identifier-based selection
+  const { selectGamesForMatchup: selectGames } =
+    await import('./services/season-game-selector');
+  const result = await selectGames(db, matchupId, gameNumber);
 
-  // 3. For each player, select a random game from their season
-  const gameRecords: Array<{
-    matchupPlayerId: number;
-    gameNum: number;
-    battingGameNum: number | null;
-    fieldingGameNum: number | null;
-    pitchingGameNum: number | null;
-    fieldingGamePos: string;
-  }> = [];
-
-  // Collect player data for queue message
-  const playersForStatsLoading: Array<{
-    matchupPlayerId: number;
-    playerId: number;
-    brefId: string;
-    season: number;
-    battingGameNum: number;
-    pitchingGameNum: number;
-    fieldingGameNum: number;
-    fieldingGamePos: string;
-  }> = [];
-
-  for (const player of matchupPlayersWithSeasons) {
-    // Check if this player already has a game selected for this game number
-    const existingGame = await db
-      .select()
-      .from(PublicSchema.matchupPlayerGames)
-      .where(
-        and(
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            player.matchupPlayerId,
-          ),
-          eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
-        ),
-      )
-      .limit(1);
-
-    if (existingGame.length > 0) {
-      LOGGER.debug(
-        `Player ${player.playerId} already has game ${gameNumber} selected, skipping`,
-      );
-      continue;
-    }
-
-    // For baseball, games are numbered 1-162
-    // Pick random game numbers for each stat type
-    const MAX_GAMES_PER_SEASON = 162;
-
-    // Select random game numbers for each stat type
-    const battingGameNum = Math.floor(Math.random() * MAX_GAMES_PER_SEASON) + 1;
-    const pitchingGameNum =
-      Math.floor(Math.random() * MAX_GAMES_PER_SEASON) + 1;
-    const fieldingGameNum =
-      Math.floor(Math.random() * MAX_GAMES_PER_SEASON) + 1;
-
-    LOGGER.debug(
-      `Selected games for player ${player.playerId}: batting=${battingGameNum}, pitching=${pitchingGameNum}, fielding=${fieldingGameNum}`,
-    );
-
-    // Get primary position from season stats
-    const seasonFielding = await db
+  // 4. Queue stats loading for uncached players
+  if (result.playersNeedingStatsLoading.length > 0) {
+    // Look up brefId for each player
+    const playerIds = result.playersNeedingStatsLoading.map((p) => p.playerId);
+    const playerRecords = await db
       .select({
-        pos: PublicSchema.seasonFielding.pos,
+        id: PublicSchema.players.id,
+        brefId: PublicSchema.players.brefId,
       })
-      .from(PublicSchema.seasonFielding)
-      .where(
-        and(
-          eq(PublicSchema.seasonFielding.playerId, player.playerId),
-          eq(PublicSchema.seasonFielding.season, player.season),
-        ),
-      )
-      .limit(1);
+      .from(PublicSchema.players)
+      .where(inArray(PublicSchema.players.id, playerIds));
 
-    const fieldingGamePos = seasonFielding[0]?.pos || 'XX';
+    const brefIdMap = new Map(playerRecords.map((p) => [p.id, p.brefId]));
 
-    // Create game record with all stat-specific game numbers populated
-    gameRecords.push({
-      matchupPlayerId: player.matchupPlayerId,
-      gameNum: gameNumber,
-      battingGameNum,
-      fieldingGameNum,
-      pitchingGameNum,
-      fieldingGamePos,
-    });
-
-    // Collect data for stats loading
-    playersForStatsLoading.push({
-      matchupPlayerId: player.matchupPlayerId,
-      playerId: player.playerId,
-      brefId: player.brefId,
-      season: player.season,
-      battingGameNum,
-      pitchingGameNum,
-      fieldingGameNum,
-      fieldingGamePos,
-    });
-  }
-
-  // 4. Batch insert all game records
-  if (gameRecords.length > 0) {
-    LOGGER.info(`Batch inserting ${gameRecords.length} game records`);
-    await db
-      .insert(PublicSchema.matchupPlayerGames)
-      .values(gameRecords)
-      .onConflictDoNothing();
-    LOGGER.info(`Successfully inserted ${gameRecords.length} game records`);
-  }
-
-  // 4.5. Get ALL games for this matchup that need stats loaded (pending status)
-  // This includes both newly created games AND any games from previous runs that never got queued
-  // NOTE: We check ALL game numbers, not just the current one, to catch any missed games
-  const gamesNeedingStats = await db
-    .select({
-      id: PublicSchema.matchupPlayerGames.id,
-      matchupPlayerId: PublicSchema.matchupPlayerGames.matchupPlayerId,
-      playerId: PublicSchema.matchupPlayers.playerId,
-      brefId: PublicSchema.players.brefId,
-      season: PublicSchema.leagueWeekPlayerSeasons.season,
-      battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
-      pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
-      fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
-      fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
-    })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
-      eq(
-        PublicSchema.matchupPlayers.id,
-        PublicSchema.matchupPlayerGames.matchupPlayerId,
-      ),
-    )
-    .innerJoin(
-      PublicSchema.players,
-      eq(PublicSchema.players.id, PublicSchema.matchupPlayers.playerId),
-    )
-    .innerJoin(
-      PublicSchema.leagueWeekPlayerSeasons,
-      and(
-        eq(
-          PublicSchema.leagueWeekPlayerSeasons.playerId,
-          PublicSchema.matchupPlayers.playerId,
-        ),
-        eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchupData.leagueId),
-        eq(
-          PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-          matchupData.weekNumber,
-        ),
-      ),
-    )
-    .where(
-      and(
-        eq(PublicSchema.matchupPlayers.matchupId, matchupId),
-        eq(PublicSchema.matchupPlayerGames.statsLoadingStatus, 'pending'),
-      ),
-    );
-
-  if (gamesNeedingStats.length > 0) {
-    LOGGER.info(
-      `Found ${gamesNeedingStats.length} games needing stats (${gameRecords.length} new, ${gamesNeedingStats.length - gameRecords.length} previously pending)`,
-    );
-
-    // Update matchup status to 'loading' before queuing
-    await db
-      .update(PublicSchema.matchups)
-      .set({ statsLoadingStatus: 'loading' })
-      .where(eq(PublicSchema.matchups.id, matchupId));
-    LOGGER.info(`Set matchup ${matchupId} stats_loading_status to 'loading'`);
-
-    // Update individual player game statuses to 'loading'
-    const gameIds = gamesNeedingStats.map((g) => g.id);
-    await db
-      .update(PublicSchema.matchupPlayerGames)
-      .set({ statsLoadingStatus: 'loading' })
-      .where(inArray(PublicSchema.matchupPlayerGames.id, gameIds));
-    LOGGER.info(`Set ${gameIds.length} player games to 'loading' status`);
-
-    // Queue all games that need stats
-    const gamesToQueue = gamesNeedingStats.map((game) => ({
-      matchupPlayerId: game.matchupPlayerId,
-      playerId: game.playerId,
-      brefId: game.brefId || '',
-      season: game.season,
-      battingGameNum: game.battingGameNum || 1,
-      pitchingGameNum: game.pitchingGameNum || 1,
-      fieldingGameNum: game.fieldingGameNum || 1,
-      fieldingGamePos: game.fieldingGamePos || 'XX',
+    const gamesToQueue = result.playersNeedingStatsLoading.map((p) => ({
+      matchupPlayerId: p.matchupPlayerId,
+      playerId: p.playerId,
+      brefId: brefIdMap.get(p.playerId) ?? '',
+      season: p.season,
+      fieldingGamePos: p.fieldingGamePos ?? 'XX',
     }));
 
     await queueMatchupStatsLoad(matchupId, matchupData.leagueId, gamesToQueue);
@@ -489,20 +295,14 @@ async function selectGameForMatchup(
   const gamesRemaining = gamesPerMatchup - gamesSelected;
 
   LOGGER.info(
-    `Games selected: ${gamesSelected}/${gamesPerMatchup}, remaining: ${gamesRemaining}`,
-  );
-
-  LOGGER.info(`Game selection complete for matchup ${matchupId}`);
-  LOGGER.info(
-    `Stats loaded on-demand from Baseball Reference for ${gameRecords.length} players`,
-  );
-  LOGGER.info(
-    `Stats aggregation available via GraphQL matchup.players.aggregatedStats query`,
+    `Game selection complete for matchup ${matchupId}. ` +
+      `Games: ${gamesSelected}/${gamesPerMatchup}, remaining: ${gamesRemaining}. ` +
+      `${result.playersNeedingStatsLoading.length} players need stats loading.`,
   );
 
   return {
-    playersProcessed: matchupPlayersWithSeasons.length,
-    gamesCreated: gameRecords.length,
+    playersProcessed: totalPlayers,
+    gamesCreated: totalPlayers - result.playersNeedingStatsLoading.length,
     gamesRemaining,
   };
 }
@@ -560,9 +360,6 @@ async function createMatchupForLeagueWeek(
           playerId: PublicSchema.matchupPlayers.playerId,
           brefId: PublicSchema.players.brefId,
           season: PublicSchema.leagueWeekPlayerSeasons.season,
-          battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
-          pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
-          fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
           fieldingGamePos: PublicSchema.matchupPlayerGames.fieldingGamePos,
         })
         .from(PublicSchema.matchupPlayerGames)
@@ -626,9 +423,6 @@ async function createMatchupForLeagueWeek(
           playerId: game.playerId,
           brefId: game.brefId || '',
           season: game.season,
-          battingGameNum: game.battingGameNum || 1,
-          pitchingGameNum: game.pitchingGameNum || 1,
-          fieldingGameNum: game.fieldingGameNum || 1,
           fieldingGamePos: game.fieldingGamePos || 'XX',
         }));
 

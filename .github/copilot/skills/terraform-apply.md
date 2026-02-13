@@ -61,6 +61,21 @@ terraform apply -target=aws_lambda_function.db
 terraform apply -target=aws_lambda_function.db -target=aws_lambda_function.oauth_proxy
 ```
 
+> **⚠️ `-target` uses Terraform resource names, NOT AWS function names.**
+> The resource name is the second label in `resource "aws_lambda_function" "<name>"` in the .tf file.
+> Example: `aws_lambda_function.stats` (NOT `aws_lambda_function.stats_lambda`).
+>
+> **Lambda resource names** (look up in `terraform/lambda-*.tf` if unsure):
+> | Deploy name | Terraform resource | Target |
+> |---|---|---|
+> | `stats` | `aws_lambda_function.stats` | `-target=aws_lambda_function.stats` |
+> | `graphql` | `aws_lambda_function.graphql` | `-target=aws_lambda_function.graphql` |
+> | `game-selection` | `aws_lambda_function.game_selection` | `-target=aws_lambda_function.game_selection` |
+> | `draft-processor` | `aws_lambda_function.draft_processor` | `-target=aws_lambda_function.draft_processor` |
+> | `oauth-proxy` | `aws_lambda_function.oauth_proxy` | `-target=aws_lambda_function.oauth_proxy` |
+> | `websocket` | `aws_lambda_function.websocket` | `-target=aws_lambda_function.websocket` |
+> | `db` | `aws_lambda_function.db` | `-target=aws_lambda_function.db` |
+
 ### Terraform Init
 
 ```powershell

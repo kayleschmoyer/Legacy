@@ -1363,9 +1363,7 @@ export const MatchupPlayerGameRef = builder.objectRef<{
   id: number;
   matchupPlayerId: number;
   gameNum: number;
-  battingGameNum: number | null;
-  pitchingGameNum: number | null;
-  fieldingGameNum: number | null;
+  gameIdentifier: string | null;
   fieldingGamePos: string | null;
   statsLoadingStatus: string | null;
 }>('MatchupPlayerGame');
@@ -1375,9 +1373,7 @@ MatchupPlayerGameRef.implement({
     id: t.exposeInt('id'),
     matchupPlayerId: t.exposeInt('matchupPlayerId'),
     gameNum: t.exposeInt('gameNum'),
-    battingGameNum: t.exposeInt('battingGameNum', { nullable: true }),
-    pitchingGameNum: t.exposeInt('pitchingGameNum', { nullable: true }),
-    fieldingGameNum: t.exposeInt('fieldingGameNum', { nullable: true }),
+    gameIdentifier: t.exposeString('gameIdentifier', { nullable: true }),
     fieldingGamePos: t.exposeString('fieldingGamePos', { nullable: true }),
     statsLoadingStatus: t.exposeString('statsLoadingStatus', {
       nullable: true,
@@ -1388,7 +1384,7 @@ MatchupPlayerGameRef.implement({
       type: GameBattingRef,
       nullable: true,
       resolve: async (game, _args, context) => {
-        if (!game.battingGameNum) return null;
+        if (!game.gameIdentifier) return null;
 
         // Get the matchup player info
         const mpResult = await context.db
@@ -1440,19 +1436,14 @@ MatchupPlayerGameRef.implement({
 
         if (!seasonResult[0]) return null;
 
-        const matchupPlayerInfo = {
-          playerId: mpResult[0].playerId,
-          season: seasonResult[0].season,
-        };
-
         const result = await context.db
           .select()
           .from(PublicSchema.gameBatting)
           .where(
             and(
-              eq(PublicSchema.gameBatting.playerId, matchupPlayerInfo.playerId),
-              eq(PublicSchema.gameBatting.season, matchupPlayerInfo.season),
-              eq(PublicSchema.gameBatting.gameNum, game.battingGameNum ?? 0),
+              eq(PublicSchema.gameBatting.playerId, mpResult[0].playerId),
+              eq(PublicSchema.gameBatting.season, seasonResult[0].season),
+              eq(PublicSchema.gameBatting.gameIdentifier, game.gameIdentifier),
             ),
           )
           .limit(1);
@@ -1464,7 +1455,9 @@ MatchupPlayerGameRef.implement({
       type: GamePitchingRef,
       nullable: true,
       resolve: async (game, _args, context) => {
-        if (!game.pitchingGameNum) return null;
+        // Pitchers only throw one game per week (game slot 1)
+        if (game.gameNum !== 1) return null;
+        if (!game.gameIdentifier) return null;
 
         // Get the matchup player info
         const mpResult = await context.db
@@ -1516,22 +1509,14 @@ MatchupPlayerGameRef.implement({
 
         if (!seasonResult[0]) return null;
 
-        const matchupPlayerInfo = {
-          playerId: mpResult[0].playerId,
-          season: seasonResult[0].season,
-        };
-
         const result = await context.db
           .select()
           .from(PublicSchema.gamePitching)
           .where(
             and(
-              eq(
-                PublicSchema.gamePitching.playerId,
-                matchupPlayerInfo.playerId,
-              ),
-              eq(PublicSchema.gamePitching.season, matchupPlayerInfo.season),
-              eq(PublicSchema.gamePitching.gameNum, game.pitchingGameNum ?? 0),
+              eq(PublicSchema.gamePitching.playerId, mpResult[0].playerId),
+              eq(PublicSchema.gamePitching.season, seasonResult[0].season),
+              eq(PublicSchema.gamePitching.gameIdentifier, game.gameIdentifier),
             ),
           )
           .limit(1);
@@ -1543,7 +1528,7 @@ MatchupPlayerGameRef.implement({
       type: GameFieldingRef,
       nullable: true,
       resolve: async (game, _args, context) => {
-        if (!game.fieldingGameNum) return null;
+        if (!game.gameIdentifier) return null;
 
         // Get the matchup player info
         const mpResult = await context.db
@@ -1595,11 +1580,6 @@ MatchupPlayerGameRef.implement({
 
         if (!seasonResult[0]) return null;
 
-        const matchupPlayerInfo = {
-          playerId: mpResult[0].playerId,
-          season: seasonResult[0].season,
-        };
-
         const result = await context.db
           .select({
             playerId: PublicSchema.gameFielding.playerId,
@@ -1607,28 +1587,24 @@ MatchupPlayerGameRef.implement({
             gameNum: PublicSchema.gameFielding.gameNum,
             gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
             // Map database column names to expected GraphQL type properties
-            pos: sql<string>`${game.fieldingGamePos}`.as('pos'), // Use the position from game object
-            g: sql<number | null>`NULL`.as('g'), // Not available in game_fielding
-            gs: sql<number | null>`NULL`.as('gs'), // Not available in game_fielding
-            inn: PublicSchema.gameFielding.innDef, // Map innDef → inn
+            pos: sql<string>`${game.fieldingGamePos ?? 'UT'}`.as('pos'),
+            g: sql<number | null>`NULL`.as('g'),
+            gs: sql<number | null>`NULL`.as('gs'),
+            inn: PublicSchema.gameFielding.innDef,
             po: PublicSchema.gameFielding.po,
             a: PublicSchema.gameFielding.a,
-            e: PublicSchema.gameFielding.eDef, // Map eDef → e
-            dp: PublicSchema.gameFielding.dpDef, // Map dpDef → dp
-            pb: sql<number | null>`NULL`.as('pb'), // Not available in game_fielding
-            sb: sql<number | null>`NULL`.as('sb'), // Not available in game_fielding
-            cs: sql<number | null>`NULL`.as('cs'), // Not available in game_fielding
+            e: PublicSchema.gameFielding.eDef,
+            dp: PublicSchema.gameFielding.dpDef,
+            pb: sql<number | null>`NULL`.as('pb'),
+            sb: sql<number | null>`NULL`.as('sb'),
+            cs: sql<number | null>`NULL`.as('cs'),
           })
           .from(PublicSchema.gameFielding)
           .where(
             and(
-              eq(
-                PublicSchema.gameFielding.playerId,
-                matchupPlayerInfo.playerId,
-              ),
-              eq(PublicSchema.gameFielding.season, matchupPlayerInfo.season),
-              eq(PublicSchema.gameFielding.gameNum, game.fieldingGameNum ?? 0),
-              // Note: pos column doesn't exist in game_fielding table, removed filter
+              eq(PublicSchema.gameFielding.playerId, mpResult[0].playerId),
+              eq(PublicSchema.gameFielding.season, seasonResult[0].season),
+              eq(PublicSchema.gameFielding.gameIdentifier, game.gameIdentifier),
             ),
           )
           .limit(1);

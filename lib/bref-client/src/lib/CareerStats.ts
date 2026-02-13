@@ -487,9 +487,12 @@ export async function getGameBattingStats(
 
   const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-  result.gameIdentifier = match?.groups
-    ? match.groups[GAME_IDENTIFIER_GROUP]
-    : '';
+  if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+    throw new Error(
+      `Failed to parse game_identifier from fielding box score link: ${link ?? 'no link found'} (game ${gameNumber})`,
+    );
+  }
+  result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
   result.season = season;
   result.gameNum = gameNumber;
 
@@ -611,9 +614,12 @@ export async function getAllGameFieldingStats(
 
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-    result.gameIdentifier = match?.groups
-      ? match.groups[GAME_IDENTIFIER_GROUP]
-      : '';
+    if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+      throw new Error(
+        `Failed to parse game_identifier from fielding box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
+      );
+    }
+    result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
     result.gameNum = gameNumber;
 
@@ -693,9 +699,12 @@ export async function getAllGameBattingStats(
 
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-    result.gameIdentifier = match?.groups
-      ? match.groups[GAME_IDENTIFIER_GROUP]
-      : '';
+    if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+      throw new Error(
+        `Failed to parse game_identifier from batting box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
+      );
+    }
+    result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
     result.gameNum = gameNumber;
 
@@ -761,9 +770,12 @@ export async function getGamePitchingStats(
 
   const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-  result.gameIdentifier = match?.groups
-    ? match.groups[GAME_IDENTIFIER_GROUP]
-    : '';
+  if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+    throw new Error(
+      `Failed to parse game_identifier from pitching box score link: ${link ?? 'no link found'} (game ${gameNumber})`,
+    );
+  }
+  result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
   result.season = season;
   result.gameNum = gameNumber;
 
@@ -865,9 +877,12 @@ export async function getAllGamePitchingStats(
 
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-    result.gameIdentifier = match?.groups
-      ? match.groups[GAME_IDENTIFIER_GROUP]
-      : '';
+    if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+      throw new Error(
+        `Failed to parse game_identifier from pitching box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
+      );
+    }
+    result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
     result.gameNum = gameNumber;
 
@@ -1028,9 +1043,12 @@ export async function getGameFieldingStats(
 
   const match = link?.match(GAME_IDENTIFIER_REGEX);
 
-  result.gameIdentifier = match?.groups
-    ? match.groups[GAME_IDENTIFIER_GROUP]
-    : '';
+  if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
+    throw new Error(
+      `Failed to parse game_identifier from fielding box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId})`,
+    );
+  }
+  result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
   result.season = season;
   result.gameNum = gameNumber;
 

@@ -44,6 +44,8 @@ import { handleGetPlayerPitching } from './commands/getPlayerPitching';
 import { handleGetPlayerFielding } from './commands/getPlayerFielding';
 import { handleTriggerGameSelection } from './commands/triggerGameSelection';
 import { handleTestWorkflow } from './commands/testWorkflow';
+import { handleRetryFailedPlayers } from './commands/retryFailedPlayers';
+import { handleStatsLoadingStatus } from './commands/statsLoadingStatus';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -78,7 +80,28 @@ async function run(): Promise<void> {
 
   // Simple commands without options
   program.command('load-players').action(handleLoadPlayers);
-  program.command('load-career-stats').action(handleLoadCareerStats);
+
+  program
+    .command('load-career-stats')
+    .description('Load career stats for players')
+    .option('-l, --limit <number>', 'Number of players to process', parseInt)
+    .option('--remote', 'Send to SQS queue instead of processing directly')
+    .option('--prioritize-new', 'Prioritize players without stats')
+    .option('--show-summary', 'Show stats refresh summary before loading')
+    .action(
+      (options: {
+        limit?: number;
+        remote?: boolean;
+        prioritizeNew?: boolean;
+        showSummary?: boolean;
+      }) =>
+        handleLoadCareerStats({
+          limit: options.limit,
+          remote: options.remote ?? false,
+          'prioritize-new': options.prioritizeNew ?? false,
+          'show-summary': options.showSummary ?? false,
+        }),
+    );
 
   program
     .command('load-single-player-stats')
@@ -347,6 +370,55 @@ async function run(): Promise<void> {
     )
     .action((options: { user?: string; skipCleanup?: boolean }) =>
       handleTestWorkflow(options),
+    );
+
+  program
+    .command('stats-loading-status')
+    .description(
+      'Show progress of player game stats loading across leagues and matchups',
+    )
+    .option('-l, --league <id>', 'Filter by league ID', parseInt)
+    .option('-m, --matchup <id>', 'Filter by matchup ID', parseInt)
+    .option('-w, --watch', 'Auto-refresh on an interval')
+    .option(
+      '-i, --interval <seconds>',
+      'Refresh interval in seconds (default: 15)',
+      parseInt,
+    )
+    .action(
+      (options: {
+        league?: number;
+        matchup?: number;
+        watch?: boolean;
+        interval?: number;
+      }) => handleStatsLoadingStatus(options),
+    );
+
+  program
+    .command('retry-failed-players')
+    .description(
+      'Re-queue failed player stats for SQS loading. Resets status and sends to stats queue.',
+    )
+    .option('-l, --league <id>', 'Filter by league ID', parseInt)
+    .option('-m, --matchup <id>', 'Filter by matchup ID', parseInt)
+    .option('--dry-run', 'Show what would be retried without sending messages')
+    .option(
+      '--process-dlq',
+      'Redrive messages from the dead letter queue back to the main queue',
+    )
+    .action(
+      (options: {
+        league?: number;
+        matchup?: number;
+        dryRun?: boolean;
+        processDlq?: boolean;
+      }) =>
+        handleRetryFailedPlayers({
+          leagueId: options.league,
+          matchupId: options.matchup,
+          dryRun: options.dryRun,
+          processDlq: options.processDlq,
+        }),
     );
 
   await program.parseAsync(process.argv);

@@ -158,9 +158,6 @@ export const matchupPlayerGames = pgTable(
     matchupPlayerId: integer('matchup_player_id').notNull(),
     gameNum: integer('game_num').notNull(),
     gameIdentifier: varchar('game_identifier', { length: 20 }),
-    battingGameNum: integer('batting_game_num'),
-    fieldingGameNum: integer('fielding_game_num'),
-    pitchingGameNum: integer('pitching_game_num'),
     fieldingGamePos: char('fielding_game_pos', { length: 2 }),
     statsLoadingStatus: varchar('stats_loading_status', { length: 20 }).default(
       'pending',

@@ -1,109 +1,181 @@
-import {
-  getSeasonBattingStatsForPlayerSeason,
-  getSeasonFieldingStatsForPlayerSeason,
-  getSeasonPitchingStatsForPlayerSeason,
-  PublicDb,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, notInArray } from 'drizzle-orm';
 
 export interface GameSelectionResult {
-  battingGameNum: number | null;
-  fieldingGameNum: number | null;
+  gameIdentifier: string | null;
   fieldingGamePos: string | null;
-  pitchingGameNum: number | null;
+  statsAreCached: boolean;
 }
 
 /**
- * Select a random game number from the available games in a season
- * @param stats - Stats object containing the number of games (g)
- * @returns Random game number (1-indexed) or null if no games available
+ * Get the primary fielding position for a player in a season.
+ * Returns the position with the most games, or null if no fielding stats.
  */
-function selectGameNumber(stats: { g: number | null } | null): number | null {
-  if (!stats?.g) {
+async function getPrimaryFieldingPosition(
+  db: PublicDb,
+  playerId: number,
+  season: number,
+): Promise<string | null> {
+  const fieldingStats = await db
+    .select({
+      pos: PublicSchema.seasonFielding.pos,
+      g: PublicSchema.seasonFielding.g,
+    })
+    .from(PublicSchema.seasonFielding)
+    .where(
+      and(
+        eq(PublicSchema.seasonFielding.playerId, playerId),
+        eq(PublicSchema.seasonFielding.season, season),
+      ),
+    );
+
+  if (fieldingStats.length === 0) {
     return null;
   }
 
-  // 1-indexed
-  return Math.floor(Math.random() * stats.g) + 1;
+  // Return position with most games
+  fieldingStats.sort((a, b) => (b.g ?? 0) - (a.g ?? 0));
+  return fieldingStats[0].pos;
 }
 
 /**
- * Select games for a single matchup player in a specific season
- * @param db - Database connection
- * @param matchupPlayerId - ID of the matchup player record
- * @param playerId - Player ID
- * @param season - Season to select games from
- * @param gameNumber - Game number in the matchup (1-7 for weekly matchups)
- * @returns Object containing selected game numbers for batting, fielding, and pitching
+ * Select a random game_identifier for a player/season from cached game stats.
+ * Excludes game_identifiers already used by other game slots.
+ */
+async function selectGameIdentifier(
+  db: PublicDb,
+  playerId: number,
+  season: number,
+  excludeGameIdentifiers: string[],
+): Promise<string | null> {
+  const conditions = [
+    eq(PublicSchema.gameBatting.playerId, playerId),
+    eq(PublicSchema.gameBatting.season, season),
+  ];
+
+  if (excludeGameIdentifiers.length > 0) {
+    conditions.push(
+      notInArray(
+        PublicSchema.gameBatting.gameIdentifier,
+        excludeGameIdentifiers,
+      ),
+    );
+  }
+
+  const availableGames = await db
+    .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
+    .from(PublicSchema.gameBatting)
+    .where(and(...conditions));
+
+  if (availableGames.length === 0) {
+    return null;
+  }
+
+  const randomIndex = Math.floor(Math.random() * availableGames.length);
+  return availableGames[randomIndex].gameIdentifier;
+}
+
+/**
+ * Select a game for a single matchup player using a real game_identifier.
+ * If stats are cached in the DB, picks a random game from the cache.
+ * If not cached, returns null gameIdentifier so stats loading can be queued.
+ *
+ * This ensures batting, pitching, and fielding stats all come from the
+ * same real baseball game instead of mixing stats from different games.
  */
 export async function selectGamesForMatchupPlayer(
   db: PublicDb,
   matchupPlayerId: number,
   playerId: number,
   season: number,
-  gameNumber: number,
 ): Promise<GameSelectionResult> {
-  // Fetch stats for the specified season
-  const battingStats = await getSeasonBattingStatsForPlayerSeason(
+  // Check if batting stats are cached (indicates stats for this player/season are loaded)
+  const cachedCheck = await db
+    .select({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
+    .from(PublicSchema.gameBatting)
+    .where(
+      and(
+        eq(PublicSchema.gameBatting.playerId, playerId),
+        eq(PublicSchema.gameBatting.season, season),
+      ),
+    )
+    .limit(1);
+
+  const fieldingPos = await getPrimaryFieldingPosition(db, playerId, season);
+
+  if (cachedCheck.length === 0) {
+    LOGGER.info(
+      `No cached stats for player ${playerId} season ${season}. Stats loading needed.`,
+    );
+    return {
+      gameIdentifier: null,
+      fieldingGamePos: fieldingPos,
+      statsAreCached: false,
+    };
+  }
+
+  // Stats are cached - get already-used game identifiers for this matchup player
+  const usedGames = await db
+    .select({ gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier })
+    .from(PublicSchema.matchupPlayerGames)
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+      ),
+    );
+
+  const excludeIds = usedGames
+    .map((g) => g.gameIdentifier)
+    .filter((id): id is string => id !== null);
+
+  const gameIdentifier = await selectGameIdentifier(
     db,
     playerId,
     season,
-  );
-  const pitchingStats = await getSeasonPitchingStatsForPlayerSeason(
-    db,
-    playerId,
-    season,
+    excludeIds,
   );
 
-  // Fielding stats are segmented by position
-  const fieldingStatsArray = await getSeasonFieldingStatsForPlayerSeason(
-    db,
-    playerId,
-    season,
-  );
-
-  const fieldingStats =
-    fieldingStatsArray.length > 0
-      ? fieldingStatsArray[
-          Math.floor(Math.random() * fieldingStatsArray.length)
-        ]
-      : null;
-
-  const battingGameNum = selectGameNumber(battingStats);
-  const fieldingGameNum = selectGameNumber(fieldingStats);
-  let pitchingGameNum: number | null = null;
-
-  // Pitchers can only throw one game per week
-  if (gameNumber === 1) {
-    pitchingGameNum = selectGameNumber(pitchingStats);
+  if (!gameIdentifier) {
+    LOGGER.warn(
+      `No available games left for player ${playerId} season ${season} (${excludeIds.length} already used)`,
+    );
+    return {
+      gameIdentifier: null,
+      fieldingGamePos: fieldingPos,
+      statsAreCached: true,
+    };
   }
 
   LOGGER.debug(
-    `Selected Games for player ${playerId} season ${season}: batting=${battingGameNum} pitching=${pitchingGameNum} fielding=${fieldingGameNum}`,
+    `Selected game ${gameIdentifier} for player ${playerId} season ${season}`,
   );
 
   return {
-    battingGameNum,
-    fieldingGameNum,
-    fieldingGamePos: fieldingStats?.pos ?? null,
-    pitchingGameNum,
+    gameIdentifier,
+    fieldingGamePos: fieldingPos,
+    statsAreCached: true,
   };
 }
 
 /**
- * Select games for all players in a matchup for a specific game number
- * Uses per-player season assignments from league_week_player_seasons
- * @param db - Database connection
- * @param matchupId - ID of the matchup
- * @param gameNumber - Game number in the matchup (1-7 for weekly matchups)
+ * Select games for all players in a matchup for a specific game number.
+ * Uses game_identifier for real game selection - all stat types come from the same game.
+ * Returns list of players that need stats loading (uncached).
  */
 export async function selectGamesForMatchup(
   db: PublicDb,
   matchupId: number,
   gameNumber: number,
-): Promise<void> {
+): Promise<{
+  playersNeedingStatsLoading: Array<{
+    matchupPlayerId: number;
+    playerId: number;
+    season: number;
+    fieldingGamePos: string | null;
+  }>;
+}> {
   // First, get the matchup to retrieve league and week information
   const matchup = await db
     .select()
@@ -151,6 +223,13 @@ export async function selectGamesForMatchup(
     playerSeasons.map((ps) => [ps.playerId, ps.season]),
   );
 
+  const playersNeedingStatsLoading: Array<{
+    matchupPlayerId: number;
+    playerId: number;
+    season: number;
+    fieldingGamePos: string | null;
+  }> = [];
+
   for (const matchupPlayer of matchupPlayers) {
     // Check if games have already been selected for this player and game number
     const existingGames = await db
@@ -183,47 +262,59 @@ export async function selectGamesForMatchup(
     }
 
     LOGGER.debug(
-      `Selecting games for player ${matchupPlayer.playerId} using season ${playerSeason}`,
+      `Selecting game for player ${matchupPlayer.playerId} using season ${playerSeason}`,
     );
 
-    // Select games for this player using their assigned season
-    const selectedGames = await selectGamesForMatchupPlayer(
+    // Select a real game for this player using game_identifier
+    const result = await selectGamesForMatchupPlayer(
       db,
       matchupPlayer.id,
       matchupPlayer.playerId,
       playerSeason,
-      gameNumber,
     );
 
-    // Insert the selected games into the database
-    // Note: fieldingGamePos may be null for pitchers or players without fielding stats
-    if (!selectedGames.fieldingGamePos) {
-      LOGGER.debug(
-        `No fielding position found for matchup player ${matchupPlayer.id}, game ${gameNumber}. Inserting game with null fielding position.`,
-      );
-    }
-
+    // Insert the selected game into the database
     await db.insert(PublicSchema.matchupPlayerGames).values({
-      battingGameNum: selectedGames.battingGameNum,
-      fieldingGameNum: selectedGames.fieldingGameNum,
-      fieldingGamePos: selectedGames.fieldingGamePos,
       gameNum: gameNumber,
       matchupPlayerId: matchupPlayer.id,
-      pitchingGameNum: selectedGames.pitchingGameNum,
+      gameIdentifier: result.gameIdentifier,
+      fieldingGamePos: result.fieldingGamePos,
+      // Set status based on whether stats are cached
+      statsLoadingStatus: result.statsAreCached ? 'completed' : 'pending',
     });
 
     LOGGER.debug(
-      `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber}`,
+      `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber} ` +
+        `(gameIdentifier=${result.gameIdentifier}, cached=${result.statsAreCached})`,
+    );
+
+    // Track players that need stats loading
+    if (!result.statsAreCached) {
+      playersNeedingStatsLoading.push({
+        matchupPlayerId: matchupPlayer.id,
+        playerId: matchupPlayer.playerId,
+        season: playerSeason,
+        fieldingGamePos: result.fieldingGamePos,
+      });
+    }
+  }
+
+  // If all players had cached stats, set matchup to completed immediately
+  if (playersNeedingStatsLoading.length === 0) {
+    await db
+      .update(PublicSchema.matchups)
+      .set({ statsLoadingStatus: 'completed' })
+      .where(eq(PublicSchema.matchups.id, matchupId));
+
+    LOGGER.info(
+      `All stats cached for matchup ${matchupId}, game ${gameNumber}. Set to completed.`,
     );
   }
 
-  // Update matchup stats loading status to 'completed'
-  await db
-    .update(PublicSchema.matchups)
-    .set({ statsLoadingStatus: 'completed' })
-    .where(eq(PublicSchema.matchups.id, matchupId));
-
   LOGGER.info(
-    `Completed game selection for matchup ${matchupId}, game ${gameNumber}`,
+    `Completed game selection for matchup ${matchupId}, game ${gameNumber}. ` +
+      `${playersNeedingStatsLoading.length} players need stats loading.`,
   );
+
+  return { playersNeedingStatsLoading };
 }

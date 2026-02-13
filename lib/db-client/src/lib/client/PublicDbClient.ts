@@ -572,8 +572,11 @@ export async function getMatchupPlayerGameStats(
       inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds),
     );
 
-  // Build map of player -> games
-  const playerGamesMap = new Map<number, { season: number; games: number[] }>();
+  // Build map of player -> game identifiers
+  const playerGamesMap = new Map<
+    number,
+    { season: number; gameIdentifiers: string[] }
+  >();
   const matchupPlayerMap = new Map<
     number,
     { playerId: number; season: number }
@@ -591,21 +594,18 @@ export async function getMatchupPlayerGameStats(
     const mpInfo = matchupPlayerMap.get(game.matchupPlayerId);
     if (!mpInfo) continue;
 
-    const battingGameNum = game.battingGameNum;
-    const pitchingGameNum = game.pitchingGameNum;
-    const fieldingGameNum = game.fieldingGameNum;
-
-    // Add all game numbers to the list
-    const gameNums = [battingGameNum, pitchingGameNum, fieldingGameNum].filter(
-      (num): num is number => num !== null && num !== undefined,
-    );
+    const gameId = game.gameIdentifier;
+    if (!gameId) continue;
 
     if (!playerGamesMap.has(mpInfo.playerId)) {
-      playerGamesMap.set(mpInfo.playerId, { season: mpInfo.season, games: [] });
+      playerGamesMap.set(mpInfo.playerId, {
+        season: mpInfo.season,
+        gameIdentifiers: [],
+      });
     }
     const playerGames = playerGamesMap.get(mpInfo.playerId);
     if (playerGames) {
-      playerGames.games.push(...gameNums);
+      playerGames.gameIdentifiers.push(gameId);
     }
   }
 
@@ -652,10 +652,9 @@ export async function getMatchupPlayerGameStats(
     fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
   }[] = [];
 
-  for (const [playerId, { season, games }] of playerGamesMap) {
-    const uniqueGames = [...new Set(games)];
-
-    for (const gameNum of uniqueGames) {
+  for (const [playerId, { season, gameIdentifiers }] of playerGamesMap) {
+    const uniqueGameIds = [...new Set(gameIdentifiers)];
+    for (const gameIdentifier of uniqueGameIds) {
       const batting = await db
         .select()
         .from(Schema.gameBatting)
@@ -663,7 +662,7 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gameBatting.playerId, playerId),
             eq(Schema.gameBatting.season, season),
-            eq(Schema.gameBatting.gameNum, gameNum),
+            eq(Schema.gameBatting.gameIdentifier, gameIdentifier),
           ),
         )
         .then(TakeUniqueOrNull);
@@ -675,7 +674,7 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gamePitching.playerId, playerId),
             eq(Schema.gamePitching.season, season),
-            eq(Schema.gamePitching.gameNum, gameNum),
+            eq(Schema.gamePitching.gameIdentifier, gameIdentifier),
           ),
         )
         .then(TakeUniqueOrNull);
@@ -687,7 +686,7 @@ export async function getMatchupPlayerGameStats(
           and(
             eq(Schema.gameFielding.playerId, playerId),
             eq(Schema.gameFielding.season, season),
-            eq(Schema.gameFielding.gameNum, gameNum),
+            eq(Schema.gameFielding.gameIdentifier, gameIdentifier),
           ),
         )
         .then(TakeUniqueOrNull);
@@ -696,7 +695,7 @@ export async function getMatchupPlayerGameStats(
         playerId,
         teamId: playerTeamMap.get(playerId) ?? null,
         season,
-        gameNum,
+        gameNum: batting?.gameNum ?? 0,
         battingStats: batting,
         pitchingStats: pitching,
         fieldingStats: fielding,

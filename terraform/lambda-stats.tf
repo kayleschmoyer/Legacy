@@ -158,8 +158,10 @@ resource "aws_lambda_function" "stats" {
   role          = aws_iam_role.stats_lambda.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = var.environment == "dev" ? 180 : var.lambda_stats_timeout
+  timeout       = var.environment == "dev" ? 600 : var.lambda_stats_timeout
   memory_size   = var.environment == "dev" ? 256 : 512 # Lower memory for dev
+
+  reserved_concurrent_executions = 1 # Enforce single instance to prevent rate limiting
 
   source_code_hash = data.aws_ssm_parameter.stats_lambda_version.value
 
@@ -323,7 +325,7 @@ resource "aws_lambda_event_source_mapping" "stats_sqs_game" {
   function_name    = aws_lambda_function.stats.arn
 
   # Batch processing configuration
-  batch_size = 1 # Process one matchup at a time to avoid timeouts
+  batch_size = 5 # Process up to 5 matchup messages per invocation (with 600s timeout + concurrency=1)
   # Note: maximum_batching_window_in_seconds is not supported for FIFO queues
 
   # Error handling

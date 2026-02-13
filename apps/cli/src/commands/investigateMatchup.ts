@@ -49,9 +49,8 @@ export const handleInvestigateMatchup = async (
         id: PublicSchema.matchupPlayerGames.id,
         matchupPlayerId: PublicSchema.matchupPlayerGames.matchupPlayerId,
         gameNum: PublicSchema.matchupPlayerGames.gameNum,
-        battingGameNum: PublicSchema.matchupPlayerGames.battingGameNum,
-        pitchingGameNum: PublicSchema.matchupPlayerGames.pitchingGameNum,
-        fieldingGameNum: PublicSchema.matchupPlayerGames.fieldingGameNum,
+        gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier,
+        statsLoadingStatus: PublicSchema.matchupPlayerGames.statsLoadingStatus,
       })
       .from(PublicSchema.matchupPlayerGames)
       .innerJoin(
@@ -69,9 +68,8 @@ export const handleInvestigateMatchup = async (
       LOGGER.info(`  Game ${game.id}:`);
       LOGGER.info(`    Matchup Player ID: ${game.matchupPlayerId}`);
       LOGGER.info(`    Game Num: ${game.gameNum}`);
-      LOGGER.info(`    Batting Game Num: ${game.battingGameNum}`);
-      LOGGER.info(`    Pitching Game Num: ${game.pitchingGameNum}`);
-      LOGGER.info(`    Fielding Game Num: ${game.fieldingGameNum}`);
+      LOGGER.info(`    Game Identifier: ${game.gameIdentifier}`);
+      LOGGER.info(`    Stats Loading Status: ${game.statsLoadingStatus}`);
     });
 
     // 4. Summary
@@ -80,12 +78,12 @@ export const handleInvestigateMatchup = async (
     LOGGER.info(`✅ Has players: ${matchupPlayers.length > 0}`);
     LOGGER.info(`✅ Has games: ${matchupPlayerGames.length > 0}`);
     LOGGER.info(
-      `${matchupPlayerGames.some((g) => g.battingGameNum !== null) ? '✅' : '❌'} Game numbers populated: ${matchupPlayerGames.some((g) => g.battingGameNum !== null)}`,
+      `${matchupPlayerGames.some((g) => g.gameIdentifier !== null) ? '✅' : '❌'} Game identifiers populated: ${matchupPlayerGames.some((g) => g.gameIdentifier !== null)}`,
     );
 
-    if (!matchupPlayerGames.some((g) => g.battingGameNum !== null)) {
+    if (!matchupPlayerGames.some((g) => g.gameIdentifier !== null)) {
       LOGGER.warn(
-        '\n⚠️  ISSUE: Game numbers are NULL. Game selection may not have run, or failed.',
+        '\n⚠️  ISSUE: Game identifiers are NULL. Game selection may not have run, or stats are not yet loaded.',
       );
     }
   });

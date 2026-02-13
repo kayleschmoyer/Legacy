@@ -144,9 +144,7 @@ fragment MatchupPlayer on MatchupPlayer {
     id
     matchupPlayerId
     gameNum
-    battingGameNum
-    pitchingGameNum
-    fieldingGameNum
+    gameIdentifier
     fieldingGamePos
     statsLoadingStatus
     battingGame {

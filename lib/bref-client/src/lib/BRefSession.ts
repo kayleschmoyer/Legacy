@@ -1,11 +1,16 @@
 import axios from 'axios';
 import { LOGGER } from '@legacy-sports/logging';
 
-// 15 requests/minute = ~4 second delays
-// This allows 8 players × 3 stat types = 24 requests × 4s = 96s + ~45s scraping = ~141s (safe for 180s timeout)
-// Previous: 5 req/min (12s delays) caused timeouts with just 6-7 players
-// No 429 errors ever observed in production, so we're being overly conservative
+// 15 requests/minute = ~4 second delays between requests
+// With reserved_concurrent_executions=1 and batch_size=5, worst case:
+//   5 messages × 8 players × 3 stat types = 120 requests × 4s = 480s (safe for 600s timeout)
+//   In practice, caching means far fewer actual HTTP requests per invocation
 const MAX_REQUESTS_PER_MINUTE = 15;
+
+// Exponential backoff config for rate limit (429) and overload (529) responses
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 15_000; // 15 seconds
+const BACKOFF_MULTIPLIER = 2; // 15s -> 30s -> 60s
 
 let lastRequest: number;
 
@@ -43,33 +48,52 @@ export async function getFromBaseballReference(url: string): Promise<string> {
 
   lastRequest = Date.now();
 
-  try {
-    LOGGER.debug(`Fetching from Baseball Reference: ${url}`);
-    const response = await axios.get<string>(url);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      LOGGER.debug(`Fetching from Baseball Reference: ${url}`);
+      const response = await axios.get<string>(url);
 
-    // Store in cache
-    responseCache.set(url, {
-      data: response.data,
-      timestamp: Date.now(),
-    });
-    LOGGER.debug(
-      `Cached response for ${url} (size: ${response.data.length} bytes)`,
-    );
-
-    return response.data;
-  } catch (error) {
-    // For 429 errors, throw immediately without retrying
-    // Let SQS visibility timeout handle the retry delay instead of sleeping in Lambda
-    if (axios.isAxiosError(error) && error.response?.status === 429) {
-      LOGGER.warn(
-        `Got 429 Too Many Requests for ${url}. Failing fast to let SQS handle retry.`,
+      // Store in cache
+      responseCache.set(url, {
+        data: response.data,
+        timestamp: Date.now(),
+      });
+      LOGGER.debug(
+        `Cached response for ${url} (size: ${response.data.length} bytes)`,
       );
+
+      return response.data;
+    } catch (error) {
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      const isRateLimitOrOverload = status === 429 || status === 529;
+
+      // For rate limit / overload errors, retry with exponential backoff
+      if (isRateLimitOrOverload && attempt < MAX_RETRIES) {
+        const backoffMs =
+          INITIAL_BACKOFF_MS * Math.pow(BACKOFF_MULTIPLIER, attempt);
+        LOGGER.warn(
+          `Got ${status} for ${url}. Backing off ${backoffMs / 1000}s before retry ${attempt + 1}/${MAX_RETRIES}`,
+        );
+        await new Promise((res) => setTimeout(res, backoffMs));
+        // Re-apply rate limiting timestamp so the next request respects spacing
+        lastRequest = Date.now();
+        continue;
+      }
+
+      // Final attempt exhausted or non-retryable error — throw
+      if (isRateLimitOrOverload) {
+        LOGGER.warn(
+          `Got ${status} for ${url} after ${MAX_RETRIES} retries. Giving up.`,
+        );
+      }
       throw error;
     }
-
-    // For all other errors, throw immediately
-    throw error;
   }
+
+  // Should never reach here, but TypeScript needs it
+  throw new Error(`Failed to fetch ${url} after ${MAX_RETRIES} retries`);
 }
 
 export function getPlayers(letter: string): Promise<string> {

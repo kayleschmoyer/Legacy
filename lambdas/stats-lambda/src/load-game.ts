@@ -1,5 +1,5 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, isNotNull, isNull } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -36,6 +36,7 @@ const notificationService = createNotificationService();
  * Message format for matchup stats loading
  * Contains a batch of players for a matchup to process sequentially
  * Supports batching to avoid Lambda timeouts
+ *
  */
 interface LoadMatchupStatsMessage {
   matchupId: number;
@@ -46,16 +47,15 @@ interface LoadMatchupStatsMessage {
     playerId: number;
     brefId: string;
     season: number;
-    battingGameNum: number;
-    pitchingGameNum: number;
-    fieldingGameNum: number;
     fieldingGamePos: string;
   }>;
 }
 
 /**
  * Select random unique game identifiers and update matchup_player_games
- * Called after all game stats are loaded for a player
+ * Called after all game stats are loaded for a player.
+ * Only updates records that don't already have a game_identifier assigned
+ * (i.e., records from the uncached path where game selection couldn't pick a game).
  */
 async function selectAndAssignGameIdentifiers(
   db: PublicDb,
@@ -67,8 +67,9 @@ async function selectAndAssignGameIdentifiers(
     `Selecting game identifiers for matchup player ${matchupPlayerId}`,
   );
 
-  // Get all unique game identifiers for this player/season across all stat types
-  const uniqueGames = await db
+  // Get all unique game identifiers for this player/season from batting stats
+  // (batting is the most reliable - every player bats)
+  const allUniqueGames = await db
     .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
     .from(PublicSchema.gameBatting)
     .where(
@@ -76,37 +77,16 @@ async function selectAndAssignGameIdentifiers(
         eq(PublicSchema.gameBatting.playerId, playerId),
         eq(PublicSchema.gameBatting.season, season),
       ),
-    )
-    .union(
-      db
-        .selectDistinct({
-          gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
-        })
-        .from(PublicSchema.gamePitching)
-        .where(
-          and(
-            eq(PublicSchema.gamePitching.playerId, playerId),
-            eq(PublicSchema.gamePitching.season, season),
-          ),
-        ),
-    )
-    .union(
-      db
-        .selectDistinct({
-          gameIdentifier: PublicSchema.gameFielding.gameIdentifier,
-        })
-        .from(PublicSchema.gameFielding)
-        .where(
-          and(
-            eq(PublicSchema.gameFielding.playerId, playerId),
-            eq(PublicSchema.gameFielding.season, season),
-          ),
-        ),
     );
+
+  // Filter out empty string game_identifiers (stale data from pre-refactor scrapes)
+  const uniqueGames = allUniqueGames.filter(
+    (g) => g.gameIdentifier !== '' && g.gameIdentifier !== null,
+  );
 
   if (uniqueGames.length === 0) {
     LOGGER.warn(
-      `No games found for player ${playerId} season ${season}, cannot select games`,
+      `No valid game identifiers found for player ${playerId} season ${season} (${allUniqueGames.length} total, all empty), cannot select games`,
     );
     return;
   }
@@ -115,41 +95,64 @@ async function selectAndAssignGameIdentifiers(
     `Found ${uniqueGames.length} unique games for player ${playerId} season ${season}`,
   );
 
-  // Get number of games needed from matchup_player_games records
-  const existingGames = await db
+  // Get records that need game_identifier assignment (null gameIdentifier)
+  const unassignedGames = await db
     .select()
     .from(PublicSchema.matchupPlayerGames)
     .where(
-      eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+      ),
     );
 
-  const gamesNeeded = existingGames.length;
-
-  if (gamesNeeded === 0) {
+  if (unassignedGames.length === 0) {
     LOGGER.info(
-      `No game slots found for matchup player ${matchupPlayerId}, skipping game selection`,
+      `All game slots already have game_identifiers for matchup player ${matchupPlayerId}`,
     );
     return;
   }
 
-  // Randomly select N unique games
-  const shuffled = uniqueGames
-    .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .slice(0, gamesNeeded);
+  // Get already-used game identifiers to avoid duplicates
+  const usedGames = await db
+    .select({ gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier })
+    .from(PublicSchema.matchupPlayerGames)
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+      ),
+    );
 
-  LOGGER.info(
-    `Selected ${shuffled.length} random games from ${uniqueGames.length} available`,
+  const usedIds = new Set(
+    usedGames
+      .map((g) => g.gameIdentifier)
+      .filter((id): id is string => id !== null),
   );
 
-  // Update each matchup_player_games record with a game_identifier
-  for (let i = 0; i < shuffled.length && i < existingGames.length; i++) {
+  // Filter to available (not already used) games
+  const availableGames = uniqueGames.filter(
+    (g) => !usedIds.has(g.gameIdentifier),
+  );
+
+  // Randomly select N unique games for unassigned slots
+  const shuffled = availableGames
+    .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, unassignedGames.length);
+
+  LOGGER.info(
+    `Selected ${shuffled.length} random games from ${availableGames.length} available (${usedIds.size} already used)`,
+  );
+
+  // Update each unassigned matchup_player_games record with a game_identifier
+  for (let i = 0; i < shuffled.length && i < unassignedGames.length; i++) {
     await db
       .update(PublicSchema.matchupPlayerGames)
       .set({
         gameIdentifier: shuffled[i].gameIdentifier,
       })
-      .where(eq(PublicSchema.matchupPlayerGames.id, existingGames[i].id));
+      .where(eq(PublicSchema.matchupPlayerGames.id, unassignedGames[i].id));
   }
 
   LOGGER.info(
@@ -158,12 +161,18 @@ async function selectAndAssignGameIdentifiers(
 }
 
 /**
- * Check if an error is a retryable Baseball-Reference timeout
+ * Check if an error is a retryable Baseball-Reference error (timeout, rate limit, or overload).
+ * Rate limit (429) and overload (529) errors should be retried after SQS visibility timeout delay.
  */
-function isRetryableTimeoutError(error: unknown): boolean {
+function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const errorMessage = error.message.toLowerCase();
+
+  // Check for HTTP 429 (Too Many Requests) or 529 (Site Overloaded)
+  const isRateLimited =
+    errorMessage.includes('status code 429') ||
+    errorMessage.includes('status code 529');
 
   // Check for HTTP 504 (Gateway Timeout) or 524 (Cloudflare timeout)
   const isTimeoutStatus =
@@ -174,7 +183,81 @@ function isRetryableTimeoutError(error: unknown): boolean {
   const isTimeoutMessage =
     errorMessage.includes('timeout') || errorMessage.includes('timed out');
 
-  return isTimeoutStatus || isTimeoutMessage;
+  return isRateLimited || isTimeoutStatus || isTimeoutMessage;
+}
+
+/**
+ * Check if an error is specifically a rate limit or overload error (429/529).
+ * Used to abort remaining players in a batch early (no point hitting an overloaded service).
+ */
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes('status code 429') || msg.includes('status code 529');
+}
+
+/**
+ * Purge stale game stats that have empty game_identifier values.
+ * These were scraped by pre-refactor code that didn't populate game_identifier.
+ * Deleting them allows a fresh re-scrape that produces proper identifiers.
+ */
+async function purgeStaleStats(
+  db: PublicDb,
+  playerId: number,
+  season: number,
+): Promise<void> {
+  const staleBatting = await db
+    .select({ cnt: count() })
+    .from(PublicSchema.gameBatting)
+    .where(
+      and(
+        eq(PublicSchema.gameBatting.playerId, playerId),
+        eq(PublicSchema.gameBatting.season, season),
+        eq(PublicSchema.gameBatting.gameIdentifier, ''),
+      ),
+    );
+
+  const staleCount = staleBatting[0]?.cnt ?? 0;
+  if (staleCount === 0) return;
+
+  LOGGER.warn(
+    `Found ${staleCount} stale batting records with empty game_identifier for player ${playerId} season ${season} — purging all stale stats to force re-scrape`,
+  );
+
+  // Delete stale batting
+  await db
+    .delete(PublicSchema.gameBatting)
+    .where(
+      and(
+        eq(PublicSchema.gameBatting.playerId, playerId),
+        eq(PublicSchema.gameBatting.season, season),
+        eq(PublicSchema.gameBatting.gameIdentifier, ''),
+      ),
+    );
+
+  // Delete stale pitching
+  await db
+    .delete(PublicSchema.gamePitching)
+    .where(
+      and(
+        eq(PublicSchema.gamePitching.playerId, playerId),
+        eq(PublicSchema.gamePitching.season, season),
+        eq(PublicSchema.gamePitching.gameIdentifier, ''),
+      ),
+    );
+
+  // Delete stale fielding
+  await db
+    .delete(PublicSchema.gameFielding)
+    .where(
+      and(
+        eq(PublicSchema.gameFielding.playerId, playerId),
+        eq(PublicSchema.gameFielding.season, season),
+        eq(PublicSchema.gameFielding.gameIdentifier, ''),
+      ),
+    );
+
+  LOGGER.info(`Purged stale stats for player ${playerId} season ${season}`);
 }
 
 async function loadPlayerGameStats(
@@ -204,6 +287,9 @@ async function loadPlayerGameStats(
   };
 
   try {
+    // Purge stale stats with empty game_identifier (from pre-refactor scrapes)
+    await purgeStaleStats(db, playerId, season);
+
     // Load batting stats - check if ANY game exists for this player/season, if not load ALL games
     LOGGER.debug(
       `Checking if batting stats exist for player ${playerId}, season ${season}`,
@@ -362,19 +448,36 @@ async function loadPlayerGameStats(
       }
     }
   } catch (error) {
+    const retryable = isRetryableError(error);
+
     LOGGER.error(`Failed to load stats for player ${playerId}:`, {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       playerId,
       brefId,
       season,
-      isRetryableTimeout: isRetryableTimeoutError(error),
+      isRetryable: retryable,
     });
 
-    // Mark this player's game as failed
+    // For retryable errors (429, timeout), leave status as 'loading' so
+    // the SQS retry can process the player again without false 'failed' state
+    if (retryable) {
+      interface RetryableError extends Error {
+        originalError: unknown;
+        isRetryableTimeout: boolean;
+        isRateLimit: boolean;
+      }
+      const retryableError = new Error(
+        `RETRYABLE: ${error instanceof Error ? error.message : String(error)}`,
+      ) as RetryableError;
+      retryableError.originalError = error;
+      retryableError.isRetryableTimeout = true;
+      retryableError.isRateLimit = isRateLimitError(error);
+      throw retryableError;
+    }
+
+    // Non-retryable error — mark this player's game as failed
     if (player.matchupPlayerId) {
-      // Determine retry count from context (passed from baseHandler)
-      // For now, mark as failed - the matchup-level logic will handle retry state
       await db
         .update(PublicSchema.matchupPlayerGames)
         .set({ statsLoadingStatus: 'failed' })
@@ -386,21 +489,6 @@ async function loadPlayerGameStats(
         );
 
       LOGGER.info(`Updated player ${playerId} game status to 'failed'`);
-    }
-
-    // Re-throw with a marker if this is a retryable timeout error
-    if (isRetryableTimeoutError(error)) {
-      // Create a retryable error with custom properties
-      interface RetryableError extends Error {
-        originalError: unknown;
-        isRetryableTimeout: boolean;
-      }
-      const retryableError = new Error(
-        `RETRYABLE_TIMEOUT: ${error instanceof Error ? error.message : String(error)}`,
-      ) as RetryableError;
-      retryableError.originalError = error;
-      retryableError.isRetryableTimeout = true;
-      throw retryableError;
     }
 
     throw error;
@@ -531,7 +619,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         const retryCount = record.attributes?.ApproximateReceiveCount
           ? parseInt(record.attributes.ApproximateReceiveCount, 10)
           : 1;
-        const maxRetries = 5;
+        // Must match SQS maxReceiveCount in terraform/sqs.tf redrive_policy
+        const maxRetries = 3;
 
         LOGGER.info(
           `Processing message with retry count: ${retryCount}/${maxRetries}`,
@@ -542,7 +631,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         );
 
         let failedPlayerCount = 0;
-        let timeoutPlayerCount = 0;
+        let retryablePlayerCount = 0;
+        let hitRateLimit = false;
 
         for (const player of message.players) {
           try {
@@ -551,15 +641,22 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           } catch (error) {
             failedPlayerCount++;
 
-            // Check if this is a retryable timeout error
-            const isTimeout =
+            // Check if this is a retryable error (429 or timeout)
+            const isRetryable =
               error &&
               typeof error === 'object' &&
               'isRetryableTimeout' in error &&
               error.isRetryableTimeout === true;
-            if (isTimeout) {
-              timeoutPlayerCount++;
+            if (isRetryable) {
+              retryablePlayerCount++;
             }
+
+            // Check if this is specifically a rate limit (429) error
+            const isRateLimit =
+              error &&
+              typeof error === 'object' &&
+              'isRateLimit' in error &&
+              error.isRateLimit === true;
 
             LOGGER.error(
               `Failed to load stats for player ${player.playerId} in matchup ${message.matchupId}`,
@@ -567,10 +664,21 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                 error: error instanceof Error ? error.message : String(error),
                 playerId: player.playerId,
                 brefId: player.brefId,
-                isRetryableTimeout: isTimeout,
+                isRetryable,
+                isRateLimit,
               },
             );
-            // Continue processing other players even if one fails
+
+            // If rate limited, abort remaining players — no point hitting a throttled service
+            if (isRateLimit) {
+              hitRateLimit = true;
+              LOGGER.warn(
+                `Rate limited (429) — aborting remaining ${message.players.length - failedPlayerCount} players in batch. Will retry via SQS.`,
+                { matchupId: message.matchupId },
+              );
+              break;
+            }
+            // Continue processing other players for non-rate-limit failures
           }
         }
 
@@ -587,17 +695,18 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             : 0;
 
         // Determine if we should retry this message
-        // If we have timeout failures and haven't exceeded retry limit, return as batch failure
-        const shouldRetry = timeoutPlayerCount > 0 && retryCount < maxRetries;
+        // If we have retryable failures (429 or timeout) and haven't exceeded retry limit, return as batch failure
+        const shouldRetry = retryablePlayerCount > 0 && retryCount < maxRetries;
 
         if (shouldRetry) {
           LOGGER.warn(
-            `Returning message to queue for retry (${timeoutPlayerCount} timeout failures, attempt ${retryCount}/${maxRetries})`,
+            `Returning message to queue for retry (${retryablePlayerCount} retryable failures${hitRateLimit ? ', rate limited' : ''}, attempt ${retryCount}/${maxRetries})`,
             {
               messageId: record.messageId,
               matchupId: message.matchupId,
-              timeoutPlayerCount,
+              retryablePlayerCount,
               totalFailedPlayers: failedPlayerCount,
+              hitRateLimit,
               retryCount,
             },
           );
@@ -612,8 +721,9 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           LOGGER.info(
             `Set matchup ${message.matchupId} stats_loading_status to 'retry' (attempt ${retryCount}/${maxRetries})`,
             {
-              timeoutPlayerCount,
+              retryablePlayerCount,
               totalFailedPlayers: failedPlayerCount,
+              hitRateLimit,
             },
           );
 
@@ -650,7 +760,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             {
               successfulPlayers: message.players.length - failedPlayerCount,
               failedPlayers: failedPlayerCount,
-              timeoutPlayers: timeoutPlayerCount,
+              retryablePlayers: retryablePlayerCount,
+              hitRateLimit,
               retryCount,
               maxRetries,
             },
@@ -702,7 +813,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               totalBatches: message.totalBatches,
               batchPlayers: message.players.length,
               failedPlayers: failedPlayerCount,
-              timeoutPlayers: timeoutPlayerCount,
+              retryablePlayers: retryablePlayerCount,
+              hitRateLimit,
               retryCount,
               finalStatus,
               cacheHitRate: `${cacheHitRate}%`,
@@ -719,7 +831,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             {
               batchPlayers: message.players.length,
               failedPlayers: failedPlayerCount,
-              timeoutPlayers: timeoutPlayerCount,
+              retryablePlayers: retryablePlayerCount,
+              hitRateLimit,
               retryCount,
               cacheHitRate: `${cacheHitRate}%`,
               currentCacheSize: cacheStatsAfter.totalEntries,
@@ -746,7 +859,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           ? parseInt(record.attributes.ApproximateReceiveCount, 10)
           : 1;
         const maxRetries = 5;
-        const isRetryable = isRetryableTimeoutError(error);
+        const isRetryable = isRetryableError(error);
 
         if (isRetryable && retryCount < maxRetries) {
           LOGGER.warn(
