@@ -1,5 +1,5 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
-import { and, count, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
@@ -750,13 +750,70 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             finalStatus = 'completed';
           }
 
+          // Check if all games are complete to determine main matchup status
+          let matchupMainStatus: 'in_progress' | 'completed' | undefined;
+
+          if (finalStatus === 'completed') {
+            // Query matchup to get gamesPerMatchup and count selected games
+            const matchupResult = await db
+              .select({
+                gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
+              })
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.id, message.matchupId))
+              .limit(1);
+
+            const gamesPerMatchup = matchupResult[0]?.gamesPerMatchup ?? 0;
+
+            // Count distinct game_num values for this matchup
+            const selectedGamesResult = await db
+              .select({
+                count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+              })
+              .from(PublicSchema.matchupPlayerGames)
+              .innerJoin(
+                PublicSchema.matchupPlayers,
+                eq(
+                  PublicSchema.matchupPlayerGames.matchupPlayerId,
+                  PublicSchema.matchupPlayers.id,
+                ),
+              )
+              .where(
+                eq(PublicSchema.matchupPlayers.matchupId, message.matchupId),
+              );
+
+            const selectedGamesCount = selectedGamesResult[0]?.count ?? 0;
+
+            // If all games are selected and stats loaded, mark matchup as completed
+            if (selectedGamesCount >= gamesPerMatchup && gamesPerMatchup > 0) {
+              matchupMainStatus = 'completed';
+              LOGGER.info(
+                `All games complete for matchup ${message.matchupId} (${selectedGamesCount}/${gamesPerMatchup})`,
+              );
+            } else {
+              matchupMainStatus = 'in_progress';
+              LOGGER.info(
+                `Matchup ${message.matchupId} still in progress (${selectedGamesCount}/${gamesPerMatchup} games)`,
+              );
+            }
+          }
+
+          const updateData: {
+            statsLoadingStatus: 'completed' | 'failed';
+            status?: 'in_progress' | 'completed';
+          } = { statsLoadingStatus: finalStatus };
+
+          if (matchupMainStatus) {
+            updateData.status = matchupMainStatus;
+          }
+
           await db
             .update(PublicSchema.matchups)
-            .set({ statsLoadingStatus: finalStatus })
+            .set(updateData)
             .where(eq(PublicSchema.matchups.id, message.matchupId));
 
           LOGGER.info(
-            `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'`,
+            `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'${matchupMainStatus ? ` and status to '${matchupMainStatus}'` : ''}`,
             {
               successfulPlayers: message.players.length - failedPlayerCount,
               failedPlayers: failedPlayerCount,

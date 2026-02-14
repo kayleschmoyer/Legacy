@@ -401,13 +401,22 @@ async function createMatchupForLeagueWeek(
           `Found ${pendingGames.length} pending games for matchup ${matchup.id}, queuing for stats loading`,
         );
 
-        // Update matchup status to 'loading' before queuing
+        // Update matchup status to 'loading' and set main status to 'in_progress' if still scheduled
+        const updateData: {
+          statsLoadingStatus: 'loading';
+          status?: 'in_progress';
+        } = { statsLoadingStatus: 'loading' };
+
+        if (matchup.status === 'scheduled') {
+          updateData.status = 'in_progress';
+        }
+
         await db
           .update(PublicSchema.matchups)
-          .set({ statsLoadingStatus: 'loading' })
+          .set(updateData)
           .where(eq(PublicSchema.matchups.id, matchup.id));
         LOGGER.info(
-          `Set matchup ${matchup.id} stats_loading_status to 'loading'`,
+          `Set matchup ${matchup.id} stats_loading_status to 'loading'${matchup.status === 'scheduled' ? " and status to 'in_progress'" : ''}`,
         );
 
         // Update individual player game statuses to 'loading'
