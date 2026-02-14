@@ -38,19 +38,14 @@ This causes failures when quota is exceeded because Nx will always try to connec
 
 ### ✅ Workflows with Conditional Nx Cloud
 
-1. **deploy-web.yml**
-   - Removed global token from env
-   - Build step sets token conditionally:
-     ```yaml
-     env:
-       NX_CLOUD_ACCESS_TOKEN: ${{ steps.detect-dte.outputs.dte-available == 'true' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
-     ```
-   - Uses DTE when available, falls back to local when not
-
-2. **ci-pipeline.yml**
+1. **ci-pipeline.yml**
    - Has global token in env (for detect-dte to check)
    - Individual actions unset it when DTE unavailable
    - Quality gates, build validation, e2e-testing all handle fallback
+
+2. **Lambda Upload Workflows** (upload-\*.yml)
+   - Always use local execution
+   - No Nx Cloud dependency for Lambda builds
 
 ### ✅ Actions with Nx Cloud Fallback
 
@@ -134,8 +129,6 @@ gh workflow run ci-pipeline.yml
 ```bash
 # Trigger workflow (will auto-detect and fallback)
 gh workflow run ci-pipeline.yml
-# Or deploy-web
-gh workflow run deploy-web.yml
 ```
 
 ### Verify Logs

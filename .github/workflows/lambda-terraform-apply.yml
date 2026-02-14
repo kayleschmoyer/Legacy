@@ -55,8 +55,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # AWS_ACCOUNT_ID is a required repository secret (configured in GitHub settings)
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Debounce Multiple Triggers
@@ -151,7 +150,34 @@ jobs:
             exit 1
           fi
 
+      - name: Release Lock on Plan Failure
+        if: always() && steps.plan.outcome == 'failure'
+        working-directory: terraform
+        run: |
+          echo "🔓 Releasing terraform lock after plan failure..."
+          bash -c '
+          LOCK_ID=$(aws dynamodb scan \
+            --table-name terraform-state-locks \
+            --filter-expression "begins_with(LockID, :prefix)" \
+            --expression-attribute-values "{\":prefix\":{\"S\":\"legacy-sports-terraform-state/legacy-sports/terraform.tfstate\"}}" \
+            --region us-east-1 \
+            --query "Items[0].LockID.S" \
+            --output text 2>/dev/null)
+
+          if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+            echo "Found lock: $LOCK_ID"
+            aws dynamodb delete-item \
+              --table-name terraform-state-locks \
+              --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" \
+              --region us-east-1
+            echo "✅ Lock released"
+          else
+            echo "No lock found to release"
+          fi
+          '
+
       - name: Apply Infrastructure Changes
+        id: apply
         if: steps.plan.outputs.has_changes == 'true'
         working-directory: terraform
         run: |
@@ -161,6 +187,32 @@ jobs:
 
           echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
           echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Release Lock on Apply Failure
+        if: always() && steps.apply.outcome == 'failure'
+        working-directory: terraform
+        run: |
+          echo "🔓 Releasing terraform lock after apply failure..."
+          bash -c '
+          LOCK_ID=$(aws dynamodb scan \
+            --table-name terraform-state-locks \
+            --filter-expression "begins_with(LockID, :prefix)" \
+            --expression-attribute-values "{\":prefix\":{\"S\":\"legacy-sports-terraform-state/legacy-sports/terraform.tfstate\"}}" \
+            --region us-east-1 \
+            --query "Items[0].LockID.S" \
+            --output text 2>/dev/null)
+
+          if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+            echo "Found lock: $LOCK_ID"
+            aws dynamodb delete-item \
+              --table-name terraform-state-locks \
+              --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" \
+              --region us-east-1
+            echo "✅ Lock released"
+          else
+            echo "No lock found to release"
+          fi
+          '
 
       - name: Verify Deployment
         if: steps.plan.outputs.has_changes == 'true'
@@ -178,21 +230,32 @@ jobs:
           echo "$FUNCTIONS" | jq -r '.[] | "- **\(.Name)**: \(.Updated)"' >> $GITHUB_STEP_SUMMARY
 
       - name: Cleanup on Failure
-        if: failure() || cancelled()
+        if: always() && (failure() || cancelled())
         working-directory: terraform
         run: |
-          echo "🔓 Ensuring lock is released..."
+          echo "🔓 Ensuring terraform lock is released..."
 
-          # Try to detect and release any locks we might hold
-          LOCK_CHECK=$(terraform plan -refresh=false 2>&1 || true)
+          # Directly query DynamoDB for locks on our state file
+          LOCK_ID=$(aws dynamodb scan \
+            --table-name terraform-state-locks \
+            --filter-expression "begins_with(LockID, :prefix)" \
+            --expression-attribute-values '{":prefix":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
+            --region us-east-1 \
+            --query "Items[0].LockID.S" \
+            --output text 2>/dev/null || echo "")
 
-          if echo "$LOCK_CHECK" | grep -q "Error acquiring the state lock"; then
-            LOCK_ID=$(echo "$LOCK_CHECK" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
+          if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+            echo "⚠️  Found stale lock: $LOCK_ID"
+            echo "🔓 Removing lock from DynamoDB..."
             
-            if [ -n "$LOCK_ID" ]; then
-              echo "Releasing lock: $LOCK_ID"
-              terraform force-unlock -force "$LOCK_ID" || true
-            fi
+            aws dynamodb delete-item \
+              --table-name terraform-state-locks \
+              --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" \
+              --region us-east-1
+            
+            echo "✅ Lock successfully released"
+          else
+            echo "✅ No locks found - state is clean"
           fi
 
       - name: Update Deployment Badge

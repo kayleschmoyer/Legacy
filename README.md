@@ -21,14 +21,13 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 ## 🚢 Deployment Status
 
-[![Deploy Web](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Web.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-web.yml)
-[![Deploy Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-stats.yml)
-[![Deploy Game Selection Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Game-Selection-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-game-selection.yml)
-[![Deploy OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-oauth-proxy.yml)
-[![Deploy GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-gql.yml)
-[![Deploy Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-draft-processor.yml)
-[![Deploy Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
-[![Deploy Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
+[![Upload Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-stats-lambda.yml)
+[![Upload Game Selection Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Game-Selection-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-game-selection.yml)
+[![Upload OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-oauth-proxy.yml)
+[![Upload GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-gql.yml)
+[![Upload Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-draft-processor.yml)
+[![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
+[![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
 ## 🌐 Live Web App
 
@@ -282,12 +281,14 @@ Android APKs are automatically built and released on every push to `main`:
 
 Manual builds can also be triggered from [GitHub Actions](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml).
 
-### Web Deployment
+### Lambda Deployment
 
-The web app automatically deploys to GitHub Pages on pushes to `main`:
+Lambdas use a two-step deployment process:
 
-- **URL**: https://bkrupa.github.io/legacy-sports/
-- **Workflow**: `.github/workflows/deploy-web.yml`
+1. **Upload**: Individual Lambda uploads run in parallel (`.github/workflows/upload-*.yml`)
+2. **Terraform Apply**: Single workflow applies all infrastructure changes (`.github/workflows/lambda-terraform-apply.yml`)
+
+This ensures only one Terraform process runs at a time, preventing state lock conflicts.
 
 ### Local Mobile Builds
 

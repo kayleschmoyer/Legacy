@@ -61,9 +61,7 @@ Migrated all workflows to use a centralized, reusable action for Nx Cloud config
 
 For workflows that use basic Nx commands but don't need distributed execution:
 
-- **`publish-oauth-proxy.yml`**
-- **`publish-stats-lambda.yml`**
-- **`deploy-web.yml`**
+- **Lambda Upload Workflows** (`upload-*.yml`)
 
 **Pattern Applied**:
 
@@ -102,9 +100,7 @@ For workflows that use basic Nx commands but don't need distributed execution:
 
 ### **🔧 Simple Build Workflows**
 
-- **`publish-oauth-proxy.yml`** - Local execution only, NX_PARALLEL=2
-- **`publish-stats-lambda.yml`** - Local execution only, NX_PARALLEL=2
-- **`deploy-web.yml`** - Local execution only, NX_PARALLEL=2
+- **Lambda Upload Workflows** (`upload-*.yml`) - Local execution only, NX_PARALLEL=2
 
 ### **📦 No Nx Workflows** (unchanged)
 

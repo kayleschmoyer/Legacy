@@ -70,9 +70,7 @@ pnpm exec nx build web --configuration=deploy
   - `tamagui-vendor`: Tamagui UI library
 - 🎯 Target: Production deployment to GitHub Pages
 
-**Used by**:
-
-- `.github/workflows/deploy-web.yml` - Deploys to GitHub Pages
+**Note**: Web deployment workflow has been removed. Use manual build and deployment process.
 
 ## Configuration Details
 
