@@ -502,7 +502,7 @@ jobs:
         with:
           github-token: ${{ secrets.GIST_TOKEN }}
           gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
-          deployment-name: "Android APK"
+          deployment-name: "Build Android APK"
           deployment-status: ${{ needs.build-android.result }}
           workflow-run-id: ${{ github.run_id }}
           branch: ${{ github.ref_name }}

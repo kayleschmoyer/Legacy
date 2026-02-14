@@ -264,7 +264,7 @@ jobs:
         with:
           github-token: ${{ secrets.GIST_TOKEN }}
           gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
-          deployment-name: "Lambda Infrastructure"
+          deployment-name: "Apply Lambda Infrastructure"
           deployment-status: ${{ job.status }}
           workflow-run-id: ${{ github.run_id }}
           branch: ${{ github.ref_name }}

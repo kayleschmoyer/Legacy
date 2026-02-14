@@ -134,3 +134,14 @@ jobs:
           echo "::notice::✅ Draft Processor Lambda uploaded successfully"
           echo "::notice::Version: ${VERSION}"
           echo "::notice::Waiting for Terraform workflow to apply infrastructure..."
+
+      - name: Update Deployment Badge
+        if: always()
+        uses: ./.github/actions/update-deployment-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          deployment-name: "Upload Draft Processor Lambda"
+          deployment-status: ${{ job.status }}
+          workflow-run-id: ${{ github.run_id }}
+          branch: ${{ github.ref_name }}

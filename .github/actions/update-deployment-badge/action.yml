@@ -72,12 +72,12 @@ runs:
         MESSAGE=$(format_status_message "$STATUS" "$TIMESTAMP")
 
         # Create filename-safe version (replace spaces with hyphens)
-        FILENAME=$(echo "Deploy-${DEPLOYMENT_NAME}" | sed 's/ /-/g')
+        FILENAME=$(echo "${DEPLOYMENT_NAME}" | sed 's/ /-/g')
 
         # Create badge JSON using jq or echo
         if command -v jq >/dev/null 2>&1; then
           jq -n \
-            --arg label "Deploy ${DEPLOYMENT_NAME}" \
+            --arg label "${DEPLOYMENT_NAME}" \
             --arg message "${MESSAGE}" \
             --arg color "${COLOR}" \
             '{
@@ -92,7 +92,7 @@ runs:
             }' > "${FILENAME}.json"
         else
           # Fallback: use echo
-          echo "{\"schemaVersion\":1,\"label\":\"Deploy ${DEPLOYMENT_NAME}\",\"message\":\"${MESSAGE}\",\"color\":\"${COLOR}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${FILENAME}.json"
+          echo "{\"schemaVersion\":1,\"label\":\"${DEPLOYMENT_NAME}\",\"message\":\"${MESSAGE}\",\"color\":\"${COLOR}\",\"namedLogo\":\"github\",\"logoColor\":\"white\",\"style\":\"flat\",\"cacheSeconds\":300}" > "${FILENAME}.json"
         fi
 
         echo "Generated badge file: ${FILENAME}.json"
@@ -142,7 +142,7 @@ runs:
           ACTION_URL="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}"
           echo "### Badge Markdown" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`markdown" >> $GITHUB_STEP_SUMMARY
-          echo "[![Deploy ${DEPLOYMENT_NAME}](${BADGE_URL})](${ACTION_URL})" >> $GITHUB_STEP_SUMMARY
+          echo "[![${DEPLOYMENT_NAME}](${BADGE_URL})](${ACTION_URL})" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
         else
