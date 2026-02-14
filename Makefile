@@ -90,6 +90,7 @@ endif
 install-tools: ## Install additional development tools (npkill, rimraf)
 	@$(call echo_blue,Installing development tools...)
 	pnpm add -g npkill rimraf
+	@$(call echo_green,Development tools installed!)
 
 install-node: ## Install only Node.js dependencies
 	@$(call echo_blue,Installing Node.js dependencies...)
@@ -176,6 +177,10 @@ lint: ## Run linting on all projects
 lint-fix: ## Run linting with auto-fix on all projects
 	@$(call echo_blue,Running linters with auto-fix...)
 	npx nx run-many -t lint --fix
+
+lint-workflows: ## Lint GitHub Actions workflow files
+	@$(call echo_blue,Linting GitHub Actions workflows...)
+	@node scripts/validate-workflows.js
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
@@ -528,15 +533,17 @@ endif
 
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
-	@$(call echo_plain,1/5 Type checking...)
+	@$(call echo_plain,1/6 Type checking...)
 	@npx nx affected -t typecheck --base=main
-	@$(call echo_plain,2/5 Formatting...)
+	@$(call echo_plain,2/6 Formatting...)
 	@npx nx format:write
-	@$(call echo_plain,3/5 Linting...)
+	@$(call echo_plain,3/6 Linting...)
 	@npx nx affected -t lint --fix --base=main
-	@$(call echo_plain,4/5 Testing...)
+	@$(call echo_plain,4/6 Workflow validation...)
+	@$(MAKE) lint-workflows
+	@$(call echo_plain,5/6 Testing...)
 	@npx nx affected -t test --base=main
-	@$(call echo_plain,5/5 Building...)
+	@$(call echo_plain,6/6 Building...)
 	@npx nx affected -t build --base=main
 	@$(call echo_green,✓ All pre-commit checks passed!)
 

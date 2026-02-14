@@ -15,7 +15,7 @@ describe('applyMultiplierGroups', () => {
   it('overrides default multipliers by stat group', () => {
     const result = applyMultiplierGroups([
       {
-        __typename: 'LeagueScoringMultiplierGroup',
+        __typename: 'ScoringRuleGroup',
         group: ScoringStatGroup.Batting,
         values: [
           {
@@ -37,7 +37,7 @@ describe('applyMultiplierGroups', () => {
     const result = applyMultiplierGroups(
       [
         {
-          __typename: 'LeagueScoringMultiplierGroup',
+          __typename: 'ScoringRuleGroup',
           group: ScoringStatGroup.Pitching,
           values: [
             {
@@ -46,7 +46,6 @@ describe('applyMultiplierGroups', () => {
               sourceColumn: 'w',
               multiplier: null,
             },
-            null,
           ],
         },
       ],

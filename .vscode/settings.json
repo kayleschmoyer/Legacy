@@ -11,7 +11,7 @@
       "args": ["mcp-server"]
     }
   },
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
   "search.exclude": {
     "**/node_modules": true,
     "**/dist": true,
@@ -43,6 +43,30 @@
   },
   "typescript.tsserver.maxTsServerMemory": 8192,
   "typescript.preferences.excludeLibrarySymbolsInNavTo": true,
+  "yaml.customTags": [
+    "!And",
+    "!If",
+    "!Not",
+    "!Equals",
+    "!Or",
+    "!FindInMap",
+    "!Base64",
+    "!Cidr",
+    "!Ref",
+    "!Sub",
+    "!GetAtt",
+    "!GetAZs",
+    "!ImportValue",
+    "!Select",
+    "!Split",
+    "!Join"
+  ],
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
+    "https://json.schemastore.org/github-action.json": ".github/actions/*/action.yml"
+  },
+  "yaml.validate": true,
+  "yaml.schemaStore.enable": true,
   "chat.tools.terminal.autoApprove": {
     "/^make pre-commit$/": {
       "approve": true,
@@ -52,5 +76,6 @@
       "approve": true,
       "matchCommandLine": true
     }
-  }
+  },
+  "chat.editing.autoAcceptDelay": 10
 }

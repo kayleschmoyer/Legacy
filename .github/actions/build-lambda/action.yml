@@ -36,7 +36,7 @@ outputs:
     value: ${{ steps.package.outputs.s3-key }}
 
 runs:
-  using: composite
+  using: "composite"
   steps:
     - name: Set derived values
       shell: bash

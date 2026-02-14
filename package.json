@@ -75,6 +75,7 @@
     "validate:package-json": "node scripts/validate-package-json-standards.js",
     "validate:workspace-deps": "node scripts/validate-workspace-deps.js",
     "validate:security": "node scripts/verify-security.js",
+    "validate:workflows": "node scripts/validate-workflows.js",
     "validate": "pnpm run validate:package-json && pnpm run validate:workspace-deps && pnpm run validate:auth-security",
     "build:all": "nx run-many --target=build --all",
     "build:libs": "nx run-many --target=build --projects=tag:scope:lib",
@@ -324,6 +325,7 @@
     "vite-plugin-dts": "~4.5.0",
     "vite-plugin-react-native-web": "^2.6.0",
     "wait-on": "^9.0.1",
+    "yaml-language-server": "^1.19.2",
     "yaml-lint": "^1.7.0"
   },
   "pnpm": {

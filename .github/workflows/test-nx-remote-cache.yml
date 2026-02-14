@@ -200,7 +200,7 @@ jobs:
 
           NO_CACHE_TIME=$((END_TIME - START_TIME))
           echo "⏱️  Time without cache: ${NO_CACHE_TIME}s"
-          echo "no-cache-time=${NO_CACHE_TIME}" >> $GITHUB_ENV
+          echo "NO_CACHE_TIME=${NO_CACHE_TIME}" >> $GITHUB_ENV
 
       - name: "Benchmark: With Cache (Second Run)"
         run: |
@@ -213,7 +213,7 @@ jobs:
 
           WITH_CACHE_TIME=$((END_TIME - START_TIME))
           echo "⏱️  Time with cache: ${WITH_CACHE_TIME}s"
-          echo "with-cache-time=${WITH_CACHE_TIME}" >> $GITHUB_ENV
+          echo "WITH_CACHE_TIME=${WITH_CACHE_TIME}" >> $GITHUB_ENV
 
       - name: "Performance Comparison"
         if: always()
@@ -221,14 +221,14 @@ jobs:
           echo "📊 Performance Comparison"
           echo "========================"
           echo ""
-          echo "Without Cache: ${{ env.no-cache-time }}s"
-          echo "With Cache: ${{ env.with-cache-time }}s"
+          echo "Without Cache: ${{ env.NO_CACHE_TIME }}s"
+          echo "With Cache: ${{ env.WITH_CACHE_TIME }}s"
           echo ""
 
-          if [ -n "${{ env.no-cache-time }}" ] && [ -n "${{ env.with-cache-time }}" ]; then
-            SAVINGS=$((100 - (100 * ${{ env.with-cache-time }} / ${{ env.no-cache-time }})))
+          if [ -n "${{ env.NO_CACHE_TIME }}" ] && [ -n "${{ env.WITH_CACHE_TIME }}" ]; then
+            SAVINGS=$((100 - (100 * ${{ env.WITH_CACHE_TIME }} / ${{ env.NO_CACHE_TIME }})))
             echo "⚡ Speed Improvement: ${SAVINGS}%"
-            echo "⏰ Time Saved: $((${{ env.no-cache-time }} - ${{ env.with-cache-time }}))s"
+            echo "⏰ Time Saved: $((${{ env.NO_CACHE_TIME }} - ${{ env.WITH_CACHE_TIME }}))s"
           fi
 
   test-pr-simulation:

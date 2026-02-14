@@ -36,7 +36,7 @@ outputs:
     value: ${{ steps.package.outputs.s3-bucket }}
 
 runs:
-  using: composite
+  using: "composite"
   steps:
     - name: Set derived values
       shell: bash

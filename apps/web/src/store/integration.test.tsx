@@ -25,8 +25,8 @@ function TestComponent() {
   const handleSetPositions = () => {
     dispatch(
       setLeaguePositions([
-        { id: 1, position: 'C' },
-        { id: 2, position: '1B' },
+        { id: 1, positionType: 'C' },
+        { id: 2, positionType: '1B' },
       ] as LeaguePositionFragment[]),
     );
   };

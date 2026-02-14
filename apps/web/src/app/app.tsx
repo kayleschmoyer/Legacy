@@ -6,25 +6,25 @@ import {
   FootballScreen,
   PlayersScreen,
 } from '@legacy-sports/shared-components';
-import { WebHomeScreen } from '../components/WebHomeScreen';
-import { UserProfileDropdown } from '../components/UserProfileDropdown';
-import { SportsDropdown } from '../components/SportsDropdown';
-import { PlayersDropdown } from '../components/PlayersDropdown';
+import HomePage from '../pages/home/HomePage';
+import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
+import { SportsDropdown } from '../components/layout/SportsDropdown';
+import { PlayersDropdown } from '../components/layout/PlayersDropdown';
 import { BaseballScreen } from '../components/baseball';
 
 import {
-  WebPlayerDetailPage,
-  WebPlayerStatsPage,
-} from '../components/WebPlayerStatsPage';
-import LeagueCreatePage from '../components/baseball/LeagueCreatePage';
-import LeagueDetailPage from '../components/baseball/LeagueDetailPage';
-import { TeamDetailPage } from '../components/baseball/TeamDetailPage';
-import JoinLeagueByCode from '../components/baseball/JoinLeagueByCode';
-import ManagementPage from '../components/ManagementPage';
-import AboutPage from '../components/AboutPage';
-import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
+  PlayerDetailPage,
+  PlayerStatsPage,
+} from '../pages/players/PlayerStatsPage';
+import LeagueCreatePage from '../pages/baseball/LeagueCreatePage';
+import LeagueDetailPage from '../pages/baseball/LeagueDetailPage';
+import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
+import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
+import ManagementPage from '../pages/management/ManagementPage';
+import AboutPage from '../pages/about/AboutPage';
+import { DraftBoardPage } from '../pages/draft/DraftBoardPage';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
-import { MatchupDetailPage } from '../components/matchup/MatchupDetailPage';
+import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 
 // Styled Tamagui components for navigation
@@ -180,7 +180,7 @@ function Navigation() {
 
 // HomeScreen wrapper with navigation
 function NavigableHomeScreen() {
-  return <WebHomeScreen />;
+  return <HomePage />;
 }
 
 const MainLayout = styled(YStack, {
@@ -226,15 +226,18 @@ function App() {
           <Route path="/" element={<NavigableHomeScreen />} />
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
-          <Route path="/baseball/draft" element={<EliteDraftBoardScreen />} />
+          <Route path="/baseball/draft" element={<DraftBoardPage />} />
           <Route
             path="/baseball/league/create"
             element={<LeagueCreatePage />}
           />
-          <Route path="/baseball/league/join" element={<JoinLeagueByCode />} />
+          <Route
+            path="/baseball/league/join"
+            element={<JoinLeagueByCodePage />}
+          />
           <Route
             path="/baseball/league/join/:inviteCode"
-            element={<JoinLeagueByCode />}
+            element={<JoinLeagueByCodePage />}
           />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route
@@ -248,8 +251,8 @@ function App() {
           />
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />
-          <Route path="/players/stats" element={<WebPlayerStatsPage />} />
-          <Route path="/players/:id" element={<WebPlayerDetailPage />} />
+          <Route path="/players/stats" element={<PlayerStatsPage />} />
+          <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
         </Routes>
       </YStack>

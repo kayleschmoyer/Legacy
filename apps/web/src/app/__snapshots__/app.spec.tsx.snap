@@ -218,7 +218,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     tabindex="-1"
   >
     <div>
-      Web Home Screen
+      Home Page
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
     tabindex="-1"
   >
     <div>
-      Web Home Screen
+      Home Page
     </div>
   </div>
 </div>

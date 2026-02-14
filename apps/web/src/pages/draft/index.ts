@@ -1,0 +1,1 @@
+export { DraftBoardPage } from './DraftBoardPage';

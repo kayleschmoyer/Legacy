@@ -45,6 +45,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # AWS_ACCOUNT_ID is a required repository secret (configured in GitHub settings)
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
@@ -106,12 +107,15 @@ jobs:
           echo "S3_KEY=stats/stats-${VERSION}.zip" >> $GITHUB_ENV
 
       - name: Update SSM Parameter
+        env:
+          VERSION: ${{ env.VERSION }}
+          S3_KEY: ${{ env.S3_KEY }}
         run: |
           echo "📝 Updating SSM parameter with new version..."
 
           aws ssm put-parameter \
             --name "/legacy-sports/${AWS_STAGE}/lambda/stats/version" \
-            --value "${{ env.VERSION }}" \
+            --value "${VERSION}" \
             --overwrite \
             --region ${{ env.AWS_REGION }}
 
@@ -119,12 +123,14 @@ jobs:
 
           echo "## 📦 Lambda Upload Complete" >> $GITHUB_STEP_SUMMARY
           echo "- **Lambda**: stats" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: \`${{ env.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Location**: \`${{ env.S3_KEY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Location**: \`${S3_KEY}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Next Step**: Central Terraform workflow will apply infrastructure changes" >> $GITHUB_STEP_SUMMARY
 
       - name: Summary
+        env:
+          VERSION: ${{ env.VERSION }}
         run: |
           echo "::notice::✅ Stats Lambda uploaded successfully"
-          echo "::notice::Version: ${{ env.VERSION }}"
+          echo "::notice::Version: ${VERSION}"
           echo "::notice::Waiting for Terraform workflow to apply infrastructure..."

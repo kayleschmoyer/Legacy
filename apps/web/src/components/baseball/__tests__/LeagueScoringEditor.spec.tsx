@@ -1,11 +1,11 @@
 import React from 'react';
-import type { ApolloClient, MutationResult } from '@apollo/client';
+import type { ApolloClient } from '@apollo/client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LeagueScoringEditor } from '../LeagueScoringEditor';
 import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
-  type UpdateLeagueScoringProfileMutation,
+  type UpdateLeagueScoringProfileMutationResult,
   useUpdateLeagueScoringProfileMutation,
 } from '../../../api/db/graphql.generated';
 
@@ -241,7 +241,7 @@ type LeagueScoringProfile = NonNullable<
   GetLeagueScoringProfileQuery['leagueScoringProfile']
 >;
 
-function createMutationState(): MutationResult<UpdateLeagueScoringProfileMutation> {
+function createMutationState(): UpdateLeagueScoringProfileMutationResult {
   return {
     loading: false,
     called: false,
@@ -254,13 +254,13 @@ function createMutationState(): MutationResult<UpdateLeagueScoringProfileMutatio
 
 describe('LeagueScoringEditor', () => {
   const baseProfile: LeagueScoringProfile = {
-    __typename: 'LeagueScoringProfile',
+    __typename: 'ScoringConfig',
     profileId: 42,
     profileName: 'Custom',
     multiplierGroups: [],
     stats: [
       {
-        __typename: 'LeagueScoringStatValue',
+        __typename: 'ScoringRule',
         multiplier: 1,
         defaultMultiplier: 1,
         isOverride: false,
@@ -283,7 +283,7 @@ describe('LeagueScoringEditor', () => {
         },
       },
       {
-        __typename: 'LeagueScoringStatValue',
+        __typename: 'ScoringRule',
         multiplier: -1,
         defaultMultiplier: -1,
         isOverride: false,
@@ -315,7 +315,7 @@ describe('LeagueScoringEditor', () => {
   it('submits multiplier overrides when Save Changes is pressed', async () => {
     const refetchMock = jest.fn().mockResolvedValue(undefined);
     const mutateMock = jest.fn().mockResolvedValue(undefined);
-    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation;
+    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation as jest.Mock;
     mockedUpdateHook.mockReturnValue([mutateMock, createMutationState()]);
 
     render(
@@ -356,7 +356,7 @@ describe('LeagueScoringEditor', () => {
   it('resets overrides back to default values', () => {
     const refetchMock = jest.fn().mockResolvedValue(undefined);
     const mutateMock = jest.fn().mockResolvedValue(undefined);
-    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation;
+    const mockedUpdateHook = useUpdateLeagueScoringProfileMutation as jest.Mock;
     mockedUpdateHook.mockReturnValue([mutateMock, createMutationState()]);
 
     render(

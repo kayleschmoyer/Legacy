@@ -2,14 +2,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { useCallback, useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client/react';
 import {
-  GetNotificationHistoryDocument,
-  GetUnreadNotificationCountDocument,
-  GetUserNotificationPreferencesDocument,
-  MarkAllNotificationsAsReadDocument,
-  MarkNotificationAsReadDocument,
-  UpdateNotificationPreferencesDocument,
+  useGetNotificationHistoryQuery,
+  useGetUnreadNotificationCountQuery,
+  useGetUserNotificationPreferencesQuery,
+  useMarkAllNotificationsAsReadMutation,
+  useMarkNotificationAsReadMutation,
+  useUpdateNotificationPreferencesMutation,
 } from '../../../api/db/graphql.generated';
 
 /**
@@ -27,8 +26,7 @@ export function useNotifications(userId: number) {
     data: preferencesData,
     loading: preferencesLoading,
     refetch: refetchPreferences,
-  } = useQuery(GetUserNotificationPreferencesDocument, {
-    variables: { userId },
+  } = useGetUserNotificationPreferencesQuery({
     skip: !userId,
   });
 
@@ -37,38 +35,38 @@ export function useNotifications(userId: number) {
     data: historyData,
     loading: historyLoading,
     refetch: refetchHistory,
-  } = useQuery(GetNotificationHistoryDocument, {
-    variables: { userId, limit: 50 },
+  } = useGetNotificationHistoryQuery({
+    variables: { limit: 50 },
     skip: !userId,
   });
 
   // Fetch unread count
-  const { data: countData, refetch: refetchCount } = useQuery(
-    GetUnreadNotificationCountDocument,
-    {
-      variables: { userId },
+  const { data: countData, refetch: refetchCount } =
+    useGetUnreadNotificationCountQuery({
       skip: !userId,
       pollInterval: 30000, // Poll every 30 seconds
-    },
-  );
+    });
 
   // Update unread count when data changes
   useEffect(() => {
-    if (countData?.getUnreadNotificationCount !== undefined) {
+    if (
+      countData?.getUnreadNotificationCount !== undefined &&
+      countData.getUnreadNotificationCount !== null
+    ) {
       setUnreadCount(countData.getUnreadNotificationCount);
     }
   }, [countData]);
 
   // Update notification preferences mutation
   const [updatePreferencesMutation, { loading: updatingPreferences }] =
-    useMutation(UpdateNotificationPreferencesDocument, {
+    useUpdateNotificationPreferencesMutation({
       onCompleted: () => {
         void refetchPreferences();
       },
     });
 
   // Mark notification as read mutation
-  const [markAsReadMutation] = useMutation(MarkNotificationAsReadDocument, {
+  const [markAsReadMutation] = useMarkNotificationAsReadMutation({
     onCompleted: () => {
       void refetchHistory();
       void refetchCount();
@@ -76,15 +74,12 @@ export function useNotifications(userId: number) {
   });
 
   // Mark all notifications as read mutation
-  const [markAllAsReadMutation] = useMutation(
-    MarkAllNotificationsAsReadDocument,
-    {
-      onCompleted: () => {
-        void refetchHistory();
-        void refetchCount();
-      },
+  const [markAllAsReadMutation] = useMarkAllNotificationsAsReadMutation({
+    onCompleted: () => {
+      void refetchHistory();
+      void refetchCount();
     },
-  );
+  });
 
   // Helper functions
   const updatePreferences = useCallback(
@@ -92,7 +87,6 @@ export function useNotifications(userId: number) {
       try {
         await updatePreferencesMutation({
           variables: {
-            userId,
             input,
           },
         });
@@ -120,9 +114,7 @@ export function useNotifications(userId: number) {
 
   const markAllAsRead = useCallback(async () => {
     try {
-      await markAllAsReadMutation({
-        variables: { userId },
-      });
+      await markAllAsReadMutation();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
       throw error;

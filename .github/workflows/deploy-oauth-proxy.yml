@@ -108,7 +108,9 @@ jobs:
           terraform-target: aws_lambda_function.oauth_proxy
           aws-region: ${{ env.AWS_REGION }}
         env:
-          # OAuth Lambda requires these secrets for authentication functionality
+          # Required repository secrets (configured in GitHub settings):
+          # - GOOGLE_OAUTH_CLIENT_SECRET: Google OAuth 2.0 client secret
+          # - JWT_SECRET_KEY: Secret key for JWT token signing
           TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
 

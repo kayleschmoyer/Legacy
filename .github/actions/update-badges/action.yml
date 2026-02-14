@@ -39,7 +39,7 @@ outputs:
     value: ${{ steps.update-badges.outputs.summary }}
 
 runs:
-  using: composite
+  using: "composite"
   steps:
     - name: "📊 Update CI Status Badges"
       id: update-badges

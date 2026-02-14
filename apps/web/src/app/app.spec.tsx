@@ -72,26 +72,16 @@ jest.mock('tamagui', () => ({
   styled: (component: React.ComponentType<unknown>) => component,
 }));
 
-// Mock the web components
-jest.mock('../components/WebHomeScreen', () => ({
-  WebHomeScreen: () => <div>Web Home Screen</div>,
-}));
-
-jest.mock('../components/UserProfileDropdown', () => ({
+// Mock the layout components
+jest.mock('../components/layout/UserProfileDropdown', () => ({
   UserProfileDropdown: () => <div>User Profile Dropdown</div>,
 }));
 
-jest.mock('../components/WebPlayerStatsPage', () => ({
-  WebPlayerDetailPage: () => <div>Web Player Detail Page</div>,
-  WebPlayerStatsPage: () => <div>Web Player Stats Page</div>,
-}));
-
-// Mock navigation components
-jest.mock('../components/SportsDropdown', () => ({
+jest.mock('../components/layout/SportsDropdown', () => ({
   SportsDropdown: () => <div>Sports Dropdown</div>,
 }));
 
-jest.mock('../components/PlayersDropdown', () => ({
+jest.mock('../components/layout/PlayersDropdown', () => ({
   PlayersDropdown: () => <div>Players Dropdown</div>,
 }));
 
@@ -100,42 +90,49 @@ jest.mock('../components/a11y/GlobalAnnouncer', () => ({
 }));
 
 // Mock page components (default exports)
-jest.mock('../components/AboutPage', () => ({
-  default: () => <div>About Page</div>,
-}));
+jest.mock('../pages/about/AboutPage', () => () => <div>About Page</div>);
 
-jest.mock('../components/ManagementPage', () => ({
-  default: () => <div>Management Page</div>,
+jest.mock('../pages/management/ManagementPage', () => () => (
+  <div>Management Page</div>
+));
+
+jest.mock('../pages/home/HomePage', () => () => <div>Home Page</div>);
+
+// Mock draft components
+jest.mock('../pages/draft/DraftBoardPage', () => ({
+  DraftBoardPage: () => <div>Draft Board Page</div>,
 }));
 
 // Mock baseball components
-jest.mock('../components/EliteDraftBoard', () => ({
-  EliteDraftBoardScreen: () => <div>Elite Draft Board Screen</div>,
+jest.mock('../pages/baseball/LeagueCreatePage', () => () => (
+  <div>League Create Page</div>
+));
+
+jest.mock('../pages/baseball/LeagueDetailPage', () => () => (
+  <div>League Detail Page</div>
+));
+
+jest.mock('../pages/baseball/TeamDetailPage', () => ({
+  TeamDetailPage: () => <div>Team Detail Page</div>,
 }));
 
+jest.mock('../pages/baseball/JoinLeagueByCodePage', () => () => (
+  <div>Join League By Code</div>
+));
+
+// Mock matchup components
+jest.mock('../pages/matchup/MatchupDetailPage', () => ({
+  MatchupDetailPage: () => <div>Matchup Detail Page</div>,
+}));
+
+// Mock baseball screen
 jest.mock('../components/baseball', () => ({
   BaseballScreen: () => <div>Baseball Screen</div>,
 }));
 
-jest.mock('../components/baseball/LeagueCreatePage', () => ({
-  default: () => <div>League Create Page</div>,
-}));
-
-jest.mock('../components/baseball/LeagueDetailPage', () => ({
-  default: () => <div>League Detail Page</div>,
-}));
-
-jest.mock('../components/baseball/TeamDetailPage', () => ({
-  TeamDetailPage: () => <div>Team Detail Page</div>,
-}));
-
-jest.mock('../components/baseball/JoinLeagueByCode', () => ({
-  default: () => <div>Join League By Code</div>,
-}));
-
-// Mock matchup components
-jest.mock('../components/matchup/MatchupDetailPage', () => ({
-  MatchupDetailPage: () => <div>Matchup Detail Page</div>,
+// Mock hooks
+jest.mock('../hooks/usePageTracking', () => ({
+  usePageTracking: () => null,
 }));
 
 describe('App', () => {
@@ -183,7 +180,7 @@ describe('App', () => {
     // Check for the main app content container
     const appContainer = container.querySelector('div');
     expect(appContainer).toBeTruthy();
-    expect(container).toHaveTextContent('Web Home Screen');
+    expect(container).toHaveTextContent('Home Page');
   });
 
   describe('Homepage Snapshot', () => {

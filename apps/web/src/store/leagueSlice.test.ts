@@ -105,8 +105,8 @@ describe('leagueSlice', () => {
   describe('setLeaguePositions', () => {
     it('should set positions and clear loading', () => {
       const positions = [
-        { id: 1, position: 'C' },
-        { id: 2, position: '1B' },
+        { id: 1, positionType: 'C' },
+        { id: 2, positionType: '1B' },
       ] as LeaguePositionFragment[];
 
       const currentState = {
@@ -256,7 +256,7 @@ describe('leagueSlice', () => {
 
   describe('complex state transitions', () => {
     it('should handle multiple state updates in sequence', () => {
-      let state = initialState;
+      let state = leagueReducer(undefined, { type: '@@INIT' });
 
       // Set league ID
       state = leagueReducer(state, setLeagueId(123));
@@ -268,7 +268,9 @@ describe('leagueSlice', () => {
       expect(state.leagueData).toEqual(leagueData);
 
       // Set positions
-      const positions = [{ id: 1, position: 'C' }] as LeaguePositionFragment[];
+      const positions = [
+        { id: 1, positionType: 'C' },
+      ] as LeaguePositionFragment[];
       state = leagueReducer(state, setLeaguePositions(positions));
       expect(state.positions).toEqual(positions);
 
@@ -284,7 +286,7 @@ describe('leagueSlice', () => {
     });
 
     it('should clear all data when league ID changes', () => {
-      let state = initialState;
+      let state = leagueReducer(undefined, { type: '@@INIT' });
 
       // Set up complete state
       state = leagueReducer(state, setLeagueId(123));
