@@ -100,8 +100,11 @@ jobs:
           VITE_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
-          VITE_BUILD_TIMESTAMP: ${{ github.event.repository.updated_at }}
-          VITE_BRANCH: ${{ github.ref_name }}
+          # Sentry configuration for sourcemap upload
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: web
+          NODE_ENV: production
         run: |
           # Only enable Nx Cloud if DTE started successfully
           if [ "${{ steps.start-dte.outcome }}" = "success" ]; then

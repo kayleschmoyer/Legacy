@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { builtinModules } from 'module';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { execSync } from 'child_process';
 
 // Cache the built-in modules set for performance
 const nodeBuiltins = new Set([
@@ -11,11 +13,49 @@ const nodeBuiltins = new Set([
 export function createLambdaConfig(projectName: string, entryFile?: string) {
   const entry = entryFile || 'src/index.ts';
 
+  // Determine if this is a production deployment build
+  const isProduction = process.env.NODE_ENV === 'production';
+  const enableSentry = isProduction && !!process.env.SENTRY_AUTH_TOKEN;
+
+  // Get version/release information
+  const appVersion = process.env.APP_VERSION || '0.0.0';
+  const commitSha = (() => {
+    try {
+      return execSync('git rev-parse --short HEAD').toString().trim();
+    } catch {
+      return 'dev';
+    }
+  })();
+
   return defineConfig({
     cacheDir: `../../node_modules/.vite/lambdas/${projectName}`,
     root: process.cwd(),
 
-    plugins: [nxViteTsPaths()],
+    plugins: [
+      nxViteTsPaths(),
+      // Upload sourcemaps to Sentry for production builds
+      ...(enableSentry
+        ? [
+            sentryVitePlugin({
+              org: process.env.SENTRY_ORG || 'legacy-sports',
+              project: process.env.SENTRY_PROJECT || `lambda-${projectName}`,
+              authToken: process.env.SENTRY_AUTH_TOKEN,
+              release: {
+                name: `${projectName}@${appVersion}-${commitSha}`,
+                setCommits: {
+                  auto: true,
+                  ignoreMissing: true,
+                },
+              },
+              sourcemaps: {
+                assets: './dist/**',
+                filesToDeleteAfterUpload: ['./dist/**/*.map'],
+              },
+              telemetry: false,
+            }),
+          ]
+        : []),
+    ],
 
     // Optimize dependency scanning to prevent timeouts
     optimizeDeps: {
@@ -37,7 +77,7 @@ export function createLambdaConfig(projectName: string, entryFile?: string) {
       ssr: true,
       // Performance optimizations
       minify: false, // Skip minification for faster builds
-      sourcemap: false, // Disable sourcemaps for speed
+      sourcemap: isProduction ? 'hidden' : false, // Enable sourcemaps for production, hidden from bundle
       rollupOptions: {
         input: entry,
         output: {
@@ -62,15 +102,6 @@ export function createLambdaConfig(projectName: string, entryFile?: string) {
     esbuild: {
       target: 'node20',
       platform: 'node',
-    },
-
-    test: {
-      globals: true,
-      cache: {
-        dir: '../../node_modules/.vitest',
-      },
-      environment: 'node',
-      include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     },
   });
 }

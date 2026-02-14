@@ -7,6 +7,7 @@ import { resolve } from 'path';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -84,6 +85,28 @@ export default defineConfig(({ mode }) => {
       }),
       react(),
       nxCopyAssetsPlugin(['*.md']),
+      // Upload sourcemaps to Sentry for deploy builds
+      ...(isDeployBuild && process.env.SENTRY_AUTH_TOKEN
+        ? [
+            sentryVitePlugin({
+              org: process.env.SENTRY_ORG || 'legacy-sports',
+              project: process.env.SENTRY_PROJECT || 'web',
+              authToken: process.env.SENTRY_AUTH_TOKEN,
+              release: {
+                name: `web@${appVersion}`,
+                setCommits: {
+                  auto: true,
+                  ignoreMissing: true,
+                },
+              },
+              sourcemaps: {
+                assets: './dist/web/**',
+                filesToDeleteAfterUpload: ['./dist/web/**/*.map'],
+              },
+              telemetry: false,
+            }),
+          ]
+        : []),
     ],
 
     // Optimize dependency scanning and exclude React Native completely

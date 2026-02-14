@@ -97,6 +97,9 @@ jobs:
           lambda-name: draft-processor
           aws-region: ${{ env.AWS_REGION }}
           aws-stage: ${{ env.AWS_STAGE }}
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.SENTRY_ORG }}
+          sentry-project: lambda-draft-processor
 
       - name: 🚀 Deploy Draft Processor Infrastructure
         uses: ./.github/actions/deploy-lambda-infrastructure

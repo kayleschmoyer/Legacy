@@ -23,6 +23,15 @@ inputs:
     description: "Deployment stage (dev, staging, prod)"
     required: false
     default: "dev"
+  sentry-auth-token:
+    description: "Sentry authentication token for sourcemap upload"
+    required: false
+  sentry-org:
+    description: "Sentry organization name"
+    required: false
+  sentry-project:
+    description: "Sentry project name"
+    required: false
 
 outputs:
   version:
@@ -67,6 +76,12 @@ runs:
     - name: Build Lambda with Nx
       shell: bash
       working-directory: ${{ steps.config.outputs.lambda-dir }}
+      env:
+        NODE_ENV: production
+        APP_VERSION: ${{ github.sha }}
+        SENTRY_AUTH_TOKEN: ${{ inputs.sentry-auth-token }}
+        SENTRY_ORG: ${{ inputs.sentry-org }}
+        SENTRY_PROJECT: ${{ inputs.sentry-project }}
       run: |
         # Disable Nx Cloud for lambda builds to avoid quota issues
         # Lambda builds are typically fast and don't benefit much from DTE

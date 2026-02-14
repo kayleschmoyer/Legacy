@@ -1,7 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import path from 'path';
 import { resolve } from 'path';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { execSync } from 'child_process';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -10,13 +11,51 @@ export default defineConfig(({ mode }) => {
   // Merge environment variables into process.env so they're available at runtime
   Object.assign(process.env, env);
 
+  // Determine if this is a production deployment build
+  const isProduction = process.env.NODE_ENV === 'production';
+  const enableSentry = isProduction && !!process.env.SENTRY_AUTH_TOKEN;
+
+  // Get version/release information
+  const appVersion = process.env.APP_VERSION || '0.0.0';
+  const commitSha = (() => {
+    try {
+      return execSync('git rev-parse --short HEAD').toString().trim();
+    } catch {
+      return 'dev';
+    }
+  })();
+
   return {
     cacheDir: '../../node_modules/.vite/lambdas/draft-processor',
 
     // Read environment variables from workspace root
     envDir: resolve(__dirname, '../../'),
 
-    plugins: [nxViteTsPaths()],
+    plugins: [
+      nxViteTsPaths(),
+      // Upload sourcemaps to Sentry for production builds
+      ...(enableSentry
+        ? [
+            sentryVitePlugin({
+              org: process.env.SENTRY_ORG || 'legacy-sports',
+              project: process.env.SENTRY_PROJECT || 'lambda-draft-processor',
+              authToken: process.env.SENTRY_AUTH_TOKEN,
+              release: {
+                name: `draft-processor@${appVersion}-${commitSha}`,
+                setCommits: {
+                  auto: true,
+                  ignoreMissing: true,
+                },
+              },
+              sourcemaps: {
+                assets: './dist/**',
+                filesToDeleteAfterUpload: ['./dist/**/*.map'],
+              },
+              telemetry: false,
+            }),
+          ]
+        : []),
+    ],
 
     // Configure for Node.js/SSR mode
     ssr: {
@@ -28,8 +67,9 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       emptyOutDir: true,
       ssr: true,
+      sourcemap: isProduction ? 'hidden' : false, // Enable sourcemaps for production
       rollupOptions: {
-        input: path.resolve(__dirname, 'src/index.ts'),
+        input: resolve(__dirname, 'src/index.ts'),
         output: {
           entryFileNames: 'index.js',
           format: 'cjs',

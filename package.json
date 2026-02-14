@@ -249,6 +249,7 @@
     "@nx/workspace": "21.6.3",
     "@playwright/test": "^1.55.0",
     "@react-native/metro-config": "0.79.7",
+    "@sentry/vite-plugin": "^4.9.1",
     "@swc-node/register": "~1.11.1",
     "@swc/cli": "0.7.10",
     "@swc/core": "^1.15.8",

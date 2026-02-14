@@ -100,6 +100,9 @@ jobs:
           lambda-name: oauth-proxy
           aws-region: ${{ env.AWS_REGION }}
           aws-stage: ${{ env.AWS_STAGE }}
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.SENTRY_ORG }}
+          sentry-project: lambda-oauth-proxy
 
       - name: 🚀 Deploy OAuth Proxy Infrastructure
         uses: ./.github/actions/deploy-lambda-infrastructure

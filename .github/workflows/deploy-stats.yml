@@ -91,6 +91,12 @@ jobs:
           echo "✅ DTE session started"
 
       - name: Build Stats Lambda
+        env:
+          NODE_ENV: production
+          APP_VERSION: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: lambda-stats
         run: |
           # Only enable Nx Cloud if DTE started successfully
           if [ "${{ steps.start-dte.outcome }}" = "success" ]; then

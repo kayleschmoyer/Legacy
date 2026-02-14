@@ -98,6 +98,9 @@ jobs:
           build-output-file: dev.js
           aws-region: ${{ env.AWS_REGION }}
           aws-stage: ${{ env.AWS_STAGE }}
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.SENTRY_ORG }}
+          sentry-project: lambda-game-selection
 
       - name: 🚀 Deploy Game Selection Infrastructure
         uses: ./.github/actions/deploy-lambda-infrastructure
