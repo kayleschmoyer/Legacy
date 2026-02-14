@@ -21,6 +21,7 @@ env:
   AWS_STAGE: dev
 
 permissions:
+  actions: read
   id-token: write
   contents: read
 

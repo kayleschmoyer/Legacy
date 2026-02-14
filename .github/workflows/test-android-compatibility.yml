@@ -68,21 +68,21 @@ jobs:
             # Production configuration only
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"}]}'
+              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           elif [ "$MATRIX_TYPE" = "compatibility" ]; then
             # Compatibility testing matrix
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"},{"name":"Minimum Supported","os":"ubuntu-latest","java_version":"11","node_version":"18","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min"},{"name":"Latest Stable","os":"ubuntu-latest","java_version":"21","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest"}]}'
+              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"},{"name":"Minimum Supported","os":"ubuntu-latest","java_version":"11","node_version":"18","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min"},{"name":"Latest Stable","os":"ubuntu-latest","java_version":"21","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           else
             # Full matrix with cross-platform testing
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production Linux","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-linux"},{"name":"Production macOS","os":"macos-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-macos"},{"name":"Production Windows","os":"windows-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"gradlew.bat","cache_key_suffix":"prod-windows"},{"name":"Minimum Java 11","os":"ubuntu-latest","java_version":"11","node_version":"18","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min-java11"},{"name":"Latest Java 21","os":"ubuntu-latest","java_version":"21","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest-java21"}]}'
+              echo '{"include":[{"name":"Production Linux","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-linux"},{"name":"Production macOS","os":"macos-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-macos"},{"name":"Production Windows","os":"windows-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"gradlew.bat","cache_key_suffix":"prod-windows"},{"name":"Minimum Java 11","os":"ubuntu-latest","java_version":"11","node_version":"18","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min-java11"},{"name":"Latest Java 21","os":"ubuntu-latest","java_version":"21","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest-java21"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           fi

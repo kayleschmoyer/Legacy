@@ -59,7 +59,7 @@ jobs:
       - name: Setup Workspace
         uses: ./.github/actions/setup
         with:
-          node-version: 22
+          node-version: 20
           install-dependencies: true
           set-nx-shas: true
           skip-system-deps: true

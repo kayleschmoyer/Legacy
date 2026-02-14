@@ -1,18 +1,22 @@
-name: Deploy Game Selection Lambda
+name: Deploy Game Selection Lambda (DEPRECATED)
+
+# ⚠️ DEPRECATED: This workflow is deprecated in favor of the new upload pattern
+# Use upload-game-selection.yml instead, which uploads to S3 and lets the central
+# lambda-terraform-apply workflow handle infrastructure deployment
+# This workflow is kept for reference only and will be removed in a future update
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "lambdas/game-selection/**"
-      - ".github/workflows/deploy-game-selection.yml"
-
-# Prevent concurrent Lambda deployments to avoid Terraform state lock contention
-# All Lambdas share the same Terraform state, so they must deploy sequentially
-concurrency:
-  group: terraform-lambda-deployment
-  cancel-in-progress: false
+    inputs:
+      confirm_deprecated:
+        description: 'WARNING: This workflow is deprecated. Type "yes" to run anyway'
+        required: true
+        default: "no"
+  # push:  # Disabled - replaced by upload-game-selection.yml
+  #   branches: [main]
+  #   paths:
+  #     - "lambdas/game-selection/**"
+  #     - ".github/workflows/deploy-game-selection.yml"
 
 # IMPORTANT: Infrastructure Configuration
 # These values are currently hardcoded for the dev environment.
@@ -36,6 +40,14 @@ jobs:
     environment: production
 
     steps:
+      - name: Check Deprecation Confirmation
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_deprecated != 'yes'
+        run: |
+          echo "::error::⚠️ This workflow is DEPRECATED"
+          echo "::error::Use upload-game-selection.yml instead"
+          echo "::error::The new pattern: Upload to S3 → Central Terraform applies infrastructure"
+          exit 1
+
       - name: Check out code
         uses: actions/checkout@v6
         with:
