@@ -12,54 +12,65 @@ import { styled } from 'tamagui';
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
   borderWidth: 0,
-  borderRadius: '$12',
+  borderRadius: '$10',
   padding: '$2',
   hoverStyle: {
-    backgroundColor: '$color2',
+    backgroundColor: '$color3',
   },
   pressStyle: {
-    backgroundColor: '$color3',
+    backgroundColor: '$color4',
+    scale: 0.97,
   },
 });
 
 const ProfileImage = styled(YStack, {
-  width: 36,
-  height: 36,
+  width: 34,
+  height: 34,
   borderRadius: '$12',
-  backgroundColor: '$blue6',
   alignItems: 'center',
   justifyContent: 'center',
   borderWidth: 2,
-  borderColor: '$borderColor',
+  borderColor: 'transparent',
 });
 
 const DropdownContent = styled(YStack, {
   backgroundColor: '$background',
-  borderRadius: '$4',
+  borderRadius: '$5',
   borderWidth: 1,
   borderColor: '$borderColor',
   padding: '$3',
   space: '$2',
-  minWidth: 200,
+  minWidth: 240,
   shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.15,
-  shadowRadius: 12,
-  elevation: 8,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.2,
+  shadowRadius: 24,
+  elevation: 12,
 });
 
 const MenuItem = styled(Button, {
   justifyContent: 'flex-start',
   backgroundColor: 'transparent',
   borderWidth: 0,
-  padding: '$3',
-  borderRadius: '$3',
+  paddingHorizontal: '$3',
+  paddingVertical: '$3',
+  borderRadius: '$4',
   hoverStyle: {
-    backgroundColor: '$color2',
-  },
-  pressStyle: {
     backgroundColor: '$color3',
   },
+  pressStyle: {
+    backgroundColor: '$color4',
+  },
+});
+
+const MenuIconBox = styled(YStack, {
+  width: 34,
+  height: 34,
+  borderRadius: '$3',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '$color2',
+  flexShrink: 0,
 });
 
 export const UserProfileDropdown: React.FC = () => {
@@ -126,8 +137,12 @@ export const UserProfileDropdown: React.FC = () => {
   return (
     <YStack position="relative" ref={dropdownRef}>
       <UserMenuButton onPress={() => setIsOpen(!isOpen)}>
-        <XStack alignItems="center" space="$2">
-          <ProfileImage>
+        <XStack alignItems="center" gap="$2">
+          <ProfileImage
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+            }}
+          >
             {userImage && !imageError ? (
               <img
                 src={userImage}
@@ -160,7 +175,7 @@ export const UserProfileDropdown: React.FC = () => {
                 }}
               />
             ) : (
-              <Paragraph size="$5" color="white" fontWeight="600">
+              <Paragraph size="$4" color="white" fontWeight="700">
                 {userName.charAt(0).toUpperCase()}
               </Paragraph>
             )}
@@ -170,7 +185,7 @@ export const UserProfileDropdown: React.FC = () => {
               {userName}
             </Paragraph>
           </YStack>
-          <Paragraph size="$2" color="$colorPress">
+          <Paragraph fontSize={10} color="$colorPress">
             {isOpen ? '▲' : '▼'}
           </Paragraph>
         </XStack>
@@ -185,32 +200,63 @@ export const UserProfileDropdown: React.FC = () => {
           zIndex={100}
         >
           {/* User Info Section */}
-          <YStack space="$2" paddingBottom="$3">
-            <Paragraph size="$4" color="$color" fontWeight="600">
-              {userName}
-            </Paragraph>
-            <Paragraph size="$3" color="$colorPress">
-              {userEmail}
-            </Paragraph>
-          </YStack>
+          <XStack padding="$2" gap="$3" alignItems="center">
+            <ProfileImage
+              width={40}
+              height={40}
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              }}
+            >
+              {userImage && !imageError ? (
+                <img
+                  src={userImage}
+                  alt={userName}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                  }}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <Paragraph size="$5" color="white" fontWeight="700">
+                  {userName.charAt(0).toUpperCase()}
+                </Paragraph>
+              )}
+            </ProfileImage>
+            <YStack flex={1}>
+              <Paragraph size="$4" color="$color" fontWeight="600">
+                {userName}
+              </Paragraph>
+              <Paragraph size="$2" color="$colorPress">
+                {userEmail}
+              </Paragraph>
+            </YStack>
+          </XStack>
 
           <Separator />
 
           {/* Menu Items */}
-          <YStack space="$1" paddingTop="$3">
+          <YStack gap="$1" paddingTop="$2">
             <MenuItem
               onPress={() => {
                 console.log('Profile clicked');
                 setIsOpen(false);
               }}
             >
-              <XStack alignItems="center" space="$3">
-                <Paragraph size="$4">
-                  <span role="img" aria-label="user profile">
-                    👤
-                  </span>
-                </Paragraph>
-                <Paragraph size="$3" color="$color">
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={15} lineHeight={17}>
+                    <span role="img" aria-label="profile">
+                      👤
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
                   Profile Settings
                 </Paragraph>
               </XStack>
@@ -222,13 +268,15 @@ export const UserProfileDropdown: React.FC = () => {
                 setIsOpen(false);
               }}
             >
-              <XStack alignItems="center" space="$3">
-                <Paragraph size="$4">
-                  <span role="img" aria-label="settings">
-                    ⚙️
-                  </span>
-                </Paragraph>
-                <Paragraph size="$3" color="$color">
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={15} lineHeight={17}>
+                    <span role="img" aria-label="settings">
+                      ⚙️
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
                   Preferences
                 </Paragraph>
               </XStack>
@@ -240,14 +288,16 @@ export const UserProfileDropdown: React.FC = () => {
                 setIsOpen(false);
               }}
             >
-              <XStack alignItems="center" space="$3">
-                <Paragraph size="$4">
-                  <span role="img" aria-label="help">
-                    ❓
-                  </span>
-                </Paragraph>
-                <Paragraph size="$3" color="$color">
-                  Help & Support
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={15} lineHeight={17}>
+                    <span role="img" aria-label="help">
+                      ❓
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
+                  Help &amp; Support
                 </Paragraph>
               </XStack>
             </MenuItem>
@@ -255,13 +305,15 @@ export const UserProfileDropdown: React.FC = () => {
             <Separator marginVertical="$2" />
 
             <MenuItem onPress={handleLogout}>
-              <XStack alignItems="center" space="$3">
-                <Paragraph size="$4">
-                  <span role="img" aria-label="exit">
-                    🚪
-                  </span>
-                </Paragraph>
-                <Paragraph size="$3" color="$red10" fontWeight="500">
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox backgroundColor="$red3">
+                  <Paragraph fontSize={15} lineHeight={17}>
+                    <span role="img" aria-label="sign out">
+                      🚪
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <Paragraph size="$3" color="$red10" fontWeight="600">
                   Sign Out
                 </Paragraph>
               </XStack>

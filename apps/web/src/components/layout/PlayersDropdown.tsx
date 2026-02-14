@@ -1,28 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Button, YStack } from '@legacy-sports/shared-components';
+import {
+  Button,
+  Paragraph,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
 
 const DropdownButton = styled(Button, {
-  size: '$2',
+  size: '$3',
   gap: '$2',
-  width: '100%',
   backgroundColor: 'transparent',
-  borderWidth: 1,
-  borderColor: '$borderColor',
+  borderWidth: 0,
+  borderRadius: '$10',
+  paddingHorizontal: '$4',
   hoverStyle: {
-    backgroundColor: '$color2',
+    backgroundColor: '$color3',
   },
   pressStyle: {
-    backgroundColor: '$color3',
+    backgroundColor: '$color4',
+    scale: 0.97,
   },
   variants: {
     highlight: {
       true: {
-        backgroundColor: '$blue9',
-        borderColor: '$blue9',
-        color: 'white',
+        backgroundColor: '$color3',
+        fontWeight: '600',
       },
     },
   } as const,
@@ -30,32 +35,51 @@ const DropdownButton = styled(Button, {
 
 const DropdownContent = styled(YStack, {
   backgroundColor: '$background',
-  borderRadius: '$4',
+  borderRadius: '$5',
   borderWidth: 1,
   borderColor: '$borderColor',
-  padding: '$2',
+  padding: '$3',
   space: '$1',
-  minWidth: 180,
+  minWidth: 260,
   shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.15,
-  shadowRadius: 12,
-  elevation: 8,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.2,
+  shadowRadius: 24,
+  elevation: 12,
 });
 
 const MenuItem = styled(Button, {
   justifyContent: 'flex-start',
   backgroundColor: 'transparent',
   borderWidth: 0,
-  padding: '$3',
-  borderRadius: '$3',
+  paddingHorizontal: '$3',
+  paddingVertical: '$3',
+  borderRadius: '$4',
   width: '100%',
+  gap: '$3',
   hoverStyle: {
-    backgroundColor: '$color2',
-  },
-  pressStyle: {
     backgroundColor: '$color3',
   },
+  pressStyle: {
+    backgroundColor: '$color4',
+  },
+  variants: {
+    active: {
+      true: {
+        backgroundColor: '$color2',
+      },
+    },
+  } as const,
+});
+
+const MenuIconBox = styled(YStack, {
+  width: 38,
+  height: 38,
+  borderRadius: '$3',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '$color2',
+  flexShrink: 0,
 });
 
 export const PlayersDropdown: React.FC = () => {
@@ -68,19 +92,6 @@ export const PlayersDropdown: React.FC = () => {
   const isActive =
     location.pathname === '/players' || location.pathname === '/players/stats';
   const isHighlighted = isActive || isOpen;
-
-  // Use sport-specific accents when within a sport section
-  const sportTone = location.pathname.startsWith('/baseball')
-    ? 'baseball'
-    : location.pathname === '/football'
-      ? 'football'
-      : 'neutral';
-  const highlightBg =
-    sportTone === 'baseball'
-      ? '$sportBaseballPrimary'
-      : sportTone === 'football'
-        ? '$sportFootballPrimary'
-        : '$blue9';
 
   // Click outside handler
   useEffect(() => {
@@ -109,20 +120,21 @@ export const PlayersDropdown: React.FC = () => {
     <YStack position="relative" ref={dropdownRef} onKeyDown={onKeyDown}>
       <DropdownButton
         highlight={isHighlighted}
-        backgroundColor={isHighlighted ? highlightBg : 'transparent'}
-        borderColor={isHighlighted ? highlightBg : '$borderColor'}
-        color={isHighlighted ? 'white' : undefined}
         onPress={() => setIsOpen(!isOpen)}
         id={buttonId}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={menuId}
       >
-        <span role="img" aria-label="Players icon">
-          👥
-        </span>
-        <Text> </Text>
-        <Text>Players {isOpen ? '▲' : '▼'}</Text>
+        <Text>
+          <span role="img" aria-label="players">
+            👥
+          </span>
+        </Text>
+        <Text>Players</Text>
+        <Text fontSize={10} color="$colorPress">
+          {isOpen ? '▲' : '▼'}
+        </Text>
       </DropdownButton>
 
       {isOpen && (
@@ -137,20 +149,70 @@ export const PlayersDropdown: React.FC = () => {
           aria-labelledby={buttonId}
         >
           <Link to="/players" style={{ textDecoration: 'none' }}>
-            <MenuItem onPress={() => setIsOpen(false)} role="menuitem">
-              <span role="img" aria-label="players list">
-                👤
-              </span>{' '}
-              All Players
+            <MenuItem
+              onPress={() => setIsOpen(false)}
+              role="menuitem"
+              active={location.pathname === '/players'}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="player">
+                      👤
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <YStack flex={1} gap="$1">
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    All Players
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Browse the full roster
+                  </Paragraph>
+                </YStack>
+                {location.pathname === '/players' && (
+                  <YStack
+                    width={6}
+                    height={6}
+                    borderRadius={3}
+                    backgroundColor="$blue9"
+                  />
+                )}
+              </XStack>
             </MenuItem>
           </Link>
 
           <Link to="/players/stats" style={{ textDecoration: 'none' }}>
-            <MenuItem onPress={() => setIsOpen(false)} role="menuitem">
-              <span role="img" aria-label="statistics">
-                📊
-              </span>{' '}
-              Player Stats
+            <MenuItem
+              onPress={() => setIsOpen(false)}
+              role="menuitem"
+              active={location.pathname === '/players/stats'}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="statistics">
+                      📊
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <YStack flex={1} gap="$1">
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    Player Stats
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Rankings &amp; performance
+                  </Paragraph>
+                </YStack>
+                {location.pathname === '/players/stats' && (
+                  <YStack
+                    width={6}
+                    height={6}
+                    borderRadius={3}
+                    backgroundColor="$blue9"
+                  />
+                )}
+              </XStack>
             </MenuItem>
           </Link>
         </DropdownContent>

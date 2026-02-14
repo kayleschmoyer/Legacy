@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
-import { Button, H1, XStack, YStack } from '@legacy-sports/shared-components';
+import {
+  Button,
+  Paragraph,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components';
 import { styled } from 'tamagui';
 import {
   FootballScreen,
@@ -27,154 +32,341 @@ import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 
-// Styled Tamagui components for navigation
+/* ────────────────────────────────────────────────────────
+ * Modern Header – styled components
+ * ──────────────────────────────────────────────────────── */
+
+/** Gradient accent bar at the very top of the page */
+const AccentBar = styled(YStack, {
+  height: 3,
+  width: '100%',
+  // gradient applied via inline style (Tamagui doesn't support CSS gradients natively)
+});
+
 const NavContainer = styled(YStack, {
   backgroundColor: '$background',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
-  padding: '$4',
-  position: 'sticky',
+  position: 'sticky' as never,
   top: 0,
   zIndex: 50,
-  shadowColor: '$shadowColor',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 4,
+  // backdrop-blur applied via inline style
 });
 
 const NavContent = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'space-between',
-  maxWidth: 1200,
+  maxWidth: 1280,
   width: '100%',
   alignSelf: 'center',
-  gap: '$6',
+  paddingHorizontal: '$5',
+  paddingVertical: '$3',
+  gap: '$4',
 });
 
 const NavLinks = styled(XStack, {
   alignItems: 'center',
-  gap: '$3',
+  gap: '$2',
   flex: 1,
   justifyContent: 'center',
 });
 
-// Note: Using regular Link instead of styled to avoid "Functions are not valid as a React child" error
+/** Pill-shaped nav link button with active indicator dot */
+const NavLinkButton = styled(Button, {
+  size: '$3',
+  borderRadius: '$10',
+  backgroundColor: 'transparent',
+  borderWidth: 0,
+  paddingHorizontal: '$4',
+  gap: '$2',
+  hoverStyle: {
+    backgroundColor: '$color3',
+  },
+  pressStyle: {
+    backgroundColor: '$color4',
+    scale: 0.97,
+  },
+  variants: {
+    active: {
+      true: {
+        backgroundColor: '$color3',
+        fontWeight: '600',
+      },
+    },
+  } as const,
+});
+
+/** Hamburger / mobile menu button */
+const MobileMenuButton = styled(Button, {
+  display: 'flex',
+  $gtMd: { display: 'none' },
+  backgroundColor: 'transparent',
+  borderWidth: 0,
+  padding: '$2',
+  borderRadius: '$4',
+  hoverStyle: {
+    backgroundColor: '$color3',
+  },
+});
+
+/** Mobile slide-down nav panel */
+const MobileNavPanel = styled(YStack, {
+  display: 'flex',
+  $gtMd: { display: 'none' },
+  backgroundColor: '$background',
+  borderBottomWidth: 1,
+  borderBottomColor: '$borderColor',
+  paddingHorizontal: '$5',
+  paddingVertical: '$4',
+  gap: '$2',
+});
+
+const MobileNavLink = styled(Button, {
+  justifyContent: 'flex-start',
+  backgroundColor: 'transparent',
+  borderWidth: 0,
+  padding: '$3',
+  borderRadius: '$3',
+  width: '100%',
+  gap: '$3',
+  hoverStyle: {
+    backgroundColor: '$color3',
+  },
+  variants: {
+    active: {
+      true: {
+        backgroundColor: '$color3',
+        fontWeight: '600',
+      },
+    },
+  } as const,
+});
+
+/* ────────────────────────────────────────────────────────
+ * Navigation component
+ * ──────────────────────────────────────────────────────── */
 
 function Navigation() {
   const location = useLocation();
-  const inBaseball = location.pathname.startsWith('/baseball');
-  const inFootball = location.pathname === '/football';
-  const accentBg = inBaseball
-    ? '$sportBaseballPrimary'
-    : inFootball
-      ? '$sportFootballPrimary'
-      : undefined;
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileRef = useRef<HTMLDivElement>(null);
+
+  const isActive = useCallback(
+    (path: string) => location.pathname === path,
+    [location.pathname],
+  );
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Close mobile nav on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
+      }
+    };
+    if (mobileOpen) {
+      document.addEventListener('mousedown', handler);
+      return () => document.removeEventListener('mousedown', handler);
+    }
+  }, [mobileOpen]);
 
   return (
-    <NavContainer role="banner">
-      <NavContent>
-        {/* Logo/Brand Section */}
-        <XStack alignItems="center" space="$4">
+    <YStack ref={mobileRef} role="banner">
+      {/* Gradient accent strip */}
+      <AccentBar
+        style={{
+          background:
+            'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%)',
+        }}
+      />
+
+      <NavContainer
+        style={{
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <NavContent>
+          {/* ── Brand ── */}
           <Link
             to="/"
             aria-label="Legacy Sports home"
-            style={{ textDecoration: 'none' }}
+            style={{ textDecoration: 'none', flexShrink: 0 }}
           >
-            <H1
-              color="$color"
-              size="$6"
-              cursor="pointer"
-              hoverStyle={{ opacity: 0.8 }}
+            <XStack alignItems="center" gap="$3" cursor="pointer">
+              <YStack
+                width={38}
+                height={38}
+                borderRadius="$4"
+                alignItems="center"
+                justifyContent="center"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                }}
+              >
+                <Paragraph fontSize={20} lineHeight={22}>
+                  <span role="img" aria-label="football">
+                    🏈
+                  </span>
+                </Paragraph>
+              </YStack>
+              <YStack>
+                <Paragraph
+                  color="$color"
+                  fontSize={18}
+                  fontWeight="700"
+                  letterSpacing={-0.3}
+                  lineHeight={22}
+                >
+                  Legacy Sports
+                </Paragraph>
+                <Paragraph
+                  color="$colorPress"
+                  fontSize={11}
+                  fontWeight="500"
+                  letterSpacing={0.5}
+                  lineHeight={14}
+                  textTransform="uppercase"
+                >
+                  Fantasy League
+                </Paragraph>
+              </YStack>
+            </XStack>
+          </Link>
+
+          {/* ── Desktop Navigation ── */}
+          <NavLinks
+            as="nav"
+            role="navigation"
+            aria-label="Primary"
+            display="none"
+            $gtMd={{ display: 'flex' }}
+          >
+            <SportsDropdown />
+            <PlayersDropdown />
+
+            <Link
+              to="/management"
+              style={{ textDecoration: 'none' }}
+              aria-current={isActive('/management') ? 'page' : undefined}
+            >
+              <NavLinkButton active={isActive('/management')}>
+                <span role="img" aria-label="management">
+                  ⚙️
+                </span>{' '}
+                Management
+              </NavLinkButton>
+            </Link>
+
+            <Link
+              to="/about"
+              style={{ textDecoration: 'none' }}
+              aria-current={isActive('/about') ? 'page' : undefined}
+            >
+              <NavLinkButton active={isActive('/about')}>
+                <span role="img" aria-label="info">
+                  ℹ️
+                </span>{' '}
+                About
+              </NavLinkButton>
+            </Link>
+          </NavLinks>
+
+          {/* ── Right section ── */}
+          <XStack alignItems="center" gap="$3" flexShrink={0}>
+            <UserProfileDropdown />
+
+            {/* Mobile hamburger */}
+            <MobileMenuButton
+              onPress={() => setMobileOpen((o) => !o)}
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileOpen}
+            >
+              <Paragraph fontSize={22} lineHeight={24}>
+                {mobileOpen ? '✕' : '☰'}
+              </Paragraph>
+            </MobileMenuButton>
+          </XStack>
+        </NavContent>
+      </NavContainer>
+
+      {/* ── Mobile Navigation Panel ── */}
+      {mobileOpen && (
+        <MobileNavPanel role="navigation" aria-label="Mobile">
+          <Link to="/football" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/football')}
+              onPress={() => setMobileOpen(false)}
             >
               <span role="img" aria-label="football">
                 🏈
               </span>{' '}
-              Legacy Sports
-            </H1>
+              Football
+            </MobileNavLink>
           </Link>
-        </XStack>
-
-        {/* Center Navigation Links */}
-        <NavLinks
-          as="nav"
-          role="navigation"
-          aria-label="Primary"
-          display="none"
-          $gtMd={{ display: 'flex' }}
-        >
-          {/* Sports Dropdown - Football and Baseball */}
-          <SportsDropdown />
-
-          {/* Players Dropdown - All Players and Stats */}
-          <PlayersDropdown />
-
-          <Link
-            to="/management"
-            style={{ textDecoration: 'none' }}
-            aria-current={
-              location.pathname === '/management' ? 'page' : undefined
-            }
-          >
-            <Button
-              variant={
-                location.pathname === '/management' && !accentBg
-                  ? 'primary'
-                  : 'secondary'
-              }
-              backgroundColor={
-                location.pathname === '/management' && accentBg
-                  ? accentBg
-                  : undefined
-              }
-              color={
-                location.pathname === '/management' && accentBg
-                  ? 'white'
-                  : undefined
-              }
-              size="$2"
+          <Link to="/baseball" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={location.pathname.startsWith('/baseball')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <span role="img" aria-label="baseball">
+                ⚾
+              </span>{' '}
+              Baseball
+            </MobileNavLink>
+          </Link>
+          <Link to="/players" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/players')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <span role="img" aria-label="players">
+                👥
+              </span>{' '}
+              Players
+            </MobileNavLink>
+          </Link>
+          <Link to="/players/stats" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/players/stats')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <span role="img" aria-label="statistics">
+                📊
+              </span>{' '}
+              Player Stats
+            </MobileNavLink>
+          </Link>
+          <Link to="/management" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/management')}
+              onPress={() => setMobileOpen(false)}
             >
               <span role="img" aria-label="management">
                 ⚙️
               </span>{' '}
               Management
-            </Button>
+            </MobileNavLink>
           </Link>
-          <Link
-            to="/about"
-            style={{ textDecoration: 'none' }}
-            aria-current={location.pathname === '/about' ? 'page' : undefined}
-          >
-            <Button
-              variant={
-                location.pathname === '/about' && !accentBg
-                  ? 'primary'
-                  : 'secondary'
-              }
-              backgroundColor={
-                location.pathname === '/about' && accentBg
-                  ? accentBg
-                  : undefined
-              }
-              color={
-                location.pathname === '/about' && accentBg ? 'white' : undefined
-              }
-              size="$2"
+          <Link to="/about" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/about')}
+              onPress={() => setMobileOpen(false)}
             >
               <span role="img" aria-label="info">
                 ℹ️
               </span>{' '}
               About
-            </Button>
+            </MobileNavLink>
           </Link>
-        </NavLinks>
-
-        {/* User Profile Section */}
-        <XStack alignItems="center" space="$3">
-          <UserProfileDropdown />
-        </XStack>
-      </NavContent>
-    </NavContainer>
+        </MobileNavPanel>
+      )}
+    </YStack>
   );
 }
 

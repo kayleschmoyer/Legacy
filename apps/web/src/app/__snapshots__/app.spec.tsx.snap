@@ -14,85 +14,123 @@ exports[`App FootballScreen should match complete football page layout snapshot 
   <div
     role="banner"
   >
+    <div />
     <div>
-      <div
-        alignitems="center"
-        space="$4"
-      >
+      <div>
         <a
           aria-label="Legacy Sports home"
           href="/"
-          style="text-decoration: none;"
+          style="text-decoration: none; flex-shrink: 0;"
         >
-          <h1
-            color="$color"
+          <div
+            alignitems="center"
             cursor="pointer"
-            hoverstyle="[object Object]"
+            gap="$3"
           >
-            <span
-              aria-label="football"
-              role="img"
+            <div
+              alignitems="center"
+              borderradius="$4"
+              height="38"
+              justifycontent="center"
+              width="38"
             >
-              🏈
-            </span>
-             
-            Legacy Sports
-          </h1>
+              <p
+                font-size="20"
+                lineheight="22"
+              >
+                <span
+                  aria-label="football"
+                  role="img"
+                >
+                  🏈
+                </span>
+              </p>
+            </div>
+            <div>
+              <p
+                color="$color"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="-0.3"
+                lineheight="22"
+              >
+                Legacy Sports
+              </p>
+              <p
+                color="$colorPress"
+                font-size="11"
+                font-weight="500"
+                letter-spacing="0.5"
+                lineheight="14"
+                texttransform="uppercase"
+              >
+                Fantasy League
+              </p>
+            </div>
+          </div>
         </a>
-      </div>
-      <div
-        aria-label="Primary"
-        as="nav"
-        display="none"
-        role="navigation"
-      >
-        <div>
-          Sports Dropdown
-        </div>
-        <div>
-          Players Dropdown
-        </div>
-        <a
-          href="/management"
-          style="text-decoration: none;"
+        <div
+          aria-label="Primary"
+          as="nav"
+          display="none"
+          role="navigation"
         >
-          <button
-            variant="secondary"
+          <div>
+            Sports Dropdown
+          </div>
+          <div>
+            Players Dropdown
+          </div>
+          <a
+            href="/management"
+            style="text-decoration: none;"
           >
-            <span
-              aria-label="management"
-              role="img"
-            >
-              ⚙️
-            </span>
-             
-            Management
-          </button>
-        </a>
-        <a
-          href="/about"
-          style="text-decoration: none;"
+            <button>
+              <span
+                aria-label="management"
+                role="img"
+              >
+                ⚙️
+              </span>
+               
+              Management
+            </button>
+          </a>
+          <a
+            href="/about"
+            style="text-decoration: none;"
+          >
+            <button>
+              <span
+                aria-label="info"
+                role="img"
+              >
+                ℹ️
+              </span>
+               
+              About
+            </button>
+          </a>
+        </div>
+        <div
+          alignitems="center"
+          flexshrink="0"
+          gap="$3"
         >
+          <div>
+            User Profile Dropdown
+          </div>
           <button
-            variant="secondary"
+            aria-expanded="false"
+            aria-label="Open menu"
           >
-            <span
-              aria-label="info"
-              role="img"
+            <p
+              font-size="22"
+              lineheight="24"
             >
-              ℹ️
-            </span>
-             
-            About
+              ☰
+            </p>
           </button>
-        </a>
-      </div>
-      <div
-        alignitems="center"
-        space="$3"
-      >
-        <div>
-          User Profile Dropdown
         </div>
       </div>
     </div>
@@ -128,85 +166,123 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
   <div
     role="banner"
   >
+    <div />
     <div>
-      <div
-        alignitems="center"
-        space="$4"
-      >
+      <div>
         <a
           aria-label="Legacy Sports home"
           href="/"
-          style="text-decoration: none;"
+          style="text-decoration: none; flex-shrink: 0;"
         >
-          <h1
-            color="$color"
+          <div
+            alignitems="center"
             cursor="pointer"
-            hoverstyle="[object Object]"
+            gap="$3"
           >
-            <span
-              aria-label="football"
-              role="img"
+            <div
+              alignitems="center"
+              borderradius="$4"
+              height="38"
+              justifycontent="center"
+              width="38"
             >
-              🏈
-            </span>
-             
-            Legacy Sports
-          </h1>
+              <p
+                font-size="20"
+                lineheight="22"
+              >
+                <span
+                  aria-label="football"
+                  role="img"
+                >
+                  🏈
+                </span>
+              </p>
+            </div>
+            <div>
+              <p
+                color="$color"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="-0.3"
+                lineheight="22"
+              >
+                Legacy Sports
+              </p>
+              <p
+                color="$colorPress"
+                font-size="11"
+                font-weight="500"
+                letter-spacing="0.5"
+                lineheight="14"
+                texttransform="uppercase"
+              >
+                Fantasy League
+              </p>
+            </div>
+          </div>
         </a>
-      </div>
-      <div
-        aria-label="Primary"
-        as="nav"
-        display="none"
-        role="navigation"
-      >
-        <div>
-          Sports Dropdown
-        </div>
-        <div>
-          Players Dropdown
-        </div>
-        <a
-          href="/management"
-          style="text-decoration: none;"
+        <div
+          aria-label="Primary"
+          as="nav"
+          display="none"
+          role="navigation"
         >
-          <button
-            variant="secondary"
+          <div>
+            Sports Dropdown
+          </div>
+          <div>
+            Players Dropdown
+          </div>
+          <a
+            href="/management"
+            style="text-decoration: none;"
           >
-            <span
-              aria-label="management"
-              role="img"
-            >
-              ⚙️
-            </span>
-             
-            Management
-          </button>
-        </a>
-        <a
-          href="/about"
-          style="text-decoration: none;"
+            <button>
+              <span
+                aria-label="management"
+                role="img"
+              >
+                ⚙️
+              </span>
+               
+              Management
+            </button>
+          </a>
+          <a
+            href="/about"
+            style="text-decoration: none;"
+          >
+            <button>
+              <span
+                aria-label="info"
+                role="img"
+              >
+                ℹ️
+              </span>
+               
+              About
+            </button>
+          </a>
+        </div>
+        <div
+          alignitems="center"
+          flexshrink="0"
+          gap="$3"
         >
+          <div>
+            User Profile Dropdown
+          </div>
           <button
-            variant="secondary"
+            aria-expanded="false"
+            aria-label="Open menu"
           >
-            <span
-              aria-label="info"
-              role="img"
+            <p
+              font-size="22"
+              lineheight="24"
             >
-              ℹ️
-            </span>
-             
-            About
+              ☰
+            </p>
           </button>
-        </a>
-      </div>
-      <div
-        alignitems="center"
-        space="$3"
-      >
-        <div>
-          User Profile Dropdown
         </div>
       </div>
     </div>
@@ -240,85 +316,123 @@ exports[`App Navigation should render navigation with correct links 1`] = `
   <div
     role="banner"
   >
+    <div />
     <div>
-      <div
-        alignitems="center"
-        space="$4"
-      >
+      <div>
         <a
           aria-label="Legacy Sports home"
           href="/"
-          style="text-decoration: none;"
+          style="text-decoration: none; flex-shrink: 0;"
         >
-          <h1
-            color="$color"
+          <div
+            alignitems="center"
             cursor="pointer"
-            hoverstyle="[object Object]"
+            gap="$3"
           >
-            <span
-              aria-label="football"
-              role="img"
+            <div
+              alignitems="center"
+              borderradius="$4"
+              height="38"
+              justifycontent="center"
+              width="38"
             >
-              🏈
-            </span>
-             
-            Legacy Sports
-          </h1>
+              <p
+                font-size="20"
+                lineheight="22"
+              >
+                <span
+                  aria-label="football"
+                  role="img"
+                >
+                  🏈
+                </span>
+              </p>
+            </div>
+            <div>
+              <p
+                color="$color"
+                font-size="18"
+                font-weight="700"
+                letter-spacing="-0.3"
+                lineheight="22"
+              >
+                Legacy Sports
+              </p>
+              <p
+                color="$colorPress"
+                font-size="11"
+                font-weight="500"
+                letter-spacing="0.5"
+                lineheight="14"
+                texttransform="uppercase"
+              >
+                Fantasy League
+              </p>
+            </div>
+          </div>
         </a>
-      </div>
-      <div
-        aria-label="Primary"
-        as="nav"
-        display="none"
-        role="navigation"
-      >
-        <div>
-          Sports Dropdown
-        </div>
-        <div>
-          Players Dropdown
-        </div>
-        <a
-          href="/management"
-          style="text-decoration: none;"
+        <div
+          aria-label="Primary"
+          as="nav"
+          display="none"
+          role="navigation"
         >
-          <button
-            variant="secondary"
+          <div>
+            Sports Dropdown
+          </div>
+          <div>
+            Players Dropdown
+          </div>
+          <a
+            href="/management"
+            style="text-decoration: none;"
           >
-            <span
-              aria-label="management"
-              role="img"
-            >
-              ⚙️
-            </span>
-             
-            Management
-          </button>
-        </a>
-        <a
-          href="/about"
-          style="text-decoration: none;"
+            <button>
+              <span
+                aria-label="management"
+                role="img"
+              >
+                ⚙️
+              </span>
+               
+              Management
+            </button>
+          </a>
+          <a
+            href="/about"
+            style="text-decoration: none;"
+          >
+            <button>
+              <span
+                aria-label="info"
+                role="img"
+              >
+                ℹ️
+              </span>
+               
+              About
+            </button>
+          </a>
+        </div>
+        <div
+          alignitems="center"
+          flexshrink="0"
+          gap="$3"
         >
+          <div>
+            User Profile Dropdown
+          </div>
           <button
-            variant="secondary"
+            aria-expanded="false"
+            aria-label="Open menu"
           >
-            <span
-              aria-label="info"
-              role="img"
+            <p
+              font-size="22"
+              lineheight="24"
             >
-              ℹ️
-            </span>
-             
-            About
+              ☰
+            </p>
           </button>
-        </a>
-      </div>
-      <div
-        alignitems="center"
-        space="$3"
-      >
-        <div>
-          User Profile Dropdown
         </div>
       </div>
     </div>

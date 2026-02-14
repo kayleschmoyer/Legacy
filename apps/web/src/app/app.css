@@ -7,29 +7,38 @@
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
+/* ── Modern Header ── */
 .app-header {
   text-align: center;
-  padding: 2rem;
-  background-color: #2a2a2a;
-  border-bottom: 1px solid #333;
+  padding: 1rem 2rem;
+  background: rgba(42, 42, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .app-header h1 {
-  margin: 0 0 0.5rem 0;
-  font-size: 2.5rem;
-  color: #007aff;
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
 }
 
 .app-header p {
   margin: 0;
-  color: #cccccc;
-  font-size: 1.1rem;
+  color: #999;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .app-nav {
-  background-color: #2a2a2a;
-  padding: 1rem;
-  border-bottom: 1px solid #333;
+  background: rgba(42, 42, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .app-nav ul {
@@ -37,7 +46,7 @@
   margin: 0;
   padding: 0;
   display: flex;
-  gap: 2rem;
+  gap: 0.5rem;
   justify-content: center;
 }
 
@@ -46,14 +55,23 @@
 }
 
 .app-nav a {
-  color: #007aff;
+  color: #94a3b8;
   text-decoration: none;
-  font-weight: 600;
-  transition: color 0.2s;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
 }
 
 .app-nav a:hover {
-  color: #66b2ff;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-nav a.active {
+  color: #ffffff;
+  background-color: rgba(59, 130, 246, 0.2);
 }
 
 .app-main {

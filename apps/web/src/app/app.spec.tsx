@@ -51,6 +51,18 @@ jest.mock('@legacy-sports/shared-components', () => {
     }) => (
       <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
     ),
+    Paragraph: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => (
+      <p {...(props as React.HTMLAttributes<HTMLParagraphElement>)}>
+        {children}
+      </p>
+    ),
+    Separator: () => <hr />,
     BaseballScreen: () => <div>Baseball Screen</div>,
     FootballScreen: () => <div>Football Screen</div>,
     PlayersScreen: () => <div>Players Screen</div>,
