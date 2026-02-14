@@ -41,6 +41,9 @@ export interface MatchupRosterComparisonProps {
 export function MatchupRosterComparison({
   matchup,
 }: MatchupRosterComparisonProps) {
+  // Bench toggle state
+  const [showBench, setShowBench] = useState(false);
+
   // Modal state for season stats
   const [seasonStatsModalOpen, setSeasonStatsModalOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<{
@@ -211,6 +214,10 @@ export function MatchupRosterComparison({
     team1Bench,
     team2Starters,
     team2Bench,
+    team1Bullpen,
+    team1BenchFielders,
+    team2Bullpen,
+    team2BenchFielders,
     team1Batters,
     team1Pitchers,
     team2Batters,
@@ -325,8 +332,12 @@ export function MatchupRosterComparison({
       return {
         team1Starters: [],
         team1Bench: [],
+        team1Bullpen: [],
+        team1BenchFielders: [],
         team2Starters: [],
         team2Bench: [],
+        team2Bullpen: [],
+        team2BenchFielders: [],
         team1Batters: [],
         team1Pitchers: [],
         team2Batters: [],
@@ -373,6 +384,25 @@ export function MatchupRosterComparison({
     const team2Bench = team2All.filter(
       (p: MatchupPlayerFragment) => p.positionId === null,
     );
+
+    // Helper to check if a bench player is a pitcher based on eligiblePositions
+    const PITCHING_POSITIONS = new Set(['SP', 'RP']);
+    const isBenchPitcher = (p: MatchupPlayerFragment): boolean => {
+      const positions = p.player?.eligiblePositions;
+      if (!positions || positions.length === 0) return false;
+      return positions.some((pos) => PITCHING_POSITIONS.has(pos));
+    };
+    const isBenchFielder = (p: MatchupPlayerFragment): boolean => {
+      const positions = p.player?.eligiblePositions;
+      if (!positions || positions.length === 0) return true; // default to bench if unknown
+      return positions.some((pos) => !PITCHING_POSITIONS.has(pos));
+    };
+
+    // Split bench into bullpen (pitchers) and bench (fielders)
+    const team1Bullpen = team1Bench.filter(isBenchPitcher);
+    const team1BenchFielders = team1Bench.filter(isBenchFielder);
+    const team2Bullpen = team2Bench.filter(isBenchPitcher);
+    const team2BenchFielders = team2Bench.filter(isBenchFielder);
 
     // Further separate starters into batters and pitchers
     const team1Batters = team1Starters.filter(
@@ -450,6 +480,10 @@ export function MatchupRosterComparison({
       team1Bench,
       team2Starters,
       team2Bench,
+      team1Bullpen,
+      team1BenchFielders,
+      team2Bullpen,
+      team2BenchFielders,
       team1Batters,
       team1Pitchers,
       team2Batters,
@@ -500,7 +534,11 @@ export function MatchupRosterComparison({
     );
   }
 
-  const maxBenchRows = Math.max(team1Bench.length, team2Bench.length);
+  const maxBullpenRows = Math.max(team1Bullpen.length, team2Bullpen.length);
+  const maxBenchFielderRows = Math.max(
+    team1BenchFielders.length,
+    team2BenchFielders.length,
+  );
   const maxBatterRows = Math.max(team1Batters.length, team2Batters.length);
   const maxPitcherRows = Math.max(team1Pitchers.length, team2Pitchers.length);
 
@@ -1435,21 +1473,37 @@ export function MatchupRosterComparison({
         </XStack>
       </XStack>
 
-      {/* Bench Section */}
+      {/* Bench Toggle */}
       {(team1Bench.length > 0 || team2Bench.length > 0) && (
-        <>
-          <Separator marginVertical="$3" />
+        <XStack
+          paddingVertical="$2"
+          paddingHorizontal="$3"
+          marginTop="$3"
+          justifyContent="center"
+          cursor="pointer"
+          hoverStyle={{ opacity: 0.8 }}
+          onPress={() => setShowBench(!showBench)}
+        >
+          <Text fontSize="$3" fontWeight="600" color="$gray11">
+            {showBench ? '▼' : '▶'} {showBench ? 'Hide' : 'Show'} Bench (
+            {team1Bench.length + team2Bench.length} players)
+          </Text>
+        </XStack>
+      )}
 
-          {/* Bench Section Header */}
+      {/* Bullpen Section (bench pitchers) */}
+      {showBench && (team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
+        <>
+          {/* Bullpen Section Header */}
           <YStack
-            backgroundColor="$gray3"
+            backgroundColor="$blue3"
             paddingVertical="$2"
             paddingHorizontal="$3"
           >
-            <H5 color="$gray11">Bench</H5>
+            <H5 color="$blue11">Bullpen</H5>
           </YStack>
 
-          {/* Header Row for Bench */}
+          {/* Header Row for Bullpen */}
           <XStack
             width="100%"
             paddingVertical="$2.5"
@@ -1468,10 +1522,10 @@ export function MatchupRosterComparison({
                 <Text
                   fontSize="$2"
                   fontWeight="bold"
-                  color="$gray11"
+                  color="$blue11"
                   textTransform="uppercase"
                 >
-                  Team 1 Bench
+                  Team 1 Bullpen
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
@@ -1527,29 +1581,146 @@ export function MatchupRosterComparison({
                 <Text
                   fontSize="$2"
                   fontWeight="bold"
-                  color="$gray11"
+                  color="$blue11"
                   textTransform="uppercase"
                 >
-                  Team 2 Bench
+                  Team 2 Bullpen
                 </Text>
               </YStack>
               <YStack width={40} flexShrink={0} />
             </XStack>
           </XStack>
 
-          {/* Bench Rows */}
+          {/* Bullpen Rows */}
           <YStack>
-            {Array.from({ length: maxBenchRows }).map((_, index) =>
+            {Array.from({ length: maxBullpenRows }).map((_, index) =>
               renderPlayerRow(
-                team1Bench[index],
-                team2Bench[index],
-                `bench-${index}`,
+                team1Bullpen[index],
+                team2Bullpen[index],
+                `bullpen-${index}`,
                 false,
               ),
             )}
           </YStack>
         </>
       )}
+
+      {/* Bench Section (fielders) */}
+      {showBench &&
+        (team1BenchFielders.length > 0 || team2BenchFielders.length > 0) && (
+          <>
+            <Separator marginVertical="$3" />
+
+            {/* Bench Section Header */}
+            <YStack
+              backgroundColor="$gray3"
+              paddingVertical="$2"
+              paddingHorizontal="$3"
+            >
+              <H5 color="$gray11">Bench</H5>
+            </YStack>
+
+            {/* Header Row for Bench */}
+            <XStack
+              width="100%"
+              paddingVertical="$2.5"
+              paddingLeft="$3"
+              paddingRight="$3"
+              backgroundColor="$gray2"
+              borderBottomWidth={2}
+              borderBottomColor="$gray7"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              {/* Team 1 Side - 47% */}
+              <XStack width="47%" alignItems="center" gap="$2">
+                <YStack width={40} flexShrink={0} />
+                <YStack flex={1} minWidth={0}>
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray11"
+                    textTransform="uppercase"
+                  >
+                    Team 1 Bench
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray9"
+                    textTransform="uppercase"
+                  >
+                    Proj
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray10"
+                    textTransform="uppercase"
+                  >
+                    Actual
+                  </Text>
+                </YStack>
+              </XStack>
+              <Separator
+                vertical
+                height="100%"
+                borderColor="$gray8"
+                borderWidth={2}
+              />
+              {/* Team 2 Side - 47% */}
+              <XStack width="47%" alignItems="center" gap="$2">
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray10"
+                    textTransform="uppercase"
+                  >
+                    Actual
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray9"
+                    textTransform="uppercase"
+                  >
+                    Proj
+                  </Text>
+                </YStack>
+                <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                  <Text
+                    fontSize="$2"
+                    fontWeight="bold"
+                    color="$gray11"
+                    textTransform="uppercase"
+                  >
+                    Team 2 Bench
+                  </Text>
+                </YStack>
+                <YStack width={40} flexShrink={0} />
+              </XStack>
+            </XStack>
+
+            {/* Bench Rows */}
+            <YStack>
+              {Array.from({ length: maxBenchFielderRows }).map((_, index) =>
+                renderPlayerRow(
+                  team1BenchFielders[index],
+                  team2BenchFielders[index],
+                  `bench-${index}`,
+                  false,
+                ),
+              )}
+            </YStack>
+          </>
+        )}
 
       {/* Player Season Stats Modal (for player name clicks) */}
       <PlayerSeasonStatsModal

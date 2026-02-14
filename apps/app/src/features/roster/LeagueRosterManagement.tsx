@@ -16,14 +16,60 @@ import {
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
-import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
 import { useTeamMemberProjections } from '../scoring';
 
-// Helper function to get player name from TeamMember's player field
+const PITCHING_POSITIONS = new Set(['SP', 'RP']);
+
+const ALLOWED_POSITIONS: Record<string, string[]> = {
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP'],
+  SP: ['SP'],
+  SS: ['SS'],
+  XDH: ['DH'],
+};
+
+/** Returns the list of eligible position strings for a team member */
+const getEligiblePositions = (player: TeamMemberFragment): string[] =>
+  player.player?.eligiblePositions ?? [];
+
+/** True when the player has at least one pitching-eligible position (SP / RP) */
+const isPlayerPitcher = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => PITCHING_POSITIONS.has(pos));
+
+/** True when the player has at least one non-pitching position */
+const isPlayerBatter = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => !PITCHING_POSITIONS.has(pos));
+
+/** True when the player qualifies as both a pitcher and a position player */
+const isDualEligible = (player: TeamMemberFragment): boolean =>
+  isPlayerPitcher(player) && isPlayerBatter(player);
+
+const canPlayerPlayPosition = (
+  player: TeamMemberFragment,
+  position: LeaguePositionFragment,
+): boolean => {
+  const eligible = getEligiblePositions(player);
+  if (eligible.length === 0) return true; // fallback if no data
+  const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
+  if (!allowed) return false;
+  return eligible.some((pos) => allowed.includes(pos));
+};
+
 // Get player name from TeamMember's player field
-const getPlayerName = (teamMember: TeamMemberFragment | null | undefined): string => {
+const getPlayerName = (
+  teamMember: TeamMemberFragment | null | undefined,
+): string => {
   if (!teamMember?.player) return 'Unknown Player';
-  
+
   const { firstName, lastName } = teamMember.player;
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
 };
@@ -58,8 +104,8 @@ function RosterSlot({
 }: RosterSlotProps): React.JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const eligiblePlayers = useMemo(() => {
-    return availablePlayers.filter(player => 
-      player && canPlayerPlayPosition(player, position)
+    return availablePlayers.filter(
+      (player) => player && canPlayerPlayPosition(player, position),
     );
   }, [availablePlayers, position]);
 
@@ -75,7 +121,13 @@ function RosterSlot({
       onPlayerAssign(selectedPlayer, position);
       onPlayerSelect(null);
     }
-  }, [assignedPlayer, selectedPlayer, position, onPlayerAssign, onPlayerSelect]);
+  }, [
+    assignedPlayer,
+    selectedPlayer,
+    position,
+    onPlayerAssign,
+    onPlayerSelect,
+  ]);
 
   const handleRemovePlayer = useCallback(() => {
     if (assignedPlayer) {
@@ -86,14 +138,14 @@ function RosterSlot({
   const getPositionDisplayName = (positionType: string) => {
     const displayNames: Record<string, string> = {
       SP: 'SP',
-      RP: 'RP', 
+      RP: 'RP',
       C: 'C',
       '1B': '1B',
       '2B': '2B',
       '3B': '3B',
       SS: 'SS',
       LF: 'LF',
-      CF: 'CF', 
+      CF: 'CF',
       RF: 'RF',
       OF: 'OF',
       IF: 'IF',
@@ -103,34 +155,35 @@ function RosterSlot({
     return displayNames[positionType] || positionType;
   };
 
-  const canAcceptSelectedPlayer = selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
+  const canAcceptSelectedPlayer =
+    selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);
 
   return (
-    <Card 
+    <Card
       padding="$3"
       margin="$1"
       borderWidth={1}
       borderColor={
-        isSelected 
-          ? "$blue8" 
-          : canAcceptSelectedPlayer 
-            ? "$green8"
-            : assignedPlayer 
-              ? "$gray6" 
-              : "$gray4"
+        isSelected
+          ? '$blue8'
+          : canAcceptSelectedPlayer
+            ? '$green8'
+            : assignedPlayer
+              ? '$gray6'
+              : '$gray4'
       }
       backgroundColor={
-        isSelected 
-          ? "$blue2" 
-          : canAcceptSelectedPlayer 
-            ? "$green2"
-            : assignedPlayer 
-              ? "$gray2" 
-              : "$gray1"
+        isSelected
+          ? '$blue2'
+          : canAcceptSelectedPlayer
+            ? '$green2'
+            : assignedPlayer
+              ? '$gray2'
+              : '$gray1'
       }
       pressStyle={{
         scale: 0.98,
-        borderColor: "$blue10"
+        borderColor: '$blue10',
       }}
       onPress={handleSlotPress}
     >
@@ -139,11 +192,8 @@ function RosterSlot({
           <Text fontSize="$3" fontWeight="600" color="$gray12">
             {getPositionDisplayName(position.positionType || '')}
           </Text>
-          <Text fontSize="$4" color={assignedPlayer ? "$gray12" : "$gray8"}>
-            {assignedPlayer
-              ? getPlayerName(assignedPlayer)
-              : 'Empty'
-            }
+          <Text fontSize="$4" color={assignedPlayer ? '$gray12' : '$gray8'}>
+            {assignedPlayer ? getPlayerName(assignedPlayer) : 'Empty'}
           </Text>
           {assignedPlayer && (
             <Text fontSize="$2" color="$gray10">
@@ -160,10 +210,10 @@ function RosterSlot({
             </Text>
           )}
         </YStack>
-        
+
         {assignedPlayer && (
-          <Button 
-            size="$2" 
+          <Button
+            size="$2"
             theme="red"
             onPress={handleRemovePlayer}
             marginLeft="$2"
@@ -176,37 +226,44 @@ function RosterSlot({
   );
 }
 
-interface AvailablePlayerListProps {
+interface PlayerPoolProps {
+  title: string;
   players: readonly TeamMemberFragment[];
   selectedPlayer?: TeamMemberFragment | null;
   onPlayerSelect: (player: TeamMemberFragment | null) => void;
   projections: Record<number, number>;
   isLoading: boolean;
+  emptyText: string;
 }
 
-function AvailablePlayerList({
+function PlayerPool({
+  title,
   players,
   selectedPlayer,
   onPlayerSelect,
   projections,
   isLoading,
-}: AvailablePlayerListProps): React.JSX.Element {
-  const unassignedPlayers = useMemo(() => {
-    return players.filter(player => !player.positionId);
-  }, [players]);
-
+  emptyText,
+}: PlayerPoolProps): React.JSX.Element {
   return (
     <YStack space="$2">
-      <H5>Available Players</H5>
-      {unassignedPlayers.length === 0 ? (
+      <XStack justifyContent="space-between" alignItems="center">
+        <H5>{title}</H5>
+        <Text fontSize="$2" color="$gray10">
+          {players.length} {players.length === 1 ? 'player' : 'players'}
+        </Text>
+      </XStack>
+      {players.length === 0 ? (
         <Text color="$gray10" fontSize="$3" textAlign="center" padding="$4">
-          No unassigned players
+          {emptyText}
         </Text>
       ) : (
-        unassignedPlayers.map((player) => {
+        players.map((player) => {
           const playerId = normalizeNumericIdentifier(player.playerId);
           const projection =
             playerId === undefined ? undefined : projections[playerId];
+          const eligible = getEligiblePositions(player);
+          const dual = isDualEligible(player);
 
           return (
             <Card
@@ -224,19 +281,35 @@ function AvailablePlayerList({
                 borderColor: '$blue10',
               }}
               onPress={() =>
-                onPlayerSelect(
-                  selectedPlayer?.id === player.id ? null : player,
-                )
+                onPlayerSelect(selectedPlayer?.id === player.id ? null : player)
               }
             >
               <XStack justifyContent="space-between" alignItems="center">
-                <YStack>
+                <YStack space="$1">
                   <Text fontSize="$4" fontWeight="500">
                     {getPlayerName(player)}
                   </Text>
-                  <Text fontSize="$3" color="$gray10">
-                    Team Member ID: {player.id}
-                  </Text>
+                  {eligible.length > 0 && (
+                    <XStack gap="$1" flexWrap="wrap">
+                      {eligible.map((pos) => (
+                        <Text
+                          key={pos}
+                          fontSize="$1"
+                          fontWeight="600"
+                          color={
+                            PITCHING_POSITIONS.has(pos) ? '$blue10' : '$green10'
+                          }
+                        >
+                          {pos}
+                        </Text>
+                      ))}
+                      {dual && (
+                        <Text fontSize="$1" fontWeight="700" color="$yellow10">
+                          2-WAY
+                        </Text>
+                      )}
+                    </XStack>
+                  )}
                   <Text fontSize="$2" color="$gray10">
                     {isLoading
                       ? 'Calculating projection...'
@@ -279,7 +352,8 @@ export function LeagueRosterManagement({
   loading = false,
   leagueId,
 }: LeagueRosterManagementProps): React.JSX.Element {
-  const [selectedPlayer, setSelectedPlayer] = useState<TeamMemberFragment | null>(null);
+  const [selectedPlayer, setSelectedPlayer] =
+    useState<TeamMemberFragment | null>(null);
 
   const {
     projections,
@@ -304,14 +378,15 @@ export function LeagueRosterManagement({
 
   // Group positions by type for better organization
   const groupedPositions = useMemo(() => {
-    const pitchingPositions = positions.filter(p => 
-      p.positionType === 'SP' || p.positionType === 'RP'
+    const pitchingPositions = positions.filter(
+      (p) => p.positionType === 'SP' || p.positionType === 'RP',
     );
-    const battingPositions = positions.filter(p => 
-      p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType)
+    const battingPositions = positions.filter(
+      (p) =>
+        p.positionType && !['SP', 'RP', 'IF', 'XDH'].includes(p.positionType),
     );
-    const utilityPositions = positions.filter(p => 
-      p.positionType === 'IF' || p.positionType === 'XDH'
+    const utilityPositions = positions.filter(
+      (p) => p.positionType === 'IF' || p.positionType === 'XDH',
     );
 
     return {
@@ -322,18 +397,53 @@ export function LeagueRosterManagement({
   }, [positions]);
 
   // Get assigned players for each position
-  const getAssignedPlayer = useCallback((position: LeaguePositionFragment) => {
-    return teamPlayers.find(player => player.positionId === position.id);
-  }, [teamPlayers]);
+  const getAssignedPlayer = useCallback(
+    (position: LeaguePositionFragment) => {
+      return teamPlayers.find((player) => player.positionId === position.id);
+    },
+    [teamPlayers],
+  );
 
-  const handlePlayerAssign = useCallback((player: TeamMemberFragment, position: LeaguePositionFragment) => {
-    onPlayerAssign(player, position);
-    setSelectedPlayer(null);
-  }, [onPlayerAssign]);
+  // Split unassigned players into bullpen (pitchers) and bench (fielders)
+  const benchPlayers = useMemo(
+    () => teamPlayers.filter((player) => !player.positionId),
+    [teamPlayers],
+  );
 
-  const handlePlayerRemove = useCallback((position: LeaguePositionFragment) => {
-    onPlayerRemove(position);
-  }, [onPlayerRemove]);
+  const bullpenPlayers = useMemo(
+    () => benchPlayers.filter((p) => isPlayerPitcher(p) && !isPlayerBatter(p)),
+    [benchPlayers],
+  );
+
+  const benchFielders = useMemo(
+    () => benchPlayers.filter((p) => isPlayerBatter(p) && !isPlayerPitcher(p)),
+    [benchPlayers],
+  );
+
+  const dualEligiblePlayers = useMemo(
+    () => benchPlayers.filter((p) => isDualEligible(p)),
+    [benchPlayers],
+  );
+
+  const unclassifiedPlayers = useMemo(
+    () => benchPlayers.filter((p) => getEligiblePositions(p).length === 0),
+    [benchPlayers],
+  );
+
+  const handlePlayerAssign = useCallback(
+    (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+      onPlayerAssign(player, position);
+      setSelectedPlayer(null);
+    },
+    [onPlayerAssign],
+  );
+
+  const handlePlayerRemove = useCallback(
+    (position: LeaguePositionFragment) => {
+      onPlayerRemove(position);
+    },
+    [onPlayerRemove],
+  );
 
   if (loading || loadingProjections) {
     return (
@@ -360,9 +470,14 @@ export function LeagueRosterManagement({
             </Text>
           </Card>
         )}
-        
+
         {selectedPlayer && (
-          <Card padding="$3" backgroundColor="$blue2" borderColor="$blue8" borderWidth={1}>
+          <Card
+            padding="$3"
+            backgroundColor="$blue2"
+            borderColor="$blue8"
+            borderWidth={1}
+          >
             <Text fontSize="$4" fontWeight="600" color="$blue12">
               Selected: {getPlayerName(selectedPlayer)}
             </Text>
@@ -455,13 +570,32 @@ export function LeagueRosterManagement({
 
         <Separator />
 
-        {/* Available Players */}
-        <AvailablePlayerList
-          players={teamPlayers}
+        {/* Bullpen - Pitchers */}
+        <PlayerPool
+          title="Bullpen"
+          players={[...bullpenPlayers, ...dualEligiblePlayers]}
           projections={projections}
           isLoading={loadingProjections}
           selectedPlayer={selectedPlayer}
           onPlayerSelect={setSelectedPlayer}
+          emptyText="No pitchers in the bullpen"
+        />
+
+        <Separator />
+
+        {/* Bench - Position Players */}
+        <PlayerPool
+          title="Bench"
+          players={[
+            ...benchFielders,
+            ...dualEligiblePlayers,
+            ...unclassifiedPlayers,
+          ]}
+          projections={projections}
+          isLoading={loadingProjections}
+          selectedPlayer={selectedPlayer}
+          onPlayerSelect={setSelectedPlayer}
+          emptyText="No position players on the bench"
         />
       </YStack>
     </ScrollView>

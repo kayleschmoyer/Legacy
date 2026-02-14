@@ -81,6 +81,7 @@ fragment MatchupPlayer on MatchupPlayer {
     firstName
     lastName
     brefId
+    eligiblePositions
   }
   seasonBatting {
     games

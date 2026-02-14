@@ -19,7 +19,7 @@ export type Position =
 // String-based position slots until GraphQL schema is updated
 export enum PositionSlot {
   '1B' = '1B',
-  '2B' = '2B', 
+  '2B' = '2B',
   '3B' = '3B',
   C = 'C',
   Cf = 'CF',
@@ -31,7 +31,7 @@ export enum PositionSlot {
   Rp = 'RP',
   Sp = 'SP',
   Ss = 'SS',
-  Xdh = 'XDH'
+  Xdh = 'XDH',
 }
 
 export const ALLOWED_POSITIONS = Object.freeze<
@@ -60,34 +60,52 @@ export type PositionType = keyof typeof ALLOWED_POSITIONS;
 export function isPitchingSlot(
   value: LeaguePositionFragment | null,
 ): value is LeaguePositionFragment {
-  return value !== null && value.positionType != null && PITCHING_POSITIONS.has(value.positionType);
+  return (
+    value !== null &&
+    value.positionType != null &&
+    PITCHING_POSITIONS.has(value.positionType)
+  );
 }
 
 export function isBattingSlot(
   value: LeaguePositionFragment | null,
 ): value is LeaguePositionFragment {
-  return value !== null && value.positionType != null && !PITCHING_POSITIONS.has(value.positionType);
+  return (
+    value !== null &&
+    value.positionType != null &&
+    !PITCHING_POSITIONS.has(value.positionType)
+  );
 }
 
 export function isPitcher(
   teamMember: TeamMemberFragment | null,
 ): teamMember is TeamMemberFragment {
-  // Simplified version - would need position data from TeamMember to implement properly
-  return teamMember !== null;
+  if (teamMember === null) return false;
+  const eligible = teamMember.player?.eligiblePositions ?? [];
+  // If no eligibility data, fall back to treating everyone as a pitcher
+  if (eligible.length === 0) return true;
+  return eligible.some((pos) => PITCHING_POSITIONS.has(pos));
 }
 
 export function isBatter(
   teamMember: TeamMemberFragment | null,
 ): teamMember is TeamMemberFragment {
-  // Simplified version - would need position data from TeamMember to implement properly  
-  return teamMember !== null;
+  if (teamMember === null) return false;
+  const eligible = teamMember.player?.eligiblePositions ?? [];
+  // If no eligibility data, fall back to treating everyone as a batter
+  if (eligible.length === 0) return true;
+  return eligible.some((pos) => !PITCHING_POSITIONS.has(pos));
 }
 
 export function canPlayerPlayPosition(
   player: TeamMemberFragment | undefined,
   positionMapping: LeaguePositionFragment | undefined,
 ): boolean {
-  if (player === undefined || positionMapping === undefined || !positionMapping.positionType) {
+  if (
+    player === undefined ||
+    positionMapping === undefined ||
+    !positionMapping.positionType
+  ) {
     return true;
   }
 
@@ -99,7 +117,8 @@ export function canPlayerPlayPosition(
     return false;
   }
 
-  // Simplified version - would need position data from player to implement properly
-  // For now, return true to avoid breaking existing code
-  return true;
+  const eligible = player.player?.eligiblePositions ?? [];
+  // If no eligibility data yet, allow placement
+  if (eligible.length === 0) return true;
+  return eligible.some((pos) => allowedPositions.includes(pos as Position));
 }

@@ -669,6 +669,8 @@ export type PageInfo = {
 export type Player = {
   __typename?: 'Player';
   brefId?: Maybe<Scalars['String']['output']>;
+  /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
+  eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;

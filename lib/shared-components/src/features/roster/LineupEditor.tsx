@@ -11,6 +11,8 @@ import {
 import {
   canPlayerPlayPosition,
   getPositionDisplayName,
+  isBatter,
+  isPitcher,
   LeaguePosition,
   TeamMember,
   TeamMemberWithPositions,
@@ -309,7 +311,9 @@ function LineupEditor(props: LineupEditorProps) {
               >
                 {positionSlot?.positionType
                   ? getPositionDisplayName(positionSlot.positionType)
-                  : 'BE'}
+                  : teamMember && isPitcher(teamMember) && !isBatter(teamMember)
+                    ? 'BP'
+                    : 'BE'}
               </Text>
             </Button>
 

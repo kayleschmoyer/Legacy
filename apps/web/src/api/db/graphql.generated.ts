@@ -669,6 +669,8 @@ export type PageInfo = {
 export type Player = {
   __typename?: 'Player';
   brefId?: Maybe<Scalars['String']['output']>;
+  /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
+  eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
@@ -1688,6 +1690,7 @@ export type MatchupPlayerFragment = {
     firstName?: string | null;
     lastName?: string | null;
     brefId?: string | null;
+    eligiblePositions?: Array<string> | null;
   } | null;
   seasonBatting?: {
     __typename?: 'SeasonBatting';
@@ -1851,6 +1854,7 @@ export type GetMatchupPlayersQuery = {
       firstName?: string | null;
       lastName?: string | null;
       brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -2442,6 +2446,7 @@ export type TeamMemberFragment = {
     firstName?: string | null;
     lastName?: string | null;
     brefId?: string | null;
+    eligiblePositions?: Array<string> | null;
   } | null;
 };
 
@@ -2464,6 +2469,7 @@ export type GetTeamMembersQuery = {
       firstName?: string | null;
       lastName?: string | null;
       brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
     } | null;
   }> | null;
 };
@@ -2488,6 +2494,7 @@ export type UpdateTeamMemberPositionMutation = {
       firstName?: string | null;
       lastName?: string | null;
       brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
     } | null;
   } | null;
 };
@@ -2574,6 +2581,7 @@ export const MatchupPlayerFragmentDoc = gql`
       firstName
       lastName
       brefId
+      eligiblePositions
     }
     seasonBatting {
       games
@@ -2773,6 +2781,7 @@ export const TeamMemberFragmentDoc = gql`
       firstName
       lastName
       brefId
+      eligiblePositions
     }
   }
 `;

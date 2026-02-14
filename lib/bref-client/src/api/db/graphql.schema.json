@@ -5529,6 +5529,26 @@
             "deprecationReason": null
           },
           {
+            "name": "eligiblePositions",
+            "description": "List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)",
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "firstName",
             "description": null,
             "args": [],

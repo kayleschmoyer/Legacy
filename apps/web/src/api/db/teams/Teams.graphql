@@ -15,6 +15,7 @@ fragment TeamMember on TeamMember {
     firstName
     lastName
     brefId
+    eligiblePositions
   }
 }
 
@@ -31,7 +32,10 @@ query GetTeamMembers($teamId: Int!) {
 }
 
 mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
-  updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
+  updateTeamMemberPosition(
+    teamMemberId: $teamMemberId
+    positionId: $positionId
+  ) {
     ...TeamMember
   }
 }

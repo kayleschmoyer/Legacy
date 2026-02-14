@@ -12,6 +12,8 @@ import {
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
+const PITCHING_POSITIONS = new Set(['SP', 'RP']);
+
 const pitchingPositions = new Set(['SP', 'RP']);
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
 const outfieldPositions = new Set(['LF', 'CF', 'RF', 'OF']);
@@ -26,12 +28,51 @@ const getPlayerName = (
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
 };
 
+/** Returns the list of eligible position strings for a team member */
+const getEligiblePositions = (player: TeamMemberFragment): string[] =>
+  player.player?.eligiblePositions ?? [];
+
+/** True when the player has at least one pitching-eligible position (SP / RP) */
+const isPlayerPitcher = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => PITCHING_POSITIONS.has(pos));
+
+/** True when the player has at least one non-pitching position */
+const isPlayerBatter = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => !PITCHING_POSITIONS.has(pos));
+
+/** True when the player qualifies as both a pitcher and a position player */
+const isDualEligible = (player: TeamMemberFragment): boolean =>
+  isPlayerPitcher(player) && isPlayerBatter(player);
+
+const ALLOWED_POSITIONS: Record<string, string[]> = {
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP'],
+  SP: ['SP'],
+  SS: ['SS'],
+  XDH: ['DH'],
+};
+
 const canPlayerPlayPosition = (
   player: TeamMemberFragment,
   position: LeaguePositionFragment,
 ): boolean => {
-  // Placeholder until player eligibility is surfaced via the API schema.
-  return Boolean(player) && Boolean(position);
+  const eligible = getEligiblePositions(player);
+  if (eligible.length === 0) {
+    // Fallback: if no eligibility data is available yet, allow placement
+    return true;
+  }
+  const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
+  if (!allowed) return false;
+  return eligible.some((pos) => allowed.includes(pos));
 };
 
 const getPositionDisplayName = (positionType: string): string => {
@@ -213,6 +254,7 @@ function RosterSlot({
     [position.positionType],
   );
 
+  const isPitchingSlot = pitchingPositions.has(position.positionType ?? '');
   const hasPlayer = Boolean(assignedPlayer);
   const canAcceptSelectedPlayer = Boolean(
     selectedPlayer &&
@@ -355,7 +397,7 @@ function RosterSlot({
               variant="outlined"
               theme="red"
               onPress={handleRemovePlayer}
-              aria-label={`Move ${getPlayerName(assignedPlayer)} to the bench`}
+              aria-label={`Move ${getPlayerName(assignedPlayer)} to the ${isPitchingSlot ? 'bullpen' : 'bench'}`}
             >
               Move
             </Button>
@@ -465,12 +507,22 @@ interface BenchListProps {
   players: readonly TeamMemberFragment[];
   selectedPlayer: TeamMemberFragment | null;
   onPlayerSelect: (player: TeamMemberFragment | null) => void;
+  title: string;
+  titleId: string;
+  emptyLabel: string;
+  emptyHint: string;
+  accentColor?: string;
 }
 
 const BenchList = ({
   players,
   selectedPlayer,
   onPlayerSelect,
+  title,
+  titleId,
+  emptyLabel,
+  emptyHint,
+  accentColor = '$blue8',
 }: BenchListProps): React.JSX.Element => (
   <Card
     padding="$4"
@@ -479,17 +531,17 @@ const BenchList = ({
     borderWidth={1}
     borderRadius="$6"
     role="region"
-    aria-labelledby="bench-title"
+    aria-labelledby={titleId}
   >
     <YStack space="$3">
       <XStack justifyContent="space-between" alignItems="center">
-        <H5 id="bench-title">Bench</H5>
+        <H5 id={titleId}>{title}</H5>
         <Text fontSize="$3" color="$textMuted">
           {players.length} {players.length === 1 ? 'player' : 'players'}
         </Text>
       </XStack>
       <Text fontSize="$3" color="$textMuted">
-        Select a bench player, then tap an open slot to assign them.
+        Select a player, then tap an open slot to assign them.
       </Text>
       {players.length === 0 ? (
         <YStack
@@ -499,16 +551,18 @@ const BenchList = ({
           role="status"
         >
           <Text fontSize="$4" fontWeight="600" color="$textMuted">
-            Bench is empty
+            {emptyLabel}
           </Text>
           <Text fontSize="$2" color="$textMuted">
-            Add free agents or move players from the lineup.
+            {emptyHint}
           </Text>
         </YStack>
       ) : (
         <YStack space="$2">
           {players.map((player) => {
             const isActive = selectedPlayer?.id === player.id;
+            const eligible = getEligiblePositions(player);
+            const dual = isDualEligible(player);
 
             const handleSelect = () => onPlayerSelect(isActive ? null : player);
 
@@ -527,10 +581,10 @@ const BenchList = ({
                 padding="$3"
                 borderRadius="$5"
                 borderWidth={1}
-                borderColor={isActive ? '$blue8' : '$surfacePanelBorder'}
+                borderColor={isActive ? accentColor : '$surfacePanelBorder'}
                 backgroundColor={isActive ? '$accentMuted' : '$surfaceSubtle'}
                 hoverStyle={{
-                  borderColor: '$blue8',
+                  borderColor: accentColor,
                   scale: 0.995,
                 }}
                 pressStyle={{
@@ -544,13 +598,49 @@ const BenchList = ({
                 onKeyDown={handleKeyDown}
               >
                 <XStack justifyContent="space-between" alignItems="center">
-                  <YStack>
+                  <YStack space="$1">
                     <Text fontSize="$4" fontWeight="600" color="$color12">
                       {getPlayerName(player)}
                     </Text>
-                    <Text fontSize="$2" color="$textMuted">
-                      Team Member ID: {player.id}
-                    </Text>
+                    {eligible.length > 0 && (
+                      <XStack gap="$1" flexWrap="wrap">
+                        {eligible.map((pos) => (
+                          <Text
+                            key={pos}
+                            fontSize="$1"
+                            fontWeight="600"
+                            color={
+                              PITCHING_POSITIONS.has(pos)
+                                ? '$blue11'
+                                : '$green9'
+                            }
+                            backgroundColor={
+                              PITCHING_POSITIONS.has(pos)
+                                ? 'rgba(59, 130, 246, 0.15)'
+                                : 'rgba(34, 197, 94, 0.12)'
+                            }
+                            paddingHorizontal="$1.5"
+                            paddingVertical="$0.5"
+                            borderRadius="$2"
+                          >
+                            {pos}
+                          </Text>
+                        ))}
+                        {dual && (
+                          <Text
+                            fontSize="$1"
+                            fontWeight="700"
+                            color="$amber8"
+                            backgroundColor="rgba(245, 158, 11, 0.15)"
+                            paddingHorizontal="$1.5"
+                            paddingVertical="$0.5"
+                            borderRadius="$2"
+                          >
+                            2-WAY
+                          </Text>
+                        )}
+                      </XStack>
+                    )}
                   </YStack>
                   <Text
                     fontSize="$2"
@@ -613,6 +703,30 @@ export function LeagueRosterManagement({
   const benchPlayers = useMemo(
     () => teamPlayers.filter((player) => !player.positionId),
     [teamPlayers],
+  );
+
+  /** Unassigned pitchers — players whose only eligible positions are SP/RP */
+  const bullpenPlayers = useMemo(
+    () => benchPlayers.filter((p) => isPlayerPitcher(p) && !isPlayerBatter(p)),
+    [benchPlayers],
+  );
+
+  /** Unassigned position players — anyone without a pitching-only profile */
+  const benchFielders = useMemo(
+    () => benchPlayers.filter((p) => isPlayerBatter(p) && !isPlayerPitcher(p)),
+    [benchPlayers],
+  );
+
+  /** Players eligible as both pitcher and fielder — shown in both lists */
+  const dualEligiblePlayers = useMemo(
+    () => benchPlayers.filter((p) => isDualEligible(p)),
+    [benchPlayers],
+  );
+
+  /** Players with no eligibility data yet (fallback) */
+  const unclassifiedPlayers = useMemo(
+    () => benchPlayers.filter((p) => getEligiblePositions(p).length === 0),
+    [benchPlayers],
   );
 
   const getAssignedPlayer = useCallback(
@@ -685,8 +799,13 @@ export function LeagueRosterManagement({
                   />
                   <SummaryStat
                     label="Bench"
-                    value={`${benchPlayers.length}`}
-                    description="Waiting for assignment"
+                    value={`${benchFielders.length + dualEligiblePlayers.length + unclassifiedPlayers.length}`}
+                    description="Position players available"
+                  />
+                  <SummaryStat
+                    label="Bullpen"
+                    value={`${bullpenPlayers.length + dualEligiblePlayers.length}`}
+                    description="Pitchers available"
                   />
                   <SummaryStat
                     label="Open Slots"
@@ -740,8 +859,8 @@ export function LeagueRosterManagement({
                 </Card>
               ) : (
                 <Text fontSize="$3" color="$textMuted">
-                  Tap a bench player to select them, then choose a lineup slot
-                  to assign.
+                  Tap a player from the bench or bullpen to select them, then
+                  choose a lineup slot to assign.
                 </Text>
               )}
             </YStack>
@@ -782,9 +901,28 @@ export function LeagueRosterManagement({
             </YStack>
             <YStack flex={2} minWidth={280} maxWidth={420} space="$4">
               <BenchList
-                players={benchPlayers}
+                players={[...bullpenPlayers, ...dualEligiblePlayers]}
                 selectedPlayer={selectedPlayer}
                 onPlayerSelect={setSelectedPlayer}
+                title="Bullpen"
+                titleId="bullpen-title"
+                emptyLabel="Bullpen is empty"
+                emptyHint="Add pitchers or move them from the rotation."
+                accentColor="$blue8"
+              />
+              <BenchList
+                players={[
+                  ...benchFielders,
+                  ...dualEligiblePlayers,
+                  ...unclassifiedPlayers,
+                ]}
+                selectedPlayer={selectedPlayer}
+                onPlayerSelect={setSelectedPlayer}
+                title="Bench"
+                titleId="bench-title"
+                emptyLabel="Bench is empty"
+                emptyHint="Add free agents or move players from the lineup."
+                accentColor="$green8"
               />
             </YStack>
           </XStack>

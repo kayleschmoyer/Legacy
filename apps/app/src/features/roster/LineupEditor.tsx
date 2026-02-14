@@ -2,12 +2,51 @@ import { useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
 import { Button, Separator, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
-import { canPlayerPlayPosition } from '../../common/temporary_models/Models';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
+
+const PITCHING_POSITIONS = new Set(['SP', 'RP']);
+
+const ALLOWED_POSITIONS: Record<string, string[]> = {
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP'],
+  SP: ['SP'],
+  SS: ['SS'],
+  XDH: ['DH'],
+};
+
+const getEligiblePositions = (player: TeamMemberFragment): string[] =>
+  player.player?.eligiblePositions ?? [];
+
+const isPlayerPitcher = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => PITCHING_POSITIONS.has(pos));
+
+const isPlayerBatter = (player: TeamMemberFragment): boolean =>
+  getEligiblePositions(player).some((pos) => !PITCHING_POSITIONS.has(pos));
+
+const canPlayerPlayPosition = (
+  player: TeamMemberFragment | undefined,
+  position: LeaguePositionFragment | undefined,
+): boolean => {
+  if (!player || !position) return true;
+  const eligible = getEligiblePositions(player);
+  if (eligible.length === 0) return true;
+  const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
+  if (!allowed) return false;
+  return eligible.some((pos) => allowed.includes(pos));
+};
 
 type MaybeNumber = number | null | undefined;
 
@@ -297,12 +336,12 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       switch (item.type) {
         case 'starter-data':
           mapping = availableRosterSlots.find(
-            (m) =>
-              normalizeNumericIdentifier(m.id) === item.positionMappingId,
+            (m) => normalizeNumericIdentifier(m.id) === item.positionMappingId,
           );
           teamMember = team.find(
             (t) =>
-              normalizeNumericIdentifier(t.positionId) === item.positionMappingId,
+              normalizeNumericIdentifier(t.positionId) ===
+              item.positionMappingId,
           );
 
           if (mapping) {
@@ -395,7 +434,11 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
               ? humanizeString(positionSlot.positionType)
                   .toUpperCase()
                   .replace(' ', '')
-              : 'BE'}
+              : teamMember &&
+                  isPlayerPitcher(teamMember) &&
+                  !isPlayerBatter(teamMember)
+                ? 'BP'
+                : 'BE'}
           </Button>
 
           <Text flex={1} textAlign="center">

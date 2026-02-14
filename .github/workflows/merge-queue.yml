@@ -22,9 +22,9 @@ on:
   # Trigger on PR review events
   pull_request_review:
     types: [submitted] # When someone approves/requests changes
-  # Trigger on status check completion for faster response
-  status:
-  check_run:
+  # Trigger when CI Orchestrator workflow completes
+  workflow_run:
+    workflows: ["🧠 Legacy Sports CI Orchestrator"]
     types: [completed]
 
 # Ensure only one merge queue run processes at a time to prevent race conditions
@@ -38,8 +38,7 @@ jobs:
       github.repository_owner == 'bkrupa' && 
       (
         github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'status' ||
-        github.event_name == 'check_run' ||
+        github.event_name == 'workflow_run' ||
         github.event_name == 'pull_request_review' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready') ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'merge-when-ready') ||
@@ -74,11 +73,11 @@ jobs:
             const { owner, repo } = context.repo;
             const isDryRun = ${{ github.event.inputs.dry_run || false }};
             const forceCheck = ${{ github.event.inputs.force_check || false }};
-            const isTriggeredByStatus = context.eventName === 'status' || context.eventName === 'check_run';
+            const isTriggeredByWorkflow = context.eventName === 'workflow_run';
 
             console.log(`🔄 Starting merge queue processing (${isDryRun ? 'DRY RUN' : 'LIVE'})...`);
-            if (isTriggeredByStatus) {
-              console.log(`⚡ Triggered by status/check completion - faster response mode`);
+            if (isTriggeredByWorkflow) {
+              console.log(`⚡ Triggered by CI Orchestrator completion - checking merge-ready PRs`);
             }
 
             // Get PRs with merge-when-ready label (or all if force_check is true)
