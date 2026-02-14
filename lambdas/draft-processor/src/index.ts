@@ -4,6 +4,8 @@ import {
   getDbOptions,
   isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
+  getVersionInfo,
+  formatVersionInfo,
 } from '@legacy-sports/utils';
 import {
   SqsDraftMessage,
@@ -32,6 +34,13 @@ const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Log version information on cold start
+const versionInfo = getVersionInfo('legacy-sports-draft-processor');
+LOGGER.info('Draft Processor Lambda initialized', {
+  versionFormatted: formatVersionInfo(versionInfo),
+  ...versionInfo,
+});
 
 // Initialize notification service
 const notificationService = createNotificationService();

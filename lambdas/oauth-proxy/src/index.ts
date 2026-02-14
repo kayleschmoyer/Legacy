@@ -7,6 +7,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 import {
   handleGoogleAuth,
   handleGoogleAuthorize,
@@ -113,6 +114,25 @@ const baseOAuthHandler = async (
 
     // Route to appropriate handler based on path
     switch (event.path) {
+      case '/oauth/version':
+      case '/dev/oauth/version':
+      case '/oauth/health':
+      case '/dev/oauth/health': {
+        // Version and health check endpoint
+        const versionInfo = getVersionInfo('legacy-sports-oauth-proxy');
+        LOGGER.debug('Version endpoint called', versionInfo);
+
+        return addCorsHeaders({
+          statusCode: 200,
+          body: JSON.stringify({
+            status: 'healthy',
+            ...versionInfo,
+            timestamp: new Date().toISOString(),
+            formatted: formatVersionInfo(versionInfo),
+          }),
+        });
+      }
+
       case '/oauth':
       case '/dev/oauth':
         // Root OAuth path - could be used for health checks or general info
@@ -123,6 +143,8 @@ const baseOAuthHandler = async (
             description:
               'OAuth authentication with automatic user provisioning',
             endpoints: [
+              '/oauth/version (version information)',
+              '/oauth/health (health check)',
               '/oauth/verify',
               '/oauth/google (secure flow with auto-provisioning)',
               '/oauth/google/legacy (original flow for backward compatibility)',

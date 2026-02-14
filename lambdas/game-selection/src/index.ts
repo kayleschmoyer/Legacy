@@ -15,6 +15,7 @@ import {
   withSentry,
 } from '@legacy-sports/sentry';
 import { createNotificationService } from '@legacy-sports/aws-utils';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 import {
   getMissingMatchupRecords,
   PublicSchema,
@@ -736,6 +737,23 @@ const baseGameSelectionHandler = async (
     const path = event.path.replace(/^\/dev/, '').replace(/^\/games/, '');
 
     switch (path) {
+      case '/version':
+      case '/health': {
+        // Version and health check endpoint
+        const versionInfo = getVersionInfo('legacy-sports-game-selection');
+        LOGGER.debug('Version endpoint called', versionInfo);
+
+        return addCorsHeaders({
+          statusCode: 200,
+          body: JSON.stringify({
+            status: 'healthy',
+            ...versionInfo,
+            timestamp: new Date().toISOString(),
+            formatted: formatVersionInfo(versionInfo),
+          }),
+        });
+      }
+
       case '/create-matchup':
         if (event.httpMethod === 'POST') {
           // Parse request body
@@ -863,7 +881,6 @@ const baseGameSelectionHandler = async (
         }
         break;
 
-      case '/health':
       case '':
       case '/':
         return addCorsHeaders({
@@ -871,7 +888,12 @@ const baseGameSelectionHandler = async (
           body: JSON.stringify({
             service: 'Game Selection Service',
             status: 'healthy',
-            endpoints: ['/create-matchup', '/select-game'],
+            endpoints: [
+              '/version',
+              '/health',
+              '/create-matchup',
+              '/select-game',
+            ],
           }),
         });
     }

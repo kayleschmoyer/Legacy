@@ -63,7 +63,7 @@ const LinkValue = styled(Text, {
 
 export default function AboutPage() {
   // Read build-time environment variables from centralized config
-  const { appVersion, commitSha, buildDate } = env;
+  const { appVersion, commitSha, buildDate, branch } = env;
 
   // Generate GitHub commit URL
   const repoUrl = 'https://github.com/bbarclay/legacy-sports';
@@ -126,6 +126,11 @@ export default function AboutPage() {
         <InfoRow>
           <Label>Build Date:</Label>
           <Value>{formattedBuildDate}</Value>
+        </InfoRow>
+
+        <InfoRow>
+          <Label>Branch:</Label>
+          <Value>{branch}</Value>
         </InfoRow>
       </InfoCard>
 

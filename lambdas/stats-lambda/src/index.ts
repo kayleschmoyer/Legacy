@@ -8,6 +8,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 import { handler as careerHandler } from './load-career';
 import { handler as gameHandler } from './load-game';
 
@@ -16,6 +17,13 @@ const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Log version information on cold start
+const versionInfo = getVersionInfo('legacy-sports-stats-lambda');
+LOGGER.info('Stats Lambda initialized', {
+  versionFormatted: formatVersionInfo(versionInfo),
+  ...versionInfo,
+});
 
 const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   addBreadcrumb('Processing stats lambda event', {

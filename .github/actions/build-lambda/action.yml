@@ -74,6 +74,19 @@ runs:
         export NX_NO_CLOUD=true
         export NX_CLOUD_NO_TIMEOUTS=true
 
+        # Inject version information into build
+        export VITE_COMMIT_SHA="${GITHUB_SHA}"
+        export VITE_BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        export VITE_BRANCH="${GITHUB_REF_NAME}"
+        export COMMIT_SHA="${GITHUB_SHA}"
+        export BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        export BRANCH="${GITHUB_REF_NAME}"
+
+        echo "🏷️  Version Information:"
+        echo "  Commit: ${VITE_COMMIT_SHA:0:7}"
+        echo "  Branch: ${VITE_BRANCH}"
+        echo "  Build Time: ${VITE_BUILD_TIMESTAMP}"
+
         LAMBDA_NAME="${{ steps.config.outputs.lambda-name }}"
         NX_PROJECT="${{ steps.config.outputs.nx-project }}"
         BUILD_OUTPUT="${{ inputs.build-output-file }}"
@@ -106,6 +119,8 @@ runs:
             echo "- **Project**: $NX_PROJECT" >> $GITHUB_STEP_SUMMARY
             echo "- **Bundle Size**: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY
             echo "- **Output**: $LAMBDA_DIR/dist/" >> $GITHUB_STEP_SUMMARY
+            echo "- **Commit**: ${VITE_COMMIT_SHA:0:7}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch**: ${VITE_BRANCH}" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Build artifacts missing: $BUILD_PATH"
             exit 1

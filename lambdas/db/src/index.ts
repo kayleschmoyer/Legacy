@@ -20,7 +20,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import {
+  formatVersionInfo,
+  getDbOptions,
+  getVersionInfo,
+} from '@legacy-sports/utils';
 import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
@@ -282,6 +286,26 @@ const baseGraphQLHandler = async (
       statusCode: 200,
       headers: CORS_HEADERS,
       body: '',
+    };
+  }
+
+  // Handle version/health check endpoint
+  if (event.path === '/version' || event.path === '/health') {
+    const versionInfo = getVersionInfo('legacy-sports-gql');
+    LOGGER.debug('Version endpoint called', versionInfo);
+
+    return {
+      statusCode: 200,
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status: 'healthy',
+        ...versionInfo,
+        timestamp: new Date().toISOString(),
+        formatted: formatVersionInfo(versionInfo),
+      }),
     };
   }
 

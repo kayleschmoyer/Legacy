@@ -27,6 +27,8 @@ A modern sports data management platform built with React Native CLI, Next.js we
 [![Deploy OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-oauth-proxy.yml)
 [![Deploy GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-gql.yml)
 [![Deploy Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy-draft-processor.yml)
+[![Deploy Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
+[![Deploy Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
 ## 🌐 Live Web App
 

@@ -97,8 +97,11 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
           VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
+          VITE_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.run_number }}
           VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_BUILD_TIMESTAMP: ${{ github.event.repository.updated_at }}
+          VITE_BRANCH: ${{ github.ref_name }}
         run: |
           # Only enable Nx Cloud if DTE started successfully
           if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
@@ -110,6 +113,13 @@ jobs:
             export NX_CLOUD_NO_TIMEOUTS=true
             export NX_NO_CLOUD=true
           fi
+
+          # Display version information
+          echo "🏷️  Version Information:"
+          echo "  Version: ${VITE_VERSION}"
+          echo "  Commit: ${VITE_COMMIT_SHA:0:7}"
+          echo "  Branch: ${VITE_BRANCH}"
+          echo "  Build Time: ${VITE_BUILD_TIMESTAMP}"
 
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then

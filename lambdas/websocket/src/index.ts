@@ -25,6 +25,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 import {
   PublicDb,
   PublicSchema,
@@ -38,6 +39,13 @@ const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);
 }
+
+// Log version information on cold start
+const versionInfo = getVersionInfo('legacy-sports-websocket');
+LOGGER.info('WebSocket Lambda initialized', {
+  versionFormatted: formatVersionInfo(versionInfo),
+  ...versionInfo,
+});
 
 const dynamoClient = new DynamoDBClient({});
 const connectionsTable = process.env['CONNECTIONS_TABLE_NAME'];

@@ -466,6 +466,9 @@ jobs:
     if: always()
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
       - name: Build Summary
         run: |
           echo "## 📱 Android Build Summary" >> $GITHUB_STEP_SUMMARY
@@ -492,3 +495,14 @@ jobs:
           echo "Build artifacts information:"
           echo "APK Name: ${{ needs.build-android.outputs.apk_name }}"
           echo "APK Path: ${{ needs.build-android.outputs.apk_path }}"
+
+      - name: Update Deployment Badge
+        if: always()
+        uses: ./.github/actions/update-deployment-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          deployment-name: "Android APK"
+          deployment-status: ${{ needs.build-android.result }}
+          workflow-run-id: ${{ github.run_id }}
+          branch: ${{ github.ref_name }}

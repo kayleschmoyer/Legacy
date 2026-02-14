@@ -16,6 +16,7 @@ export interface EnvironmentConfig {
   readonly appVersion: string;
   readonly commitSha: string;
   readonly buildDate: string;
+  readonly branch: string;
   readonly sentryDsn?: string;
   readonly sentryTracesSampleRate?: number;
   readonly googleAnalyticsMeasurementId?: string;
@@ -37,9 +38,16 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   isDev: import.meta.env.DEV === true,
   authTestMode: import.meta.env.VITE_AUTH_TEST_MODE === 'true',
   baseUrl: import.meta.env.BASE_URL || '/',
-  appVersion: (import.meta.env.VITE_APP_VERSION as string) || 'unknown',
+  appVersion:
+    (import.meta.env.VITE_VERSION as string) ||
+    (import.meta.env.VITE_APP_VERSION as string) ||
+    'unknown',
   commitSha: (import.meta.env.VITE_COMMIT_SHA as string) || 'unknown',
-  buildDate: (import.meta.env.VITE_BUILD_DATE as string) || 'unknown',
+  buildDate:
+    (import.meta.env.VITE_BUILD_TIMESTAMP as string) ||
+    (import.meta.env.VITE_BUILD_DATE as string) ||
+    'unknown',
+  branch: (import.meta.env.VITE_BRANCH as string) || 'unknown',
   sentryDsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
   sentryTracesSampleRate: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
     ? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE as string)
