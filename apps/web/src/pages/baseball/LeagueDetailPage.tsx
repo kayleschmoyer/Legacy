@@ -43,10 +43,15 @@ import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
-import { useCurrentMatchup } from '../../hooks/useMatchup';
+import {
+  useCurrentMatchup,
+  useMatchupById,
+  useMatchupsForLeague,
+} from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
+import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
 import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -222,7 +227,15 @@ const TAB_ALIASES: Record<string, TabId> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function LeagueDetailPage(): React.JSX.Element {
-  const { id, tab: tabParam } = useParams<{ id: string; tab?: string }>();
+  const {
+    id,
+    tab: tabParam,
+    matchupId: matchupIdParam,
+  } = useParams<{
+    id: string;
+    tab?: string;
+    matchupId?: string;
+  }>();
   const leagueId = parseInt(id || '0', 10);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -415,12 +428,67 @@ export function LeagueDetailPage(): React.JSX.Element {
     refetch: refetchScoringProfile,
   } = useLeagueScoringSettings(leagueId);
 
+  // Current matchup (for default selection)
   const {
     matchup: currentMatchup,
-    loading: matchupLoading,
-    error: matchupError,
-    refetch: refetchMatchup,
+    loading: currentMatchupLoading,
+    error: currentMatchupError,
+    refetch: refetchCurrentMatchup,
   } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
+
+  // Selected matchup state (null means show current matchup)
+  // Initialize from URL route parameter if present
+  const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(
+    matchupIdParam ?? null,
+  );
+
+  // Fetch all matchups for navigation
+  const { matchups: allLeagueMatchups } = useMatchupsForLeague(
+    !isNaN(leagueId) ? leagueId : null,
+  );
+
+  // Fetch selected matchup if user navigated away from current
+  const {
+    matchup: selectedMatchup,
+    loading: selectedMatchupLoading,
+    error: selectedMatchupError,
+  } = useMatchupById(
+    selectedMatchupId ? parseInt(selectedMatchupId, 10) : null,
+  );
+
+  // Determine which matchup to display
+  const displayedMatchup = selectedMatchupId ? selectedMatchup : currentMatchup;
+  const matchupLoading = selectedMatchupId
+    ? selectedMatchupLoading
+    : currentMatchupLoading;
+  const matchupError = selectedMatchupId
+    ? selectedMatchupError
+    : currentMatchupError;
+  const refetchMatchup = useMemo(
+    () =>
+      selectedMatchupId
+        ? () => {
+            void refetchCurrentMatchup();
+          }
+        : refetchCurrentMatchup,
+    [selectedMatchupId, refetchCurrentMatchup],
+  );
+
+  // Sync selected matchup ID when URL param changes (e.g., when navigating via shared link)
+  useEffect(() => {
+    if (matchupIdParam !== selectedMatchupId) {
+      setSelectedMatchupId(matchupIdParam ?? null);
+    }
+  }, [matchupIdParam, selectedMatchupId]);
+
+  // Reset to current matchup when it changes (e.g., week advance)
+  useEffect(() => {
+    if (currentMatchup?.id && !selectedMatchupId) {
+      // We're viewing current matchup and it changed, stay on current
+    } else if (currentMatchup?.id && selectedMatchupId === currentMatchup.id) {
+      // We were viewing current, and it's still current, stay selected
+    }
+  }, [currentMatchup?.id, selectedMatchupId]);
 
   const [matchupSuccessMessage, setMatchupSuccessMessage] = useState<
     string | null
@@ -1366,26 +1434,51 @@ export function LeagueDetailPage(): React.JSX.Element {
                   Error loading matchup: {matchupError.message}
                 </Text>
               </Card>
-            ) : currentMatchup ? (
+            ) : displayedMatchup ? (
               <YStack gap="$4">
+                {/* Matchup Navigation */}
+                <MatchupNavigationControls
+                  currentMatchup={displayedMatchup}
+                  leagueId={leagueId}
+                  allMatchups={allLeagueMatchups}
+                  userTeamId={reduxUserTeamId}
+                  isViewingOther={selectedMatchupId != null}
+                  onMatchupChange={(matchupId) => {
+                    setSelectedMatchupId(matchupId);
+                    // Update URL with matchup ID as route parameter for shareable links
+                    navigate(
+                      `/baseball/league/${leagueId}/matchup/${matchupId}`,
+                      {
+                        replace: true,
+                      },
+                    );
+                  }}
+                  onResetToDefault={() => {
+                    setSelectedMatchupId(null);
+                    // Navigate back to base matchup tab without matchupId
+                    navigate(`/baseball/league/${leagueId}/matchup`, {
+                      replace: true,
+                    });
+                  }}
+                />
                 <MatchupScoreboard
-                  matchup={currentMatchup}
+                  matchup={displayedMatchup}
                   gamesRemaining={
-                    (currentMatchup.gamesPerMatchup ?? 0) -
-                    (currentMatchup.selectedGamesCount ?? 0)
+                    (displayedMatchup.gamesPerMatchup ?? 0) -
+                    (displayedMatchup.selectedGamesCount ?? 0)
                   }
                 />
-                {currentMatchup.gamesPerMatchup && (
+                {displayedMatchup.gamesPerMatchup && (
                   <GamesRemaining
                     gamesRemaining={
-                      (currentMatchup.gamesPerMatchup ?? 0) -
-                      (currentMatchup.selectedGamesCount ?? 0)
+                      (displayedMatchup.gamesPerMatchup ?? 0) -
+                      (displayedMatchup.selectedGamesCount ?? 0)
                     }
-                    totalGames={currentMatchup.gamesPerMatchup}
+                    totalGames={displayedMatchup.gamesPerMatchup}
                   />
                 )}
-                <MatchupRosterComparison matchup={currentMatchup} />
-                {(currentMatchup.startTime || currentMatchup.endTime) && (
+                <MatchupRosterComparison matchup={displayedMatchup} />
+                {(displayedMatchup.startTime || displayedMatchup.endTime) && (
                   <Card
                     backgroundColor="$surfacePanel"
                     borderColor="$surfacePanelBorder"
@@ -1398,19 +1491,19 @@ export function LeagueDetailPage(): React.JSX.Element {
                         Schedule
                       </Text>
                       <YStack gap="$1">
-                        {currentMatchup.startTime && (
+                        {displayedMatchup.startTime && (
                           <Text fontSize="$2" color="$textMuted">
                             Start:{' '}
                             {new Date(
-                              String(currentMatchup.startTime),
+                              String(displayedMatchup.startTime),
                             ).toLocaleString()}
                           </Text>
                         )}
-                        {currentMatchup.endTime && (
+                        {displayedMatchup.endTime && (
                           <Text fontSize="$2" color="$textMuted">
                             End:{' '}
                             {new Date(
-                              String(currentMatchup.endTime),
+                              String(displayedMatchup.endTime),
                             ).toLocaleString()}
                           </Text>
                         )}
