@@ -449,7 +449,7 @@ const createMatchupPlayerGamesLoader = (
 /**
  * DataLoader for player eligible positions
  * Key: playerId (number)
- * Returns: string[] of position codes
+ * Returns: string[] of position codes, sorted by games played (most to least)
  */
 const createEligiblePositionsLoader = (
   db: GenericDatabase<typeof PublicSchema>,
@@ -460,21 +460,30 @@ const createEligiblePositionsLoader = (
       .select({
         playerId: PublicSchema.playerEligiblePositions.playerId,
         position: PublicSchema.playerEligiblePositions.position,
+        games: PublicSchema.playerEligiblePositions.games,
       })
       .from(PublicSchema.playerEligiblePositions)
       .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids));
 
-    const posMap = new Map<number, string[]>();
+    const posMap = new Map<
+      number,
+      Array<{ position: string; games: number }>
+    >();
     for (const row of rows) {
       let arr = posMap.get(row.playerId);
       if (!arr) {
         arr = [];
         posMap.set(row.playerId, arr);
       }
-      arr.push(row.position);
+      arr.push({ position: row.position, games: row.games });
     }
 
-    return keys.map((key) => posMap.get(key) ?? []);
+    // Sort positions by games played (descending) and return just the position strings
+    return keys.map((key) => {
+      const positions = posMap.get(key);
+      if (!positions) return [];
+      return positions.sort((a, b) => b.games - a.games).map((p) => p.position);
+    });
   });
 
 /**
