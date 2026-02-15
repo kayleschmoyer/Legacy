@@ -1,11 +1,22 @@
 import DataLoader from 'dataloader';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 
+// ---------------------------------------------------------------------------
+// Helper: chunk an array to keep OR-clause sizes manageable
+// ---------------------------------------------------------------------------
+function chunk<T>(arr: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 /**
  * DataLoader for game batting stats
- * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
+ * Key format: "playerId-season-gameIdentifier" (e.g., "1234-2019-CLE201905010")
  */
 export const createGameBattingLoader = (
   db: GenericDatabase<typeof PublicSchema>,
@@ -14,189 +25,167 @@ export const createGameBattingLoader = (
     async (keys) => {
       LOGGER.debug(`[gameBatting loader] Looking up ${keys.length} keys`);
 
-      // Parse keys into lookup objects
       const lookups = keys.map((key) => {
-        const [playerId, season, gameNum] = key.split('-').map(Number);
-        return { playerId, season, gameNum };
+        const parts = key.split('-');
+        const playerId = Number(parts[0]);
+        const season = Number(parts[1]);
+        const gameIdentifier = parts.slice(2).join('-');
+        return { playerId, season, gameIdentifier };
       });
 
-      // Execute individual queries in parallel to avoid Drizzle parameter binding bug
-      // The OR/AND query with many parameters was returning wrong data
-      LOGGER.debug(
-        `[gameBatting loader] First 3 lookups: ${JSON.stringify(lookups.slice(0, 3))}`,
-      );
+      // Batch: fetch all rows matching any (playerId, season) pair then filter
+      const pairKeys = [
+        ...new Set(lookups.map((l) => `${l.playerId}-${l.season}`)),
+      ];
+      const pairs = pairKeys.map((k) => {
+        const [pid, s] = k.split('-').map(Number);
+        return { playerId: pid, season: s };
+      });
 
-      const results = await Promise.all(
-        lookups.map(async ({ playerId, season, gameNum }) => {
-          const result = await db
-            .select()
-            .from(PublicSchema.gameBatting)
-            .where(
-              and(
-                eq(PublicSchema.gameBatting.playerId, playerId),
-                eq(PublicSchema.gameBatting.season, season),
-                eq(PublicSchema.gameBatting.gameNum, gameNum),
+      const allStats: (typeof PublicSchema.gameBatting.$inferSelect)[] = [];
+      for (const batch of chunk(pairs, 50)) {
+        const rows = await db
+          .select()
+          .from(PublicSchema.gameBatting)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.gameBatting.playerId, playerId),
+                  eq(PublicSchema.gameBatting.season, season),
+                ),
               ),
-            )
-            .limit(1);
-          return result;
-        }),
-      );
-
-      LOGGER.debug(
-        `[gameBatting loader] Results array length: ${results.length}, each contains: ${results
-          .map((r) => r.length)
-          .slice(0, 10)
-          .join(',')}`,
-      );
-
-      // Check for any non-empty results
-      const nonEmpty = results.filter((r) => r.length > 0);
-      LOGGER.debug(
-        `[gameBatting loader] Non-empty results: ${nonEmpty.length}`,
-      );
-      if (nonEmpty.length > 0) {
-        LOGGER.debug(
-          `[gameBatting loader] First non-empty: ${JSON.stringify({
-            playerId: nonEmpty[0][0].playerId,
-            season: nonEmpty[0][0].season,
-            gameNum: nonEmpty[0][0].gameNum,
-          })}`,
-        );
+            ),
+          );
+        allStats.push(...rows);
       }
 
-      // Flatten results (each query returns array of 0 or 1 item)
-      const allStats = results.flat();
-      LOGGER.debug(
-        `[gameBatting loader] After flatten: ${allStats.length} records`,
-      );
-
-      LOGGER.debug(
-        `[gameBatting loader] Query returned: ${allStats.length} records`,
-      );
-      if (allStats.length > 0) {
-        LOGGER.debug(
-          `[gameBatting loader] First allStats result: ${JSON.stringify({
-            playerId: allStats[0].playerId,
-            season: allStats[0].season,
-            gameNum: allStats[0].gameNum,
-          })}`,
-        );
-      }
-
-      // Create a map for fast lookup
+      // Index by composite key
       const statsMap = new Map<
         string,
         typeof PublicSchema.gameBatting.$inferSelect
       >();
-      allStats.forEach((stat) => {
-        const key = `${stat.playerId}-${stat.season}-${stat.gameNum}`;
-        statsMap.set(key, stat);
-      });
+      for (const stat of allStats) {
+        statsMap.set(
+          `${stat.playerId}-${stat.season}-${stat.gameIdentifier}`,
+          stat,
+        );
+        // Also index by gameNum for backward compat
+        statsMap.set(`${stat.playerId}-${stat.season}-${stat.gameNum}`, stat);
+      }
 
-      // Return results in the same order as keys
-      const finalResults = keys.map((key) => statsMap.get(key) ?? null);
-      const foundCount = finalResults.filter((r) => r !== null).length;
-      LOGGER.debug(
-        `[gameBatting loader] Returning: ${foundCount} found, ${keys.length - foundCount} null`,
-      );
-
-      return finalResults;
+      return keys.map((key) => statsMap.get(key) ?? null);
     },
   );
 
 /**
  * DataLoader for game pitching stats
- * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
+ * Key format: "playerId-season-gameIdentifier"
  */
 export const createGamePitchingLoader = (
   db: GenericDatabase<typeof PublicSchema>,
 ) =>
   new DataLoader<string, typeof PublicSchema.gamePitching.$inferSelect | null>(
     async (keys) => {
-      // Parse keys into lookup objects
       const lookups = keys.map((key) => {
-        const [playerId, season, gameNum] = key.split('-').map(Number);
-        return { playerId, season, gameNum };
+        const parts = key.split('-');
+        return { playerId: Number(parts[0]), season: Number(parts[1]) };
       });
 
-      // Execute individual queries in parallel to avoid Drizzle parameter binding bug
-      const results = await Promise.all(
-        lookups.map(({ playerId, season, gameNum }) =>
-          db
-            .select()
-            .from(PublicSchema.gamePitching)
-            .where(
-              and(
-                eq(PublicSchema.gamePitching.playerId, playerId),
-                eq(PublicSchema.gamePitching.season, season),
-                eq(PublicSchema.gamePitching.gameNum, gameNum),
-              ),
-            )
-            .limit(1),
-        ),
-      );
-      const allStats = results.flat();
+      const pairKeys = [
+        ...new Set(lookups.map((l) => `${l.playerId}-${l.season}`)),
+      ];
+      const pairs = pairKeys.map((k) => {
+        const [pid, s] = k.split('-').map(Number);
+        return { playerId: pid, season: s };
+      });
 
-      // Create a map for fast lookup
+      const allStats: (typeof PublicSchema.gamePitching.$inferSelect)[] = [];
+      for (const batch of chunk(pairs, 50)) {
+        const rows = await db
+          .select()
+          .from(PublicSchema.gamePitching)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.gamePitching.playerId, playerId),
+                  eq(PublicSchema.gamePitching.season, season),
+                ),
+              ),
+            ),
+          );
+        allStats.push(...rows);
+      }
+
       const statsMap = new Map<
         string,
         typeof PublicSchema.gamePitching.$inferSelect
       >();
-      allStats.forEach((stat) => {
-        const key = `${stat.playerId}-${stat.season}-${stat.gameNum}`;
-        statsMap.set(key, stat);
-      });
+      for (const stat of allStats) {
+        statsMap.set(
+          `${stat.playerId}-${stat.season}-${stat.gameIdentifier}`,
+          stat,
+        );
+        statsMap.set(`${stat.playerId}-${stat.season}-${stat.gameNum}`, stat);
+      }
 
-      // Return results in the same order as keys
       return keys.map((key) => statsMap.get(key) ?? null);
     },
   );
 
 /**
  * DataLoader for game fielding stats
- * Key format: "playerId-season-gameNum" (e.g., "1234-2019-5")
+ * Key format: "playerId-season-gameIdentifier"
  */
 export const createGameFieldingLoader = (
   db: GenericDatabase<typeof PublicSchema>,
 ) =>
   new DataLoader<string, typeof PublicSchema.gameFielding.$inferSelect | null>(
     async (keys) => {
-      // Parse keys into lookup objects
       const lookups = keys.map((key) => {
-        const [playerId, season, gameNum] = key.split('-').map(Number);
-        return { playerId, season, gameNum };
+        const parts = key.split('-');
+        return { playerId: Number(parts[0]), season: Number(parts[1]) };
       });
 
-      // Execute individual queries in parallel to avoid Drizzle parameter binding bug
-      const results = await Promise.all(
-        lookups.map(({ playerId, season, gameNum }) =>
-          db
-            .select()
-            .from(PublicSchema.gameFielding)
-            .where(
-              and(
-                eq(PublicSchema.gameFielding.playerId, playerId),
-                eq(PublicSchema.gameFielding.season, season),
-                eq(PublicSchema.gameFielding.gameNum, gameNum),
-              ),
-            )
-            .limit(1),
-        ),
-      );
-      const allStats = results.flat();
+      const pairKeys = [
+        ...new Set(lookups.map((l) => `${l.playerId}-${l.season}`)),
+      ];
+      const pairs = pairKeys.map((k) => {
+        const [pid, s] = k.split('-').map(Number);
+        return { playerId: pid, season: s };
+      });
 
-      // Create a map for fast lookup
+      const allStats: (typeof PublicSchema.gameFielding.$inferSelect)[] = [];
+      for (const batch of chunk(pairs, 50)) {
+        const rows = await db
+          .select()
+          .from(PublicSchema.gameFielding)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.gameFielding.playerId, playerId),
+                  eq(PublicSchema.gameFielding.season, season),
+                ),
+              ),
+            ),
+          );
+        allStats.push(...rows);
+      }
+
       const statsMap = new Map<
         string,
         typeof PublicSchema.gameFielding.$inferSelect
       >();
-      allStats.forEach((stat) => {
-        const key = `${stat.playerId}-${stat.season}-${stat.gameNum}`;
-        statsMap.set(key, stat);
-      });
+      for (const stat of allStats) {
+        statsMap.set(
+          `${stat.playerId}-${stat.season}-${stat.gameIdentifier}`,
+          stat,
+        );
+        statsMap.set(`${stat.playerId}-${stat.season}-${stat.gameNum}`, stat);
+      }
 
-      // Return results in the same order as keys
       return keys.map((key) => statsMap.get(key) ?? null);
     },
   );
@@ -334,63 +323,98 @@ const createSeasonFieldingLoader = (db: GenericDatabase<typeof PublicSchema>) =>
 
 /**
  * DataLoader for teams
- * Key format: teamId (number)
+ * Key: teamId (number)
  */
 const createTeamsLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<number, typeof PublicSchema.teams.$inferSelect | null>(
     async (keys) => {
-      // Fetch all teams in a single batched query
+      const ids = [...new Set(keys)] as number[];
       const allTeams = await db
         .select()
         .from(PublicSchema.teams)
-        .where(or(...keys.map((teamId) => eq(PublicSchema.teams.id, teamId))));
+        .where(inArray(PublicSchema.teams.id, ids));
 
-      // Create a map for fast lookup
       const teamsMap = new Map<
         number,
         typeof PublicSchema.teams.$inferSelect
       >();
-      allTeams.forEach((team) => {
-        teamsMap.set(team.id, team);
-      });
-
-      // Return results in the same order as keys
+      for (const team of allTeams) teamsMap.set(team.id, team);
       return keys.map((key) => teamsMap.get(key) ?? null);
     },
   );
 
 /**
  * DataLoader for players
- * Key format: playerId (number)
+ * Key: playerId (number)
  */
 const createPlayersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<number, typeof PublicSchema.players.$inferSelect | null>(
     async (keys) => {
-      // Fetch all players in a single batched query
+      const ids = [...new Set(keys)] as number[];
       const allPlayers = await db
         .select()
         .from(PublicSchema.players)
-        .where(
-          or(...keys.map((playerId) => eq(PublicSchema.players.id, playerId))),
-        );
+        .where(inArray(PublicSchema.players.id, ids));
 
-      // Create a map for fast lookup
       const playersMap = new Map<
         number,
         typeof PublicSchema.players.$inferSelect
       >();
-      allPlayers.forEach((player) => {
-        playersMap.set(player.id, player);
-      });
-
-      // Return results in the same order as keys
+      for (const player of allPlayers) playersMap.set(player.id, player);
       return keys.map((key) => playersMap.get(key) ?? null);
     },
   );
 
 /**
+ * DataLoader for users
+ * Key: userId (number)
+ */
+const createUsersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
+  new DataLoader<
+    number,
+    {
+      id: number;
+      email: string | null;
+      username: string | null;
+      accessLevel: string | null;
+    } | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const allUsers = await db
+      .select({
+        id: PublicSchema.users.id,
+        email: PublicSchema.users.email,
+        username: PublicSchema.users.username,
+        accessLevel: PublicSchema.users.accessLevel,
+      })
+      .from(PublicSchema.users)
+      .where(inArray(PublicSchema.users.id, ids));
+
+    const usersMap = new Map<
+      number,
+      {
+        id: number;
+        email: string | null;
+        username: string | null;
+        accessLevel: string | null;
+      }
+    >();
+    for (const user of allUsers) {
+      if (user.id !== null) {
+        usersMap.set(user.id, {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          accessLevel: user.accessLevel,
+        });
+      }
+    }
+    return keys.map((key) => usersMap.get(key) ?? null);
+  });
+
+/**
  * DataLoader for matchup player games
- * Key format: matchupPlayerId (number)
+ * Key: matchupPlayerId (number)
  * Returns: Array of games for that matchup player
  */
 const createMatchupPlayerGamesLoader = (
@@ -400,44 +424,310 @@ const createMatchupPlayerGamesLoader = (
     number,
     Array<typeof PublicSchema.matchupPlayerGames.$inferSelect>
   >(async (keys) => {
-    // Fetch all matchup player games in a single batched query
+    const ids = [...new Set(keys)] as number[];
     const allGames = await db
       .select()
       .from(PublicSchema.matchupPlayerGames)
-      .where(
-        or(
-          ...keys.map((matchupPlayerId) =>
-            eq(
-              PublicSchema.matchupPlayerGames.matchupPlayerId,
-              matchupPlayerId,
-            ),
-          ),
-        ),
-      );
+      .where(inArray(PublicSchema.matchupPlayerGames.matchupPlayerId, ids));
 
-    // Group games by matchupPlayerId
     const gamesMap = new Map<
       number,
       Array<typeof PublicSchema.matchupPlayerGames.$inferSelect>
     >();
-    allGames.forEach((game) => {
-      const matchupPlayerId = game.matchupPlayerId;
-      if (!gamesMap.has(matchupPlayerId)) {
-        gamesMap.set(matchupPlayerId, []);
+    for (const game of allGames) {
+      let arr = gamesMap.get(game.matchupPlayerId);
+      if (!arr) {
+        arr = [];
+        gamesMap.set(game.matchupPlayerId, arr);
       }
-      const games = gamesMap.get(matchupPlayerId);
-      if (games) {
-        games.push(game);
-      }
-    });
+      arr.push(game);
+    }
 
-    // Return results in the same order as keys (empty array if no games)
     return keys.map((key) => gamesMap.get(key) ?? []);
   });
 
 /**
+ * DataLoader for player eligible positions
+ * Key: playerId (number)
+ * Returns: string[] of position codes
+ */
+const createEligiblePositionsLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, string[]>(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select({
+        playerId: PublicSchema.playerEligiblePositions.playerId,
+        position: PublicSchema.playerEligiblePositions.position,
+      })
+      .from(PublicSchema.playerEligiblePositions)
+      .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids));
+
+    const posMap = new Map<number, string[]>();
+    for (const row of rows) {
+      let arr = posMap.get(row.playerId);
+      if (!arr) {
+        arr = [];
+        posMap.set(row.playerId, arr);
+      }
+      arr.push(row.position);
+    }
+
+    return keys.map((key) => posMap.get(key) ?? []);
+  });
+
+/**
+ * DataLoader for matchup players (resolves matchupPlayerId → { playerId, matchupId })
+ * Used by MatchupPlayerGame resolvers to avoid per-item MP lookups.
+ * Key: matchupPlayerId (number)
+ */
+const createMatchupPlayersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
+  new DataLoader<number, { playerId: number; matchupId: number } | null>(
+    async (keys) => {
+      const ids = [...new Set(keys)] as number[];
+      const rows = await db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(inArray(PublicSchema.matchupPlayers.id, ids));
+
+      const mpMap = new Map<number, { playerId: number; matchupId: number }>();
+      for (const row of rows) {
+        mpMap.set(row.id, { playerId: row.playerId, matchupId: row.matchupId });
+      }
+      return keys.map((key) => mpMap.get(key) ?? null);
+    },
+  );
+
+/**
+ * DataLoader for matchups (resolves matchupId → { leagueId, weekNumber })
+ * Used by MatchupPlayerGame resolvers to avoid per-item matchup lookups.
+ * Key: matchupId (number)
+ */
+const createMatchupsLoader = (db: GenericDatabase<typeof PublicSchema>) =>
+  new DataLoader<number, { leagueId: number; weekNumber: number } | null>(
+    async (keys) => {
+      const ids = [...new Set(keys)] as number[];
+      const rows = await db
+        .select({
+          id: PublicSchema.matchups.id,
+          leagueId: PublicSchema.matchups.leagueId,
+          weekNumber: PublicSchema.matchups.weekNumber,
+        })
+        .from(PublicSchema.matchups)
+        .where(inArray(PublicSchema.matchups.id, ids));
+
+      const mMap = new Map<number, { leagueId: number; weekNumber: number }>();
+      for (const row of rows) {
+        mMap.set(row.id, {
+          leagueId: row.leagueId,
+          weekNumber: row.weekNumber,
+        });
+      }
+      return keys.map((key) => mMap.get(key) ?? null);
+    },
+  );
+
+/**
+ * DataLoader for league-week-player seasons
+ * Key: "leagueId-weekNumber-playerId"
+ * Returns: season number or null
+ */
+const createLeagueWeekPlayerSeasonsLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<string, number | null>(async (keys) => {
+    const lookups = keys.map((key) => {
+      const [leagueId, weekNumber, playerId] = key.split('-').map(Number);
+      return { leagueId, weekNumber, playerId };
+    });
+
+    // Deduplicate (leagueId, weekNumber) pairs and fetch all player seasons for those
+    const pairKeys = [
+      ...new Set(lookups.map((l) => `${l.leagueId}-${l.weekNumber}`)),
+    ];
+    const allRows: {
+      leagueId: number;
+      weekNumber: number;
+      playerId: number;
+      season: number;
+    }[] = [];
+    for (const batch of chunk(pairKeys, 20)) {
+      const pairs = batch.map((k) => {
+        const [lid, wn] = k.split('-').map(Number);
+        return { leagueId: lid, weekNumber: wn };
+      });
+      const rows = await db
+        .select({
+          leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
+          weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          or(
+            ...pairs.map(({ leagueId, weekNumber }) =>
+              and(
+                eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+                eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+              ),
+            ),
+          ),
+        );
+      allRows.push(...rows);
+    }
+
+    const seasonMap = new Map<string, number>();
+    for (const row of allRows) {
+      seasonMap.set(
+        `${row.leagueId}-${row.weekNumber}-${row.playerId}`,
+        row.season,
+      );
+    }
+
+    return keys.map((key) => seasonMap.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for selectedGamesCount per matchup
+ * Key: matchupId (number)
+ * Returns: count of distinct game_num values
+ */
+const createSelectedGamesCountLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, number>(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select({
+        matchupId: PublicSchema.matchupPlayers.matchupId,
+        count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+      })
+      .from(PublicSchema.matchupPlayerGames)
+      .innerJoin(
+        PublicSchema.matchupPlayers,
+        eq(
+          PublicSchema.matchupPlayerGames.matchupPlayerId,
+          PublicSchema.matchupPlayers.id,
+        ),
+      )
+      .where(inArray(PublicSchema.matchupPlayers.matchupId, ids))
+      .groupBy(PublicSchema.matchupPlayers.matchupId);
+
+    const countMap = new Map<number, number>();
+    for (const row of rows) countMap.set(row.matchupId, row.count);
+    return keys.map((key) => countMap.get(key) ?? 0);
+  });
+
+/**
+ * DataLoader for career fielding stats
+ * Key: playerId (number)
+ * Returns: career fielding record with positionsPlayed JSON
+ */
+const createCareerFieldingLoader = (db: GenericDatabase<typeof PublicSchema>) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFielding.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFielding)
+      .where(inArray(PublicSchema.careerFielding.playerId, ids));
+
+    const cfMap = new Map<
+      number,
+      typeof PublicSchema.careerFielding.$inferSelect
+    >();
+    for (const row of rows) {
+      if (row.playerId !== null) cfMap.set(row.playerId, row);
+    }
+    return keys.map((key) => cfMap.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for matchup messages
+ * Key: messageId (number)
+ * Returns: matchup message record (for replyToMessage lookups)
+ */
+const createMatchupMessagesLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    | (typeof PublicSchema.matchupMessages.$inferSelect & {
+        metadata: Record<string, unknown>;
+      })
+    | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.matchupMessages)
+      .where(inArray(PublicSchema.matchupMessages.id, ids));
+
+    const messagesMap = new Map<
+      number,
+      typeof PublicSchema.matchupMessages.$inferSelect & {
+        metadata: Record<string, unknown>;
+      }
+    >();
+    for (const row of rows) {
+      messagesMap.set(row.id, {
+        ...row,
+        metadata: row.metadata as Record<string, unknown>,
+      });
+    }
+    return keys.map((key) => messagesMap.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for playoff matchups by bracket
+ * Key: bracketId (number)
+ * Returns: Array of playoff matchups for that bracket (sorted by round, matchupNumber)
+ */
+const createPlayoffMatchupsByBracketLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    Array<typeof PublicSchema.playoffMatchups.$inferSelect>
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.playoffMatchups)
+      .where(inArray(PublicSchema.playoffMatchups.bracketId, ids))
+      .orderBy(
+        sql`${PublicSchema.playoffMatchups.bracketId}`,
+        sql`${PublicSchema.playoffMatchups.round}`,
+        sql`${PublicSchema.playoffMatchups.matchupNumber}`,
+      );
+
+    const matchupsMap = new Map<
+      number,
+      Array<typeof PublicSchema.playoffMatchups.$inferSelect>
+    >();
+    for (const row of rows) {
+      let arr = matchupsMap.get(row.bracketId);
+      if (!arr) {
+        arr = [];
+        matchupsMap.set(row.bracketId, arr);
+      }
+      arr.push(row);
+    }
+
+    return keys.map((key) => matchupsMap.get(key) ?? []);
+  });
+
+/**
  * Create all loaders for GraphQL context
- * Now accepts a shared database connection instead of creating its own
+ * Accepts a shared database connection instead of creating its own
  */
 export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   gameBatting: createGameBattingLoader(db),
@@ -448,7 +738,16 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   seasonFielding: createSeasonFieldingLoader(db),
   teams: createTeamsLoader(db),
   players: createPlayersLoader(db),
+  users: createUsersLoader(db),
   matchupPlayerGames: createMatchupPlayerGamesLoader(db),
+  eligiblePositions: createEligiblePositionsLoader(db),
+  matchupPlayersById: createMatchupPlayersLoader(db),
+  matchupsById: createMatchupsLoader(db),
+  leagueWeekPlayerSeasons: createLeagueWeekPlayerSeasonsLoader(db),
+  selectedGamesCount: createSelectedGamesCountLoader(db),
+  careerFielding: createCareerFieldingLoader(db),
+  matchupMessages: createMatchupMessagesLoader(db),
+  playoffMatchupsByBracket: createPlayoffMatchupsByBracketLoader(db),
 });
 
 /**

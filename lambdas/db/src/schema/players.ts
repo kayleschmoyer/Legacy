@@ -1,6 +1,5 @@
-import { createDatabaseService, PublicSchema } from '@legacy-sports/db-client';
+import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
-import { eq } from 'drizzle-orm';
 import { builder } from './builder';
 
 // Create a single database service instance to reuse across all resolvers
@@ -32,11 +31,7 @@ PlayerRef.implement({
       description:
         'List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)',
       resolve: async (parent, _args, context) => {
-        const rows = await context.db
-          .select({ position: PublicSchema.playerEligiblePositions.position })
-          .from(PublicSchema.playerEligiblePositions)
-          .where(eq(PublicSchema.playerEligiblePositions.playerId, parent.id));
-        return rows.map((r) => r.position);
+        return context.loaders.eligiblePositions.load(parent.id);
       },
     }),
   }),

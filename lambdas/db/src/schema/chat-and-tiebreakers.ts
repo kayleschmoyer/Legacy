@@ -107,19 +107,7 @@ builder.objectType(MatchupMessage, {
       type: 'User',
       nullable: true,
       resolve: async (msg, _args, context) => {
-        const results = await context.db
-          .select()
-          .from(PublicSchema.users)
-          .where(eq(PublicSchema.users.id, msg.senderId))
-          .limit(1);
-        const user = results[0];
-        if (!user || user.id === null) return null;
-        return {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          accessLevel: user.accessLevel,
-        };
+        return context.loaders.users.load(msg.senderId);
       },
     }),
     replyToMessage: t.field({
@@ -127,17 +115,7 @@ builder.objectType(MatchupMessage, {
       nullable: true,
       resolve: async (msg, _args, context) => {
         if (!msg.replyToMessageId) return null;
-        const results = await context.db
-          .select()
-          .from(PublicSchema.matchupMessages)
-          .where(eq(PublicSchema.matchupMessages.id, msg.replyToMessageId))
-          .limit(1);
-        const reply = results[0];
-        if (!reply) return null;
-        return {
-          ...reply,
-          metadata: reply.metadata as Record<string, unknown>,
-        };
+        return context.loaders.matchupMessages.load(msg.replyToMessageId);
       },
     }),
   }),

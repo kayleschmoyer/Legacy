@@ -74,33 +74,14 @@ builder.objectType(PlayoffBracket, {
       nullable: true,
       resolve: async (bracket, _args, context) => {
         if (!bracket.championTeamId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, bracket.championTeamId ?? 0))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(bracket.championTeamId);
       },
     }),
     // Relational field: all matchups in this bracket
     matchups: t.field({
       type: [PlayoffMatchup],
       resolve: async (bracket, _args, context) => {
-        const results = await context.db
-          .select()
-          .from(PublicSchema.playoffMatchups)
-          .where(eq(PublicSchema.playoffMatchups.bracketId, bracket.id))
-          .orderBy(
-            asc(PublicSchema.playoffMatchups.round),
-            asc(PublicSchema.playoffMatchups.matchupNumber),
-          );
-        return results;
+        return context.loaders.playoffMatchupsByBracket.load(bracket.id);
       },
     }),
   }),
@@ -159,18 +140,7 @@ builder.objectType(PlayoffMatchup, {
       nullable: true,
       resolve: async (matchup, _args, context) => {
         if (!matchup.highSeedTeamId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, matchup.highSeedTeamId ?? 0))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(matchup.highSeedTeamId);
       },
     }),
     lowSeedTeam: t.field({
@@ -178,18 +148,7 @@ builder.objectType(PlayoffMatchup, {
       nullable: true,
       resolve: async (matchup, _args, context) => {
         if (!matchup.lowSeedTeamId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, matchup.lowSeedTeamId ?? 0))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(matchup.lowSeedTeamId);
       },
     }),
     winnerTeam: t.field({
@@ -197,18 +156,7 @@ builder.objectType(PlayoffMatchup, {
       nullable: true,
       resolve: async (matchup, _args, context) => {
         if (!matchup.winnerTeamId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, matchup.winnerTeamId ?? 0))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(matchup.winnerTeamId);
       },
     }),
   }),
@@ -243,18 +191,7 @@ builder.objectType(PlayoffSeed, {
     team: t.field({
       type: Team,
       resolve: async (seed, _args, context) => {
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, seed.teamId))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(seed.teamId);
       },
     }),
   }),
@@ -301,18 +238,7 @@ builder.objectType(ChampionTrophy, {
     championTeam: t.field({
       type: Team,
       resolve: async (trophy, _args, context) => {
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, trophy.teamId))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(trophy.teamId);
       },
     }),
     runnerUpTeam: t.field({
@@ -320,18 +246,7 @@ builder.objectType(ChampionTrophy, {
       nullable: true,
       resolve: async (trophy, _args, context) => {
         if (!trophy.runnerUpTeamId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, trophy.runnerUpTeamId ?? 0))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(trophy.runnerUpTeamId);
       },
     }),
   }),

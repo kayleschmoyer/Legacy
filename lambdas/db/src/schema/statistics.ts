@@ -325,21 +325,22 @@ CareerBattingRef.implement({
     player: t.field({
       type: 'Player',
       nullable: true,
-      resolve: async (stats) => {
+      resolve: async (stats, _args, context) => {
         if (!stats.playerId) return null;
-        return dbService.players.getPlayerById(stats.playerId);
+        return context.loaders.players.load(stats.playerId);
       },
     }),
     // Primary position based on fielding statistics
     primaryPosition: t.field({
       type: 'String',
       nullable: true,
-      resolve: async (stats) => {
+      resolve: async (stats, _args, context) => {
         if (!stats.playerId) return null;
 
         try {
-          const fieldingStats =
-            await dbService.statistics.getPlayerCareerFielding(stats.playerId);
+          const fieldingStats = await context.loaders.careerFielding.load(
+            stats.playerId,
+          );
           if (!fieldingStats?.positionsPlayed) return null;
 
           // The positions played is already a JSON object from the database
@@ -397,12 +398,13 @@ CareerBattingRef.implement({
     positionsPlayed: t.field({
       type: 'String',
       nullable: true,
-      resolve: async (stats) => {
+      resolve: async (stats, _args, context) => {
         if (!stats.playerId) return null;
 
         try {
-          const fieldingStats =
-            await dbService.statistics.getPlayerCareerFielding(stats.playerId);
+          const fieldingStats = await context.loaders.careerFielding.load(
+            stats.playerId,
+          );
           if (!fieldingStats?.positionsPlayed) return null;
 
           // Return the positions played as a JSON string

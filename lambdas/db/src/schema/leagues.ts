@@ -1,19 +1,10 @@
-import {
-  createDatabaseService,
-  PublicDb,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import type { Team as DbTeam } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
 import { DraftService } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from './scoring';
-
-// Create a single database service instance to reuse across all resolvers
-// Updated for player field support - 2025-10-06
-const dbService = createDatabaseService(getDbOptions());
 
 // Helper function to generate unique invite codes
 // Uses uppercase letters and numbers (excluding confusable characters: 0, O, 1, I, l)
@@ -171,33 +162,8 @@ LeagueMember.implement({
       type: Team,
       nullable: true,
       resolve: async (parent, _args, context) => {
-        // If no teamId, return null
-        if (!parent.teamId) {
-          return null;
-        }
-
-        // Query the database to get the team details
-        try {
-          const results = await context.db
-            .select({
-              id: PublicSchema.teams.id,
-              name: PublicSchema.teams.name,
-              leagueId: PublicSchema.teams.leagueId,
-              createdAt: PublicSchema.teams.createdAt,
-              updatedAt: PublicSchema.teams.updatedAt,
-            })
-            .from(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.id, parent.teamId ?? 0))
-            .limit(1);
-
-          return results.length > 0 ? results[0] : null;
-        } catch (error) {
-          LOGGER.error('Error fetching team for LeagueMember', {
-            teamId: parent.teamId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return null;
-        }
+        if (!parent.teamId) return null;
+        return context.loaders.teams.load(parent.teamId);
       },
     }),
   }),
@@ -239,8 +205,8 @@ TeamMember.implement({
     player: t.field({
       type: 'Player',
       nullable: true,
-      resolve: async (parent) => {
-        return dbService.players.getPlayerById(parent.playerId);
+      resolve: async (parent, _args, context) => {
+        return context.loaders.players.load(parent.playerId);
       },
     }),
   }),
