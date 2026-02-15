@@ -18,7 +18,8 @@ resource "aws_iam_policy" "github_actions_ssm" {
         Effect = "Allow"
         Action = [
           "ssm:GetParameter",
-          "ssm:GetParameters"
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
         ]
         Resource = [
           "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/s3/lambda-deployments-bucket",
