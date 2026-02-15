@@ -110,11 +110,7 @@ export class StatisticsService {
     };
 
     const options: QueryOptions = {
-      orderBy: queryOptions.orderBy as
-        | 'games'
-        | 'homeRuns'
-        | 'wins'
-        | 'strikeouts',
+      orderBy: queryOptions.orderBy as QueryOptions['orderBy'],
       orderDirection: queryOptions.orderDirection || 'desc',
       limit: queryOptions.limit,
       offset: queryOptions.offset,

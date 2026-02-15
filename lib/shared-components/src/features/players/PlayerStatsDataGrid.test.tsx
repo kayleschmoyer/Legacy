@@ -392,7 +392,7 @@ describe('PlayerStatsDataGrid - Rendering', () => {
     );
 
     expect(screen.getByText('Filters:')).toBeInTheDocument();
-    expect(screen.getByText('Min Games:')).toBeInTheDocument();
+    expect(screen.getByText('Min G:')).toBeInTheDocument();
     expect(screen.getByText('Min HR:')).toBeInTheDocument();
   });
 

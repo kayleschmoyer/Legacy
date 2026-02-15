@@ -1,0 +1,24 @@
+# Query to fetch career pitching statistics with pagination and sorting support
+#import "./careerPitching.fragment.graphql"
+
+query GetCareerPitchingStats(
+  $limit: Int
+  $offset: Int
+  $orderBy: String
+  $orderDirection: String
+  $minGames: Int
+  $minWins: Int
+  $minStrikeouts: Int
+) {
+  careerPitchingStats(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    minGames: $minGames
+    minWins: $minWins
+    minStrikeouts: $minStrikeouts
+  ) {
+    ...CareerPitching
+  }
+}

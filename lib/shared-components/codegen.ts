@@ -38,13 +38,20 @@ const config: CodegenConfig = {
         // Apollo Client 4.x configuration
         apolloClientVersion: 4,
         withHooks: true,
-        reactApolloImportFrom: '@apollo/client/react',
-        apolloReactCommonImportFrom: '@apollo/client/react',
+        apolloImportFrom: '@apollo/client',
+        reactApolloImportFrom: '@apollo/client',
+        apolloReactCommonImportFrom: '@apollo/client',
       },
       plugins: [
         {
           add: {
             content: '/* eslint-disable */',
+          },
+        },
+        {
+          add: {
+            content:
+              "import { useQuery, useLazyQuery, useSuspenseQuery, useMutation } from '@apollo/client/react';",
           },
         },
         'typescript',

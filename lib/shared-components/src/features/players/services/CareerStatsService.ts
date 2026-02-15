@@ -25,11 +25,9 @@ import {
 // =============================================================================
 
 // All GraphQL operations are now imported from the generated file:
-// - GetCareerBattingStats: Primary query for career batting statistics  
+// - GetCareerBattingStats: Primary query for career batting statistics
 // - GetAllPlayers: Query to fetch players with positions
 // - Associated hooks: useGetCareerBattingStatsQuery, useGetCareerBattingStatsLazyQuery, etc.
-
-
 
 // =============================================================================
 // Type Definitions
@@ -170,19 +168,22 @@ function safeNumber(value: number | null | undefined, fallback = 0): number {
   return value ?? fallback;
 }
 
-
 /**
  * Parse positions played JSON string into a structured object
  *
  * @param positionsPlayedJson - JSON string of position data from database
  * @returns Parsed positions object or undefined if parsing fails
  */
-function parsePositionsPlayed(positionsPlayedJson: string | null | undefined): Record<string, PositionData> | undefined {
+function parsePositionsPlayed(
+  positionsPlayedJson: string | null | undefined,
+): Record<string, PositionData> | undefined {
   if (!positionsPlayedJson) return undefined;
-  
+
   try {
     const parsed = JSON.parse(positionsPlayedJson) as unknown;
-    return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, PositionData> : undefined;
+    return typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, PositionData>)
+      : undefined;
   } catch (error) {
     console.warn('Failed to parse positions data:', error);
     return undefined;
@@ -195,17 +196,21 @@ function parsePositionsPlayed(positionsPlayedJson: string | null | undefined): R
  * @param positionsPlayedJson - JSON string of position data from database
  * @returns Formatted string like "1B (210g), OF (45g), DH (12g)"
  */
-function formatPositionsPlayed(positionsPlayedJson: string | null | undefined): string {
+function formatPositionsPlayed(
+  positionsPlayedJson: string | null | undefined,
+): string {
   if (!positionsPlayedJson) return '';
-  
+
   try {
-    const positionsData: Record<string, PositionData> = JSON.parse(positionsPlayedJson) as Record<string, PositionData>;
-    
+    const positionsData: Record<string, PositionData> = JSON.parse(
+      positionsPlayedJson,
+    ) as Record<string, PositionData>;
+
     // Convert to array and sort by games played (descending)
     const sortedPositions = Object.values(positionsData)
       .sort((a, b) => b.games - a.games)
-      .map(pos => `${pos.position} (${pos.games}g)`);
-      
+      .map((pos) => `${pos.position} (${pos.games}g)`);
+
     return sortedPositions.join(', ');
   } catch (error) {
     console.warn('Failed to parse positions played data:', error);
@@ -246,10 +251,15 @@ export function transformCareerStats(
   const intentionalBaseOnBalls = safeNumber(rawStats.intentionalBaseOnBalls);
 
   // Use calculated statistics from schema when available, or calculate if needed
-  const battingAverage = rawStats.battingAverage ?? (atBats > 0 ? hits / atBats : 0);
-  const onBasePercentage = rawStats.onBasePercentage ?? (plateAppearances > 0 ? 
-    (hits + baseOnBalls + hitByPitch) / plateAppearances : 0);
-  const sluggingPercentage = rawStats.sluggingPercentage ?? (atBats > 0 ? totalBases / atBats : 0);
+  const battingAverage =
+    rawStats.battingAverage ?? (atBats > 0 ? hits / atBats : 0);
+  const onBasePercentage =
+    rawStats.onBasePercentage ??
+    (plateAppearances > 0
+      ? (hits + baseOnBalls + hitByPitch) / plateAppearances
+      : 0);
+  const sluggingPercentage =
+    rawStats.sluggingPercentage ?? (atBats > 0 ? totalBases / atBats : 0);
 
   // Compute OPS (On-base Plus Slugging)
   const ops = onBasePercentage + sluggingPercentage;
@@ -314,21 +324,27 @@ export function transformCareerStatsWithFielding(
 ): PlayerCareerStats {
   // Start with the existing batting transformation
   const baseStats = transformCareerStats(battingStats, player);
-  
+
   // Add fielding data if available
   if (fieldingStats) {
     const fieldingGames = safeNumber(fieldingStats.games);
     const fieldingPercentage = fieldingStats.fieldingPercentage ?? undefined;
     const positionsPlayedJson = fieldingStats.positionsPlayed;
-    
+
     // Parse positions data
     let positionsPlayed: Record<string, PositionData> | undefined;
     try {
-      positionsPlayed = positionsPlayedJson ? JSON.parse(positionsPlayedJson) as Record<string, PositionData> : undefined;
+      positionsPlayed = positionsPlayedJson
+        ? (JSON.parse(positionsPlayedJson) as Record<string, PositionData>)
+        : undefined;
     } catch (error) {
-      console.warn('Failed to parse positions data for player', battingStats.playerId, error);
+      console.warn(
+        'Failed to parse positions data for player',
+        battingStats.playerId,
+        error,
+      );
     }
-    
+
     return {
       ...baseStats,
       fieldingGames,
@@ -337,7 +353,7 @@ export function transformCareerStatsWithFielding(
       formattedPositions: formatPositionsPlayed(positionsPlayedJson),
     };
   }
-  
+
   return baseStats;
 }
 
@@ -380,16 +396,21 @@ export function useCareerStatsService(
 
   // Transform raw data from connection format (using edges instead of nodes)
   const transformedData: PlayerCareerStats[] =
-    data?.careerBattingStats?.edges?.map((edge) =>
-      edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null
-    ).filter((item): item is PlayerCareerStats => item !== null) ?? [];
+    data?.careerBattingStats?.edges
+      ?.map((edge) =>
+        edge
+          ? transformCareerStats(edge.node || ({} as CareerBattingFragment))
+          : null,
+      )
+      .filter((item): item is PlayerCareerStats => item !== null) ?? [];
 
   // Extract pagination metadata from connection
   const totalCount = data?.careerBattingStats?.totalCount ?? 0;
   const pageSize = params.first ?? 25;
   const hasNextPage = data?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
-  const hasPreviousPage = data?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
-  
+  const hasPreviousPage =
+    data?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+
   // Calculate current page from cursor (simplified approximation)
   const currentPage = 1; // Since we're using cursor-based pagination, page concept is simplified
 
@@ -426,23 +447,29 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
     variables: params,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
-    fetchPolicy: 'cache-and-network', // Balance performance with data freshness
+    fetchPolicy: 'network-only', // Always fetch fresh data when sorting/filtering changes
   });
 
   // Transform data (simplified - just batting stats for now)
   const transformedData: PlayerCareerStats[] = React.useMemo(() => {
     if (!statsData?.careerBattingStats?.edges) return [];
 
-    return statsData.careerBattingStats.edges.map((edge) => {
-      return edge ? transformCareerStats(edge.node || {} as CareerBattingFragment) : null;
-    }).filter((item): item is PlayerCareerStats => item !== null);
+    return statsData.careerBattingStats.edges
+      .map((edge) => {
+        return edge
+          ? transformCareerStats(edge.node || ({} as CareerBattingFragment))
+          : null;
+      })
+      .filter((item): item is PlayerCareerStats => item !== null);
   }, [statsData]);
 
   // Extract pagination metadata from connection
   const totalCount = statsData?.careerBattingStats?.totalCount ?? 0;
   const pageSize = params.first ?? 25;
-  const hasNextPage = statsData?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
-  const hasPreviousPage = statsData?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+  const hasNextPage =
+    statsData?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
+  const hasPreviousPage =
+    statsData?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
   const currentPage = 1; // Simplified for cursor-based pagination
 
   // Combined loading and error states
@@ -506,7 +533,11 @@ export const CAREER_STATS_SORT_OPTIONS = [
   { label: 'Stolen Bases (Most)', value: 'stolenBases', direction: 'desc' },
   { label: 'At Bats (Most)', value: 'atBats', direction: 'desc' },
   { label: 'Runs (Most)', value: 'runs', direction: 'desc' },
-  { label: 'Batting Average (Highest)', value: 'battingAverage', direction: 'desc' },
+  {
+    label: 'Batting Average (Highest)',
+    value: 'battingAverage',
+    direction: 'desc',
+  },
 ] as const;
 
 /**
@@ -533,6 +564,6 @@ export const DEFAULT_CAREER_STATS_PARAMS: CareerStatsQueryParams = {
 export const CAREER_BATTING_STATS_QUERY = GetCareerBattingStats;
 
 /**
- * Players query document  
+ * Players query document
  */
 export const PLAYERS_QUERY = GetAllPlayers;

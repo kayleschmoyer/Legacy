@@ -1,0 +1,27 @@
+# Career Pitching fragment defining the fields for career pitching statistics
+fragment CareerPitching on CareerPitching {
+  playerId
+  wins
+  losses
+  games
+  gamesStarted
+  gamesFinished
+  completeGames
+  shutouts
+  saves
+  hits
+  runs
+  earnedRuns
+  homeRuns
+  baseOnBalls
+  intentionalBaseOnBalls
+  strikeouts
+  hitByPitch
+  balks
+  wildPitches
+  battersFaced
+  outsRecorded
+  outRate
+  era
+  winPercentage
+}

@@ -1,5 +1,12 @@
 /* eslint-disable */
+import {
+  useQuery,
+  useLazyQuery,
+  useSuspenseQuery,
+  useMutation,
+} from '@apollo/client/react';
 import { gql } from '@apollo/client';
+import * as ApolloReactCommon from '@apollo/client';
 import * as Apollo from '@apollo/client/react';
 
 // Apollo Client 4.x compatibility: these types are no longer exported
@@ -1341,6 +1348,34 @@ export type CareerBattingFragment = {
   } | null;
 };
 
+export type CareerPitchingFragment = {
+  __typename?: 'CareerPitching';
+  playerId?: number | null;
+  wins?: number | null;
+  losses?: number | null;
+  games?: number | null;
+  gamesStarted?: number | null;
+  gamesFinished?: number | null;
+  completeGames?: number | null;
+  shutouts?: number | null;
+  saves?: number | null;
+  hits?: number | null;
+  runs?: number | null;
+  earnedRuns?: number | null;
+  homeRuns?: number | null;
+  baseOnBalls?: number | null;
+  intentionalBaseOnBalls?: number | null;
+  strikeouts?: number | null;
+  hitByPitch?: number | null;
+  balks?: number | null;
+  wildPitches?: number | null;
+  battersFaced?: number | null;
+  outsRecorded?: number | null;
+  outRate?: number | null;
+  era?: string | null;
+  winPercentage?: number | null;
+};
+
 export type GetAllPlayersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -1424,6 +1459,47 @@ export type GetCareerBattingStatsQuery = {
   } | null;
 };
 
+export type GetCareerPitchingStatsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minWins?: InputMaybe<Scalars['Int']['input']>;
+  minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetCareerPitchingStatsQuery = {
+  __typename?: 'Query';
+  careerPitchingStats?: Array<{
+    __typename?: 'CareerPitching';
+    playerId?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    gamesFinished?: number | null;
+    completeGames?: number | null;
+    shutouts?: number | null;
+    saves?: number | null;
+    hits?: number | null;
+    runs?: number | null;
+    earnedRuns?: number | null;
+    homeRuns?: number | null;
+    baseOnBalls?: number | null;
+    intentionalBaseOnBalls?: number | null;
+    strikeouts?: number | null;
+    hitByPitch?: number | null;
+    balks?: number | null;
+    wildPitches?: number | null;
+    battersFaced?: number | null;
+    outsRecorded?: number | null;
+    outRate?: number | null;
+    era?: string | null;
+    winPercentage?: number | null;
+  }> | null;
+};
+
 export type PlayerFragment = {
   __typename?: 'Player';
   id?: number | null;
@@ -1475,6 +1551,34 @@ export const CareerBattingFragmentDoc = gql`
       lastName
       brefId
     }
+  }
+`;
+export const CareerPitchingFragmentDoc = gql`
+  fragment CareerPitching on CareerPitching {
+    playerId
+    wins
+    losses
+    games
+    gamesStarted
+    gamesFinished
+    completeGames
+    shutouts
+    saves
+    hits
+    runs
+    earnedRuns
+    homeRuns
+    baseOnBalls
+    intentionalBaseOnBalls
+    strikeouts
+    hitByPitch
+    balks
+    wildPitches
+    battersFaced
+    outsRecorded
+    outRate
+    era
+    winPercentage
   }
 `;
 export const PlayerFragmentDoc = gql`
@@ -1711,6 +1815,115 @@ export type GetCareerBattingStatsSuspenseQueryHookResult = ReturnType<
 export type GetCareerBattingStatsQueryResult = Apollo.QueryResult<
   GetCareerBattingStatsQuery,
   GetCareerBattingStatsQueryVariables
+>;
+export const GetCareerPitchingStats = gql`
+  query GetCareerPitchingStats(
+    $limit: Int
+    $offset: Int
+    $orderBy: String
+    $orderDirection: String
+    $minGames: Int
+    $minWins: Int
+    $minStrikeouts: Int
+  ) {
+    careerPitchingStats(
+      limit: $limit
+      offset: $offset
+      orderBy: $orderBy
+      orderDirection: $orderDirection
+      minGames: $minGames
+      minWins: $minWins
+      minStrikeouts: $minStrikeouts
+    ) {
+      ...CareerPitching
+    }
+  }
+  ${CareerPitchingFragmentDoc}
+`;
+
+/**
+ * __useGetCareerPitchingStatsQuery__
+ *
+ * To run a query within a React component, call `useGetCareerPitchingStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCareerPitchingStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCareerPitchingStatsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
+ *      minGames: // value for 'minGames'
+ *      minWins: // value for 'minWins'
+ *      minStrikeouts: // value for 'minStrikeouts'
+ *   },
+ * });
+ */
+export function useGetCareerPitchingStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetCareerPitchingStatsQuery,
+    GetCareerPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetCareerPitchingStatsQuery,
+    GetCareerPitchingStatsQueryVariables
+  >(GetCareerPitchingStats, options);
+}
+export function useGetCareerPitchingStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetCareerPitchingStatsQuery,
+    GetCareerPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetCareerPitchingStatsQuery,
+    GetCareerPitchingStatsQueryVariables
+  >(GetCareerPitchingStats, options);
+}
+export function useGetCareerPitchingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCareerPitchingStatsQuery,
+        GetCareerPitchingStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetCareerPitchingStatsQuery,
+    GetCareerPitchingStatsQueryVariables
+  >(
+    GetCareerPitchingStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetCareerPitchingStatsQuery,
+          GetCareerPitchingStatsQueryVariables
+        >,
+  );
+}
+export type GetCareerPitchingStatsQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsQuery
+>;
+export type GetCareerPitchingStatsLazyQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsLazyQuery
+>;
+export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsSuspenseQuery
+>;
+export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<
+  GetCareerPitchingStatsQuery,
+  GetCareerPitchingStatsQueryVariables
 >;
 export const TriggerGameSelection = gql`
   mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {

@@ -20,7 +20,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
-  CAREER_STATS_SORT_OPTIONS,
   type CareerStatsQueryParams,
   DEFAULT_CAREER_STATS_PARAMS,
   type PlayerCareerStats,
@@ -336,7 +335,6 @@ export function PlayerStatsDataGrid({
     totalCount,
     hasNextPage,
     hasPreviousPage,
-    currentPage,
     pageSize,
     refetch,
   } = useCareerStatsWithNames(queryParams);
@@ -449,6 +447,47 @@ export function PlayerStatsDataGrid({
   );
 
   /**
+   * Jumps to a specific page number
+   */
+  const handleGoToPage = useCallback(
+    (pageNumber: number) => {
+      const pageSize = queryParams.first ?? 25;
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      // Validate page number
+      if (pageNumber < 1 || pageNumber > totalPages) {
+        return;
+      }
+
+      // Calculate offset for the target page (page 1 = offset 0)
+      const offset = (pageNumber - 1) * pageSize;
+
+      // Create cursor from offset (same encoding used by backend)
+      const cursor =
+        offset > 0
+          ? Buffer.from(offset.toString()).toString('base64')
+          : undefined;
+
+      updateQueryParams({ after: cursor });
+    },
+    [queryParams.first, totalCount, updateQueryParams],
+  );
+
+  // Calculate total pages and current page number
+  const totalPages = useMemo(() => {
+    const pageSize = queryParams.first ?? 25;
+    return Math.max(1, Math.ceil(totalCount / pageSize));
+  }, [totalCount, queryParams.first]);
+
+  const currentPageNumber = useMemo(() => {
+    const pageSize = queryParams.first ?? 25;
+    const offset = queryParams.after
+      ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
+      : 0;
+    return Math.floor(offset / pageSize) + 1;
+  }, [queryParams.after, queryParams.first]);
+
+  /**
    * Handles row selection
    */
   const handleRowClick = useCallback(
@@ -486,7 +525,12 @@ export function PlayerStatsDataGrid({
    */
   const renderControls = () => (
     <YStack space="$3" padding="$3" backgroundColor="$color2" borderRadius="$3">
-      <XStack space="$3" alignItems="center" flexWrap="wrap">
+      <XStack
+        space="$3"
+        alignItems="center"
+        flexWrap="wrap"
+        justifyContent="space-between"
+      >
         {/* Search */}
         {showSearch && (
           <XStack flex={1} minWidth="200px" alignItems="center" space="$2">
@@ -501,46 +545,63 @@ export function PlayerStatsDataGrid({
           </XStack>
         )}
 
-        {/* Sort Selection */}
-        {showSorting && (
-          <XStack alignItems="center" space="$2" minWidth="150px">
-            <Text fontSize="$3" color="$color11">
-              Sort by:
+        {/* Filters */}
+        {showFilters && (
+          <XStack space="$2" alignItems="center" flexWrap="wrap">
+            <Text fontSize="$2" color="$color11" fontWeight="500">
+              Filters:
             </Text>
-            <XStack>
-              <select
-                value={`${queryParams.orderBy}-${queryParams.orderDirection}`}
-                onChange={(e) => {
-                  const [orderBy, orderDirection] = e.target.value.split(
-                    '-',
-                  ) as [string, 'asc' | 'desc'];
-                  handleSort(orderBy, orderDirection);
-                }}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #ccc',
-                  fontSize: '14px',
-                  backgroundColor: 'white',
-                  minWidth: '150px',
-                }}
-              >
-                {CAREER_STATS_SORT_OPTIONS.map((option) => (
-                  <option
-                    key={`${option.value}-desc`}
-                    value={`${option.value}-desc`}
-                  >
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <XStack alignItems="center" space="$1">
+              <Text fontSize="$2" color="$color10">
+                Min G:
+              </Text>
+              <Input
+                width={60}
+                size="$2"
+                value={String(localFilters.minGames)}
+                onChangeText={(value: string) =>
+                  handleFilterChange('minGames', parseInt(value) || 0)
+                }
+                keyboardType="numeric"
+                backgroundColor="$color1"
+              />
+            </XStack>
+            <XStack alignItems="center" space="$1">
+              <Text fontSize="$2" color="$color10">
+                Min HR:
+              </Text>
+              <Input
+                width={60}
+                size="$2"
+                value={String(localFilters.minHomeRuns)}
+                onChangeText={(value: string) =>
+                  handleFilterChange('minHomeRuns', parseInt(value) || 0)
+                }
+                keyboardType="numeric"
+                backgroundColor="$color1"
+              />
+            </XStack>
+            <XStack alignItems="center" space="$1">
+              <Text fontSize="$2" color="$color10">
+                Min RBI:
+              </Text>
+              <Input
+                width={60}
+                size="$2"
+                value={String(localFilters.minRBI)}
+                onChangeText={(value: string) =>
+                  handleFilterChange('minRBI', parseInt(value) || 0)
+                }
+                keyboardType="numeric"
+                backgroundColor="$color1"
+              />
             </XStack>
           </XStack>
         )}
 
         {/* Refresh Button */}
         <Button
-          size="$3"
+          size="$2"
           variant="outlined"
           icon={RefreshCw}
           onPress={handleRefresh}
@@ -550,45 +611,15 @@ export function PlayerStatsDataGrid({
         </Button>
       </XStack>
 
-      {/* Filters */}
-      {showFilters && (
-        <XStack space="$3" alignItems="center" flexWrap="wrap">
-          <Text fontSize="$3" color="$color11">
-            Filters:
+      {/* Sorting Instructions */}
+      {showSorting && (
+        <XStack justifyContent="center" paddingTop="$1">
+          <Text fontSize="$2" color="$color9" textAlign="center">
+            <span role="img" aria-label="Light bulb">
+              💡
+            </span>{' '}
+            Click column headers to sort
           </Text>
-          <XStack alignItems="center" space="$2">
-            <Text fontSize="$2">Min Games:</Text>
-            <Input
-              width={80}
-              value={String(localFilters.minGames)}
-              onChangeText={(value: string) =>
-                handleFilterChange('minGames', parseInt(value) || 0)
-              }
-              keyboardType="numeric"
-            />
-          </XStack>
-          <XStack alignItems="center" space="$2">
-            <Text fontSize="$2">Min HR:</Text>
-            <Input
-              width={80}
-              value={String(localFilters.minHomeRuns)}
-              onChangeText={(value: string) =>
-                handleFilterChange('minHomeRuns', parseInt(value) || 0)
-              }
-              keyboardType="numeric"
-            />
-          </XStack>
-          <XStack alignItems="center" space="$2">
-            <Text fontSize="$2">Min RBI:</Text>
-            <Input
-              width={80}
-              value={String(localFilters.minRBI)}
-              onChangeText={(value: string) =>
-                handleFilterChange('minRBI', parseInt(value) || 0)
-              }
-              keyboardType="numeric"
-            />
-          </XStack>
         </XStack>
       )}
     </YStack>
@@ -612,58 +643,83 @@ export function PlayerStatsDataGrid({
         paddingVertical="$2"
         paddingHorizontal="$3"
       >
-        {visibleColumns.map((column) => (
-          <XStack
-            key={column.key}
-            width={column.width || 'auto'}
-            minWidth={column.minWidth}
-            justifyContent={
-              column.align === 'center'
-                ? 'center'
-                : column.align === 'right'
-                  ? 'flex-end'
-                  : 'flex-start'
-            }
-            alignItems="center"
-            pressStyle={column.sortable ? { opacity: 0.7 } : undefined}
-            cursor={column.sortable ? 'pointer' : 'default'}
-            onPress={
-              column.sortable
-                ? () => {
-                    const sortField =
-                      COLUMN_TO_SORT_FIELD_MAP[column.key as string] ||
-                      column.key;
-                    const currentDirection =
-                      queryParams.orderBy === sortField &&
-                      queryParams.orderDirection === 'desc'
-                        ? 'asc'
-                        : 'desc';
-                    handleSort(column.key as string, currentDirection);
-                  }
-                : undefined
-            }
-          >
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              color="$color12"
-              numberOfLines={1}
+        {visibleColumns.map((column) => {
+          const sortField =
+            COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
+          const isActiveSortColumn = queryParams.orderBy === sortField;
+          const isDescending = queryParams.orderDirection === 'desc';
+
+          return (
+            <XStack
+              key={column.key}
+              width={column.width || 'auto'}
+              minWidth={column.minWidth}
+              justifyContent={
+                column.align === 'center'
+                  ? 'center'
+                  : column.align === 'right'
+                    ? 'flex-end'
+                    : 'flex-start'
+              }
+              alignItems="center"
+              paddingHorizontal="$1"
+              paddingVertical="$1"
+              borderRadius="$2"
+              backgroundColor={isActiveSortColumn ? '$blue3' : 'transparent'}
+              hoverStyle={
+                column.sortable
+                  ? {
+                      backgroundColor: isActiveSortColumn
+                        ? '$blue4'
+                        : '$color4',
+                      opacity: 0.9,
+                    }
+                  : undefined
+              }
+              pressStyle={
+                column.sortable
+                  ? {
+                      backgroundColor: isActiveSortColumn
+                        ? '$blue5'
+                        : '$color5',
+                      scale: 0.98,
+                    }
+                  : undefined
+              }
+              cursor={column.sortable ? 'pointer' : 'default'}
+              onPress={
+                column.sortable
+                  ? () => {
+                      const currentDirection =
+                        isActiveSortColumn && isDescending ? 'asc' : 'desc';
+                      handleSort(column.key as string, currentDirection);
+                    }
+                  : undefined
+              }
             >
-              {column.label}
-              {column.sortable &&
-                (() => {
-                  const sortField =
-                    COLUMN_TO_SORT_FIELD_MAP[column.key as string] ||
-                    column.key;
-                  return queryParams.orderBy === sortField;
-                })() && (
-                  <Text color="$color10">
-                    {queryParams.orderDirection === 'desc' ? ' ↓' : ' ↑'}
+              <XStack space="$1" alignItems="center">
+                <Text
+                  fontSize="$3"
+                  fontWeight={isActiveSortColumn ? '700' : '600'}
+                  color={isActiveSortColumn ? '$blue11' : '$color12'}
+                  numberOfLines={1}
+                  userSelect="none"
+                >
+                  {column.label}
+                </Text>
+                {column.sortable && (
+                  <Text
+                    fontSize="$2"
+                    color={isActiveSortColumn ? '$blue10' : '$color9'}
+                    opacity={isActiveSortColumn ? 1 : 0.5}
+                  >
+                    {isActiveSortColumn ? (isDescending ? '↓' : '↑') : '↕'}
                   </Text>
                 )}
-            </Text>
-          </XStack>
-        ))}
+              </XStack>
+            </XStack>
+          );
+        })}
       </XStack>
 
       {/* Table Body */}
@@ -762,61 +818,157 @@ export function PlayerStatsDataGrid({
   );
 
   /**
-   * Renders pagination controls
+   * Renders pagination controls with page jumping
    */
-  const renderPagination = () => (
-    <XStack
-      justifyContent="space-between"
-      alignItems="center"
-      padding="$3"
-      backgroundColor="$color2"
-      borderRadius="$3"
-    >
-      <XStack space="$2" alignItems="center">
-        <Text fontSize="$3" color="$color10">
-          Page {currentPage}
-        </Text>
-        <Text fontSize="$2" color="$color9">
-          • {totalCount} players
-        </Text>
-      </XStack>
+  const renderPagination = () => {
+    // Calculate page range for quick jump buttons (show 5 pages around current)
+    const getPageRange = () => {
+      const range: number[] = [];
+      const maxButtons = 5;
 
-      <XStack space="$2" alignItems="center">
-        <Text fontSize="$3" color="$color10">
-          Show:
-        </Text>
-        {[10, 25, 50, 100].map((size) => (
-          <Button
-            key={size}
-            size="$2"
-            variant={pageSize === size ? 'outlined' : undefined}
-            onPress={() => handlePageSizeChange(size)}
+      if (totalPages <= maxButtons) {
+        // Show all pages if total is small
+        for (let i = 1; i <= totalPages; i++) {
+          range.push(i);
+        }
+      } else {
+        // Show current page with 2 pages on each side
+        const start = Math.max(1, currentPageNumber - 2);
+        const end = Math.min(totalPages, currentPageNumber + 2);
+
+        for (let i = start; i <= end; i++) {
+          range.push(i);
+        }
+
+        // Add first page if not in range
+        if (!range.includes(1)) {
+          range.unshift(1);
+          if (range[1] !== 2) {
+            range.splice(1, 0, -1); // -1 represents ellipsis
+          }
+        }
+
+        // Add last page if not in range
+        if (!range.includes(totalPages)) {
+          if (range[range.length - 1] !== totalPages - 1) {
+            range.push(-1); // -1 represents ellipsis
+          }
+          range.push(totalPages);
+        }
+      }
+
+      return range;
+    };
+
+    return (
+      <YStack space="$2">
+        {/* Main pagination controls */}
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          padding="$3"
+          backgroundColor="$color2"
+          borderRadius="$3"
+          flexWrap="wrap"
+          gap="$2"
+        >
+          {/* Page info */}
+          <XStack space="$2" alignItems="center">
+            <Text fontSize="$3" color="$color10" fontWeight="600">
+              Page {currentPageNumber} of {totalPages}
+            </Text>
+            <Text fontSize="$2" color="$color9">
+              ({totalCount.toLocaleString()} total)
+            </Text>
+          </XStack>
+
+          {/* Page size selector */}
+          <XStack space="$2" alignItems="center">
+            <Text fontSize="$2" color="$color10">
+              Show:
+            </Text>
+            {[10, 25, 50, 100].map((size) => (
+              <Button
+                key={size}
+                size="$2"
+                variant={pageSize === size ? 'outlined' : undefined}
+                onPress={() => handlePageSizeChange(size)}
+                disabled={loading}
+              >
+                {size}
+              </Button>
+            ))}
+          </XStack>
+
+          {/* Prev/Next navigation */}
+          <XStack space="$2">
+            <Button
+              size="$3"
+              variant="outlined"
+              disabled={currentPageNumber === 1 || loading}
+              onPress={() => handlePageChange('prev')}
+            >
+              ← Previous
+            </Button>
+            <Button
+              size="$3"
+              variant="outlined"
+              disabled={currentPageNumber === totalPages || loading}
+              onPress={() => handlePageChange('next')}
+            >
+              Next →
+            </Button>
+          </XStack>
+        </XStack>
+
+        {/* Page number navigation (only show if more than 1 page) */}
+        {totalPages > 1 && (
+          <XStack
+            justifyContent="center"
+            alignItems="center"
+            padding="$2"
+            backgroundColor="$color2"
+            borderRadius="$3"
+            flexWrap="wrap"
+            gap="$1"
           >
-            {size}
-          </Button>
-        ))}
-      </XStack>
+            {getPageRange().map((page, index) => {
+              if (page === -1) {
+                // Ellipsis
+                return (
+                  <Text
+                    key={`ellipsis-${index}`}
+                    fontSize="$3"
+                    color="$color9"
+                    paddingHorizontal="$2"
+                  >
+                    ...
+                  </Text>
+                );
+              }
 
-      <XStack space="$2">
-        <Button
-          size="$3"
-          variant="outlined"
-          disabled={!hasPreviousPage || loading}
-          onPress={() => handlePageChange('prev')}
-        >
-          ← Previous
-        </Button>
-        <Button
-          size="$3"
-          variant="outlined"
-          disabled={!hasNextPage || loading}
-          onPress={() => handlePageChange('next')}
-        >
-          Next →
-        </Button>
-      </XStack>
-    </XStack>
-  );
+              const isCurrentPage = page === currentPageNumber;
+              return (
+                <Button
+                  key={page}
+                  size="$2"
+                  variant={isCurrentPage ? 'outlined' : undefined}
+                  backgroundColor={isCurrentPage ? '$blue3' : 'transparent'}
+                  color={isCurrentPage ? '$blue11' : '$color11'}
+                  fontWeight={isCurrentPage ? '700' : '400'}
+                  onPress={() => handleGoToPage(page)}
+                  disabled={loading || isCurrentPage}
+                  minWidth={32}
+                >
+                  {page}
+                </Button>
+              );
+            })}
+          </XStack>
+        )}
+      </YStack>
+    );
+  };
 
   // =============================================================================
   // Main Render

@@ -1,13 +1,14 @@
-import { 
-  and, 
-  asc, 
+import {
+  and,
+  asc,
   count,
-  desc, 
-  eq, 
-  gte, 
-  ilike, 
+  desc,
+  eq,
+  gte,
+  ilike,
   or,
-  SQL
+  sql,
+  SQL,
 } from 'drizzle-orm';
 import { PublicSchema } from '../client/PublicDbClient';
 import type { PublicDb } from '../client/PublicDbClient';
@@ -32,8 +33,37 @@ export interface StatisticsQueryFilters {
   searchTerm?: string;
 }
 
+/**
+ * Options for ordering query results with comprehensive field support
+ */
 export interface QueryOptions {
-  orderBy?: 'games' | 'homeRuns' | 'wins' | 'strikeouts';
+  orderBy?: // Batting statistics
+    | 'games'
+    | 'plateAppearances'
+    | 'atBats'
+    | 'runs'
+    | 'hits'
+    | 'doubles'
+    | 'triples'
+    | 'homeRuns'
+    | 'rbi'
+    | 'stolenBases'
+    | 'caughtStealing'
+    | 'baseOnBalls'
+    | 'strikeouts'
+    | 'hitByPitch'
+    | 'intentionalBaseOnBalls'
+    | 'totalBases'
+    | 'groundedIntoDoublePlays'
+    | 'sacrificeHits'
+    // Pitching statistics
+    | 'wins'
+    | 'losses'
+    | 'gamesStarted'
+    | 'completeGames'
+    | 'shutouts'
+    | 'saves'
+    | 'earnedRuns';
   orderDirection?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
@@ -53,21 +83,32 @@ export class CareerBattingQueryBuilder {
   /**
    * Execute a type-safe career batting query using Drizzle's recommended conditional approach
    */
-  async executeQuery(filters: StatisticsQueryFilters = {}, options: QueryOptions = {}) {
+  async executeQuery(
+    filters: StatisticsQueryFilters = {},
+    options: QueryOptions = {},
+  ) {
     // Build base conditions for batting stats
     const battingConditions: SQL<unknown>[] = [];
-    
+
     if (filters.playerId !== undefined) {
-      battingConditions.push(eq(PublicSchema.careerBatting.playerId, filters.playerId));
+      battingConditions.push(
+        eq(PublicSchema.careerBatting.playerId, filters.playerId),
+      );
     }
     if (filters.minGames !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.g, filters.minGames),
+      );
     }
     if (filters.minHomeRuns !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.hr, filters.minHomeRuns),
+      );
     }
     if (filters.minRBI !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.rbi, filters.minRBI),
+      );
     }
 
     // Determine ordering clause
@@ -75,7 +116,12 @@ export class CareerBattingQueryBuilder {
 
     // Check if we need to join with players table (for search functionality)
     if (filters.searchTerm) {
-      return this.executeWithPlayerJoin(battingConditions, filters.searchTerm, orderByClause, options);
+      return this.executeWithPlayerJoin(
+        battingConditions,
+        filters.searchTerm,
+        orderByClause,
+        options,
+      );
     } else {
       return this.executeWithoutJoin(battingConditions, orderByClause, options);
     }
@@ -89,42 +135,50 @@ export class CareerBattingQueryBuilder {
     battingConditions: SQL<unknown>[],
     searchTerm: string,
     orderByClause: SQL<unknown>,
-    options: QueryOptions
+    options: QueryOptions,
   ) {
     // Add search conditions to existing batting conditions
     const searchPattern = `%${searchTerm}%`;
     const searchCondition = or(
       ilike(PublicSchema.players.firstName, searchPattern),
-      ilike(PublicSchema.players.lastName, searchPattern)
+      ilike(PublicSchema.players.lastName, searchPattern),
     );
-    
-    const allConditions = searchCondition 
+
+    const allConditions = searchCondition
       ? [...battingConditions, searchCondition]
       : battingConditions;
 
     // Build complete query using function-based approach - Drizzle recommended pattern
-    const baseQuery = () => this.db
-      .select()
-      .from(PublicSchema.careerBatting)
-      .innerJoin(PublicSchema.players, eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id));
+    const baseQuery = () =>
+      this.db
+        .select()
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
+        );
 
     // Apply conditions conditionally
     const withConditions = () => {
       const query = baseQuery();
       return allConditions.length > 0
-        ? query.where(allConditions.length === 1 ? allConditions[0] : and(...allConditions))
+        ? query.where(
+            allConditions.length === 1
+              ? allConditions[0]
+              : and(...allConditions),
+          )
         : query;
     };
 
     // Apply ordering
     const withOrdering = () => withConditions().orderBy(orderByClause);
 
-    // Apply pagination conditionally  
+    // Apply pagination conditionally
     const finalQuery = () => {
       const query = withOrdering();
       if (options.limit !== undefined) {
         const limitedQuery = query.limit(options.limit);
-        return options.offset !== undefined 
+        return options.offset !== undefined
           ? limitedQuery.offset(options.offset)
           : limitedQuery;
       }
@@ -141,30 +195,30 @@ export class CareerBattingQueryBuilder {
   private async executeWithoutJoin(
     conditions: SQL<unknown>[],
     orderByClause: SQL<unknown>,
-    options: QueryOptions
+    options: QueryOptions,
   ) {
     // Build complete query using function-based approach - Drizzle recommended pattern
-    const baseQuery = () => this.db
-      .select()
-      .from(PublicSchema.careerBatting);
+    const baseQuery = () => this.db.select().from(PublicSchema.careerBatting);
 
     // Apply conditions conditionally
     const withConditions = () => {
       const query = baseQuery();
       return conditions.length > 0
-        ? query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
         : query;
     };
 
     // Apply ordering
     const withOrdering = () => withConditions().orderBy(orderByClause);
 
-    // Apply pagination conditionally  
+    // Apply pagination conditionally
     const finalQuery = () => {
       const query = withOrdering();
       if (options.limit !== undefined) {
         const limitedQuery = query.limit(options.limit);
-        return options.offset !== undefined 
+        return options.offset !== undefined
           ? limitedQuery.offset(options.offset)
           : limitedQuery;
       }
@@ -176,41 +230,97 @@ export class CareerBattingQueryBuilder {
 
   /**
    * Get properly typed ORDER BY clause based on options
+   * Supports all baseball statistics columns for comprehensive sorting
+   * Always puts NULL values last regardless of sort direction
    */
   private getOrderByClause(options: QueryOptions): SQL<unknown> {
-    if (options.orderBy === 'games') {
-      return options.orderDirection === 'desc' 
-        ? desc(PublicSchema.careerBatting.g)
-        : asc(PublicSchema.careerBatting.g);
-    } else if (options.orderBy === 'homeRuns') {
-      return options.orderDirection === 'desc'
-        ? desc(PublicSchema.careerBatting.hr) 
-        : asc(PublicSchema.careerBatting.hr);
-    } else {
-      // Default to home runs descending
-      return desc(PublicSchema.careerBatting.hr);
+    const dir = options.orderDirection === 'desc' ? 'DESC' : 'ASC';
+
+    // Map orderBy field names to database columns with NULLS LAST
+    switch (options.orderBy) {
+      // Basic batting statistics
+      case 'games':
+        return sql`${PublicSchema.careerBatting.g} ${sql.raw(dir)} NULLS LAST`;
+      case 'plateAppearances':
+        return sql`${PublicSchema.careerBatting.pa} ${sql.raw(dir)} NULLS LAST`;
+      case 'atBats':
+        return sql`${PublicSchema.careerBatting.ab} ${sql.raw(dir)} NULLS LAST`;
+      case 'runs':
+        return sql`${PublicSchema.careerBatting.r} ${sql.raw(dir)} NULLS LAST`;
+      case 'hits':
+        return sql`${PublicSchema.careerBatting.h} ${sql.raw(dir)} NULLS LAST`;
+      case 'doubles':
+        return sql`${PublicSchema.careerBatting.doubles} ${sql.raw(dir)} NULLS LAST`;
+      case 'triples':
+        return sql`${PublicSchema.careerBatting.triples} ${sql.raw(dir)} NULLS LAST`;
+      case 'homeRuns':
+        return sql`${PublicSchema.careerBatting.hr} ${sql.raw(dir)} NULLS LAST`;
+      case 'rbi':
+        return sql`${PublicSchema.careerBatting.rbi} ${sql.raw(dir)} NULLS LAST`;
+
+      // Base running
+      case 'stolenBases':
+        return sql`${PublicSchema.careerBatting.sb} ${sql.raw(dir)} NULLS LAST`;
+      case 'caughtStealing':
+        return sql`${PublicSchema.careerBatting.cs} ${sql.raw(dir)} NULLS LAST`;
+
+      // Plate discipline
+      case 'baseOnBalls':
+        return sql`${PublicSchema.careerBatting.bb} ${sql.raw(dir)} NULLS LAST`;
+      case 'strikeouts':
+        return sql`${PublicSchema.careerBatting.so} ${sql.raw(dir)} NULLS LAST`;
+      case 'hitByPitch':
+        return sql`${PublicSchema.careerBatting.hbp} ${sql.raw(dir)} NULLS LAST`;
+      case 'intentionalBaseOnBalls':
+        return sql`${PublicSchema.careerBatting.ibb} ${sql.raw(dir)} NULLS LAST`;
+
+      // Additional statistics
+      case 'totalBases':
+        return sql`${PublicSchema.careerBatting.tb} ${sql.raw(dir)} NULLS LAST`;
+      case 'groundedIntoDoublePlays':
+        return sql`${PublicSchema.careerBatting.gidp} ${sql.raw(dir)} NULLS LAST`;
+      case 'sacrificeHits':
+        return sql`${PublicSchema.careerBatting.sh} ${sql.raw(dir)} NULLS LAST`;
+
+      // Note: Calculated percentages (battingAverage, onBasePercentage, etc.)
+      // are computed in the GraphQL layer, not in the database view,
+      // so they cannot be used for ORDER BY in SQL queries
+
+      default:
+        // Default to home runs descending for most interesting results
+        return sql`${PublicSchema.careerBatting.hr} DESC NULLS LAST`;
     }
   }
 
   /**
    * Get count with player join using function-based approach
    */
-  async countWithPlayerJoin(options: { filters?: StatisticsQueryFilters }): Promise<{ count: number }[]> {
+  async countWithPlayerJoin(options: {
+    filters?: StatisticsQueryFilters;
+  }): Promise<{ count: number }[]> {
     const filters = options.filters || {};
-    
+
     // Build batting conditions
     const battingConditions: SQL<unknown>[] = [];
     if (filters.playerId !== undefined) {
-      battingConditions.push(eq(PublicSchema.careerBatting.playerId, filters.playerId));
+      battingConditions.push(
+        eq(PublicSchema.careerBatting.playerId, filters.playerId),
+      );
     }
     if (filters.minGames !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.g, filters.minGames),
+      );
     }
     if (filters.minHomeRuns !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.hr, filters.minHomeRuns),
+      );
     }
     if (filters.minRBI !== undefined) {
-      battingConditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+      battingConditions.push(
+        gte(PublicSchema.careerBatting.rbi, filters.minRBI),
+      );
     }
 
     // Add search condition if provided
@@ -219,7 +329,7 @@ export class CareerBattingQueryBuilder {
       const searchPattern = `%${filters.searchTerm}%`;
       const searchCondition = or(
         ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern)
+        ilike(PublicSchema.players.lastName, searchPattern),
       );
       if (searchCondition) {
         allConditions.push(searchCondition);
@@ -227,15 +337,23 @@ export class CareerBattingQueryBuilder {
     }
 
     // Build query using function-based approach
-    const baseQuery = () => this.db
-      .select({ count: count() })
-      .from(PublicSchema.careerBatting)
-      .innerJoin(PublicSchema.players, eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id));
+    const baseQuery = () =>
+      this.db
+        .select({ count: count() })
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
+        );
 
     const finalQuery = () => {
       const query = baseQuery();
       return allConditions.length > 0
-        ? query.where(allConditions.length === 1 ? allConditions[0] : and(...allConditions))
+        ? query.where(
+            allConditions.length === 1
+              ? allConditions[0]
+              : and(...allConditions),
+          )
         : query;
     };
 
@@ -245,13 +363,17 @@ export class CareerBattingQueryBuilder {
   /**
    * Get count without player join using function-based approach
    */
-  async countWithoutJoin(options: { filters?: StatisticsQueryFilters }): Promise<{ count: number }[]> {
+  async countWithoutJoin(options: {
+    filters?: StatisticsQueryFilters;
+  }): Promise<{ count: number }[]> {
     const filters = options.filters || {};
-    
+
     // Build conditions
     const conditions: SQL<unknown>[] = [];
     if (filters.playerId !== undefined) {
-      conditions.push(eq(PublicSchema.careerBatting.playerId, filters.playerId));
+      conditions.push(
+        eq(PublicSchema.careerBatting.playerId, filters.playerId),
+      );
     }
     if (filters.minGames !== undefined) {
       conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
@@ -264,14 +386,15 @@ export class CareerBattingQueryBuilder {
     }
 
     // Build query using function-based approach
-    const baseQuery = () => this.db
-      .select({ count: count() })
-      .from(PublicSchema.careerBatting);
+    const baseQuery = () =>
+      this.db.select({ count: count() }).from(PublicSchema.careerBatting);
 
     const finalQuery = () => {
       const query = baseQuery();
       return conditions.length > 0
-        ? query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
         : query;
     };
 
@@ -289,29 +412,46 @@ export class CareerPitchingQueryBuilder {
     this.db = db;
   }
 
-  async executeQuery(filters: StatisticsQueryFilters = {}, options: QueryOptions = {}) {
+  async executeQuery(
+    filters: StatisticsQueryFilters = {},
+    options: QueryOptions = {},
+  ) {
     const conditions: SQL<unknown>[] = [];
 
     if (filters.playerId !== undefined) {
-      conditions.push(eq(PublicSchema.careerPitching.playerId, filters.playerId));
+      conditions.push(
+        eq(PublicSchema.careerPitching.playerId, filters.playerId),
+      );
     }
     if (filters.minWins !== undefined) {
       conditions.push(gte(PublicSchema.careerPitching.w, filters.minWins));
     }
     if (filters.minStrikeouts !== undefined) {
-      conditions.push(gte(PublicSchema.careerPitching.so, filters.minStrikeouts));
+      conditions.push(
+        gte(PublicSchema.careerPitching.so, filters.minStrikeouts),
+      );
     }
 
     // Determine ordering
-    const orderByClause = options.orderBy === 'wins' 
-      ? (options.orderDirection === 'desc' ? desc(PublicSchema.careerPitching.w) : asc(PublicSchema.careerPitching.w))
-      : (options.orderBy === 'strikeouts'
-        ? (options.orderDirection === 'desc' ? desc(PublicSchema.careerPitching.so) : asc(PublicSchema.careerPitching.so))
-        : desc(PublicSchema.careerPitching.w));
+    const orderByClause =
+      options.orderBy === 'wins'
+        ? options.orderDirection === 'desc'
+          ? desc(PublicSchema.careerPitching.w)
+          : asc(PublicSchema.careerPitching.w)
+        : options.orderBy === 'strikeouts'
+          ? options.orderDirection === 'desc'
+            ? desc(PublicSchema.careerPitching.so)
+            : asc(PublicSchema.careerPitching.so)
+          : desc(PublicSchema.careerPitching.w);
 
     // Check if we need player join for search
     if (filters.searchTerm) {
-      return this.executeWithPlayerJoin(filters, conditions, orderByClause, options);
+      return this.executeWithPlayerJoin(
+        filters,
+        conditions,
+        orderByClause,
+        options,
+      );
     } else {
       return this.executeWithoutJoin(conditions, orderByClause, options);
     }
@@ -321,29 +461,35 @@ export class CareerPitchingQueryBuilder {
     filters: StatisticsQueryFilters,
     conditions: SQL<unknown>[],
     orderByClause: SQL<unknown>,
-    options: QueryOptions
+    options: QueryOptions,
   ) {
     // Add search condition
     if (filters.searchTerm) {
       const searchPattern = `%${filters.searchTerm}%`;
       const searchCondition = or(
         ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern)
+        ilike(PublicSchema.players.lastName, searchPattern),
       );
       if (searchCondition) {
         conditions.push(searchCondition);
       }
     }
 
-    const baseQuery = () => this.db
-      .select()
-      .from(PublicSchema.careerPitching)
-      .innerJoin(PublicSchema.players, eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id));
+    const baseQuery = () =>
+      this.db
+        .select()
+        .from(PublicSchema.careerPitching)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
+        );
 
     const withConditions = () => {
       const query = baseQuery();
       return conditions.length > 0
-        ? query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
         : query;
     };
 
@@ -353,7 +499,7 @@ export class CareerPitchingQueryBuilder {
       const query = withOrdering();
       if (options.limit !== undefined) {
         const limitedQuery = query.limit(options.limit);
-        return options.offset !== undefined 
+        return options.offset !== undefined
           ? limitedQuery.offset(options.offset)
           : limitedQuery;
       }
@@ -366,16 +512,16 @@ export class CareerPitchingQueryBuilder {
   private async executeWithoutJoin(
     conditions: SQL<unknown>[],
     orderByClause: SQL<unknown>,
-    options: QueryOptions
+    options: QueryOptions,
   ) {
-    const baseQuery = () => this.db
-      .select()
-      .from(PublicSchema.careerPitching);
+    const baseQuery = () => this.db.select().from(PublicSchema.careerPitching);
 
     const withConditions = () => {
       const query = baseQuery();
       return conditions.length > 0
-        ? query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
         : query;
     };
 
@@ -385,7 +531,7 @@ export class CareerPitchingQueryBuilder {
       const query = withOrdering();
       if (options.limit !== undefined) {
         const limitedQuery = query.limit(options.limit);
-        return options.offset !== undefined 
+        return options.offset !== undefined
           ? limitedQuery.offset(options.offset)
           : limitedQuery;
       }
