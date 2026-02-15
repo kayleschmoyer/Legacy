@@ -33,19 +33,20 @@ export const playerEligiblePositions = pgView('player_eligible_positions', {
   playerId: integer('player_id').notNull(),
   position: playerPosition('position').notNull(),
 }).as(sql`
-SELECT player_id,
-       pos AS position
-FROM career_fielding_by_position
-WHERE g > 50
-  AND POS != 'P'
+SELECT cfbp.player_id,
+       cfbp.pos AS position
+FROM career_fielding_by_position cfbp
+JOIN career_batting cb ON cb.player_id = cfbp.player_id
+WHERE cfbp.pos != 'P'
+  AND (cfbp.g >= 100 OR (cb.g > 0 AND cfbp.g * 10 >= cb.g))
 UNION
 SELECT player_id,
        'SP' AS position
 FROM career_pitching
-WHERE gs > 50
+WHERE gs >= 100 OR (g > 0 AND gs * 10 >= g)
 UNION
 SELECT player_id,
        'RP' AS position
 FROM career_pitching
-WHERE g - gs > 50;
+WHERE (g - gs) >= 100 OR (g > 0 AND (g - gs) * 10 >= g);
 `);

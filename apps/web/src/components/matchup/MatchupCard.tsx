@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, H4, Text, XStack, YStack } from 'tamagui';
+import { Card, styled, Text, XStack, YStack } from 'tamagui';
+import { Activity, CheckCircle, Clock } from '@tamagui/lucide-icons';
 import {
   type MatchupFragment,
   MatchupStatus,
@@ -11,9 +12,42 @@ export interface MatchupCardProps {
   showWeek?: boolean;
 }
 
+// ── Styled Components ─────────────────────────────────────────────────────────
+
+const CardContainer = styled(Card, {
+  overflow: 'hidden',
+  borderRadius: '$5',
+  borderWidth: 1,
+  borderColor: '$surfacePanelBorder',
+  cursor: 'pointer',
+  pressStyle: { scale: 0.98, opacity: 0.9 },
+  hoverStyle: { borderColor: '$blue7' },
+  animation: 'quick',
+  margin: '$1',
+});
+
+const AccentBar = styled(YStack, {
+  height: 3,
+  width: '100%',
+});
+
+const StatusDot = styled(YStack, {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+});
+
+const ScoreValue = styled(Text, {
+  fontWeight: '800',
+  fontVariant: ['tabular-nums'],
+  letterSpacing: -0.5,
+});
+
+// ── Component ─────────────────────────────────────────────────────────────
+
 /**
- * MatchupCard - Displays a matchup between two teams
- * Shows team names, scores, and matchup status with selected season info
+ * MatchupCard - Modern card displaying a matchup between two teams
+ * Shows team names, scores, and matchup status with visual polish
  */
 export function MatchupCard({
   matchup,
@@ -26,84 +60,114 @@ export function MatchupCard({
 
   const { weekNumber, team1Score, team2Score, status } = matchup;
 
-  const getStatusColor = () => {
-    switch (status) {
-      case MatchupStatus.Completed:
-        return '$green10';
-      case MatchupStatus.InProgress:
-        return '$blue10';
-      case MatchupStatus.Scheduled:
-        return '$gray10';
-      default:
-        return '$gray10';
-    }
-  };
+  const isLive = status === MatchupStatus.InProgress;
+  const isCompleted = status === MatchupStatus.Completed;
+  const team1Wins = isCompleted && (team1Score ?? 0) > (team2Score ?? 0);
+  const team2Wins = isCompleted && (team2Score ?? 0) > (team1Score ?? 0);
 
-  const getStatusText = () => {
-    switch (status) {
-      case MatchupStatus.Completed:
-        return 'Final';
-      case MatchupStatus.InProgress:
-        return 'Live';
-      case MatchupStatus.Scheduled:
-        return 'Scheduled';
-      case MatchupStatus.Cancelled:
-        return 'Cancelled';
-      default:
-        return status ?? 'Unknown';
-    }
-  };
+  const statusConfig = isLive
+    ? {
+        color: '$green10',
+        bg: '$green3',
+        label: 'Live',
+        icon: <Activity size={12} color="var(--green10)" />,
+      }
+    : isCompleted
+      ? {
+          color: '$blue10',
+          bg: '$blue3',
+          label: 'Final',
+          icon: <CheckCircle size={12} color="var(--blue10)" />,
+        }
+      : {
+          color: '$gray10',
+          bg: '$gray3',
+          label: 'Scheduled',
+          icon: <Clock size={12} color="var(--gray10)" />,
+        };
+
+  const accentColor = isLive ? '$green9' : isCompleted ? '$blue9' : '$gray6';
 
   return (
-    <Card
-      elevate
-      size="$4"
-      bordered
-      pressStyle={{ scale: 0.98 }}
-      onPress={onPress}
-      animation="bouncy"
-      margin="$2"
-      cursor="pointer"
-    >
-      <Card.Header padded>
-        <XStack justifyContent="space-between" alignItems="center">
-          {showWeek && (
-            <Text fontSize="$3" color="$gray11">
-              Week {weekNumber}
-            </Text>
-          )}
-          <Text fontSize="$2" color={getStatusColor()} fontWeight="bold">
-            {getStatusText()}
+    <CardContainer onPress={onPress}>
+      {/* Accent bar */}
+      <AccentBar backgroundColor={accentColor} />
+
+      {/* Header row */}
+      <XStack
+        justifyContent="space-between"
+        alignItems="center"
+        paddingHorizontal="$4"
+        paddingTop="$3"
+        paddingBottom="$2"
+      >
+        {showWeek && (
+          <Text fontSize="$2" fontWeight="600" color="$textMuted">
+            Week {weekNumber}
+          </Text>
+        )}
+        <XStack
+          alignItems="center"
+          gap="$1.5"
+          paddingHorizontal="$2.5"
+          paddingVertical="$1"
+          borderRadius="$10"
+          backgroundColor={statusConfig.bg}
+        >
+          {statusConfig.icon}
+          <Text
+            fontSize="$1"
+            fontWeight="700"
+            color={statusConfig.color}
+            textTransform="uppercase"
+            letterSpacing={0.3}
+          >
+            {statusConfig.label}
           </Text>
         </XStack>
-      </Card.Header>
+      </XStack>
 
-      <YStack padding="$3" space="$2">
+      {/* Teams & Scores */}
+      <YStack paddingHorizontal="$4" paddingBottom="$4" gap="$2.5">
         {/* Team 1 */}
         <XStack justifyContent="space-between" alignItems="center">
-          <H4 flex={1}>Team 1</H4>
-          <Text fontSize="$6" fontWeight="bold" color="$gray12">
+          <XStack alignItems="center" gap="$2" flex={1}>
+            {team1Wins && <StatusDot backgroundColor="$green9" />}
+            <Text
+              fontSize="$4"
+              fontWeight={team1Wins ? '700' : '500'}
+              color={team1Wins ? '$color' : '$textMuted'}
+              numberOfLines={1}
+            >
+              Team 1
+            </Text>
+          </XStack>
+          <ScoreValue fontSize="$6" color={team1Wins ? '$color' : '$textMuted'}>
             {team1Score?.toFixed(2) ?? '0.00'}
-          </Text>
+          </ScoreValue>
         </XStack>
+
+        {/* Divider */}
+        <YStack height={1} backgroundColor="$surfacePanelBorder" />
 
         {/* Team 2 */}
         <XStack justifyContent="space-between" alignItems="center">
-          <H4 flex={1}>Team 2</H4>
-          <Text fontSize="$6" fontWeight="bold" color="$gray12">
+          <XStack alignItems="center" gap="$2" flex={1}>
+            {team2Wins && <StatusDot backgroundColor="$green9" />}
+            <Text
+              fontSize="$4"
+              fontWeight={team2Wins ? '700' : '500'}
+              color={team2Wins ? '$color' : '$textMuted'}
+              numberOfLines={1}
+            >
+              Team 2
+            </Text>
+          </XStack>
+          <ScoreValue fontSize="$6" color={team2Wins ? '$color' : '$textMuted'}>
             {team2Score?.toFixed(2) ?? '0.00'}
-          </Text>
+          </ScoreValue>
         </XStack>
-
-        {/* Winner indicator */}
-        {status === MatchupStatus.Completed && team1Score !== team2Score && (
-          <Text fontSize="$2" color="$green10" textAlign="center">
-            {(team1Score ?? 0) > (team2Score ?? 0)
-              ? 'Team 1 Wins'
-              : 'Team 2 Wins'}
-          </Text>
-        )}
       </YStack>
-    </Card>
+    </CardContainer>
   );
 }

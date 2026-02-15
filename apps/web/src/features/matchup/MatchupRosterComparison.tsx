@@ -1,15 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Complex type mapping for scoring calculations */
 import React, { useMemo, useState } from 'react';
-import {
-  Card,
-  H4,
-  H5,
-  Separator,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Card, H4, Separator, styled, Text, XStack, YStack } from 'tamagui';
+import { ChevronRight, Users } from '@tamagui/lucide-icons';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -29,6 +21,514 @@ import {
   mapFieldingStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
+
+// ── Styled Components ─────────────────────────────────────────────────────────
+
+// ── Position Badge Color Helper ───────────────────────────────────────────────
+const getPositionColors = (
+  position: string | null | undefined,
+): { bg: string; text: string } => {
+  if (!position) return { bg: '$gray4', text: '$gray11' };
+  const pos = position.toUpperCase();
+  // Catchers
+  if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
+  // Infield
+  if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
+    return { bg: '$blue3', text: '$blue11' };
+  // Outfield
+  if (['LF', 'CF', 'RF', 'OF'].includes(pos))
+    return { bg: '$green3', text: '$green11' };
+  // Starting Pitcher
+  if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };
+  // Relief Pitcher
+  if (pos === 'RP') return { bg: '$red3', text: '$red11' };
+  // DH / Utility
+  if (['DH', 'XDH', 'UT', 'UTIL'].includes(pos))
+    return { bg: '$red7', text: '$red12' };
+  return { bg: '$gray4', text: '$gray11' };
+};
+
+const RosterCard = styled(Card, {
+  overflow: 'hidden',
+  borderRadius: '$6',
+  borderWidth: 1,
+  borderColor: '$surfacePanelBorder',
+  backgroundColor: '$background',
+});
+
+const SectionHeader = styled(XStack, {
+  alignItems: 'center',
+  gap: '$2',
+  paddingVertical: '$2.5',
+  paddingHorizontal: '$4',
+});
+
+const ColumnHeader = styled(XStack, {
+  width: '100%',
+  paddingVertical: '$2',
+  paddingHorizontal: '$3',
+  backgroundColor: '$surfacePanel',
+  borderBottomWidth: 1,
+  borderBottomColor: '$surfacePanelBorder',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+});
+
+const TotalsRow = styled(XStack, {
+  width: '100%',
+  paddingVertical: '$3',
+  paddingHorizontal: '$3',
+  backgroundColor: '$surfacePanel',
+  borderTopWidth: 2,
+  borderTopColor: '$surfacePanelBorder',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+});
+
+const BenchToggle = styled(XStack, {
+  paddingVertical: '$3',
+  paddingHorizontal: '$4',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: '$2',
+  cursor: 'pointer',
+  hoverStyle: { backgroundColor: '$gray2' },
+});
+
+const SectionTable = styled(YStack, {
+  overflow: 'hidden',
+  borderRadius: '$4',
+  borderWidth: 1,
+  borderColor: '$surfacePanelBorder',
+  backgroundColor: '$background',
+});
+
+// ── Skeleton loading components ─────────────────────────────────────────────
+const skeletonKeyframes = `
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+`;
+
+const skeletonPulseStyle = {
+  animationName: 'skeleton-pulse',
+  animationDuration: '1.5s',
+  animationIterationCount: 'infinite',
+  animationTimingFunction: 'ease-in-out',
+} as React.CSSProperties;
+
+function SkeletonPulse(
+  props: React.ComponentProps<typeof YStack> & { backgroundColor?: string },
+) {
+  const { style, backgroundColor, ...rest } = props;
+  return (
+    <YStack
+      backgroundColor={backgroundColor ?? '$gray4'}
+      borderRadius="$2"
+      {...rest}
+      style={{ ...skeletonPulseStyle, ...(style as React.CSSProperties) }}
+    />
+  );
+}
+
+function SkeletonRow({ isEven = false }: { isEven?: boolean }) {
+  return (
+    <XStack
+      paddingVertical="$2.5"
+      paddingHorizontal="$3"
+      backgroundColor={isEven ? undefined : '$gray2'}
+      borderBottomWidth={1}
+      borderBottomColor="$gray4"
+      justifyContent="space-between"
+      alignItems="center"
+    >
+      {/* Team 1 side */}
+      <XStack width="47%" alignItems="center" gap="$2">
+        <XStack flex={1} gap="$2" alignItems="center" minWidth={0}>
+          {/* Avatar circle */}
+          <SkeletonPulse width={32} height={32} borderRadius={16} />
+          {/* Name + subtitle + stat line */}
+          <YStack gap="$1" flex={1} minWidth={0}>
+            <SkeletonPulse height={13} width="75%" />
+            <SkeletonPulse height={9} width="55%" backgroundColor="$gray3" />
+            <SkeletonPulse height={9} width="40%" backgroundColor="$blue3" />
+          </YStack>
+        </XStack>
+        {/* Projected */}
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={32} height={13} />
+        </YStack>
+        {/* Actual */}
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={38} height={16} />
+        </YStack>
+      </XStack>
+      {/* Separator */}
+      <Separator vertical height="100%" borderColor="$gray8" borderWidth={2} />
+      {/* Team 2 side */}
+      <XStack width="47%" alignItems="center" gap="$2">
+        {/* Actual */}
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={38} height={16} />
+        </YStack>
+        {/* Projected */}
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={32} height={13} />
+        </YStack>
+        <XStack
+          flex={1}
+          gap="$2"
+          alignItems="center"
+          justifyContent="flex-end"
+          minWidth={0}
+        >
+          {/* Name + subtitle + stat line */}
+          <YStack gap="$1" flex={1} alignItems="flex-end" minWidth={0}>
+            <SkeletonPulse height={13} width="75%" alignSelf="flex-end" />
+            <SkeletonPulse
+              height={9}
+              width="55%"
+              alignSelf="flex-end"
+              backgroundColor="$gray3"
+            />
+            <SkeletonPulse
+              height={9}
+              width="40%"
+              alignSelf="flex-end"
+              backgroundColor="$blue3"
+            />
+          </YStack>
+          {/* Avatar circle */}
+          <SkeletonPulse width={32} height={32} borderRadius={16} />
+        </XStack>
+      </XStack>
+    </XStack>
+  );
+}
+
+function SkeletonTotalsRow() {
+  return (
+    <TotalsRow>
+      <XStack width="47%" alignItems="center" gap="$2">
+        <YStack flex={1} minWidth={0}>
+          <SkeletonPulse width={100} height={16} />
+        </YStack>
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={36} height={13} />
+        </YStack>
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={42} height={18} />
+        </YStack>
+      </XStack>
+      <Separator vertical height="100%" borderColor="$gray8" borderWidth={2} />
+      <XStack width="47%" alignItems="center" gap="$2">
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={42} height={18} />
+        </YStack>
+        <YStack width={60} flexShrink={0} alignItems="center">
+          <SkeletonPulse width={36} height={13} />
+        </YStack>
+        <YStack flex={1} alignItems="flex-end" minWidth={0}>
+          <SkeletonPulse width={100} height={16} />
+        </YStack>
+      </XStack>
+    </TotalsRow>
+  );
+}
+
+function SkeletonLoading() {
+  return (
+    <RosterCard>
+      {/* Inject keyframes */}
+      <style dangerouslySetInnerHTML={{ __html: skeletonKeyframes }} />
+
+      {/* Card Header - real labels */}
+      <XStack
+        padding="$4"
+        justifyContent="space-between"
+        alignItems="center"
+        borderBottomWidth={1}
+        borderBottomColor="$surfacePanelBorder"
+      >
+        <XStack alignItems="center" gap="$2">
+          <Users size={18} color="var(--color)" />
+          <H4 color="$color">Player Matchups</H4>
+        </XStack>
+        <SkeletonPulse width={60} height={24} borderRadius={12} />
+      </XStack>
+
+      {/* Hitters Section */}
+      <SectionTable>
+        {/* Section Header - real label */}
+        <SectionHeader backgroundColor="$blue2">
+          <YStack
+            width={4}
+            height={16}
+            borderRadius={2}
+            backgroundColor="$blue9"
+          />
+          <Text
+            fontSize="$3"
+            fontWeight="700"
+            color="$blue11"
+            letterSpacing={0.3}
+          >
+            STARTING LINEUP
+          </Text>
+        </SectionHeader>
+
+        {/* Column Headers - real labels */}
+        <ColumnHeader>
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={40} flexShrink={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+            <YStack flex={1} minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 1
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+          </XStack>
+          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack flex={1} alignItems="flex-end" minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 2
+              </Text>
+            </YStack>
+            <YStack width={40} flexShrink={0} alignItems="flex-end">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+          </XStack>
+        </ColumnHeader>
+
+        {/* Batters sub-header */}
+        <SectionHeader backgroundColor="$green2">
+          <YStack
+            width={4}
+            height={16}
+            borderRadius={2}
+            backgroundColor="$green9"
+          />
+          <Text
+            fontSize="$2"
+            fontWeight="700"
+            color="$green11"
+            letterSpacing={0.3}
+          >
+            BATTERS
+          </Text>
+        </SectionHeader>
+
+        {/* Skeleton batter rows */}
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonRow key={`batter-${i}`} isEven={i % 2 === 0} />
+        ))}
+
+        {/* Totals skeleton */}
+        <SkeletonTotalsRow />
+      </SectionTable>
+
+      {/* Pitchers Section */}
+      <SectionTable marginTop="$4">
+        <SectionHeader backgroundColor="$green2">
+          <YStack
+            width={4}
+            height={16}
+            borderRadius={2}
+            backgroundColor="$green9"
+          />
+          <Text
+            fontSize="$2"
+            fontWeight="700"
+            color="$green11"
+            letterSpacing={0.3}
+          >
+            PITCHERS
+          </Text>
+        </SectionHeader>
+
+        {/* Column Headers - real labels */}
+        <ColumnHeader>
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={40} flexShrink={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+            <YStack flex={1} minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 1
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+          </XStack>
+          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack flex={1} alignItems="flex-end" minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 2
+              </Text>
+            </YStack>
+            <YStack width={40} flexShrink={0} alignItems="flex-end">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+          </XStack>
+        </ColumnHeader>
+
+        {/* Skeleton pitcher rows */}
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonRow key={`pitcher-${i}`} isEven={i % 2 === 0} />
+        ))}
+
+        {/* Totals skeleton */}
+        <SkeletonTotalsRow />
+      </SectionTable>
+    </RosterCard>
+  );
+}
 
 export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
@@ -507,30 +1007,28 @@ export function MatchupRosterComparison({
 
   if (!team1Id || !team2Id) {
     return (
-      <Card backgroundColor="$gray2" borderColor="$gray6" padding="$4">
-        <Text color="$gray11">Teams not assigned to this matchup yet.</Text>
-      </Card>
+      <RosterCard padding="$5">
+        <YStack alignItems="center" gap="$2">
+          <Users size={24} color="var(--textMuted)" />
+          <Text color="$textMuted">
+            Teams not assigned to this matchup yet.
+          </Text>
+        </YStack>
+      </RosterCard>
     );
   }
 
   if (loading) {
-    return (
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-        <YStack space="$3" alignItems="center">
-          <Spinner size="large" />
-          <Text color="$gray11">Loading matchup players...</Text>
-        </YStack>
-      </Card>
-    );
+    return <SkeletonLoading />;
   }
 
   if (error) {
     return (
-      <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
+      <RosterCard borderColor="$red6" padding="$5">
         <Text color="$red11">
           Error loading matchup players: {error.message}
         </Text>
-      </Card>
+      </RosterCard>
     );
   }
 
@@ -774,7 +1272,7 @@ export function MatchupRosterComparison({
     team1Player: MatchupPlayerFragment | undefined,
     team2Player: MatchupPlayerFragment | undefined,
     index: number | string,
-    showPosition = true,
+    rowIndex = 0,
   ) => {
     const team1Actual =
       team1Player?.games?.reduce(
@@ -819,14 +1317,21 @@ export function MatchupRosterComparison({
 
     const team1Position = team1Player?.positionId
       ? positionMap.get(team1Player.positionId)
-      : null;
+      : (team1Player?.player?.eligiblePositions?.[0] ?? null);
     const team2Position = team2Player?.positionId
       ? positionMap.get(team2Player.positionId)
-      : null;
+      : (team2Player?.player?.eligiblePositions?.[0] ?? null);
 
     // Get accumulated stats breakdown
     const team1Stats = formatAccumulatedStats(team1Player);
     const team2Stats = formatAccumulatedStats(team2Player);
+
+    // Position colors for badges
+    const team1PosBadge = getPositionColors(team1Position);
+    const team2PosBadge = getPositionColors(team2Position);
+
+    // Zebra stripe: alternate row background
+    const isEvenRow = rowIndex % 2 === 0;
 
     return (
       <XStack
@@ -837,101 +1342,115 @@ export function MatchupRosterComparison({
         paddingRight="$3"
         borderBottomWidth={1}
         borderBottomColor="$gray4"
-        hoverStyle={{ backgroundColor: '$gray2' }}
+        backgroundColor={isEvenRow ? undefined : '$gray2'}
+        hoverStyle={{ backgroundColor: '$gray3' }}
         justifyContent="space-between"
         alignItems="center"
       >
         {/* Team 1 Side - 47% */}
         <XStack width="47%" alignItems="center" gap="$2">
-          {/* Team 1 Position */}
-          <YStack width={40} flexShrink={0} justifyContent="center">
-            {showPosition && (
-              <Text fontSize="$2" fontWeight="bold" color="$blue10">
-                {team1Position || '—'}
-              </Text>
-            )}
-          </YStack>
-
           {/* Team 1 Player - Flexible width */}
-          <YStack
-            flex={1}
-            justifyContent="center"
-            minWidth={0}
-            overflow="hidden"
-          >
-            {team1Player ? (
-              <>
-                <Text
-                  fontSize="$3"
-                  fontWeight="600"
-                  color="$gray12"
-                  cursor="pointer"
-                  hoverStyle={{ color: '$blue11', textDecoration: 'underline' }}
-                  onPress={() => {
-                    if (team1Player?.playerId && team1Player?.player) {
-                      setSelectedPlayer({
-                        id: team1Player.playerId,
-                        name: `${team1Player.player.firstName} ${team1Player.player.lastName}`,
-                      });
-                      setSeasonStatsModalOpen(true);
-                    }
-                  }}
-                >
-                  {team1Player.player?.firstName} {team1Player.player?.lastName}
+          <XStack flex={1} gap="$2" alignItems="center" minWidth={0}>
+            {/* Player Avatar */}
+            {team1Player && (
+              <YStack
+                width={32}
+                height={32}
+                borderRadius={16}
+                backgroundColor={team1PosBadge.bg}
+                justifyContent="center"
+                alignItems="center"
+                flexShrink={0}
+              >
+                <Text fontSize="$1" fontWeight="800" color={team1PosBadge.text}>
+                  {team1Position || '?'}
                 </Text>
-                <Text fontSize="$1" color="$gray10">
-                  Season {team1Player.season}
-                  {team1Player.games && team1Player.games.length > 0 ? (
-                    <>
-                      <Text color="$green10">
-                        {' '}
-                        • {team1Player.games.length}/{gamesPerMatchup} games
-                      </Text>
-                      {(() => {
-                        const loadingCount = team1Player.games.filter(
-                          (g) =>
-                            g.statsLoadingStatus === 'loading' ||
-                            g.statsLoadingStatus === 'pending',
-                        ).length;
-                        const failedCount = team1Player.games.filter(
-                          (g) => g.statsLoadingStatus === 'failed',
-                        ).length;
-
-                        if (loadingCount > 0) {
-                          return (
-                            <Text color="$blue10">
-                              {' '}
-                              • Loading stats ({loadingCount})
-                            </Text>
-                          );
-                        }
-                        if (failedCount > 0) {
-                          return (
-                            <Text color="$red10">
-                              {' '}
-                              • Failed ({failedCount})
-                            </Text>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </>
-                  ) : (
-                    <Text color="$gray8"> • Yet to play</Text>
-                  )}
-                </Text>
-                {team1Stats && (
-                  <Text fontSize="$1" color="$blue10" marginTop="$1">
-                    {team1Stats}
-                  </Text>
-                )}
-              </>
-            ) : (
-              <Text fontSize="$3" color="$gray8">
-                —
-              </Text>
+              </YStack>
             )}
-          </YStack>
+            <YStack
+              flex={1}
+              justifyContent="center"
+              minWidth={0}
+              overflow="hidden"
+            >
+              {team1Player ? (
+                <>
+                  <Text
+                    fontSize="$3"
+                    fontWeight="600"
+                    color="$gray12"
+                    cursor="pointer"
+                    hoverStyle={{
+                      color: '$blue11',
+                      textDecoration: 'underline',
+                    }}
+                    onPress={() => {
+                      if (team1Player?.playerId && team1Player?.player) {
+                        setSelectedPlayer({
+                          id: team1Player.playerId,
+                          name: `${team1Player.player.firstName} ${team1Player.player.lastName}`,
+                        });
+                        setSeasonStatsModalOpen(true);
+                      }
+                    }}
+                  >
+                    {team1Player.player?.firstName}{' '}
+                    {team1Player.player?.lastName}
+                  </Text>
+                  <Text fontSize="$1" color="$gray10">
+                    Season {team1Player.season}
+                    {team1Player.games && team1Player.games.length > 0 ? (
+                      <>
+                        <Text color="$green10">
+                          {' '}
+                          • {team1Player.games.length}/{gamesPerMatchup} games
+                        </Text>
+                        {(() => {
+                          const loadingCount = team1Player.games.filter(
+                            (g) =>
+                              g.statsLoadingStatus === 'loading' ||
+                              g.statsLoadingStatus === 'pending',
+                          ).length;
+                          const failedCount = team1Player.games.filter(
+                            (g) => g.statsLoadingStatus === 'failed',
+                          ).length;
+
+                          if (loadingCount > 0) {
+                            return (
+                              <Text color="$blue10">
+                                {' '}
+                                • Loading stats ({loadingCount})
+                              </Text>
+                            );
+                          }
+                          if (failedCount > 0) {
+                            return (
+                              <Text color="$red10">
+                                {' '}
+                                • Failed ({failedCount})
+                              </Text>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </>
+                    ) : (
+                      <Text color="$gray8"> • Yet to play</Text>
+                    )}
+                  </Text>
+                  {team1Stats && (
+                    <Text fontSize="$1" color="$blue10" marginTop="$1">
+                      {team1Stats}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text fontSize="$3" color="$gray8">
+                  —
+                </Text>
+              )}
+            </YStack>
+          </XStack>
 
           {/* Team 1 Projected Score */}
           <YStack
@@ -1039,106 +1558,120 @@ export function MatchupRosterComparison({
           </YStack>
 
           {/* Team 2 Player - Flexible width */}
-          <YStack
+          <XStack
             flex={1}
-            alignItems="flex-end"
-            justifyContent="center"
+            gap="$2"
+            alignItems="center"
+            justifyContent="flex-end"
             minWidth={0}
-            overflow="hidden"
           >
-            {team2Player ? (
-              <>
-                <Text
-                  fontSize="$3"
-                  fontWeight="600"
-                  color="$gray12"
-                  textAlign="right"
-                  cursor="pointer"
-                  hoverStyle={{ color: '$blue11', textDecoration: 'underline' }}
-                  onPress={() => {
-                    if (team2Player?.playerId && team2Player?.player) {
-                      setSelectedPlayer({
-                        id: team2Player.playerId,
-                        name: `${team2Player.player.firstName} ${team2Player.player.lastName}`,
-                      });
-                      setSeasonStatsModalOpen(true);
-                    }
-                  }}
-                >
-                  {team2Player.player?.firstName} {team2Player.player?.lastName}
-                </Text>
-                <Text fontSize="$1" color="$gray10" textAlign="right">
-                  Season {team2Player.season}
-                  {team2Player.games && team2Player.games.length > 0 ? (
-                    <>
-                      <Text color="$green10">
-                        {' '}
-                        • {team2Player.games.length}/{gamesPerMatchup} games
-                      </Text>
-                      {(() => {
-                        const loadingCount = team2Player.games.filter(
-                          (g) =>
-                            g.statsLoadingStatus === 'loading' ||
-                            g.statsLoadingStatus === 'pending',
-                        ).length;
-                        const failedCount = team2Player.games.filter(
-                          (g) => g.statsLoadingStatus === 'failed',
-                        ).length;
-
-                        if (loadingCount > 0) {
-                          return (
-                            <Text color="$blue10">
-                              {' '}
-                              • Loading stats ({loadingCount})
-                            </Text>
-                          );
-                        }
-                        if (failedCount > 0) {
-                          return (
-                            <Text color="$red10">
-                              {' '}
-                              • Failed ({failedCount})
-                            </Text>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </>
-                  ) : (
-                    <Text color="$gray8"> • Yet to play</Text>
-                  )}
-                </Text>
-                {team2Stats && (
+            <YStack
+              flex={1}
+              alignItems="flex-end"
+              justifyContent="center"
+              minWidth={0}
+              overflow="hidden"
+            >
+              {team2Player ? (
+                <>
                   <Text
-                    fontSize="$1"
-                    color="$blue10"
-                    marginTop="$1"
+                    fontSize="$3"
+                    fontWeight="600"
+                    color="$gray12"
                     textAlign="right"
+                    cursor="pointer"
+                    hoverStyle={{
+                      color: '$blue11',
+                      textDecoration: 'underline',
+                    }}
+                    onPress={() => {
+                      if (team2Player?.playerId && team2Player?.player) {
+                        setSelectedPlayer({
+                          id: team2Player.playerId,
+                          name: `${team2Player.player.firstName} ${team2Player.player.lastName}`,
+                        });
+                        setSeasonStatsModalOpen(true);
+                      }
+                    }}
                   >
-                    {team2Stats}
+                    {team2Player.player?.firstName}{' '}
+                    {team2Player.player?.lastName}
                   </Text>
-                )}
-              </>
-            ) : (
-              <Text fontSize="$3" color="$gray8">
-                —
-              </Text>
-            )}
-          </YStack>
+                  <Text fontSize="$1" color="$gray10" textAlign="right">
+                    Season {team2Player.season}
+                    {team2Player.games && team2Player.games.length > 0 ? (
+                      <>
+                        <Text color="$green10">
+                          {' '}
+                          • {team2Player.games.length}/{gamesPerMatchup} games
+                        </Text>
+                        {(() => {
+                          const loadingCount = team2Player.games.filter(
+                            (g) =>
+                              g.statsLoadingStatus === 'loading' ||
+                              g.statsLoadingStatus === 'pending',
+                          ).length;
+                          const failedCount = team2Player.games.filter(
+                            (g) => g.statsLoadingStatus === 'failed',
+                          ).length;
 
-          {/* Team 2 Position */}
-          <YStack
-            width={40}
-            flexShrink={0}
-            alignItems="flex-end"
-            justifyContent="center"
-          >
-            {showPosition && (
-              <Text fontSize="$2" fontWeight="bold" color="$blue10">
-                {team2Position || '—'}
-              </Text>
+                          if (loadingCount > 0) {
+                            return (
+                              <Text color="$blue10">
+                                {' '}
+                                • Loading stats ({loadingCount})
+                              </Text>
+                            );
+                          }
+                          if (failedCount > 0) {
+                            return (
+                              <Text color="$red10">
+                                {' '}
+                                • Failed ({failedCount})
+                              </Text>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </>
+                    ) : (
+                      <Text color="$gray8"> • Yet to play</Text>
+                    )}
+                  </Text>
+                  {team2Stats && (
+                    <Text
+                      fontSize="$1"
+                      color="$blue10"
+                      marginTop="$1"
+                      textAlign="right"
+                    >
+                      {team2Stats}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text fontSize="$3" color="$gray8">
+                  —
+                </Text>
+              )}
+            </YStack>
+            {/* Player Avatar */}
+            {team2Player && (
+              <YStack
+                width={32}
+                height={32}
+                borderRadius={16}
+                backgroundColor={team2PosBadge.bg}
+                justifyContent="center"
+                alignItems="center"
+                flexShrink={0}
+              >
+                <Text fontSize="$1" fontWeight="800" color={team2PosBadge.text}>
+                  {team2Position || '?'}
+                </Text>
+              </YStack>
             )}
-          </YStack>
+          </XStack>
         </XStack>
       </XStack>
     );
@@ -1147,580 +1680,652 @@ export function MatchupRosterComparison({
   // Show loading state if scoring settings are loading
   if (scoringLoading) {
     return (
-      <Card elevate size="$4" bordered backgroundColor="$background">
-        <Card.Header padded>
-          <XStack justifyContent="space-between" alignItems="center">
-            <H4>Player Matchups</H4>
-            <Text fontSize="$2" color="$gray10">
-              Loading projections...
-            </Text>
-          </XStack>
-        </Card.Header>
-      </Card>
+      <RosterCard>
+        <XStack padding="$4" justifyContent="space-between" alignItems="center">
+          <H4 color="$color">Player Matchups</H4>
+          <Text fontSize="$2" color="$textMuted">
+            Loading projections...
+          </Text>
+        </XStack>
+      </RosterCard>
     );
   }
 
   const playerCount = data?.getMatchupPlayers?.length ?? 0;
 
   return (
-    <Card elevate size="$4" bordered backgroundColor="$background">
-      <Card.Header padded>
-        <XStack justifyContent="space-between" alignItems="center">
-          <H4>Player Matchups</H4>
-          <Text fontSize="$2" color="$gray10">
+    <RosterCard>
+      {/* Card Header */}
+      <XStack
+        padding="$4"
+        justifyContent="space-between"
+        alignItems="center"
+        borderBottomWidth={1}
+        borderBottomColor="$surfacePanelBorder"
+      >
+        <XStack alignItems="center" gap="$2">
+          <Users size={18} color="var(--color)" />
+          <H4 color="$color">Player Matchups</H4>
+        </XStack>
+        <XStack
+          alignItems="center"
+          gap="$1.5"
+          paddingHorizontal="$3"
+          paddingVertical="$1"
+          borderRadius="$10"
+          backgroundColor="$surfacePanel"
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+        >
+          <Text fontSize="$2" fontWeight="600" color="$textMuted">
             {team1Starters.length + team1Bench.length} vs{' '}
-            {team2Starters.length + team2Bench.length} players
+            {team2Starters.length + team2Bench.length}
           </Text>
         </XStack>
-      </Card.Header>
+      </XStack>
 
       {/* Warning if season stats are missing */}
       {seasonStatsMap.size === 0 && playerCount > 0 && (
-        <YStack
+        <XStack
           backgroundColor="$yellow2"
           padding="$3"
           borderBottomWidth={1}
           borderBottomColor="$yellow6"
+          gap="$2"
+          alignItems="flex-start"
         >
-          <Text fontSize="$2" color="$yellow11" fontWeight="600">
-            <span role="img" aria-label="Warning">
-              ⚠️
-            </span>{' '}
-            Season statistics not available
-          </Text>
-          <Text fontSize="$1" color="$yellow10" marginTop="$1">
-            Projections are based on games played in this matchup only. Load
-            season stats for more accurate projections.
-          </Text>
-        </YStack>
+          <YStack gap="$1">
+            <Text fontSize="$2" color="$yellow11" fontWeight="600">
+              Season statistics not available
+            </Text>
+            <Text fontSize="$1" color="$yellow10">
+              Projections are based on games played in this matchup only.
+            </Text>
+          </YStack>
+        </XStack>
       )}
 
-      <Separator />
-
-      {/* Starters Section Header */}
-      <YStack
-        backgroundColor="$blue3"
-        paddingVertical="$2"
-        paddingHorizontal="$3"
-      >
-        <H5 color="$blue11">Starting Lineup</H5>
-      </YStack>
-
-      {/* Header Row for Starters */}
-      <XStack
-        width="100%"
-        paddingVertical="$2.5"
-        paddingLeft="$3"
-        paddingRight="$3"
-        backgroundColor="$blue2"
-        borderBottomWidth={2}
-        borderBottomColor="$blue7"
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        {/* Team 1 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={40} flexShrink={0}>
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Pos
-            </Text>
-          </YStack>
-          <YStack flex={1} minWidth={0}>
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Team 1
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$gray10"
-              textTransform="uppercase"
-            >
-              Proj
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Actual
-            </Text>
-          </YStack>
-        </XStack>
-        <Separator vertical height="100%" borderColor="$blue6" />
-        {/* Team 2 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Actual
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$gray10"
-              textTransform="uppercase"
-            >
-              Proj
-            </Text>
-          </YStack>
-          <YStack flex={1} alignItems="flex-end" minWidth={0}>
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Team 2
-            </Text>
-          </YStack>
-          <YStack width={40} flexShrink={0} alignItems="flex-end">
-            <Text
-              fontSize="$2"
-              fontWeight="bold"
-              color="$blue11"
-              textTransform="uppercase"
-            >
-              Pos
-            </Text>
-          </YStack>
-        </XStack>
-      </XStack>
-
-      {/* Batters Section */}
-      {(team1Batters.length > 0 || team2Batters.length > 0) && (
-        <>
+      {/* Hitters Section Table */}
+      <SectionTable>
+        {/* Starters Section Header */}
+        <SectionHeader backgroundColor="$blue2">
           <YStack
-            backgroundColor="$green3"
-            paddingVertical="$2"
-            paddingHorizontal="$3"
-            marginTop="$2"
+            width={4}
+            height={16}
+            borderRadius={2}
+            backgroundColor="$blue9"
+          />
+          <Text
+            fontSize="$3"
+            fontWeight="700"
+            color="$blue11"
+            letterSpacing={0.3}
           >
-            <H5 color="$green11">Batters</H5>
-          </YStack>
-          <YStack>
-            {Array.from({ length: maxBatterRows }).map((_, index) =>
-              renderPlayerRow(
-                team1Batters[index],
-                team2Batters[index],
-                `batter-${index}`,
-                true,
-              ),
-            )}
-          </YStack>
-        </>
-      )}
+            STARTING LINEUP
+          </Text>
+        </SectionHeader>
 
-      {/* Totals Row - Hitters */}
-      <XStack
-        width="100%"
-        paddingVertical="$2"
-        paddingLeft="$3"
-        paddingRight="$3"
-        backgroundColor="$blue2"
-        borderTopWidth={2}
-        borderTopColor="$blue8"
-        marginTop="$3"
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        {/* Team 1 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={40} flexShrink={0} />
-          <YStack flex={1} minWidth={0}>
-            <Text fontSize="$3" fontWeight="bold" color="$blue11">
-              Hitters Total
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$2" fontWeight="600" color="$gray10">
-              {team1BatterTotals.projected.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$4" fontWeight="bold" color="$blue11">
-              {team1BatterTotals.actual.toFixed(1)}
-            </Text>
-          </YStack>
-        </XStack>
-        <Separator
-          vertical
-          height="100%"
-          borderColor="$blue8"
-          borderWidth={2}
-        />
-        {/* Team 2 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$4" fontWeight="bold" color="$blue11">
-              {team2BatterTotals.actual.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$2" fontWeight="600" color="$gray10">
-              {team2BatterTotals.projected.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack flex={1} alignItems="flex-end" minWidth={0}>
-            <Text fontSize="$3" fontWeight="bold" color="$blue11">
-              Hitters Total
-            </Text>
-          </YStack>
-          <YStack width={40} flexShrink={0} />
-        </XStack>
-      </XStack>
+        {/* Header Row for Starters */}
+        <ColumnHeader>
+          {/* Team 1 Side - 47% */}
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={40} flexShrink={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+            <YStack flex={1} minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 1
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+          </XStack>
+          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
+          {/* Team 2 Side - 47% */}
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$blue11"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Actual
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Proj
+              </Text>
+            </YStack>
+            <YStack flex={1} alignItems="flex-end" minWidth={0}>
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Team 2
+              </Text>
+            </YStack>
+            <YStack width={40} flexShrink={0} alignItems="flex-end">
+              <Text
+                fontSize="$1"
+                fontWeight="700"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Pos
+              </Text>
+            </YStack>
+          </XStack>
+        </ColumnHeader>
 
-      {/* Pitchers Section */}
+        {/* Batters Section */}
+        {(team1Batters.length > 0 || team2Batters.length > 0) && (
+          <>
+            <SectionHeader backgroundColor="$green2">
+              <YStack
+                width={4}
+                height={16}
+                borderRadius={2}
+                backgroundColor="$green9"
+              />
+              <Text
+                fontSize="$2"
+                fontWeight="700"
+                color="$green11"
+                letterSpacing={0.3}
+              >
+                BATTERS
+              </Text>
+            </SectionHeader>
+            <YStack>
+              {Array.from({ length: maxBatterRows }).map((_, index) =>
+                renderPlayerRow(
+                  team1Batters[index],
+                  team2Batters[index],
+                  `batter-${index}`,
+                  index,
+                ),
+              )}
+            </YStack>
+          </>
+        )}
+
+        {/* Totals Row - Hitters */}
+        <TotalsRow>
+          {/* Team 1 Side - 47% */}
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack flex={1} minWidth={0}>
+              <Text fontSize="$4" fontWeight="800" color="$color">
+                Hitters Total
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                {team1BatterTotals.projected.toFixed(1)}
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$5"
+                fontWeight="900"
+                color={
+                  team1BatterTotals.actual >= team2BatterTotals.actual
+                    ? '$green10'
+                    : '$red10'
+                }
+              >
+                {team1BatterTotals.actual.toFixed(1)}
+              </Text>
+            </YStack>
+          </XStack>
+          <Separator
+            vertical
+            height="100%"
+            borderColor="$surfacePanelBorder"
+            borderWidth={2}
+          />
+          {/* Team 2 Side - 47% */}
+          <XStack width="47%" alignItems="center" gap="$2">
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text
+                fontSize="$5"
+                fontWeight="900"
+                color={
+                  team2BatterTotals.actual >= team1BatterTotals.actual
+                    ? '$green10'
+                    : '$red10'
+                }
+              >
+                {team2BatterTotals.actual.toFixed(1)}
+              </Text>
+            </YStack>
+            <YStack width={60} flexShrink={0} alignItems="center">
+              <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                {team2BatterTotals.projected.toFixed(1)}
+              </Text>
+            </YStack>
+            <YStack flex={1} alignItems="flex-end" minWidth={0}>
+              <Text fontSize="$4" fontWeight="800" color="$color">
+                Hitters Total
+              </Text>
+            </YStack>
+          </XStack>
+        </TotalsRow>
+      </SectionTable>
+
+      {/* Pitchers Section Table */}
       {(team1Pitchers.length > 0 || team2Pitchers.length > 0) && (
-        <>
-          <Separator marginVertical="$3" />
-          <YStack
-            backgroundColor="$blue3"
-            paddingVertical="$2"
-            paddingHorizontal="$3"
-          >
-            <H5 color="$blue11">Pitchers</H5>
-          </YStack>
+        <SectionTable marginTop="$4">
+          <SectionHeader backgroundColor="$blue2">
+            <YStack
+              width={4}
+              height={16}
+              borderRadius={2}
+              backgroundColor="$blue9"
+            />
+            <Text
+              fontSize="$2"
+              fontWeight="700"
+              color="$blue11"
+              letterSpacing={0.3}
+            >
+              PITCHERS
+            </Text>
+          </SectionHeader>
           <YStack>
             {Array.from({ length: maxPitcherRows }).map((_, index) =>
               renderPlayerRow(
                 team1Pitchers[index],
                 team2Pitchers[index],
                 `pitcher-${index}`,
-                true,
+                index,
               ),
             )}
           </YStack>
-        </>
-      )}
 
-      {/* Totals Row - Pitchers */}
-      <XStack
-        width="100%"
-        paddingVertical="$2"
-        paddingLeft="$3"
-        paddingRight="$3"
-        backgroundColor="$blue2"
-        borderTopWidth={2}
-        borderTopColor="$blue8"
-        marginTop="$3"
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        {/* Team 1 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={40} flexShrink={0} />
-          <YStack flex={1} minWidth={0}>
-            <Text fontSize="$3" fontWeight="bold" color="$blue11">
-              Pitchers Total
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$2" fontWeight="600" color="$gray10">
-              {team1PitcherTotals.projected.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$4" fontWeight="bold" color="$blue11">
-              {team1PitcherTotals.actual.toFixed(1)}
-            </Text>
-          </YStack>
-        </XStack>
-        <Separator
-          vertical
-          height="100%"
-          borderColor="$blue8"
-          borderWidth={2}
-        />
-        {/* Team 2 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$4" fontWeight="bold" color="$blue11">
-              {team2PitcherTotals.actual.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack width={60} flexShrink={0} alignItems="center">
-            <Text fontSize="$2" fontWeight="600" color="$gray10">
-              {team2PitcherTotals.projected.toFixed(1)}
-            </Text>
-          </YStack>
-          <YStack flex={1} alignItems="flex-end" minWidth={0}>
-            <Text fontSize="$3" fontWeight="bold" color="$blue11">
-              Pitchers Total
-            </Text>
-          </YStack>
-          <YStack width={40} flexShrink={0} />
-        </XStack>
-      </XStack>
-
-      {/* Bench Toggle */}
-      {(team1Bench.length > 0 || team2Bench.length > 0) && (
-        <XStack
-          paddingVertical="$2"
-          paddingHorizontal="$3"
-          marginTop="$3"
-          justifyContent="center"
-          cursor="pointer"
-          hoverStyle={{ opacity: 0.8 }}
-          onPress={() => setShowBench(!showBench)}
-        >
-          <Text fontSize="$3" fontWeight="600" color="$gray11">
-            {showBench ? '▼' : '▶'} {showBench ? 'Hide' : 'Show'} Bench (
-            {team1Bench.length + team2Bench.length} players)
-          </Text>
-        </XStack>
-      )}
-
-      {/* Bullpen Section (bench pitchers) */}
-      {showBench && (team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
-        <>
-          {/* Bullpen Section Header */}
-          <YStack
-            backgroundColor="$blue3"
-            paddingVertical="$2"
-            paddingHorizontal="$3"
-          >
-            <H5 color="$blue11">Bullpen</H5>
-          </YStack>
-
-          {/* Header Row for Bullpen */}
-          <XStack
-            width="100%"
-            paddingVertical="$2.5"
-            paddingLeft="$3"
-            paddingRight="$3"
-            backgroundColor="$gray2"
-            borderBottomWidth={2}
-            borderBottomColor="$gray7"
-            justifyContent="space-between"
-            alignItems="center"
-          >
+          {/* Totals Row - Pitchers */}
+          <TotalsRow>
             {/* Team 1 Side - 47% */}
             <XStack width="47%" alignItems="center" gap="$2">
-              <YStack width={40} flexShrink={0} />
               <YStack flex={1} minWidth={0}>
-                <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$blue11"
-                  textTransform="uppercase"
-                >
-                  Team 1 Bullpen
+                <Text fontSize="$4" fontWeight="800" color="$color">
+                  Pitchers Total
+                </Text>
+              </YStack>
+              <YStack width={60} flexShrink={0} alignItems="center">
+                <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                  {team1PitcherTotals.projected.toFixed(1)}
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
                 <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$gray9"
-                  textTransform="uppercase"
+                  fontSize="$5"
+                  fontWeight="900"
+                  color={
+                    team1PitcherTotals.actual >= team2PitcherTotals.actual
+                      ? '$green10'
+                      : '$red10'
+                  }
                 >
-                  Proj
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$gray10"
-                  textTransform="uppercase"
-                >
-                  Actual
+                  {team1PitcherTotals.actual.toFixed(1)}
                 </Text>
               </YStack>
             </XStack>
             <Separator
               vertical
               height="100%"
-              borderColor="$gray8"
+              borderColor="$surfacePanelBorder"
               borderWidth={2}
             />
             {/* Team 2 Side - 47% */}
             <XStack width="47%" alignItems="center" gap="$2">
               <YStack width={60} flexShrink={0} alignItems="center">
                 <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$gray10"
-                  textTransform="uppercase"
+                  fontSize="$5"
+                  fontWeight="900"
+                  color={
+                    team2PitcherTotals.actual >= team1PitcherTotals.actual
+                      ? '$green10'
+                      : '$red10'
+                  }
                 >
-                  Actual
+                  {team2PitcherTotals.actual.toFixed(1)}
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$gray9"
-                  textTransform="uppercase"
-                >
-                  Proj
+                <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                  {team2PitcherTotals.projected.toFixed(1)}
                 </Text>
               </YStack>
               <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                <Text
-                  fontSize="$2"
-                  fontWeight="bold"
-                  color="$blue11"
-                  textTransform="uppercase"
-                >
-                  Team 2 Bullpen
+                <Text fontSize="$4" fontWeight="800" color="$color">
+                  Pitchers Total
                 </Text>
               </YStack>
-              <YStack width={40} flexShrink={0} />
             </XStack>
-          </XStack>
-
-          {/* Bullpen Rows */}
-          <YStack>
-            {Array.from({ length: maxBullpenRows }).map((_, index) =>
-              renderPlayerRow(
-                team1Bullpen[index],
-                team2Bullpen[index],
-                `bullpen-${index}`,
-                false,
-              ),
-            )}
-          </YStack>
-        </>
+          </TotalsRow>
+        </SectionTable>
       )}
 
-      {/* Bench Section (fielders) */}
-      {showBench &&
-        (team1BenchFielders.length > 0 || team2BenchFielders.length > 0) && (
-          <>
-            <Separator marginVertical="$3" />
-
-            {/* Bench Section Header */}
-            <YStack
-              backgroundColor="$gray3"
-              paddingVertical="$2"
-              paddingHorizontal="$3"
-            >
-              <H5 color="$gray11">Bench</H5>
-            </YStack>
-
-            {/* Header Row for Bench */}
+      {/* Bench Section Table */}
+      {(team1Bench.length > 0 || team2Bench.length > 0) && (
+        <SectionTable marginTop="$4">
+          <BenchToggle onPress={() => setShowBench(!showBench)}>
             <XStack
-              width="100%"
-              paddingVertical="$2.5"
-              paddingLeft="$3"
-              paddingRight="$3"
-              backgroundColor="$gray2"
-              borderBottomWidth={2}
-              borderBottomColor="$gray7"
-              justifyContent="space-between"
-              alignItems="center"
+              style={{
+                transition: 'transform 250ms ease',
+                transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
             >
-              {/* Team 1 Side - 47% */}
-              <XStack width="47%" alignItems="center" gap="$2">
-                <YStack width={40} flexShrink={0} />
-                <YStack flex={1} minWidth={0}>
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray11"
-                    textTransform="uppercase"
-                  >
-                    Team 1 Bench
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray9"
-                    textTransform="uppercase"
-                  >
-                    Proj
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray10"
-                    textTransform="uppercase"
-                  >
-                    Actual
-                  </Text>
-                </YStack>
-              </XStack>
-              <Separator
-                vertical
-                height="100%"
-                borderColor="$gray8"
-                borderWidth={2}
-              />
-              {/* Team 2 Side - 47% */}
-              <XStack width="47%" alignItems="center" gap="$2">
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray10"
-                    textTransform="uppercase"
-                  >
-                    Actual
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray9"
-                    textTransform="uppercase"
-                  >
-                    Proj
-                  </Text>
-                </YStack>
-                <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                  <Text
-                    fontSize="$2"
-                    fontWeight="bold"
-                    color="$gray11"
-                    textTransform="uppercase"
-                  >
-                    Team 2 Bench
-                  </Text>
-                </YStack>
-                <YStack width={40} flexShrink={0} />
-              </XStack>
+              <ChevronRight size={16} color="var(--textMuted)" />
             </XStack>
+            <Text fontSize="$3" fontWeight="600" color="$textMuted">
+              {showBench ? 'Hide' : 'Show'} Bench
+            </Text>
+            <XStack
+              paddingHorizontal="$2"
+              paddingVertical="$0.5"
+              borderRadius="$10"
+              backgroundColor="$gray3"
+            >
+              <Text fontSize="$1" fontWeight="600" color="$textMuted">
+                {team1Bench.length + team2Bench.length}
+              </Text>
+            </XStack>
+          </BenchToggle>
 
-            {/* Bench Rows */}
-            <YStack>
-              {Array.from({ length: maxBenchFielderRows }).map((_, index) =>
-                renderPlayerRow(
-                  team1BenchFielders[index],
-                  team2BenchFielders[index],
-                  `bench-${index}`,
-                  false,
-                ),
+          {/* Animated bench content wrapper */}
+          <YStack
+            style={{
+              display: 'grid',
+              gridTemplateRows: showBench ? '1fr' : '0fr',
+              transition: 'grid-template-rows 300ms ease-in-out',
+            }}
+          >
+            <YStack overflow="hidden">
+              {/* Bullpen Section (bench pitchers) */}
+              {(team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
+                <>
+                  {/* Bullpen Section Header */}
+                  <SectionHeader backgroundColor="$blue2">
+                    <YStack
+                      width={4}
+                      height={16}
+                      borderRadius={2}
+                      backgroundColor="$blue8"
+                    />
+                    <Text
+                      fontSize="$2"
+                      fontWeight="700"
+                      color="$blue11"
+                      letterSpacing={0.3}
+                    >
+                      BULLPEN
+                    </Text>
+                  </SectionHeader>
+
+                  {/* Header Row for Bullpen */}
+                  <XStack
+                    width="100%"
+                    paddingVertical="$2.5"
+                    paddingLeft="$3"
+                    paddingRight="$3"
+                    backgroundColor="$gray2"
+                    borderBottomWidth={2}
+                    borderBottomColor="$gray7"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    {/* Team 1 Side - 47% */}
+                    <XStack width="47%" alignItems="center" gap="$2">
+                      <YStack flex={1} minWidth={0}>
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$blue11"
+                          textTransform="uppercase"
+                        >
+                          Team 1 Bullpen
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray9"
+                          textTransform="uppercase"
+                        >
+                          Proj
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray10"
+                          textTransform="uppercase"
+                        >
+                          Actual
+                        </Text>
+                      </YStack>
+                    </XStack>
+                    <Separator
+                      vertical
+                      height="100%"
+                      borderColor="$gray8"
+                      borderWidth={2}
+                    />
+                    {/* Team 2 Side - 47% */}
+                    <XStack width="47%" alignItems="center" gap="$2">
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray10"
+                          textTransform="uppercase"
+                        >
+                          Actual
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray9"
+                          textTransform="uppercase"
+                        >
+                          Proj
+                        </Text>
+                      </YStack>
+                      <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$blue11"
+                          textTransform="uppercase"
+                        >
+                          Team 2 Bullpen
+                        </Text>
+                      </YStack>
+                    </XStack>
+                  </XStack>
+
+                  {/* Bullpen Rows */}
+                  <YStack>
+                    {Array.from({ length: maxBullpenRows }).map((_, index) =>
+                      renderPlayerRow(
+                        team1Bullpen[index],
+                        team2Bullpen[index],
+                        `bullpen-${index}`,
+                        index,
+                      ),
+                    )}
+                  </YStack>
+                </>
+              )}
+
+              {/* Bench Section (fielders) */}
+              {(team1BenchFielders.length > 0 ||
+                team2BenchFielders.length > 0) && (
+                <>
+                  {/* Bench Section Header */}
+                  <SectionHeader backgroundColor="$blue2">
+                    <YStack
+                      width={4}
+                      height={16}
+                      borderRadius={2}
+                      backgroundColor="$blue8"
+                    />
+                    <Text
+                      fontSize="$2"
+                      fontWeight="700"
+                      color="$blue11"
+                      letterSpacing={0.3}
+                    >
+                      BENCH
+                    </Text>
+                  </SectionHeader>
+
+                  {/* Header Row for Bench */}
+                  <ColumnHeader>
+                    {/* Team 1 Side - 47% */}
+                    <XStack width="47%" alignItems="center" gap="$2">
+                      <YStack flex={1} minWidth={0}>
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$blue11"
+                          textTransform="uppercase"
+                        >
+                          Team 1 Bench
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray9"
+                          textTransform="uppercase"
+                        >
+                          Proj
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray10"
+                          textTransform="uppercase"
+                        >
+                          Actual
+                        </Text>
+                      </YStack>
+                    </XStack>
+                    <Separator
+                      vertical
+                      height="100%"
+                      borderColor="$gray8"
+                      borderWidth={2}
+                    />
+                    {/* Team 2 Side - 47% */}
+                    <XStack width="47%" alignItems="center" gap="$2">
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray10"
+                          textTransform="uppercase"
+                        >
+                          Actual
+                        </Text>
+                      </YStack>
+                      <YStack width={60} flexShrink={0} alignItems="center">
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$gray9"
+                          textTransform="uppercase"
+                        >
+                          Proj
+                        </Text>
+                      </YStack>
+                      <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                        <Text
+                          fontSize="$2"
+                          fontWeight="bold"
+                          color="$blue11"
+                          textTransform="uppercase"
+                        >
+                          Team 2 Bench
+                        </Text>
+                      </YStack>
+                    </XStack>
+                  </ColumnHeader>
+
+                  {/* Bench Rows */}
+                  <YStack>
+                    {Array.from({ length: maxBenchFielderRows }).map(
+                      (_, index) =>
+                        renderPlayerRow(
+                          team1BenchFielders[index],
+                          team2BenchFielders[index],
+                          `bench-${index}`,
+                          index,
+                        ),
+                    )}
+                  </YStack>
+                </>
               )}
             </YStack>
-          </>
-        )}
+          </YStack>
+        </SectionTable>
+      )}
 
       {/* Player Season Stats Modal (for player name clicks) */}
       <PlayerSeasonStatsModal
@@ -1738,6 +2343,6 @@ export function MatchupRosterComparison({
         playerName={selectedMatchupPlayerName}
         scoringSettings={scoringSettings}
       />
-    </Card>
+    </RosterCard>
   );
 }

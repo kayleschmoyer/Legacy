@@ -1345,6 +1345,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               <Card
                 backgroundColor="$surfacePanel"
                 borderColor="$surfacePanelBorder"
+                borderWidth={1}
                 padding="$6"
                 borderRadius="$6"
               >
@@ -1357,6 +1358,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               <Card
                 backgroundColor="$red2"
                 borderColor="$red6"
+                borderWidth={1}
                 padding="$4"
                 borderRadius="$6"
               >
@@ -1365,7 +1367,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 </Text>
               </Card>
             ) : currentMatchup ? (
-              <>
+              <YStack gap="$4">
                 <MatchupScoreboard
                   matchup={currentMatchup}
                   gamesRemaining={
@@ -1373,7 +1375,6 @@ export function LeagueDetailPage(): React.JSX.Element {
                     (currentMatchup.selectedGamesCount ?? 0)
                   }
                 />
-                <MatchupRosterComparison matchup={currentMatchup} />
                 {currentMatchup.gamesPerMatchup && (
                   <GamesRemaining
                     gamesRemaining={
@@ -1383,41 +1384,41 @@ export function LeagueDetailPage(): React.JSX.Element {
                     totalGames={currentMatchup.gamesPerMatchup}
                   />
                 )}
-                <Card
-                  backgroundColor="$surfacePanel"
-                  borderColor="$surfacePanelBorder"
-                  borderWidth={1}
-                  padding="$4"
-                  borderRadius="$6"
-                >
-                  <YStack gap="$2">
-                    <Text fontSize="$4" fontWeight="bold" color="$color">
-                      Matchup Details
-                    </Text>
-                    <YStack gap="$1">
-                      <Text fontSize="$3" color="$textMuted">
-                        Week {currentMatchup.weekNumber}
+                <MatchupRosterComparison matchup={currentMatchup} />
+                {(currentMatchup.startTime || currentMatchup.endTime) && (
+                  <Card
+                    backgroundColor="$surfacePanel"
+                    borderColor="$surfacePanelBorder"
+                    borderWidth={1}
+                    padding="$4"
+                    borderRadius="$6"
+                  >
+                    <YStack gap="$2">
+                      <Text fontSize="$3" fontWeight="700" color="$color">
+                        Schedule
                       </Text>
-                      {currentMatchup.startTime && (
-                        <Text fontSize="$3" color="$textMuted">
-                          Start:{' '}
-                          {new Date(
-                            String(currentMatchup.startTime),
-                          ).toLocaleString()}
-                        </Text>
-                      )}
-                      {currentMatchup.endTime && (
-                        <Text fontSize="$3" color="$textMuted">
-                          End:{' '}
-                          {new Date(
-                            String(currentMatchup.endTime),
-                          ).toLocaleString()}
-                        </Text>
-                      )}
+                      <YStack gap="$1">
+                        {currentMatchup.startTime && (
+                          <Text fontSize="$2" color="$textMuted">
+                            Start:{' '}
+                            {new Date(
+                              String(currentMatchup.startTime),
+                            ).toLocaleString()}
+                          </Text>
+                        )}
+                        {currentMatchup.endTime && (
+                          <Text fontSize="$2" color="$textMuted">
+                            End:{' '}
+                            {new Date(
+                              String(currentMatchup.endTime),
+                            ).toLocaleString()}
+                          </Text>
+                        )}
+                      </YStack>
                     </YStack>
-                  </YStack>
-                </Card>
-              </>
+                  </Card>
+                )}
+              </YStack>
             ) : (
               <Card
                 backgroundColor="$surfacePanel"

@@ -202,7 +202,7 @@ export function MatchupDetailPage() {
       {/* Scoreboard */}
       <MatchupScoreboard matchup={matchup} gamesRemaining={gamesRemaining} />
 
-      {/* Games Remaining */}
+      {/* Games Progress */}
       {matchup.gamesPerMatchup && (
         <GamesRemaining
           gamesRemaining={gamesRemaining}
