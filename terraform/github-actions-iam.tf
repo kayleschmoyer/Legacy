@@ -23,7 +23,7 @@ resource "aws_iam_policy" "github_actions_ssm" {
         ]
         Resource = [
           "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/s3/lambda-deployments-bucket",
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*/version"
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*"
         ]
       },
       {
@@ -33,7 +33,7 @@ resource "aws_iam_policy" "github_actions_ssm" {
           "ssm:PutParameter"
         ]
         Resource = [
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*/version"
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*"
         ]
       }
     ]
