@@ -5,10 +5,11 @@
   "nxCloudAccessToken": "$(NX_CLOUD_ACCESS_TOKEN)",
   "tasksRunnerOptions": {
     "default": {
-      "runner": "nx-cloud",
+      "runner": "nx/tasks-runners/default",
       "options": {
-        "cacheableOperations": ["build", "test", "lint", "typecheck", "format"],
-        "accessToken": "$(NX_CLOUD_ACCESS_TOKEN)"
+        "env": {
+          "NODE_OPTIONS": "--require ./scripts/patch-child-process.js"
+        }
       }
     }
   },
@@ -78,20 +79,20 @@
     },
     "build:lambda": {
       "cache": true,
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "inputs": ["production"],
       "outputs": ["{projectRoot}/dist"]
     },
     "package": {
       "cache": false,
       "dependsOn": ["build"],
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "options": {}
     },
     "zip": {
       "cache": false,
       "dependsOn": ["build"],
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "options": {}
     },
     "deploy": {
@@ -103,13 +104,13 @@
       "dependsOn": ["build"]
     },
     "validate:package-json": {
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/validate-package-json-standards.js"
       }
     },
     "validate:workspace-deps": {
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/validate-workspace-deps.js"
       }
@@ -123,7 +124,7 @@
       "inputs": ["production", "^production"]
     },
     "lint": {
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "default",
@@ -146,7 +147,7 @@
       }
     },
     "format": {
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "default",
@@ -166,7 +167,7 @@
       }
     },
     "typecheck": {
-      "executor": "@legacy-sports/run-commands-windows",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "production",

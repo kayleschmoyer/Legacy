@@ -1,7 +1,20 @@
 # Legacy Sports Makefile
 # Cross-platform build and deployment automation for Nx monorepo
 
-.PHONY: help install clean build test lint format fmt dev deploy infrastructure android ios pr terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy deploy-infrastructure deploy-lambdas pc pre-commit reset
+.PHONY: help install install-force install-tools install-node install-python setup setup-force \
+	clean clean-safe clean-cache clean-node clean-python force-clean reset \
+	lint lint-fix lint-workflows format fmt typecheck validate \
+	test test-all test-watch test-e2e check-skipped-tests check-skipped-tests-verbose \
+	build build-all build-web build-mobile build-lambdas build-libs \
+	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql \
+	android ios build-android build-ios \
+	db-migrate db-studio db-reset db-check-connections codegen \
+	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy \
+	sync-env check-services graph affected list-projects workspace-lint pr \
+	ci ci-force ci-full release full-deploy full-check dev-setup \
+	fix-windows-locks diagnose \
+	branch-tree cleanup-merged-branches squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
+	pre-commit pc quick-check
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -11,7 +24,6 @@ ifeq ($(OS),Windows_NT)
 	SHELL := cmd
 	.SHELLFLAGS := /c
 	RM_DIR := rmdir /s /q
-	RM_FILE := del /f /q
 	NULL_REDIRECT := >nul 2>&1
 	KILL_NODE := taskkill /f /im node.exe $(NULL_REDIRECT) || echo No node processes
 	KILL_ESBUILD := taskkill /f /im esbuild.exe $(NULL_REDIRECT) || echo No esbuild processes
@@ -25,7 +37,6 @@ else
 	SHELL := /bin/bash
 	.SHELLFLAGS := -ec
 	RM_DIR := rm -rf
-	RM_FILE := rm -f
 	NULL_REDIRECT := >/dev/null 2>&1
 	KILL_NODE := pkill -f node $(NULL_REDIRECT) || echo No node processes
 	KILL_ESBUILD := pkill -f esbuild $(NULL_REDIRECT) || echo No esbuild processes
@@ -33,6 +44,19 @@ else
 	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
 	PATH_SEP := /
 	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; pids=$$(pgrep -f "$$workspace" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
+endif
+
+# LS-102: Prevent console windows from spawning on Windows
+# NODE_OPTIONS loads a monkey-patch that adds windowsHide: true to all
+# child_process calls (spawn, fork, exec, etc.). Uses an absolute path
+# so it works regardless of cwd when Nx forks task workers.
+# NX_DAEMON=false disables the background daemon process, which uses
+# detached: true + spawn() — a combination that can still flash a
+# console window even with windowsHide. Caching still works without
+# the daemon; only the persistent project-graph file watcher is lost.
+ifeq ($(OS),Windows_NT)
+    export NODE_OPTIONS := --require $(WORKSPACE_PATH)/scripts/patch-child-process.js
+    export NX_DAEMON := false
 endif
 
 # Cross-platform echo with colors
@@ -105,21 +129,18 @@ setup: install ## Alias for install
 setup-force: install-force ## Setup with force install for Windows file lock issues
 
 # Cleaning
-clean-safe: ## Safely clean build artifacts and cache
-	@$(call echo_blue,Cleaning workspace safely...)
-	npx nx reset
-	@$(call echo_blue,Safe clean completed)
+clean-safe: clean-cache ## Safely clean build artifacts and cache (alias for clean-cache)
 
 clean: ## Clean all build artifacts and dependencies
 	@$(call echo_blue,Cleaning workspace...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
 	@$(call echo_blue,Clearing Nx cache...)
-	npx nx reset $(NULL_REDIRECT) || echo Nx reset skipped
+	pnpm exec nx reset $(NULL_REDIRECT) || echo Nx reset skipped
 	@$(call echo_blue,Stopping Nx daemon if running...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -Command "$$job = Start-Job { npx nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+	@powershell -Command "$$job = Start-Job { pnpm exec nx daemon --stop }; Wait-Job $$job -Timeout 5; Stop-Job $$job -ErrorAction SilentlyContinue; Remove-Job $$job -ErrorAction SilentlyContinue" $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 else
-	@timeout 5 npx nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
+	@timeout 5 pnpm exec nx daemon --stop $(NULL_REDIRECT) || echo Daemon stop timed out or not running
 endif
 	@$(call echo_blue,Stopping workspace-affiliated processes...)
 	@$(KILL_WORKSPACE_PROCS)
@@ -163,20 +184,18 @@ clean-python: ## Clean Python dependencies only
 
 clean-cache: ## Clear Nx cache
 	@$(call echo_blue,Clearing Nx cache...)
-	npx nx reset
+	pnpm exec nx reset
 
-reset: ## Reset Nx cache (alias for clean-cache)
-	@$(call echo_blue,Resetting Nx cache...)
-	npx nx reset
+reset: clean-cache ## Reset Nx cache (alias for clean-cache)
 
 # Code Quality
 lint: ## Run linting on all projects
 	@$(call echo_blue,Running linters...)
-	npx nx run-many -t lint
+	pnpm exec nx run-many -t lint
 
 lint-fix: ## Run linting with auto-fix on all projects
 	@$(call echo_blue,Running linters with auto-fix...)
-	npx nx run-many -t lint --fix
+	pnpm exec nx run-many -t lint --fix
 
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
@@ -184,13 +203,13 @@ lint-workflows: ## Lint GitHub Actions workflow files
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)
-	npx nx format:write
+	@pnpm exec nx format:write
 
 fmt: format ## Alias for format command
 
 typecheck: ## Run TypeScript type checking
 	@$(call echo_blue,Running type checking...)
-	npx nx run-many -t typecheck
+	pnpm exec nx run-many -t typecheck
 
 validate: ## Validate package.json and workspace dependencies
 	@$(call echo_blue,Validating workspace...)
@@ -199,23 +218,23 @@ validate: ## Validate package.json and workspace dependencies
 # Testing
 test: ## Run tests on changed files
 	@$(call echo_blue,Running tests on changed files...)
-	npx nx affected -t test
+	pnpm exec nx affected -t test
 
 test-all: ## Run all tests
 	@$(call echo_blue,Running all tests...)
-	npx nx run-many -t test
+	pnpm exec nx run-many -t test
 
 test-watch: ## Run tests in watch mode
 	@$(call echo_blue,Running tests in watch mode...)
-	npx nx run-many -t test --watch
+	pnpm exec nx run-many -t test --watch
 
 test-e2e: ## Run end-to-end tests
 	@$(call echo_blue,Running e2e tests...)
-	npx nx run-many -t e2e
+	pnpm exec nx run-many -t e2e
 
 check-skipped-tests: ## Check for skipped tests and report them
 	@$(call echo_blue,Checking for skipped tests...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1
 else
 	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1
@@ -223,7 +242,7 @@ endif
 
 check-skipped-tests-verbose: ## Check for skipped tests with detailed output
 	@$(call echo_blue,Checking for skipped tests (verbose)...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1 -ShowDetails
 else
 	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-skipped-tests.ps1 -ShowDetails
@@ -232,27 +251,27 @@ endif
 # Building
 build: ## Build all affected projects
 	@$(call echo_blue,Building affected projects...)
-	npx nx affected -t build
+	pnpm exec nx affected -t build
 
 build-all: ## Build all projects
 	@$(call echo_blue,Building all projects...)
-	npx nx run-many -t build
+	pnpm exec nx run-many -t build
 
 build-web: ## Build web application
 	@$(call echo_blue,Building web application...)
-	npx nx build web
+	pnpm exec nx build web
 
 build-mobile: ## Build mobile application
 	@$(call echo_blue,Building mobile application...)
-	npx nx build app
+	pnpm exec nx build app
 
 build-lambdas: ## Build all lambda functions
 	@$(call echo_blue,Building lambda functions...)
-	npx nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
+	pnpm exec nx run-many -t build --projects=db,game-selection,oauth-proxy,stats-lambda
 
 build-libs: ## Build all libraries
 	@$(call echo_blue,Building libraries...)
-	npx nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
+	pnpm exec nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
 
 # Development
 start: ## Start the dev server
@@ -265,11 +284,11 @@ dev: ## Start all development services
 
 dev-web: ## Start web development server
 	@$(call echo_blue,Starting web development server...)
-	npx nx serve web
+	pnpm exec nx serve web
 
 dev-mobile: ## Start mobile development server
 	@$(call echo_blue,Starting mobile development server...)
-	npx nx start app
+	pnpm exec nx start app
 
 dev-db: ## Start database development server
 	@$(call echo_blue,Starting database service...)
@@ -277,7 +296,7 @@ dev-db: ## Start database development server
 
 dev-graphql: ## Start GraphQL service (alias for dev-db)
 	@$(call echo_blue,Starting GraphQL service on http://localhost:5000/graphql...)
-	npx nx run db:serve
+	pnpm exec nx run db:serve
 
 dev-storybook: ## Start Storybook for component development
 	@$(call echo_blue,Starting Storybook...)
@@ -307,23 +326,15 @@ build-ios: ## Build iOS application
 # Database Operations
 db-migrate: ## Run database migrations
 	@$(call echo_blue,Running database migrations...)
-ifeq ($(DETECTED_OS),Windows)
 	cd lib$(PATH_SEP)db-client && pnpm run db:migrate
-else
-	cd lib$(PATH_SEP)db-client && pnpm run db:migrate
-endif
 
 db-studio: ## Open database studio
 	@$(call echo_blue,Opening database studio...)
-	npx nx studio:public db-client
+	pnpm exec nx studio:public db-client
 
 db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
-ifeq ($(DETECTED_OS),Windows)
 	cd lib$(PATH_SEP)db-client && pnpm run db:reset
-else
-	cd lib$(PATH_SEP)db-client && pnpm run db:reset
-endif
 
 db-check-connections: ## Check database connection pool status
 	@$(call echo_blue,Checking database connection pool status...)
@@ -394,15 +405,15 @@ check-services: ## Check service health
 # Utilities
 graph: ## Show Nx project dependency graph
 	@$(call echo_blue,Opening Nx project graph...)
-	npx nx graph
+	pnpm exec nx graph
 
 affected: ## Show affected projects
 	@$(call echo_blue,Showing affected projects...)
-	npx nx show projects --affected
+	pnpm exec nx show projects --affected
 
 list-projects: ## List all projects in workspace
 	@$(call echo_blue,Listing all projects...)
-	npx nx show projects
+	pnpm exec nx show projects
 
 workspace-lint: ## Run workspace-level validations
 	@$(call echo_blue,Running workspace validations...)
@@ -455,18 +466,16 @@ diagnose: ## Diagnose common issues
 	@$(call echo_plain,NPM version (optional):)
 	@npm --version || echo "npm not installed"
 	@$(call echo_plain,Nx version:)
-	@npx nx --version
+	@pnpm exec nx --version
 	@$(call echo_green,Diagnosis completed!)
 
 # Branch management helpers
-.PHONY: branch-tree rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts squash-branch cleanup-merged-branches pre-commit
-
 branch-tree: ## Show current branch tree structure
 	@twig tree
 
 cleanup-merged-branches: ## List merged remote branches (use DELETE=1 to remove them)
 	@$(call echo_blue,Checking for merged remote branches...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 ifdef DELETE
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\cleanup-merged-branches.ps1" -Delete
 else
@@ -482,7 +491,7 @@ endif
 
 squash-branch: ## Squash all commits on current branch from parent (optional: MESSAGE="commit message")
 	@$(call echo_blue,Squashing branch commits...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 ifdef MESSAGE
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\squash-branch.ps1" -Message "$(MESSAGE)"
 else
@@ -494,7 +503,7 @@ endif
 
 rebase-tree: ## Rebase entire branch tree with auto-conflict resolution
 	@$(call echo_blue,Rebasing branch tree...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1"
 else
 	@./scripts/rebase-branch-tree.sh
@@ -502,7 +511,7 @@ endif
 
 rebase-tree-auto: ## Rebase branch tree with auto-continue (no prompts)
 	@$(call echo_blue,Auto-rebasing branch tree...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -AutoContinue
 else
 	@./scripts/rebase-branch-tree.sh --auto-continue
@@ -510,7 +519,7 @@ endif
 
 rebase-tree-skip: ## Rebase branch tree skipping commits (SKIP_COMMITS=hash1,hash2 or SKIP_COMMITS_FILE=path)
 	@$(call echo_blue,Rebasing branch tree with skip-commits...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 ifdef SKIP_COMMITS
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\rebase-branch-tree.ps1" -SkipCommits "$(SKIP_COMMITS)"
 else ifdef SKIP_COMMITS_FILE
@@ -525,7 +534,7 @@ endif
 
 resolve-conflicts: ## Resolve conflicts in generated files
 	@$(call echo_blue,Resolving conflicts in generated files...)
-ifeq ($(OS),Windows_NT)
+ifeq ($(DETECTED_OS),Windows)
 	@powershell -ExecutionPolicy Bypass -File ".\scripts\resolve-generated-conflicts.ps1"
 else
 	@./scripts/resolve-generated-conflicts.sh
@@ -534,23 +543,23 @@ endif
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
 	@$(call echo_plain,1/6 Type checking...)
-	@npx nx affected -t typecheck --base=main
+	@pnpm exec nx affected -t typecheck --base=main
 	@$(call echo_plain,2/6 Formatting...)
-	@npx nx format:write
+	@pnpm exec nx format:write
 	@$(call echo_plain,3/6 Linting...)
-	@npx nx affected -t lint --fix --base=main
+	@pnpm exec nx affected -t lint --fix --base=main
 	@$(call echo_plain,4/6 Workflow validation...)
-	@$(MAKE) lint-workflows
+	@node scripts/validate-workflows.js
 	@$(call echo_plain,5/6 Testing...)
-	@npx nx affected -t test --base=main
+	@pnpm exec nx affected -t test --base=main
 	@$(call echo_plain,6/6 Building...)
-	@npx nx affected -t build --base=main
+	@pnpm exec nx affected -t build --base=main
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
 pc: pre-commit ## Alias for pre-commit
 
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
-	@npx nx affected -t typecheck --base=main
-	@npx nx affected -t lint --fix --base=main
+	@pnpm exec nx affected -t typecheck --base=main
+	@pnpm exec nx affected -t lint --fix --base=main
 	@$(call echo_green,✓ Quick checks passed!)

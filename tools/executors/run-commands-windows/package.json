@@ -1,7 +1,0 @@
-{
-  "name": "@legacy-sports/run-commands-windows",
-  "version": "1.0.0",
-  "main": "./executor.ts",
-  "executors": "./executors.json",
-  "description": "Windows-optimized run-commands executor with windowsHide support"
-}

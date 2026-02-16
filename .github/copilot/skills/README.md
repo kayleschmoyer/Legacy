@@ -52,18 +52,19 @@ Each skill provides comprehensive guidance on executing specific development tas
 
 ### Troubleshooting & Maintenance Skills
 
-20. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
-21. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
-22. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
+20. **[Makefile](makefile.md)** - Complete reference for all `make` targets (the primary task runner)
+21. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
+22. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
+23. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
 
 ### Deployment Skills
 
-23. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
-24. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
+24. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
+25. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
 ### CLI & Administrative Tools
 
-25. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
+26. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
 
 ## Skill Structure
 
