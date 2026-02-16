@@ -3,6 +3,15 @@
   "defaultBase": "origin/main",
   "useDaemonProcess": true,
   "nxCloudAccessToken": "$(NX_CLOUD_ACCESS_TOKEN)",
+  "tasksRunnerOptions": {
+    "default": {
+      "runner": "nx-cloud",
+      "options": {
+        "cacheableOperations": ["build", "test", "lint", "typecheck", "format"],
+        "accessToken": "$(NX_CLOUD_ACCESS_TOKEN)"
+      }
+    }
+  },
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
