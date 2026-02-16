@@ -6,7 +6,9 @@
   "scripts": {
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "start": "react-native start"
+    "start": "expo start",
+    "prebuild": "expo prebuild --clean --no-install",
+    "prebuild:android": "expo prebuild --clean --platform android --no-install"
   },
   "dependencies": {
     "@expo/metro-config": "*",

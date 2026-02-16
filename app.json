@@ -1,16 +1,7 @@
 {
-  "plugins": ["expo-asset", "expo-font", "expo-router"],
-  "android": {
-    "package": "com.anonymous.legacysportssource",
-    "googleServicesFile": "./apps/app/android/app/google-services.json"
-  },
-  "ios": {
-    "bundleIdentifier": "com.anonymous.legacysportssource",
-    "googleServicesFile": "./apps/app/ios/GoogleService-Info.plist"
-  },
-  "extra": {
-    "googleClientId": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com",
-    "oauthProxyUrl": "http://localhost:5001",
-    "sentryDsn": "https://9cde57d0dba3d0dd1e85a797ef980e97@o4509922239315968.ingest.us.sentry.io/4510161844043776"
+  "_comment": "Expo configuration lives in apps/app/app.json. This root file is kept minimal to avoid accidental prebuilds at workspace root.",
+  "expo": {
+    "name": "legacy-sports-workspace",
+    "slug": "legacy-sports-workspace"
   }
 }

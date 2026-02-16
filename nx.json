@@ -185,42 +185,34 @@
       "inputs": [
         "default",
         "^production",
-        "{projectRoot}/android/**/*",
+        "{projectRoot}/app.json",
         "{projectRoot}/index.js",
         "{projectRoot}/metro.config.js",
-        "{projectRoot}/babel.config.js",
-        "{workspaceRoot}/android/**/*",
+        "{projectRoot}/.babelrc.js",
         "{workspaceRoot}/app.json",
         "{workspaceRoot}/babel.config.json",
         {
           "externalDependencies": ["gradle", "java"]
         }
       ],
-      "outputs": [
-        "{projectRoot}/android/app/build/outputs/apk",
-        "{projectRoot}/android/app/build/intermediates/merged_assets"
-      ]
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     },
     "build-android-debug": {
       "cache": true,
       "inputs": [
         "default",
         "^production",
-        "{projectRoot}/android/**/*",
+        "{projectRoot}/app.json",
         "{projectRoot}/index.js",
         "{projectRoot}/metro.config.js",
-        "{projectRoot}/babel.config.js",
-        "{workspaceRoot}/android/**/*",
+        "{projectRoot}/.babelrc.js",
         "{workspaceRoot}/app.json",
         "{workspaceRoot}/babel.config.json",
         {
           "externalDependencies": ["gradle", "java"]
         }
       ],
-      "outputs": [
-        "{projectRoot}/android/app/build/outputs/apk",
-        "{projectRoot}/android/app/build/intermediates/merged_assets"
-      ]
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     }
   },
   "generators": {

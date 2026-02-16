@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:1025244625243:android:a1b2c3d4e5f6789012345678",
         "android_client_info": {
-          "package_name": "com.anonymous.legacysportssource"
+          "package_name": "com.legacySports"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.anonymous.legacysportssource",
+            "package_name": "com.legacySports",
             "certificate_hash": "sha1_placeholder_for_development"
           }
         },

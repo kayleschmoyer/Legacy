@@ -38,57 +38,30 @@ concurrency:
 env:
   # Version Matrix Configuration
   JAVA_VERSION: "17" # LTS version, compatible with RN 0.79.6
-  NODE_VERSION: "20" # Node 20 LTS - Node 22 has stricter ESM exports that break Metro 0.82/0.83
+  NODE_VERSION: "22" # Node 22 LTS
   ANDROID_API_LEVEL: "35" # Target SDK for Google Play compliance
   NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.79.6
 
-  # Build optimization environment variables with improved network timeouts and cache limits
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.caching=true -Dorg.gradle.caching.debug=false -Dorg.gradle.cache.cleanup=true -Dorg.gradle.internal.network.retry.max.count=3"
-  GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+  # Gradle CI flags — daemon disabled, parallel enabled, caching on
+  GRADLE_OPTS: >-
+    -Dorg.gradle.daemon=false
+    -Dorg.gradle.jvmargs=-Xmx4096m
+    -Dorg.gradle.caching=true
+    -Dorg.gradle.internal.http.connectionTimeout=120000
+    -Dorg.gradle.internal.http.socketTimeout=120000
   NODE_OPTIONS: "--max-old-space-size=4096"
 
-  # Cache optimization - reduce compression time during cleanup
-  ACTIONS_CACHE_COMPRESSION_LEVEL: "1" # Lower compression = faster cleanup
-  ACTIONS_CACHE_MAX_SIZE: "5GB" # Limit cache size
-
 jobs:
-  setup:
-    name: Setup and Version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      build_number: ${{ steps.version.outputs.build_number }}
-      commit_sha: ${{ steps.version.outputs.commit_sha }}
-      build_type: ${{ steps.platform.outputs.build_type }}
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-
-      - name: Extract Version Info
-        id: version
-        run: |
-          VERSION=$(node -p "require('./apps/app/package.json').version")
-          COMMIT_SHA=${GITHUB_SHA:0:7}
-          BUILD_NUMBER=$(date +%Y%m%d_%H%M%S)
-
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-
-      - name: Set Build Type
-        id: platform
-        run: |
-          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
-          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
-
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
-    needs: setup
     outputs:
       apk_path: ${{ steps.build.outputs.apk_path }}
       apk_name: ${{ steps.build.outputs.apk_name }}
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
+      build_type: ${{ steps.version.outputs.build_type }}
 
     steps:
       - name: Verify Branch
@@ -101,329 +74,112 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v6
 
+      - name: Extract Version Info
+        id: version
+        run: |
+          VERSION=$(node -p "require('./apps/app/package.json').version")
+          COMMIT_SHA=${GITHUB_SHA:0:7}
+          BUILD_NUMBER=$(date +%Y%m%d_%H%M%S)
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+
       - name: Setup Workspace
         uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
           install-dependencies: true
-          set-nx-shas: true
+          set-nx-shas: false
           skip-system-deps: true
 
+      # setup-java with built-in Gradle caching — replaces manual cache step
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: ${{ env.JAVA_VERSION }}
+          cache: "gradle"
+          cache-dependency-path: |
+            apps/app/app.json
+            pnpm-lock.yaml
 
-      - name: Verify Version Matrix
-        run: |
-          echo "## 📋 Build Version Matrix" >> $GITHUB_STEP_SUMMARY
-          echo "- **Java**: $(java -version 2>&1 | head -n1)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Node.js**: $(node --version)" >> $GITHUB_STEP_SUMMARY
-          echo "- **NPM**: $(npm --version)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Android API Level**: ${{ env.ANDROID_API_LEVEL }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **NDK Version**: ${{ env.NDK_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **React Native**: $(node -p "require('./apps/app/package.json').dependencies['react-native'] || require('./package.json').dependencies['react-native']")" >> $GITHUB_STEP_SUMMARY
-
-      # Android SDK caching - improves SDK download times
-      - name: Cache Android SDK
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.android/sdk
-            /usr/local/lib/android/sdk
-          key: ${{ runner.os }}-android-sdk-${{ env.ANDROID_API_LEVEL }}-${{ env.NDK_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-android-sdk-${{ env.ANDROID_API_LEVEL }}-
-            ${{ runner.os }}-android-sdk-
-
-      # Android-specific caching for Gradle artifacts
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches/modules-2
-            ~/.gradle/caches/jars-9
-            ~/.gradle/caches/transforms-3
-            ~/.gradle/caches/build-cache-1
-            ${{ github.workspace }}/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/app/android/gradle/wrapper/gradle-wrapper.properties', 'apps/app/android/app/build.gradle', 'apps/app/android/build.gradle') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      # Metro bundler cache - speeds up JS bundle generation
-      - name: Cache Metro Bundler
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.metro
-            ${{ github.workspace }}/node_modules/.cache/metro
-            /tmp/metro-*
-            /tmp/haste-map-*
-          key: ${{ runner.os }}-metro-${{ hashFiles('apps/app/package.json', 'apps/app/metro.config.js') }}
-          restore-keys: |
-            ${{ runner.os }}-metro-
-
-      # Hermes compiler cache
-      - name: Cache Hermes Compiler
-        uses: actions/cache@v5
-        with:
-          path: |
-            apps/app/android/app/build/generated/assets/react
-            apps/app/android/app/build/intermediates/merged_assets
-          key: ${{ runner.os }}-hermes-${{ hashFiles('apps/app/src/**/*.{js,jsx,ts,tsx}', 'lib/**/*.{js,jsx,ts,tsx}') }}
-          restore-keys: |
-            ${{ runner.os }}-hermes-
-
-      - name: Setup Gradle Wrapper Permissions
-        run: |
-          cd apps/app/android
-          chmod +x gradlew
-
-      - name: Verify Gradle Setup
-        timeout-minutes: 20
-        run: |
-          cd apps/app/android
-
-          echo "📥 Ensuring Gradle wrapper is available..."
-          echo "🕐 Gradle setup started at $(date)"
-
-          # Set network timeout environment variables for better CI reliability
-          export GRADLE_OPTS="$GRADLE_OPTS -Dorg.gradle.internal.http.connectionTimeout=180000 -Dorg.gradle.internal.http.socketTimeout=180000"
-
-          # Version compatibility validation
-          echo "🔍 Validating version matrix compatibility..."
-
-          # Check Java version compatibility
-          JAVA_VERSION=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1-2)
-          echo "Java version detected: $JAVA_VERSION"
-
-          # Check Gradle version with increased timeout for network-dependent operations
-          echo "🔍 Checking Gradle wrapper version..."
-          timeout 600s ./gradlew --version --no-daemon || {
-            echo "⚠️  Gradle version check failed - checking connectivity and retrying with offline mode"
-            timeout 180s ./gradlew --version --offline --no-daemon || {
-              echo "❌ Gradle setup failed completely - check network connectivity and gradle wrapper"
-              exit 1
-            }
-          }
-
-          # Validate Android SDK configuration
-          echo "🔍 Validating Android SDK configuration..."
-          echo "Target Android API Level: ${{ env.ANDROID_API_LEVEL }}"
-          echo "NDK Version: ${{ env.NDK_VERSION }}"
-
-          # Quick validation that build.gradle is parseable (with dependency resolution allowed on first run)
-          echo "🔍 Validating build configuration..."
-          timeout 600s ./gradlew help --quiet --no-daemon > /dev/null || {
-            echo "⚠️  Build configuration issue detected - showing details:"
-            timeout 300s ./gradlew help --no-daemon --info  # Show error details with more info
-          }
-
-          echo "✅ Gradle setup and version matrix verified at $(date)"
-
-      - name: Check Cache Status
-        run: |
-          echo "📊 Current cache status:"
-          echo "  Gradle wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) files"
-          echo "  Gradle caches: $(ls ~/.gradle/caches/ 2>/dev/null | wc -l) entries"
-          echo "  Gradle build cache: $(ls ~/.gradle/caches/build-cache-1/ 2>/dev/null | wc -l) entries"
-          echo "  Metro cache: $(ls ~/.metro/ 2>/dev/null | wc -l) files"
-          echo "  Node modules: $(ls node_modules/ 2>/dev/null | wc -l) packages"
-          echo "  Android SDK: $(ls ~/.android/sdk/ 2>/dev/null | wc -l) components"
-          echo ""
-          echo "💡 Dependencies will be downloaded during build if not cached"
-          echo "🚀 Nx computation caching enabled for faster incremental builds"
-
-      - name: Generate React Native Bundle
-        timeout-minutes: 10
-        env:
-          APP_VERSION: ${{ needs.setup.outputs.version }}
-          EXPO_PUBLIC_APP_VERSION: ${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+      - name: Run Expo Prebuild
         run: |
           cd apps/app
-
-          # Ensure assets directory exists
-          mkdir -p android/app/src/main/assets
-          mkdir -p android/app/src/main/res
-
-          # Check Metro cache status
-          echo "📊 Checking Metro cache status..."
-          ls -la ~/.metro/ 2>/dev/null || echo "No Metro cache found"
-          ls -la node_modules/.cache/metro/ 2>/dev/null || echo "No Metro node_modules cache found"
-
-          # Set environment optimizations for bundling with cache utilization
-          export REACT_NATIVE_PACKAGER_CACHE_DISABLED=false
-          export RCT_METRO_PORT=8082
-
-          # Generate bundle with optimizations for CI and cache utilization
-          echo "📦 Generating React Native bundle for Android (with caching)..."
-          pnpm exec react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res/ \
-            --minify true \
-            --verbose || {
-            echo "⚠️ Bundle generation failed, trying with reset-cache..."
-            pnpm exec react-native bundle \
-              --platform android \
-              --dev false \
-              --entry-file index.js \
-              --bundle-output android/app/src/main/assets/index.android.bundle \
-              --assets-dest android/app/src/main/res/ \
-              --minify true \
-              --reset-cache
-          }
-
-          # Verify bundle was created and show cache effectiveness
-          if [ -f "android/app/src/main/assets/index.android.bundle" ]; then
-            BUNDLE_SIZE=$(du -h android/app/src/main/assets/index.android.bundle | cut -f1)
-            echo "✅ Bundle generated successfully: $BUNDLE_SIZE"
-            
-            # Check if Hermes cache is being used
-            ls -la android/app/build/generated/assets/ 2>/dev/null | head -3 || echo "No Hermes assets cache"
-          else
-            echo "❌ Bundle generation failed"
-            exit 1
-          fi
+          npx expo prebuild --platform android --no-install
+          chmod +x android/gradlew
+          echo "✅ Expo prebuild completed"
 
       - name: Build Android APK
         id: build
         timeout-minutes: 25
         env:
-          APP_VERSION: ${{ needs.setup.outputs.version }}
-          EXPO_PUBLIC_APP_VERSION: ${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
         run: |
           cd apps/app/android
 
-          # Kill any existing Gradle daemons to prevent conflicts
-          ./gradlew --stop || true
+          BUILD_TYPE="${{ steps.version.outputs.build_type }}"
 
-          # Use CI-optimized Gradle properties
-          cp gradle-ci.properties gradle.properties
+          # Gradle flags — parallel, build cache, configuration cache
+          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache --configuration-cache --configuration-cache-problems=warn"
 
-          # Configure build optimizations with cache awareness
-          export _JAVA_OPTIONS="-Xmx4096m"
+          # Debug builds: single ABI (arm64-v8a) to cut native compilation ~50%
+          # Release builds: all architectures for full device compatibility
+          if [ "$BUILD_TYPE" == "debug" ]; then
+            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
+          else
+            ABI_FLAG=""
+          fi
 
-          # Check cache effectiveness before build
-          echo "📊 Cache Status Summary:"
-          echo "  Gradle Wrapper: $(ls ~/.gradle/wrapper/ 2>/dev/null | wc -l) items"
-          echo "  Gradle Dependencies: $(ls ~/.gradle/caches/modules-2/ 2>/dev/null | wc -l) items"
-          echo "  Gradle Build Cache: $(ls ~/.gradle/caches/build-cache-1/ 2>/dev/null | wc -l) items"
-          echo "  Kotlin Cache: $(ls ~/.gradle/kotlin/ 2>/dev/null | wc -l) items"
-          echo "  Metro Cache: $(ls ~/.metro/ 2>/dev/null | wc -l) items"
-          echo "  Hermes Cache: $(ls apps/app/android/app/build/generated/assets/react/ 2>/dev/null | wc -l) items"
-
-          # Determine build type
-          BUILD_TYPE="${{ needs.setup.outputs.build_type }}"
-
-          # Common Gradle flags for CI optimization with aggressive caching
-          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache --configuration-cache-problems=warn --no-scan --info"
-
-          # Start build with timing
           echo "🏗️  Starting Android $BUILD_TYPE build at $(date)"
           BUILD_START_TIME=$(date +%s)
 
           if [ "$BUILD_TYPE" == "release" ]; then
-            echo "📦 Building Release APK..."
-            ./gradlew assembleRelease $GRADLE_FLAGS
+            ./gradlew assembleRelease $GRADLE_FLAGS $ABI_FLAG
             APK_PATH="app/build/outputs/apk/release/app-release.apk"
-            APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}.apk"
+            APK_NAME="legacy-sports-${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit_sha }}.apk"
           else
-            echo "🔧 Building Debug APK..."
-            ./gradlew assembleDebug $GRADLE_FLAGS
+            ./gradlew assembleDebug $GRADLE_FLAGS $ABI_FLAG
             APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-            APK_NAME="legacy-sports-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.commit_sha }}-debug.apk"
+            APK_NAME="legacy-sports-${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit_sha }}-debug.apk"
           fi
 
-          # Calculate build time
           BUILD_END_TIME=$(date +%s)
-          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
-          echo "⏱️  Build completed in ${BUILD_DURATION} seconds"
+          echo "⏱️  Build completed in $((BUILD_END_TIME - BUILD_START_TIME)) seconds"
 
-          # Verify APK was created
           if [ ! -f "$APK_PATH" ]; then
             echo "❌ APK not found at $APK_PATH"
             exit 1
           fi
 
-          # Get APK info
           APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
           echo "✅ APK built successfully: $APK_SIZE"
-          ls -la "$APK_PATH"
 
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
 
-      - name: Cache Cleanup & Optimization
-        if: always()
-        run: |
-          echo "🧹 Optimizing caches for next run..."
-
-          # Remove lock files but keep the actual caches
-          find ~/.gradle/caches -name "*.lock" -delete 2>/dev/null || true
-          find ~/.gradle/caches -name "gc.properties" -delete 2>/dev/null || true
-
-          # Clean up old build intermediates but preserve dependencies and build cache
-          rm -rf apps/app/android/build/intermediates/incremental 2>/dev/null || true
-          rm -rf apps/app/android/app/build/intermediates/incremental 2>/dev/null || true
-
-          # Show final cache sizes for monitoring
-          echo "📊 Final Cache Summary:"
-          du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Not found"
-          du -sh ~/.gradle/wrapper 2>/dev/null || echo "  Gradle wrapper: Not found"
-          du -sh ~/.gradle/caches/build-cache-1 2>/dev/null || echo "  Gradle build cache: Not found"
-          du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Not found"
-          du -sh ~/.android/sdk 2>/dev/null || echo "  Android SDK: Not found"
-
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: android-apk-${{ needs.setup.outputs.build_type }}
+          name: android-apk-${{ steps.version.outputs.build_type }}
           path: apps/app/android/${{ steps.build.outputs.apk_path }}
           retention-days: 30
-
-      - name: Cache Cleanup for Faster Compression
-        if: always()
-        run: |
-          echo "🧹 Cleaning up large temporary files to speed up post-job cache save..."
-
-          # Remove large temporary build artifacts that don't need to be cached
-          rm -rf apps/app/android/app/build/intermediates/merged_assets/ || true
-          rm -rf apps/app/android/app/build/intermediates/incremental/ || true
-          rm -rf apps/app/android/app/build/outputs/logs/ || true
-          rm -rf /tmp/metro-* /tmp/haste-map-* || true
-
-          # Clean up temporary node_modules artifacts
-          find node_modules -name "*.log" -delete || true
-          find node_modules -name ".DS_Store" -delete || true
-
-          # Clean duplicate lock files
-          find ~/.gradle/caches -name "*.lock" -delete || true
-
-          echo "✅ Cache cleanup completed. Remaining cache sizes:"
-          du -sh ~/.gradle/caches 2>/dev/null || echo "  Gradle caches: Cleaned"
-          du -sh ~/.gradle/caches/build-cache-1 2>/dev/null || echo "  Gradle build cache: Cleaned"
-          du -sh ~/.metro 2>/dev/null || echo "  Metro cache: Cleaned"
-          du -sh node_modules 2>/dev/null || echo "  Node modules: $(du -sh node_modules | cut -f1)"
-
-          echo "💡 Post-job cache compression should be much faster now"
-          echo "🚀 Nx cache will be used for incremental builds when code hasn't changed"
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [setup, build-android]
+    needs: build-android
     if: github.event.inputs.create_releases != 'false'
 
     steps:
       - name: Download APK Artifact
         uses: actions/download-artifact@v7
         with:
-          name: android-apk-${{ needs.setup.outputs.build_type }}
+          name: android-apk-${{ needs.build-android.outputs.build_type }}
           path: ./artifacts
 
       - name: Rename APK
@@ -434,18 +190,18 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
-          name: "Android Release v${{ needs.setup.outputs.version }} (${{ needs.setup.outputs.commit_sha }})"
+          tag_name: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
+          name: "Android Release v${{ needs.build-android.outputs.version }} (${{ needs.build-android.outputs.commit_sha }})"
           draft: false
-          prerelease: ${{ needs.setup.outputs.build_type == 'debug' }}
+          prerelease: ${{ needs.build-android.outputs.build_type == 'debug' }}
           generate_release_notes: true
           body: |
             ## 🤖 Android APK Release
 
-            **Version:** ${{ needs.setup.outputs.version }}  
-            **Build Number:** ${{ needs.setup.outputs.build_number }}  
-            **Commit:** ${{ needs.setup.outputs.commit_sha }}  
-            **Build Type:** ${{ needs.setup.outputs.build_type }}
+            **Version:** ${{ needs.build-android.outputs.version }}  
+            **Build Number:** ${{ needs.build-android.outputs.build_number }}  
+            **Commit:** ${{ needs.build-android.outputs.commit_sha }}  
+            **Build Type:** ${{ needs.build-android.outputs.build_type }}
 
             ### 📱 Installation Instructions
             1. Download the APK file below
@@ -454,15 +210,15 @@ jobs:
 
             ### 🔧 Build Information
             - **Platform:** Android
-            - **Build Type:** ${{ needs.setup.outputs.build_type }}
+            - **Build Type:** ${{ needs.build-android.outputs.build_type }}
             - **Java Version:** ${{ env.JAVA_VERSION }}
-            - **Built with:** React Native + Expo SDK 52
+            - **Built with:** React Native 0.79 + Expo SDK 53
           files: ./artifacts/${{ needs.build-android.outputs.apk_name }}
 
   notify:
     name: Notify Build Results
     runs-on: ubuntu-latest
-    needs: [setup, build-android, create-release]
+    needs: [build-android, create-release]
     if: always()
 
     steps:
@@ -473,10 +229,10 @@ jobs:
         run: |
           echo "## 📱 Android Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Number:** ${{ needs.setup.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** ${{ needs.setup.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Type:** ${{ needs.setup.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.build-android.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Number:** ${{ needs.build-android.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ needs.build-android.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Type:** ${{ needs.build-android.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Android Status:** ${{ needs.build-android.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Status:** ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

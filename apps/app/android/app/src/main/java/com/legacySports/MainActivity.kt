@@ -1,4 +1,4 @@
-package com.anonymous.legacysportssource
+package com.legacySports
 
 import android.os.Build
 import android.os.Bundle

@@ -12,53 +12,59 @@
         "command": "echo 'Use build-android or build-ios for platform-specific builds'"
       }
     },
+    "prebuild": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx expo prebuild --clean --no-install",
+        "cwd": "apps/app"
+      }
+    },
+    "prebuild-android": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx expo prebuild --clean --platform android --no-install",
+        "cwd": "apps/app"
+      }
+    },
     "build-android": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
+        "command": "npx expo prebuild --platform android --no-install && cd android && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan",
         "cwd": "apps/app"
       },
       "cache": true,
       "inputs": [
         "default",
         "^production",
-        "{projectRoot}/android/**/*",
+        "{projectRoot}/app.json",
         "{projectRoot}/index.js",
         "{projectRoot}/metro.config.js",
-        "{projectRoot}/babel.config.js",
-        "{workspaceRoot}/android/**/*",
+        "{projectRoot}/.babelrc.js",
         "{workspaceRoot}/app.json",
         "{workspaceRoot}/babel.config.json"
       ],
-      "outputs": [
-        "{projectRoot}/android/app/build/outputs/apk",
-        "{projectRoot}/android/app/build/intermediates/merged_assets"
-      ]
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     },
     "build-android-debug": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "cd android && chmod +x gradlew && ./gradlew --stop && cp gradle-ci.properties gradle.properties && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan --quiet",
+        "command": "npx expo prebuild --platform android --no-install && cd android && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan",
         "cwd": "apps/app"
       },
       "cache": true,
       "inputs": [
         "default",
         "^production",
-        "{projectRoot}/android/**/*",
+        "{projectRoot}/app.json",
         "{projectRoot}/index.js",
         "{projectRoot}/metro.config.js",
-        "{projectRoot}/babel.config.js",
-        "{workspaceRoot}/android/**/*",
+        "{projectRoot}/.babelrc.js",
         "{workspaceRoot}/app.json",
         "{workspaceRoot}/babel.config.json"
       ],
-      "outputs": [
-        "{projectRoot}/android/app/build/outputs/apk",
-        "{projectRoot}/android/app/build/intermediates/merged_assets"
-      ]
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     },
     "test-android": {
       "executor": "nx:run-commands",
@@ -70,7 +76,7 @@
     "ios-setup": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd ios && pod install",
+        "command": "npx expo prebuild --platform ios --no-install && cd ios && pod install",
         "cwd": "apps/app"
       }
     },
@@ -78,7 +84,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["ios-setup"],
       "options": {
-        "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme TempIosExtraction -configuration Release -sdk iphonesimulator -arch x86_64 build",
+        "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -arch x86_64 build",
         "cwd": "apps/app"
       }
     },
@@ -86,35 +92,35 @@
       "executor": "nx:run-commands",
       "dependsOn": ["ios-setup"],
       "options": {
-        "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme TempIosExtraction -configuration Debug -sdk iphonesimulator -arch x86_64 test",
+        "command": "cd ios && xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -arch x86_64 test",
         "cwd": "apps/app"
       }
     },
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native start",
+        "command": "npx expo start",
         "cwd": "apps/app"
       }
     },
     "start": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native start",
+        "command": "npx expo start",
         "cwd": "apps/app"
       }
     },
     "run-ios": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native run-ios",
+        "command": "npx expo run:ios",
         "cwd": "apps/app"
       }
     },
     "run-android": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native run-android",
+        "command": "npx expo run:android",
         "cwd": "apps/app"
       }
     },
@@ -135,14 +141,14 @@
     "android": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native run-android",
+        "command": "npx expo run:android",
         "cwd": "apps/app"
       }
     },
     "ios": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec react-native run-ios",
+        "command": "npx expo run:ios",
         "cwd": "apps/app"
       }
     },
