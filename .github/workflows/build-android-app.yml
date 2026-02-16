@@ -38,7 +38,7 @@ concurrency:
 env:
   # Version Matrix Configuration
   JAVA_VERSION: "17" # LTS version, compatible with RN 0.79.6
-  NODE_VERSION: "22" # Node 22 LTS
+  NODE_VERSION: "20" # Node 20 LTS — Node 22 breaks metro/src exports in @expo/cli
   ANDROID_API_LEVEL: "35" # Target SDK for Google Play compliance
   NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.79.6
 
