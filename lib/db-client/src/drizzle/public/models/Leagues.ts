@@ -58,6 +58,10 @@ export const leagues = pgTable(
   (table) => {
     return {
       inviteCodeIdx: index('leagues_invite_code_idx').on(table.inviteCode),
+      ownerIdx: index('leagues_owner_idx').on(table.owner),
+      currentMatchupIdx: index('leagues_current_matchup_idx').on(
+        table.currentMatchup,
+      ),
     };
   },
 );
@@ -86,6 +90,7 @@ export const teams = pgTable(
         table.id,
         table.leagueId,
       ),
+      leagueIdIdx: index('teams_league_id_idx').on(table.leagueId),
     };
   },
 );
@@ -112,6 +117,7 @@ export const drafts = pgTable(
         foreignColumns: [leagues.id],
         name: 'drafts_leagues_id_fk',
       }).onDelete('cascade'),
+      leagueIdIdx: index('drafts_league_id_idx').on(table.leagueId),
     };
   },
 );
@@ -167,6 +173,8 @@ export const leagueMembers = pgTable(
         columns: [table.leagueId, table.userId],
         name: 'league_members_pk',
       }),
+      userIdIdx: index('league_members_user_id_idx').on(table.userId),
+      teamIdIdx: index('league_members_team_id_idx').on(table.teamId),
     };
   },
 );
@@ -199,6 +207,11 @@ export const draftTeams = pgTable(
         table.draftId,
         table.draftOrder,
       ),
+      draftIdIdx: index('draft_teams_draft_id_idx').on(table.draftId),
+      teamIdLeagueIdIdx: index('draft_teams_team_id_league_id_idx').on(
+        table.teamId,
+        table.leagueId,
+      ),
     };
   },
 );
@@ -223,6 +236,7 @@ export const leaguePosition = pgTable(
       updatedAt: timestamp('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
+      leagueIdIdx: index('league_positions_league_id_idx').on(table.leagueId),
     };
   },
 );
@@ -264,6 +278,9 @@ export const teamMembers = pgTable(
         table.teamId,
         table.positionId,
       ),
+      teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
+      playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
+      leagueIdIdx: index('team_members_league_id_idx').on(table.leagueId),
     };
   },
 );

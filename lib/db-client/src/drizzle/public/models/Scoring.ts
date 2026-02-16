@@ -119,6 +119,11 @@ export const leagueScoringProfiles = pgTable(
       defaultUnique: uniqueIndex('league_scoring_profiles_unique_default')
         .on(table.leagueId)
         .where(sql`${table.isDefault} = true`),
+      copiedFromProfileIdIdx: index(
+        'league_scoring_profiles_copied_from_profile_id_idx',
+      )
+        .on(table.copiedFromProfileId)
+        .where(sql`${table.copiedFromProfileId} IS NOT NULL`),
     };
   },
 );
@@ -159,6 +164,9 @@ export const leagueScoringProfileEntries = pgTable(
       profileStatUnique: uniqueIndex(
         'league_scoring_profile_entries_unique',
       ).on(table.profileId, table.statDefinitionId),
+      profileIdIdx: index('league_scoring_profile_entries_profile_id_idx')
+        .on(table.profileId)
+        .where(sql`${table.isEnabled} = true`),
     };
   },
 );
@@ -203,6 +211,9 @@ export const leagueScoringChangeLog = pgTable(
         table.statDefinitionId,
       ),
       actionIdx: index('league_scoring_change_log_action_idx').on(table.action),
+      profileIdChangedAtIdx: index(
+        'league_scoring_change_log_profile_id_changed_at_idx',
+      ).on(table.profileId, sql`${table.changedAt} DESC`),
     };
   },
 );

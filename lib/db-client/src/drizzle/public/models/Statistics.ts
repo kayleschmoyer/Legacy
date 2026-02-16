@@ -579,7 +579,18 @@ export const gameBatting = pgTable(
     ibb: integer('ibb'),
   },
   (table) => {
-    return {};
+    return {
+      playerIdSeasonIdx: index('game_batting_player_id_season_idx').on(
+        table.playerId,
+        table.season,
+      ),
+      playerIdSeasonGameNumIdx: index(
+        'game_batting_player_id_season_game_num_idx',
+      ).on(table.playerId, table.season, table.gameNum),
+      gameIdentifierIdx: index('game_batting_game_identifier_idx').on(
+        table.gameIdentifier,
+      ),
+    };
   },
 );
 
@@ -612,7 +623,18 @@ export const gamePitching = pgTable(
     ),
   },
   (table) => {
-    return {};
+    return {
+      playerIdSeasonIdx: index('game_pitching_player_id_season_idx').on(
+        table.playerId,
+        table.season,
+      ),
+      playerIdSeasonGameNumIdx: index(
+        'game_pitching_player_id_season_game_num_idx',
+      ).on(table.playerId, table.season, table.gameNum),
+      gameIdentifierIdx: index('game_pitching_game_identifier_idx').on(
+        table.gameIdentifier,
+      ),
+    };
   },
 );
 
@@ -631,7 +653,18 @@ export const gameFielding = pgTable(
     dpDef: integer('dp_def'),
   },
   (table) => {
-    return {};
+    return {
+      playerIdSeasonIdx: index('game_fielding_player_id_season_idx').on(
+        table.playerId,
+        table.season,
+      ),
+      playerIdSeasonGameNumIdx: index(
+        'game_fielding_player_id_season_game_num_idx',
+      ).on(table.playerId, table.season, table.gameNum),
+      gameIdentifierIdx: index('game_fielding_game_identifier_idx').on(
+        table.gameIdentifier,
+      ),
+    };
   },
 );
 

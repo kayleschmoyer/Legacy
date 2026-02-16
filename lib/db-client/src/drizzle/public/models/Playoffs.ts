@@ -2,6 +2,7 @@ import {
   boolean,
   decimal,
   foreignKey,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -12,6 +13,7 @@ import {
   unique,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { leagues, teams } from './Leagues';
 import { users } from './Users';
 import { tiebreakerMethod } from './Enums';
@@ -80,6 +82,10 @@ export const playoffBrackets = pgTable(
       playoffBracketsLeagueSeasonUk: unique(
         'playoff_brackets_league_season_uk',
       ).on(table.leagueId, table.season),
+      leagueIdIdx: index('playoff_brackets_league_id_idx').on(table.leagueId),
+      championTeamIdIdx: index('playoff_brackets_champion_team_id_idx')
+        .on(table.championTeamId)
+        .where(sql`${table.championTeamId} IS NOT NULL`),
     };
   },
 );
@@ -125,6 +131,22 @@ export const playoffMatchups = pgTable(
         foreignColumns: [teams.id],
         name: 'playoff_matchups_winner_fk',
       }).onDelete('cascade'),
+      bracketIdIdx: index('playoff_matchups_bracket_id_idx').on(
+        table.bracketId,
+      ),
+      bracketIdRoundIdx: index('playoff_matchups_bracket_id_round_idx').on(
+        table.bracketId,
+        table.round,
+      ),
+      highSeedTeamIdIdx: index('playoff_matchups_high_seed_team_id_idx').on(
+        table.highSeedTeamId,
+      ),
+      lowSeedTeamIdIdx: index('playoff_matchups_low_seed_team_id_idx').on(
+        table.lowSeedTeamId,
+      ),
+      winnerTeamIdIdx: index('playoff_matchups_winner_team_id_idx')
+        .on(table.winnerTeamId)
+        .where(sql`${table.winnerTeamId} IS NOT NULL`),
     };
   },
 );
@@ -159,6 +181,8 @@ export const playoffSeeds = pgTable(
         table.bracketId,
         table.teamId,
       ),
+      bracketIdIdx: index('playoff_seeds_bracket_id_idx').on(table.bracketId),
+      teamIdIdx: index('playoff_seeds_team_id_idx').on(table.teamId),
     };
   },
 );
@@ -207,6 +231,11 @@ export const championTrophies = pgTable(
       championTrophiesLeagueSeasonUk: unique(
         'champion_trophies_league_season_uk',
       ).on(table.leagueId, table.season),
+      leagueIdIdx: index('champion_trophies_league_id_idx').on(table.leagueId),
+      teamIdIdx: index('champion_trophies_team_id_idx').on(table.teamId),
+      runnerUpTeamIdIdx: index('champion_trophies_runner_up_team_id_idx')
+        .on(table.runnerUpTeamId)
+        .where(sql`${table.runnerUpTeamId} IS NOT NULL`),
     };
   },
 );

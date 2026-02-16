@@ -3,6 +3,7 @@ import {
   char,
   decimal,
   foreignKey,
+  index,
   integer,
   jsonb,
   numeric,
@@ -14,6 +15,7 @@ import {
   unique,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { leagues, teams } from './Leagues';
 import { players } from './Players';
 import { users } from './Users';
@@ -83,6 +85,11 @@ export const matchups = pgTable(
       }).onDelete('cascade'),
       // Note: Removed unique constraint on (leagueId, weekNumber) as a league
       // needs to support multiple matchups per week (one for each team pairing)
+      team1IdIdx: index('matchups_team1_id_idx').on(table.team1Id),
+      team2IdIdx: index('matchups_team2_id_idx').on(table.team2Id),
+      statsLoadingStatusIdx: index('matchups_stats_loading_status_idx').on(
+        table.statsLoadingStatus,
+      ),
     };
   },
 );
@@ -118,6 +125,8 @@ export const matchupPlayers = pgTable(
         foreignColumns: [teams.id],
         name: 'matchup_players_team_fk',
       }).onDelete('cascade'),
+      teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
+      playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
     };
   },
 );
@@ -147,6 +156,9 @@ export const leagueWeekPlayerSeasons = pgTable(
       leagueWeekPlayerSeasonsUnique: unique(
         'league_week_player_seasons_unique',
       ).on(table.leagueId, table.weekNumber, table.playerId),
+      leagueIdWeekNumberIdx: index(
+        'league_week_player_seasons_league_id_week_number_idx',
+      ).on(table.leagueId, table.weekNumber),
     };
   },
 );
@@ -178,6 +190,9 @@ export const matchupPlayerGames = pgTable(
         foreignColumns: [matchupPlayers.id],
         name: 'matchup_player_games_matchup_player_fk',
       }),
+      statsLoadingStatusIdx: index(
+        'matchup_player_games_stats_loading_status_idx',
+      ).on(table.statsLoadingStatus),
     };
   },
 );
@@ -232,6 +247,11 @@ export const matchupMessages = pgTable(
         foreignColumns: [users.id],
         name: 'matchup_messages_sender_fk',
       }).onDelete('cascade'),
+      matchupMessagesFlaggedByFk: foreignKey({
+        columns: [table.flaggedBy],
+        foreignColumns: [users.id],
+        name: 'matchup_messages_flagged_by_fk',
+      }).onDelete('set null'),
       matchupMessagesReplyFk: foreignKey({
         columns: [table.replyToMessageId],
         foreignColumns: [table.id],
@@ -242,6 +262,19 @@ export const matchupMessages = pgTable(
         foreignColumns: [users.id],
         name: 'matchup_messages_flagger_fk',
       }).onDelete('set null'),
+      matchupIdCreatedAtIdx: index(
+        'matchup_messages_matchup_id_created_at_idx',
+      ).on(table.matchupId, table.createdAt.desc()),
+      senderIdIdx: index('matchup_messages_sender_id_idx').on(table.senderId),
+      isFlaggedIdx: index('matchup_messages_is_flagged_idx')
+        .on(table.isFlagged)
+        .where(sql`${table.isFlagged} = true`),
+      flaggedByIdx: index('matchup_messages_flagged_by_idx')
+        .on(table.flaggedBy)
+        .where(sql`${table.flaggedBy} IS NOT NULL`),
+      replyToMessageIdIdx: index('matchup_messages_reply_to_message_id_idx')
+        .on(table.replyToMessageId)
+        .where(sql`${table.replyToMessageId} IS NOT NULL`),
     };
   },
 );
@@ -275,6 +308,15 @@ export const matchupChatBlocks = pgTable(
         foreignColumns: [users.id],
         name: 'matchup_chat_blocks_blocked_fk',
       }).onDelete('cascade'),
+      blockingUserIdIdx: index('matchup_chat_blocks_blocking_user_id_idx').on(
+        table.blockingUserId,
+      ),
+      blockedUserIdIdx: index('matchup_chat_blocks_blocked_user_id_idx').on(
+        table.blockedUserId,
+      ),
+      leagueIdIdx: index('matchup_chat_blocks_league_id_idx').on(
+        table.leagueId,
+      ),
     };
   },
 );
@@ -295,6 +337,22 @@ export const matchupMessageConnections = pgTable(
     lastSeenAt: timestamp('last_seen_at', { mode: 'string' })
       .notNull()
       .defaultNow(),
+  },
+  (table) => {
+    return {
+      leagueIdIdx: index('matchup_message_connections_league_id_idx').on(
+        table.leagueId,
+      ),
+      matchupIdIdx: index('matchup_message_connections_matchup_id_idx').on(
+        table.matchupId,
+      ),
+      userIdIdx: index('matchup_message_connections_user_id_idx').on(
+        table.userId,
+      ),
+      lastSeenAtIdx: index('matchup_message_connections_last_seen_at_idx').on(
+        table.lastSeenAt,
+      ),
+    };
   },
 );
 
@@ -329,6 +387,9 @@ export const matchupMessageReactions = pgTable(
       matchupMessageReactionsUnique: unique(
         'matchup_message_reactions_unique',
       ).on(table.messageId, table.userId, table.reactionType),
+      messageIdIdx: index('matchup_message_reactions_message_id_idx').on(
+        table.messageId,
+      ),
     };
   },
 );
@@ -369,6 +430,16 @@ export const matchupMessageReports = pgTable(
         foreignColumns: [users.id],
         name: 'matchup_message_reports_reviewer_fk',
       }).onDelete('set null'),
+      messageIdIdx: index('matchup_message_reports_message_id_idx').on(
+        table.messageId,
+      ),
+      statusIdx: index('matchup_message_reports_status_idx').on(table.status),
+      reportedByIdx: index('matchup_message_reports_reported_by_idx').on(
+        table.reportedBy,
+      ),
+      reviewedByIdx: index('matchup_message_reports_reviewed_by_idx')
+        .on(table.reviewedBy)
+        .where(sql`${table.reviewedBy} IS NOT NULL`),
     };
   },
 );

@@ -6,6 +6,9 @@ import { AuthMiddleware } from '../services/AuthMiddleware';
 export interface TestWorkflowArgs extends CommandArgs {
   user?: string;
   skipCleanup?: boolean;
+  teams?: number;
+  weeks?: number;
+  finalWeekGames?: number;
 }
 
 interface WebSocketMessage {
@@ -324,6 +327,7 @@ async function waitForEvent(
 async function createLeague(
   authMiddleware: AuthMiddleware,
   userEmail: string,
+  numberOfTeams = 4,
 ): Promise<{ leagueId: number; teamIds: number[] }> {
   LOGGER.info('\n📝 Step 1: Creating league...');
 
@@ -347,7 +351,7 @@ async function createLeague(
   const variables = {
     input: {
       leagueName: `Test League ${new Date().toISOString()}`,
-      numberOfTeams: 4,
+      numberOfTeams,
       draftType: 'RANDOM-DRAFT',
       maxRosterSize: 25,
     },
@@ -454,7 +458,13 @@ async function advanceLeagueWeek(
   authMiddleware: AuthMiddleware,
   userEmail: string,
   leagueId: number,
-): Promise<{ matchups: Array<{ id: number; weekNumber: number }> }> {
+): Promise<{
+  matchups: Array<{
+    id: number;
+    weekNumber: number;
+    gamesPerMatchup?: number | null;
+  }>;
+}> {
   LOGGER.info('\n⏭️ Step 3: Advancing league week (creating matchups)...');
 
   const mutation = `
@@ -465,6 +475,7 @@ async function advanceLeagueWeek(
           weekNumber
           status
           statsLoadingStatus
+          gamesPerMatchup
         }
         currentMatchupId
       }
@@ -485,7 +496,12 @@ async function advanceLeagueWeek(
   const data = (await response.json()) as {
     data?: {
       advanceLeagueWeek?: {
-        matchups: Array<{ id: number; weekNumber: number; status: string }>;
+        matchups: Array<{
+          id: number;
+          weekNumber: number;
+          status: string;
+          gamesPerMatchup?: number | null;
+        }>;
         currentMatchupId: number;
       };
     };
@@ -639,16 +655,21 @@ async function waitForStatsLoading(
   );
 }
 
-/**
- * Main workflow test handler
- */
 export async function handleTestWorkflow(
   args: TestWorkflowArgs,
 ): Promise<void> {
-  const { user, skipCleanup } = args;
+  const { user, skipCleanup, teams = 4, weeks = 1, finalWeekGames } = args;
 
   try {
     LOGGER.info('🚀 Starting End-to-End League Workflow Test');
+    LOGGER.info('═'.repeat(60));
+    LOGGER.info(`   Teams: ${teams}`);
+    LOGGER.info(`   Weeks: ${weeks}`);
+    if (finalWeekGames !== undefined) {
+      LOGGER.info(`   Final week games: ${finalWeekGames}`);
+    } else {
+      LOGGER.info(`   Final week games: all games`);
+    }
     LOGGER.info('═'.repeat(60));
 
     // Set up authentication
@@ -672,12 +693,15 @@ export async function handleTestWorkflow(
 
     let ws: WebSocket | null = null;
     let leagueId: number | undefined;
+    let totalMatchupsProcessed = 0;
+    let totalGamesTriggered = 0;
 
     try {
       // Step 1: Create league
       const { leagueId: newLeagueId, teamIds } = await createLeague(
         authMiddleware,
         userEmail,
+        teams,
       );
       leagueId = newLeagueId;
 
@@ -716,79 +740,123 @@ export async function handleTestWorkflow(
         await new Promise((resolve) => setTimeout(resolve, 10000));
       }
 
-      // Step 3: Advance league week to create matchups
-      const { matchups } = await advanceLeagueWeek(
-        authMiddleware,
-        userEmail,
-        leagueId,
-      );
+      // Step 3: Process multiple weeks
+      for (let weekNum = 1; weekNum <= weeks; weekNum++) {
+        LOGGER.info(`\n${'═'.repeat(60)}`);
+        LOGGER.info(`📅 Processing Week ${weekNum} of ${weeks}`);
+        LOGGER.info(`${'═'.repeat(60)}`);
 
-      // Step 4: Trigger game selection for each matchup and wait for completion
-      for (const matchup of matchups) {
-        // Ensure IDs are numbers, not strings
-        const matchupId =
-          typeof matchup.id === 'string'
-            ? parseInt(matchup.id, 10)
-            : matchup.id;
+        // Advance league week to create matchups
+        const { matchups } = await advanceLeagueWeek(
+          authMiddleware,
+          userEmail,
+          leagueId,
+        );
+
+        // Determine how many games to trigger for this week
+        const isLastWeek = weekNum === weeks;
+        const gamesPerMatchup = matchups[0]?.gamesPerMatchup || 5;
+        const gamesToTrigger =
+          isLastWeek && finalWeekGames !== undefined
+            ? Math.min(finalWeekGames, gamesPerMatchup)
+            : gamesPerMatchup;
 
         LOGGER.info(
-          `\n🎲 Triggering game selection for matchup ${matchupId}...`,
+          `\n🎮 Triggering ${gamesToTrigger} of ${gamesPerMatchup} games for ${matchups.length} matchup(s)`,
         );
-        await triggerGameSelection(authMiddleware, userEmail, matchupId);
 
-        // Close existing WebSocket and reconnect with matchupId context
-        if (ws) {
-          LOGGER.info('🔄 Reconnecting WebSocket with matchup context...');
-          ws.close();
-          ws = null;
-        }
+        // Process each matchup in this week
+        for (const matchup of matchups) {
+          // Ensure IDs are numbers, not strings
+          const matchupId =
+            typeof matchup.id === 'string'
+              ? parseInt(matchup.id, 10)
+              : matchup.id;
 
-        try {
-          ws = await connectWebSocket(token, leagueId, matchupId, 'matchup');
-        } catch (error) {
-          LOGGER.warn(
-            '⚠️ Failed to connect to WebSocket, will use polling instead',
-          );
-          LOGGER.warn(
-            `   Error: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-
-        // Wait for stats loading to complete via WebSocket
-        if (ws) {
           LOGGER.info(
-            `\n⏳ Waiting for stats loading to complete for matchup ${matchupId} via WebSocket...`,
+            `\n🎲 Processing Matchup ${matchupId} (Week ${matchup.weekNumber})`,
           );
-          try {
-            // Smart heartbeat only sends pings during idle periods (8+ min without messages)
-            // Active stats loading sends frequent notifications, keeping connection alive naturally
-            await waitForEvent(
-              ws,
-              'matchup-stats-complete',
-              leagueId,
-              matchupId,
-              900000,
-            ); // 15 minutes
+
+          // Trigger games sequentially for this matchup
+          for (let gameNum = 1; gameNum <= gamesToTrigger; gameNum++) {
             LOGGER.info(
-              `✅ Stats loading completed for matchup ${matchupId} (via WebSocket)`,
+              `\n   🎯 Game ${gameNum}/${gamesToTrigger} for Matchup ${matchupId}`,
             );
-          } catch (error) {
-            LOGGER.warn(
-              `⚠️ WebSocket wait failed for matchup ${matchupId}, falling back to polling`,
+            await triggerGameSelection(
+              authMiddleware,
+              userEmail,
+              matchupId,
+              gameNum,
             );
-            LOGGER.warn(
-              `   Error: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            // Fall back to polling
-            await waitForStatsLoading(authMiddleware, userEmail, matchupId);
+
+            // Close existing WebSocket and reconnect with matchupId context
+            if (ws) {
+              LOGGER.debug('🔄 Reconnecting WebSocket with matchup context...');
+              ws.close();
+              ws = null;
+            }
+
+            try {
+              ws = await connectWebSocket(
+                token,
+                leagueId,
+                matchupId,
+                'matchup',
+              );
+            } catch (error) {
+              LOGGER.warn(
+                '⚠️ Failed to connect to WebSocket, will use polling instead',
+              );
+              LOGGER.warn(
+                `   Error: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+
+            // Wait for stats loading to complete via WebSocket
+            if (ws) {
+              LOGGER.info(
+                `   ⏳ Waiting for stats loading to complete for matchup ${matchupId}, game ${gameNum}...`,
+              );
+              try {
+                // Smart heartbeat only sends pings during idle periods (8+ min without messages)
+                // Active stats loading sends frequent notifications, keeping connection alive naturally
+                await waitForEvent(
+                  ws,
+                  'matchup-stats-complete',
+                  leagueId,
+                  matchupId,
+                  900000,
+                ); // 15 minutes
+                LOGGER.info(
+                  `   ✅ Stats loading completed for matchup ${matchupId}, game ${gameNum} (via WebSocket)`,
+                );
+              } catch (error) {
+                LOGGER.warn(
+                  `   ⚠️ WebSocket wait failed for matchup ${matchupId}, falling back to polling`,
+                );
+                LOGGER.warn(
+                  `   Error: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                // Fall back to polling
+                await waitForStatsLoading(authMiddleware, userEmail, matchupId);
+              }
+            } else {
+              // Fallback to polling if WebSocket not available
+              LOGGER.warn(
+                `   ⚠️ No WebSocket connection, using polling for matchup ${matchupId}`,
+              );
+              await waitForStatsLoading(authMiddleware, userEmail, matchupId);
+            }
+
+            totalGamesTriggered++;
           }
-        } else {
-          // Fallback to polling if WebSocket not available
-          LOGGER.warn(
-            `⚠️ No WebSocket connection, using polling for matchup ${matchupId}`,
-          );
-          await waitForStatsLoading(authMiddleware, userEmail, matchupId);
+
+          totalMatchupsProcessed++;
         }
+
+        LOGGER.info(
+          `\n✅ Week ${weekNum} completed: ${matchups.length} matchup(s), ${gamesToTrigger} game(s) each`,
+        );
       }
 
       LOGGER.info('\n═'.repeat(60));
@@ -797,8 +865,9 @@ export async function handleTestWorkflow(
       LOGGER.info(`\n📊 Summary:`);
       LOGGER.info(`   League ID: ${leagueId}`);
       LOGGER.info(`   Teams: ${teamIds.length}`);
-      LOGGER.info(`   Matchups: ${matchups.length}`);
-      LOGGER.info(`   All game selections completed with stats loaded`);
+      LOGGER.info(`   Weeks processed: ${weeks}`);
+      LOGGER.info(`   Total matchups: ${totalMatchupsProcessed}`);
+      LOGGER.info(`   Total games triggered: ${totalGamesTriggered}`);
       LOGGER.info(
         `\n🔗 View league: https://legacy-fantasy.com/league/${leagueId}`,
       );

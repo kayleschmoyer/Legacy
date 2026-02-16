@@ -368,8 +368,29 @@ async function run(): Promise<void> {
       '--skip-cleanup',
       'Keep the test league after completion for inspection',
     )
-    .action((options: { user?: string; skipCleanup?: boolean }) =>
-      handleTestWorkflow(options),
+    .option(
+      '--teams <number>',
+      'Number of teams to create in the league (default: 4)',
+      parseInt,
+    )
+    .option(
+      '--weeks <number>',
+      'Number of weeks to create and process (default: 1)',
+      parseInt,
+    )
+    .option(
+      '--final-week-games <number>',
+      'Number of games to trigger in the final week (default: all games)',
+      parseInt,
+    )
+    .action(
+      (options: {
+        user?: string;
+        skipCleanup?: boolean;
+        teams?: number;
+        weeks?: number;
+        finalWeekGames?: number;
+      }) => handleTestWorkflow(options),
     );
 
   program

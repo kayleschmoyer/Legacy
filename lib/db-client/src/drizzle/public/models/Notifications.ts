@@ -65,6 +65,9 @@ export const deviceTokens = pgTable(
       table.deviceToken,
     ),
     userIdIdx: index('device_tokens_user_id_idx').on(table.userId),
+    userIdPlatformIdx: index('device_tokens_user_id_platform_idx')
+      .on(table.userId, table.platform)
+      .where(sql`${table.isActive} = true`),
   }),
 );
 
@@ -90,5 +93,9 @@ export const notificationHistory = pgTable(
     userIdIdx: index('notification_history_user_id_idx').on(table.userId),
     isReadIdx: index('notification_history_is_read_idx').on(table.isRead),
     sentAtIdx: index('notification_history_sent_at_idx').on(table.sentAt),
+    userIdSentAtIdx: index('notification_history_user_id_sent_at_idx').on(
+      table.userId,
+      sql`${table.sentAt} DESC`,
+    ),
   }),
 );
