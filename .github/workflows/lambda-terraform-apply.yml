@@ -104,20 +104,25 @@ jobs:
         run: |
           echo "🔍 Checking for stale Terraform locks..."
 
-          # Check if state is locked
-          if ! terraform plan -refresh=false -detailed-exitcode > /dev/null 2>&1; then
-            # Try to get lock info
-            LOCK_OUTPUT=$(terraform plan -refresh=false 2>&1 || true)
+          # Query DynamoDB directly for locks (avoids hanging on terraform commands)
+          LOCK_ID=$(aws dynamodb scan \
+            --table-name terraform-state-locks \
+            --filter-expression "begins_with(LockID, :prefix)" \
+            --expression-attribute-values '{":prefix":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
+            --region us-east-1 \
+            --query "Items[0].LockID.S" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+            echo "⚠️  Found stale lock: $LOCK_ID"
+            echo "🔓 Removing lock from DynamoDB..."
             
-            if echo "$LOCK_OUTPUT" | grep -q "Error acquiring the state lock"; then
-              LOCK_ID=$(echo "$LOCK_OUTPUT" | grep -A 10 "Lock Info:" | grep "ID:" | awk '{print $2}')
-              
-              if [ -n "$LOCK_ID" ]; then
-                echo "🔓 Clearing stale lock: $LOCK_ID"
-                terraform force-unlock -force "$LOCK_ID"
-                echo "✅ Stale lock cleared"
-              fi
-            fi
+            aws dynamodb delete-item \
+              --table-name terraform-state-locks \
+              --key "{\"LockID\":{\"S\":\"$LOCK_ID\"}}" \
+              --region us-east-1
+            
+            echo "✅ Stale lock cleared"
           else
             echo "✅ No stale locks detected"
           fi
