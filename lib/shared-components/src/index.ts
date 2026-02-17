@@ -126,6 +126,9 @@ export * from './navigation';
 // Enhanced components (final migration)
 export * from './navigation/TamaguiAppNavigator';
 
+// Real-time WebSocket hooks
+export * from './hooks/useWebSocket';
+
 // Tamagui config - should be imported directly by consumers
 // export { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
