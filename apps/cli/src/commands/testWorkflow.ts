@@ -1,5 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
-import WebSocket from 'ws';
+import { WebSocketClient } from '@legacy-sports/websocket-client';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
 
@@ -11,196 +11,67 @@ export interface TestWorkflowArgs extends CommandArgs {
   finalWeekGames?: number;
 }
 
-interface WebSocketMessage {
-  type: string;
-  leagueId?: number;
-  status?: string;
-  progress?: {
-    current: number;
-    total: number;
-  };
-  matchupId?: number;
-  data?: {
-    type: string;
-    leagueId?: number;
-    matchupId?: number;
-    draftType?: string;
-    completedAt?: string;
-    [key: string]: unknown;
-  };
-}
-
 /**
  * Connect to WebSocket and wait for specific events
- * Includes heartbeat mechanism to prevent 10-minute idle timeout
+ * Uses the shared WebSocketClient for connection management
  */
 async function connectWebSocket(
   token: string,
   leagueId?: number,
   matchupId?: number,
-  viewContext = 'general',
-): Promise<WebSocket> {
-  let wsUrl =
+  viewContext: 'general' | 'league' | 'matchup' | 'roster' = 'general',
+): Promise<WebSocketClient> {
+  const wsUrl =
     process.env.WEBSOCKET_URL ||
+    process.env.NX_WEBSOCKET_URL ||
     'wss://nx7q8petpg.execute-api.us-east-1.amazonaws.com/dev';
-
-  // Build query parameters
-  // Note: WebSocket connections in API Gateway don't support custom headers,
-  // so we must pass the JWT token as a query parameter
-  const params: string[] = [`token=${encodeURIComponent(token)}`];
-  if (leagueId) {
-    params.push(`leagueId=${leagueId}`);
-  }
-  if (matchupId) {
-    params.push(`matchupId=${matchupId}`);
-  }
-  if (viewContext !== 'general') {
-    params.push(`viewContext=${viewContext}`);
-  }
-
-  wsUrl += `?${params.join('&')}`;
 
   LOGGER.info(`🔌 Connecting to WebSocket: ${wsUrl}`);
 
+  const client = new WebSocketClient({
+    url: wsUrl,
+    token,
+    leagueId,
+    matchupId,
+    viewContext,
+    autoConnect: false,
+    reconnect: false, // CLI manages connection manually
+  });
+
+  // Set up logging for connection events
+  client.on('connected', () => {
+    LOGGER.info('✅ WebSocket connected');
+  });
+
+  client.on('disconnected', () => {
+    LOGGER.info('🔌 WebSocket disconnected');
+  });
+
+  client.on('error', (error) => {
+    LOGGER.error('❌ WebSocket error:', error);
+  });
+
+  // Connect and wait for connection
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl);
-
-    // Smart heartbeat mechanism to prevent 10-minute idle timeout
-    // Only sends ping if no messages received for 8+ minutes
-    // Disconnects after 3 consecutive pings with no data (24+ min idle)
-    let heartbeatInterval: NodeJS.Timeout | null = null;
-    let pongTimeout: NodeJS.Timeout | null = null;
-    let isAlive = true;
-    let lastMessageTime = Date.now();
-    let consecutivePings = 0;
-    const MAX_CONSECUTIVE_PINGS = 3; // Disconnect after 24 minutes of only pings
-
-    const startHeartbeat = () => {
-      // Check every 8 minutes if we need to send a ping
-      const eightMinutes = 480000; // 8 minutes in milliseconds
-
-      heartbeatInterval = setInterval(() => {
-        const timeSinceLastMessage = Date.now() - lastMessageTime;
-
-        // Only send ping if we haven't received any messages in 8+ minutes
-        if (timeSinceLastMessage < eightMinutes) {
-          LOGGER.debug(
-            `💓 Skipping ping - received message ${Math.round(timeSinceLastMessage / 1000)}s ago`,
-          );
-          consecutivePings = 0; // Reset counter when we have recent messages
-          return;
-        }
-
-        // Check if we've sent too many consecutive pings without data
-        if (consecutivePings >= MAX_CONSECUTIVE_PINGS) {
-          LOGGER.warn(
-            `⚠️ WebSocket idle for ${MAX_CONSECUTIVE_PINGS * 8}+ minutes with no data, disconnecting`,
-          );
-          LOGGER.info('💡 Falling back to polling for remaining operations');
-          ws.close();
-          return;
-        }
-
-        if (!isAlive) {
-          LOGGER.warn(
-            '⚠️ WebSocket not responding to pings, closing connection',
-          );
-          ws.terminate();
-          return;
-        }
-
-        isAlive = false;
-        consecutivePings++;
-        LOGGER.debug(
-          `💓 Sending WebSocket ping #${consecutivePings} (idle for 8+ minutes)`,
-        );
-
-        ws.send(JSON.stringify({ type: 'ping' }), (error) => {
-          if (error) {
-            LOGGER.warn('⚠️ Failed to send ping:', error);
-          }
-        });
-
-        // Set timeout for pong response (30 seconds)
-        pongTimeout = setTimeout(() => {
-          if (!isAlive) {
-            LOGGER.warn('⚠️ No pong received within 30 seconds');
-            ws.terminate();
-          }
-        }, 30000);
-      }, eightMinutes); // Check every 8 minutes
-    };
-
-    const stopHeartbeat = () => {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-      }
-      if (pongTimeout) {
-        clearTimeout(pongTimeout);
-        pongTimeout = null;
-      }
-    };
-
-    ws.on('open', () => {
-      LOGGER.info('✅ WebSocket connected');
-      startHeartbeat();
-      resolve(ws);
+    const unsubscribe = client.on('connected', () => {
+      unsubscribe();
+      resolve(client);
     });
 
-    ws.on('message', (data: WebSocket.Data) => {
-      try {
-        // Update last message time for any message received
-        lastMessageTime = Date.now();
-
-        // Convert data to string (handles Buffer, ArrayBuffer, Buffer[], etc.)
-        let messageString: string;
-        if (typeof data === 'string') {
-          messageString = data;
-        } else if (Buffer.isBuffer(data)) {
-          messageString = data.toString('utf8');
-        } else if (Array.isArray(data)) {
-          messageString = Buffer.concat(data).toString('utf8');
-        } else {
-          messageString = new TextDecoder().decode(data);
-        }
-
-        const message = JSON.parse(messageString) as { type?: string };
-
-        // Handle pong response
-        if (message.type === 'pong') {
-          LOGGER.debug('💓 Received WebSocket pong');
-          isAlive = true;
-          if (pongTimeout) {
-            clearTimeout(pongTimeout);
-            pongTimeout = null;
-          }
-        } else {
-          // Any non-pong message is actual data, reset consecutive ping counter
-          consecutivePings = 0;
-        }
-      } catch {
-        // Ignore parse errors for pong handling
-      }
-    });
-
-    ws.on('error', (error) => {
-      LOGGER.error('❌ WebSocket error:', error);
-      stopHeartbeat();
+    const unsubError = client.on('error', (error) => {
+      unsubError();
       reject(error);
     });
 
-    ws.on('close', () => {
-      LOGGER.info('🔌 WebSocket disconnected');
-      stopHeartbeat();
-    });
+    client.connect();
 
-    // Ensure cleanup happens
-    const originalClose = ws.close.bind(ws);
-    ws.close = (...args: Parameters<typeof ws.close>) => {
-      stopHeartbeat();
-      return originalClose(...args);
-    };
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (client.getState() !== 'connected') {
+        client.dispose();
+        reject(new Error('WebSocket connection timeout'));
+      }
+    }, 30000);
   });
 }
 
@@ -208,38 +79,20 @@ async function connectWebSocket(
  * Wait for a specific WebSocket event
  */
 async function waitForEvent(
-  ws: WebSocket,
+  client: WebSocketClient,
   eventType: string,
   leagueId: number,
   matchupId?: number,
   timeout = 300000, // 5 minutes default
-): Promise<WebSocketMessage> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
+      unsubscribe();
       reject(new Error(`Timeout waiting for ${eventType} event`));
     }, timeout);
 
-    const messageHandler = (data: WebSocket.Data) => {
+    const unsubscribe = client.on('message', (message) => {
       try {
-        // Convert data to string (handles Buffer, ArrayBuffer, Buffer[], etc.)
-        let messageString: string;
-        if (typeof data === 'string') {
-          messageString = data;
-        } else if (Buffer.isBuffer(data)) {
-          messageString = data.toString('utf8');
-        } else if (Array.isArray(data)) {
-          messageString = Buffer.concat(data).toString('utf8');
-        } else {
-          messageString = new TextDecoder().decode(data);
-        }
-
-        const message = JSON.parse(messageString) as WebSocketMessage;
-
-        // Ignore pong messages (handled by heartbeat mechanism)
-        if (message.type === 'pong') {
-          return;
-        }
-
         LOGGER.debug(
           `📨 Received WebSocket message:`,
           JSON.stringify(message, null, 2),
@@ -251,8 +104,14 @@ async function waitForEvent(
         // Check if this is a notification wrapper with nested data
         if (message.type === 'notification' && message.data) {
           LOGGER.debug(
-            `📦 Notification wrapper detected: data.type=${message.data.type}`,
+            `📦 Notification wrapper detected: data.type=${(message.data as { type?: string }).type}`,
           );
+
+          const data = message.data as {
+            type?: string;
+            leagueId?: number;
+            matchupId?: number;
+          };
 
           // Map notification data types to expected event types
           const notificationTypeMap: Record<string, string> = {
@@ -262,14 +121,14 @@ async function waitForEvent(
             GAME_SELECTED: 'game-selected',
           };
 
-          const mappedType =
-            notificationTypeMap[message.data.type] ||
-            message.data.type.toLowerCase();
-          const messageLeagueId = message.data.leagueId || message.leagueId;
-          const messageMatchupId = message.data.matchupId || message.matchupId;
+          const mappedType = data.type
+            ? notificationTypeMap[data.type] || data.type.toLowerCase()
+            : '';
+          const messageLeagueId = data.leagueId || message.leagueId;
+          const messageMatchupId = data.matchupId || message.matchupId;
 
           LOGGER.debug(
-            `🔄 Mapped type: ${message.data.type} -> ${mappedType}, messageLeagueId=${messageLeagueId}, messageMatchupId=${messageMatchupId}`,
+            `🔄 Mapped type: ${data.type} -> ${mappedType}, messageLeagueId=${messageLeagueId}, messageMatchupId=${messageMatchupId}`,
           );
 
           // Check if event type matches
@@ -280,8 +139,8 @@ async function waitForEvent(
           if (typeMatches && leagueMatches && matchupMatches) {
             LOGGER.info(`✅ Event matched! Resolving...`);
             clearTimeout(timeoutId);
-            ws.removeListener('message', messageHandler);
-            resolve(message);
+            unsubscribe();
+            resolve();
           } else {
             LOGGER.debug(
               `❌ No match: type=${typeMatches}, league=${leagueMatches}, matchup=${matchupMatches}`,
@@ -295,8 +154,8 @@ async function waitForEvent(
           // Direct message type match (for backwards compatibility)
           LOGGER.info(`✅ Direct event matched! Resolving...`);
           clearTimeout(timeoutId);
-          ws.removeListener('message', messageHandler);
-          resolve(message);
+          unsubscribe();
+          resolve();
         } else {
           LOGGER.debug(
             `❌ Message doesn't match: type="${message.type}" vs eventType="${eventType}"`,
@@ -305,18 +164,6 @@ async function waitForEvent(
       } catch (error) {
         LOGGER.warn('Failed to parse WebSocket message:', error);
       }
-    };
-
-    ws.on('message', messageHandler);
-
-    ws.on('close', () => {
-      clearTimeout(timeoutId);
-      reject(new Error('WebSocket closed while waiting for event'));
-    });
-
-    ws.on('error', (error) => {
-      clearTimeout(timeoutId);
-      reject(error);
     });
   });
 }
@@ -691,7 +538,7 @@ export async function handleTestWorkflow(
       throw new Error('Failed to get authentication token');
     }
 
-    let ws: WebSocket | null = null;
+    let client: WebSocketClient | null = null;
     let leagueId: number | undefined;
     let totalMatchupsProcessed = 0;
     let totalGamesTriggered = 0;
@@ -707,7 +554,7 @@ export async function handleTestWorkflow(
 
       // Connect to WebSocket with leagueId (optional - will continue if fails)
       try {
-        ws = await connectWebSocket(token, leagueId);
+        client = await connectWebSocket(token, leagueId);
       } catch (error) {
         LOGGER.warn(
           '⚠️ Failed to connect to WebSocket, will use polling instead',
@@ -721,10 +568,16 @@ export async function handleTestWorkflow(
       await startDraft(authMiddleware, userEmail, leagueId);
 
       // Wait for draft to complete
-      if (ws) {
+      if (client) {
         LOGGER.info('\n⏳ Waiting for draft to complete via WebSocket...');
         try {
-          await waitForEvent(ws, 'draft-complete', leagueId, undefined, 180000); // 3 minutes
+          await waitForEvent(
+            client,
+            'draft-complete',
+            leagueId,
+            undefined,
+            180000,
+          ); // 3 minutes
           LOGGER.info('✅ Draft completed (via WebSocket)');
         } catch (error) {
           LOGGER.warn('⚠️ WebSocket wait failed, falling back to wait');
@@ -790,14 +643,14 @@ export async function handleTestWorkflow(
             );
 
             // Close existing WebSocket and reconnect with matchupId context
-            if (ws) {
+            if (client) {
               LOGGER.debug('🔄 Reconnecting WebSocket with matchup context...');
-              ws.close();
-              ws = null;
+              client.dispose();
+              client = null;
             }
 
             try {
-              ws = await connectWebSocket(
+              client = await connectWebSocket(
                 token,
                 leagueId,
                 matchupId,
@@ -813,7 +666,7 @@ export async function handleTestWorkflow(
             }
 
             // Wait for stats loading to complete via WebSocket
-            if (ws) {
+            if (client) {
               LOGGER.info(
                 `   ⏳ Waiting for stats loading to complete for matchup ${matchupId}, game ${gameNum}...`,
               );
@@ -821,7 +674,7 @@ export async function handleTestWorkflow(
                 // Smart heartbeat only sends pings during idle periods (8+ min without messages)
                 // Active stats loading sends frequent notifications, keeping connection alive naturally
                 await waitForEvent(
-                  ws,
+                  client,
                   'matchup-stats-complete',
                   leagueId,
                   matchupId,
@@ -880,8 +733,8 @@ export async function handleTestWorkflow(
       }
     } finally {
       // Close WebSocket
-      if (ws) {
-        ws.close();
+      if (client) {
+        client.dispose();
       }
     }
   } catch (error) {

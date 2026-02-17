@@ -37,6 +37,7 @@
       "@legacy-sports/tamagui-config": ["lib/tamagui-config/src/index.ts"],
       "@legacy-sports/ui-abstractions": ["lib/ui-abstractions/src/index.ts"],
       "@legacy-sports/utils": ["lib/utils/src/index.ts"],
+      "@legacy-sports/websocket-client": ["lib/websocket-client/src/index.ts"],
       "__PLATFORM_COMPONENTS__": [
         "lib/shared-components/src/platform-components/web/index.ts"
       ]

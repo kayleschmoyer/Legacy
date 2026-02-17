@@ -28,6 +28,7 @@
     "@legacy-sports/api": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/tamagui-config": "workspace:*",
-    "@legacy-sports/ui-abstractions": "workspace:*"
+    "@legacy-sports/ui-abstractions": "workspace:*",
+    "@legacy-sports/websocket-client": "workspace:*"
   }
 }

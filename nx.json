@@ -7,9 +7,7 @@
     "default": {
       "runner": "nx/tasks-runners/default",
       "options": {
-        "env": {
-          "NODE_OPTIONS": "--require ./scripts/patch-child-process.js"
-        }
+        "env": {}
       }
     }
   },

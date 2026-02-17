@@ -1,2 +1,0 @@
-﻿2026-02-05T17:38:24.729Z	e605513c-afa1-4313-b2c8-8b7206e7946c	WARN	[2026-02-05T17:38:24.729Z] WARN: No seasons found for player 2659, skipping
-
