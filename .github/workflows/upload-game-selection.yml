@@ -44,7 +44,7 @@ jobs:
           install-dependencies: true
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           aws-region: ${{ env.AWS_REGION }}
