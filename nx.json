@@ -2,7 +2,7 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
   "useDaemonProcess": true,
-  "//nxCloud": "Nx Cloud auth is handled via the NX_CLOUD_ACCESS_TOKEN env var (set by CI secrets). Do NOT add nxCloudAccessToken here — placeholder values cause 401 errors and non-zero exit codes.",
+  "//nxCloud": "Nx Cloud auth is handled via the NX_CLOUD_ACCESS_TOKEN env var (set by CI secrets). Do NOT add nxCloudAccessToken here â€” placeholder values cause 401 errors and non-zero exit codes.",
   "tasksRunnerOptions": {
     "default": {
       "runner": "nx/tasks-runners/default",
@@ -41,22 +41,12 @@
     },
     {
       "plugin": "@nx/vite/plugin",
+      "exclude": ["lambdas/**"],
       "options": {
         "buildTargetName": "build",
         "serveTargetName": "serve",
         "previewTargetName": "preview",
         "testTargetName": "test"
-      }
-    },
-    {
-      "plugin": "@nx/react/router-plugin",
-      "options": {
-        "buildTargetName": "build",
-        "devTargetName": "dev",
-        "startTargetName": "start",
-        "watchDepsTargetName": "watch-deps",
-        "buildDepsTargetName": "build-deps",
-        "typecheckTargetName": "typecheck"
       }
     },
     {

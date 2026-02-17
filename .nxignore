@@ -1,0 +1,8 @@
+# Directories that contain no Nx projects — skip during plugin glob scans
+resources/
+static/
+docs/
+logs/
+certs/
+terraform/
+playwright-report/

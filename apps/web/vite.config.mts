@@ -21,16 +21,19 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production' || isDeployBuild;
 
   // Get build information - fallback to local git if not in CI
+  // Avoid execSync during Nx graph creation (no build underway)
   const commitSha =
     process.env.VITE_COMMIT_SHA ||
     process.env.GITHUB_SHA ||
-    (() => {
-      try {
-        return execSync('git rev-parse --short HEAD').toString().trim();
-      } catch {
-        return 'dev';
-      }
-    })();
+    (process.env.NX_TASK_HASH
+      ? (() => {
+          try {
+            return execSync('git rev-parse --short HEAD').toString().trim();
+          } catch {
+            return 'dev';
+          }
+        })()
+      : 'dev');
 
   const appVersion = process.env.VITE_APP_VERSION || '0.0.0';
   const buildDate = new Date().toISOString();

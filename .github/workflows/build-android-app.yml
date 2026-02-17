@@ -38,7 +38,7 @@ concurrency:
 env:
   # Version Matrix Configuration
   JAVA_VERSION: "17" # LTS version, compatible with RN 0.79.6
-  NODE_VERSION: "20" # Node 20 LTS — Node 22 breaks metro/src exports in @expo/cli
+  NODE_VERSION: "22"
   ANDROID_API_LEVEL: "35" # Target SDK for Google Play compliance
   NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.79.6
 
@@ -106,6 +106,29 @@ jobs:
             apps/app/app.json
             pnpm-lock.yaml
 
+      # Cache native C++ build outputs (.so files) — saves ~10-14 min on repeat builds
+      # Key changes when native package versions change (pnpm-lock.yaml hash)
+      - name: Cache Native Build Outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/app/android/app/.cxx
+            apps/app/android/build
+          key: ${{ runner.os }}-android-native-${{ steps.version.outputs.build_type }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-android-native-${{ steps.version.outputs.build_type }}-
+
+      # Cache Metro bundler state — saves ~3-5 min on JS bundling
+      - name: Cache Metro Bundler
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/metro-*
+            /tmp/haste-map-*
+          key: ${{ runner.os }}-metro-${{ hashFiles('pnpm-lock.yaml', 'apps/app/metro.config.js') }}
+          restore-keys: |
+            ${{ runner.os }}-metro-
+
       - name: Run Expo Prebuild
         run: |
           cd apps/app
@@ -115,7 +138,7 @@ jobs:
 
       - name: Build Android APK
         id: build
-        timeout-minutes: 25
+        timeout-minutes: 40
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
@@ -127,12 +150,12 @@ jobs:
           # Gradle flags — parallel, build cache, configuration cache
           GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache --configuration-cache --configuration-cache-problems=warn"
 
-          # Debug builds: single ABI (arm64-v8a) to cut native compilation ~50%
-          # Release builds: all architectures for full device compatibility
+          # Debug builds: single ABI (arm64-v8a) for fast iteration
+          # Release builds: arm64-v8a (99%+ devices) + x86_64 (emulators)
           if [ "$BUILD_TYPE" == "debug" ]; then
             ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
           else
-            ABI_FLAG=""
+            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
           fi
 
           echo "🏗️  Starting Android $BUILD_TYPE build at $(date)"
@@ -212,7 +235,7 @@ jobs:
             - **Platform:** Android
             - **Build Type:** ${{ needs.build-android.outputs.build_type }}
             - **Java Version:** ${{ env.JAVA_VERSION }}
-            - **Built with:** React Native 0.79 + Expo SDK 53
+            - **Built with:** React Native 0.81 + Expo SDK 54
           files: ./artifacts/${{ needs.build-android.outputs.apk_name }}
 
   notify:

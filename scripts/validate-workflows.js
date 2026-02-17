@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { glob } = require('glob');
+const glob = require('glob');
 const yaml = require('js-yaml');
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
@@ -106,10 +106,10 @@ async function main() {
     addFormats(ajv);
 
     // Find files
-    const workflowFiles = await glob('.github/workflows/*.{yml,yaml}', {
+    const workflowFiles = glob.sync('.github/workflows/*.{yml,yaml}', {
       nodir: true,
     });
-    const actionFiles = await glob('.github/actions/**/action.{yml,yaml}', {
+    const actionFiles = glob.sync('.github/actions/**/action.{yml,yaml}', {
       nodir: true,
     });
 

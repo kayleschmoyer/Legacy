@@ -3,7 +3,7 @@
     "name": "App",
     "slug": "app",
     "version": "1.0.0",
-    "sdkVersion": "53.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "legacysports",
@@ -29,7 +29,8 @@
         "foregroundImage": "./assets/adaptive_icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.legacySports"
+      "package": "com.legacySports",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
