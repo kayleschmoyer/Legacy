@@ -137,7 +137,7 @@ jobs:
 
       # Android-specific cache for matrix testing
       - name: "📦 Cache Gradle Dependencies"
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/wrapper
@@ -148,125 +148,20 @@ jobs:
             ${{ runner.os }}-gradle-matrix-${{ matrix.cache_key_suffix }}-${{ matrix.java_version }}-
             ${{ runner.os }}-gradle-matrix-${{ matrix.cache_key_suffix }}-
 
-      - name: "🔧 Run Expo Prebuild"
-        run: |
-          cd apps/app
-          npx expo prebuild --platform android --no-install
-          chmod +x android/gradlew
-          echo "✅ Expo prebuild completed - Android project generated"
-
-      - name: "🔧 Setup Gradle Wrapper"
-        run: |
-          cd apps/app/android
-          chmod +x gradlew
-
-          # Verify Gradle version compatibility
-          echo "🔍 Verifying Gradle setup..."
-          ${{ matrix.gradle_executable }} --version
-
       - name: "🧪 Validate Configuration"
         run: |
-          cd apps/app/android
-
           echo "🔍 Validating build configuration..."
-
-          # Check Java version
           java -version
           javac -version
-
-          # Check Gradle configuration
-          ${{ matrix.gradle_executable }} help --no-daemon --quiet
-
-          # Validate Android configuration without dependency download
           echo "✅ Configuration validation passed"
 
       - name: "🏗️ Build Android ${{ env.BUILD_TYPE }}"
+        uses: ./.github/actions/build-android
+        with:
+          build-type: ${{ env.BUILD_TYPE }}
+          gradle-executable: ${{ matrix.gradle_executable }}
+          cache-key-suffix: matrix-${{ matrix.cache_key_suffix }}
         timeout-minutes: 40
-        run: |
-          cd apps/app/android
-
-          echo "🔨 Building Android APK (${{ env.BUILD_TYPE }})..."
-
-          # Gradle flags — parallel, build cache, match build-android-app workflow
-          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache"
-
-          # Debug builds: single ABI (arm64-v8a) for fast iteration
-          # Release builds: arm64-v8a (99%+ devices) + x86_64 (emulators)
-          # Reanimated v4 C++ worklet compilation across all 4 ABIs exceeds 25 min
-          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
-          else
-            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
-          fi
-
-          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            ${{ matrix.gradle_executable }} assembleRelease $GRADLE_FLAGS $ABI_FLAG
-            BUILD_OUTPUT="app/build/outputs/apk/release/app-release.apk"
-          else
-            ${{ matrix.gradle_executable }} assembleDebug $GRADLE_FLAGS $ABI_FLAG
-            BUILD_OUTPUT="app/build/outputs/apk/debug/app-debug.apk"
-          fi
-
-          # Verify APK was created
-          if [ -f "$BUILD_OUTPUT" ]; then
-            APK_SIZE=$(du -h "$BUILD_OUTPUT" | cut -f1)
-            echo "✅ APK built successfully: $APK_SIZE"
-            echo "- **APK Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ APK not found at $BUILD_OUTPUT"
-            exit 1
-          fi
-
-      - name: "📊 Build Metrics"
-        if: always()
-        run: |
-          echo "## 📊 Build Metrics" >> $GITHUB_STEP_SUMMARY
-
-          # APK info if exists
-          cd apps/app/android
-          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            APK_PATH="app/build/outputs/apk/release/app-release.apk"
-          else
-            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          fi
-
-          if [ -f "$APK_PATH" ]; then
-            APK_SIZE=$(du -sh "$APK_PATH" | cut -f1)
-            echo "- **APK Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
-            echo "- **Build Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Build Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Gradle build cache info
-          if [ -d "~/.gradle/caches/build-cache-1" ]; then
-            CACHE_SIZE=$(du -sh ~/.gradle/caches/build-cache-1 2>/dev/null | cut -f1 || echo "N/A")
-            echo "- **Gradle Cache**: $CACHE_SIZE" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: "🧪 APK Validation"
-        if: success()
-        run: |
-          cd apps/app/android
-
-          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            APK_PATH="app/build/outputs/apk/release/app-release.apk"
-          else
-            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          fi
-
-          # Basic APK validation
-          echo "🔍 Validating APK structure..."
-
-          # Check APK can be read by aapt (if available)
-          if command -v aapt >/dev/null 2>&1; then
-            aapt dump badging "$APK_PATH" | head -5
-            echo "✅ APK validation passed"
-          else
-            echo "ℹ️ AAPT not available, skipping detailed validation"
-          fi
-
-          echo "- **APK Validation**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   matrix-summary:
     name: "Matrix Build Summary"
@@ -296,7 +191,7 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Compatibility Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **React Native 0.79.6**: ✅ Supported" >> $GITHUB_STEP_SUMMARY
+          echo "- **React Native 0.81.5**: ✅ Supported" >> $GITHUB_STEP_SUMMARY
           echo "- **Java 11-21**: ✅ Compatible" >> $GITHUB_STEP_SUMMARY
           echo "- **Android API 33-35**: ✅ Tested" >> $GITHUB_STEP_SUMMARY
           echo "- **Multi-platform**: ✅ Verified" >> $GITHUB_STEP_SUMMARY
