@@ -8,7 +8,7 @@ on:
       - "apps/app/**"
       - "lib/**"
       - "package.json"
-      - "package-lock.json"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
     inputs:
       build_type:
@@ -37,16 +37,13 @@ concurrency:
 
 env:
   # Version Matrix Configuration
-  JAVA_VERSION: "17" # LTS version, compatible with RN 0.79.6
+  JAVA_VERSION: "17" # LTS version, compatible with RN 0.81.5
   NODE_VERSION: "22"
   ANDROID_API_LEVEL: "35" # Target SDK for Google Play compliance
-  NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.79.6
+  NDK_VERSION: "27.1.12297006" # Stable NDK for RN 0.81.5
 
-  # Gradle CI flags — daemon disabled, parallel enabled, caching on
+  # Gradle CI env — build-android composite action handles daemon/parallel/cache flags
   GRADLE_OPTS: >-
-    -Dorg.gradle.daemon=false
-    -Dorg.gradle.jvmargs=-Xmx4096m
-    -Dorg.gradle.caching=true
     -Dorg.gradle.internal.http.connectionTimeout=120000
     -Dorg.gradle.internal.http.socketTimeout=120000
   NODE_OPTIONS: "--max-old-space-size=4096"
@@ -56,8 +53,8 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
     outputs:
-      apk_path: ${{ steps.build.outputs.apk_path }}
-      apk_name: ${{ steps.build.outputs.apk_name }}
+      apk_path: ${{ steps.build.outputs.apk-path }}
+      apk_name: ${{ steps.apk-name.outputs.apk_name }}
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
       commit_sha: ${{ steps.version.outputs.commit_sha }}
@@ -106,90 +103,30 @@ jobs:
             apps/app/app.json
             pnpm-lock.yaml
 
-      # Cache native C++ build outputs (.so files) — saves ~10-14 min on repeat builds
-      # Key changes when native package versions change (pnpm-lock.yaml hash)
-      - name: Cache Native Build Outputs
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/app/android/app/.cxx
-            apps/app/android/build
-          key: ${{ runner.os }}-android-native-${{ steps.version.outputs.build_type }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-android-native-${{ steps.version.outputs.build_type }}-
-
-      # Cache Metro bundler state — saves ~3-5 min on JS bundling
-      - name: Cache Metro Bundler
-        uses: actions/cache@v4
-        with:
-          path: |
-            /tmp/metro-*
-            /tmp/haste-map-*
-          key: ${{ runner.os }}-metro-${{ hashFiles('pnpm-lock.yaml', 'apps/app/metro.config.js') }}
-          restore-keys: |
-            ${{ runner.os }}-metro-
-
-      - name: Run Expo Prebuild
-        run: |
-          cd apps/app
-          npx expo prebuild --platform android --no-install
-          chmod +x android/gradlew
-          echo "✅ Expo prebuild completed"
-
       - name: Build Android APK
         id: build
+        uses: ./.github/actions/build-android
+        with:
+          build-type: ${{ steps.version.outputs.build_type }}
+          extra-gradle-flags: "--configuration-cache --configuration-cache-problems=warn"
         timeout-minutes: 40
-        env:
-          APP_VERSION: ${{ steps.version.outputs.version }}
-          EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+
+      - name: Set APK Name
+        id: apk-name
         run: |
-          cd apps/app/android
-
           BUILD_TYPE="${{ steps.version.outputs.build_type }}"
-
-          # Gradle flags — parallel, build cache, configuration cache
-          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache --configuration-cache --configuration-cache-problems=warn"
-
-          # Debug builds: single ABI (arm64-v8a) for fast iteration
-          # Release builds: arm64-v8a (99%+ devices) + x86_64 (emulators)
-          if [ "$BUILD_TYPE" == "debug" ]; then
-            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
-          else
-            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
-          fi
-
-          echo "🏗️  Starting Android $BUILD_TYPE build at $(date)"
-          BUILD_START_TIME=$(date +%s)
-
-          if [ "$BUILD_TYPE" == "release" ]; then
-            ./gradlew assembleRelease $GRADLE_FLAGS $ABI_FLAG
-            APK_PATH="app/build/outputs/apk/release/app-release.apk"
-            APK_NAME="legacy-sports-${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit_sha }}.apk"
-          else
-            ./gradlew assembleDebug $GRADLE_FLAGS $ABI_FLAG
-            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          if [ "$BUILD_TYPE" = "debug" ]; then
             APK_NAME="legacy-sports-${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit_sha }}-debug.apk"
+          else
+            APK_NAME="legacy-sports-${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit_sha }}.apk"
           fi
-
-          BUILD_END_TIME=$(date +%s)
-          echo "⏱️  Build completed in $((BUILD_END_TIME - BUILD_START_TIME)) seconds"
-
-          if [ ! -f "$APK_PATH" ]; then
-            echo "❌ APK not found at $APK_PATH"
-            exit 1
-          fi
-
-          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
-          echo "✅ APK built successfully: $APK_SIZE"
-
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v6
         with:
           name: android-apk-${{ steps.version.outputs.build_type }}
-          path: apps/app/android/${{ steps.build.outputs.apk_path }}
+          path: apps/app/android/${{ steps.build.outputs.apk-path }}
           retention-days: 30
 
   create-release:

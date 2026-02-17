@@ -393,6 +393,25 @@ runs:
 
         echo "::endgroup::"
 
+    - name: "☕ Setup Java for Android Build"
+      id: setup-java-mobile
+      if: inputs.should-build-mobile == 'true' && steps.validate-mobile.outputs.result == 'success'
+      uses: actions/setup-java@v5
+      with:
+        distribution: "temurin"
+        java-version: "17"
+        cache: "gradle"
+        cache-dependency-path: |
+          apps/app/app.json
+          pnpm-lock.yaml
+
+    - name: "🤖 Android Debug Build Smoke Test"
+      id: android-build
+      if: inputs.should-build-mobile == 'true' && steps.validate-mobile.outputs.result == 'success'
+      uses: ./.github/actions/build-android
+      with:
+        build-type: debug
+
     - name: "🔧 Setup Terraform"
       if: inputs.should-validate-terraform == 'true'
       uses: hashicorp/setup-terraform@v3
@@ -484,8 +503,14 @@ runs:
         # Collect all results
         WEB_RESULT="${{ steps.build-web.outputs.result || 'skipped' }}"
         MOBILE_RESULT="${{ steps.validate-mobile.outputs.result || 'skipped' }}"
+        ANDROID_BUILD_RESULT="${{ steps.android-build.outcome || 'skipped' }}"
         LAMBDAS_RESULT="${{ steps.build-lambdas.outputs.result || 'skipped' }}"
         TERRAFORM_RESULT="${{ steps.terraform-validation.outputs.result || 'skipped' }}"
+
+        # If config validated but Gradle build failed, override mobile result
+        if [ "$MOBILE_RESULT" = "success" ] && [ "$ANDROID_BUILD_RESULT" = "failure" ]; then
+          MOBILE_RESULT="failure"
+        fi
 
         # Determine overall result
         OVERALL_RESULT="success"
@@ -505,7 +530,7 @@ runs:
         echo "| Component | Status | Result |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
         echo "| Web Application | $( [ "$WEB_RESULT" = "success" ] && echo "✅ Built" || [ "$WEB_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$WEB_RESULT" = "success" ] && echo "Ready for deployment" || [ "$WEB_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Mobile App Config | $( [ "$MOBILE_RESULT" = "success" ] && echo "✅ Valid" || [ "$MOBILE_RESULT" = "failure" ] && echo "❌ Invalid" || echo "⏭️ Skipped" ) | $( [ "$MOBILE_RESULT" = "success" ] && echo "Configuration validated" || [ "$MOBILE_RESULT" = "failure" ] && echo "Configuration errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile App | $( [ "$MOBILE_RESULT" = "success" ] && echo "✅ Built" || [ "$MOBILE_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$MOBILE_RESULT" = "success" ] && echo "Config + Android build passed" || [ "$MOBILE_RESULT" = "failure" ] && echo "Build or config errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
         echo "| Lambda Functions | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "✅ Built" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "Ready for deployment" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
         echo "| Infrastructure | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "✅ Valid" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "❌ Invalid" || echo "⏭️ Skipped" ) | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "Configuration validated" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "Configuration errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

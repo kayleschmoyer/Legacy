@@ -1,0 +1,165 @@
+name: "Build Android APK"
+description: "Shared Android build logic — Expo prebuild + Gradle assembleDebug/Release with ABI filtering, caching, and APK validation"
+
+inputs:
+  build-type:
+    description: "Build type: debug or release"
+    required: false
+    default: "debug"
+  gradle-executable:
+    description: "Gradle executable path (./gradlew or gradlew.bat)"
+    required: false
+    default: "./gradlew"
+  extra-gradle-flags:
+    description: "Additional Gradle flags (e.g. --configuration-cache)"
+    required: false
+    default: ""
+  timeout-minutes:
+    description: "Timeout for the Gradle build step (minutes)"
+    required: false
+    default: "40"
+  skip-prebuild:
+    description: "Skip expo prebuild (if already run)"
+    required: false
+    default: "false"
+  cache-native-builds:
+    description: "Cache native C++ build outputs (.cxx, .so)"
+    required: false
+    default: "true"
+  cache-key-suffix:
+    description: "Suffix for cache keys (useful for matrix builds)"
+    required: false
+    default: ""
+
+outputs:
+  apk-path:
+    description: "Relative path to the built APK (from apps/app/android/)"
+    value: ${{ steps.build.outputs.apk_path }}
+  apk-size:
+    description: "Human-readable APK file size"
+    value: ${{ steps.build.outputs.apk_size }}
+  build-time:
+    description: "Build duration in seconds"
+    value: ${{ steps.build.outputs.build_time }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "🔧 Run Expo Prebuild"
+      if: inputs.skip-prebuild != 'true'
+      shell: bash
+      run: |
+        cd apps/app
+        npx expo prebuild --platform android --no-install
+        chmod +x android/gradlew
+        echo "✅ Expo prebuild completed"
+
+    - name: "📦 Cache Native C++ Build Outputs"
+      if: inputs.cache-native-builds == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          apps/app/android/app/.cxx
+          apps/app/android/build
+        key: ${{ runner.os }}-android-native-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-android-native-${{ inputs.build-type }}-${{ inputs.cache-key-suffix }}-
+          ${{ runner.os }}-android-native-${{ inputs.build-type }}-
+
+    - name: "📦 Cache Metro Bundler"
+      if: inputs.cache-native-builds == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          /tmp/metro-*
+          /tmp/haste-map-*
+        key: ${{ runner.os }}-metro-${{ inputs.cache-key-suffix }}-${{ hashFiles('pnpm-lock.yaml', 'apps/app/metro.config.js') }}
+        restore-keys: |
+          ${{ runner.os }}-metro-${{ inputs.cache-key-suffix }}-
+          ${{ runner.os }}-metro-
+
+    - name: "🏗️ Build Android APK"
+      id: build
+      shell: bash
+      run: |
+        cd apps/app/android
+        chmod +x gradlew
+
+        BUILD_TYPE="${{ inputs.build-type }}"
+
+        # Shared Gradle flags — single source of truth for all Android builds
+        GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache"
+
+        # ABI filtering — Reanimated v4 C++ worklet compilation is expensive
+        # Debug:   arm64-v8a only (single ABI, fast iteration)
+        # Release: arm64-v8a (99%+ devices) + x86_64 (emulators/ChromeOS)
+        if [ "$BUILD_TYPE" = "release" ]; then
+          ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
+        else
+          ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
+        fi
+
+        echo "🏗️ Starting Android $BUILD_TYPE build at $(date)"
+        echo "   Gradle flags: $GRADLE_FLAGS $ABI_FLAG ${{ inputs.extra-gradle-flags }}"
+        BUILD_START=$(date +%s)
+
+        if [ "$BUILD_TYPE" = "release" ]; then
+          ${{ inputs.gradle-executable }} assembleRelease $GRADLE_FLAGS $ABI_FLAG ${{ inputs.extra-gradle-flags }}
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+        else
+          ${{ inputs.gradle-executable }} assembleDebug $GRADLE_FLAGS $ABI_FLAG ${{ inputs.extra-gradle-flags }}
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+        fi
+
+        BUILD_END=$(date +%s)
+        BUILD_TIME=$((BUILD_END - BUILD_START))
+
+        if [ ! -f "$APK_PATH" ]; then
+          echo "❌ APK not found at $APK_PATH"
+          exit 1
+        fi
+
+        APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+        echo "✅ APK built successfully: $APK_SIZE in ${BUILD_TIME}s"
+
+        echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+        echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+        echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+
+    - name: "🧪 APK Validation"
+      if: success()
+      shell: bash
+      run: |
+        cd apps/app/android
+        APK_PATH="${{ steps.build.outputs.apk_path }}"
+
+        echo "🔍 Validating APK structure..."
+        if command -v aapt >/dev/null 2>&1; then
+          aapt dump badging "$APK_PATH" | head -5
+          echo "✅ APK validation passed"
+        else
+          # Fallback: verify it's a valid ZIP (APK is a ZIP)
+          if file "$APK_PATH" | grep -q "Zip archive\|Java archive"; then
+            echo "✅ APK is a valid archive"
+          else
+            echo "⚠️ APK structure could not be verified"
+          fi
+        fi
+
+    - name: "📊 Build Summary"
+      if: always()
+      shell: bash
+      run: |
+        echo "## 🤖 Android Build (${{ inputs.build-type }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Type**: ${{ inputs.build-type }}" >> $GITHUB_STEP_SUMMARY
+
+        APK_SIZE="${{ steps.build.outputs.apk_size }}"
+        BUILD_TIME="${{ steps.build.outputs.build_time }}"
+
+        if [ -n "$APK_SIZE" ]; then
+          echo "- **APK Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Time**: ${BUILD_TIME}s" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+        fi
