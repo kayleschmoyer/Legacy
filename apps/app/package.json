@@ -11,19 +11,19 @@
     "prebuild:android": "expo prebuild --clean --platform android --no-install"
   },
   "dependencies": {
-    "@expo/metro-config": "*",
-    "expo": "*",
-    "expo-image": "*",
-    "expo-router": "*",
-    "react": "*",
-    "react-native": "*",
-    "react-native-reanimated": "*"
+    "@expo/metro-config": "~54.0.14",
+    "expo": "^54.0.33",
+    "expo-image": "~3.0.11",
+    "expo-router": "~6.0.23",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-reanimated": "~4.1.1"
   },
   "devDependencies": {
     "@babel/core": "*",
     "@babel/preset-env": "*",
     "@babel/runtime": "*",
     "@expo/cli": "*",
-    "@types/react": "*"
+    "@types/react": "~19.1.10"
   }
 }

@@ -17,13 +17,20 @@ export default defineConfig(({ mode }) => {
 
   // Get version/release information
   const appVersion = process.env.APP_VERSION || '0.0.0';
-  const commitSha = (() => {
-    try {
-      return execSync('git rev-parse --short HEAD').toString().trim();
-    } catch {
-      return 'dev';
-    }
-  })();
+  // Only shell out to git during actual builds (NX_TASK_HASH is set),
+  // not during Nx graph creation where vite configs may be evaluated.
+  const commitSha =
+    process.env.VITE_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    (process.env.NX_TASK_HASH
+      ? (() => {
+          try {
+            return execSync('git rev-parse --short HEAD').toString().trim();
+          } catch {
+            return 'dev';
+          }
+        })()
+      : 'dev');
 
   return {
     cacheDir: '../../node_modules/.vite/lambdas/db',

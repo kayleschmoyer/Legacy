@@ -68,21 +68,21 @@ jobs:
             # Production configuration only
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"}]}'
+              echo '{"include":[{"name":"Production (RN 0.81.5)","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           elif [ "$MATRIX_TYPE" = "compatibility" ]; then
             # Compatibility testing matrix
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production (RN 0.79.6)","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"},{"name":"Minimum Supported","os":"ubuntu-latest","java_version":"11","node_version":"20","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min"},{"name":"Latest Stable","os":"ubuntu-latest","java_version":"21","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest"}]}'
+              echo '{"include":[{"name":"Production (RN 0.81.5)","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod"},{"name":"Minimum Supported","os":"ubuntu-latest","java_version":"11","node_version":"22","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min"},{"name":"Latest Stable","os":"ubuntu-latest","java_version":"21","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           else
             # Full matrix with cross-platform testing
             {
               echo "matrix<<EOF"
-              echo '{"include":[{"name":"Production Linux","os":"ubuntu-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-linux"},{"name":"Production macOS","os":"macos-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-macos"},{"name":"Production Windows","os":"windows-latest","java_version":"17","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"gradlew.bat","cache_key_suffix":"prod-windows"},{"name":"Minimum Java 11","os":"ubuntu-latest","java_version":"11","node_version":"20","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min-java11"},{"name":"Latest Java 21","os":"ubuntu-latest","java_version":"21","node_version":"20","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest-java21"}]}'
+              echo '{"include":[{"name":"Production Linux","os":"ubuntu-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-linux"},{"name":"Production macOS","os":"macos-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"prod-macos"},{"name":"Production Windows","os":"windows-latest","java_version":"17","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"gradlew.bat","cache_key_suffix":"prod-windows"},{"name":"Minimum Java 11","os":"ubuntu-latest","java_version":"11","node_version":"22","android_api_level":"33","ndk_version":"25.2.9519653","gradle_executable":"./gradlew","cache_key_suffix":"min-java11"},{"name":"Latest Java 21","os":"ubuntu-latest","java_version":"21","node_version":"22","android_api_level":"35","ndk_version":"27.1.12297006","gradle_executable":"./gradlew","cache_key_suffix":"latest-java21"}]}'
               echo "EOF"
             } >> $GITHUB_OUTPUT
           fi
@@ -181,17 +181,29 @@ jobs:
           echo "✅ Configuration validation passed"
 
       - name: "🏗️ Build Android ${{ env.BUILD_TYPE }}"
-        timeout-minutes: 25
+        timeout-minutes: 40
         run: |
           cd apps/app/android
 
           echo "🔨 Building Android APK (${{ env.BUILD_TYPE }})..."
 
+          # Gradle flags — parallel, build cache, match build-android-app workflow
+          GRADLE_FLAGS="--no-daemon --stacktrace --parallel --max-workers=4 --build-cache"
+
+          # Debug builds: single ABI (arm64-v8a) for fast iteration
+          # Release builds: arm64-v8a (99%+ devices) + x86_64 (emulators)
+          # Reanimated v4 C++ worklet compilation across all 4 ABIs exceeds 25 min
           if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            ${{ matrix.gradle_executable }} assembleRelease --no-daemon --parallel --build-cache
+            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a,x86_64"
+          else
+            ABI_FLAG="-PreactNativeArchitectures=arm64-v8a"
+          fi
+
+          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
+            ${{ matrix.gradle_executable }} assembleRelease $GRADLE_FLAGS $ABI_FLAG
             BUILD_OUTPUT="app/build/outputs/apk/release/app-release.apk"
           else
-            ${{ matrix.gradle_executable }} assembleDebug --no-daemon --parallel --build-cache
+            ${{ matrix.gradle_executable }} assembleDebug $GRADLE_FLAGS $ABI_FLAG
             BUILD_OUTPUT="app/build/outputs/apk/debug/app-debug.apk"
           fi
 
