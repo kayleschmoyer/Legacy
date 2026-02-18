@@ -78,7 +78,7 @@ jobs:
           echo "Version: $VERSION"
 
           # Create deployment package from built artifacts
-          zip -r "graphql-${VERSION}.zip" dist/
+          (cd dist && zip -r "../graphql-${VERSION}.zip" .)
 
           # Get S3 bucket name from SSM parameter store
           echo "🔍 Getting S3 bucket name from SSM..."
