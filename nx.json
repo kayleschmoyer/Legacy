@@ -40,16 +40,6 @@
       }
     },
     {
-      "plugin": "@nx/vite/plugin",
-      "exclude": ["lambdas/**"],
-      "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "previewTargetName": "preview",
-        "testTargetName": "test"
-      }
-    },
-    {
       "plugin": "@nx/storybook/plugin",
       "options": {
         "buildStorybookTargetName": "build-storybook",
