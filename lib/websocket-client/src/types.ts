@@ -13,6 +13,28 @@ export interface DraftCompletedNotification {
   completedAt: string;
 }
 
+export interface DraftStartedNotification {
+  type: 'draft-started';
+  leagueId: number;
+  draftId: number;
+  draftOrder: string;
+  teamCount: number;
+  startedAt: string;
+}
+
+export interface DraftPickNotification {
+  type: 'draft-pick-made';
+  leagueId: number;
+  draftId: number;
+  pickId: number;
+  teamId: number;
+  playerId: number;
+  round: number;
+  pickNumber: number;
+  overallPick: number;
+  pickedAt: string;
+}
+
 export interface PlayerStatsLoadingNotification {
   type: 'player-stats-loading';
   leagueId: number;
@@ -39,6 +61,8 @@ export interface MatchupStatsCompleteNotification {
 
 export type NotificationData =
   | DraftCompletedNotification
+  | DraftStartedNotification
+  | DraftPickNotification
   | PlayerStatsLoadingNotification
   | PlayerStatsUpdatedNotification
   | MatchupStatsCompleteNotification;

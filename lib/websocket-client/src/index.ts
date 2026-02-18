@@ -17,6 +17,8 @@ export type {
   UnsubscribeFn,
   NotificationData,
   DraftCompletedNotification,
+  DraftStartedNotification,
+  DraftPickNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,

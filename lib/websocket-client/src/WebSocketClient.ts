@@ -357,6 +357,27 @@ export class WebSocketClient {
       if (typeHandlers) {
         typeHandlers.forEach((handler) => handler(message));
       }
+
+      // For 'notification' messages, re-dispatch based on data.type (UPPER_SNAKE → kebab-case)
+      // e.g. { type: 'notification', data: { type: 'DRAFT_PICK_MADE', ... } }
+      //   → dispatches to 'draft-pick-made' handlers with data as payload
+      if (
+        message.type === 'notification' &&
+        message.data &&
+        typeof message.data['type'] === 'string'
+      ) {
+        const notificationEventType = message.data['type']
+          .toLowerCase()
+          .replace(/_/g, '-');
+        const notificationHandlers = this.eventHandlers.get(
+          notificationEventType,
+        );
+        if (notificationHandlers) {
+          notificationHandlers.forEach((handler) =>
+            handler(message.data as unknown as WebSocketMessage),
+          );
+        }
+      }
     } catch (error) {
       LOGGER.error('Failed to parse WebSocket message', { error });
       this.emitError(error instanceof Error ? error : new Error(String(error)));

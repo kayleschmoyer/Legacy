@@ -17,7 +17,10 @@ import {
   withSentry,
 } from '@legacy-sports/sentry';
 import { LOGGER } from '@legacy-sports/logging';
-import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import {
+  createNotificationService,
+  retrieveSecretParameterValue,
+} from '@legacy-sports/aws-utils';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import {
@@ -89,6 +92,9 @@ if (sentryConfig) {
 
 // Create database service for Lambda (module-level singleton for warm starts)
 const dbService = createDatabaseService(getDbOptions());
+
+// Create notification service (module-level singleton)
+const notificationService = createNotificationService();
 
 /**
  * Example Career Statistics GraphQL Queries
@@ -256,6 +262,7 @@ const baseHandler = startServerAndCreateLambdaHandler(
       const db = await dbService.getDb();
 
       return {
+        notificationService, // WebSocket notification service
         user,
         loaders: createLoaders(db), // Pass shared connection to loaders
         db, // Shared connection for all resolvers in this request

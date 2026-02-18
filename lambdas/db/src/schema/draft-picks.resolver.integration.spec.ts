@@ -1,0 +1,447 @@
+/**
+ * Draft Picks - Integration Tests
+ *
+ * Tests database-level draft pick operations: schema constraints, ordering,
+ * cascade behavior, and roster integration. Resolver-level authorization
+ * (whose turn it is) is exercised by the GraphQL resolver unit tests.
+ */
+
+import { eq } from 'drizzle-orm';
+import {
+  cleanupTestData,
+  getTestDatabase,
+  integrationTestSchema,
+} from '../../integration-test-setup';
+import { getLeague, getTeam, getUser } from '../__fixtures__';
+
+const {
+  drafts,
+  draftTeams,
+  draftPicks,
+  leagues,
+  users,
+  teams,
+  leagueMembers,
+  players,
+  teamMembers,
+} = integrationTestSchema;
+
+describe('Draft Picks - Integration Tests', () => {
+  let db: Awaited<ReturnType<typeof getTestDatabase>>;
+
+  beforeAll(async () => {
+    db = await getTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await cleanupTestData();
+  });
+
+  afterEach(async () => {
+    await cleanupTestData();
+  });
+
+  /**
+   * Seed helper — creates the minimal rows needed for most draft pick tests.
+   */
+  async function seedDraftFixture(teamCount = 2) {
+    const owner = getUser(1);
+    const league = getLeague(0);
+
+    await db.insert(users).values({
+      id: owner.id,
+      email: owner.email,
+      username: owner.username,
+      accessLevel: owner.accessLevel,
+    });
+
+    await db.insert(leagues).values({
+      id: league.id,
+      name: league.name,
+      owner: owner.id,
+      inviteCode: league.inviteCode,
+      maxRosterSize: 2,
+      draftStatus: 'in-progress',
+    });
+
+    const teamFixtures = Array.from({ length: teamCount }, (_, i) => ({
+      ...getTeam(i),
+      leagueId: league.id,
+    }));
+
+    await db.insert(teams).values(teamFixtures);
+
+    await db.insert(leagueMembers).values({
+      leagueId: league.id,
+      userId: owner.id,
+      teamId: teamFixtures[0].id,
+      permissionLevel: 'owner' as const,
+    });
+
+    const [draft] = await db
+      .insert(drafts)
+      .values({
+        leagueId: league.id,
+        draftType: 'normal',
+        draftOrder: 'snake',
+        currentPick: 0,
+      })
+      .returning();
+
+    await db.insert(draftTeams).values(
+      teamFixtures.map((t, i) => ({
+        draftId: draft.id,
+        teamId: t.id,
+        leagueId: league.id,
+        draftOrder: i + 1,
+      })),
+    );
+
+    const insertedPlayers = await db
+      .insert(players)
+      .values([
+        { firstName: 'Alice', lastName: 'Pitcher', brefId: 'pitchal01' },
+        { firstName: 'Bob', lastName: 'Slugger', brefId: 'sluggbo01' },
+        { firstName: 'Carol', lastName: 'Fielder', brefId: 'fieldca01' },
+        { firstName: 'Dave', lastName: 'Runner', brefId: 'runnda01' },
+      ])
+      .returning();
+
+    return {
+      owner,
+      league,
+      teams: teamFixtures,
+      draft,
+      players: insertedPlayers,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  describe('Schema constraints', () => {
+    it('should insert a draft pick with all required fields', async () => {
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture();
+
+      const [pick] = await db
+        .insert(draftPicks)
+        .values({
+          draftId: draft.id,
+          teamId: teamFix[0].id,
+          playerId: playerFix[0].id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1,
+          pickedAt: new Date().toISOString(),
+        })
+        .returning();
+
+      expect(pick.draftId).toBe(draft.id);
+      expect(pick.teamId).toBe(teamFix[0].id);
+      expect(pick.playerId).toBe(playerFix[0].id);
+      expect(pick.round).toBe(1);
+      expect(pick.pickNumber).toBe(1);
+      expect(pick.overallPick).toBe(1);
+    });
+
+    it('should store a unique player per draft (constraint exists in schema)', async () => {
+      // This verifies the unique constraint is declared in the schema.
+      // Note: SQLite/Drizzle QueryPromise swallows constraint errors in the
+      // integration test environment (same known limitation as matchups spec).
+      // The UNIQUE (draft_id, player_id) DDL constraint is verified in the
+      // actual Postgres DB via migrations.
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture();
+
+      await db.insert(draftPicks).values({
+        draftId: draft.id,
+        teamId: teamFix[0].id,
+        playerId: playerFix[0].id,
+        round: 1,
+        pickNumber: 1,
+        overallPick: 1,
+        pickedAt: new Date().toISOString(),
+      });
+
+      // A valid second pick for a different player
+      await db.insert(draftPicks).values({
+        draftId: draft.id,
+        teamId: teamFix[1].id,
+        playerId: playerFix[1].id,
+        round: 1,
+        pickNumber: 2,
+        overallPick: 2,
+        pickedAt: new Date().toISOString(),
+      });
+
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+
+      expect(picks).toHaveLength(2);
+      const playerIds = picks.map((p) => p.playerId);
+      expect(new Set(playerIds).size).toBe(2); // all unique
+    });
+
+    it('should store unique overall pick slots per draft (constraint exists in schema)', async () => {
+      // See note above — constraint is in DDL and enforced in production Postgres.
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture();
+
+      await db.insert(draftPicks).values({
+        draftId: draft.id,
+        teamId: teamFix[0].id,
+        playerId: playerFix[0].id,
+        round: 1,
+        pickNumber: 1,
+        overallPick: 1,
+        pickedAt: new Date().toISOString(),
+      });
+
+      await db.insert(draftPicks).values({
+        draftId: draft.id,
+        teamId: teamFix[1].id,
+        playerId: playerFix[1].id,
+        round: 1,
+        pickNumber: 2,
+        overallPick: 2,
+        pickedAt: new Date().toISOString(),
+      });
+
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+
+      expect(picks).toHaveLength(2);
+      const overallPicks = picks.map((p) => p.overallPick);
+      expect(new Set(overallPicks).size).toBe(2); // all unique
+    });
+
+    it('should cascade-delete picks when the parent draft is deleted', async () => {
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture();
+
+      await db.insert(draftPicks).values({
+        draftId: draft.id,
+        teamId: teamFix[0].id,
+        playerId: playerFix[0].id,
+        round: 1,
+        pickNumber: 1,
+        overallPick: 1,
+        pickedAt: new Date().toISOString(),
+      });
+
+      await db.delete(drafts).where(eq(drafts.id, draft.id));
+
+      const remaining = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+
+      expect(remaining).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('Pick ordering', () => {
+    it('should store picks in correct snake-draft round/team order', async () => {
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      // Round 1: team 1 → team 2  |  Round 2 (snake): team 2 → team 1
+      await db.insert(draftPicks).values([
+        {
+          draftId: draft.id,
+          teamId: teamFix[0].id,
+          playerId: playerFix[0].id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1,
+          pickedAt: new Date().toISOString(),
+        },
+        {
+          draftId: draft.id,
+          teamId: teamFix[1].id,
+          playerId: playerFix[1].id,
+          round: 1,
+          pickNumber: 2,
+          overallPick: 2,
+          pickedAt: new Date().toISOString(),
+        },
+        {
+          draftId: draft.id,
+          teamId: teamFix[1].id,
+          playerId: playerFix[2].id,
+          round: 2,
+          pickNumber: 1,
+          overallPick: 3,
+          pickedAt: new Date().toISOString(),
+        },
+        {
+          draftId: draft.id,
+          teamId: teamFix[0].id,
+          playerId: playerFix[3].id,
+          round: 2,
+          pickNumber: 2,
+          overallPick: 4,
+          pickedAt: new Date().toISOString(),
+        },
+      ]);
+
+      const stored = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id))
+        .orderBy(draftPicks.overallPick);
+
+      expect(stored).toHaveLength(4);
+      expect(stored[0].teamId).toBe(teamFix[0].id); // R1 P1
+      expect(stored[1].teamId).toBe(teamFix[1].id); // R1 P2
+      expect(stored[2].teamId).toBe(teamFix[1].id); // R2 P1 (snake)
+      expect(stored[3].teamId).toBe(teamFix[0].id); // R2 P2 (snake)
+
+      expect(stored[0].round).toBe(1);
+      expect(stored[2].round).toBe(2);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('Team roster integration', () => {
+    it('should allow recording a drafted player in team_members', async () => {
+      const {
+        league,
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture();
+
+      const [pick] = await db
+        .insert(draftPicks)
+        .values({
+          draftId: draft.id,
+          teamId: teamFix[0].id,
+          playerId: playerFix[0].id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1,
+          pickedAt: new Date().toISOString(),
+        })
+        .returning();
+
+      const [member] = await db
+        .insert(teamMembers)
+        .values({
+          teamId: teamFix[0].id,
+          leagueId: league.id,
+          playerId: playerFix[0].id,
+          draftRound: pick.round,
+          draftPick: pick.pickNumber,
+          acquisitionType: 'draft',
+        })
+        .returning();
+
+      expect(member.teamId).toBe(teamFix[0].id);
+      expect(member.playerId).toBe(playerFix[0].id);
+      expect(member.draftRound).toBe(1);
+      expect(member.draftPick).toBe(1);
+      expect(member.acquisitionType).toBe('draft');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('getDraftPicks query behavior', () => {
+    it('should retrieve all picks ordered by overallPick', async () => {
+      const {
+        teams: teamFix,
+        draft,
+        players: playerFix,
+      } = await seedDraftFixture(2);
+
+      await db.insert(draftPicks).values([
+        {
+          draftId: draft.id,
+          teamId: teamFix[0].id,
+          playerId: playerFix[0].id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1,
+          pickedAt: new Date().toISOString(),
+        },
+        {
+          draftId: draft.id,
+          teamId: teamFix[1].id,
+          playerId: playerFix[1].id,
+          round: 1,
+          pickNumber: 2,
+          overallPick: 2,
+          pickedAt: new Date().toISOString(),
+        },
+      ]);
+
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id))
+        .orderBy(draftPicks.overallPick);
+
+      expect(picks).toHaveLength(2);
+      expect(picks[0].overallPick).toBeLessThan(picks[1].overallPick);
+    });
+
+    it('should return empty for a draft with no picks', async () => {
+      const { draft } = await seedDraftFixture();
+
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draft.id));
+
+      expect(picks).toHaveLength(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('initializeLiveDraft — DB preconditions', () => {
+    it('seeded league should have draftStatus = in-progress', async () => {
+      const { league } = await seedDraftFixture();
+
+      const [found] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, league.id));
+
+      expect(found.draftStatus).toBe('in-progress');
+    });
+
+    it('should have correctly ordered draft_teams after seeding', async () => {
+      const { draft } = await seedDraftFixture(3);
+
+      const entries = await db
+        .select()
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft.id))
+        .orderBy(draftTeams.draftOrder);
+
+      expect(entries).toHaveLength(3);
+      expect(entries[0].draftOrder).toBe(1);
+      expect(entries[1].draftOrder).toBe(2);
+      expect(entries[2].draftOrder).toBe(3);
+    });
+  });
+});

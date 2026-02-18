@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type DraftCompletedNotification,
+  type DraftPickNotification,
+  type DraftStartedNotification,
   type MatchupStatsCompleteNotification,
   type NotificationData,
   type PlayerStatsLoadingNotification,
@@ -39,6 +41,8 @@ const noop = () => {
 // Re-export types for backward compatibility
 export type {
   DraftCompletedNotification,
+  DraftPickNotification,
+  DraftStartedNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
@@ -52,7 +56,9 @@ interface UseWebSocketOptions {
   matchupId?: number;
   viewContext?: 'general' | 'league' | 'matchup' | 'roster';
   autoConnect?: boolean;
+  onDraftStarted?: (notification: DraftStartedNotification) => void;
   onDraftCompleted?: (notification: DraftCompletedNotification) => void;
+  onDraftPickMade?: (notification: DraftPickNotification) => void;
   onPlayerStatsLoading?: (notification: PlayerStatsLoadingNotification) => void;
   onPlayerStatsUpdated?: (notification: PlayerStatsUpdatedNotification) => void;
   onMatchupStatsComplete?: (
@@ -86,7 +92,9 @@ export function useWebSocket({
   matchupId,
   viewContext = 'general',
   autoConnect = true,
+  onDraftStarted,
   onDraftCompleted,
+  onDraftPickMade,
   onPlayerStatsLoading,
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
@@ -179,6 +187,18 @@ export function useWebSocket({
         })
       : noop;
 
+    const unsubscribeDraftStarted = onDraftStarted
+      ? client.on('draft-started', (notification: NotificationData) => {
+          onDraftStarted(notification as DraftStartedNotification);
+        })
+      : noop;
+
+    const unsubscribeDraftPickMade = onDraftPickMade
+      ? client.on('draft-pick-made', (notification: NotificationData) => {
+          onDraftPickMade(notification as DraftPickNotification);
+        })
+      : noop;
+
     const unsubscribePlayerStatsLoading = onPlayerStatsLoading
       ? client.on('player-stats-loading', (notification: NotificationData) => {
           onPlayerStatsLoading(notification as PlayerStatsLoadingNotification);
@@ -209,6 +229,8 @@ export function useWebSocket({
       unsubscribeError();
       unsubscribeMessage();
       unsubscribeDraftCompleted();
+      unsubscribeDraftStarted();
+      unsubscribeDraftPickMade();
       unsubscribePlayerStatsLoading();
       unsubscribePlayerStatsUpdated();
       unsubscribeMatchupStatsComplete();
@@ -221,7 +243,9 @@ export function useWebSocket({
     matchupId,
     viewContext,
     autoConnect,
+    onDraftStarted,
     onDraftCompleted,
+    onDraftPickMade,
     onPlayerStatsLoading,
     onPlayerStatsUpdated,
     onMatchupStatsComplete,

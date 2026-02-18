@@ -109,6 +109,9 @@ export const drafts = pgTable(
     draftType: draftType('draft_type').notNull(),
     date: date('date'),
     draftOrder: draftOrder('draft_order').default('snake').notNull(),
+    currentPick: integer('current_pick').notNull().default(0),
+    draftStartedAt: timestamp('draft_started_at', { withTimezone: true }),
+    draftCompletedAt: timestamp('draft_completed_at', { withTimezone: true }),
   },
   (table) => {
     return {
@@ -216,6 +219,62 @@ export const draftTeams = pgTable(
   },
 );
 
+export const draftPicks = pgTable(
+  'draft_picks',
+  {
+    id: serial('id').primaryKey().notNull(),
+    draftId: integer('draft_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    round: integer('round').notNull(),
+    pickNumber: integer('pick_number').notNull(),
+    overallPick: integer('overall_pick').notNull(),
+    pickedAt: timestamp('picked_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      draftPicksDraftsIdFk: foreignKey({
+        columns: [table.draftId],
+        foreignColumns: [drafts.id],
+        name: 'draft_picks_drafts_id_fk',
+      }).onDelete('cascade'),
+      draftPicksTeamsIdFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'draft_picks_teams_id_fk',
+      }),
+      draftPicksPlayersIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'draft_picks_players_id_fk',
+      }),
+      draftPicksUkDraftOverall: unique('draft_picks_uk_draft_overall').on(
+        table.draftId,
+        table.overallPick,
+      ),
+      draftPicksUkDraftPlayer: unique('draft_picks_uk_draft_player').on(
+        table.draftId,
+        table.playerId,
+      ),
+      draftIdIdx: index('draft_picks_draft_id_idx').on(table.draftId),
+      teamIdIdx: index('draft_picks_team_id_idx').on(table.teamId),
+      playerIdIdx: index('draft_picks_player_id_idx').on(table.playerId),
+      overallPickIdx: index('draft_picks_overall_pick_idx').on(
+        table.draftId,
+        table.overallPick,
+      ),
+    };
+  },
+);
+
 export const leaguePosition = pgTable(
   'league_positions',
   {
@@ -249,6 +308,11 @@ export const teamMembers = pgTable(
     leagueId: integer('league_id').notNull(),
     playerId: integer('player_id').notNull(),
     positionId: integer('position_id'),
+    draftRound: integer('draft_round'),
+    draftPick: integer('draft_pick'),
+    acquisitionType: varchar('acquisition_type', { length: 20 }).default(
+      'draft',
+    ),
   },
   (table) => {
     return {

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 
 /**
  * SQLite schema definitions for integration tests.
@@ -57,20 +57,6 @@ export const players = sqliteTable('players', {
   brefId: text('bref_id').unique(),
 });
 
-export const teamMembers = sqliteTable('team_members', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  teamId: integer('team_id')
-    .notNull()
-    .references(() => teams.id, { onDelete: 'cascade' }),
-  leagueId: integer('league_id')
-    .notNull()
-    .references(() => leagues.id, { onDelete: 'cascade' }),
-  playerId: integer('player_id')
-    .notNull()
-    .references(() => players.id, { onDelete: 'cascade' }),
-  positionId: integer('position_id'),
-});
-
 export const matchups = sqliteTable('matchups', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   leagueId: integer('league_id')
@@ -109,6 +95,9 @@ export const drafts = sqliteTable('drafts', {
   draftType: text('draft_type'),
   date: text('date'), // DATE stored as ISO string in SQLite
   draftOrder: text('draft_order').notNull(),
+  currentPick: integer('current_pick').notNull().default(0),
+  draftStartedAt: text('draft_started_at'), // Timestamp as ISO string
+  draftCompletedAt: text('draft_completed_at'), // Timestamp as ISO string
 });
 
 export const draftTeams = sqliteTable('draft_teams', {
@@ -124,6 +113,53 @@ export const draftTeams = sqliteTable('draft_teams', {
   draftOrder: integer('draft_order').notNull().unique(),
 });
 
+export const draftPicks = sqliteTable(
+  'draft_picks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    draftId: integer('draft_id')
+      .notNull()
+      .references(() => drafts.id, { onDelete: 'cascade' }),
+    teamId: integer('team_id')
+      .notNull()
+      .references(() => teams.id),
+    playerId: integer('player_id')
+      .notNull()
+      .references(() => players.id),
+    round: integer('round').notNull(),
+    pickNumber: integer('pick_number').notNull(),
+    overallPick: integer('overall_pick').notNull(),
+    pickedAt: text('picked_at').notNull(), // Timestamp as ISO string
+  },
+  (table) => ({
+    uniqueDraftPlayer: unique().on(table.draftId, table.playerId),
+    uniqueOverallPick: unique().on(table.draftId, table.overallPick),
+  }),
+);
+
+export const teamMembers = sqliteTable(
+  'team_members',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    teamId: integer('team_id').references(() => teams.id, {
+      onDelete: 'cascade',
+    }),
+    leagueId: integer('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    playerId: integer('player_id')
+      .notNull()
+      .references(() => players.id),
+    positionId: integer('position_id'),
+    draftRound: integer('draft_round'),
+    draftPick: integer('draft_pick'),
+    acquisitionType: text('acquisition_type').default('draft'),
+  },
+  (table) => ({
+    uniqueTeamPlayer: unique().on(table.teamId, table.playerId),
+  }),
+);
+
 // Export all tables as a schema object for easier imports
 export const integrationTestSchema = {
   users,
@@ -136,4 +172,5 @@ export const integrationTestSchema = {
   matchupPlayers,
   drafts,
   draftTeams,
+  draftPicks,
 };

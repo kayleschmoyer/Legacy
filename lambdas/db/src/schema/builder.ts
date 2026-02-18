@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
+import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { type Loaders } from './dataloaders';
 
 // Initialize database service
@@ -23,6 +24,7 @@ export interface Context {
   } | null;
   loaders: Loaders; // DataLoaders for batching queries
   db: GenericDatabase<typeof PublicSchema>; // Shared database connection for this request
+  notificationService?: WebSocketNotificationService | null; // WebSocket notification service
 }
 
 // Define the schema builder with comprehensive types

@@ -84,20 +84,7 @@ async function createTestSchema(
     )
   `);
 
-  // Create team_members table (for CASCADE delete testing)
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS team_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      team_id INTEGER NOT NULL,
-      league_id INTEGER NOT NULL,
-      player_id INTEGER NOT NULL,
-      position_id INTEGER,
-      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
-      FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-      UNIQUE(team_id, player_id)
-    )
-  `);
+  // team_members is created later (after draft_picks) with full draft columns
 
   // Create matchups table
   await db.run(sql`
@@ -140,6 +127,9 @@ async function createTestSchema(
       draft_type TEXT NOT NULL,
       date TEXT,
       draft_order TEXT NOT NULL,
+      current_pick INTEGER NOT NULL DEFAULT 0,
+      draft_started_at TEXT,
+      draft_completed_at TEXT,
       FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
     )
   `);
@@ -154,6 +144,43 @@ async function createTestSchema(
       FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE CASCADE,
       FOREIGN KEY (team_id) REFERENCES teams(id),
       FOREIGN KEY (league_id) REFERENCES leagues(id)
+    )
+  `);
+
+  // Create draft_picks table
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS draft_picks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      draft_id INTEGER NOT NULL,
+      team_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      round INTEGER NOT NULL,
+      pick_number INTEGER NOT NULL,
+      overall_pick INTEGER NOT NULL,
+      picked_at TEXT NOT NULL,
+      FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE CASCADE,
+      FOREIGN KEY (team_id) REFERENCES teams(id),
+      FOREIGN KEY (player_id) REFERENCES players(id),
+      UNIQUE (draft_id, player_id),
+      UNIQUE (draft_id, overall_pick)
+    )
+  `);
+
+  // Create team_members table
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS team_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id INTEGER,
+      league_id INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      position_id INTEGER,
+      draft_round INTEGER,
+      draft_pick INTEGER,
+      acquisition_type TEXT DEFAULT 'draft',
+      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+      FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE,
+      FOREIGN KEY (player_id) REFERENCES players(id),
+      UNIQUE(team_id, player_id)
     )
   `);
 
@@ -224,14 +251,15 @@ export async function cleanupTestData(): Promise<void> {
     'matchup_players',
     'matchups',
     'team_members',
+    'draft_picks',
+    'draft_teams',
+    'league_members', // must be before teams (references teams.id)
     'teams',
-    'league_members',
     'league_positions',
     'league_messages',
     'league_scoring_change_log',
     'league_scoring_profile_entries',
     'league_scoring_profiles',
-    'draft_teams',
     'drafts',
     'leagues',
     'users',

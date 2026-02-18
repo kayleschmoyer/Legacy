@@ -2,8 +2,11 @@
 
 exports[`Drafts Resolver - Integration Tests CRUD Operations should create a draft with all fields 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "normal",
   "id": 1,
   "leagueId": 1,
@@ -12,8 +15,11 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should create a dra
 
 exports[`Drafts Resolver - Integration Tests CRUD Operations should read a draft by id 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "blind",
   "id": 1,
   "leagueId": 1,
@@ -22,8 +28,11 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should read a draft
 
 exports[`Drafts Resolver - Integration Tests CRUD Operations should update draft type 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "legacy",
   "id": 1,
   "leagueId": 1,
@@ -32,8 +41,11 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should update draft
 
 exports[`Drafts Resolver - Integration Tests Draft Orders should support normal draft order 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "normal",
+  "draftStartedAt": null,
   "draftType": "normal",
   "id": 1,
   "leagueId": 1,
@@ -42,8 +54,11 @@ exports[`Drafts Resolver - Integration Tests Draft Orders should support normal 
 
 exports[`Drafts Resolver - Integration Tests Draft Orders should support snake draft order 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "normal",
   "id": 1,
   "leagueId": 1,
@@ -52,8 +67,11 @@ exports[`Drafts Resolver - Integration Tests Draft Orders should support snake d
 
 exports[`Drafts Resolver - Integration Tests Draft Types should support blind draft type 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "blind",
   "id": 1,
   "leagueId": 1,
@@ -62,8 +80,11 @@ exports[`Drafts Resolver - Integration Tests Draft Types should support blind dr
 
 exports[`Drafts Resolver - Integration Tests Draft Types should support legacy draft type 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "legacy",
   "id": 1,
   "leagueId": 1,
@@ -72,8 +93,11 @@ exports[`Drafts Resolver - Integration Tests Draft Types should support legacy d
 
 exports[`Drafts Resolver - Integration Tests Draft Types should support normal draft type 1`] = `
 {
+  "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
+  "draftCompletedAt": null,
   "draftOrder": "snake",
+  "draftStartedAt": null,
   "draftType": "normal",
   "id": 1,
   "leagueId": 1,

@@ -3,6 +3,7 @@ import {
   leagues,
   teams,
   drafts,
+  draftPicks,
   leagueMessages,
   leagueMembers,
   draftTeams,
@@ -27,6 +28,7 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
     references: [leagues.id],
   }),
   draftTeams: many(draftTeams),
+  draftPicks: many(draftPicks),
   matchupsAsTeam1: many(matchups, { relationName: 'team1' }),
   matchupsAsTeam2: many(matchups, { relationName: 'team2' }),
 }));
@@ -46,6 +48,22 @@ export const draftsRelations = relations(drafts, ({ one, many }) => ({
     references: [leagues.id],
   }),
   draftTeams: many(draftTeams),
+  draftPicks: many(draftPicks),
+}));
+
+export const draftPicksRelations = relations(draftPicks, ({ one }) => ({
+  draft: one(drafts, {
+    fields: [draftPicks.draftId],
+    references: [drafts.id],
+  }),
+  team: one(teams, {
+    fields: [draftPicks.teamId],
+    references: [teams.id],
+  }),
+  player: one(players, {
+    fields: [draftPicks.playerId],
+    references: [players.id],
+  }),
 }));
 
 export const leagueMessagesRelations = relations(leagueMessages, ({ one }) => ({

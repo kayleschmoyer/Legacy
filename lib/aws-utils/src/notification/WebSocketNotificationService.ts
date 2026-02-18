@@ -27,6 +27,28 @@ export interface DraftCompletedNotification {
   completedAt: string;
 }
 
+export interface DraftStartedNotification {
+  type: 'DRAFT_STARTED';
+  leagueId: number;
+  draftId: number;
+  draftOrder: string;
+  teamCount: number;
+  startedAt: string;
+}
+
+export interface DraftPickNotification {
+  type: 'DRAFT_PICK_MADE';
+  leagueId: number;
+  draftId: number;
+  pickId: number;
+  teamId: number;
+  playerId: number;
+  round: number;
+  pickNumber: number;
+  overallPick: number;
+  pickedAt: string;
+}
+
 export interface PlayerStatsLoadingNotification {
   type: 'PLAYER_STATS_LOADING';
   playerId: number;
@@ -291,6 +313,85 @@ export class WebSocketNotificationService {
     LOGGER.info('Sending draft completion notification', {
       leagueId,
       draftType,
+    });
+
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
+  }
+
+  /**
+   * Send draft started notification to all connections for a specific league
+   */
+  async notifyDraftStarted(
+    leagueId: number,
+    draftId: number,
+    draftOrder: string,
+    teamCount: number,
+  ): Promise<void> {
+    const notification: DraftStartedNotification = {
+      type: 'DRAFT_STARTED',
+      leagueId,
+      draftId,
+      draftOrder,
+      teamCount,
+      startedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft started notification', {
+      leagueId,
+      draftId,
+      draftOrder,
+      teamCount,
+    });
+
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
+  }
+
+  /**
+   * Send draft pick notification to all connections for a specific league
+   */
+  async notifyDraftPickMade(
+    leagueId: number,
+    draftId: number,
+    pickId: number,
+    teamId: number,
+    playerId: number,
+    round: number,
+    pickNumber: number,
+    overallPick: number,
+  ): Promise<void> {
+    const notification: DraftPickNotification = {
+      type: 'DRAFT_PICK_MADE',
+      leagueId,
+      draftId,
+      pickId,
+      teamId,
+      playerId,
+      round,
+      pickNumber,
+      overallPick,
+      pickedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft pick notification', {
+      leagueId,
+      draftId,
+      teamId,
+      playerId,
+      round,
+      pickNumber,
+      overallPick,
     });
 
     await this.broadcast(
