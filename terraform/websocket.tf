@@ -176,7 +176,6 @@ resource "aws_ssm_parameter" "websocket_lambda_version" {
   name  = "/legacy-sports/${var.environment}/lambda/websocket/version"
   type  = "String"
   value = "initial"
-  overwrite = true
 
   tags = local.common_tags
 

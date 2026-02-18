@@ -12,6 +12,7 @@ on:
       - "Upload Draft Processor Lambda"
       - "Upload Game Selection Lambda"
       - "Upload OAuth Proxy Lambda"
+      - "Upload WebSocket Lambda"
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -91,7 +92,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~1.13"
+          terraform_version: "~> 1.14"
 
       - name: Initialize Terraform
         working-directory: terraform

@@ -89,5 +89,6 @@ output "lambda_version_parameters" {
     stats          = aws_ssm_parameter.stats_lambda_version.name
     oauth_proxy    = aws_ssm_parameter.oauth_proxy_lambda_version.name
     game_selection = aws_ssm_parameter.game_selection_lambda_version.name
+    websocket      = aws_ssm_parameter.websocket_lambda_version.name
   }
 }

@@ -4,7 +4,6 @@
 *.tfvars.backup
 *.tfplan
 .terraform/
-.terraform.lock.hcl
 
 # Lambda deployment packages
 *.zip
