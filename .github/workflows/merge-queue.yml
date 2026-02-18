@@ -17,8 +17,11 @@ on:
     types:
       - labeled # When merge-when-ready label is added
       - unlabeled # When label is removed
-      - synchronize # When new commits are pushed
-      - reopened # When PR is reopened
+      # NOTE: 'synchronize' and 'reopened' are intentionally omitted.
+      # They fire before CI registers check runs on the new SHA, which causes
+      # validateStatusChecks to see an empty check list and incorrectly conclude
+      # all checks are passing — merging the PR before CI has even started.
+      # The 'workflow_run' trigger below handles re-evaluation once CI finishes.
   # Trigger on PR review events
   pull_request_review:
     types: [submitted] # When someone approves/requests changes
@@ -42,7 +45,7 @@ jobs:
         github.event_name == 'pull_request_review' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready') ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'merge-when-ready') ||
-        (github.event_name == 'pull_request' && contains(fromJSON('["synchronize", "reopened"]'), github.event.action))
+        false /* synchronize/reopened removed - handled by workflow_run after CI completes */
       )
     runs-on: ubuntu-latest
     permissions:
@@ -200,6 +203,15 @@ jobs:
               
               const failingChecks = [];
               const pendingChecks = [];
+              
+              // Guard: if no check runs exist yet for this SHA, CI hasn't started.
+              // Treat this as pending rather than all-passing to avoid premature merges.
+              const relevantChecks = checks.data.check_runs.filter(
+                c => c.name !== 'process-merge-queue' && c.name !== 'manage-merge-queue'
+              );
+              if (relevantChecks.length === 0) {
+                pendingChecks.push('CI checks not yet registered for this SHA');
+              }
               
               // Validate check runs
               for (const check of checks.data.check_runs) {
