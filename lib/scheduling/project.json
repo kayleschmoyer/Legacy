@@ -4,25 +4,12 @@
   "sourceRoot": "lib/scheduling/src",
   "projectType": "library",
   "targets": {
+    "typecheck": {},
     "lint": {
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],
       "options": {
         "lintFilePatterns": ["lib/scheduling/**/*.ts"]
-      }
-    },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
-      "options": {
-        "jestConfig": "lib/scheduling/jest.config.ts",
-        "passWithNoTests": false
-      }
-    },
-    "typecheck": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc --project lib/scheduling/tsconfig.lib.json --noEmit"
       }
     }
   },

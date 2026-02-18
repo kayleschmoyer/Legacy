@@ -1,6 +1,6 @@
-/* eslint-disable */
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'scoring',
-  preset: '../../jest.preset.js',
-  coverageDirectory: '../../coverage/lib/scoring',
-};
+  projectPath: 'lib/scoring',
+});

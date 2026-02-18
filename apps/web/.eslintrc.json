@@ -2,6 +2,7 @@
   "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
   "ignorePatterns": [
     "!**/*",
+    "jest.config.ts",
     "**/vite.config.*.timestamp*",
     "**/vitest.config.*.timestamp*",
     "mocks/**",

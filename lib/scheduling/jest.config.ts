@@ -1,11 +1,11 @@
-/* eslint-disable */
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'scheduling',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  transform: {
-    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.lib.json' }],
+  projectPath: 'lib/scheduling',
+  overrides: {
+    transform: {
+      '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+    },
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/lib/scheduling',
-};
+});

@@ -1,29 +1,12 @@
 {
-  "root": true,
-  "ignorePatterns": ["!**/*", "dist"],
-  "plugins": ["@nx"],
+  "extends": ["../../.eslintrc.json"],
+  "ignorePatterns": ["!**/*", "jest.config.ts", "dist", "node_modules"],
   "overrides": [
     {
-      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
-      "rules": {
-        "@nx/enforce-module-boundaries": [
-          "error",
-          {
-            "enforceBuildableLibDependency": true,
-            "allow": [],
-            "depConstraints": [
-              {
-                "sourceTag": "*",
-                "onlyDependOnLibsWithTags": ["*"]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "files": ["*.ts", "*.tsx"],
-      "extends": ["plugin:@nx/typescript"],
+      "parserOptions": {
+        "project": ["tsconfig.*?.json"]
+      },
       "rules": {}
     }
   ]

@@ -3,12 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/oauth-proxy",
   "projectType": "application",
-  "tags": [
-    "lambda",
-    "platform:node",
-    "scope:lambda",
-    "type:auth"
-  ],
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:auth"],
   "targets": {
     "build": {
       "extends": "build:lambda",
@@ -27,9 +22,7 @@
     },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "echo 'Legacy serverless package command. Use nx deploy oauth-proxy instead.'",
         "cwd": "lambdas/oauth-proxy"
@@ -37,9 +30,7 @@
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "../../scripts/deploy-lambda.ps1 -FunctionName oauth-proxy",
         "cwd": "lambdas/oauth-proxy"
@@ -47,9 +38,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for OAuth proxy lambda...'",
@@ -91,18 +80,6 @@
         "command": "tsx watch --tsconfig ../../tsconfig.base.json src/dev.ts",
         "cwd": "lambdas/oauth-proxy"
       }
-    },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{projectRoot}"
-      ],
-      "options": {
-        "jestConfig": "lambdas/oauth-proxy/jest.config.ts"
-      }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint"
     }
   }
 }

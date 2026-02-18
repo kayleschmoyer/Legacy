@@ -1,11 +1,11 @@
-export default {
+﻿import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+export default createNodeJestConfig({
   displayName: 'api',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  transform: {
-    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+  projectPath: 'lib/api',
+  overrides: {
+    passWithNoTests: true,
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/lib/api',
-  passWithNoTests: true,
-};
+});

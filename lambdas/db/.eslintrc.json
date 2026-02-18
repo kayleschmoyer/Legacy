@@ -2,14 +2,11 @@
   "extends": ["../../.eslintrc.json"],
   "ignorePatterns": [
     "!**/*",
-    ".expo",
-    "web-build",
-    "cache",
+    "jest.config.ts",
     "dist",
     "src/.startup.ts",
-    "node_modules/**/*",
-    "**/node_modules/**",
-    "index.js"
+    "index.js",
+    "node_modules"
   ],
   "overrides": [
     {

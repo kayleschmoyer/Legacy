@@ -1,11 +1,6 @@
-/* eslint-disable */
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'websocket-client',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  transform: {
-    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
-  },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/lib/websocket-client',
-};
+  projectPath: 'lib/websocket-client',
+});

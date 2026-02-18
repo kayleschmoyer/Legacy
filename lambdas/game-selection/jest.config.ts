@@ -1,12 +1,9 @@
-/* eslint-disable */
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'game-selection',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  setupFiles: ['<rootDir>/src/setup-tests.ts'],
-  transform: {
-    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+  projectPath: 'lambdas/game-selection',
+  overrides: {
+    setupFiles: ['<rootDir>/src/setup-tests.ts'],
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/lambdas/game-selection',
-};
+});

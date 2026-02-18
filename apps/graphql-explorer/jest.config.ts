@@ -1,4 +1,4 @@
-export default {
+﻿export default {
   displayName: 'graphql-explorer',
   preset: '../../jest.preset.js',
   transform: {

@@ -8,8 +8,14 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
       "options": {
-        "jestConfig": "apps/cli-e2e/jest.config.json",
+        "jestConfig": "apps/cli-e2e/jest.config.ts",
         "passWithNoTests": true
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo cli-e2e: CLI e2e tests require a built CLI. Run nx e2e cli-e2e after building the CLI app."
       }
     }
   },

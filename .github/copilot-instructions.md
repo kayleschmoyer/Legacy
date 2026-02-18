@@ -33,5 +33,9 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | DB queries                 | `docs/agents/database-query-guide.md`           |
 | Architecture               | `copilot/architecture-summary.md`               |
 | Full workflow              | `docs/guides/ai-agent-contribution-workflow.md` |
-| Skills (17 guides)         | `copilot/skills/`                               |
+| **New library**            | `copilot/skills/create-lib.md`                  |
+| **New lambda**             | `copilot/skills/create-lambda.md`               |
+| **New app**                | `copilot/skills/create-app.md`                  |
+| **Config reference**       | `copilot/skills/config-standards.md`            |
+| Skills (21 guides)         | `copilot/skills/`                               |
 | CSV patterns               | `docs/agents/*.csv`                             |

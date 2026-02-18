@@ -1,31 +1,31 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  formatVersionInfo,
   getDbOptions,
+  getVersionInfo,
   isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
-  getVersionInfo,
-  formatVersionInfo,
 } from '@legacy-sports/utils';
 import {
-  SqsDraftMessage,
-  DraftProcessingResult,
   createNotificationService,
+  DraftProcessingResult,
+  SqsDraftMessage,
 } from '@legacy-sports/aws-utils';
 import {
+  addBreadcrumb,
+  captureError,
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-  captureError,
-  addBreadcrumb,
 } from '@legacy-sports/sentry';
 import {
-  runWithPublicClient,
-  PublicSchema,
   PublicDb,
-  validateUserAccess,
+  PublicSchema,
+  runWithPublicClient,
   updateLeagueDraftStatus,
   validateDraftType,
+  validateUserAccess,
 } from '@legacy-sports/db-client';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
@@ -354,10 +354,6 @@ const BATTING_POSITIONS = Object.freeze(
 function canPlayerPlayPosition(
   playerEligiblePositions: string[],
   requiredPosition: string,
-  _positionDetails?: Record<
-    string,
-    { games: number; gamesStarted: number; position: string }
-  >,
 ): boolean {
   // Use same core logic as GraphQL API: lib/shared-components/src/utils/PositionModels.ts
   const allowedPositions =
@@ -421,13 +417,7 @@ function getPositionScore(
     { games: number; gamesStarted: number; position: string }
   >,
 ): number {
-  if (
-    !canPlayerPlayPosition(
-      playerEligiblePositions,
-      requiredPosition,
-      positionDetails,
-    )
-  ) {
+  if (!canPlayerPlayPosition(playerEligiblePositions, requiredPosition)) {
     return 0;
   }
 
@@ -738,7 +728,6 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             const canPlay = canPlayerPlayPosition(
               player.eligiblePositions,
               position.positionType,
-              player.positionDetails,
             );
             if (!canPlay) {
               LOGGER.debug(
@@ -952,10 +941,10 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
 
         await tx.insert(PublicSchema.teamMembers).values(
           assignments.map((assignment) => ({
-            teamId: assignment.teamId as number,
-            leagueId: assignment.leagueId as number,
-            playerId: assignment.playerId as number,
-            positionId: assignment.positionId as number | null, // null for bench slots
+            teamId: assignment.teamId,
+            leagueId: assignment.leagueId,
+            playerId: assignment.playerId,
+            positionId: assignment.positionId, // null for bench slots
           })),
         );
 
@@ -1104,7 +1093,7 @@ async function processDraftMessage(
         // TODO: Implement auction draft logic
         throw new Error('Auction draft not yet implemented');
       default:
-        throw new Error(`Unknown draft type: ${draftType}`);
+        throw new Error(`Unknown draft type: ${String(draftType)}`);
     }
 
     addBreadcrumb('Draft processing completed successfully', {
@@ -1259,7 +1248,7 @@ const baseDraftProcessorHandler = async (
 
   for (const record of event.Records) {
     try {
-      const message: SqsDraftMessage = JSON.parse(record.body);
+      const message = JSON.parse(record.body) as SqsDraftMessage;
 
       addBreadcrumb('Processing draft message', {
         messageId: record.messageId,
@@ -1269,7 +1258,7 @@ const baseDraftProcessorHandler = async (
 
       // Validate message format
       if (message.messageType !== 'START_DRAFT') {
-        throw new Error(`Invalid message type: ${message.messageType}`);
+        throw new Error(`Invalid message type: ${String(message.messageType)}`);
       }
 
       const result = await processDraftMessage(message);

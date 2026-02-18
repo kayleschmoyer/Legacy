@@ -29,6 +29,10 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | DB queries      | `docs/agents/database-query-guide.md`                            |
 | Architecture    | `.github/copilot/architecture-summary.md`                        |
 | Type/lint fixes | `.github/copilot/tasks/`                                         |
-| Skills (17)     | `.github/copilot/skills/`                                        |
+| **New library** | `.github/copilot/skills/create-lib.md`                           |
+| **New lambda**  | `.github/copilot/skills/create-lambda.md`                        |
+| **New app**     | `.github/copilot/skills/create-app.md`                           |
+| **Config ref**  | `.github/copilot/skills/config-standards.md`                     |
+| Skills (21)     | `.github/copilot/skills/`                                        |
 | CSV patterns    | `docs/agents/`                                                   |
 | Tech stack      | React Native Next.js Lambda GraphQL PostgreSQL/Drizzle Terraform |

@@ -40,16 +40,6 @@
       }
     },
     {
-      "plugin": "@nx/vite/plugin",
-      "exclude": ["lambdas/**"],
-      "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "previewTargetName": "preview",
-        "testTargetName": "test"
-      }
-    },
-    {
       "plugin": "@nx/storybook/plugin",
       "options": {
         "buildStorybookTargetName": "build-storybook",
@@ -165,9 +155,21 @@
         }
       ],
       "options": {
-        "command": "tsc --noEmit"
+        "command": "tsc --noEmit -p tsconfig.lib.json",
+        "cwd": "{projectRoot}"
       },
       "parallelism": false
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "coverageReporters": ["text"]
+        }
+      }
     },
     "build-android": {
       "cache": true,

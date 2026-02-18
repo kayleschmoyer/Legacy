@@ -1,6 +1,13 @@
 {
   "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", ".expo", "web-build", "cache", "dist"],
+  "ignorePatterns": [
+    "!**/*",
+    "jest.config.ts",
+    ".expo",
+    "web-build",
+    "cache",
+    "dist"
+  ],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],

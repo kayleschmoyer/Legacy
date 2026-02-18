@@ -1,10 +1,6 @@
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'tamagui-config',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  transform: {
-    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
-  },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/lib/tamagui-config',
-};
+  projectPath: 'lib/tamagui-config',
+});

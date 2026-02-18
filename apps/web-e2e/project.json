@@ -3,16 +3,8 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/web-e2e/src",
   "projectType": "application",
-  "tags": [
-    "platform:web",
-    "scope:e2e",
-    "scope:web",
-    "type:e2e",
-    "type:test"
-  ],
-  "implicitDependencies": [
-    "web"
-  ],
+  "tags": ["platform:web", "scope:e2e", "scope:web", "type:e2e", "type:test"],
+  "implicitDependencies": ["web"],
   "// targets": "to see all targets run: nx show project web-e2e --web",
   "targets": {
     "e2e": {
@@ -65,7 +57,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node -e \"console.log('\\n✅ web-e2e: Playwright tests configured successfully!\\n✅ Run \\\"nx e2e web-e2e\\\" to execute e2e tests with a running server.\\n✅ Tests require web server at localhost:4200\\n'); process.exit(0);\""
+        "command": "echo web-e2e: Playwright tests configured successfully. Run nx e2e web-e2e to execute e2e tests with a running server."
       },
       "configurations": {
         "full": {
@@ -75,13 +67,9 @@
     },
     "lint": {
       "executor": "@nx/eslint:lint",
-      "outputs": [
-        "{options.outputFile}"
-      ],
+      "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": [
-          "apps/web-e2e/**/*.{ts,tsx,js,jsx}"
-        ]
+        "lintFilePatterns": ["apps/web-e2e/**/*.{ts,tsx,js,jsx}"]
       }
     }
   }

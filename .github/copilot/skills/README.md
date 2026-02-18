@@ -50,21 +50,28 @@ Each skill provides comprehensive guidance on executing specific development tas
 18. **[Run Database Migration](db-migrate.md)** - Applying pending migrations
 19. **[Database Connection](db-connect.md)** - Testing database connectivity
 
+### Project Creation Skills
+
+20. **[Create Library](create-lib.md)** ⭐ - Create a new shared library under `lib/`
+21. **[Create Lambda](create-lambda.md)** ⭐ - Create a new AWS Lambda under `lambdas/`
+22. **[Create App](create-app.md)** ⭐ - Create a new app under `apps/`
+23. **[Config Standards](config-standards.md)** - Full reference for config conventions
+
 ### Troubleshooting & Maintenance Skills
 
-20. **[Makefile](makefile.md)** - Complete reference for all `make` targets (the primary task runner)
-21. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
-22. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
-23. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
+24. **[Makefile](makefile.md)** - Complete reference for all `make` targets (the primary task runner)
+25. **[Nx Cache Reset](nx-reset.md)** - Clearing Nx cache when stuck
+26. **[Affected Projects Check](affected-check.md)** - Viewing project dependency graph
+27. **[Workspace Validation](validate-workspace.md)** - Validating workspace integrity
 
 ### Deployment Skills
 
-24. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
-25. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
+28. **[Lambda Deployment](deploy-lambda.md)** - Deploying AWS Lambda functions
+29. **[Terraform Infrastructure](terraform-apply.md)** - Managing AWS infrastructure
 
 ### CLI & Administrative Tools
 
-26. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
+30. **[CLI Usage](cli-usage.md)** - Using the Legacy Sports CLI for database operations, user management, and debugging
 
 ## Skill Structure
 

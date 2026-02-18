@@ -1,7 +1,9 @@
-/* eslint-disable */
-export default {
+﻿const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'load-stats-lambda',
-  preset: '../../jest.preset.js',
-  coverageDirectory: '../../coverage/lambdas/stats-lambda',
-  setupFiles: ['<rootDir>/src/setup-tests.ts'],
-};
+  projectPath: 'lambdas/stats-lambda',
+  overrides: {
+    setupFiles: ['<rootDir>/src/setup-tests.ts'],
+  },
+});

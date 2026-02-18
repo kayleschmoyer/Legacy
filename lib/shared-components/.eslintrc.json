@@ -1,3 +1,63 @@
-{
-  "extends": ["./.eslintrc.cjs"]
+﻿{
+  "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
+  "ignorePatterns": [
+    "!**/*",
+    "jest.config.ts",
+    "dist",
+    "jest-setup.js",
+    "node_modules/**",
+    ".cache/**",
+    "storybook-static/**",
+    ".storybook/**",
+    "**/*.example.tsx",
+    "src/platform-components/wrappers/LazyTable.tsx",
+    "src/features/players/usePlayerProjections.ts"
+  ],
+  "parserOptions": {
+    "project": ["./tsconfig.json", "./tsconfig.lib.json"]
+  },
+  "overrides": [
+    {
+      "files": ["*.js", "*.jsx"],
+      "parser": "espree",
+      "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "module"
+      },
+      "env": {
+        "node": true,
+        "jest": true
+      },
+      "rules": {}
+    },
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "error",
+        "@typescript-eslint/no-unsafe-assignment": "error",
+        "@typescript-eslint/no-unsafe-member-access": "error",
+        "@typescript-eslint/no-unsafe-call": "error",
+        "@typescript-eslint/no-unsafe-return": "error",
+        "@typescript-eslint/no-unsafe-argument": "error",
+        "@typescript-eslint/no-unused-vars": "error",
+        "@typescript-eslint/no-empty-function": "error",
+        "@typescript-eslint/no-empty-interface": "error",
+        "@typescript-eslint/no-misused-promises": "error",
+        "@typescript-eslint/no-floating-promises": "error",
+        "@typescript-eslint/no-var-requires": "error",
+        "@typescript-eslint/no-unnecessary-type-assertion": "error",
+        "@typescript-eslint/no-unsafe-enum-comparison": "error",
+        "@typescript-eslint/no-non-null-assertion": "error",
+        "@typescript-eslint/no-use-before-define": "error",
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "error",
+        "jsx-a11y/accessible-emoji": "error",
+        "sort-imports": "error",
+        "import/order": "error",
+        "react/jsx-no-useless-fragment": "error",
+        "prefer-const": "error",
+        "no-inner-declarations": "error"
+      }
+    }
+  ]
 }

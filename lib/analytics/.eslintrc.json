@@ -1,17 +1,12 @@
 {
   "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*"],
+  "ignorePatterns": ["!**/*", "jest.config.ts"],
   "overrides": [
     {
-      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
-      "rules": {}
-    },
-    {
       "files": ["*.ts", "*.tsx"],
-      "rules": {}
-    },
-    {
-      "files": ["*.js", "*.jsx"],
+      "parserOptions": {
+        "project": ["tsconfig.*?.json"]
+      },
       "rules": {}
     }
   ]

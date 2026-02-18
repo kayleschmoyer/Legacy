@@ -5,21 +5,6 @@
   "projectType": "library",
   "tags": ["platform:shared", "scope:lib", "type:util"],
   "targets": {
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
-      "options": {
-        "jestConfig": "lib/analytics/jest.config.ts"
-      }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint"
-    },
-    "typecheck": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc --noEmit -p lib/analytics/tsconfig.lib.json"
-      }
-    }
+    "typecheck": {}
   }
 }

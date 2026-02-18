@@ -3,12 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lambdas/stats-lambda",
   "projectType": "application",
-  "tags": [
-    "lambda",
-    "platform:node",
-    "scope:lambda",
-    "type:api"
-  ],
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:api"],
   "// targets": "to see all targets run: nx show project stats-lambda --web",
   "targets": {
     "build": {
@@ -26,21 +21,9 @@
         }
       }
     },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{options.outputPath}"
-      ],
-      "options": {
-        "jestConfig": "lambdas/stats-lambda/jest.config.ts",
-        "passWithNoTests": true
-      }
-    },
     "package": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
           "cd lambdas/stats-lambda/dist && (command -v zip > /dev/null 2>&1 && zip -j index.js.zip index.js || echo 'Warning: zip utility not found - skipping packaging. This is expected in DTE environments.')"
@@ -57,9 +40,7 @@
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "command": "../../scripts/deploy-lambda.sh stats",
         "cwd": "lambdas/stats-lambda"
@@ -67,9 +48,7 @@
     },
     "deploy:plan": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "commands": [
           "echo '🔍 Validating Terraform configuration for stats lambda...'",
