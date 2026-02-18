@@ -80,5 +80,15 @@
       "matchCommandLine": true
     }
   },
-  "chat.editing.autoAcceptDelay": 10
+  "chat.editing.autoAcceptDelay": 10,
+  "C_Cpp.files.exclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.nx/**": true,
+    "**/android/build/**": true,
+    "**/android/.gradle/**": true,
+    "**/tmp/**": true,
+    "**/.tamagui/**": true,
+    "**/playwright-report/**": true
+  }
 }

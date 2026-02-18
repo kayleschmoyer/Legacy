@@ -2,15 +2,14 @@ name: "Code Quality Gates"
 description: "Comprehensive code quality validation with formatting, linting, type checking, and intelligent parallel execution"
 
 inputs:
-  execution-mode:
-    description: "Execution mode (distributed/local)"
-    required: true
-  dte-available:
-    description: "Whether DTE is available"
-    required: true
-  optimal-agents:
-    description: "Number of optimal agents/parallel processes"
-    required: true
+  dte-active:
+    description: "Whether a DTE session has already been started by the calling job"
+    required: false
+    default: "false"
+  parallel:
+    description: "Number of parallel processes (used for local execution and distributed max-parallel)"
+    required: false
+    default: "4"
   base-ref:
     description: "Base reference for affected detection"
     required: false
@@ -34,7 +33,7 @@ outputs:
     value: ${{ steps.check-results.outputs.result }}
   dte-quota-exceeded:
     description: "Whether DTE quota was exceeded during execution"
-    value: ${{ steps.distributed.outputs.dte-quota-exceeded || 'false' }}
+    value: ${{ steps.run-tasks.outputs.dte-quota-exceeded || 'false' }}
   formatting-result:
     description: "Code formatting check result"
     value: ${{ steps.formatting.outputs.result }}
@@ -43,25 +42,25 @@ outputs:
     value: ${{ steps.formatting.outputs.failed-projects }}
   lint-result:
     description: "ESLint validation result"
-    value: ${{ steps.distributed.outputs.lint-result || steps.local.outputs.lint-result }}
+    value: ${{ steps.run-tasks.outputs.lint-result }}
   lint-failed-projects:
     description: "Projects that failed lint (comma-separated)"
-    value: ${{ steps.distributed.outputs.lint-failed-projects || steps.local.outputs.lint-failed-projects }}
+    value: ${{ steps.run-tasks.outputs.lint-failed-projects }}
   typecheck-result:
     description: "TypeScript type checking result"
-    value: ${{ steps.distributed.outputs.typecheck-result || steps.local.outputs.typecheck-result }}
+    value: ${{ steps.run-tasks.outputs.typecheck-result }}
   typecheck-failed-projects:
     description: "Projects that failed typecheck (comma-separated)"
-    value: ${{ steps.distributed.outputs.typecheck-failed-projects || steps.local.outputs.typecheck-failed-projects }}
+    value: ${{ steps.run-tasks.outputs.typecheck-failed-projects }}
   test-result:
     description: "Unit tests result"
-    value: ${{ steps.distributed.outputs.test-result || steps.local.outputs.test-result }}
+    value: ${{ steps.run-tasks.outputs.test-result }}
   test-failed-projects:
     description: "Projects that failed tests (comma-separated)"
-    value: ${{ steps.distributed.outputs.test-failed-projects || steps.local.outputs.test-failed-projects }}
+    value: ${{ steps.run-tasks.outputs.test-failed-projects }}
   execution-strategy:
-    description: "Strategy used (distributed/local-affected/local-full)"
-    value: ${{ steps.distributed.outputs.strategy || steps.local.outputs.strategy }}
+    description: "Strategy used (distributed/local)"
+    value: ${{ steps.run-tasks.outputs.strategy }}
 
 runs:
   using: "composite"
@@ -212,122 +211,52 @@ runs:
 
         echo "::endgroup::"
 
-    - name: "⚡ Distributed Quality Gates"
-      id: distributed
-      if: inputs.dte-available == 'true'
+    - name: "⚡ Run Quality Gates"
+      id: run-tasks
       shell: bash
       run: |
-        echo "::group::⚡ Nx Cloud Distributed Task Execution"
+        echo "::group::⚡ Quality Gates (lint · typecheck · test)"
 
-        AGENTS="${{ inputs.optimal-agents }}"
-        echo "🎯 Starting DTE with $AGENTS agents..."
+        PARALLEL="${{ inputs.parallel }}"
 
-        # Start DTE session with automatic agent provisioning
-        # Don't stop agents after build - let them continue for all build targets
-        # This allows build-validation step to also use DTE
-        DTE_START_OUTPUT=$(mktemp)
-        DTE_START_RESULT=0
-
-        if command -v pnpm >/dev/null 2>&1; then
-          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
+        # When dte-active is true, start-ci-run was already called by the job.
+        # Nx will automatically route tasks to the pre-spawned agent runners.
+        # When dte-active is false, disable cloud completely to preserve quota.
+        if [ "${{ inputs.dte-active }}" = "true" ]; then
+          echo "ℹ️ Nx Cloud DTE active — tasks will be distributed to agents"
+          echo "strategy=distributed" >> $GITHUB_OUTPUT
         else
-          pnpm exec nx-cloud start-ci-run --distribute-on="$AGENTS linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
+          echo "ℹ️ Running locally with --parallel=$PARALLEL"
+          export NX_NO_CLOUD=true
+          echo "strategy=local" >> $GITHUB_OUTPUT
         fi
 
-        # Check if DTE start failed - distinguish between auth and quota issues
-        if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|invalid credentials\|minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
-          # Determine specific failure reason
-          if grep -qi "unauthorized\|authorization\|401\|invalid credentials" "$DTE_START_OUTPUT"; then
-            echo "::error title=Nx Cloud Authentication Failed::Invalid or expired NX_CLOUD_ACCESS_TOKEN. Please check your token configuration."
-            echo "🔒 Authentication Error Details:"
-            cat "$DTE_START_OUTPUT"
-          elif grep -qi "minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
-            echo "::warning title=DTE Quota Exhausted::Insufficient agents available for DTE. Falling back to local execution."
-            echo "📊 Agent Availability:"
-            cat "$DTE_START_OUTPUT"
-          else
-            echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable. Falling back to local execution."
-            echo "DTE start output:"
-            cat "$DTE_START_OUTPUT"
-          fi
-          
-          rm -f "$DTE_START_OUTPUT"
-          
-          # Set output to indicate DTE is not actually available
-          echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
-          
-          # Export flag so local execution runs instead
-          echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
-          
-          # Clean up any partial DTE session
-          pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
-          
-          echo "::endgroup::"
-          exit 0
-        fi
-
-        rm -f "$DTE_START_OUTPUT"
-
-        echo "strategy=distributed" >> $GITHUB_OUTPUT
-
-        # Initialize result tracking
         LINT_SUCCESS=true
         TYPECHECK_SUCCESS=true
         TEST_SUCCESS=true
-        LINT_FAILED_PROJECTS=""
-        TYPECHECK_FAILED_PROJECTS=""
-        TEST_FAILED_PROJECTS=""
 
-        echo "🔧 Running lint and typecheck with DTE..."
-        DTE_QUALITY_RESULT=0
-        if $NX_CMD affected -t lint,typecheck --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-quality.log; then
-          echo "✅ Code quality checks passed (DTE)"
+        # ── Lint + Typecheck ──────────────────────────────────────────────────
+        if pnpm exec nx affected -t lint typecheck --parallel="$PARALLEL" 2>&1 | tee quality.log; then
+          echo "✅ Lint and typecheck passed"
           echo "lint-result=success" >> $GITHUB_OUTPUT
           echo "lint-failed-projects=" >> $GITHUB_OUTPUT
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
           echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
         else
-          DTE_QUALITY_RESULT=$?
-          
-          # Check if failure was due to quota, authorization, or insufficient agents
-          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent\|unable to complete" dte-quality.log; then
-            echo "::warning title=DTE Unavailable During Execution::DTE unavailable mid-run (quota, authorization, or insufficient agents). Setting up fallback to local execution."
-            echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
-            echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
-            
-            # Add summary for DTE unavailability
-            echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
-            echo "Nx Cloud DTE became unavailable during quality checks execution (quota exceeded, authorization failed, or insufficient agents)." >> $GITHUB_STEP_SUMMARY
-            echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
-            echo "::endgroup::"
-            exit 0
-          fi
-          
-          echo "❌ Code quality checks failed (DTE)"
-          echo "## DTE Quality Errors"
-          grep -E "error|warning|failed" dte-quality.log | head -20 || true
-          echo "::error::Code quality checks failed in DTE mode. Check dte-quality.log for details."
-
-          # Extract failed projects from Nx output (look for "✖" or "failed" followed by project name)
-          LINT_FAILED_PROJECTS=$(grep -B2 "lint.*failed\|ESLint.*failed" dte-quality.log 2>/dev/null | grep -oE "nx run [^:]+:lint" | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
-          TYPECHECK_FAILED_PROJECTS=$(grep -B2 "typecheck.*failed\|TypeScript.*failed" dte-quality.log 2>/dev/null | grep -oE "nx run [^:]+:typecheck" | sed 's/nx run //;s/:typecheck//' | sort -u | xargs | tr ' ' ',' || echo "")
-
-          # Determine which specific checks failed
-          if grep -q "lint.*failed\|ESLint" dte-quality.log; then
+          if grep -q "lint.*failed\|ESLint" quality.log; then
+            LINT_FAILED=$(grep -oE "nx run [^:]+:lint" quality.log 2>/dev/null | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
             echo "lint-result=failure" >> $GITHUB_OUTPUT
-            echo "lint-failed-projects=$LINT_FAILED_PROJECTS" >> $GITHUB_OUTPUT
+            echo "lint-failed-projects=${LINT_FAILED:-lint}" >> $GITHUB_OUTPUT
             LINT_SUCCESS=false
           else
             echo "lint-result=success" >> $GITHUB_OUTPUT
             echo "lint-failed-projects=" >> $GITHUB_OUTPUT
           fi
 
-          if grep -q "typecheck.*failed\|TypeScript\|TS[0-9]" dte-quality.log; then
+          if grep -q "typecheck.*failed\|TypeScript\|TS[0-9]" quality.log; then
+            TYPECHECK_FAILED=$(grep -oE "nx run [^:]+:typecheck" quality.log 2>/dev/null | sed 's/nx run //;s/:typecheck//' | sort -u | xargs | tr ' ' ',' || echo "")
             echo "typecheck-result=failure" >> $GITHUB_OUTPUT
-            echo "typecheck-failed-projects=$TYPECHECK_FAILED_PROJECTS" >> $GITHUB_OUTPUT
+            echo "typecheck-failed-projects=${TYPECHECK_FAILED:-typecheck}" >> $GITHUB_OUTPUT
             TYPECHECK_SUCCESS=false
           else
             echo "typecheck-result=success" >> $GITHUB_OUTPUT
@@ -335,255 +264,42 @@ runs:
           fi
         fi
 
-        echo "🧪 Running tests with DTE..."
-        if $NX_CMD affected -t test --parallel=$AGENTS --max-parallel=$AGENTS --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} 2>&1 | tee dte-test.log; then
-          echo "✅ Tests passed (DTE)"
+        # ── Tests ─────────────────────────────────────────────────────────────
+        if pnpm exec nx affected -t test --parallel="$PARALLEL" 2>&1 | tee test.log; then
+          echo "✅ Tests passed"
           echo "test-result=success" >> $GITHUB_OUTPUT
           echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
-          # Check if failure was due to quota, authorization, or insufficient agents
-          if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|minimum.*agent\|distributing on.*agent\|unable to complete" dte-test.log; then
-            echo "::warning title=DTE Unavailable During Tests::DTE unavailable during test execution (quota, authorization, or insufficient agents). Setting up fallback to local execution."
-            echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
-            echo "DTE_QUOTA_EXHAUSTED=true" >> $GITHUB_ENV
-            
-            # Add summary for DTE unavailability
-            echo "## ⚠️ DTE Unavailable" >> $GITHUB_STEP_SUMMARY
-            echo "Nx Cloud DTE became unavailable during test execution (quota exceeded, authorization failed, or insufficient agents)." >> $GITHUB_STEP_SUMMARY
-            echo "**Fallback**: Automatically switching to local GitHub Actions runners." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            pnpm exec nx-cloud stop-all-agents >/dev/null 2>&1 || true
-            echo "::endgroup::"
-            exit 0
-          fi
-          
-          echo "❌ Tests failed (DTE)"
-          echo "## DTE Test Errors"
-          grep -E "FAIL|error" dte-test.log | head -10 || true
-          echo "::error::Tests failed in DTE mode. Check dte-test.log for details."
-          
-          # Extract failed projects from test output
-          TEST_FAILED_PROJECTS=$(grep -B2 "test.*failed\|FAIL" dte-test.log 2>/dev/null | grep -oE "nx run [^:]+:test" | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
-          
+          TEST_FAILED=$(grep -oE "nx run [^:]+:test" test.log 2>/dev/null | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
           echo "test-result=failure" >> $GITHUB_OUTPUT
-          echo "test-failed-projects=$TEST_FAILED_PROJECTS" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=${TEST_FAILED:-test}" >> $GITHUB_OUTPUT
           TEST_SUCCESS=false
         fi
 
-        # Check overall success
-        if [ "$LINT_SUCCESS" = true ] && [ "$TYPECHECK_SUCCESS" = true ] && [ "$TEST_SUCCESS" = true ]; then
-          echo "🎉 Distributed execution completed successfully"
+        # ── DTE quota exceeded detection ───────────────────────────────────────
+        # Surface cloud-specific failures separately from real code failures so
+        # the PR comment can show an informative quota warning.
+        if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|401\|minimum.*agent\|unable to complete" quality.log test.log 2>/dev/null; then
+          echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
         else
-          echo "❌ Distributed execution failed"
-          exit 1
+          echo "dte-quota-exceeded=false" >> $GITHUB_OUTPUT
         fi
 
-        echo "::endgroup::"
-
-    - name: "🔧 Local Parallel Quality Gates"
-      id: local
-      if: inputs.dte-available != 'true' || env.DTE_QUOTA_EXHAUSTED == 'true'
-      shell: bash
-      run: |
-        echo "::group::⚡ Parallel Quality Gates (GitHub Actions)"
-
-        # Check why we're running locally
-        if [ "${DTE_QUOTA_EXHAUSTED:-false}" = "true" ]; then
-          echo "⚠️ Running locally due to DTE quota exhaustion"
-          echo "::warning title=Fallback to Local Execution::DTE quota was exhausted, running tests on GitHub Actions runners"
-        else
-          echo "📋 Running locally as DTE is not available"
-        fi
-
-        # Disable Nx Cloud completely when DTE is not available to avoid quota errors
-        unset NX_CLOUD_ACCESS_TOKEN
-        export NX_CLOUD_NO_TIMEOUTS=true
-        export NX_NO_CLOUD=true
-        echo "📋 Using local execution with parallel quality gates"
-        echo "🎯 Running lint, typecheck, and tests in parallel for optimized execution"
-
-        # Check if we have any affected projects to optimize execution
-        AFFECTED_PROJECTS=$($NX_CMD print-affected --select=projects --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --type=lib,app 2>/dev/null || echo "")
-
-        if [ -z "$AFFECTED_PROJECTS" ] || [ "$AFFECTED_PROJECTS" = "" ]; then
-          echo "ℹ️ No affected projects detected - running full validation"
-          EXECUTION_STRATEGY="local-full"
-        else
-          echo "🎯 Affected projects detected: $AFFECTED_PROJECTS"
-          echo "⚡ Using smart affected-only execution"
-          EXECUTION_STRATEGY="local-affected"
-        fi
-
-        echo "strategy=$EXECUTION_STRATEGY" >> $GITHUB_OUTPUT
-
-        # Initialize parallel execution with timestamp for unique file names
-        TIMESTAMP=$(date +%s)
-        LINT_LOG="lint-${TIMESTAMP}.log"
-        TYPECHECK_LOG="typecheck-${TIMESTAMP}.log" 
-        TEST_LOG="test-${TIMESTAMP}.log"
-
-        echo "🚀 Starting parallel quality gates..."
-
-        # Start all quality checks in parallel background processes
-        if [ "$EXECUTION_STRATEGY" = "local-affected" ]; then
-          # Affected-only execution for faster feedback
-          echo "🔧 [PARALLEL] Starting ESLint validation (affected)..."
-          ($NX_CMD affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
-          LINT_PID=$!
-
-          echo "📝 [PARALLEL] Starting TypeScript type checking (affected)..."
-          ($NX_CMD affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
-          TYPECHECK_PID=$!
-
-          echo "🧪 [PARALLEL] Starting unit tests (affected)..."
-          ($NX_CMD affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }} --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
-          TEST_PID=$!
-        else
-          # Full execution fallback
-          echo "🔧 [PARALLEL] Starting ESLint validation (full)..."
-          ($NX_CMD run-many -t lint --parallel=2 2>&1 | tee "$LINT_LOG"; echo $? > lint-exit.code) &
-          LINT_PID=$!
-
-          echo "📝 [PARALLEL] Starting TypeScript type checking (full)..."
-          ($NX_CMD run-many -t typecheck --parallel=2 2>&1 | tee "$TYPECHECK_LOG"; echo $? > typecheck-exit.code) &
-          TYPECHECK_PID=$!
-
-          echo "🧪 [PARALLEL] Starting unit tests (full)..."
-          ($NX_CMD run-many -t test --parallel=3 2>&1 | tee "$TEST_LOG"; echo $? > test-exit.code) &
-          TEST_PID=$!
-        fi
-
-        echo "⏳ Waiting for parallel quality gates to complete..."
-        echo "📊 Progress tracking: Lint(PID:$LINT_PID) | TypeCheck(PID:$TYPECHECK_PID) | Test(PID:$TEST_PID)"
-
-        # Wait for all processes and track completion
-        LINT_DONE=false
-        TYPECHECK_DONE=false
-        TEST_DONE=false
-
-        while [ "$LINT_DONE" = false ] || [ "$TYPECHECK_DONE" = false ] || [ "$TEST_DONE" = false ]; do
-          # Check lint completion
-          if [ "$LINT_DONE" = false ] && ! kill -0 $LINT_PID 2>/dev/null; then
-            wait $LINT_PID
-            echo "✅ ESLint validation completed"
-            LINT_DONE=true
-          fi
-
-          # Check typecheck completion
-          if [ "$TYPECHECK_DONE" = false ] && ! kill -0 $TYPECHECK_PID 2>/dev/null; then
-            wait $TYPECHECK_PID
-            echo "✅ TypeScript type checking completed"
-            TYPECHECK_DONE=true
-          fi
-
-          # Check test completion
-          if [ "$TEST_DONE" = false ] && ! kill -0 $TEST_PID 2>/dev/null; then
-            wait $TEST_PID
-            echo "✅ Unit tests completed"
-            TEST_DONE=true
-          fi
-
-          # Avoid busy waiting
-          if [ "$LINT_DONE" = false ] || [ "$TYPECHECK_DONE" = false ] || [ "$TEST_DONE" = false ]; then
-            sleep 2
-          fi
-        done
-
-        echo "🔍 Checking results from parallel execution..."
-
-        # Check results and provide comprehensive error reporting
-        LINT_EXIT_CODE=$(cat lint-exit.code 2>/dev/null || echo 1)
-        TYPECHECK_EXIT_CODE=$(cat typecheck-exit.code 2>/dev/null || echo 1)
-        TEST_EXIT_CODE=$(cat test-exit.code 2>/dev/null || echo 1)
-
-        OVERALL_SUCCESS=true
-
-        # Process lint results
-        if [ "$LINT_EXIT_CODE" -eq 0 ]; then
-          echo "✅ ESLint validation: PASSED"
-          echo "lint-result=success" >> $GITHUB_OUTPUT
-          echo "lint-failed-projects=" >> $GITHUB_OUTPUT
-        else
-          echo "❌ ESLint validation: FAILED (exit code: $LINT_EXIT_CODE)"
-          echo "## ESLint Errors Summary"
-          grep -E "error|warning" "$LINT_LOG" | head -20 || echo "No specific errors found in log"
-          echo "::error::ESLint validation failed. Check $LINT_LOG for details."
-          
-          # Extract failed projects from Nx lint output
-          LINT_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:lint" "$LINT_LOG" 2>/dev/null | grep -B5 "failed\|error" "$LINT_LOG" | grep -oE "nx run [^:]+:lint" | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
-          if [ -z "$LINT_FAILED_PROJECTS" ]; then
-            # Fallback: try to extract from error messages
-            LINT_FAILED_PROJECTS=$(grep -E "Running target.*lint.*failed" "$LINT_LOG" 2>/dev/null | sed -E 's/.*Running target "lint" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "lint")
-          fi
-          
-          echo "lint-result=failure" >> $GITHUB_OUTPUT
-          echo "lint-failed-projects=$LINT_FAILED_PROJECTS" >> $GITHUB_OUTPUT
-          OVERALL_SUCCESS=false
-        fi
-
-        # Process typecheck results  
-        if [ "$TYPECHECK_EXIT_CODE" -eq 0 ]; then
-          echo "✅ TypeScript type checking: PASSED"
-          echo "typecheck-result=success" >> $GITHUB_OUTPUT
-          echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
-        else
-          echo "❌ TypeScript type checking: FAILED (exit code: $TYPECHECK_EXIT_CODE)"
-          echo "## TypeScript Errors Summary"
-          grep -E "error|TS[0-9]" "$TYPECHECK_LOG" | head -15 || echo "No specific errors found in log"
-          echo "::error::TypeScript validation failed. Check $TYPECHECK_LOG for details."
-          
-          # Extract failed projects from Nx typecheck output
-          TYPECHECK_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:typecheck" "$TYPECHECK_LOG" 2>/dev/null | grep -B5 "failed\|error" "$TYPECHECK_LOG" | grep -oE "nx run [^:]+:typecheck" | sed 's/nx run //;s/:typecheck//' | sort -u | xargs | tr ' ' ',' || echo "")
-          if [ -z "$TYPECHECK_FAILED_PROJECTS" ]; then
-            # Fallback: try to extract from error messages
-            TYPECHECK_FAILED_PROJECTS=$(grep -E "Running target.*typecheck.*failed" "$TYPECHECK_LOG" 2>/dev/null | sed -E 's/.*Running target "typecheck" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "typecheck")
-          fi
-          
-          echo "typecheck-result=failure" >> $GITHUB_OUTPUT
-          echo "typecheck-failed-projects=$TYPECHECK_FAILED_PROJECTS" >> $GITHUB_OUTPUT
-          OVERALL_SUCCESS=false
-        fi
-
-        # Process test results
-        if [ "$TEST_EXIT_CODE" -eq 0 ]; then
-          echo "✅ Unit tests: PASSED"
-          echo "test-result=success" >> $GITHUB_OUTPUT
-          echo "test-failed-projects=" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Unit tests: FAILED (exit code: $TEST_EXIT_CODE)"
-          echo "## Test Errors Summary"
-          grep -E "FAIL|error" "$TEST_LOG" | head -10 || echo "No specific errors found in log"
-          echo "::error::Unit tests failed. Check $TEST_LOG for details."
-          
-          # Extract failed projects from Nx test output
-          TEST_FAILED_PROJECTS=$(grep -oE "nx run [^:]+:test" "$TEST_LOG" 2>/dev/null | grep -B5 "FAIL\|failed" "$TEST_LOG" | grep -oE "nx run [^:]+:test" | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
-          if [ -z "$TEST_FAILED_PROJECTS" ]; then
-            # Fallback: try to extract from error messages  
-            TEST_FAILED_PROJECTS=$(grep -E "Running target.*test.*failed\|FAIL.*spec" "$TEST_LOG" 2>/dev/null | sed -E 's/.*Running target "test" for project "(.*)" failed.*/\1/' | sort -u | xargs | tr ' ' ',' || echo "test")
-          fi
-          
-          echo "test-result=failure" >> $GITHUB_OUTPUT
-          echo "test-failed-projects=$TEST_FAILED_PROJECTS" >> $GITHUB_OUTPUT
-          OVERALL_SUCCESS=false
-        fi
-
-        # Final status check
-        if [ "$OVERALL_SUCCESS" = true ]; then
-          echo "🎉 All parallel quality gates passed successfully!"
-          echo "::notice::To reproduce locally ($EXECUTION_STRATEGY mode): $NX_CMD affected -t lint,typecheck,test --parallel=4"
-        else
+        # ── Final result ───────────────────────────────────────────────────────
+        if [ "$LINT_SUCCESS" = false ] || [ "$TYPECHECK_SUCCESS" = false ] || [ "$TEST_SUCCESS" = false ]; then
           echo "❌ One or more quality gates failed"
-          echo "🔧 Reproduction commands:"
-          echo "  Lint: $NX_CMD affected -t lint --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
-          echo "  TypeCheck: $NX_CMD affected -t typecheck --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
-          echo "  Test: $NX_CMD affected -t test --base=${{ inputs.base-ref }} --head=${{ inputs.head-ref }}"
+          echo "  Lint:      $([ "$LINT_SUCCESS"      = true ] && echo '✅' || echo '❌')"
+          echo "  Typecheck: $([ "$TYPECHECK_SUCCESS" = true ] && echo '✅' || echo '❌')"
+          echo "  Tests:     $([ "$TEST_SUCCESS"      = true ] && echo '✅' || echo '❌')"
+          echo "To reproduce locally:"
+          echo "  pnpm exec nx affected -t lint typecheck test --parallel=$PARALLEL"
           exit 1
         fi
 
+        echo "✅ All quality gates passed"
         echo "::endgroup::"
 
-    - name: "📊 Check Overall Results"
+    - name: " Check Overall Results"
       id: check-results
       if: always()
       shell: bash
@@ -592,9 +308,9 @@ runs:
 
         # Collect all results
         FORMATTING_RESULT="${{ steps.formatting.outputs.result || 'skipped' }}"
-        LINT_RESULT="${{ steps.distributed.outputs.lint-result || steps.local.outputs.lint-result }}"
-        TYPECHECK_RESULT="${{ steps.distributed.outputs.typecheck-result || steps.local.outputs.typecheck-result }}"
-        TEST_RESULT="${{ steps.distributed.outputs.test-result || steps.local.outputs.test-result }}"
+        LINT_RESULT="${{ steps.run-tasks.outputs.lint-result }}"
+        TYPECHECK_RESULT="${{ steps.run-tasks.outputs.typecheck-result }}"
+        TEST_RESULT="${{ steps.run-tasks.outputs.test-result }}"
 
         # Determine overall result
         OVERALL_RESULT="success"

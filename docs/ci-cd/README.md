@@ -6,6 +6,7 @@ This directory contains all continuous integration and deployment documentation 
 
 ### Core CI/CD System
 
+- **[CI Pipeline Requirements](ci-pipeline-requirements.md)** ⭐ - Functional requirements, constraints, and design decisions
 - **[CI System Documentation](ci-system-documentation.md)** - Complete CI/CD system overview
 - **[CI Migration Plan](ci-migration-plan.md)** - Migration strategy and timeline
 - **[CI Workflow Migration Status](ci-workflow-migration-status.md)** - Current migration state

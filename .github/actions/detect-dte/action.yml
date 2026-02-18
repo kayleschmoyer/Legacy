@@ -36,6 +36,9 @@ outputs:
   optimal-agents:
     description: "Optimal number of agents/parallel processes"
     value: ${{ steps.detect.outputs.optimal-agents }}
+  agent-matrix:
+    description: "JSON array of agent indices for the agents matrix job (e.g. [1,2,3])"
+    value: ${{ steps.detect.outputs.agent-matrix }}
   fallback-reason:
     description: "Reason for fallback to local execution"
     value: ${{ steps.detect.outputs.fallback-reason }}
@@ -85,8 +88,9 @@ runs:
           NX_CLOUD_CMD=""
           if command -v pnpm >/dev/null 2>&1 && pnpm exec nx-cloud --version >/dev/null 2>&1; then
             NX_CLOUD_CMD="pnpm exec nx-cloud"
-          elif command -v pnpm exec >/dev/null 2>&1; then
-            NX_CLOUD_CMD="pnpm exec nx-cloud"
+          elif command -v npx >/dev/null 2>&1; then
+            # Fallback to npx when node_modules are not installed (detect-dte skips full pnpm install)
+            NX_CLOUD_CMD="npx --yes nx-cloud"
           fi
 
           if [ -z "$NX_CLOUD_CMD" ]; then
@@ -169,11 +173,22 @@ runs:
           echo "ℹ️ $FALLBACK_REASON"
         fi
 
+        # Generate agent matrix array (capped at 3 GitHub-hosted runners)
+        AGENT_CAP=3
+        AGENT_COUNT=$(( OPTIMAL_AGENTS < AGENT_CAP ? OPTIMAL_AGENTS : AGENT_CAP ))
+        AGENT_ARRAY="["
+        for i in $(seq 1 $AGENT_COUNT); do
+          [ $i -gt 1 ] && AGENT_ARRAY="${AGENT_ARRAY},"
+          AGENT_ARRAY="${AGENT_ARRAY}${i}"
+        done
+        AGENT_ARRAY="${AGENT_ARRAY}]"
+
         # Set outputs
         echo "cloud-available=$CLOUD_AVAILABLE" >> $GITHUB_OUTPUT
         echo "dte-available=$DTE_AVAILABLE" >> $GITHUB_OUTPUT
         echo "execution-mode=$EXECUTION_MODE" >> $GITHUB_OUTPUT
         echo "optimal-agents=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT
+        echo "agent-matrix=$AGENT_ARRAY" >> $GITHUB_OUTPUT
         echo "fallback-reason=$FALLBACK_REASON" >> $GITHUB_OUTPUT
         echo "memory-limit=$MEMORY_LIMIT" >> $GITHUB_OUTPUT
         echo "nx-parallel=$OPTIMAL_AGENTS" >> $GITHUB_OUTPUT

@@ -1,7 +1,7 @@
 name: "🧠 Legacy Sports CI Orchestrator"
 
 # Central orchestrator for pull requests, integration branches, and scheduled
-# health checks. Handles cache warmup once, determines which pipelines need to
+# health checks. Determines which pipelines need to
 # run, then dispatches reusable workflows for CI, security scanning, and Android
 # compatibility testing.
 
@@ -86,41 +86,6 @@ permissions:
   security-events: write
 
 jobs:
-  warmup:
-    name: "🔥 Cache Warmup"
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    outputs:
-      cache-hit: ${{ steps.setup.outputs.cache-hit }}
-
-    steps:
-      - name: "🚀 Checkout Repository"
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: "🔧 Setup Workspace & Warm Cache"
-        id: setup
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: true
-          set-nx-shas: false
-          include-optional-deps: false
-
-      - name: "✅ Cache Ready"
-        run: |
-          if [ "${{ steps.setup.outputs.cache-hit }}" = "true" ]; then
-            echo "✅ Cache hit! Subsequent jobs will be fast (~30s setup)"
-          else
-            echo "🔥 Cache populated! First warmup takes ~1.5min, next runs will be fast"
-          fi
-
-          echo "## 🔥 Cache Warmup" >> $GITHUB_STEP_SUMMARY
-          echo "- **Cache Status**: $([[ "${{ steps.setup.outputs.cache-hit }}" = "true" ]] && echo 'Hit ✅' || echo 'Populated 🔥')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Node Version**: 22" >> $GITHUB_STEP_SUMMARY
-
   determine-scope:
     name: "🔍 Determine Workflow Scope"
     runs-on: ubuntu-latest
@@ -212,7 +177,7 @@ jobs:
 
   ci-pipeline:
     name: "🚀 CI Pipeline"
-    needs: [warmup]
+    needs: [determine-scope]
     uses: ./.github/workflows/ci-pipeline.yml
     with:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
@@ -220,7 +185,7 @@ jobs:
 
   security-scanning:
     name: "🔐 Security Scanning"
-    needs: [warmup, determine-scope]
+    needs: [determine-scope]
     if: ${{ needs.determine-scope.outputs.run-security == 'true' }}
     uses: ./.github/workflows/security-scanning.yml
     with:
@@ -229,7 +194,7 @@ jobs:
 
   android-compatibility:
     name: "📱 Android Compatibility"
-    needs: [warmup, determine-scope]
+    needs: [determine-scope]
     if: ${{ needs.determine-scope.outputs.run-android == 'true' }}
     uses: ./.github/workflows/test-android-compatibility.yml
     with:

@@ -494,7 +494,13 @@ runs:
 
         # Determine overall result
         OVERALL_RESULT="success"
-        ARTIFACTS_READY="true"
+        # artifacts-ready is only true when the web build actually succeeded
+        # (E2E tests require a real web artifact; skipped builds don't produce one)
+        if [ "$WEB_RESULT" = "success" ]; then
+          ARTIFACTS_READY="true"
+        else
+          ARTIFACTS_READY="false"
+        fi
 
         if [ "$WEB_RESULT" = "failure" ] || [ "$MOBILE_RESULT" = "failure" ] || [ "$LAMBDAS_RESULT" = "failure" ] || [ "$TERRAFORM_RESULT" = "failure" ]; then
           OVERALL_RESULT="failure"
