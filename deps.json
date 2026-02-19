@@ -259,7 +259,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lambdas/game-selection/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -739,7 +739,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/shared-components/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -1150,7 +1150,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lambdas/stats-lambda/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -1861,7 +1861,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/tamagui-config/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -1932,7 +1932,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/env-utilities/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2037,7 +2037,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/data-loaders/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2119,7 +2119,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/bref-client/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2216,7 +2216,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/aws-utils/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2322,7 +2322,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/db-client/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2751,7 +2751,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/apps/cli-e2e/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -2937,7 +2937,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/logging/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -3042,7 +3042,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/scoring/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -3120,7 +3120,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lambdas/db/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -3541,7 +3541,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/utils/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -3789,7 +3789,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/apps/cli/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -4207,7 +4207,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/apps/web/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {
@@ -4433,7 +4433,7 @@
               "inputs": [
                 "default",
                 "^default",
-                "{workspaceRoot}/.eslintrc.base.json",
+                "{workspaceRoot}/.eslintrc.json",
                 "{workspaceRoot}/lib/api/.eslintrc.json",
                 "{workspaceRoot}/tools/eslint-rules/**/*",
                 {

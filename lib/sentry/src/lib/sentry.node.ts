@@ -5,7 +5,7 @@
 
 import * as Sentry from '@sentry/node';
 import { LOGGER } from '@legacy-sports/logging';
-import { SentryInterface, SentryConfig, SentryBreadcrumb } from './types';
+import { SentryBreadcrumb, SentryConfig, SentryInterface } from './types';
 import { sanitizeSentryContext } from './sanitize-context';
 
 class NodeSentryImplementation implements SentryInterface {
@@ -16,7 +16,11 @@ class NodeSentryImplementation implements SentryInterface {
         environment: config.environment,
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
-        beforeSend: config.beforeSend,
+        ...(typeof config.beforeSend === 'function'
+          ? {
+              beforeSend: config.beforeSend as Sentry.NodeOptions['beforeSend'],
+            }
+          : {}),
         release: config.release,
         integrations: [
           // Add Node.js specific integrations
@@ -32,7 +36,7 @@ class NodeSentryImplementation implements SentryInterface {
     }
   }
 
-  captureError(error: Error, context?: Record<string, any>): void {
+  captureError(error: Error, context?: Record<string, unknown>): void {
     try {
       if (context) {
         const safeContext = sanitizeSentryContext(context);
@@ -66,7 +70,7 @@ class NodeSentryImplementation implements SentryInterface {
     });
   }
 
-  withSentry<TArgs extends any[], TResult>(
+  withSentry<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {

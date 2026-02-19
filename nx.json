@@ -31,13 +31,15 @@
       "plugin": "@nx/jest/plugin",
       "options": {
         "targetName": "test"
-      }
+      },
+      "exclude": ["package.json"]
     },
     {
       "plugin": "@nx/eslint/plugin",
       "options": {
         "targetName": "lint"
-      }
+      },
+      "exclude": ["package.json"]
     },
     {
       "plugin": "@nx/storybook/plugin",
@@ -107,7 +109,7 @@
       "inputs": [
         "default",
         "^default",
-        "{workspaceRoot}/.eslintrc.base.json",
+        "{workspaceRoot}/.eslintrc.json",
         "{projectRoot}/.eslintrc.json",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         {

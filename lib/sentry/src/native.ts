@@ -13,19 +13,22 @@ export const initSentry = (config: import('./lib/types').SentryConfig) => {
   return sentry.init(config);
 };
 
-export const captureError = (error: Error, context?: Record<string, any>) => {
+export const captureError = (
+  error: Error,
+  context?: Record<string, unknown>,
+) => {
   return sentry.captureError(error, context);
 };
 
 export const addBreadcrumb = (
   message: string,
-  data?: Record<string, any>,
+  data?: Record<string, unknown>,
   level?: 'info' | 'warning' | 'error',
 ) => {
   return sentry.addBreadcrumb({ message, data, level });
 };
 
-export const withSentry = <TArgs extends any[], TResult>(
+export const withSentry = <TArgs extends unknown[], TResult>(
   handler: (...args: TArgs) => TResult | Promise<TResult>,
 ): ((...args: TArgs) => TResult | Promise<TResult>) => {
   return sentry.withSentry(handler);

@@ -5,7 +5,7 @@
 
 import * as Sentry from '@sentry/browser';
 import { LOGGER } from '@legacy-sports/logging';
-import { SentryInterface, SentryConfig, SentryBreadcrumb } from './types';
+import { SentryBreadcrumb, SentryConfig, SentryInterface } from './types';
 import { sanitizeSentryContext } from './sanitize-context';
 
 class WebSentryImplementation implements SentryInterface {
@@ -16,7 +16,12 @@ class WebSentryImplementation implements SentryInterface {
         environment: config.environment,
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
-        beforeSend: config.beforeSend,
+        ...(typeof config.beforeSend === 'function'
+          ? {
+              beforeSend:
+                config.beforeSend as Sentry.BrowserOptions['beforeSend'],
+            }
+          : {}),
         release: config.release,
         integrations: [
           // Add web-specific integrations as needed
@@ -35,7 +40,7 @@ class WebSentryImplementation implements SentryInterface {
     }
   }
 
-  captureError(error: Error, context?: Record<string, any>): void {
+  captureError(error: Error, context?: Record<string, unknown>): void {
     try {
       if (context) {
         const safeContext = sanitizeSentryContext(context);
@@ -44,9 +49,9 @@ class WebSentryImplementation implements SentryInterface {
             const value = safeContext[key];
             scope.setContext(
               key,
-              (typeof value === 'object' && value !== null
+              typeof value === 'object' && value !== null
                 ? (value as Record<string, unknown>)
-                : { value }) as any,
+                : { value },
             );
           });
           Sentry.captureException(error);
@@ -74,7 +79,7 @@ class WebSentryImplementation implements SentryInterface {
     });
   }
 
-  withSentry<TArgs extends any[], TResult>(
+  withSentry<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {

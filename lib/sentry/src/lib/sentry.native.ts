@@ -5,7 +5,7 @@
 
 import * as Sentry from '@sentry/react-native';
 import { LOGGER } from '@legacy-sports/logging';
-import { SentryInterface, SentryConfig, SentryBreadcrumb } from './types';
+import { SentryBreadcrumb, SentryConfig, SentryInterface } from './types';
 import { sanitizeSentryContext } from './sanitize-context';
 
 class ReactNativeSentryImplementation implements SentryInterface {
@@ -16,7 +16,12 @@ class ReactNativeSentryImplementation implements SentryInterface {
         environment: config.environment,
         tracesSampleRate: config.tracesSampleRate || 0.1,
         debug: config.debug || false,
-        beforeSend: config.beforeSend,
+        ...(typeof config.beforeSend === 'function'
+          ? {
+              beforeSend:
+                config.beforeSend as Sentry.ReactNativeOptions['beforeSend'],
+            }
+          : {}),
         release: config.release,
         integrations: [
           // Add React Native specific integrations as needed
@@ -36,7 +41,7 @@ class ReactNativeSentryImplementation implements SentryInterface {
     }
   }
 
-  captureError(error: Error, context?: Record<string, any>): void {
+  captureError(error: Error, context?: Record<string, unknown>): void {
     try {
       if (context) {
         const safeContext = sanitizeSentryContext(context);
@@ -75,7 +80,7 @@ class ReactNativeSentryImplementation implements SentryInterface {
     });
   }
 
-  withSentry<TArgs extends any[], TResult>(
+  withSentry<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult> {
     // For React Native, we don't wrap with error boundaries here

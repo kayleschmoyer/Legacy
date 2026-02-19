@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import './main.css';
 
 interface GraphQLResponse {
-  data?: any;
-  errors?: Array<{ message: string; locations?: any; path?: any }>;
+  data?: Record<string, unknown>;
+  errors?: Array<{ message: string; locations?: unknown; path?: unknown }>;
 }
 
 const App: React.FC = () => {
@@ -36,9 +36,9 @@ query {
     setResponse(null);
 
     try {
-      let parsedVariables = {};
+      let parsedVariables: Record<string, unknown> = {};
       if (variables.trim()) {
-        parsedVariables = JSON.parse(variables);
+        parsedVariables = JSON.parse(variables) as Record<string, unknown>;
       }
 
       const response = await fetch(GRAPHQL_HOST, {
@@ -52,7 +52,7 @@ query {
         }),
       });
 
-      const result: GraphQLResponse = await response.json();
+      const result = (await response.json()) as GraphQLResponse;
       setResponse(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -61,13 +61,13 @@ query {
     }
   };
 
-  const formatJson = (obj: any) => {
+  const formatJson = (obj: unknown) => {
     return JSON.stringify(obj, null, 2);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      executeQuery();
+      void executeQuery();
     }
   };
 
@@ -108,7 +108,7 @@ query {
 
           <div className="controls">
             <button
-              onClick={executeQuery}
+              onClick={() => void executeQuery()}
               disabled={loading}
               className="execute-btn"
             >

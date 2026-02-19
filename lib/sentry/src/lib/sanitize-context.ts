@@ -17,7 +17,7 @@ const DEFAULT_SENSITIVE_KEYS = [
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object') return false;
-  const proto = Object.getPrototypeOf(value);
+  const proto: unknown = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
 
@@ -52,8 +52,8 @@ function sanitizeValue(
   }
 
   if (typeof value === 'object') {
-    if (seen.has(value as object)) return '[Circular]';
-    seen.add(value as object);
+    if (seen.has(value)) return '[Circular]';
+    seen.add(value);
 
     if (isPlainObject(value)) {
       const out: Record<string, unknown> = {};
@@ -69,13 +69,15 @@ function sanitizeValue(
 
     // For non-plain objects (Errors, Dates, etc), stringify safely.
     try {
-      return String(value);
+      if (value instanceof Error) return value.message;
+      if (value instanceof Date) return value.toISOString();
+      return JSON.stringify(value) ?? '[Unserializable]';
     } catch {
       return '[Unserializable]';
     }
   }
 
-  return String(value);
+  return typeof value === 'symbol' ? value.toString() : String(value as string);
 }
 
 export function sanitizeSentryContext(

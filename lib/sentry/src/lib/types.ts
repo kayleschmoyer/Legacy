@@ -8,13 +8,14 @@ export interface SentryConfig {
   environment: string;
   tracesSampleRate?: number;
   debug?: boolean;
-  beforeSend?: (event: any) => any | null;
+  /** Platform-specific beforeSend callback. Type varies by Sentry SDK. */
+  beforeSend?: unknown;
   release?: string;
 }
 
 export interface SentryBreadcrumb {
   message: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   level?: 'info' | 'warning' | 'error';
 }
 
@@ -31,7 +32,7 @@ export interface SentryInterface {
   /**
    * Capture an error with optional context
    */
-  captureError(error: Error, context?: Record<string, any>): void;
+  captureError(error: Error, context?: Record<string, unknown>): void;
 
   /**
    * Add a breadcrumb for debugging
@@ -43,7 +44,7 @@ export interface SentryInterface {
    * For Lambda functions, this handles the AWS Lambda context
    * For React Native, this handles React error boundaries
    */
-  withSentry<TArgs extends any[], TResult>(
+  withSentry<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult>;
 
