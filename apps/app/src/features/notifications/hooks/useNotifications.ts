@@ -95,7 +95,7 @@ export function useNotifications(userId: number) {
         throw error;
       }
     },
-    [userId, updatePreferencesMutation],
+    [updatePreferencesMutation],
   );
 
   const markAsRead = useCallback(
@@ -119,7 +119,7 @@ export function useNotifications(userId: number) {
       console.error('Error marking all notifications as read:', error);
       throw error;
     }
-  }, [userId, markAllAsReadMutation]);
+  }, [markAllAsReadMutation]);
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access

@@ -21,9 +21,12 @@ export function LeagueStandings({
   loading = false,
   userTeamId,
 }: LeagueStandingsProps): React.JSX.Element {
+  // expo-router types cannot be resolved in this project's TS config
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
 
   const handleTeamPress = (teamId: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     router.push(`/baseball/team/${teamId}` as Href);
   };
 
@@ -143,7 +146,8 @@ export function LeagueStandings({
           borderWidth={1}
         >
           <Text fontSize="$2" color="$yellow11" textAlign="center">
-            <Text role="img" aria-label="info">
+            {/* eslint-disable-next-line jsx-a11y/accessible-emoji -- React Native uses Text, not span */}
+            <Text role="img" aria-label="info" accessibilityLabel="info">
               ℹ️
             </Text>{' '}
             Stats and scoring coming soon!

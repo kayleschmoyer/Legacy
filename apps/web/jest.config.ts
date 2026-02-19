@@ -9,7 +9,7 @@ export default {
     'node_modules/(?!(react-native|@react-native|react-native-.*|@tamagui|tamagui)/)',
   ],
   moduleNameMapper: {
-    '^react-native$': 'react-native-web',
+    '^react-native$': '<rootDir>/src/__mocks__/react-native.js',
     '^react-native-svg$': 'react-native-svg/lib/commonjs/ReactNativeSVG.web.js',
     '^@react-native-picker/picker$':
       '<rootDir>/src/__mocks__/react-native-picker.js',

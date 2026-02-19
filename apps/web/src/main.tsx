@@ -3,8 +3,8 @@ import * as ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider as ReduxProvider } from 'react-redux';
 
-// Initialize React Native Web
-import 'react-native-web/dist/cjs/exports/AppRegistry';
+// React Native Web is initialized automatically via Vite plugin
+// No explicit AppRegistry import needed
 
 // Import Tamagui CSS
 import '@tamagui/core/reset.css';

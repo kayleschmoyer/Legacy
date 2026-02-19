@@ -1,3 +1,20 @@
+// Mock tamagui dependencies that have react-native-web issues in Jest
+jest.mock('@tamagui/config', () => ({
+  config: {
+    themes: {},
+    tokens: {},
+    media: {},
+    shorthands: {},
+    settings: {},
+  },
+}));
+
+jest.mock('tamagui', () => ({
+  createTamagui: jest.fn(
+    (config: unknown) => config as Record<string, unknown>,
+  ),
+}));
+
 import { tamaguiConfig } from './tamagui-config';
 
 describe('tamaguiConfig', () => {

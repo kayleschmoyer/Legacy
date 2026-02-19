@@ -183,32 +183,8 @@ jest.mock('__PLATFORM_COMPONENTS__', () => {
   };
 });
 
-// Mock React Native components that might not be available in web environment
-jest.mock('react-native', () => {
-  const RN = jest.requireActual('react-native-web');
-
-  return {
-    ...RN,
-    Platform: {
-      OS: 'web',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      select: (options: any) => options.web || options.default,
-    },
-    StyleSheet: {
-      ...RN.StyleSheet,
-      hairlineWidth: 1,
-    },
-    Dimensions: {
-      get: () => ({ width: 1024, height: 768 }),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    },
-    PixelRatio: {
-      get: () => 1,
-      getPixelSizeForLayoutSize: (size: any) => size,
-    },
-  };
-});
+// React Native is now mocked via moduleNameMapper pointing to __mocks__/react-native.js
+// This avoids Jest resolver issues with react-native-web
 
 // Mock React Native SVG
 jest.mock('react-native-svg', () => {

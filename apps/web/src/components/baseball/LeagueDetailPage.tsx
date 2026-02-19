@@ -15,6 +15,7 @@ import {
   Info,
   LayoutGrid,
   Link2,
+  QrCode,
   Settings,
   Share2,
   Swords,
@@ -22,6 +23,7 @@ import {
   UserPlus,
   Users,
 } from '@tamagui/lucide-icons';
+import { QRCodeSVG } from 'qrcode.react';
 import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
 import { LeagueActivityFeed } from './LeagueActivityFeed';
@@ -246,6 +248,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>(getTabFromUrl());
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const { user } = useAuth();
 
   // ── Effects ──
@@ -1048,6 +1051,57 @@ export function LeagueDetailPage(): React.JSX.Element {
                 <Text className="sr-only" aria-live="polite" role="status">
                   {linkCopied ? 'Invite code copied to clipboard' : ''}
                 </Text>
+              </YStack>
+
+              {/* QR Code Section */}
+              <YStack gap="$2">
+                <XStack alignItems="center" justifyContent="space-between">
+                  <Text
+                    fontSize="$2"
+                    color="$textMuted"
+                    fontWeight="600"
+                    textTransform="uppercase"
+                    letterSpacing={0.5}
+                  >
+                    QR Code
+                  </Text>
+                  <Button
+                    size="$2"
+                    chromeless
+                    onPress={() => setShowQRCode(!showQRCode)}
+                    icon={<QrCode size={16} />}
+                    aria-label={showQRCode ? 'Hide QR Code' : 'Show QR Code'}
+                  >
+                    <Text fontSize="$2" fontWeight="600" color="$blue11">
+                      {showQRCode ? 'Hide' : 'Show'}
+                    </Text>
+                  </Button>
+                </XStack>
+                {showQRCode && inviteUrl && (
+                  <YStack
+                    alignItems="center"
+                    padding="$4"
+                    backgroundColor="white"
+                    borderRadius="$3"
+                    borderWidth={1}
+                    borderColor="$outlineSubtle"
+                  >
+                    <QRCodeSVG
+                      value={inviteUrl}
+                      size={200}
+                      level="M"
+                      includeMargin
+                    />
+                    <Text
+                      fontSize="$2"
+                      color="$textMuted"
+                      marginTop="$3"
+                      textAlign="center"
+                    >
+                      Scan to join league
+                    </Text>
+                  </YStack>
+                )}
               </YStack>
             </YStack>
           </InviteCard>
