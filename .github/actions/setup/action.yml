@@ -83,7 +83,7 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: pnpm
+        cache: ${{ inputs.install-dependencies == 'true' && 'pnpm' || '' }}
 
     - name: Cache pnpm Store
       if: inputs.install-dependencies == 'true'

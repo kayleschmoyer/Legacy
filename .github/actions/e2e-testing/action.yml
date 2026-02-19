@@ -215,7 +215,7 @@ runs:
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json"
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output-dir=test-results"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=test-results"
 
         if [ "${{ inputs.headless }}" != "true" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --headed"

@@ -23,7 +23,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 ## Docs Index
 
 | Need                | File                                                                       |
-| ------------------- | -------------------------------------------------------------------------- |
+| ------------------- | -------------------------------------------------------------------------- | --- | -------------------- | ------------------------------------------ | --- | -------------- | ------------------------------------------ |
 | Full workflow       | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
 | Type errors         | `.github/skills/fix-types/SKILL.md`                                        |
 | Lint errors         | `.github/skills/fix-lint/SKILL.md`                                         |
@@ -34,8 +34,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **New library**     | `.github/skills/create-lib/SKILL.md`                                       |
 | **New lambda**      | `.github/skills/create-lambda/SKILL.md`                                    |
 | **New app**         | `.github/skills/create-app/SKILL.md`                                       |
-| **New skill**       | `.github/skills/create-skill/SKILL.md`                                     |
-| **Config ref**      | `.github/skills/config-standards/SKILL.md`                                 |
+| **New skill**       | `.github/skills/create-skill/SKILL.md`                                     |     | **Install packages** | `.github/skills/install-packages/SKILL.md` |     | **Config ref** | `.github/skills/config-standards/SKILL.md` |
 | All skills (40)     | `.github/skills/`                                                          |
 | CSV reference data  | `docs/agents/*.csv`                                                        |
 | Tech stack          | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |
