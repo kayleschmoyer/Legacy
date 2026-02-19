@@ -9,17 +9,15 @@ variable "google_oauth_client_secret" {
 }
 
 variable "jwt_secret_key" {
-  description = "JWT signing secret key for token validation (optional - will use random generation if not provided)"
+  description = "JWT signing secret key for token validation"
   type        = string
   sensitive   = true
-  default     = null
 }
 
 variable "oauth_proxy_cookie_secret" {
-  description = "Cookie signing secret for OAuth proxy sessions (optional - will use random generation if not provided)"
+  description = "Cookie signing secret for OAuth proxy sessions"
   type        = string
   sensitive   = true
-  default     = null
 }
 
 # =============================================================================
@@ -58,12 +56,7 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
 
 resource "aws_secretsmanager_secret_version" "jwt_secret" {
   secret_id     = aws_secretsmanager_secret.jwt_secret.id
-  secret_string = var.jwt_secret_key != null ? var.jwt_secret_key : random_password.jwt_secret.result
-}
-
-resource "random_password" "jwt_secret" {
-  length  = 64
-  special = false
+  secret_string = var.jwt_secret_key
 }
 
 resource "aws_secretsmanager_secret" "google_oauth_client_secret" {
@@ -87,13 +80,5 @@ resource "aws_secretsmanager_secret" "oauth_proxy_cookie_secret" {
 
 resource "aws_secretsmanager_secret_version" "oauth_proxy_cookie_secret" {
   secret_id     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.id
-  secret_string = var.oauth_proxy_cookie_secret != null ? var.oauth_proxy_cookie_secret : random_bytes.oauth_proxy_cookie_key.base64
-}
-
-resource "random_bytes" "oauth_proxy_cookie_key" {
-  length = 32 # 32 bytes = 256 bits for AES-256-GCM encryption
-  keepers = {
-    # Force recreation if we want to rotate the key
-    version = "v1"
-  }
+  secret_string = var.oauth_proxy_cookie_secret
 }

@@ -48,6 +48,24 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+      - name: Validate Required Secrets
+        run: |
+          MISSING=()
+          if [ -z "${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}" ]; then
+            MISSING+=("GOOGLE_OAUTH_CLIENT_SECRET")
+          fi
+          if [ -z "${{ secrets.JWT_SECRET_KEY }}" ]; then
+            MISSING+=("JWT_SECRET_KEY")
+          fi
+          if [ -z "${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}" ]; then
+            MISSING+=("OAUTH_PROXY_COOKIE_SECRET")
+          fi
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -132,6 +150,10 @@ jobs:
       - name: Plan Infrastructure Changes
         id: plan
         working-directory: terraform
+        env:
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
         run: |
           set -o pipefail
           echo "📋 Planning Terraform changes..."
@@ -173,6 +195,10 @@ jobs:
         id: apply
         if: steps.plan.outputs.has_changes == 'true'
         working-directory: terraform
+        env:
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
         run: |
           echo "🚀 Applying Terraform changes..."
 
