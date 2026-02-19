@@ -263,160 +263,34 @@ runs:
           exit 1
         fi
 
-        # Debug node_modules structure
-        echo "📁 Checking Nx installation paths..."
-        echo "node_modules/.bin/nx exists: $([ -f node_modules/.bin/nx ] && echo 'yes' || echo 'no')"
-        echo "node_modules/nx exists: $([ -d node_modules/nx ] && echo 'yes' || echo 'no')"
-        echo "@nx packages: $(ls node_modules/ | grep '^@nx' | wc -l)"
-
-        # Try different methods to access Nx with enhanced debugging
+        # Validate Nx CLI — prefer pnpm exec (canonical for pnpm workspaces),
+        # fall back to node_modules/.bin only if pnpm exec fails.
         NX_COMMAND=""
-        echo "🔍 Attempting Nx CLI detection..."
-
-        # Method 1: pnpm exec nx (preferred for pnpm workspace)
-        if [ -z "$NX_COMMAND" ]; then
-          echo "  Testing Method 1: pnpm exec nx"
-          if pnpm exec nx --version >/dev/null 2>&1; then
-            NX_COMMAND="pnpm exec nx"
-            echo "  ✅ Nx accessible via: pnpm exec nx"
-          else
-            echo "  ❌ pnpm exec nx failed"
-          fi
-        fi
-
-        # Method 2: Direct path to nx binary  
-        if [ -z "$NX_COMMAND" ]; then
-          echo "  Testing Method 2: node_modules/.bin/nx"
-          if [ -f "node_modules/.bin/nx" ]; then
-            if node_modules/.bin/nx --version >/dev/null 2>&1; then
-              NX_COMMAND="node_modules/.bin/nx"
-              echo "  ✅ Nx accessible via: node_modules/.bin/nx"
-            else
-              echo "  ❌ node_modules/.bin/nx exists but not executable"
-            fi
-          else
-            echo "  ❌ node_modules/.bin/nx does not exist"
-          fi
-        fi
-
-        # Method 3: pnpm exec with explicit separator
-        if [ -z "$NX_COMMAND" ]; then
-          echo "  Testing Method 3: pnpm exec nx --"
-          if pnpm exec nx -- --version >/dev/null 2>&1; then
-            NX_COMMAND="pnpm exec nx --"
-            echo "  ✅ Nx accessible via: pnpm exec nx --"
-          else
-            echo "  ❌ pnpm exec nx -- failed"
-          fi
-        fi
-
-        # Method 4: npm exec (fallback)
-        if [ -z "$NX_COMMAND" ]; then
-          echo "  Testing Method 4: npm exec nx"
-          if npm exec nx -- --version >/dev/null 2>&1; then
-            NX_COMMAND="npm exec nx --"
-            echo "  ✅ Nx accessible via: npm exec nx --"
-          else
-            echo "  ❌ npm exec nx failed"
-          fi
-        fi
-
-        # Method 5: Try to manually find and execute nx
-        if [ -z "$NX_COMMAND" ]; then
-          echo "  Testing Method 4: Manual nx resolution"
-          
-          # Look for nx in various locations
-          for nx_path in "node_modules/.bin/nx" "node_modules/nx/bin/nx.js" "node_modules/@nx/cli/bin/nx.js"; do
-            if [ -f "$nx_path" ]; then
-              echo "  Found potential nx at: $nx_path"
-              if node "$nx_path" --version >/dev/null 2>&1; then
-                NX_COMMAND="node $nx_path"
-                echo "  ✅ Nx accessible via: node $nx_path"
-                break
-              fi
-            fi
-          done
-        fi
-
-        # If all methods failed
-        if [ -z "$NX_COMMAND" ]; then
-          echo "❌ Nx not accessible through any method"
-          echo ""
-          echo "🔍 Diagnostic information:"
-          echo "  Available binaries in node_modules/.bin:"
-          ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "    No nx binaries found"
-          echo "  Nx package directory:"
-          ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "    No nx directory found"
-          echo "  @nx packages:"
-          ls -la node_modules/@nx/ 2>/dev/null | head -5 || echo "    No @nx directory found"
-          echo "  pnpm exec debug:"
-          pnpm exec nx --version 2>&1 || echo "    pnpm exec nx failed"
-          echo "  pnpm exec with separator debug:"
-          pnpm exec nx -- --version 2>&1 || echo "    pnpm exec nx -- failed"
-          echo ""
+        if pnpm exec nx --version >/dev/null 2>&1; then
+          NX_COMMAND="pnpm exec nx"
+        elif [ -f "node_modules/.bin/nx" ] && node_modules/.bin/nx --version >/dev/null 2>&1; then
+          NX_COMMAND="node_modules/.bin/nx"
+        else
+          echo "❌ Nx not accessible via pnpm exec or node_modules/.bin"
+          pnpm exec nx --version 2>&1 || true
           exit 1
         fi
 
-        # Test basic Nx functionality
-        echo "🧪 Testing Nx workspace detection with: $NX_COMMAND"
-        echo "Current directory: $(pwd)"
-        echo "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
-
-        # Try to get version first
         NX_VERSION=$($NX_COMMAND --version 2>/dev/null || echo "unknown")
-        echo "Nx version: $NX_VERSION"
 
-        # Test workspace detection
+        # Quick workspace sanity check with one recovery attempt
         if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then
-          echo "⚠️ Nx workspace detection failed, attempting diagnostics..."
-          
-          # Enhanced diagnostics
-          echo "🔧 Workspace diagnostic information:"
-          echo "  - Working directory: $(pwd)"
-          echo "  - nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"
-          echo "  - package.json exists: $([ -f package.json ] && echo 'yes' || echo 'no')"
-          
-          if [ -f nx.json ]; then
-            echo "  - nx.json size: $(wc -c nx.json | awk '{print $1}') bytes"
-            echo "  - nx.json first few lines:"
-            head -5 nx.json 2>/dev/null || echo "    Cannot read nx.json"
-          fi
-          
-          # Try reset with full path
-          echo "🔄 Attempting Nx reset..."
-          $NX_COMMAND reset 2>&1 || echo "Reset failed"
-          
-          # Try clearing any potential cache issues
-          if [ -d ".nx" ]; then
-            echo "🗑️ Removing .nx directory..."
-            rm -rf .nx
-          fi
-          
-          if [ -d "node_modules/.cache/nx" ]; then
-            echo "🗑️ Removing nx cache..."
-            rm -rf node_modules/.cache/nx
-          fi
-          
-          # Try again after cleanup
-          echo "🔄 Retrying workspace detection..."
+          echo "⚠️ Nx workspace detection failed — attempting reset..."
+          $NX_COMMAND reset 2>/dev/null || true
+          rm -rf .nx node_modules/.cache/nx 2>/dev/null || true
           if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then
-            echo "❌ Nx workspace still not accessible after cleanup"
-            echo "🔍 Final diagnostic - attempting to show projects with verbose output:"
-            $NX_COMMAND show projects 2>&1 || echo "Command failed"
+            echo "❌ Nx workspace still not accessible after reset"
             exit 1
           fi
         fi
 
-        # Store the working command for later use
         echo "NX_COMMAND=$NX_COMMAND" >> $GITHUB_ENV
-
-        echo "✅ Basic Nx environment configured and validated"
-        echo "   Nx version: $NX_VERSION"
-        echo "   Command: $NX_COMMAND"
-
-        # Try to count projects safely
-        PROJECT_COUNT=$($NX_COMMAND show projects 2>/dev/null | wc -l || echo "unknown")
-        echo "   Projects detected: $PROJECT_COUNT"
+        echo "✅ Nx $NX_VERSION validated ($NX_COMMAND)"
 
     - name: Workspace Setup Complete
       shell: bash

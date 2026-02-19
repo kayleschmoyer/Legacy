@@ -189,7 +189,8 @@ jobs:
     if: ${{ needs.determine-scope.outputs.run-security == 'true' }}
     uses: ./.github/workflows/security-scanning.yml
     with:
-      scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || 'comprehensive' }}
+      # PRs get a lightweight dependency-only scan; comprehensive runs weekly
+      scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || (github.event_name == 'pull_request' && 'dependencies-only' || 'comprehensive') }}
     secrets: inherit
 
   android-compatibility:

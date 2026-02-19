@@ -235,14 +235,20 @@ runs:
         TYPECHECK_SUCCESS=true
         TEST_SUCCESS=true
 
-        # ── Lint + Typecheck ──────────────────────────────────────────────────
-        if pnpm exec nx affected -t lint typecheck --parallel="$PARALLEL" 2>&1 | tee quality.log; then
-          echo "✅ Lint and typecheck passed"
+        # ── Lint + Typecheck + Test (single Nx invocation) ────────────────────
+        # Running all three target types in one `nx affected` call lets Nx's
+        # task scheduler optimise parallelism across all targets simultaneously,
+        # instead of waiting for lint+typecheck to finish before starting tests.
+        if pnpm exec nx affected -t lint typecheck test --parallel="$PARALLEL" 2>&1 | tee quality.log; then
+          echo "✅ Lint, typecheck, and tests passed"
           echo "lint-result=success" >> $GITHUB_OUTPUT
           echo "lint-failed-projects=" >> $GITHUB_OUTPUT
           echo "typecheck-result=success" >> $GITHUB_OUTPUT
           echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
+          echo "test-result=success" >> $GITHUB_OUTPUT
+          echo "test-failed-projects=" >> $GITHUB_OUTPUT
         else
+          # Parse individual target failures from the combined log
           if grep -q "lint.*failed\|ESLint" quality.log; then
             LINT_FAILED=$(grep -oE "nx run [^:]+:lint" quality.log 2>/dev/null | sed 's/nx run //;s/:lint//' | sort -u | xargs | tr ' ' ',' || echo "")
             echo "lint-result=failure" >> $GITHUB_OUTPUT
@@ -262,24 +268,22 @@ runs:
             echo "typecheck-result=success" >> $GITHUB_OUTPUT
             echo "typecheck-failed-projects=" >> $GITHUB_OUTPUT
           fi
-        fi
 
-        # ── Tests ─────────────────────────────────────────────────────────────
-        if pnpm exec nx affected -t test --parallel="$PARALLEL" 2>&1 | tee test.log; then
-          echo "✅ Tests passed"
-          echo "test-result=success" >> $GITHUB_OUTPUT
-          echo "test-failed-projects=" >> $GITHUB_OUTPUT
-        else
-          TEST_FAILED=$(grep -oE "nx run [^:]+:test" test.log 2>/dev/null | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
-          echo "test-result=failure" >> $GITHUB_OUTPUT
-          echo "test-failed-projects=${TEST_FAILED:-test}" >> $GITHUB_OUTPUT
-          TEST_SUCCESS=false
+          if grep -q "test.*failed\|FAIL " quality.log; then
+            TEST_FAILED=$(grep -oE "nx run [^:]+:test" quality.log 2>/dev/null | sed 's/nx run //;s/:test//' | sort -u | xargs | tr ' ' ',' || echo "")
+            echo "test-result=failure" >> $GITHUB_OUTPUT
+            echo "test-failed-projects=${TEST_FAILED:-test}" >> $GITHUB_OUTPUT
+            TEST_SUCCESS=false
+          else
+            echo "test-result=success" >> $GITHUB_OUTPUT
+            echo "test-failed-projects=" >> $GITHUB_OUTPUT
+          fi
         fi
 
         # ── DTE quota exceeded detection ───────────────────────────────────────
         # Surface cloud-specific failures separately from real code failures so
         # the PR comment can show an informative quota warning.
-        if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|401\|minimum.*agent\|unable to complete" quality.log test.log 2>/dev/null; then
+        if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|401\|minimum.*agent\|unable to complete" quality.log 2>/dev/null; then
           echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
         else
           echo "dte-quota-exceeded=false" >> $GITHUB_OUTPUT

@@ -6,7 +6,8 @@ name: "Legacy Sports CI Pipeline"
 # Each logical stage runs as its own GitHub Actions job so that:
 #   - detect-dte and detect-changes run in parallel (both ~30 s)
 #   - Nx Cloud agents are spawned as sibling jobs and pick up work in real-time
-#   - quality-gates, build-validation, and e2e run on dedicated runners
+#   - quality-gates and build-validation run in PARALLEL on dedicated runners
+#   - e2e runs only after both quality-gates AND build-validation pass
 #   - summarize always runs to post PR comments and update badges
 #
 # Execution modes
@@ -157,8 +158,7 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          filter: tree:0
+          fetch-depth: 1
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
@@ -252,14 +252,18 @@ jobs:
           echo "result=${RESULT:-failure}" >> $GITHUB_OUTPUT
 
   # ============================================================================
-  # STAGE 4 — Build validation (runs after quality gates pass)
+  # STAGE 3b — Build validation (runs in PARALLEL with quality gates)
+  #
+  # Builds are independent of lint/typecheck/test — running them in parallel
+  # saves 5–15 min of wall-clock time on the happy path.  The e2e job below
+  # gates on both quality-gates AND build-validation before proceeding.
   # ============================================================================
   build-validation:
     name: "Build Validation"
-    needs: [detect-dte, detect-changes, quality-gates]
+    needs: [detect-dte, detect-changes]
     if: >-
-      needs.quality-gates.result == 'success' &&
-      needs.quality-gates.outputs.result == 'success'
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
+      needs.detect-changes.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -271,15 +275,14 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          filter: tree:0
+          fetch-depth: 1
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
         with:
           node-version: 22
           install-dependencies: true
-          set-nx-shas: true
+          set-nx-shas: false
           include-optional-deps: false
 
       # execution-plan action removed: detect-changes already outputs per-component booleans.
@@ -307,12 +310,14 @@ jobs:
           if-no-files-found: warn
 
   # ============================================================================
-  # STAGE 5 — E2E tests (runs after build artifacts are ready)
+  # STAGE 4 — E2E tests (runs after BOTH quality gates AND build pass)
   # ============================================================================
   e2e:
     name: "E2E Tests"
-    needs: [detect-dte, detect-changes, build-validation]
+    needs: [detect-dte, detect-changes, quality-gates, build-validation]
     if: >-
+      needs.quality-gates.result == 'success' &&
+      needs.quality-gates.outputs.result == 'success' &&
       needs.build-validation.result == 'success' &&
       needs.build-validation.outputs.overall-result == 'success'
     runs-on: ubuntu-latest
@@ -323,15 +328,14 @@ jobs:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          filter: tree:0
+          fetch-depth: 1
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
         with:
           node-version: 22
           install-dependencies: true
-          set-nx-shas: true
+          set-nx-shas: false
           include-optional-deps: false
 
       # Download the pre-built web artifact from build-validation; fall back to
@@ -350,7 +354,7 @@ jobs:
           should-run-e2e: ${{ needs.build-validation.outputs.artifacts-ready }}
 
   # ============================================================================
-  # STAGE 6 — Summarize results (always runs — posts PR comment, updates badges)
+  # STAGE 5 — Summarize results (always runs — posts PR comment, updates badges)
   # ============================================================================
   summarize:
     name: "Summarize & Report"

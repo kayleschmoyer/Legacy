@@ -143,8 +143,18 @@ runs:
         echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
 
         SERVER_LOG="dev-server-${E2E_TIMESTAMP}.log"
-        NX_CLOUD_DISTRIBUTED_EXECUTION=false $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
-        SERVER_PID=$!
+        # Prefer a static file server against the pre-built artifact (avoids a
+        # redundant build inside nx serve).  Falls back to nx serve when the
+        # build directory is missing (e.g. artifact download was skipped).
+        if [ -d "${{ inputs.web-build-path }}" ]; then
+          echo "📦 Serving pre-built web artifact with static file server..."
+          npx --yes serve@latest "${{ inputs.web-build-path }}" -l ${{ inputs.server-port }} --no-clipboard > "$SERVER_LOG" 2>&1 &
+          SERVER_PID=$!
+        else
+          echo "⚠️ Pre-built artifact not found at ${{ inputs.web-build-path }}, falling back to nx serve..."
+          NX_CLOUD_DISTRIBUTED_EXECUTION=false $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
+          SERVER_PID=$!
+        fi
 
         echo "📝 Server output logged to: $SERVER_LOG"
         echo "🔍 Server PID: $SERVER_PID"
