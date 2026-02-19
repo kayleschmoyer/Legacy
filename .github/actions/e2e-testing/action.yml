@@ -206,12 +206,16 @@ runs:
         cd apps/web-e2e
         E2E_EXIT_CODE=0
 
+        # Set JSON reporter output path via environment variable
+        # Playwright doesn't support json:filepath inline syntax
+        export PLAYWRIGHT_JSON_OUTPUT_NAME="test-results/results.json"
+
         # Build Playwright command
         PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json:test-results/results.json"
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=test-results"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output-dir=test-results"
 
         if [ "${{ inputs.headless }}" != "true" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --headed"
