@@ -98,7 +98,7 @@ jobs:
         working-directory: terraform
         run: |
           echo "🔧 Initializing Terraform..."
-          terraform init
+          terraform init -input=false
 
       - name: Clear Stale Locks
         working-directory: terraform
@@ -138,7 +138,7 @@ jobs:
           echo "⏳ Acquiring state lock (wait up to 5 minutes)..."
 
           # Plan changes with lock timeout
-          if terraform plan -out=tfplan -lock-timeout=5m 2>&1 | tee plan.log; then
+          if terraform plan -input=false -out=tfplan -lock-timeout=5m 2>&1 | tee plan.log; then
             echo "✅ Terraform plan successful"
             
             # Check if there are any changes
@@ -176,7 +176,7 @@ jobs:
         run: |
           echo "🚀 Applying Terraform changes..."
 
-          terraform apply -auto-approve -lock-timeout=5m tfplan
+          terraform apply -input=false -auto-approve -lock-timeout=5m tfplan
 
           echo "## ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
           echo "Applied changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)" >> $GITHUB_STEP_SUMMARY
