@@ -118,15 +118,14 @@ runs:
             fi
             
             # Check for quota-related errors OR authorization failures in output
-            if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$QUOTA_CHECK_OUTPUT"; then
+            if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|authenticate\|401\|invalid.*credential" "$QUOTA_CHECK_OUTPUT"; then
               FALLBACK_REASON="DTE quota exceeded, insufficient, or authorization failed"
               echo "⚠️ $FALLBACK_REASON"
               echo "Quota check output:"
               cat "$QUOTA_CHECK_OUTPUT"
               QUOTA_REMAINING="0"
               
-              # Even though quota may be exceeded, keep trying - sometimes it's just a warning
-              CLOUD_AVAILABLE="true"
+              CLOUD_AVAILABLE="false"
               DTE_AVAILABLE="false"
               EXECUTION_MODE="local"
             elif [ $QUOTA_CHECK_RESULT -eq 124 ]; then
@@ -139,17 +138,15 @@ runs:
               MEMORY_LIMIT="6144"
               QUOTA_REMAINING="available"
             elif [ $QUOTA_CHECK_RESULT -ne 0 ]; then
-              # Non-zero exit but not quota related
+              # Non-zero exit but not quota/auth related — fall back to local
               echo "⚠️ DTE check returned non-zero exit code: $QUOTA_CHECK_RESULT"
               echo "Check output:"
               cat "$QUOTA_CHECK_OUTPUT"
+              FALLBACK_REASON="DTE check failed (exit code $QUOTA_CHECK_RESULT)"
               
-              # Still try to use DTE - errors might be transient
-              CLOUD_AVAILABLE="true"
-              DTE_AVAILABLE="true"
-              EXECUTION_MODE="distributed"
-              OPTIMAL_AGENTS=8
-              MEMORY_LIMIT="6144"
+              CLOUD_AVAILABLE="false"
+              DTE_AVAILABLE="false"
+              EXECUTION_MODE="local"
               QUOTA_REMAINING="unknown"
             else
               # Success - DTE is available

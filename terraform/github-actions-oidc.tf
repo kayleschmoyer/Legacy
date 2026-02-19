@@ -62,14 +62,15 @@ resource "aws_iam_role_policy" "github_actions_additional" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Secrets Manager access for RDS credentials
+      # Secrets Manager access for RDS credentials and application secrets
       {
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*"
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
         ]
       },
       # Lambda function updates
@@ -114,10 +115,12 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          "dynamodb:DeleteItem"
+          "dynamodb:DeleteItem",
+          "dynamodb:DescribeTable"
         ]
         Resource = [
-          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks"
+          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks",
+          "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${local.name_prefix}-*"
         ]
       },
       # IAM read permissions for Terraform plan/apply
@@ -132,11 +135,13 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "iam:ListAttachedRolePolicies",
           "iam:ListPolicyVersions",
           "iam:ListInstanceProfilesForRole",
-          "iam:PassRole"
+          "iam:PassRole",
+          "iam:GetOpenIDConnectProvider"
         ]
         Resource = [
           "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
-          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
         ]
       },
       # CloudWatch Logs read permissions
@@ -187,7 +192,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:GetBucketObjectLockConfiguration"
         ]
         Resource = [
-          "arn:aws:s3:::${local.name_prefix}-*"
+          "arn:aws:s3:::${local.name_prefix}-*",
+          "arn:aws:s3:::legacy-sports-terraform-state"
         ]
       },
       # VPC and networking read permissions
@@ -197,6 +203,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:DescribeVpcs",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSecurityGroupRules",
           "ec2:DescribeRouteTables",
           "ec2:DescribeInternetGateways",
           "ec2:DescribeNatGateways",
@@ -204,7 +211,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeInstances",
           "ec2:DescribeAddresses",
-          "ec2:DescribeVpcAttribute"
+          "ec2:DescribeVpcAttribute",
+          "ec2:DescribeImages",
+          "ec2:DescribePrefixLists"
         ]
         Resource = "*"
       },
@@ -214,11 +223,20 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Action = [
           "ssm:GetParameter",
           "ssm:GetParameters",
-          "ssm:DescribeParameters"
+          "ssm:GetParametersByPath"
         ]
         Resource = [
-          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*"
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*",
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/legacy-sports/${var.environment}/*"
         ]
+      },
+      # SSM DescribeParameters requires wildcard resource
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters"
+        ]
+        Resource = "*"
       },
       # RDS and RDS Proxy permissions (read + write for Terraform apply)
       {
@@ -250,7 +268,19 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:sqs:${local.region}:${local.account_id}:${local.name_prefix}-*"
         ]
       },
-      # API Gateway read permissions
+      # Route 53 read permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:GetHostedZone",
+          "route53:ListTagsForResource",
+          "route53:ListResourceRecordSets"
+        ]
+        Resource = [
+          "arn:aws:route53:::hostedzone/*"
+        ]
+      },
+      # API Gateway read permissions (REST API + WebSocket/HTTP API v2)
       {
         Effect = "Allow"
         Action = [
@@ -258,7 +288,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:apigateway:${local.region}::/restapis",
-          "arn:aws:apigateway:${local.region}::/restapis/*"
+          "arn:aws:apigateway:${local.region}::/restapis/*",
+          "arn:aws:apigateway:${local.region}::/apis",
+          "arn:aws:apigateway:${local.region}::/apis/*"
         ]
       },
       # Lambda read permissions

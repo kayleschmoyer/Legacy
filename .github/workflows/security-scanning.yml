@@ -427,7 +427,7 @@ jobs:
 
           pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
 
-          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401" "$DTE_START_OUTPUT"; then
+          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|authenticate\|401\|invalid.*credential" "$DTE_START_OUTPUT"; then
             echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable. Build will proceed with local execution."
             cat "$DTE_START_OUTPUT"
             rm -f "$DTE_START_OUTPUT"
@@ -458,6 +458,8 @@ jobs:
           else
             echo "⚠️ DTE unavailable - using local execution"
             unset NX_CLOUD_ACCESS_TOKEN
+            export NX_NO_CLOUD=true
+            export NX_CLOUD_DISTRIBUTED_EXECUTION=false
           fi
 
           NX_CMD="${NX_COMMAND:-}"

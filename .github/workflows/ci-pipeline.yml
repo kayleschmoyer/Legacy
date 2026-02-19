@@ -224,7 +224,9 @@ jobs:
       # Start the DTE session — agents (spawned above) will connect and receive
       # tasks.  Skipped when DTE is unavailable; nx falls back to local execution.
       - name: "Start Nx Cloud CI Run"
+        id: start-cloud
         if: needs.detect-dte.outputs.dte-available == 'true'
+        continue-on-error: true
         run: pnpm exec nx-cloud start-ci-run
         env:
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
@@ -233,12 +235,12 @@ jobs:
         id: quality
         uses: ./.github/actions/quality-gates
         with:
-          dte-active: ${{ needs.detect-dte.outputs.dte-available }}
+          dte-active: ${{ steps.start-cloud.outcome == 'success' }}
           parallel: ${{ needs.detect-dte.outputs.optimal-agents }}
 
       # Always stop agents — closes cloud session even on failure
       - name: "Stop Nx Cloud Agents"
-        if: always() && needs.detect-dte.outputs.dte-available == 'true'
+        if: always() && steps.start-cloud.outcome == 'success'
         run: pnpm exec nx-cloud stop-all-agents || true
         env:
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}

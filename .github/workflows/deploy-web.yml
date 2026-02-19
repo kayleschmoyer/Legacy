@@ -98,9 +98,9 @@ jobs:
           fi
 
           # Check if DTE start failed - distinguish between auth and quota issues
-          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|401\|invalid credentials\|minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
+          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|authenticate\|401\|invalid.*credential" "$DTE_START_OUTPUT"; then
             # Determine specific failure reason
-            if grep -qi "unauthorized\|authorization\|401\|invalid credentials" "$DTE_START_OUTPUT"; then
+            if grep -qi "unauthorized\|authorization\|401\|invalid.*credential\|authenticate" "$DTE_START_OUTPUT"; then
               echo "::error title=Nx Cloud Authentication Failed::Invalid or expired NX_CLOUD_ACCESS_TOKEN. Please check your token configuration."
               echo "🔒 Authentication Error Details:"
             elif grep -qi "minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
@@ -143,6 +143,7 @@ jobs:
             unset NX_CLOUD_ACCESS_TOKEN
             export NX_CLOUD_NO_TIMEOUTS=true
             export NX_NO_CLOUD=true
+            export NX_CLOUD_DISTRIBUTED_EXECUTION=false
           fi
 
           # Display version information
@@ -173,7 +174,7 @@ jobs:
           echo "✅ CNAME file created for legacy-fantasy.com"
 
       - name: "🛑 Stop Nx Cloud Agents"
-        if: always() && steps.detect-dte.outputs.dte-available == 'true'
+        if: always() && steps.start-dte.outcome == 'success'
         run: |
           echo "🛑 Stopping Nx Cloud DTE agents..."
           if command -v pnpm >/dev/null 2>&1; then
