@@ -16,6 +16,51 @@ Create pull requests using twig's GitHub integration or the GitHub CLI. **Always
 - Ready for code review
 - Before updating Jira ticket to "In Review"
 
+## Prerequisites
+
+Before creating a PR, verify the following **in order**. Stop at the first failure and resolve it.
+
+### 1. Must Be on a Non-Main Branch
+
+```powershell
+$branch = git branch --show-current
+if ($branch -eq 'main') { Write-Error 'Cannot create a PR from main. Create a feature branch first.' }
+```
+
+If you are on `main`, **stop** and use the **branch-create** skill to create a
+feature branch before proceeding:
+
+```powershell
+# See: .github/skills/branch-create/SKILL.md
+.\scripts\branch-create.ps1 -TicketKey LS-####
+# — or —
+twig switch LS-#### -p=main
+```
+
+### 2. Must Have an Associated Jira Ticket
+
+Extract the ticket key from the branch name and confirm it exists:
+
+```powershell
+$branch = git branch --show-current
+if ($branch -match '(LS-\d+)') {
+    $ticket = $Matches[1]
+    acli jira workitem view $ticket          # Must succeed
+} else {
+    Write-Error "Branch '$branch' has no Jira ticket (expected LS-#### in the name). Create a branch with an associated ticket first."
+}
+```
+
+If the branch does not contain a Jira ticket key:
+
+1. Identify or create the relevant Jira ticket.
+2. Rename/recreate the branch using the **branch-create** skill so the ticket
+   key is embedded in the branch name.
+
+> **Why?** Every PR must link back to a Jira ticket for traceability. The ticket
+> key in the branch name is used to auto-populate the PR description and to
+> transition the ticket to "In Review" after the PR is created.
+
 ## Command
 
 ```powershell
@@ -225,6 +270,9 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 
 ### Before Creating PR Checklist
 
+- [ ] **On a feature branch** (not `main`) — see [branch-create skill](../branch-create/SKILL.md)
+- [ ] **Branch name contains a Jira ticket key** (e.g. `feature/LS-1234-…`)
+- [ ] **Jira ticket exists and is accessible** (`acli jira workitem view LS-####`)
 - [ ] All commits follow conventional commit format
 - [ ] Type checking passes (`pnpm exec nx affected -t typecheck`)
 - [ ] Linting passes (`pnpm exec nx affected -t lint --fix`)
