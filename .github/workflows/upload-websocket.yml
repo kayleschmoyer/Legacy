@@ -50,11 +50,11 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build Lambda
-        working-directory: lambdas/websocket
         run: |
+          set -o pipefail
           echo "🔨 Building WebSocket Lambda..."
 
-          if pnpm run build 2>&1 | tee build.log; then
+          if pnpm exec nx run websocket:build 2>&1 | tee build.log; then
             echo "✅ Build successful"
           else
             echo "❌ Build failed"
@@ -66,7 +66,6 @@ jobs:
           fi
 
       - name: Package and Upload to S3
-        working-directory: lambdas/websocket
         run: |
           echo "📦 Creating Lambda deployment package..."
 
@@ -78,7 +77,7 @@ jobs:
           echo "Version: $VERSION"
 
           # Create deployment package from built artifacts
-          zip -r "websocket-${VERSION}.zip" dist/
+          zip -r "websocket-${VERSION}.zip" dist/lambdas/websocket/
 
           # Get S3 bucket name from SSM parameter store
           echo "🔍 Getting S3 bucket name from SSM..."
