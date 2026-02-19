@@ -6,28 +6,13 @@ This document provides structured guidance for AI agents working on the Legacy S
 
 ## 🛠️ Skills Documentation
 
-**Detailed Task Guides**: [GitHub Copilot Skills](../../.github/copilot/skills/README.md)
+**Detailed Task Guides**: [Agent Skills](../../.github/skills/)
 
-⚡ **For concrete command execution** (how to run specific commands), see the **skills documentation** in `.github/copilot/skills/`.
+⚡ **For concrete command execution** (how to run specific commands), see the **skills documentation** in `.github/skills/`.
 
 📋 **For patterns and guidelines** (when to use certain approaches, best practices), see the **CSV files** below.
 
-**Available Skills**: 20 comprehensive skill guides covering validation, development servers, workflow management, code generation, database operations, troubleshooting, and deployment. Each skill includes commands, alternatives, troubleshooting, and integration guidance.
-
-## 🤖 AI Agent Tools
-
-### Twig MCP Server (Recommended)
-
-This repository includes a **Twig MCP (Model Context Protocol) server** for AI agents:
-
-- **Enabled**: Configured in `.vscode/settings.json`
-- **Command**: `twig mcp-server`
-- **Benefits**: Direct API access to twig functionality with structured responses
-- **Use Case**: Branch management, tree visualization, cascade rebases, PR creation
-
-**Recommendation**: If your AI environment supports MCP, use the twig MCP server for all twig operations instead of running terminal commands. This provides better error handling and structured data for parsing.
-
----
+**Available Skills**: 41 skill guides covering validation, development servers, workflow management, code generation, database operations, troubleshooting, and deployment. Each skill includes commands, alternatives, troubleshooting, and integration guidance.
 
 ## 📁 Agent Instruction Topics
 
@@ -47,7 +32,6 @@ This repository includes a **Twig MCP (Model Context Protocol) server** for AI a
 
 | Topic                            | File                                                                                   | Description                                                         |
 | -------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Database Query Guide** 🆕⭐    | [`docs/agents/database-query-guide.md`](./database-query-guide.md)                     | **CRITICAL**: Two schemas, common mistakes, query patterns          |
 | **GraphQL API**                  | [`docs/agents/graphql-api.csv`](./docs/agents/graphql-api.csv)                         | Apollo Server, Pothos schema, career statistics integration         |
 | **Database Schema**              | [`docs/agents/database-schema.csv`](./docs/agents/database-schema.csv)                 | Season-to-career data pattern, credential management                |
 | **Migration Policy** ⚠️          | [`docs/database/migration-policy.md`](../database/migration-policy.md)                 | **CRITICAL**: All schema changes MUST use migrations, never scripts |

@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows format fmt typecheck validate \
+	lint lint-fix lint-workflows lint-skills format fmt typecheck validate \
 	test test-all test-watch test-e2e check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql \
@@ -200,6 +200,10 @@ lint-fix: ## Run linting with auto-fix on all projects
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
 	@node scripts/validate-workflows.js
+
+lint-skills: ## Validate all agent skills conform to agentskills.io format
+	@$(call echo_blue,Validating agent skills...)
+	@node scripts/lint-skills.js
 
 format: ## Format code across all projects
 	@$(call echo_blue,Formatting code...)

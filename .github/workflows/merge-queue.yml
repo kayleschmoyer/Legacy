@@ -44,8 +44,7 @@ jobs:
         github.event_name == 'workflow_run' ||
         github.event_name == 'pull_request_review' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready') ||
-        (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'merge-when-ready') ||
-        false /* synchronize/reopened removed - handled by workflow_run after CI completes */
+        (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'merge-when-ready')
       )
     runs-on: ubuntu-latest
     permissions:

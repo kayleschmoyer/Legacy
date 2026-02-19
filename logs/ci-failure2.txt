@@ -1,0 +1,1117 @@
+﻿≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	∩╗┐2026-02-18T20:06:00.5167232Z Current runner version: '2.331.0'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5203801Z ##[group]Runner Image Provisioner
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5205157Z Hosted Compute Agent
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5206219Z Version: 20260123.484
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5207424Z Commit: 6bd6555ca37d84114959e1c76d2c01448ff61c5d
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5208639Z Build Date: 2026-01-23T19:41:17Z
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5209799Z Worker ID: {1ba7adda-ea45-411b-87b1-37f9752f95df}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5211019Z Azure Region: northcentralus
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5212002Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5214622Z ##[group]Operating System
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5215695Z Ubuntu
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5216507Z 24.04.3
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5217323Z LTS
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5218162Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5219148Z ##[group]Runner Image
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5220304Z Image: ubuntu-24.04
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5221248Z Version: 20260209.23.1
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5223725Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260209.23/images/ubuntu/Ubuntu2404-Readme.md
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5226549Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260209.23
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5228174Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5230677Z ##[group]GITHUB_TOKEN Permissions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5233826Z Actions: read
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5234947Z Checks: read
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5235806Z Contents: read
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5236696Z Issues: write
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5237788Z Metadata: read
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5238712Z PullRequests: write
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5239805Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5243003Z Secret source: Actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5244564Z Prepare workflow directory
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5908871Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:00.5964737Z Getting action download info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.0263974Z Download action repository 'actions/checkout@v6' (SHA:de0fac2e4500dabe0009e67214ff5f5447ce83dd)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.2508752Z Uses: bkrupa/legacy-sports/.github/workflows/ci-pipeline.yml@refs/pull/316/merge (1828e3d14d8e10e14ad0c9f5c20925a8cf92ea9f)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.2513576Z ##[group] Inputs
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.2514471Z   debug_mode: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.2514939Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.2515791Z Complete job name: ≡ƒÜÇ CI Pipeline / Summarize & Report
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3203808Z ##[group]Run actions/checkout@v6
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3204723Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3205165Z   repository: bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3205887Z   token: ***
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3206304Z   ssh-strict: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3206740Z   ssh-user: git
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3207180Z   persist-credentials: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3207664Z   clean: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3208110Z   sparse-checkout-cone-mode: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3208624Z   fetch-depth: 1
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3209033Z   fetch-tags: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3209486Z   show-progress: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3210188Z   lfs: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3210667Z   submodules: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3211115Z   set-safe-directory: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3211827Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3212253Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3212707Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3213202Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3214128Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.3214723Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4235034Z Syncing repository: bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4237716Z ##[group]Getting Git version info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4239055Z Working directory is '/home/runner/work/legacy-sports/legacy-sports'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4242227Z [command]/usr/bin/git version
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4248046Z git version 2.52.0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4278906Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4293591Z Temporarily overriding HOME='/home/runner/work/_temp/73e9186f-f826-47d1-855a-ba9de22712f2' before making global git config changes
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4297468Z Adding repository directory to the temporary git global config as a safe directory
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4301666Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4349623Z Deleting the contents of '/home/runner/work/legacy-sports/legacy-sports'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4354617Z ##[group]Initializing the repository
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4360784Z [command]/usr/bin/git init /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4462981Z hint: Using 'master' as the name for the initial branch. This default branch name
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4465594Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4468813Z hint: to use in all of your new repositories, which will suppress this warning,
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4470077Z hint: call:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4472279Z hint:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4473251Z hint: 	git config --global init.defaultBranch <name>
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4476647Z hint:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4477647Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4479218Z hint: 'development'. The just-created branch can be renamed via this command:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4480929Z hint:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4481670Z hint: 	git branch -m <name>
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4482841Z hint:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4484164Z hint: Disable this message with "git config set advice.defaultBranchName false"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4506809Z Initialized empty Git repository in /home/runner/work/legacy-sports/legacy-sports/.git/
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4509704Z [command]/usr/bin/git remote add origin https://github.com/bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4672266Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4673965Z ##[group]Disabling automatic garbage collection
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4675225Z [command]/usr/bin/git config --local gc.auto 0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4679070Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4680024Z ##[group]Setting up auth
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4680863Z Removing SSH command configuration
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4682268Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.4686316Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5867215Z Removing HTTP extra header
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5869025Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5873308Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5879917Z Removing includeIf entries pointing to credentials config files
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5881483Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5884814Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5889526Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5909258Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5944568Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.5980809Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.6015388Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.6058553Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.6061372Z ##[group]Fetching the repository
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:01.6066848Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1828e3d14d8e10e14ad0c9f5c20925a8cf92ea9f:refs/remotes/pull/316/merge
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2170168Z From https://github.com/bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2172904Z  * [new ref]         1828e3d14d8e10e14ad0c9f5c20925a8cf92ea9f -> pull/316/merge
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2210350Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2212096Z ##[group]Determining the checkout info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2214548Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2217479Z [command]/usr/bin/git sparse-checkout disable
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2263745Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2297746Z ##[group]Checking out the ref
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.2301521Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/316/merge
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.6997615Z Note: switching to 'refs/remotes/pull/316/merge'.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.6998788Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.6999321Z You are in 'detached HEAD' state. You can look around, make experimental
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7000366Z changes and commit them, and you can discard any commits you make in this
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7001587Z state without impacting any branches by switching back to a branch.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7002135Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7002487Z If you want to create a new branch to retain commits you create, you may
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7003731Z do so (now or later) by using -c with the switch command. Example:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7004419Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7004701Z   git switch -c <new-branch-name>
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7005039Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7005243Z Or undo this operation with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7005540Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7005716Z   git switch -
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7005967Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7006647Z Turn off this advice by setting config variable advice.detachedHead to false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7007243Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7016830Z HEAD is now at 1828e3d Merge 89f12f96f054d2300b91049a8bdd75b07be9c2bb into fc13b9259d725d60b52a9a6f6dda58b7293eafe5
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7034109Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7081811Z [command]/usr/bin/git log -1 --format=%H
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7108845Z 1828e3d14d8e10e14ad0c9f5c20925a8cf92ea9f
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7609144Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.7609670Z Getting action download info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:08.9320745Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.0354256Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.1502260Z Download action repository 'nrwl/nx-set-shas@v4' (SHA:3e9ad7370203c1e93d109be57f3b72eb0eb511b1)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6029880Z ##[group]Run ./.github/actions/setup
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6030154Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6030347Z   node-version: 22
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6030559Z   install-dependencies: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6030782Z   set-nx-shas: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6030997Z   include-optional-deps: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6031227Z   skip-system-deps: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6031430Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6031594Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6031797Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6032039Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6032289Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6032560Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6730848Z ##[group]Run echo "≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6731565Z [36;1mecho "≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6732063Z [36;1mif command -v pnpm >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6732429Z [36;1m  echo "pnpm already available at $(command -v pnpm)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6732751Z [36;1m  exit 0[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6732927Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6733098Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6733280Z [36;1mDEFAULT_VERSION="9.12.1"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6734541Z [36;1mPACKAGE_VERSION=$(node -pe "(require('./package.json').packageManager || '').startsWith('pnpm@') ? require('./package.json').packageManager.split('@')[1] : ''" 2>/dev/null || echo "")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6735384Z [36;1mPNPM_VERSION="${PACKAGE_VERSION:-$DEFAULT_VERSION}"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6735813Z [36;1mecho "Installing pnpm@${PNPM_VERSION} via corepack/npm fallback"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6736167Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6736388Z [36;1mif command -v corepack >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6736695Z [36;1m  corepack enable[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6737008Z [36;1m  corepack prepare "pnpm@${PNPM_VERSION}" --activate[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6737330Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6737587Z [36;1m  echo "corepack unavailable, using npm install -g"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6737930Z [36;1m  npm install -g "pnpm@${PNPM_VERSION}"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6738200Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6738364Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6738583Z [36;1mPNPM_HOME_DIR="$HOME/.local/share/pnpm"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6738872Z [36;1mif [ -d "$PNPM_HOME_DIR" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6739194Z [36;1m  echo "Γ₧ò Adding pnpm home (${PNPM_HOME_DIR}) to PATH"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6739562Z [36;1m  echo "$PNPM_HOME_DIR" >> "$GITHUB_PATH"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6739831Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6739994Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6740279Z [36;1mecho "Preparing pnpm@${PNPM_VERSION} for immediate activation..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6794582Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6794933Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6795111Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6795313Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6795539Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6795809Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6796069Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.6896057Z ≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:09.8172244Z Installing pnpm@9.12.1 via corepack/npm fallback
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:10.0406900Z Preparing pnpm@9.12.1 for immediate activation...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3480772Z Preparing pnpm@9.12.1 for immediate activation...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3524291Z ##[group]Run # This repository is pnpm-based (pnpm-lock.yaml + pnpm-workspace.yaml)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3524929Z [36;1m# This repository is pnpm-based (pnpm-lock.yaml + pnpm-workspace.yaml)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3525409Z [36;1m# Fail fast if lockfile is missing - no npm fallback supported[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3525782Z [36;1mif [ ! -f "pnpm-lock.yaml" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3526071Z [36;1m  echo "Γ¥î pnpm-lock.yaml not found"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3526467Z [36;1m  echo "This repository requires pnpm. Expected lockfile: pnpm-lock.yaml"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3526841Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3527012Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3527218Z [36;1mecho "manager=pnpm" >> "$GITHUB_OUTPUT"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3527583Z [36;1mecho "Γ£à Validated pnpm workspace (pnpm-lock.yaml found)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3579530Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3579856Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3580028Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3580248Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3580503Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3580748Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3581006Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3654995Z Γ£à Validated pnpm workspace (pnpm-lock.yaml found)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3754702Z ##[group]Run actions/setup-node@v4
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3754979Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3755162Z   node-version: 22
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3755349Z   cache: pnpm
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3755532Z   always-auth: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3755733Z   check-latest: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3756047Z   token: ***
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3756225Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3756387Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3756574Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3757004Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3757278Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.3757527Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.5885153Z Found in cache @ /opt/hostedtoolcache/node/22.22.0/x64
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.5895711Z ##[group]Environment details
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9216726Z [warning]This project is configured to use pnpm because /home/runner/work/legacy-sports/legacy-sports/package.json has a "packageManager" field
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9218391Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9881552Z node: v22.22.0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9883199Z npm: 10.9.4
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9887769Z yarn: 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9889057Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:11.9911891Z [command]/usr/local/bin/pnpm store path --silent
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:12.5105523Z /home/runner/.local/share/pnpm/store/v3
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:12.6816751Z Cache hit for: node-cache-Linux-x64-pnpm-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:13.8086071Z Received 113246208 of 649178790 (17.4%), 107.6 MBs/sec
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:14.8095422Z Received 268435456 of 649178790 (41.4%), 127.7 MBs/sec
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:15.8131959Z Received 419430400 of 649178790 (64.6%), 133.0 MBs/sec
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:16.8203117Z Received 591396864 of 649178790 (91.1%), 140.4 MBs/sec
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:17.1049184Z Received 649178790 of 649178790 (100.0%), 144.0 MBs/sec
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:17.1064283Z Cache Size: ~619 MB (649178790 B)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:17.1324660Z [command]/usr/bin/tar -xf /home/runner/work/_temp/a6867076-bb0d-4a2e-851a-7eeba032c79f/cache.tzst -P -C /home/runner/work/legacy-sports/legacy-sports --use-compress-program unzstd
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:29.8104394Z Cache restored successfully
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:29.9265762Z Cache restored from key: node-cache-Linux-x64-pnpm-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:29.9591180Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:29.9591507Z Getting action download info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0977444Z ##[group]Run ./.github/actions/nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0977715Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0977889Z   restore-only: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0978087Z   base-branch: main
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0978271Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0978433Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0978627Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0979028Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0979293Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.0979554Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1015629Z ##[group]Run echo "≡ƒöì Determining Nx cache strategy..."
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1016009Z [36;1mecho "≡ƒöì Determining Nx cache strategy..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1016298Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1016495Z [36;1m# Determine if this is a PR build[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1016799Z [36;1mif [ "pull_request" = "pull_request" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1017085Z [36;1m  IS_PR="true"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1017300Z [36;1m  BASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1017566Z [36;1m  HEAD_REF="ci/optimize-pipeline-multi-job"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1017871Z [36;1m  echo "≡ƒôï PR Build Detected"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1018142Z [36;1m  echo "  Base: $BASE_REF"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1018384Z [36;1m  echo "  Head: $HEAD_REF"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1018608Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1018795Z [36;1m  IS_PR="false"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1019017Z [36;1m  BASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1019241Z [36;1m  HEAD_REF="316/merge"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1019499Z [36;1m  echo "≡ƒôï Direct Branch Build"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1019766Z [36;1m  echo "  Branch: $HEAD_REF"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1020001Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1020166Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1020370Z [36;1mecho "is-pr=$IS_PR" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1020689Z [36;1mecho "base-ref=$BASE_REF" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1021006Z [36;1mecho "head-ref=$HEAD_REF" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1021270Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1021447Z [36;1m# Determine cache strategy[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1021695Z [36;1mif [ "$IS_PR" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1022161Z [36;1m  echo "source=base-branch" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1022547Z [36;1m  echo "≡ƒôª Strategy: Restore cache from base branch ($BASE_REF)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1022897Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1023152Z [36;1m  echo "source=current-branch" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1023846Z [36;1m  echo "≡ƒôª Strategy: Use current branch cache"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1024152Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1954530Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1954868Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1955040Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1955246Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1955475Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1955744Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.1956005Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.2474983Z ≡ƒöì Determining Nx cache strategy...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.2475437Z ≡ƒôï PR Build Detected
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.2475678Z   Base: main
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.2475959Z   Head: ci/optimize-pipeline-multi-job
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.2476423Z ≡ƒôª Strategy: Restore cache from base branch (main)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3760146Z ##[group]Run echo "≡ƒöæ Generating cache keys..."
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3760757Z [36;1mecho "≡ƒöæ Generating cache keys..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3761203Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3761513Z [36;1mBASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3761991Z [36;1mHEAD_REF="ci/optimize-pipeline-multi-job"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3762500Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3762881Z [36;1m# Hash of dependencies and Nx configuration[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3764044Z [36;1mDEPS_HASH="f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3765095Z [36;1mNX_CONFIG_HASH="608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3765855Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3766211Z [36;1m# Current branch cache key (for saving)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3767915Z [36;1mCURRENT_KEY="nx-cache-${HEAD_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3768567Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3768960Z [36;1m# Base branch cache key (for restoring on PRs)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3769868Z [36;1mBASE_KEY="nx-cache-${BASE_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3770468Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3770881Z [36;1mecho "current-key=$CURRENT_KEY" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3771489Z [36;1mecho "base-key=$BASE_KEY" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3772072Z [36;1mecho "deps-hash=$DEPS_HASH" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3772388Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3772589Z [36;1mecho "Γ£à Cache Keys Generated:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3772873Z [36;1mecho "  Current: $CURRENT_KEY"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3773144Z [36;1mecho "  Base:    $BASE_KEY"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3848023Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3848581Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3848882Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3849249Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3849891Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3850410Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3850860Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3975876Z ≡ƒöæ Generating cache keys...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3977307Z Γ£à Cache Keys Generated:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3991881Z   Current: nx-cache-ci/optimize-pipeline-multi-job-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.3996065Z   Base:    nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4037120Z ##[group]Run actions/cache/restore@v4
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4037367Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4037568Z   path: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	node_modules/.cache/nx
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4038295Z   key: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4039437Z   restore-keys: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	nx-cache-main-
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4039980Z   enableCrossOsArchive: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4040228Z   fail-on-cache-miss: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4040452Z   lookup-only: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4040636Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4040800Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4040993Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4041214Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4041464Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.4041720Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8144253Z Cache not found for input keys: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5, nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-, nx-cache-main-
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8221246Z ##[group]Run echo "≡ƒôè Nx Cache Restoration Summary"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8221643Z [36;1mecho "≡ƒôè Nx Cache Restoration Summary"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8221947Z [36;1mecho "================================"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8222211Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8222418Z [36;1mif [ "true" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8222665Z [36;1m  if [ "" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8222947Z [36;1m    echo "Γ£à Cache HIT from base branch (main)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8223301Z [36;1m    echo "ΓÜí Nx will only rebuild affected projects!"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8223991Z [36;1m  elif [ -n "" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8224296Z [36;1m    echo "ΓÜá∩╕Å  Partial cache restored from base branch"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8224667Z [36;1m    echo "≡ƒöä Some tasks may need to rebuild"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8224944Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8225176Z [36;1m    echo "Γ¥î No cache available from base branch"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8225488Z [36;1m    echo "≡ƒö¿ Full rebuild required"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8225732Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8225923Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8226112Z [36;1m  if [ "" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8226395Z [36;1m    echo "Γ£à Cache HIT from current branch"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8226676Z [36;1m  elif [ -n "" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8227114Z [36;1m    echo "ΓÜá∩╕Å  Partial cache restored"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8227376Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8227572Z [36;1m    echo "Γ¥î No cache available"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8227839Z [36;1m    echo "≡ƒö¿ Full build required"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8228081Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8228249Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8228410Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8228589Z [36;1m# Show cache size if available[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8228844Z [36;1mif [ -d ".nx-cache" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8229196Z [36;1m  CACHE_SIZE=$(du -sh .nx-cache 2>/dev/null | cut -f1 || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8229582Z [36;1m  echo "≡ƒôª Cache size: $CACHE_SIZE"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8229834Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8280994Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8281326Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8281506Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8281716Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8281952Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8282208Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8282463Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8387784Z ≡ƒôè Nx Cache Restoration Summary
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8391816Z ================================
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8395204Z Γ¥î No cache available from base branch
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8395804Z ≡ƒö¿ Full rebuild required
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8430727Z ##[group]Run echo "ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache..."
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8431290Z [36;1mecho "ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8431869Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8432193Z [36;1m# Ensure cache directory exists[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8432648Z [36;1mmkdir -p .nx-cache[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8433231Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8433913Z [36;1m# Set environment variables for Nx[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8434474Z [36;1mecho "NX_CACHE_DIRECTORY=.nx-cache" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8435094Z [36;1mecho "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8435573Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8435986Z [36;1mecho "Γ£à Nx configured to use local cache at .nx-cache"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8496395Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8496730Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8496911Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8497117Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8497344Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8497601Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.8497863Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9099763Z ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9102735Z Γ£à Nx configured to use local cache at .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9175554Z ##[group]Run echo "≡ƒôê Final Cache Statistics"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9175896Z [36;1mecho "≡ƒôê Final Cache Statistics"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9176196Z [36;1mecho "========================="[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9176484Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9176677Z [36;1mif [ -d ".nx-cache" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9176953Z [36;1m  echo "Cache directory exists: Γ£à"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9177318Z [36;1m  echo "Cache entries: $(find .nx-cache -type f 2>/dev/null | wc -l)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9177770Z [36;1m  echo "Cache size: $(du -sh .nx-cache 2>/dev/null | cut -f1)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9178099Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9178306Z [36;1m  echo "Cache directory exists: Γ¥î"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9178557Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9178718Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9178921Z [36;1mif [ -d "node_modules/.cache/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9179331Z [36;1m  echo "Nx internal cache: $(du -sh node_modules/.cache/nx 2>/dev/null | cut -f1)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9179714Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9229374Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9229709Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9229896Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9230105Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9230480Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9230737Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9230996Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9492000Z ≡ƒôê Final Cache Statistics
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9494379Z =========================
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9514877Z Cache directory exists: Γ£à
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:30.9963206Z Cache entries: 0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0014417Z Cache size: 4.0K
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0086668Z ##[group]Run echo "≡ƒöº Configuring basic Nx environment..."
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0087393Z [36;1mecho "≡ƒöº Configuring basic Nx environment..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0087692Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0087927Z [36;1m# Set conservative defaults for Nx execution[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0088246Z [36;1mecho "NX_DAEMON=false" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0088572Z [36;1mecho "NX_PARALLEL=2" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0088829Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0089108Z [36;1m# Ensure Nx cache directory exists and is properly configured[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0089529Z [36;1mif [ -n "${NX_CACHE_DIRECTORY:-}" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0089831Z [36;1m  mkdir -p "$NX_CACHE_DIRECTORY"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0090182Z [36;1m  echo "≡ƒôü Created Nx cache directory: $NX_CACHE_DIRECTORY"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0090517Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0090682Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0091066Z [36;1m# Skip Nx validation when dependencies are not installed (e.g. detect-dte / detect-changes jobs)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0091544Z [36;1mif [ "false" != "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0091896Z [36;1m  echo "ΓÅ¡∩╕Å  Skipping Nx validation (install-dependencies=false)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0092241Z [36;1m  exit 0[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0092424Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0092585Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0093024Z [36;1m# Comprehensive Nx installation and workspace validation[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0093697Z [36;1mecho "≡ƒöì Validating Nx installation..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0094103Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0094311Z [36;1m# Check if node_modules has Nx[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0094582Z [36;1mif [ ! -d "node_modules" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0094875Z [36;1m  echo "Γ¥î node_modules directory missing"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0095146Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0095323Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0095489Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0095670Z [36;1m# Debug node_modules structure[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0095969Z [36;1mecho "≡ƒôü Checking Nx installation paths..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0096447Z [36;1mecho "node_modules/.bin/nx exists: $([ -f node_modules/.bin/nx ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0097030Z [36;1mecho "node_modules/nx exists: $([ -d node_modules/nx ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0097519Z [36;1mecho "@nx packages: $(ls node_modules/ | grep '^@nx' | wc -l)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0097859Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0098120Z [36;1m# Try different methods to access Nx with enhanced debugging[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0098456Z [36;1mNX_COMMAND=""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0098706Z [36;1mecho "≡ƒöì Attempting Nx CLI detection..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0098973Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0099216Z [36;1m# Method 1: pnpm exec nx (preferred for pnpm workspace)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0099548Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0099827Z [36;1m  echo "  Testing Method 1: pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0100173Z [36;1m  if pnpm exec nx --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0100483Z [36;1m    NX_COMMAND="pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0100778Z [36;1m    echo "  Γ£à Nx accessible via: pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0101050Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0101254Z [36;1m    echo "  Γ¥î pnpm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0101503Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0101683Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0101844Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0102035Z [36;1m# Method 2: Direct path to nx binary  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0102324Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0102784Z [36;1m  echo "  Testing Method 2: node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0103107Z [36;1m  if [ -f "node_modules/.bin/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0103713Z [36;1m    if node_modules/.bin/nx --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0104074Z [36;1m      NX_COMMAND="node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0104406Z [36;1m      echo "  Γ£à Nx accessible via: node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0104709Z [36;1m    else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0104972Z [36;1m      echo "  Γ¥î node_modules/.bin/nx exists but not executable"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0105288Z [36;1m    fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0105466Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0105694Z [36;1m    echo "  Γ¥î node_modules/.bin/nx does not exist"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0105978Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0106148Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0106313Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0106532Z [36;1m# Method 3: pnpm exec with explicit separator[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0106837Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0107127Z [36;1m  echo "  Testing Method 3: pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0107473Z [36;1m  if pnpm exec nx -- --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0107795Z [36;1m    NX_COMMAND="pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0108103Z [36;1m    echo "  Γ£à Nx accessible via: pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0108385Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0108593Z [36;1m    echo "  Γ¥î pnpm exec nx -- failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0108845Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0109014Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0109181Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0109364Z [36;1m# Method 4: npm exec (fallback)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0109628Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0110033Z [36;1m  echo "  Testing Method 4: npm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0110351Z [36;1m  if npm exec nx -- --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0110660Z [36;1m    NX_COMMAND="npm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0110963Z [36;1m    echo "  Γ£à Nx accessible via: npm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0111240Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0111439Z [36;1m    echo "  Γ¥î npm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0111681Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0111842Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0112004Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0112216Z [36;1m# Method 5: Try to manually find and execute nx[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0112513Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0112802Z [36;1m  echo "  Testing Method 4: Manual nx resolution"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0113072Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0113267Z [36;1m  # Look for nx in various locations[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0113859Z [36;1m  for nx_path in "node_modules/.bin/nx" "node_modules/nx/bin/nx.js" "node_modules/@nx/cli/bin/nx.js"; do[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0114340Z [36;1m    if [ -f "$nx_path" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0114630Z [36;1m      echo "  Found potential nx at: $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0114983Z [36;1m      if node "$nx_path" --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0115312Z [36;1m        NX_COMMAND="node $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0115614Z [36;1m        echo "  Γ£à Nx accessible via: node $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0115912Z [36;1m        break[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116112Z [36;1m      fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116289Z [36;1m    fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116461Z [36;1m  done[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116625Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116788Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0116964Z [36;1m# If all methods failed[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0117209Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0117509Z [36;1m  echo "Γ¥î Nx not accessible through any method"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0117805Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0118018Z [36;1m  echo "≡ƒöì Diagnostic information:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0118341Z [36;1m  echo "  Available binaries in node_modules/.bin:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0118892Z [36;1m  ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "    No nx binaries found"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0119304Z [36;1m  echo "  Nx package directory:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0119691Z [36;1m  ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "    No nx directory found"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0120094Z [36;1m  echo "  @nx packages:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0120461Z [36;1m  ls -la node_modules/@nx/ 2>/dev/null | head -5 || echo "    No @nx directory found"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0120865Z [36;1m  echo "  pnpm exec debug:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0121199Z [36;1m  pnpm exec nx --version 2>&1 || echo "    pnpm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0121571Z [36;1m  echo "  pnpm exec with separator debug:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0121950Z [36;1m  pnpm exec nx -- --version 2>&1 || echo "    pnpm exec nx -- failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0122302Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0122489Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0122660Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0122828Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0123019Z [36;1m# Test basic Nx functionality[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0123351Z [36;1mecho "≡ƒº¬ Testing Nx workspace detection with: $NX_COMMAND"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0123803Z [36;1mecho "Current directory: $(pwd)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0124153Z [36;1mecho "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0124489Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0124701Z [36;1m# Try to get version first[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0125033Z [36;1mNX_VERSION=$($NX_COMMAND --version 2>/dev/null || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0125393Z [36;1mecho "Nx version: $NX_VERSION"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0125629Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0125806Z [36;1m# Test workspace detection[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0126124Z [36;1mif ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0126680Z [36;1m  echo "ΓÜá∩╕Å Nx workspace detection failed, attempting diagnostics..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0127022Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0127215Z [36;1m  # Enhanced diagnostics[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0127500Z [36;1m  echo "≡ƒöº Workspace diagnostic information:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0127820Z [36;1m  echo "  - Working directory: $(pwd)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0128197Z [36;1m  echo "  - nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0128691Z [36;1m  echo "  - package.json exists: $([ -f package.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0129077Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0129253Z [36;1m  if [ -f nx.json ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0129581Z [36;1m    echo "  - nx.json size: $(wc -c nx.json | awk '{print $1}') bytes"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0129954Z [36;1m    echo "  - nx.json first few lines:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0130307Z [36;1m    head -5 nx.json 2>/dev/null || echo "    Cannot read nx.json"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0130785Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0131037Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0131218Z [36;1m  # Try reset with full path[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0131496Z [36;1m  echo "≡ƒöä Attempting Nx reset..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0131800Z [36;1m  $NX_COMMAND reset 2>&1 || echo "Reset failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0132110Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0132325Z [36;1m  # Try clearing any potential cache issues[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0132600Z [36;1m  if [ -d ".nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0132860Z [36;1m    echo "≡ƒùæ∩╕Å Removing .nx directory..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0133129Z [36;1m    rm -rf .nx[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0133326Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0133756Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0133975Z [36;1m  if [ -d "node_modules/.cache/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0134267Z [36;1m    echo "≡ƒùæ∩╕Å Removing nx cache..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0134546Z [36;1m    rm -rf node_modules/.cache/nx[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0134803Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0134972Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0135154Z [36;1m  # Try again after cleanup[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0135439Z [36;1m  echo "≡ƒöä Retrying workspace detection..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0135942Z [36;1m  if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0136377Z [36;1m    echo "Γ¥î Nx workspace still not accessible after cleanup"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0136855Z [36;1m    echo "≡ƒöì Final diagnostic - attempting to show projects with verbose output:"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0137328Z [36;1m    $NX_COMMAND show projects 2>&1 || echo "Command failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0137639Z [36;1m    exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0137822Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0137982Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0138148Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0138351Z [36;1m# Store the working command for later use[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0138664Z [36;1mecho "NX_COMMAND=$NX_COMMAND" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0138941Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0139184Z [36;1mecho "Γ£à Basic Nx environment configured and validated"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0139513Z [36;1mecho "   Nx version: $NX_VERSION"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0139784Z [36;1mecho "   Command: $NX_COMMAND"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0140018Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0140198Z [36;1m# Try to count projects safely[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0140589Z [36;1mPROJECT_COUNT=$($NX_COMMAND show projects 2>/dev/null | wc -l || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0141028Z [36;1mecho "   Projects detected: $PROJECT_COUNT"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0191110Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0191444Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0191620Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0191821Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0192052Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0192301Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.0192558Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1594901Z ≡ƒöº Configuring basic Nx environment...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1620581Z ≡ƒôü Created Nx cache directory: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1621700Z ΓÅ¡∩╕Å  Skipping Nx validation (install-dependencies=false)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1668173Z ##[group]Run echo "Γ£à Workspace setup complete"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1668765Z [36;1mecho "Γ£à Workspace setup complete"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1669280Z [36;1mecho "   Node.js: $(node --version)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1669787Z [36;1mecho "   pnpm: $(pnpm --version)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1670316Z [36;1mecho "   Dependencies: Installed fresh"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1670827Z [36;1mecho "   Cache Key Suffix: none"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1671323Z [36;1mecho "   System Dependencies: Installed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1671807Z [36;1mecho ""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1672225Z [36;1mecho "Γä╣∩╕Å  Ready for build and test operations"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1727815Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1728153Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1728332Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1728554Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1728781Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1729041Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1729306Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.1729505Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.2004715Z Γ£à Workspace setup complete
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.2062217Z    Node.js: v22.22.0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7250401Z    pnpm: 9.12.1
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7251904Z    Dependencies: Installed fresh
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7252357Z    Cache Key Suffix: none
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7252804Z    System Dependencies: Installed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7253082Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7253819Z Γä╣∩╕Å  Ready for build and test operations
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7346050Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7477052Z ##[group]Run ./.github/actions/collect-results
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7477518Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7478558Z   step-results: {
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "detect-dte":       "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "detect-changes":   "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "quality-gates":    "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "build-validation": "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "e2e-testing":      "failure"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7480051Z   workflow-start-time: 2026-02-18T19:58:39Z
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7480682Z   failure-threshold: quality-gates,build-validation,e2e-testing
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7481306Z   include-performance-metrics: true
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7481723Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7482016Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7482354Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7482742Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7483178Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7483883Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7484196Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7507436Z ##[group]Run echo "::group::Collecting CI Results and Metrics"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7508231Z [36;1mecho "::group::Collecting CI Results and Metrics"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7508659Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7508992Z [36;1m# Parse input step results[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7509378Z [36;1mSTEP_RESULTS='{[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7509641Z [36;1m  "detect-dte":       "success",[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7509918Z [36;1m  "detect-changes":   "success",[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7510354Z [36;1m  "quality-gates":    "success",[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7510817Z [36;1m  "build-validation": "success",[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7511279Z [36;1m  "e2e-testing":      "failure"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7511698Z [36;1m}[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7511982Z [36;1m'[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7512504Z [36;1mFAILURE_THRESHOLD="quality-gates,build-validation,e2e-testing"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7513171Z [36;1mINCLUDE_PERF="true"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7513689Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7514028Z [36;1mecho "Processing step results..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7514469Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7514808Z [36;1m# Validate and enhance step results[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7515382Z [36;1mif ! echo "$STEP_RESULTS" | jq . >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7516025Z [36;1m  echo "::error::Invalid JSON in step-results input"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7516750Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7517063Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7517359Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7517778Z [36;1m# Determine overall status based on failure threshold[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7518343Z [36;1mOVERALL_STATUS="success"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7518753Z [36;1mFAILED_STEPS=()[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7519102Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7519470Z [36;1m# Check each step against failure threshold[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7520092Z [36;1mIFS=',' read -ra CRITICAL_STEPS <<< "$FAILURE_THRESHOLD"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7520720Z [36;1mfor step in "${CRITICAL_STEPS[@]}"; do[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7521306Z [36;1m  step=$(echo "$step" | xargs) # trim whitespace[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7522008Z [36;1m  STEP_RESULT=$(echo "$STEP_RESULTS" | jq -r ".[\"$step\"] // \"unknown\"")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7522650Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7523015Z [36;1m  if [ "$STEP_RESULT" = "failure" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7523765Z [36;1m    OVERALL_STATUS="failure"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7524232Z [36;1m    FAILED_STEPS+=("$step")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7524746Z [36;1m    echo "[FAILED] Critical step '$step' failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7525310Z [36;1m  elif [ "$STEP_RESULT" = "success" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7525886Z [36;1m    echo "[SUCCESS] Critical step '$step' passed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7526397Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7526869Z [36;1m    echo "[UNKNOWN] Critical step '$step' status: $STEP_RESULT"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7527448Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7527753Z [36;1mdone[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7528043Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7528371Z [36;1m# Calculate workflow duration[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7529049Z [36;1mWORKFLOW_DURATION="unknown"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7529530Z [36;1mWORKFLOW_START="2026-02-18T19:58:39Z"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7530006Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7530221Z [36;1mif [ -n "$WORKFLOW_START" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7530510Z [36;1m  echo "Calculating workflow duration..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7530925Z [36;1m  START_SECONDS=$(date -d "$WORKFLOW_START" +%s 2>/dev/null || date +%s)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7531302Z [36;1m  CURRENT_SECONDS=$(date +%s)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7531632Z [36;1m  WORKFLOW_DURATION=$((CURRENT_SECONDS - START_SECONDS))[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7532420Z [36;1m  echo "Duration: ${WORKFLOW_DURATION}s ($(($WORKFLOW_DURATION / 60))m $(($WORKFLOW_DURATION % 60))s)"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7533221Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7533658Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7534024Z [36;1m# Generate performance summary if enabled[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7534532Z [36;1mPERFORMANCE_SUMMARY="{}"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7535158Z [36;1mif [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7535884Z [36;1m  echo "Generating performance analysis..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7536373Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7536703Z [36;1m  PERFORMANCE_CATEGORY="normal"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7537172Z [36;1m  PERFORMANCE_RATING="good"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7537592Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7537948Z [36;1m  if [ "$WORKFLOW_DURATION" -lt 300 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7538448Z [36;1m    PERFORMANCE_CATEGORY="fast"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7538936Z [36;1m    PERFORMANCE_RATING="excellent"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7539454Z [36;1m  elif [ "$WORKFLOW_DURATION" -gt 1200 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7539988Z [36;1m    PERFORMANCE_CATEGORY="slow"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7540504Z [36;1m    PERFORMANCE_RATING="needs optimization"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7540984Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7541285Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7541621Z [36;1m  # Create performance summary JSON[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7542130Z [36;1m  PERFORMANCE_SUMMARY=$(printf '{[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7542600Z [36;1m    "duration_seconds": %s,[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7543045Z [36;1m    "duration_category": "%s", [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7568164Z [36;1m    "rating": "%s",[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7568595Z [36;1m    "benchmark": {[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7569208Z [36;1m      "fast_threshold": 300,[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7569650Z [36;1m      "slow_threshold": 1200,[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7570093Z [36;1m      "current_duration": %s[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7570498Z [36;1m    }[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7571167Z [36;1m  }' "$WORKFLOW_DURATION" "$PERFORMANCE_CATEGORY" "$PERFORMANCE_RATING" "$WORKFLOW_DURATION")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7571934Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7572231Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7572603Z [36;1m# Create enhanced step results with metadata[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7573185Z [36;1mif [[ "$WORKFLOW_DURATION" =~ ^[0-9]+$ ]]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7574077Z [36;1m  JQ_DURATION_ARG="$WORKFLOW_DURATION"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7574550Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7574884Z [36;1m  JQ_DURATION_ARG="null"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7575231Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7575403Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7576787Z [36;1mENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$JQ_DURATION_ARG" --arg status "$OVERALL_STATUS" '. + {"metadata": {"overall_status": $status, "workflow_duration": $duration, "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")), "total_steps": (. | length)}}')[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7578577Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7578878Z [36;1m# Set outputs[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7579473Z [36;1mecho "step-results=$(echo "$ENHANCED_RESULTS" | jq -c .)" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7580299Z [36;1mecho "overall-status=$OVERALL_STATUS" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7581047Z [36;1mecho "workflow-duration=$WORKFLOW_DURATION" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7582125Z [36;1mecho "failed-steps=$(printf '%s,' "${FAILED_STEPS[@]}" | sed 's/,$//')" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7583171Z [36;1mecho "performance-summary=$(echo "$PERFORMANCE_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7584081Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7584399Z [36;1m# Create step summary[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7584915Z [36;1mecho "## CI Results Summary" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7585914Z [36;1mecho "- **Overall Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "SUCCESS" || echo "FAILED" )" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7586984Z [36;1mecho "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7588155Z [36;1mecho "- **Failed Steps**: $( [ ${#FAILED_STEPS[@]} -eq 0 ] && echo "None" || printf '%s, ' "${FAILED_STEPS[@]}" | sed 's/, $//' )" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7589144Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7589650Z [36;1mif [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7590469Z [36;1m  PERF_RATING=$(echo "$PERFORMANCE_SUMMARY" | jq -r '.rating')[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7591214Z [36;1m  echo "- **Performance**: $PERF_RATING" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7591794Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7592088Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7592421Z [36;1mecho "### Step Details" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7593016Z [36;1mecho "| Step | Status |" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7593847Z [36;1mecho "|------|--------|" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7594332Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7595583Z [36;1mecho "$STEP_RESULTS" | jq -r 'to_entries[] | "| " + .key + " | " + (if .value == "success" then "[SUCCESS] " + .value elif .value == "failure" then "[FAILED] " + .value else "[UNKNOWN] " + .value end) + " |"' >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7596958Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7597376Z [36;1mecho "Results collection completed: $OVERALL_STATUS"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7597934Z [36;1mecho "::endgroup::"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7647215Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7647546Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7647718Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7647929Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7648154Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7648552Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7648821Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7649010Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7992162Z ##[group]Collecting CI Results and Metrics
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.7994015Z Processing step results...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8143304Z [SUCCESS] Critical step 'quality-gates' passed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8222893Z [SUCCESS] Critical step 'build-validation' passed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8288349Z [FAILED] Critical step 'e2e-testing' failed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8290336Z Calculating workflow duration...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8319749Z Duration: 472s (7m 52s)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8321274Z Generating performance analysis...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8628133Z Results collection completed: failure
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8629051Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8867095Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:31.8867435Z Getting action download info
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.0202724Z Download action repository 'actions/github-script@v7' (SHA:f28e40c7f34bde8b3046d885e986cb6290c5673b)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5610025Z ##[group]Run ./.github/actions/ci-reporting
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5610297Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5610461Z   status: failure
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5610979Z   github-token: ***
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5611194Z   event-name: pull_request
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5611416Z   pr-number: 316
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5611615Z   execution-mode: distributed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5611843Z   optimal-agents: 8
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5612033Z   quota-status: available
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5612248Z   quota-exceeded: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5613178Z   step-results: {"detect-dte":"success","detect-changes":"success","quality-gates":"success","build-validation":"success","e2e-testing":"failure","metadata":{"overall_status":"failure","workflow_duration":472,"timestamp":"2026-02-18T20:06:31Z","total_steps":5}}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5614295Z   workflow-duration: 472
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5614504Z   run-id: 22155437800
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5615000Z   quality-gates-subsections: {
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "formatting": "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "lint":        "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "typecheck":   "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "test":        "success"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5615713Z   project-failures: {
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "formatting": "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "lint":        "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "typecheck":   "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "test":        ""
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5616126Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5616297Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5616498Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5616718Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5616967Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5617224Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5617409Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5634770Z ##[group]Run echo "::group::≡ƒôè CI Pipeline Report Generation"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5635232Z [36;1mecho "::group::≡ƒôè CI Pipeline Report Generation"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5635533Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5635712Z [36;1mSTATUS="failure"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5635938Z [36;1mEVENT_NAME="pull_request"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5636197Z [36;1mEXECUTION_MODE="distributed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5636457Z [36;1mOPTIMAL_AGENTS="8"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5636689Z [36;1mFALLBACK_REASON=""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5636910Z [36;1mWORKFLOW_DURATION="472"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5637141Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5637372Z [36;1mecho "≡ƒôï Generating comprehensive CI report..."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5637697Z [36;1mecho "  - Status: $STATUS"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5637973Z [36;1mecho "  - Event: $EVENT_NAME"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5638258Z [36;1mecho "  - Execution Mode: $EXECUTION_MODE"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5638584Z [36;1mecho "  - Duration: ${WORKFLOW_DURATION}s"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5638854Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5639055Z [36;1m# Create comprehensive report JSON[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5639360Z [36;1mTIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5639627Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5639825Z [36;1m# Determine duration category first[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5640228Z [36;1mif [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -gt 1200 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5640805Z [36;1m  DURATION_CATEGORY="slow"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5641188Z [36;1melif [ "$WORKFLOW_DURATION" != "unknown" ] && [ "$WORKFLOW_DURATION" -lt 600 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5641592Z [36;1m  DURATION_CATEGORY="fast"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5641823Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5642010Z [36;1m  DURATION_CATEGORY="normal"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5642244Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5642406Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5644285Z [36;1mprintf '%s\n' "{\"pipeline\":{\"status\":\"$STATUS\",\"timestamp\":\"$TIMESTAMP\",\"duration_seconds\":\"$WORKFLOW_DURATION\",\"trigger\":\"$EVENT_NAME\",\"execution_mode\":\"$EXECUTION_MODE\",\"agents_used\":\"$OPTIMAL_AGENTS\",\"fallback_reason\":\"$FALLBACK_REASON\"},\"performance\":{\"mode_used\":\"$EXECUTION_MODE\",\"agent_count\":\"$OPTIMAL_AGENTS\",\"duration_category\":\"$DURATION_CATEGORY\"}}" > ci-report.json[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5645691Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5645930Z [36;1mecho "report-generated=true" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5646232Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5646415Z [36;1m# Create performance insights[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5646759Z [36;1mecho "## ≡ƒôè CI Performance Analysis" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5647206Z [36;1mecho "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5647673Z [36;1mecho "- **Agents/Processes**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5648028Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5648241Z [36;1mif [ "$WORKFLOW_DURATION" != "unknown" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5648625Z [36;1m  echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5648966Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5649191Z [36;1m  if [ "$WORKFLOW_DURATION" -gt 1200 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5649619Z [36;1m    echo "- **Performance**: ΓÜá∩╕Å Slow (consider optimization)" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5650063Z [36;1m  elif [ "$WORKFLOW_DURATION" -lt 600 ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5650436Z [36;1m    echo "- **Performance**: ≡ƒÄë Excellent" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5650770Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5651023Z [36;1m    echo "- **Performance**: Γ£à Good" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5651335Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5651507Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5651674Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5651854Z [36;1m# Display DTE quota status[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5652102Z [36;1mQUOTA_STATUS="available"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5652346Z [36;1mQUOTA_EXCEEDED="false"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5652569Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5652785Z [36;1mif [ "$EXECUTION_MODE" = "distributed" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5653219Z [36;1m  echo "- **Optimization**: ≡ƒÜÇ DTE enabled (60-80% faster)" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5653768Z [36;1m  if [ -n "$QUOTA_STATUS" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5654029Z [36;1m    case "$QUOTA_STATUS" in[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5654276Z [36;1m      "available")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5654576Z [36;1m        echo "- **DTE Quota**: Γ£à Available" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5654900Z [36;1m        ;;[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5655099Z [36;1m      "limited")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5655460Z [36;1m        echo "- **DTE Quota**: ΓÜá∩╕Å Limited (consider optimization)" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5655859Z [36;1m        ;;[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5656054Z [36;1m      "exhausted")[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5656348Z [36;1m        echo "- **DTE Quota**: Γ¥î Exhausted" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5656668Z [36;1m        ;;[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5656852Z [36;1m    esac[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5657029Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5657194Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5657487Z [36;1m  echo "- **Optimization**: ΓÜí Local execution" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5657874Z [36;1m  if [ "$QUOTA_EXCEEDED" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5658392Z [36;1m    echo "- **DTE Status**: ΓÜá∩╕Å Quota exceeded during execution - fell back to local runners" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5659048Z [36;1m  elif [ -n "$FALLBACK_REASON" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5659410Z [36;1m    echo "- **DTE Fallback**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5659746Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5659913Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5660081Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5660287Z [36;1mecho "≡ƒôè CI report generated successfully"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5660573Z [36;1mecho "::endgroup::"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5708786Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5709113Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5709286Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5709489Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5709872Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5710135Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5710395Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5710577Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5780626Z ##[group]≡ƒôè CI Pipeline Report Generation
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5783017Z ≡ƒôï Generating comprehensive CI report...
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5783742Z   - Status: failure
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5784126Z   - Event: pull_request
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5784575Z   - Execution Mode: distributed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5784983Z   - Duration: 472s
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5800978Z ≡ƒôè CI report generated successfully
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5802726Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5865279Z ##[group]Run actions/github-script@v7
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5865532Z with:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5865886Z   github-token: ***
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5866425Z   script: const reportFailure = require('./.github/scripts/ci-report-failure.js');
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	return await reportFailure({ github, context, core });
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5867016Z   debug: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5867220Z   user-agent: actions/github-script
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5867473Z   result-encoding: json
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5867679Z   retries: 0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5867894Z   retry-exempt-status-codes: 400,401,403,404,422
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5868171Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5868338Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5868531Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5868758Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5869007Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5869258Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5869442Z   PR_NUMBER: 316
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5870312Z   STEP_RESULTS: {"detect-dte":"success","detect-changes":"success","quality-gates":"success","build-validation":"success","e2e-testing":"failure","metadata":{"overall_status":"failure","workflow_duration":472,"timestamp":"2026-02-18T20:06:31Z","total_steps":5}}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5871532Z   QUALITY_GATES_SUBSECTIONS: {
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "formatting": "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "lint":        "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "typecheck":   "success",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "test":        "success"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5872222Z   PROJECT_FAILURES: {
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "formatting": "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "lint":        "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "typecheck":   "",
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	  "test":        ""
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5872642Z   EXECUTION_MODE: distributed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5872876Z   OPTIMAL_AGENTS: 8
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5873071Z   FALLBACK_REASON: 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5873258Z   QUOTA_STATUS: available
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5873681Z   QUOTA_EXCEEDED: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5873887Z   RUN_ID: 22155437800
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:32.5874080Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9242965Z Created new CI failure comment #3922922517
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9370449Z ##[group]Run # Set the comment ID from either success or failure comment
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9371270Z [36;1m# Set the comment ID from either success or failure comment[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9371876Z [36;1mSUCCESS_COMMENT_ID=""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9372332Z [36;1mFAILURE_COMMENT_ID="3922922517"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9372771Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9373159Z [36;1mif [ -n "$SUCCESS_COMMENT_ID" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9374089Z [36;1m  echo "comment_id=$SUCCESS_COMMENT_ID" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9374744Z [36;1melif [ -n "$FAILURE_COMMENT_ID" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9375619Z [36;1m  echo "comment_id=$FAILURE_COMMENT_ID" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9376187Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9447673Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9448263Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9448566Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9448934Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9449341Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9449818Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9450292Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9450609Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9565676Z ##[group]Run echo "::group::≡ƒôè Final Pipeline Summary"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9566333Z [36;1mecho "::group::≡ƒôè Final Pipeline Summary"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9566830Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9567363Z [36;1mSTATUS="failure"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9567782Z [36;1mEVENT_NAME="pull_request"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9568247Z [36;1mEXECUTION_MODE="distributed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9568681Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9569012Z [36;1mecho "## ≡ƒÄ» CI Pipeline Summary"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9569800Z [36;1mecho "- **Final Status**: $( [ "$STATUS" = "success" ] && echo "Γ£à Success" || echo "Γ¥î Failed" )"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9570600Z [36;1mecho "- **Event**: $EVENT_NAME"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9571135Z [36;1mecho "- **Execution Mode**: $EXECUTION_MODE"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9571639Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9572088Z [36;1mif [ "$EVENT_NAME" = "pull_request" ] && [ -n "316" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9572999Z [36;1m  echo "- **PR Comment**: $( [ -n "3922922517" ] && echo "Updated (ID: 3922922517)" || echo "Not created" )"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9574169Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9574486Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9574829Z [36;1mif [ "$STATUS" = "success" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9575277Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9575857Z [36;1m  echo "≡ƒÄë **All CI checks passed!** The pipeline completed successfully."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9576623Z [36;1m  if [ "$EVENT_NAME" = "pull_request" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9577233Z [36;1m    echo "This PR is ready for review and merge."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9577748Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9578049Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9578362Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9579007Z [36;1m  echo "ΓÜá∩╕Å **CI pipeline failed.** Check the failure details above and fix the issues."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9579998Z [36;1m  echo "The pipeline will automatically re-run when you push new changes."[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9580690Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9580977Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9581336Z [36;1mecho "::endgroup::"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9647756Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9648246Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9648537Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9648859Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9649220Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9649606Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9650035Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9650334Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9725014Z ##[group]≡ƒôè Final Pipeline Summary
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9727127Z ## ≡ƒÄ» CI Pipeline Summary
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9730836Z - **Final Status**: Γ¥î Failed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9733219Z - **Event**: pull_request
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9734232Z - **Execution Mode**: distributed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9738142Z - **PR Comment**: Updated (ID: 3922922517)
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9739809Z 
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9740772Z ΓÜá∩╕Å **CI pipeline failed.** Check the failure details above and fix the issues.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9741811Z The pipeline will automatically re-run when you push new changes.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9742656Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9773047Z ##[group]Run STATUS="failure"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9773335Z [36;1mSTATUS="failure"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9773937Z [36;1mif [ "$STATUS" = "success" ]; then[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9774257Z [36;1m  echo "CI Pipeline completed successfully!"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9774766Z [36;1m  echo "Execution Mode: distributed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9775040Z [36;1m  echo "Duration: 472s"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9775262Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9775470Z [36;1m  echo "FAILED: CI Pipeline failed"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9775767Z [36;1m  echo "Failed Steps: e2e-testing"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9776030Z [36;1m  echo "Duration: 472s"[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9776258Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9776432Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9821412Z shell: /usr/bin/bash -e {0}
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9821651Z env:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9821831Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9822036Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9822262Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9822543Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9822804Z   NX_PARALLEL: 2
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9822985Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9889805Z FAILED: CI Pipeline failed
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9890749Z Failed Steps: e2e-testing
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9892459Z Duration: 472s
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:33.9903090Z ##[error]Process completed with exit code 1.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.0100475Z Post job cleanup.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.0156198Z Post job cleanup.
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.0978048Z [command]/usr/bin/git version
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1020822Z git version 2.52.0
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1066506Z Temporarily overriding HOME='/home/runner/work/_temp/5a0aabaf-eeb3-418b-a827-c1f83ab481be' before making global git config changes
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1069620Z Adding repository directory to the temporary git global config as a safe directory
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1074977Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1107502Z Removing SSH command configuration
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1114780Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1154336Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1413982Z Removing HTTP extra header
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1420434Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1457499Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1728006Z Removing includeIf entries pointing to credentials config files
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1738402Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1784470Z includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1802997Z includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1804427Z includeif.gitdir:/github/workspace/.git.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1805207Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1810412Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1849053Z /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1875131Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1959707Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1976285Z /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.1993988Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2077948Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2086521Z /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2106722Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2165243Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2191713Z /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2210866Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2266808Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2651414Z Removing credentials config '/home/runner/work/_temp/git-credentials-bcc5e2c6-f808-4aa9-9659-61d6447100b1.config'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2816847Z Evaluate and set job outputs
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2821610Z Set output 'overall-status'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2823204Z Set output 'workflow-duration'
+≡ƒÜÇ CI Pipeline / Summarize & Report	UNKNOWN STEP	2026-02-18T20:06:34.2824761Z Cleaning up orphan processes

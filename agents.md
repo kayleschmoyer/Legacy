@@ -2,7 +2,7 @@
 
 **Copilot users**: See `.github/copilot-instructions.md` (auto-loaded)
 
-**Other agents**: Load `.github/copilot/start-here.md` (2KB essentials)
+**Other agents**: Load `.github/skills/workflow-ticket-to-pr/SKILL.md` to start
 
 ## 🚨 CRITICAL
 
@@ -22,17 +22,20 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 
 ## Docs Index
 
-| Need            | File                                                             |
-| --------------- | ---------------------------------------------------------------- |
-| Commands        | `.github/copilot/quick-reference.md`                             |
-| Workflow        | `docs/guides/ai-agent-contribution-workflow.md`                  |
-| DB queries      | `docs/agents/database-query-guide.md`                            |
-| Architecture    | `.github/copilot/architecture-summary.md`                        |
-| Type/lint fixes | `.github/copilot/tasks/`                                         |
-| **New library** | `.github/copilot/skills/create-lib.md`                           |
-| **New lambda**  | `.github/copilot/skills/create-lambda.md`                        |
-| **New app**     | `.github/copilot/skills/create-app.md`                           |
-| **Config ref**  | `.github/copilot/skills/config-standards.md`                     |
-| Skills (21)     | `.github/copilot/skills/`                                        |
-| CSV patterns    | `docs/agents/`                                                   |
-| Tech stack      | React Native Next.js Lambda GraphQL PostgreSQL/Drizzle Terraform |
+| Need                | File                                                                       |
+| ------------------- | -------------------------------------------------------------------------- |
+| Full workflow       | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
+| Type errors         | `.github/skills/fix-types/SKILL.md`                                        |
+| Lint errors         | `.github/skills/fix-lint/SKILL.md`                                         |
+| Troubleshooting     | `.github/skills/troubleshoot/SKILL.md`                                     |
+| DB queries          | `.github/skills/db-query/SKILL.md`                                         |
+| DB schema reference | `.github/skills/db-schema/SKILL.md`                                        |
+| Architecture        | `.github/skills/architecture/SKILL.md`                                     |
+| **New library**     | `.github/skills/create-lib/SKILL.md`                                       |
+| **New lambda**      | `.github/skills/create-lambda/SKILL.md`                                    |
+| **New app**         | `.github/skills/create-app/SKILL.md`                                       |
+| **New skill**       | `.github/skills/create-skill/SKILL.md`                                     |
+| **Config ref**      | `.github/skills/config-standards/SKILL.md`                                 |
+| All skills (40)     | `.github/skills/`                                                          |
+| CSV reference data  | `docs/agents/*.csv`                                                        |
+| Tech stack          | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

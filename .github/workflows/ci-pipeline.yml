@@ -215,6 +215,12 @@ jobs:
           set-nx-shas: true
           include-optional-deps: false
 
+      - name: "Setup uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Lint Agent Skills"
+        run: node scripts/lint-skills.js
+
       # Start the DTE session — agents (spawned above) will connect and receive
       # tasks.  Skipped when DTE is unavailable; nx falls back to local execution.
       - name: "Start Nx Cloud CI Run"

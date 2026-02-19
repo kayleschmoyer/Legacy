@@ -245,6 +245,7 @@ bundle.js
 # Build and distribution artifacts
 **/dist/
 **/build/
+!.github/skills/build/
 **/out/
 **/.next/
 **/.vite/

@@ -1,0 +1,666 @@
+﻿≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	∩╗┐2026-02-18T18:42:34.2498040Z Current runner version: '2.331.0'
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2574128Z ##[group]Runner Image Provisioner
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2575311Z Hosted Compute Agent
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2576188Z Version: 20260123.484
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2577959Z Commit: 6bd6555ca37d84114959e1c76d2c01448ff61c5d
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2579087Z Build Date: 2026-01-23T19:41:17Z
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2580151Z Worker ID: {c92a52ce-b72c-49df-ab2f-e87473f20a43}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2581786Z Azure Region: northcentralus
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2582693Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2584999Z ##[group]Operating System
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2586010Z Ubuntu
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2586823Z 24.04.3
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2587616Z LTS
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2588381Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2589203Z ##[group]Runner Image
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2590159Z Image: ubuntu-24.04
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2591299Z Version: 20260209.23.1
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2593281Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260209.23/images/ubuntu/Ubuntu2404-Readme.md
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2595896Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260209.23
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2597453Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2599864Z ##[group]GITHUB_TOKEN Permissions
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2622887Z Actions: read
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2623881Z Checks: read
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2624684Z Contents: read
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2625512Z Issues: write
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2626479Z Metadata: read
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2627231Z PullRequests: write
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2628070Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2651730Z Secret source: Actions
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.2652847Z Prepare workflow directory
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.4436856Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.4562981Z Getting action download info
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:34.7776171Z Download action repository 'actions/checkout@v6' (SHA:de0fac2e4500dabe0009e67214ff5f5447ce83dd)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.1581908Z Uses: bkrupa/legacy-sports/.github/workflows/ci-pipeline.yml@refs/pull/316/merge (ac1801baaf592a8a75a3f2279b9deb5cb463ebd3)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.1586633Z ##[group] Inputs
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.1587462Z   debug_mode: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.1587891Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.1588686Z Complete job name: ≡ƒÜÇ CI Pipeline / Detect DTE Availability
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2288067Z ##[group]Run actions/checkout@v6
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2288924Z with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2289334Z   repository: bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2289973Z   token: ***
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2290548Z   ssh-strict: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2291168Z   ssh-user: git
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2291741Z   persist-credentials: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2292190Z   clean: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2292592Z   sparse-checkout-cone-mode: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2293065Z   fetch-depth: 1
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2293444Z   fetch-tags: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2293830Z   show-progress: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2294231Z   lfs: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2294593Z   submodules: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2294981Z   set-safe-directory: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2295682Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2296074Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2296480Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2296930Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2297430Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.2297984Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3348243Z Syncing repository: bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3351146Z ##[group]Getting Git version info
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3352444Z Working directory is '/home/runner/work/legacy-sports/legacy-sports'
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3362197Z [command]/usr/bin/git version
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3363062Z git version 2.52.0
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3366293Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3372985Z Temporarily overriding HOME='/home/runner/work/_temp/ef041149-53ee-4581-8e4a-75923b7afc6a' before making global git config changes
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3375530Z Adding repository directory to the temporary git global config as a safe directory
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3381855Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3426295Z Deleting the contents of '/home/runner/work/legacy-sports/legacy-sports'
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3430488Z ##[group]Initializing the repository
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3435233Z [command]/usr/bin/git init /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3575522Z hint: Using 'master' as the name for the initial branch. This default branch name
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3581012Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3582643Z hint: to use in all of your new repositories, which will suppress this warning,
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3583854Z hint: call:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3584438Z hint:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3585253Z hint: 	git config --global init.defaultBranch <name>
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3586713Z hint:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3587701Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3589299Z hint: 'development'. The just-created branch can be renamed via this command:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3590829Z hint:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3591497Z hint: 	git branch -m <name>
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3592212Z hint:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3593169Z hint: Disable this message with "git config set advice.defaultBranchName false"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3594814Z Initialized empty Git repository in /home/runner/work/legacy-sports/legacy-sports/.git/
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3599562Z [command]/usr/bin/git remote add origin https://github.com/bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3633390Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3634578Z ##[group]Disabling automatic garbage collection
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3638711Z [command]/usr/bin/git config --local gc.auto 0
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3675610Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3678473Z ##[group]Setting up auth
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3679307Z Removing SSH command configuration
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3683391Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.3721991Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4132746Z Removing HTTP extra header
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4138179Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4173487Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4426038Z Removing includeIf entries pointing to credentials config files
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4433004Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4468678Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4723726Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4765146Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4799533Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4833872Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4871451Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4936602Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4938202Z ##[group]Fetching the repository
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:35.4947027Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ac1801baaf592a8a75a3f2279b9deb5cb463ebd3:refs/remotes/pull/316/merge
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6251591Z From https://github.com/bkrupa/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6253550Z  * [new ref]         ac1801baaf592a8a75a3f2279b9deb5cb463ebd3 -> pull/316/merge
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6307598Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6309054Z ##[group]Determining the checkout info
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6310885Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6315304Z [command]/usr/bin/git sparse-checkout disable
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6392994Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6463141Z ##[group]Checking out the ref
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:42.6467236Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/316/merge
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1028461Z Note: switching to 'refs/remotes/pull/316/merge'.
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1033956Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1034406Z You are in 'detached HEAD' state. You can look around, make experimental
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1035329Z changes and commit them, and you can discard any commits you make in this
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1036248Z state without impacting any branches by switching back to a branch.
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1036799Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1037186Z If you want to create a new branch to retain commits you create, you may
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1038040Z do so (now or later) by using -c with the switch command. Example:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1038521Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1038714Z   git switch -c <new-branch-name>
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1039027Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1039243Z Or undo this operation with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1039533Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1039718Z   git switch -
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1040036Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1040643Z Turn off this advice by setting config variable advice.detachedHead to false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1041234Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1041911Z HEAD is now at ac1801b Merge 5a77d560d308e07e2d059040d5f7790fc947d9b0 into fc13b9259d725d60b52a9a6f6dda58b7293eafe5
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1079282Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1143703Z [command]/usr/bin/git log -1 --format=%H
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1191639Z ac1801baaf592a8a75a3f2279b9deb5cb463ebd3
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1689470Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.1690048Z Getting action download info
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.3502326Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.4552486Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.5716829Z Download action repository 'nrwl/nx-set-shas@v4' (SHA:3e9ad7370203c1e93d109be57f3b72eb0eb511b1)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9950590Z ##[group]Run ./.github/actions/setup
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9950880Z with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9951092Z   node-version: 22
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9951305Z   install-dependencies: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9951534Z   set-nx-shas: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9951762Z   include-optional-deps: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9951998Z   skip-system-deps: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9952206Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9952380Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9952564Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9952808Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9953060Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:43.9953346Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0670011Z ##[group]Run echo "≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0671427Z [36;1mecho "≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0671939Z [36;1mif command -v pnpm >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0672312Z [36;1m  echo "pnpm already available at $(command -v pnpm)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0672642Z [36;1m  exit 0[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0672828Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0672995Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0673192Z [36;1mDEFAULT_VERSION="9.12.1"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0674152Z [36;1mPACKAGE_VERSION=$(node -pe "(require('./package.json').packageManager || '').startsWith('pnpm@') ? require('./package.json').packageManager.split('@')[1] : ''" 2>/dev/null || echo "")[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0674981Z [36;1mPNPM_VERSION="${PACKAGE_VERSION:-$DEFAULT_VERSION}"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0675413Z [36;1mecho "Installing pnpm@${PNPM_VERSION} via corepack/npm fallback"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0675786Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0676010Z [36;1mif command -v corepack >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0676336Z [36;1m  corepack enable[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0676636Z [36;1m  corepack prepare "pnpm@${PNPM_VERSION}" --activate[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0676954Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0677205Z [36;1m  echo "corepack unavailable, using npm install -g"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0677547Z [36;1m  npm install -g "pnpm@${PNPM_VERSION}"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0677819Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0677987Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0678196Z [36;1mPNPM_HOME_DIR="$HOME/.local/share/pnpm"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0678483Z [36;1mif [ -d "$PNPM_HOME_DIR" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0678816Z [36;1m  echo "Γ₧ò Adding pnpm home (${PNPM_HOME_DIR}) to PATH"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0679178Z [36;1m  echo "$PNPM_HOME_DIR" >> "$GITHUB_PATH"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0679445Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0679607Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0679899Z [36;1mecho "Preparing pnpm@${PNPM_VERSION} for immediate activation..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0734914Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0735279Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0735454Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0735664Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0735889Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0736143Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0736417Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.0833594Z ≡ƒöº Prepping pnpm before setup-node (required for package-manager cache)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.2370015Z Installing pnpm@9.12.1 via corepack/npm fallback
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:44.4862895Z Preparing pnpm@9.12.1 for immediate activation...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0712708Z Preparing pnpm@9.12.1 for immediate activation...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0760138Z ##[group]Run # This repository is pnpm-based (pnpm-lock.yaml + pnpm-workspace.yaml)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0761342Z [36;1m# This repository is pnpm-based (pnpm-lock.yaml + pnpm-workspace.yaml)[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0761839Z [36;1m# Fail fast if lockfile is missing - no npm fallback supported[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0762217Z [36;1mif [ ! -f "pnpm-lock.yaml" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0762508Z [36;1m  echo "Γ¥î pnpm-lock.yaml not found"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0762909Z [36;1m  echo "This repository requires pnpm. Expected lockfile: pnpm-lock.yaml"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0763292Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0763466Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0763676Z [36;1mecho "manager=pnpm" >> "$GITHUB_OUTPUT"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0764050Z [36;1mecho "Γ£à Validated pnpm workspace (pnpm-lock.yaml found)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0816870Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0817194Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0817373Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0817578Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0817801Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0818047Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0818291Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0893799Z Γ£à Validated pnpm workspace (pnpm-lock.yaml found)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0993883Z ##[group]Run actions/setup-node@v4
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0994159Z with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0994339Z   node-version: 22
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0994546Z   cache: pnpm
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0994733Z   always-auth: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0994943Z   check-latest: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0995280Z   token: ***
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0995451Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0995616Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0995812Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0996234Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0996495Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.0996749Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.3335318Z Found in cache @ /opt/hostedtoolcache/node/22.22.0/x64
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.3351376Z ##[group]Environment details
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.6524178Z [warning]This project is configured to use pnpm because /home/runner/work/legacy-sports/legacy-sports/package.json has a "packageManager" field
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.6525741Z 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.7368643Z node: v22.22.0
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.7374059Z npm: 10.9.4
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.7374351Z yarn: 
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.7375773Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:46.7402740Z [command]/usr/local/bin/pnpm store path --silent
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:47.2343537Z /home/runner/.local/share/pnpm/store/v3
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:47.4210887Z Cache hit for: node-cache-Linux-x64-pnpm-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:48.5691727Z Received 117440512 of 649178790 (18.1%), 111.4 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:49.6855855Z Received 268435456 of 649178790 (41.4%), 120.6 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:50.6887857Z Received 406847488 of 649178790 (62.7%), 124.2 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:51.6898794Z Received 532676608 of 649178790 (82.1%), 123.1 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:52.6954377Z Received 612368384 of 649178790 (94.3%), 113.8 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:52.9532711Z Received 649178790 of 649178790 (100.0%), 114.9 MBs/sec
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:52.9536272Z Cache Size: ~619 MB (649178790 B)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:42:52.9598803Z [command]/usr/bin/tar -xf /home/runner/work/_temp/8eedb7b1-71ee-477a-8c16-fce566b72d79/cache.tzst -P -C /home/runner/work/legacy-sports/legacy-sports --use-compress-program unzstd
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.2389570Z Cache restored successfully
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.4481463Z Cache restored from key: node-cache-Linux-x64-pnpm-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.4850965Z Prepare all required actions
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.4851330Z Getting action download info
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6449737Z ##[group]Run ./.github/actions/nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6450164Z with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6451247Z   restore-only: true
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6451583Z   base-branch: main
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6451886Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6452387Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6452715Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6453078Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6453489Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6453913Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6506872Z ##[group]Run echo "≡ƒöì Determining Nx cache strategy..."
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6507536Z [36;1mecho "≡ƒöì Determining Nx cache strategy..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6508020Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6508359Z [36;1m# Determine if this is a PR build[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6508787Z [36;1mif [ "pull_request" = "pull_request" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6509081Z [36;1m  IS_PR="true"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6509297Z [36;1m  BASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6509580Z [36;1m  HEAD_REF="ci/optimize-pipeline-multi-job"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6509930Z [36;1m  echo "≡ƒôï PR Build Detected"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6510728Z [36;1m  echo "  Base: $BASE_REF"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6511148Z [36;1m  echo "  Head: $HEAD_REF"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6511569Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6512022Z [36;1m  IS_PR="false"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6512382Z [36;1m  BASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6513071Z [36;1m  HEAD_REF="316/merge"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6513502Z [36;1m  echo "≡ƒôï Direct Branch Build"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6513953Z [36;1m  echo "  Branch: $HEAD_REF"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6514364Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6514653Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6514998Z [36;1mecho "is-pr=$IS_PR" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6515535Z [36;1mecho "base-ref=$BASE_REF" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6516100Z [36;1mecho "head-ref=$HEAD_REF" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6516578Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6516894Z [36;1m# Determine cache strategy[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6517577Z [36;1mif [ "$IS_PR" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6518076Z [36;1m  echo "source=base-branch" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6518786Z [36;1m  echo "≡ƒôª Strategy: Restore cache from base branch ($BASE_REF)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6519393Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6519801Z [36;1m  echo "source=current-branch" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6520634Z [36;1m  echo "≡ƒôª Strategy: Use current branch cache"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6521123Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6602478Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6603024Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6603326Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6603674Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6604064Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6604499Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6604943Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6992867Z ≡ƒöì Determining Nx cache strategy...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.6998398Z ≡ƒôï PR Build Detected
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.7001137Z   Base: main
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.7003456Z   Head: ci/optimize-pipeline-multi-job
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.7005446Z ≡ƒôª Strategy: Restore cache from base branch (main)
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8295428Z ##[group]Run echo "≡ƒöæ Generating cache keys..."
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8295802Z [36;1mecho "≡ƒöæ Generating cache keys..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8296068Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8296244Z [36;1mBASE_REF="main"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8296516Z [36;1mHEAD_REF="ci/optimize-pipeline-multi-job"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8296798Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8297015Z [36;1m# Hash of dependencies and Nx configuration[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8297458Z [36;1mDEPS_HASH="f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8298046Z [36;1mNX_CONFIG_HASH="608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8298469Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8298666Z [36;1m# Current branch cache key (for saving)[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8299070Z [36;1mCURRENT_KEY="nx-cache-${HEAD_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8299424Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8299650Z [36;1m# Base branch cache key (for restoring on PRs)[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8300440Z [36;1mBASE_KEY="nx-cache-${BASE_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8300877Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8301122Z [36;1mecho "current-key=$CURRENT_KEY" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8301474Z [36;1mecho "base-key=$BASE_KEY" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8301806Z [36;1mecho "deps-hash=$DEPS_HASH" >> $GITHUB_OUTPUT[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8302078Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8302263Z [36;1mecho "Γ£à Cache Keys Generated:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8302525Z [36;1mecho "  Current: $CURRENT_KEY"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8302778Z [36;1mecho "  Base:    $BASE_KEY"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8356197Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8356544Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8356722Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8356926Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8357157Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8357412Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8357684Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8452971Z ≡ƒöæ Generating cache keys...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8453572Z Γ£à Cache Keys Generated:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8455455Z   Current: nx-cache-ci/optimize-pipeline-multi-job-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8458340Z   Base:    nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8517142Z ##[group]Run actions/cache/restore@v4
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8517588Z with:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8517913Z   path: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	node_modules/.cache/nx
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8519317Z   key: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8521625Z   restore-keys: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	nx-cache-main-
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8522644Z   enableCrossOsArchive: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8523064Z   fail-on-cache-miss: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8523442Z   lookup-only: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8523767Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8524051Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8524380Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8524753Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8525180Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:06.8525619Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2776345Z Cache not found for input keys: nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-608cd67f4bd415815b42ed23a50de60f90a6cfb6b26e12ede1e94c8b84b009f5, nx-cache-main-f2f30dd43be94a50e4a7b659a3b5e1a0419a153930121075aaf80b01dec31b42-, nx-cache-main-
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2895560Z ##[group]Run echo "≡ƒôè Nx Cache Restoration Summary"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2896220Z [36;1mecho "≡ƒôè Nx Cache Restoration Summary"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2896777Z [36;1mecho "================================"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2897297Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2897632Z [36;1mif [ "true" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2898094Z [36;1m  if [ "" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2898631Z [36;1m    echo "Γ£à Cache HIT from base branch (main)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2899306Z [36;1m    echo "ΓÜí Nx will only rebuild affected projects!"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2899899Z [36;1m  elif [ -n "" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2900813Z [36;1m    echo "ΓÜá∩╕Å  Partial cache restored from base branch"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2901486Z [36;1m    echo "≡ƒöä Some tasks may need to rebuild"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2902023Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2902453Z [36;1m    echo "Γ¥î No cache available from base branch"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2903044Z [36;1m    echo "≡ƒö¿ Full rebuild required"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2903545Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2903854Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2904179Z [36;1m  if [ "" = "true" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2904966Z [36;1m    echo "Γ£à Cache HIT from current branch"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2905529Z [36;1m  elif [ -n "" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2906013Z [36;1m    echo "ΓÜá∩╕Å  Partial cache restored"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2906506Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2906865Z [36;1m    echo "Γ¥î No cache available"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2907375Z [36;1m    echo "≡ƒö¿ Full build required"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2907832Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2908135Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2908420Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2908746Z [36;1m# Show cache size if available[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2909228Z [36;1mif [ -d ".nx-cache" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2909877Z [36;1m  CACHE_SIZE=$(du -sh .nx-cache 2>/dev/null | cut -f1 || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2910813Z [36;1m  echo "≡ƒôª Cache size: $CACHE_SIZE"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2911260Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2982516Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2983123Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2983429Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2983827Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2984242Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2984715Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.2985185Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3241815Z ≡ƒôè Nx Cache Restoration Summary
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3247536Z ================================
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3251442Z Γ¥î No cache available from base branch
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3252704Z ≡ƒö¿ Full rebuild required
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3294781Z ##[group]Run echo "ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache..."
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3295289Z [36;1mecho "ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3295621Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3295821Z [36;1m# Ensure cache directory exists[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3296304Z [36;1mmkdir -p .nx-cache[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3296535Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3296748Z [36;1m# Set environment variables for Nx[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3297107Z [36;1mecho "NX_CACHE_DIRECTORY=.nx-cache" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3297474Z [36;1mecho "NX_SKIP_NX_CACHE=false" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3297761Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3298009Z [36;1mecho "Γ£à Nx configured to use local cache at .nx-cache"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3347374Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3347708Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3347879Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3348087Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3348321Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3348579Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3348830Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3536568Z ΓÜÖ∩╕Å  Configuring Nx to use GitHub Actions cache...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3560861Z Γ£à Nx configured to use local cache at .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3600550Z ##[group]Run echo "≡ƒôê Final Cache Statistics"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3601122Z [36;1mecho "≡ƒôê Final Cache Statistics"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3601616Z [36;1mecho "========================="[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3602127Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3602448Z [36;1mif [ -d ".nx-cache" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3602911Z [36;1m  echo "Cache directory exists: Γ£à"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3603569Z [36;1m  echo "Cache entries: $(find .nx-cache -type f 2>/dev/null | wc -l)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3604352Z [36;1m  echo "Cache size: $(du -sh .nx-cache 2>/dev/null | cut -f1)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3604932Z [36;1melse[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3605287Z [36;1m  echo "Cache directory exists: Γ¥î"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3605717Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3606000Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3606351Z [36;1mif [ -d "node_modules/.cache/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3607080Z [36;1m  echo "Nx internal cache: $(du -sh node_modules/.cache/nx 2>/dev/null | cut -f1)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3607773Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3673693Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3674245Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3674555Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3675086Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3675439Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3675828Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.3676271Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4029503Z ≡ƒôê Final Cache Statistics
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4174033Z =========================
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4175413Z Cache directory exists: Γ£à
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4176026Z Cache entries: 0
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4176552Z Cache size: 4.0K
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4252837Z ##[group]Run echo "≡ƒöº Configuring basic Nx environment..."
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4253927Z [36;1mecho "≡ƒöº Configuring basic Nx environment..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4254671Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4255064Z [36;1m# Set conservative defaults for Nx execution[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4255644Z [36;1mecho "NX_DAEMON=false" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4256164Z [36;1mecho "NX_PARALLEL=2" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4256602Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4257071Z [36;1m# Ensure Nx cache directory exists and is properly configured[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4257738Z [36;1mif [ -n "${NX_CACHE_DIRECTORY:-}" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4258254Z [36;1m  mkdir -p "$NX_CACHE_DIRECTORY"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4258845Z [36;1m  echo "≡ƒôü Created Nx cache directory: $NX_CACHE_DIRECTORY"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4259401Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4259692Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4260141Z [36;1m# Comprehensive Nx installation and workspace validation[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4261093Z [36;1mecho "≡ƒöì Validating Nx installation..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4261603Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4261916Z [36;1m# Check if node_modules has Nx[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4262355Z [36;1mif [ ! -d "node_modules" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4262844Z [36;1m  echo "Γ¥î node_modules directory missing"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4263120Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4263299Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4263470Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4263662Z [36;1m# Debug node_modules structure[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4263961Z [36;1mecho "≡ƒôü Checking Nx installation paths..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4264427Z [36;1mecho "node_modules/.bin/nx exists: $([ -f node_modules/.bin/nx ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4265031Z [36;1mecho "node_modules/nx exists: $([ -d node_modules/nx ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4265549Z [36;1mecho "@nx packages: $(ls node_modules/ | grep '^@nx' | wc -l)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4265892Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4266157Z [36;1m# Try different methods to access Nx with enhanced debugging[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4266500Z [36;1mNX_COMMAND=""[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4266749Z [36;1mecho "≡ƒöì Attempting Nx CLI detection..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4267038Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4267293Z [36;1m# Method 1: pnpm exec nx (preferred for pnpm workspace)[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4267628Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4267903Z [36;1m  echo "  Testing Method 1: pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4268245Z [36;1m  if pnpm exec nx --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4268557Z [36;1m    NX_COMMAND="pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4268855Z [36;1m    echo "  Γ£à Nx accessible via: pnpm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4269135Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4269338Z [36;1m    echo "  Γ¥î pnpm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4269594Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4269768Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4269934Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4270127Z [36;1m# Method 2: Direct path to nx binary  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4270635Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4270942Z [36;1m  echo "  Testing Method 2: node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4271272Z [36;1m  if [ -f "node_modules/.bin/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4271615Z [36;1m    if node_modules/.bin/nx --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4271963Z [36;1m      NX_COMMAND="node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4272452Z [36;1m      echo "  Γ£à Nx accessible via: node_modules/.bin/nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4272771Z [36;1m    else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4273036Z [36;1m      echo "  Γ¥î node_modules/.bin/nx exists but not executable"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4273370Z [36;1m    fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4273539Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4273764Z [36;1m    echo "  Γ¥î node_modules/.bin/nx does not exist"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4274047Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4274212Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4274375Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4274595Z [36;1m# Method 3: pnpm exec with explicit separator[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4274893Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4275178Z [36;1m  echo "  Testing Method 3: pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4275522Z [36;1m  if pnpm exec nx -- --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4275843Z [36;1m    NX_COMMAND="pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4276154Z [36;1m    echo "  Γ£à Nx accessible via: pnpm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4276442Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4276652Z [36;1m    echo "  Γ¥î pnpm exec nx -- failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4276906Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4277078Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4277242Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4277426Z [36;1m# Method 4: npm exec (fallback)[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4277680Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4277955Z [36;1m  echo "  Testing Method 4: npm exec nx"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4278281Z [36;1m  if npm exec nx -- --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4278595Z [36;1m    NX_COMMAND="npm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4278889Z [36;1m    echo "  Γ£à Nx accessible via: npm exec nx --"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4279296Z [36;1m  else[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4279496Z [36;1m    echo "  Γ¥î npm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4279743Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4279914Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4280073Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4280515Z [36;1m# Method 5: Try to manually find and execute nx[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4280849Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4281152Z [36;1m  echo "  Testing Method 4: Manual nx resolution"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4281438Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4281629Z [36;1m  # Look for nx in various locations[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4282116Z [36;1m  for nx_path in "node_modules/.bin/nx" "node_modules/nx/bin/nx.js" "node_modules/@nx/cli/bin/nx.js"; do[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4282594Z [36;1m    if [ -f "$nx_path" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4282890Z [36;1m      echo "  Found potential nx at: $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4283236Z [36;1m      if node "$nx_path" --version >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4283563Z [36;1m        NX_COMMAND="node $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4283868Z [36;1m        echo "  Γ£à Nx accessible via: node $nx_path"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4284157Z [36;1m        break[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4284352Z [36;1m      fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4284531Z [36;1m    fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4284704Z [36;1m  done[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4284871Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4285037Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4285211Z [36;1m# If all methods failed[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4285449Z [36;1mif [ -z "$NX_COMMAND" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4285742Z [36;1m  echo "Γ¥î Nx not accessible through any method"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4286031Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4286248Z [36;1m  echo "≡ƒöì Diagnostic information:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4286568Z [36;1m  echo "  Available binaries in node_modules/.bin:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4287035Z [36;1m  ls -la node_modules/.bin/ | grep -E "(nx|@nx)" || echo "    No nx binaries found"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4287450Z [36;1m  echo "  Nx package directory:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4287847Z [36;1m  ls -la node_modules/nx/ 2>/dev/null | head -5 || echo "    No nx directory found"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4288248Z [36;1m  echo "  @nx packages:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4288754Z [36;1m  ls -la node_modules/@nx/ 2>/dev/null | head -5 || echo "    No @nx directory found"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4289167Z [36;1m  echo "  pnpm exec debug:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4289497Z [36;1m  pnpm exec nx --version 2>&1 || echo "    pnpm exec nx failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4289876Z [36;1m  echo "  pnpm exec with separator debug:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4290454Z [36;1m  pnpm exec nx -- --version 2>&1 || echo "    pnpm exec nx -- failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4290816Z [36;1m  echo ""[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4291005Z [36;1m  exit 1[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4291181Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4291343Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4291525Z [36;1m# Test basic Nx functionality[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4291868Z [36;1mecho "≡ƒº¬ Testing Nx workspace detection with: $NX_COMMAND"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4292227Z [36;1mecho "Current directory: $(pwd)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4292589Z [36;1mecho "nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4292937Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4293129Z [36;1m# Try to get version first[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4293465Z [36;1mNX_VERSION=$($NX_COMMAND --version 2>/dev/null || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4293830Z [36;1mecho "Nx version: $NX_VERSION"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4294069Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4294248Z [36;1m# Test workspace detection[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4294576Z [36;1mif ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4295027Z [36;1m  echo "ΓÜá∩╕Å Nx workspace detection failed, attempting diagnostics..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4295381Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4295571Z [36;1m  # Enhanced diagnostics[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4295856Z [36;1m  echo "≡ƒöº Workspace diagnostic information:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4296320Z [36;1m  echo "  - Working directory: $(pwd)"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4296701Z [36;1m  echo "  - nx.json exists: $([ -f nx.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4297208Z [36;1m  echo "  - package.json exists: $([ -f package.json ] && echo 'yes' || echo 'no')"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4297602Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4297786Z [36;1m  if [ -f nx.json ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4298122Z [36;1m    echo "  - nx.json size: $(wc -c nx.json | awk '{print $1}') bytes"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4298499Z [36;1m    echo "  - nx.json first few lines:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4298846Z [36;1m    head -5 nx.json 2>/dev/null || echo "    Cannot read nx.json"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4299180Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4299356Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4299531Z [36;1m  # Try reset with full path[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4299792Z [36;1m  echo "≡ƒöä Attempting Nx reset..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4300097Z [36;1m  $NX_COMMAND reset 2>&1 || echo "Reset failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4300729Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4301187Z [36;1m  # Try clearing any potential cache issues[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4301547Z [36;1m  if [ -d ".nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4301939Z [36;1m    echo "≡ƒùæ∩╕Å Removing .nx directory..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4302386Z [36;1m    rm -rf .nx[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4302701Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4302960Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4303334Z [36;1m  if [ -d "node_modules/.cache/nx" ]; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4303740Z [36;1m    echo "≡ƒùæ∩╕Å Removing nx cache..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4304109Z [36;1m    rm -rf node_modules/.cache/nx[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4304526Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4304759Z [36;1m  [0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4305030Z [36;1m  # Try again after cleanup[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4305524Z [36;1m  echo "≡ƒöä Retrying workspace detection..."[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4305998Z [36;1m  if ! $NX_COMMAND show projects --quiet >/dev/null 2>&1; then[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4306560Z [36;1m    echo "Γ¥î Nx workspace still not accessible after cleanup"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4307125Z [36;1m    echo "≡ƒöì Final diagnostic - attempting to show projects with verbose output:"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4307844Z [36;1m    $NX_COMMAND show projects 2>&1 || echo "Command failed"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4308344Z [36;1m    exit 1[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4308657Z [36;1m  fi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4308930Z [36;1mfi[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4309191Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4309526Z [36;1m# Store the working command for later use[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4309990Z [36;1mecho "NX_COMMAND=$NX_COMMAND" >> $GITHUB_ENV[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4310702Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4311090Z [36;1mecho "Γ£à Basic Nx environment configured and validated"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4311521Z [36;1mecho "   Nx version: $NX_VERSION"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4311978Z [36;1mecho "   Command: $NX_COMMAND"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4312335Z [36;1m[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4312645Z [36;1m# Try to count projects safely[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4313256Z [36;1mPROJECT_COUNT=$($NX_COMMAND show projects 2>/dev/null | wc -l || echo "unknown")[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4313781Z [36;1mecho "   Projects detected: $PROJECT_COUNT"[0m
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4362961Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4363441Z env:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4363751Z   NX_DAEMON: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4364086Z   NX_SKIP_NX_CACHE: false
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4364422Z   NX_CACHE_DIRECTORY: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4364835Z   NODE_OPTIONS: --max_old_space_size=4096
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4365167Z ##[endgroup]
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4512502Z ≡ƒöº Configuring basic Nx environment...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4527924Z ≡ƒôü Created Nx cache directory: .nx-cache
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4529220Z ≡ƒöì Validating Nx installation...
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4531087Z Γ¥î node_modules directory missing
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4544273Z ##[error]Process completed with exit code 1.
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4768197Z Post job cleanup.
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.4828312Z Post job cleanup.
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5805835Z [command]/usr/bin/git version
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5849530Z git version 2.52.0
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5895783Z Temporarily overriding HOME='/home/runner/work/_temp/f82eed91-1237-4a09-b509-8915afeb9acc' before making global git config changes
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5899531Z Adding repository directory to the temporary git global config as a safe directory
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5904302Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/legacy-sports/legacy-sports
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5954475Z Removing SSH command configuration
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.5968847Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.6030638Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.6926362Z Removing HTTP extra header
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.6947095Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7018508Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7413015Z Removing includeIf entries pointing to credentials config files
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7418470Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7456792Z includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7458509Z includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7459765Z includeif.gitdir:/github/workspace/.git.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7460863Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7473186Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7521684Z /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7546186Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git.path /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7600578Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7635888Z /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7652101Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/legacy-sports/legacy-sports/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7700817Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7734349Z /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7754001Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7798288Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7838750Z /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7855456Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.7910982Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.8392935Z Removing credentials config '/home/runner/work/_temp/git-credentials-7ddded29-dd70-41f8-9d68-2389e388efaf.config'
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.8570158Z Evaluate and set job outputs
+≡ƒÜÇ CI Pipeline / Detect DTE Availability	UNKNOWN STEP	2026-02-18T18:43:07.8578238Z Cleaning up orphan processes

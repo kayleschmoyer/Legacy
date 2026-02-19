@@ -23,19 +23,21 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 
 ## Load When Needed
 
-| Task                       | File                                            |
-| -------------------------- | ----------------------------------------------- |
-| Commands & troubleshooting | `copilot/quick-reference.md`                    |
-| Branch/ticket workflow     | `copilot/tasks/start-ticket.md`                 |
-| Type errors                | `copilot/tasks/fix-types.md`                    |
-| Lint errors                | `copilot/tasks/fix-lint.md`                     |
-| PR creation                | `copilot/tasks/create-pr.md`                    |
-| DB queries                 | `docs/agents/database-query-guide.md`           |
-| Architecture               | `copilot/architecture-summary.md`               |
-| Full workflow              | `docs/guides/ai-agent-contribution-workflow.md` |
-| **New library**            | `copilot/skills/create-lib.md`                  |
-| **New lambda**             | `copilot/skills/create-lambda.md`               |
-| **New app**                | `copilot/skills/create-app.md`                  |
-| **Config reference**       | `copilot/skills/config-standards.md`            |
-| Skills (21 guides)         | `copilot/skills/`                               |
-| CSV patterns               | `docs/agents/*.csv`                             |
+| Task                       | File                                    |
+| -------------------------- | --------------------------------------- |
+| Full workflow (start here) | `skills/workflow-ticket-to-pr/SKILL.md` |
+| Branch/ticket workflow     | `skills/branch-create/SKILL.md`         |
+| Type errors                | `skills/fix-types/SKILL.md`             |
+| Lint errors                | `skills/fix-lint/SKILL.md`              |
+| PR creation                | `skills/create-pr/SKILL.md`             |
+| Troubleshooting            | `skills/troubleshoot/SKILL.md`          |
+| DB queries                 | `skills/db-query/SKILL.md`              |
+| DB schema reference        | `skills/db-schema/SKILL.md`             |
+| Architecture               | `skills/architecture/SKILL.md`          |
+| **New library**            | `skills/create-lib/SKILL.md`            |
+| **New lambda**             | `skills/create-lambda/SKILL.md`         |
+| **New app**                | `skills/create-app/SKILL.md`            |
+| **New skill**              | `skills/create-skill/SKILL.md`          |
+| **Config reference**       | `skills/config-standards/SKILL.md`      |
+| All skills (40 guides)     | `skills/`                               |
+| CSV reference data         | `docs/agents/*.csv`                     |

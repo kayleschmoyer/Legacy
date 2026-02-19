@@ -8,12 +8,6 @@
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
-  "github.copilot.chat.mcp.servers": {
-    "twig": {
-      "command": "twig",
-      "args": ["mcp-server"]
-    }
-  },
   "typescript.tsserver.experimental.enableProjectDiagnostics": false,
   "search.exclude": {
     "**/node_modules": true,
