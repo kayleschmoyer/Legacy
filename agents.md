@@ -10,7 +10,7 @@
 
 ## Workflow
 
-1. Jira "In Progress" 2. `twig switch LS-#### -p main` 3. Code with `pnpm exec nx affected` 4. `make pre-commit` 5. PR + Jira "In Review"
+1. Jira "In Progress" 2. `twig switch LS-#### -p=main` 3. Code with `pnpm exec nx affected` 4. `make pre-commit` 5. PR + Jira "In Review"
 
 ## Rules
 

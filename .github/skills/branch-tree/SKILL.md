@@ -179,7 +179,7 @@ LS-17 [+23]  ← Has 23 commits
 ```powershell
 # ✅ CORRECT: Create from specific parent
 git checkout parent-branch-name
-twig switch LS-1234 -p current
+twig switch LS-1234 -p=current
 
 # ❌ WRONG: Create from main
 git checkout main
@@ -231,7 +231,7 @@ twig switch LS-17
 
 # 3. Create dependent branches one at a time
 git checkout LS-17/branch-name
-twig switch LS-18 -p current
+twig switch LS-18 -p=current
 
 # 4. Verify after each creation
 twig tree

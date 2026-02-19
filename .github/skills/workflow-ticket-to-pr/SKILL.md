@@ -44,7 +44,7 @@ git pull
 twig switch LS-1234
 
 # For follow-up work from current branch
-twig switch LS-1234 -p current
+twig switch LS-1234 -p=current
 ```
 
 **⚠️ DO NOT SKIP THIS STEP**

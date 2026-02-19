@@ -13,7 +13,7 @@ contribution_workflow,step1_planning,POWERSHELL,refresh_path,Refresh PATH if acl
 contribution_workflow,step1_planning,PATTERN,create_ticket,Create new Jira ticket with acli,"acli jira workitem create --project LS --type ""Task"" --summary ""Your summary"" --description ""Details""",""
 contribution_workflow,step2_branching,DECISION,branch_strategy,Choose branching strategy based on ticket type,"New ticket: branch from main. Follow-up: branch from current",""
 contribution_workflow,step2_branching,PATTERN,new_ticket_branch,Create branch for new ticket from main,"git checkout main; git pull; twig switch LS-1234",""
-contribution_workflow,step2_branching,PATTERN,followup_branch,Create branch for follow-up ticket from current,"twig switch LS-1234 -p","The -p flag means parent (branch from current)"
+contribution_workflow,step2_branching,PATTERN,followup_branch,Create branch for follow-up ticket from current,"twig switch LS-1234 -p","Bare -p defaults to current branch as parent. Use -p=<name> with equals sign to specify a different parent."
 contribution_workflow,step2_branching,CONVENTION,branch_naming,Twig automatically creates proper branch names,"feature/LS-####-description, bugfix/LS-####-description",""
 contribution_workflow,step2_branching,CRITICAL,branch_before_editing,Never edit code while on main; confirm you are on the ticket branch before making changes,"git status; git branch; twig switch LS-1234",""
 contribution_workflow,step3_implementation,CRITICAL,use_nx_affected,Run only affected projects for efficiency,"pnpm exec nx affected -t test","Not pnpm exec nx run-many --all"

@@ -5,7 +5,7 @@
 ## Workflow
 
 1. Jira "In Progress": `acli jira workitem transition --key LS-#### --status "In Progress"`
-2. Branch: `twig switch LS-#### -p main` (new) | `-p current` (dependent)
+2. Branch: `twig switch LS-#### -p=main` (new) | `-p=current` (dependent)
 3. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
 4. Validate: `make pre-commit` — typecheck→lint→test→build, all must pass
 5. Ship: `git commit -m "type(scope): msg"` → `git push origin HEAD` → `twig github pr create-pr` → Jira "In Review"

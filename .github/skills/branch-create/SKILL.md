@@ -38,11 +38,17 @@ Create feature branches with automatic Jira integration using the branch-create 
 # From main branch - Always set parent explicitly!
 git checkout main
 git pull
-twig switch LS-1234 -p main
+twig switch LS-1234 -p=main
 
 # From current branch (dependent work)
-twig switch LS-1234 -p current
+twig switch LS-1234 -p=current
+# Or equivalently, bare -p defaults to current:
+twig switch LS-1234 -p
 ```
+
+> **⚠️ CRITICAL**: The `-p` flag requires equals-sign syntax when providing a
+> value (e.g., `-p=main`, `-p=current`). Space-separated `-p main` will fail.
+> Bare `-p` (no value) defaults to using the current branch as parent.
 
 ### Manual Branch Creation
 
@@ -99,13 +105,13 @@ twig init
 
 ### Choosing the Right Parent Branch
 
-**Use `-p main` (default without `-FromCurrent`) when:**
+**Use `-p=main` (default without `-FromCurrent`) when:**
 
 - Starting a NEW independent feature
 - Working on unrelated tickets
 - First ticket in a new sprint
 
-**Use `-p current` (with `-FromCurrent` flag) when:**
+**Use `-p` or `-p=current` (with `-FromCurrent` flag) when:**
 
 - Creating a follow-up ticket to current work
 - Building on changes in the current branch
@@ -115,7 +121,7 @@ twig init
 
 ### Other Best Practices
 
-1. **Always set parent explicitly** with `-p main` or `-p current` to avoid incorrect parent tracking
+1. **Always set parent explicitly** with `-p=main` or `-p=current` (equals-sign syntax, not space-separated) to avoid incorrect parent tracking
 2. **Verify ticket exists** before creating branch
 3. **Pull latest main** before branching from main (script does this automatically)
 4. **Check branch name** follows convention: feature/LS-####-description

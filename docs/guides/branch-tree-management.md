@@ -135,7 +135,7 @@ twig switch LS-17
 
 # For dependent branch - start from specific parent
 git checkout LS-17/set-up-matchup-system
-twig switch LS-18 -p current
+twig switch LS-18 -p=current
 
 # ❌ DON'T: Create from wrong parent
 # ❌ DON'T: Create from main when it should be from LS-17
@@ -552,24 +552,24 @@ twig switch LS-19
 
 # ✅ CORRECT: Creating LS-19 from LS-18
 git checkout LS-18/extend-matchup-schema
-twig switch LS-19 -p current
+twig switch LS-19 -p=current
 ```
 
 ### Mistake 2: Not Verifying Tree
 
 ```powershell
 # ❌ WRONG: Create many branches without checking
-twig switch LS-18 -p current
+twig switch LS-18 -p=current
 # ...make changes, commit...
-twig switch LS-19 -p current
+twig switch LS-19 -p=current
 # ...make changes, commit...
 # Never checked twig tree - might have duplicates!
 
 # ✅ CORRECT: Verify after each branch
-twig switch LS-18 -p current
+twig switch LS-18 -p=current
 twig tree  # ← Check here
 # ...make changes, commit...
-twig switch LS-19 -p current
+twig switch LS-19 -p=current
 twig tree  # ← And here
 ```
 
@@ -610,7 +610,7 @@ twig tree
 
 # Create dependent branch
 git checkout parent-branch
-twig switch LS-#### -p current
+twig switch LS-#### -p=current
 
 # Verify unique commits
 git log --oneline parent..current
