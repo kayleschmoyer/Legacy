@@ -7,7 +7,7 @@ description: 'Create pull requests using twig GitHub integration with automatic 
 
 ## Overview
 
-Create pull requests using twig's GitHub integration with automatic PR template population.
+Create pull requests using twig's GitHub integration or the GitHub CLI. **Always use a temp file for the PR body** to avoid PowerShell mangling markdown.
 
 ## When to Use
 
@@ -23,31 +23,108 @@ Create pull requests using twig's GitHub integration with automatic PR template 
 twig github pr create-pr
 ```
 
-## Alternative Commands
+## Using GitHub CLI (Preferred for Agents)
 
-### Using GitHub CLI
+### 🚨 CRITICAL: Always Use --body-file, Never --body
+
+PowerShell corrupts inline markdown passed via `--body`:
+
+- Backticks are stripped or escaped incorrectly
+- Arrow characters (→) turn into `\`
+- Code blocks render as broken text
+- Special characters get double-escaped
+
+**PowerShell heredoc (`@" "@`) also strips single backticks.** The only safe way
+is to write the file directly using a tool (e.g., `create_file`) or `Set-Content`
+with properly escaped content via a variable.
+
+**Agent workflow — write a temp .md file, then pass it to `gh pr create`:**
 
 ```powershell
-# Create PR with gh CLI
-gh pr create --title "LS-1234: Brief description" \
-  --body "Description of changes"
+# 1. Use your file-writing tool to create a temp .md file with the PR body
+#    (agents: use create_file to write the markdown — it preserves backticks)
+#    File location: .github/tmp-pr-body.md (or $env:TEMP/pr-body.md)
 
-# Create PR with auto-filled details
-gh pr create --fill
+# 2. Create PR using --body-file
+gh pr create --title "fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+
+# 3. Clean up the temp file
+Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
 ```
 
-### Manual PR Creation
+### ❌ NEVER Do These
 
 ```powershell
-# Push branch and open GitHub in browser
-git push origin HEAD
-# Then manually create PR at github.com
+# BAD - PowerShell will mangle the markdown
+gh pr create --title "fix: thing" --body "## Problem`nThe \`code\` was broken"
+
+# BAD - Inline backticks and special chars get corrupted
+gh pr create --title "fix: thing" --body "Change \`--old\` to \`--new\`"
+
+# BAD - Heredoc also strips single backticks
+@"
+The `function` was broken
+"@ | Set-Content -Path "$env:TEMP\pr-body.md"
+# Result: "The  was broken" (backticks gone)
+```
+
+### Quick PR (No Description Needed)
+
+```powershell
+# Auto-fill from commit messages (safe, no markdown)
+gh pr create --fill --base main
+```
+
+### Fixing a Mangled PR Description
+
+If a PR was already created with broken formatting:
+
+```powershell
+# 1. Write corrected body to a temp file (use create_file tool)
+# 2. Update the existing PR
+gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
+# 3. Clean up
+Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
+```
+
+## PR Body Template
+
+When writing the temp PR body file, use this structure:
+
+```markdown
+## Summary
+
+Brief overview of what this PR does.
+
+## Jira Ticket
+
+[LS-1234](https://legacysports.atlassian.net/browse/LS-1234)
+
+## Problem
+
+Description of the issue being fixed, with error messages in fenced code blocks.
+
+## Root Cause
+
+Technical explanation of why the issue occurred.
+
+## Changes Made
+
+- Change 1
+- Change 2
+- Change 3
+
+## Testing Done
+
+- [ ] Unit tests pass
+- [ ] Manual testing completed
+- [ ] Pre-commit validation passes
 ```
 
 ## Expected Output
 
-- **Success**: Browser opens to GitHub PR creation page
-- **Pre-filled**: Title, description, and Jira link automatically populated
+- **Success**: PR URL printed to console
+- **Pre-filled**: Title and body from provided content
 - **Branch**: Current branch set as source, main as target
 
 ## Common Issues
@@ -57,9 +134,7 @@ git push origin HEAD
 **Solution**: Push branch before creating PR
 
 ```powershell
-git push origin HEAD
-# or
-git push -u origin HEAD  # First push
+git push -u origin HEAD
 ```
 
 ### Issue: No changes to commit
@@ -79,77 +154,46 @@ git push origin HEAD
 
 ```powershell
 twig github setup
-# Follow prompts to add GitHub personal access token
 ```
 
-### Issue: PR template not populated
+### Issue: PR body has broken formatting
 
-**Solution**: Manually fill PR template with required information
+**Solution**: You used `--body` inline. Re-create using `--body-file`:
 
-- Title: `LS-1234: Brief description`
-- Jira link: `https://your-jira.atlassian.net/browse/LS-1234`
-- Description of changes
-- Screenshots (if UI changes)
-- Test results
+```powershell
+# Close the broken PR
+gh pr close <PR_NUMBER>
+
+# Recreate with --body-file
+@"
+Your markdown content here
+"@ | Set-Content -Path "$env:TEMP\pr-body.md" -Encoding utf8
+gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
+```
 
 ## Best Practices
 
-1. **Run pre-commit validation** before creating PR (make pre-commit)
-2. **Use conventional commit format** in title
-3. **Link Jira ticket** in PR description
-4. **Add screenshots** for UI changes
-5. **Update Jira status** to "In Review" after PR creation
-6. **Fill PR checklist** completely
-7. **Keep PRs focused** - split large changes into multiple PRs
+1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
+2. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
+3. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
+4. **Run pre-commit validation** before creating PR (`make pre-commit`)
+5. **Use conventional commit format** in the PR title: `type(scope): description`
+6. **Link Jira ticket** in PR description
+7. **Add screenshots** for UI changes
+8. **Keep PRs focused** — split large changes into multiple PRs
 
 ## PR Title Format
 
 ```
-LS-1234: Brief description of changes
+type(scope): Brief description
 ```
 
 **Examples**:
 
-- `LS-1234: Add career statistics resolver`
-- `LS-1234: Fix OAuth token refresh issue`
-- `LS-1234: Update GraphQL schema documentation`
-
-## PR Description Template
-
-```markdown
-## Summary
-
-Brief overview of what this PR does.
-
-## Jira Ticket
-
-[LS-1234](https://your-jira.atlassian.net/browse/LS-1234)
-
-## Changes Made
-
-- Change 1
-- Change 2
-- Change 3
-
-## Testing Done
-
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-- [ ] E2E tests pass (if applicable)
-
-## Screenshots
-
-(If applicable)
-
-## Breaking Changes
-
-None / List any breaking changes
-
-## Additional Notes
-
-Any additional context or notes for reviewers.
-```
+- `feat(db): add career statistics resolver`
+- `fix(auth): fix OAuth token refresh issue`
+- `docs(graphql): update GraphQL schema documentation`
+- `fix(ci): fix invalid Playwright CLI options in E2E action`
 
 ## Integration with Workflow
 
@@ -166,13 +210,17 @@ git commit -m "feat(scope): description"
 # 3. Push branch
 git push origin HEAD
 
-# 4. Create PR
-twig github pr create-pr
+# 4. Write PR body to a temp .md file (use create_file tool — NOT heredoc)
+#    File: .github/tmp-pr-body.md
 
-# 5. Update Jira ticket
+# 5. Create PR
+gh pr create --title "feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+
+# 6. Clean up temp file
+Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
+
+# 7. Update Jira ticket
 acli jira workitem transition --key LS-1234 --status "In Review"
-
-# 6. Request reviews (in GitHub UI)
 ```
 
 ### Before Creating PR Checklist
@@ -187,8 +235,8 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 
 ### After Creating PR Checklist
 
-- [ ] PR title references Jira ticket
-- [ ] PR description complete
+- [ ] PR title references Jira ticket or uses conventional commit format
+- [ ] PR description renders correctly (check in browser)
 - [ ] Jira ticket updated to "In Review"
 - [ ] Reviewers assigned
 - [ ] Labels added (if needed)
@@ -200,15 +248,15 @@ If PR becomes too large, consider splitting:
 
 ```powershell
 # 1. Create follow-up ticket
-acli jira workitem create --project LS --type "Story" \
-  --summary "Follow-up: UI components" \
+acli jira workitem create --project LS --type "Story" `
+  --summary "Follow-up: UI components" `
   --description "Work de-scoped from LS-ORIG"
 
 # 2. Document in PR description
 # "UI components de-scoped to LS-NEW (link)"
 
 # 3. Update original ticket
-acli jira workitem comment create --key LS-ORIG \
+acli jira workitem comment create --key LS-ORIG `
   --body "UI work de-scoped to LS-NEW to keep PR focused"
 ```
 
@@ -227,7 +275,7 @@ gh pr checks
 
 ## Exit Codes
 
-- **0**: PR created successfully (browser opened)
+- **0**: PR created successfully
 - **Non-zero**: Error occurred (check error message)
 
 ## Related Skills
