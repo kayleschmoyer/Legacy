@@ -1,30 +1,100 @@
-# LeagueMessage type and related queries not available in current schema
-# fragment LeagueMessage on LeagueMessage {
-#   leagueId
-#   messageText
-#   timestamp
-#   user {
-#     id
-#     username
-#   }
-# }
+# ============================================================
+# Chat System — GQL documents for the mobile app (LS-chat)
+#
+# Two chat types:
+#   1. League Chat Room  — league-wide broadcast via sendLeagueMessage
+#   2. Direct Messages   — player-to-player via sendDirectMessage
+#
+# Messages are sent via GQL mutations.
+# Real-time delivery is handled by the WebSocket layer:
+#   - League chat → broadcast to all LeagueIdIndex connections
+#   - Direct messages → pushed to recipient's active connections
+# ============================================================
 
-# query GetMessagesForLeague(
-#   $orderBy: [LeagueMessagesOrderBy!]
-#   $condition: LeagueMessageCondition!
-# ) {
-#   leagueMessages(orderBy: $orderBy, condition: $condition) {
-#     nodes {
-#       ...LeagueMessage
-#     }
-#   }
-# }
+# -----------------------------------------------------------
+# FRAGMENTS
+# -----------------------------------------------------------
 
-# SendLeagueMessage mutation not available in current schema
-# mutation SendLeagueMessage($input: CreateLeagueMessageInput!) {
-#   createLeagueMessage(input: $input) {
-#     leagueMessage {
-#       ...LeagueMessage
-#     }
-#   }
-# }
+fragment LeagueChatMessageFields on LeagueChatMessage {
+  id
+  leagueId
+  userId
+  messageText
+  timestamp
+  sender {
+    id
+    username
+  }
+}
+
+fragment DirectMessageFields on DirectMessage {
+  id
+  fromUserId
+  toUserId
+  leagueId
+  messageText
+  readAt
+  deletedAt
+  createdAt
+  updatedAt
+  sender {
+    id
+    username
+  }
+  recipient {
+    id
+    username
+  }
+}
+
+# -----------------------------------------------------------
+# QUERIES
+# -----------------------------------------------------------
+
+# Fetch the most recent messages in a league's chat room.
+# Call this on mount to hydrate the chat history before the
+# WebSocket connection delivers live updates.
+query GetLeagueMessages($leagueId: Int!, $limit: Int) {
+  getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+    ...LeagueChatMessageFields
+  }
+}
+
+# Fetch the conversation thread between the current user and another player.
+# Call this when opening a DM thread to pre-load history.
+query GetDirectMessages($otherUserId: Int!, $limit: Int) {
+  getDirectMessages(otherUserId: $otherUserId, limit: $limit) {
+    ...DirectMessageFields
+  }
+}
+
+# -----------------------------------------------------------
+# MUTATIONS
+# -----------------------------------------------------------
+
+# Post a message to the league-wide chat room.
+# After a successful response the server broadcasts a
+# LEAGUE_CHAT_MESSAGE WebSocket event to all connected
+# league members — no polling required.
+mutation SendLeagueMessage($leagueId: Int!, $messageText: String!) {
+  sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+    ...LeagueChatMessageFields
+  }
+}
+
+# Send a private direct message to another player.
+# The server pushes a DIRECT_MESSAGE WebSocket notification
+# to all active connections belonging to the recipient.
+mutation SendDirectMessage(
+  $toUserId: Int!
+  $messageText: String!
+  $leagueId: Int
+) {
+  sendDirectMessage(
+    toUserId: $toUserId
+    messageText: $messageText
+    leagueId: $leagueId
+  ) {
+    ...DirectMessageFields
+  }
+}

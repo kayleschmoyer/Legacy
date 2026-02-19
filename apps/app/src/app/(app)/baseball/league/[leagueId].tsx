@@ -21,6 +21,7 @@ import {
 } from '../../../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
+import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 // Manual GraphQL query for getting user's team ID in a league
@@ -264,6 +265,9 @@ export default function LeagueId(): React.JSX.Element {
           <Tabs.Tab value="standings" flex={1}>
             <Text>Standings</Text>
           </Tabs.Tab>
+          <Tabs.Tab value="chat" flex={1}>
+            <Text>Chat</Text>
+          </Tabs.Tab>
           {isCommissioner && (
             <Tabs.Tab value="commissioner" flex={1}>
               <Text>Commissioner</Text>
@@ -291,6 +295,10 @@ export default function LeagueId(): React.JSX.Element {
             loading={leagueTeamsLoading}
             userTeamId={userTeamId}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="chat" flex={1}>
+          <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
         </Tabs.Content>
 
         {isCommissioner && (

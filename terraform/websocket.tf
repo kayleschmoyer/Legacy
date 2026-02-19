@@ -22,6 +22,11 @@ resource "aws_dynamodb_table" "websocket_connections" {
     type = "N"
   }
 
+  attribute {
+    name = "userId"
+    type = "N"
+  }
+
   global_secondary_index {
     name            = "LeagueIdIndex"
     hash_key        = "leagueId"
@@ -32,6 +37,15 @@ resource "aws_dynamodb_table" "websocket_connections" {
     name            = "MatchupIdIndex"
     hash_key        = "matchupId"
     projection_type = "ALL"
+  }
+
+  # UserIdIndex — enables efficient direct-message delivery:
+  # the DB lambda scans this index to find all active WebSocket
+  # connections belonging to a DM recipient.
+  global_secondary_index {
+    name            = "UserIdIndex"
+    hash_key        = "userId"
+    projection_type = "KEYS_ONLY"
   }
 
   ttl {

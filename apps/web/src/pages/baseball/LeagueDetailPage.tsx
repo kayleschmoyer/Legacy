@@ -15,6 +15,7 @@ import {
   Info,
   LayoutGrid,
   Link2,
+  MessageSquare,
   QrCode,
   Settings,
   Share2,
@@ -42,6 +43,7 @@ import {
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
+import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
@@ -194,7 +196,13 @@ function getDraftBadgeColors(status?: string | null) {
 
 // ── Tab Definitions ──────────────────────────────────────────────────────────
 
-type TabId = 'overview' | 'roster' | 'standings' | 'matchup' | 'commissioner';
+type TabId =
+  | 'overview'
+  | 'roster'
+  | 'standings'
+  | 'matchup'
+  | 'chat'
+  | 'commissioner';
 
 interface TabDef {
   id: TabId;
@@ -208,6 +216,7 @@ const TABS: TabDef[] = [
   { id: 'roster', label: 'My Roster', icon: <ClipboardList size={16} /> },
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
+  { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
   {
     id: 'commissioner',
     label: 'Commissioner',
@@ -223,6 +232,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   roster: 'roster',
   standings: 'standings',
   matchup: 'matchup',
+  chat: 'chat',
   commissioner: 'commissioner',
 };
 
@@ -1206,6 +1216,19 @@ export function LeagueDetailPage(): React.JSX.Element {
     </YStack>
   );
 
+  const renderChat = () => (
+    <YStack
+      flex={1}
+      role="tabpanel"
+      id="panel-chat"
+      aria-labelledby="tab-chat"
+      height="calc(100vh - 260px)"
+      minHeight={400}
+    >
+      <LeagueChatTab leagueId={leagueId} userId={user?.id ?? 0} />
+    </YStack>
+  );
+
   const renderCommissionerSettings = () => (
     <YStack
       gap="$4"
@@ -1608,6 +1631,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             )}
           </YStack>
         )}
+        {activeTab === 'chat' && renderChat()}
         {activeTab === 'commissioner' &&
           isCommissioner &&
           renderCommissionerSettings()}

@@ -20,6 +20,7 @@ import {
   leagueScoringProfiles,
   leagueScoringProfileEntries,
   leagueScoringChangeLog,
+  directMessages,
 } from './schema';
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -209,3 +210,14 @@ export const matchupPlayerGamesRelations = relations(
     }),
   }),
 );
+
+/**
+ * Direct messages: optional relation to a league context.
+ * No user relations — users is a Postgres VIEW, not a table.
+ */
+export const directMessagesRelations = relations(directMessages, ({ one }) => ({
+  league: one(leagues, {
+    fields: [directMessages.leagueId],
+    references: [leagues.id],
+  }),
+}));

@@ -59,13 +59,47 @@ export interface MatchupStatsCompleteNotification {
   completedAt: string;
 }
 
+/**
+ * New chat message posted to a league chat room.
+ * Broadcast to all WebSocket connections scoped to `leagueId`.
+ */
+export interface LeagueChatMessageNotification {
+  type: 'LEAGUE_CHAT_MESSAGE';
+  leagueId: number;
+  messageId: number;
+  senderId: number;
+  senderUsername: string;
+  messageText: string;
+  /** ISO-8601 timestamp */
+  timestamp: string;
+}
+
+/**
+ * A direct message delivered to a specific recipient.
+ * Pushed only to the recipient's active WebSocket connections.
+ */
+export interface DirectMessageNotification {
+  type: 'DIRECT_MESSAGE';
+  messageId: number;
+  fromUserId: number;
+  fromUsername: string;
+  toUserId: number;
+  /** Optional league context in which the DM was sent */
+  leagueId: number | null;
+  messageText: string;
+  /** ISO-8601 creation timestamp */
+  createdAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
   | DraftPickNotification
   | PlayerStatsLoadingNotification
   | PlayerStatsUpdatedNotification
-  | MatchupStatsCompleteNotification;
+  | MatchupStatsCompleteNotification
+  | LeagueChatMessageNotification
+  | DirectMessageNotification;
 
 /**
  * WebSocket message structure
@@ -105,7 +139,7 @@ export interface WebSocketClientOptions {
   /** Matchup ID for context */
   matchupId?: number;
   /** View context for notifications */
-  viewContext?: 'general' | 'league' | 'matchup' | 'roster';
+  viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
   /** Auto-connect on instantiation */
   autoConnect?: boolean;
   /** Enable auto-reconnect on disconnect */
@@ -127,7 +161,7 @@ export interface RequiredWebSocketClientOptions {
   token?: string;
   leagueId?: number;
   matchupId?: number;
-  viewContext: 'general' | 'league' | 'matchup' | 'roster';
+  viewContext: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
   autoConnect: boolean;
   reconnect: boolean;
   maxReconnectAttempts: number;

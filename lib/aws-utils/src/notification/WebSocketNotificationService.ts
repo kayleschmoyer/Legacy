@@ -76,6 +76,36 @@ export interface MatchupStatsCompleteNotification {
   completedAt: string;
 }
 
+/**
+ * A new message posted to a league-wide chat room.
+ * Broadcast to all WebSocket connections scoped to the league.
+ */
+export interface LeagueChatMessageNotification {
+  type: 'LEAGUE_CHAT_MESSAGE';
+  leagueId: number;
+  messageId: number;
+  senderId: number;
+  senderUsername: string;
+  messageText: string;
+  /** ISO-8601 */
+  timestamp: string;
+}
+
+/**
+ * A direct message pushed only to the recipient's active connections.
+ */
+export interface DirectMessageNotification {
+  type: 'DIRECT_MESSAGE';
+  messageId: number;
+  fromUserId: number;
+  fromUsername: string;
+  toUserId: number;
+  leagueId: number | null;
+  messageText: string;
+  /** ISO-8601 */
+  createdAt: string;
+}
+
 export interface NotificationMessage {
   type: string;
   data: unknown;
@@ -475,6 +505,139 @@ export class WebSocketNotificationService {
     });
 
     await this.notifyMatchupViewers(matchupId, notification);
+  }
+
+  /**
+   * Get all active WebSocket connections for a specific user.
+   *
+   * Queries the UserIdIndex GSI (hash_key="userId") for efficient lookups.
+   * The GSI is defined in terraform/websocket.tf.
+   */
+  private async getUserConnections(userId: number): Promise<string[]> {
+    try {
+      const result = await this.dynamoClient.send(
+        new QueryCommand({
+          TableName: this.connectionsTableName,
+          IndexName: 'UserIdIndex',
+          KeyConditionExpression: 'userId = :userId',
+          ExpressionAttributeValues: {
+            ':userId': { N: userId.toString() },
+          },
+          ProjectionExpression: 'connectionId',
+        }),
+      );
+
+      const items = result.Items || [];
+      const connectionIds = items
+        .map((item: DynamoDBItem) => item['connectionId']?.S)
+        .filter((id: string | undefined): id is string => !!id);
+
+      LOGGER.info('Retrieved user connections for DM delivery', {
+        userId,
+        count: connectionIds.length,
+      });
+
+      return connectionIds;
+    } catch (error) {
+      LOGGER.error('Error retrieving user connections', { error, userId });
+      throw error;
+    }
+  }
+
+  /**
+   * Broadcast a new league chat message to all connected league members.
+   *
+   * @param leagueId - The league whose members should be notified.
+   * @param payload  - Message details (excludes the `type` discriminator).
+   */
+  async notifyLeagueChatMessage(
+    leagueId: number,
+    payload: Omit<LeagueChatMessageNotification, 'type'>,
+  ): Promise<void> {
+    const notification: LeagueChatMessageNotification = {
+      type: 'LEAGUE_CHAT_MESSAGE',
+      ...payload,
+    };
+
+    LOGGER.info('Sending league chat message notification', {
+      leagueId,
+      messageId: payload.messageId,
+      senderId: payload.senderId,
+    });
+
+    await this.broadcast(
+      { type: 'notification', data: notification },
+      leagueId,
+    );
+  }
+
+  /**
+   * Push a direct message notification to all active connections belonging
+   * to the recipient.
+   *
+   * @param recipientUserId - The user who should receive the notification.
+   * @param payload         - DM details (excludes the `type` discriminator).
+   */
+  async notifyDirectMessage(
+    recipientUserId: number,
+    payload: Omit<DirectMessageNotification, 'type'>,
+  ): Promise<void> {
+    if (!this.websocketEndpoint) {
+      LOGGER.warn(
+        'WebSocket endpoint not configured, skipping DM notification',
+      );
+      return;
+    }
+
+    const notification: DirectMessageNotification = {
+      type: 'DIRECT_MESSAGE',
+      ...payload,
+    };
+
+    LOGGER.info('Sending direct message notification', {
+      recipientUserId,
+      messageId: payload.messageId,
+      fromUserId: payload.fromUserId,
+    });
+
+    try {
+      const connectionIds = await this.getUserConnections(recipientUserId);
+
+      if (connectionIds.length === 0) {
+        LOGGER.info(
+          'Recipient has no active WebSocket connections, DM stored for later retrieval',
+          {
+            recipientUserId,
+          },
+        );
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        connectionIds.map((connectionId) =>
+          this.sendToConnection(connectionId, {
+            type: 'notification',
+            data: notification,
+          }),
+        ),
+      );
+
+      const sent = results.filter(
+        (r) => r.status === 'fulfilled' && r.value === true,
+      ).length;
+
+      LOGGER.info('Direct message notification delivered', {
+        recipientUserId,
+        sent,
+        total: connectionIds.length,
+      });
+    } catch (error) {
+      LOGGER.error('Error delivering direct message notification', {
+        error,
+        recipientUserId,
+      });
+      throw error;
+    }
   }
 
   /**

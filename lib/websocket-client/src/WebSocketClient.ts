@@ -234,7 +234,7 @@ export class WebSocketClient {
   public updateContext(context: {
     leagueId?: number;
     matchupId?: number;
-    viewContext?: 'general' | 'league' | 'matchup' | 'roster';
+    viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
   }): void {
     if (context.leagueId !== undefined) {
       this.options.leagueId = context.leagueId;

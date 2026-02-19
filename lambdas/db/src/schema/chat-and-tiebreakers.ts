@@ -1,5 +1,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, desc, eq } from 'drizzle-orm';
+import { createNotificationService } from '@legacy-sports/aws-utils';
+import { LOGGER } from '@legacy-sports/logging';
+import { and, asc, desc, eq, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues';
 
@@ -241,6 +243,82 @@ builder.objectType(MatchupMessageConnection, {
     platform: t.exposeString('platform'),
     connectedAt: t.exposeString('connectedAt'),
     lastSeenAt: t.exposeString('lastSeenAt'),
+  }),
+});
+
+// ============================================================================
+// LEAGUE & DIRECT-MESSAGE CHAT TYPES
+// ============================================================================
+
+/**
+ * LeagueChatMessage — a message in the league-wide chat room.
+ * Backed by the `league_messages` table.
+ */
+const LeagueChatMessage = builder.objectRef<{
+  id: number;
+  leagueId: number;
+  userId: number;
+  messageText: string;
+  timestamp: string | null;
+}>('LeagueChatMessage');
+
+builder.objectType(LeagueChatMessage, {
+  description: 'A message posted to the league-wide chat room',
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    leagueId: t.exposeInt('leagueId'),
+    userId: t.exposeInt('userId'),
+    messageText: t.exposeString('messageText'),
+    timestamp: t.exposeString('timestamp', { nullable: true }),
+    sender: t.field({
+      type: 'User',
+      nullable: true,
+      resolve: async (msg, _args, context) =>
+        context.loaders.users.load(msg.userId),
+    }),
+  }),
+});
+
+/**
+ * DirectMessage — a private message between two players.
+ * Backed by the `direct_messages` table.
+ */
+const DirectMessage = builder.objectRef<{
+  id: number;
+  fromUserId: number;
+  toUserId: number;
+  leagueId: number | null;
+  messageText: string;
+  readAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}>('DirectMessage');
+
+builder.objectType(DirectMessage, {
+  description: 'A private direct message between two players',
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    fromUserId: t.exposeInt('fromUserId'),
+    toUserId: t.exposeInt('toUserId'),
+    leagueId: t.exposeInt('leagueId', { nullable: true }),
+    messageText: t.exposeString('messageText'),
+    readAt: t.exposeString('readAt', { nullable: true }),
+    deletedAt: t.exposeString('deletedAt', { nullable: true }),
+    createdAt: t.exposeString('createdAt'),
+    updatedAt: t.exposeString('updatedAt'),
+    sender: t.field({
+      type: 'User',
+      nullable: true,
+      resolve: async (msg, _args, context) =>
+        context.loaders.users.load(msg.fromUserId),
+    }),
+    recipient: t.field({
+      type: 'User',
+      nullable: true,
+      resolve: async (msg, _args, context) =>
+        context.loaders.users.load(msg.toUserId),
+    }),
   }),
 });
 
@@ -497,6 +575,116 @@ builder.queryField('getTiebreakerHistory', (t) =>
   }),
 );
 
+// Query: getLeagueMessages — fetch recent messages in the league chat room
+builder.queryField('getLeagueMessages', (t) =>
+  t.field({
+    type: [LeagueChatMessage],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      limit: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      // Verify caller is a member of the league
+      const membership = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      const query = context.db
+        .select()
+        .from(PublicSchema.leagueMessages)
+        .where(eq(PublicSchema.leagueMessages.leagueId, args.leagueId))
+        .orderBy(desc(PublicSchema.leagueMessages.timestamp));
+
+      const results = args.limit ? await query.limit(args.limit) : await query;
+
+      return results.map((msg) => ({
+        id: msg.id,
+        leagueId: msg.leagueId,
+        userId: msg.userId,
+        messageText: msg.messageText,
+        timestamp: msg.timestamp ?? null,
+      }));
+    },
+  }),
+);
+
+// Query: getDirectMessages — fetch the conversation thread between two users
+builder.queryField('getDirectMessages', (t) =>
+  t.field({
+    type: [DirectMessage],
+    args: {
+      otherUserId: t.arg.int({ required: true }),
+      limit: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const selfId = context.user.id;
+      const otherId = args.otherUserId;
+
+      const query = context.db
+        .select()
+        .from(PublicSchema.directMessages)
+        .where(
+          or(
+            and(
+              eq(PublicSchema.directMessages.fromUserId, selfId),
+              eq(PublicSchema.directMessages.toUserId, otherId),
+            ),
+            and(
+              eq(PublicSchema.directMessages.fromUserId, otherId),
+              eq(PublicSchema.directMessages.toUserId, selfId),
+            ),
+          ),
+        )
+        .orderBy(asc(PublicSchema.directMessages.createdAt));
+
+      const results = args.limit ? await query.limit(args.limit) : await query;
+
+      return results.map((msg) => ({
+        id: msg.id,
+        fromUserId: msg.fromUserId,
+        toUserId: msg.toUserId,
+        leagueId: msg.leagueId ?? null,
+        messageText: msg.messageText,
+        readAt:
+          msg.readAt instanceof Date
+            ? msg.readAt.toISOString()
+            : (msg.readAt ?? null),
+        deletedAt:
+          msg.deletedAt instanceof Date
+            ? msg.deletedAt.toISOString()
+            : (msg.deletedAt ?? null),
+        createdAt:
+          msg.createdAt instanceof Date
+            ? msg.createdAt.toISOString()
+            : String(msg.createdAt),
+        updatedAt:
+          msg.updatedAt instanceof Date
+            ? msg.updatedAt.toISOString()
+            : String(msg.updatedAt),
+      }));
+    },
+  }),
+);
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
@@ -582,6 +770,174 @@ builder.mutationField('createTiebreakerRules', (t) =>
       return {
         ...results[0],
         config: results[0].config as Record<string, unknown> | null,
+      };
+    },
+  }),
+);
+
+// Mutation: sendLeagueMessage
+// Persists a league chat message and broadcasts a WebSocket notification to
+// all connected league members.
+builder.mutationField('sendLeagueMessage', (t) =>
+  t.field({
+    type: LeagueChatMessage,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      messageText: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const text = args.messageText.trim();
+      if (text.length === 0) {
+        throw new Error('Message cannot be empty');
+      }
+      if (text.length > 2000) {
+        throw new Error('Message cannot exceed 2000 characters');
+      }
+
+      // Verify the caller is a member of the league
+      const membership = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      // Persist the message
+      const rows = await context.db
+        .insert(PublicSchema.leagueMessages)
+        .values({
+          leagueId: args.leagueId,
+          userId: context.user.id,
+          messageText: text,
+        })
+        .returning();
+
+      const msg = rows[0];
+
+      // Dispatch WebSocket notification (fire-and-forget — never block the mutation)
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        notificationService
+          .notifyLeagueChatMessage(args.leagueId, {
+            leagueId: args.leagueId,
+            messageId: msg.id,
+            senderId: context.user.id,
+            senderUsername: context.user.username ?? `user_${context.user.id}`,
+            messageText: text,
+            timestamp: msg.timestamp ?? new Date().toISOString(),
+          })
+          .catch((err: unknown) => {
+            LOGGER.warn('Failed to send league chat WS notification', { err });
+          });
+      }
+
+      return {
+        id: msg.id,
+        leagueId: msg.leagueId,
+        userId: msg.userId,
+        messageText: msg.messageText,
+        timestamp: msg.timestamp ?? null,
+      };
+    },
+  }),
+);
+
+// Mutation: sendDirectMessage
+// Delivers a private message between two players, persists it to
+// `direct_messages`, and pushes a WebSocket notification to the recipient's
+// active connections.
+builder.mutationField('sendDirectMessage', (t) =>
+  t.field({
+    type: DirectMessage,
+    args: {
+      toUserId: t.arg.int({ required: true }),
+      messageText: t.arg.string({ required: true }),
+      /** Optional: scope this DM to a shared league for context */
+      leagueId: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      if (args.toUserId === context.user.id) {
+        throw new Error('Cannot send a direct message to yourself');
+      }
+
+      const text = args.messageText.trim();
+      if (text.length === 0) {
+        throw new Error('Message cannot be empty');
+      }
+      if (text.length > 2000) {
+        throw new Error('Message cannot exceed 2000 characters');
+      }
+
+      // Persist the direct message
+      const rows = await context.db
+        .insert(PublicSchema.directMessages)
+        .values({
+          fromUserId: context.user.id,
+          toUserId: args.toUserId,
+          leagueId: args.leagueId ?? null,
+          messageText: text,
+        })
+        .returning();
+
+      const msg = rows[0];
+
+      const toIso = (v: Date | string | null): string | null => {
+        if (v === null || v === undefined) return null;
+        return v instanceof Date ? v.toISOString() : String(v);
+      };
+
+      const createdAt =
+        msg.createdAt instanceof Date
+          ? msg.createdAt.toISOString()
+          : String(msg.createdAt);
+
+      // Dispatch WebSocket notification to the recipient's active connections
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        notificationService
+          .notifyDirectMessage(args.toUserId, {
+            messageId: msg.id,
+            fromUserId: context.user.id,
+            fromUsername: context.user.username ?? `user_${context.user.id}`,
+            toUserId: args.toUserId,
+            leagueId: msg.leagueId ?? null,
+            messageText: text,
+            createdAt,
+          })
+          .catch((err: unknown) => {
+            LOGGER.warn('Failed to deliver DM WebSocket notification', { err });
+          });
+      }
+
+      return {
+        id: msg.id,
+        fromUserId: msg.fromUserId,
+        toUserId: msg.toUserId,
+        leagueId: msg.leagueId ?? null,
+        messageText: msg.messageText,
+        readAt: toIso(msg.readAt),
+        deletedAt: toIso(msg.deletedAt),
+        createdAt,
+        updatedAt:
+          msg.updatedAt instanceof Date
+            ? msg.updatedAt.toISOString()
+            : String(msg.updatedAt),
       };
     },
   }),
