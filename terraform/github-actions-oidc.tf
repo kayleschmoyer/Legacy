@@ -199,26 +199,11 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:s3:::legacy-sports-terraform-state"
         ]
       },
-      # VPC and networking read permissions
+      # VPC, EC2, and networking read permissions
       {
         Effect = "Allow"
         Action = [
-          "ec2:DescribeVpcs",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSecurityGroupRules",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeInternetGateways",
-          "ec2:DescribeNatGateways",
-          "ec2:DescribeVpcEndpoints",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DescribeInstances",
-          "ec2:DescribeAddresses",
-          "ec2:DescribeVpcAttribute",
-          "ec2:DescribeImages",
-          "ec2:DescribePrefixLists",
-          "ec2:DescribeInstanceTypes",
-          "ec2:DescribeTags"
+          "ec2:Describe*"
         ]
         Resource = "*"
       },
