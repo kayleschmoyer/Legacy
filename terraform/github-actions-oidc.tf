@@ -119,7 +119,14 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "dynamodb:DescribeTable",
           "dynamodb:DescribeContinuousBackups",
           "dynamodb:DescribeTimeToLive",
-          "dynamodb:ListTagsOfResource"
+          "dynamodb:ListTagsOfResource",
+          "dynamodb:UpdateTable",
+          "dynamodb:UpdateTimeToLive",
+          "dynamodb:UpdateContinuousBackups",
+          "dynamodb:TagResource",
+          "dynamodb:UntagResource",
+          "dynamodb:CreateTable",
+          "dynamodb:DeleteTable"
         ]
         Resource = [
           "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks",
@@ -206,6 +213,39 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:Describe*"
         ]
         Resource = "*"
+      },
+      # EC2 write permissions for NAT instance management
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:StopInstances",
+          "ec2:StartInstances",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:AssociateAddress",
+          "ec2:DisassociateAddress",
+          "ec2:AllocateAddress",
+          "ec2:ReleaseAddress",
+          "ec2:CreateRoute",
+          "ec2:DeleteRoute",
+          "ec2:ReplaceRoute",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:ModifyVpcEndpoint",
+          "ec2:CreateVpcEndpoint",
+          "ec2:DeleteVpcEndpoints"
+        ]
+        Resource = [
+          "arn:aws:ec2:${local.region}:${local.account_id}:*",
+          "arn:aws:ec2:${local.region}::image/*"
+        ]
       },
       # SSM Parameter Store read permissions
       {
