@@ -1,6 +1,7 @@
 # Stats Lambda Configuration
 resource "aws_iam_role" "stats_lambda" {
-  name = "${local.name_prefix}-stats-lambda-role"
+  name        = "${local.name_prefix}-stats-lambda-role"
+  description = "Execution role for the Stats Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

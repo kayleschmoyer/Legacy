@@ -21,7 +21,8 @@ data "aws_ssm_parameter" "draft_processor_lambda_version" {
 
 # IAM role for draft processor lambda
 resource "aws_iam_role" "draft_processor_lambda" {
-  name = "${local.name_prefix}-draft-processor-lambda-role"
+  name        = "${local.name_prefix}-draft-processor-lambda-role"
+  description = "Execution role for the Draft Processor Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -147,7 +148,7 @@ resource "aws_iam_policy" "draft_processor_lambda_websocket" {
         Action = [
           "execute-api:ManageConnections"
         ]
-        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*/*/@connections/*"
       },
       {
         Effect = "Allow"

@@ -19,7 +19,8 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 
 # IAM Role for GitHub Actions to assume
 resource "aws_iam_role" "github_actions" {
-  name = "${local.name_prefix}-github-actions"
+  name        = "${local.name_prefix}-github-actions"
+  description = "OIDC role assumed by GitHub Actions for CI/CD deployments"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

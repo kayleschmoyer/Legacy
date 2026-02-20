@@ -5,7 +5,8 @@ data "aws_ssm_parameter" "graphql_lambda_version" {
 
 # IAM role for the GraphQL Lambda
 resource "aws_iam_role" "graphql_lambda" {
-  name = "${local.name_prefix}-graphql-lambda-role"
+  name        = "${local.name_prefix}-graphql-lambda-role"
+  description = "Execution role for the GraphQL API Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -55,14 +56,6 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
           aws_secretsmanager_secret.database_credentials.arn,
           aws_secretsmanager_secret.jwt_secret.arn
         ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetRandomPassword",
-          "secretsmanager:ListSecrets"
-        ]
-        Resource = "*"
       }
     ]
   })

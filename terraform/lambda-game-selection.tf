@@ -1,6 +1,7 @@
 # Game Selection Lambda Configuration
 resource "aws_iam_role" "game_selection_lambda" {
-  name = "${local.name_prefix}-game-selection-lambda-role"
+  name        = "${local.name_prefix}-game-selection-lambda-role"
+  description = "Execution role for the Game Selection Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

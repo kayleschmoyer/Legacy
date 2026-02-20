@@ -1,6 +1,7 @@
 # OAuth Proxy Lambda Configuration
 resource "aws_iam_role" "oauth_proxy_lambda" {
-  name = "${local.name_prefix}-oauth-proxy-lambda-role"
+  name        = "${local.name_prefix}-oauth-proxy-lambda-role"
+  description = "Execution role for the OAuth Proxy Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

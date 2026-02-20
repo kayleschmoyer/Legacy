@@ -67,7 +67,8 @@ resource "aws_apigatewayv2_api" "websocket" {
 
 # WebSocket Lambda IAM Role
 resource "aws_iam_role" "websocket_lambda" {
-  name = "${local.name_prefix}-websocket-lambda-role"
+  name        = "${local.name_prefix}-websocket-lambda-role"
+  description = "Execution role for the WebSocket Lambda function"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -143,7 +144,7 @@ resource "aws_iam_policy" "websocket_lambda_apigw" {
         Action = [
           "execute-api:ManageConnections"
         ]
-        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*/*/@connections/*"
       }
     ]
   })
