@@ -118,6 +118,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "dynamodb:DeleteItem",
           "dynamodb:DescribeTable",
           "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
           "dynamodb:ListTagsOfResource"
         ]
         Resource = [
@@ -216,7 +217,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:DescribeVpcAttribute",
           "ec2:DescribeImages",
           "ec2:DescribePrefixLists",
-          "ec2:DescribeInstanceTypes"
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeTags"
         ]
         Resource = "*"
       },
