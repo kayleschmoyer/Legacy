@@ -1,166 +1,204 @@
-import { adminTest, createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+import {
+  adminTest,
+  createCustomAuthTest,
+  expect,
+  test,
+  unauthTest,
+} from '../fixtures/auth-enhanced';
 import { E2EAuth, E2EJwtUtil } from '../utils/jwt';
 
 /**
- * Example E2E tests demonstrating CLI JWT usage patterns
+ * E2E tests demonstrating JWT authentication patterns.
+ *
+ * Authentication is provided by the global-setup storageState. These tests
+ * exercise the fixture-level overrides for admin, custom-user, and
+ * unauthenticated scenarios.
  */
 
-// Regular user tests using the default auth fixture
+// ---------------------------------------------------------------------------
+// Regular user tests — uses default storageState (admin JWT from global setup)
+// ---------------------------------------------------------------------------
+
 test.describe('Regular User Tests', () => {
-  test('should access user dashboard with generated JWT', async ({ page }) => {
-    await page.goto('/dashboard');
-    
-    // Verify authentication worked
-    await expect(page.locator('[data-testid="user-menu"]')).toBeVisible();
-    await expect(page.locator('text=user@test.com')).toBeVisible();
-  });
+  test('should load authenticated page without seeing login', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
-  test('should be denied admin features', async ({ page }) => {
-    await page.goto('/admin');
-    
-    // Should redirect or show access denied
-    await expect(page.locator('text=Access Denied')).toBeVisible();
+    // The auth guard should NOT display the login page
+    await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
   });
 });
 
-// Admin tests using the admin fixture
+// ---------------------------------------------------------------------------
+// Admin tests — overrides storageState with an admin JWT
+// ---------------------------------------------------------------------------
+
 adminTest.describe('Admin User Tests', () => {
-  adminTest('should access admin dashboard', async ({ page }) => {
-    await page.goto('/admin');
-    
-    // Verify admin access
-    await expect(page.locator('[data-testid="admin-panel"]')).toBeVisible();
-    await expect(page.locator('text=admin@test.com')).toBeVisible();
-  });
+  adminTest(
+    'should load authenticated page with admin JWT',
+    async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
 
-  adminTest('should manage users', async ({ page }) => {
-    await page.goto('/admin/users');
-    
-    await expect(page.locator('[data-testid="user-management"]')).toBeVisible();
-  });
+      // Should not see login page
+      await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+    },
+  );
 });
 
-// Custom user tests for specific scenarios
-const leagueManagerTest = createCustomAuthTest('league-manager@test.com', 'none');
+// ---------------------------------------------------------------------------
+// Custom user tests
+// ---------------------------------------------------------------------------
+
+const leagueManagerTest = createCustomAuthTest(
+  'league-manager@test.com',
+  'none',
+);
 
 leagueManagerTest.describe('League Manager Tests', () => {
-  leagueManagerTest('should create a new league', async ({ page }) => {
-    await page.goto('/leagues/create');
-    
-    await page.fill('[data-testid="league-name"]', 'Test League');
-    await page.click('[data-testid="create-league-btn"]');
-    
-    await expect(page.locator('text=League created successfully')).toBeVisible();
-  });
+  leagueManagerTest(
+    'should load authenticated page with custom user JWT',
+    async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Should not see login page
+      await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+    },
+  );
 });
 
+// ---------------------------------------------------------------------------
+// Unauthenticated tests — verifies login page shows when no JWT
+// ---------------------------------------------------------------------------
+
+unauthTest.describe('Unauthenticated Tests', () => {
+  unauthTest(
+    'should show login page when not authenticated',
+    async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Without a JWT, the auth guard should show the login page
+      await expect(page.locator('text=Sign in with Google')).toBeVisible({
+        timeout: 10000,
+      });
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Dynamic JWT generation within tests
+// ---------------------------------------------------------------------------
+
 test.describe('Dynamic JWT Tests', () => {
-  test('should handle multiple user sessions', async ({ page }) => {
-    // Start with one user
-    const firstUserJwt = E2EJwtUtil.generateJwt({ 
-      email: 'user1@test.com', 
-      accessLevel: 'none' 
-    });
-    
-    await page.addInitScript((token: string) => {
-      window.localStorage.setItem('auth_jwt', token);
-    }, firstUserJwt);
-    
-    await page.goto('/dashboard');
-    await expect(page.locator('text=user1@test.com')).toBeVisible();
-    
-    // Switch to admin user
-    const adminJwt = E2EAuth.generateAdminJwt();
-    
+  test('should switch user identity mid-test', async ({
+    page,
+    browserName,
+  }) => {
+    // WebKit blocks localStorage access via page.evaluate — SecurityError
+    test.skip(
+      browserName === 'webkit',
+      'WebKit blocks localStorage in e2e context',
+    );
+
+    // Start with the default storageState user
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Inject a different JWT and reload
+    const adminJwt = E2EAuth.generateAdminJwt('1h');
+
     await page.evaluate((token: string) => {
       window.localStorage.setItem('auth_jwt', token);
       window.location.reload();
     }, adminJwt);
-    
-    await expect(page.locator('text=admin@test.com')).toBeVisible();
-    await expect(page.locator('[data-testid="admin-menu"]')).toBeVisible();
+
+    await page.waitForLoadState('networkidle');
+
+    // Should still be authenticated (not showing login)
+    await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
   });
 
-  test('should handle JWT expiration', async ({ page }) => {
-    // Generate a short-lived JWT
-    const shortLivedJwt = E2EJwtUtil.generateJwt({ 
-      email: 'expire-test@test.com', 
-      expiration: '1s' // Very short for testing
+  test('should show login after JWT expires', async ({
+    page,
+    browserName,
+  }) => {
+    // WebKit blocks localStorage access via page.evaluate — SecurityError
+    test.skip(
+      browserName === 'webkit',
+      'WebKit blocks localStorage in e2e context',
+    );
+
+    // Must navigate to the app first so page.evaluate operates on the
+    // correct origin's localStorage (not about:blank)
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Inject a JWT that expires in 1 second
+    const shortLivedJwt = E2EJwtUtil.generateJwt({
+      email: 'expire-test@test.com',
+      expiration: '1s',
     });
-    
-    await page.addInitScript((token: string) => {
+
+    await page.evaluate((token: string) => {
       window.localStorage.setItem('auth_jwt', token);
     }, shortLivedJwt);
-    
-    await page.goto('/dashboard');
-    
-    // Wait for token to expire
-    await page.waitForTimeout(2000);
-    
-    // Try to access a protected route
-    await page.goto('/protected');
-    
-    // Should redirect to login or show unauthorized
-    await expect(page.locator('text=Please log in')).toBeVisible();
+
+    // Wait long enough for the JWT to expire (1s expiry + margin)
+    await page.waitForTimeout(3000);
+
+    // Reload — the app should detect the expired token
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Auth guard should redirect to login since token is expired
+    await expect(page.locator('text=Sign in with Google')).toBeVisible({
+      timeout: 15000,
+    });
   });
 });
 
-// JWT validation tests
+// ---------------------------------------------------------------------------
+// JWT utility validation tests (no browser interaction needed)
+// ---------------------------------------------------------------------------
+
 test.describe('JWT Validation', () => {
-  test('should validate JWT format', ({ page }) => {
-    const jwt = E2EAuth.generateUserJwt();
-    
-    // Test the utility functions
+  test('should validate JWT format', () => {
+    const jwt = E2EAuth.generateUserJwt('5m');
+
     expect(E2EJwtUtil.isValidJwtFormat(jwt)).toBe(true);
-    
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     const payload = E2EJwtUtil.decodeJwtPayload(jwt);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(payload.email).toBe('user@test.com');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(payload.accessLevel).toBe('none');
   });
 
-  test('should handle multiple test users', ({ page }) => {
+  test('should generate JWTs for all test user types', () => {
     const jwts = E2EJwtUtil.generateTestJwts('30m');
-    
-    // Verify we got JWTs for all user types
+
     expect(jwts.admin).toBeTruthy();
     expect(jwts.regularUser).toBeTruthy();
     expect(jwts.leagueCreator).toBeTruthy();
     expect(jwts.participant).toBeTruthy();
-    
-    // Each should be a valid JWT
-    Object.values(jwts).forEach(jwt => {
-      expect(E2EJwtUtil.isValidJwtFormat(jwt)).toBe(true);
-    });
-  });
-});
 
-// Performance test with JWT generation
-test.describe('JWT Performance', () => {
-  test('should generate JWTs efficiently', ({ page }) => {
-    const startTime = Date.now();
-    
-    // Generate multiple JWTs
-    const jwts = [
-      E2EJwtUtil.generateJwt({ email: 'perf1@test.com' }),
-      E2EJwtUtil.generateJwt({ email: 'perf2@test.com' }),
-      E2EJwtUtil.generateJwt({ email: 'perf3@test.com' })
-    ];
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    console.log(`Generated 3 JWTs in ${duration}ms`);
-    
-    // Should be reasonably fast (adjust threshold as needed)
-    expect(duration).toBeLessThan(10000); // 10 seconds max
-    
-    // All JWTs should be valid
-    jwts.forEach(jwt => {
+    // Each should be a valid JWT
+    for (const jwt of Object.values(jwts)) {
       expect(E2EJwtUtil.isValidJwtFormat(jwt)).toBe(true);
-    });
+    }
+  });
+
+  test('should generate JWTs with correct payloads', () => {
+    const adminJwt = E2EAuth.generateAdminJwt('5m');
+    const adminPayload = E2EJwtUtil.decodeJwtPayload(adminJwt);
+    expect(adminPayload.email).toBe('admin@test.com');
+    expect(adminPayload.accessLevel).toBe('admin');
+
+    const userJwt = E2EAuth.generateUserJwt('5m');
+    const userPayload = E2EJwtUtil.decodeJwtPayload(userJwt);
+    expect(userPayload.email).toBe('user@test.com');
+    expect(userPayload.accessLevel).toBe('none');
   });
 });

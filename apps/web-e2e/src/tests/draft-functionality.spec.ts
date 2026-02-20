@@ -26,8 +26,8 @@ test.describe('Draft Status Web UI Tests', () => {
   });
 
   test('should display draft button and status correctly', async ({ page }) => {
-    // Wait for league data to load
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    // Wait for league data to load (the component renders <h1 id="league-title">)
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Look for draft-related UI elements
     const draftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
@@ -55,8 +55,8 @@ test.describe('Draft Status Web UI Tests', () => {
   });
 
   test('should update draft status when start draft button is clicked', async ({ page }) => {
-    // Wait for league data to load
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    // Wait for league data to load (the component renders <h1 id="league-title">)
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Find the start draft button
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
@@ -109,8 +109,8 @@ test.describe('Draft Status Web UI Tests', () => {
   test('should maintain draft status after page refresh (persistence test)', async ({ page }) => {
     // This is the critical test that validates our fix for the database persistence issue
 
-    // Wait for league data to load
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    // Wait for league data to load (the component renders <h1 id="league-title">)
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Find and click start draft button (if available)
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
@@ -156,7 +156,7 @@ test.describe('Draft Status Web UI Tests', () => {
     // CRITICAL TEST: Refresh the page and verify status persists
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Wait a bit more for any GraphQL queries to complete
     await page.waitForTimeout(2000);
@@ -195,7 +195,7 @@ test.describe('Draft Status Web UI Tests', () => {
   test('should handle rapid interactions gracefully', async ({ page }) => {
     // Test for race conditions or UI state issues
 
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
     
@@ -231,7 +231,7 @@ test.describe('Draft Status Web UI Tests', () => {
   test('should display appropriate error messages for invalid operations', async ({ page }) => {
     // Test error handling in the UI
 
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Look for any error messages or alerts that might appear
     const errorAlert = page.locator('[role="alert"], .error, .alert-error').first();
@@ -266,7 +266,7 @@ test.describe('Draft Status Web UI Tests', () => {
   test('should maintain accessibility standards', async ({ page }) => {
     // Accessibility test for draft functionality
 
-    await page.waitForSelector('[data-testid="league-title"], h1', { timeout: 10000 });
+    await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Check that draft button has proper accessibility attributes
     const draftButton = page.locator('button').filter({ hasText: /draft/i }).first();

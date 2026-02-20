@@ -199,11 +199,10 @@ test.describe('Visual Snapshots', () => {
 
   test('should capture loading states', async ({ page }) => {
     // Intercept network requests to simulate loading states
-    await page.route('**/*', (route) => {
+    await page.route('**/*', async (route) => {
       // Delay responses by 2 seconds to capture loading states
-      setTimeout(() => {
-        void route.continue();
-      }, 2000);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.continue();
     });
 
     await page.goto('/');

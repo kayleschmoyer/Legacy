@@ -21,17 +21,10 @@ interface GraphQLCapture {
 
 /**
  * GraphQL Integration E2E Tests for Draft Functionality
- * 
-         } catch (e) {
-        // Continue normally
-      }
-
-      void route.fulfill({
-        response,
-        body: responseBody,
-      });est suite validates the web app's integration with our GraphQL API
+ *
+ * This test suite validates the web app's integration with our GraphQL API
  * for draft functionality by intercepting network requests and responses.
- * 
+ *
  * This complements the UI tests by focusing on the data layer integration.
  */
 
@@ -39,45 +32,136 @@ test.describe('Draft GraphQL Integration Tests', () => {
   const testLeagueId = 1;
   const leagueUrl = `/baseball/league/${testLeagueId}`;
 
+  /**
+   * Build a mock response for the given operation based on the POST body.
+   * Returns a per-operation mock so the page can render correctly.
+   */
+  function buildMockResponse(body: GraphQLRequest): GraphQLResponse {
+    const op = (body.operationName ?? body.query ?? '').toLowerCase();
+
+    if (op.includes('getleaguebyid') || op.includes('league') && !op.includes('team') && !op.includes('position') && !op.includes('matchup') && !op.includes('scoring')) {
+      return {
+        data: {
+          league: {
+            __typename: 'League',
+            id: testLeagueId,
+            name: 'Test League',
+            description: 'A test league for GraphQL integration testing',
+            owner: 1,
+            maxRosterSize: 25,
+            draftStatus: 'not-started',
+            currentMatchup: null,
+            numberOfTeams: 10,
+            draftType: 'NORMAL',
+            isPublic: false,
+            maxBatters: 14,
+            maxPitchers: 9,
+            tradingEnabled: true,
+            waiverEnabled: true,
+            startDate: null,
+          },
+        },
+      };
+    }
+
+    if (op.includes('startdraft')) {
+      return {
+        data: {
+          startDraft: {
+            __typename: 'League',
+            id: testLeagueId,
+            name: 'Test League',
+            draftStatus: 'queued',
+            owner: 1,
+            maxRosterSize: 25,
+            currentMatchup: null,
+            numberOfTeams: 10,
+            draftType: 'NORMAL',
+            isPublic: false,
+            maxBatters: 14,
+            maxPitchers: 9,
+            tradingEnabled: true,
+            waiverEnabled: true,
+            startDate: null,
+          },
+        },
+      };
+    }
+
+    if (op.includes('position')) {
+      return { data: { leaguePositions: [{ __typename: 'LeaguePosition', id: 1, name: 'Catcher', abbrev: 'C' }] } };
+    }
+
+    if (op.includes('teammembers') || op.includes('getteammembers')) {
+      return { data: { teamMembers: [] } };
+    }
+
+    if (op.includes('userteamid')) {
+      return { data: { userTeamId: { __typename: 'UserTeamId', teamId: 1 } } };
+    }
+
+    if (op.includes('getleagueteams')) {
+      return { data: { leagueTeams: [{ __typename: 'Team', id: 1, name: 'Team 1', owner: 1 }] } };
+    }
+
+    if (op.includes('matchup')) {
+      if (op.includes('current')) return { data: { currentMatchupForLeague: null } };
+      if (op.includes('byid')) return { data: { matchup: null } };
+      return { data: { matchupsForLeague: [] } };
+    }
+
+    if (op.includes('scoring')) {
+      return { data: { leagueScoringProfile: null } };
+    }
+
+    // Default fallback
+    return { data: {} };
+  }
+
   test('should make correct GraphQL queries and handle responses', async ({ page }) => {
     // Track GraphQL requests
     const graphqlRequests: GraphQLRequest[] = [];
     const graphqlResponses: GraphQLResponse[] = [];
 
-    // Intercept GraphQL requests
-    await page.route('**/graphql', (route) => {
-      const request = route.request()
-      const requestBody = request.postData()
-      
-      if (requestBody) {
-        try {
-          const body = JSON.parse(requestBody) as GraphQLRequest
-          graphqlRequests.push(body)
-          
-          // Mock response for any GraphQL query
-          const mockResponse = {
-            data: {
-              league: {
-                id: testLeagueId,
-                name: 'Test League',
-                draftStatus: 'SCHEDULED'
-              }
-            }
+    // Intercept GraphQL requests using a URL predicate (not glob) to ensure
+    // query-string URLs like /graphql?ref=GetLeagueById are matched
+    await page.route(
+      (url) => {
+        const urlString = url.toString();
+        return (
+          urlString.includes('/graphql') &&
+          !urlString.includes('/@fs/') &&
+          !urlString.includes('.ts') &&
+          !urlString.includes('.js')
+        );
+      },
+      async (route) => {
+        const request = route.request();
+        const requestBody = request.postData();
+
+        if (requestBody) {
+          try {
+            const body = JSON.parse(requestBody) as GraphQLRequest;
+            graphqlRequests.push(body);
+
+            const mockResponse = buildMockResponse(body);
+            graphqlResponses.push(mockResponse);
+
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify(mockResponse),
+            });
+          } catch {
+            await route.continue();
           }
-          graphqlResponses.push(mockResponse)
-          
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(mockResponse)
-          })
-        } catch {
-          void route.continue()
+        } else {
+          await route.continue();
         }
-      } else {
-        void route.continue()
-      }
-    })    // Navigate to league page
+      },
+    );
+
+    // Navigate to league page
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 

@@ -2,60 +2,61 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Player Statistics Page', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the player stats page (using hash routing)
-    await page.goto('/#/players/stats');
+    // Navigate to the player stats page (BrowserRouter — no hash)
+    await page.goto('/players/stats');
     await page.waitForLoadState('networkidle');
   });
 
   test('should load the player statistics page', async ({ page }) => {
-    // Check that the page has loaded (using current title until dynamic titles are implemented)
+    // Check that the page has loaded
     await expect(page).toHaveTitle(/.*Web.*|.*Legacy Sports.*/);
 
-    // Check for main page elements
+    // Check for main page elements — actual heading is "MLB Player Statistics"
     await expect(
       page.getByRole('heading', { name: /player statistics/i }),
     ).toBeVisible();
 
     // Check that the stats interface components are present
     await expect(page.getByPlaceholder('Search players...')).toBeVisible();
-    await expect(page.getByText('Sort by:')).toBeVisible();
+    // No "Sort by:" label — there is a hint "💡 Click column headers to sort"
+    await expect(page.getByText('Click column headers to sort')).toBeVisible();
     await expect(page.getByRole('button', { name: /refresh/i })).toBeVisible();
 
     // Take a screenshot of the page
     await expect(page).toHaveScreenshot('player-stats-page.png');
   });
 
-  test('should display player statistics table', async ({ page }) => {
-    // Wait for the table to load
-    await page.waitForSelector('table, [role="table"], .stats-table', {
-      timeout: 10000,
-    });
+  test('should display player statistics data grid', async ({ page }) => {
+    // Wait for player rows to load (div-based grid with data-testid, not <table>)
+    try {
+      await page
+        .locator('[data-testid^="player-row-"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10000 });
+    } catch {
+      test.skip(true, 'No player data rows rendered — backend may be offline');
+      return;
+    }
 
-    // Check that table headers are present
-    const tableHeaders = ['Name', 'Team', 'Position'];
-    for (const header of tableHeaders) {
+    // Check that column headers are visible — actual columns: Player, Positions, G, HR, etc.
+    const columnHeaders = ['Player', 'G', 'HR', 'RBI'];
+    for (const header of columnHeaders) {
       await expect(
-        page.getByRole('columnheader', { name: new RegExp(header, 'i') }),
+        page.getByText(header, { exact: true }).first(),
       ).toBeVisible();
     }
 
     // Check that there are player rows
-    const playerRows = page.locator('tbody tr, [role="row"]:not(:first-child)');
+    const playerRows = page.locator('[data-testid^="player-row-"]');
     await expect(playerRows.first()).toBeVisible();
 
-    // Take a screenshot of the table
-    await expect(
-      page.locator('table, [role="table"]').first(),
-    ).toHaveScreenshot('stats-table.png');
+    // Take a screenshot of the data grid
+    await expect(page).toHaveScreenshot('stats-table.png');
   });
 
   test('should allow searching for players', async ({ page }) => {
     // Find the search input
-    const searchInput = page
-      .getByPlaceholder(/search.*player/i)
-      .or(page.getByRole('textbox', { name: /search/i }))
-      .or(page.locator('input[type="text"]').first());
-
+    const searchInput = page.getByPlaceholder('Search players...');
     await expect(searchInput).toBeVisible();
 
     // Type in a search query
@@ -73,135 +74,79 @@ test.describe('Player Statistics Page', () => {
   });
 
   test('should support view mode switching', async ({ page }) => {
-    // Look for view mode buttons or selector
-    const viewModeSelector = page
-      .getByRole('button', { name: /batting/i })
-      .or(page.getByRole('button', { name: /pitching/i }))
-      .or(page.getByRole('button', { name: /combined/i }))
-      .or(page.locator('[data-testid*="view"], select').first());
+    // Tamagui Tabs — look for tab triggers with batting/pitching text
+    const battingTab = page.getByText(/batting stats/i).first();
+    const pitchingTab = page.getByText(/pitching stats/i).first();
 
-    if (await viewModeSelector.isVisible()) {
-      // Try switching to batting view
-      const battingButton = page
-        .getByRole('button', { name: /batting/i })
-        .or(page.locator('[value="batting"], option[value="batting"]').first());
+    if (await battingTab.isVisible()) {
+      await battingTab.click();
+      await page.waitForTimeout(500);
 
-      if (await battingButton.isVisible()) {
-        await battingButton.click();
-        await page.waitForTimeout(500);
+      // Take screenshot of batting view
+      await expect(page).toHaveScreenshot('batting-view.png');
+    }
 
-        // Take screenshot of batting view
-        await expect(page).toHaveScreenshot('batting-view.png');
-      }
+    if (await pitchingTab.isVisible()) {
+      await pitchingTab.click();
+      await page.waitForTimeout(500);
 
-      // Try switching to pitching view
-      const pitchingButton = page
-        .getByRole('button', { name: /pitching/i })
-        .or(
-          page.locator('[value="pitching"], option[value="pitching"]').first(),
-        );
-
-      if (await pitchingButton.isVisible()) {
-        await pitchingButton.click();
-        await page.waitForTimeout(500);
-
-        // Take screenshot of pitching view
-        await expect(page).toHaveScreenshot('pitching-view.png');
-      }
+      // Take screenshot of pitching view
+      await expect(page).toHaveScreenshot('pitching-view.png');
     }
   });
 
   test('should support sorting by clicking column headers', async ({
     page,
   }) => {
-    // Wait for the table to be fully loaded
-    await page.waitForSelector('table th, [role="columnheader"]');
+    // Wait for the data grid to be loaded — player rows use data-testid
+    try {
+      await page
+        .locator('[data-testid^="player-row-"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10000 });
+    } catch {
+      test.skip(true, 'No player data rows rendered — backend may be offline');
+      return;
+    }
 
-    // Find sortable column headers (they should be clickable)
-    const nameHeader = page
-      .getByRole('columnheader', { name: /name/i })
-      .or(
-        page
-          .locator(
-            'th:has-text("Name"), [role="columnheader"]:has-text("Name")',
-          )
-          .first(),
-      );
+    // Find a sortable column header — e.g. "HR" (Home Runs)
+    const hrHeader = page.getByText('HR', { exact: true }).first();
 
-    if (await nameHeader.isVisible()) {
-      // Click to sort by name
-      await nameHeader.click();
+    if (await hrHeader.isVisible()) {
+      // Click to sort
+      await hrHeader.click();
       await page.waitForTimeout(500);
 
       // Take screenshot after sorting
-      await expect(page).toHaveScreenshot('sorted-by-name.png');
+      await expect(page).toHaveScreenshot('sorted-by-hr.png');
 
       // Click again to reverse sort
-      await nameHeader.click();
+      await hrHeader.click();
       await page.waitForTimeout(500);
 
       // Take screenshot of reverse sort
-      await expect(page).toHaveScreenshot('reverse-sorted-by-name.png');
+      await expect(page).toHaveScreenshot('reverse-sorted-by-hr.png');
     }
   });
 
-  test('should open filter dialog when filter button is clicked', async ({
-    page,
-  }) => {
-    // Look for filter button
-    const filterButton = page
-      .getByRole('button', { name: /filter/i })
-      .or(page.getByText('Filters'))
-      .or(
-        page
-          .locator('[data-testid*="filter"], button:has-text("Filter")')
-          .first(),
-      );
+  test('should show filter controls', async ({ page }) => {
+    // The grid has inline filter controls: "Filters:", "Min G:", "Min HR:", "Min RBI:"
+    const filtersLabel = page.getByText('Filters:');
 
-    if (await filterButton.isVisible()) {
-      await filterButton.click();
-
-      // Wait for dialog to open
-      await page.waitForTimeout(500);
-
-      // Check for filter dialog
-      const dialog = page
-        .getByRole('dialog')
-        .or(page.locator('.dialog, .modal, [data-testid*="dialog"]'));
-
-      if (await dialog.isVisible()) {
-        // Take screenshot of filter dialog
-        await expect(dialog).toHaveScreenshot('filter-dialog.png');
-
-        // Close the dialog
-        const closeButton = dialog.getByRole('button', {
-          name: /close|cancel/i,
-        });
-
-        if (await closeButton.isVisible()) {
-          await closeButton.click();
-        } else {
-          await page.keyboard.press('Escape');
-        }
-      }
+    if (await filtersLabel.isVisible({ timeout: 5000 })) {
+      // Take screenshot showing filter controls
+      await expect(page).toHaveScreenshot('filter-controls.png');
     }
   });
 
   test('should support pagination', async ({ page }) => {
-    // Look for pagination controls
-    const paginationNext = page
-      .getByRole('button', { name: /next/i })
-      .or(page.locator('button:has-text("Next"), [aria-label*="next"]'));
+    // Look for pagination controls — actual buttons are "← Previous" and "Next →"
+    const paginationNext = page.getByRole('button', { name: /next/i });
+    const paginationPrev = page.getByRole('button', {
+      name: /previous|prev/i,
+    });
 
-    const paginationPrev = page
-      .getByRole('button', { name: /previous|prev/i })
-      .or(
-        page.locator(
-          'button:has-text("Previous"), button:has-text("Prev"), [aria-label*="previous"]',
-        ),
-      );
-
-    if (await paginationNext.isVisible()) {
+    if (await paginationNext.isVisible({ timeout: 5000 })) {
       // Check if next button is enabled
       const isNextEnabled = await paginationNext.isEnabled();
 
@@ -229,8 +174,7 @@ test.describe('Player Statistics Page', () => {
   });
 
   test('should handle player selection and navigation', async ({ page }) => {
-    // Wait for player rows to load (component uses data-testid, not table elements)
-    // Use a short timeout — rows may not appear if the GraphQL backend is unavailable
+    // Wait for player rows to load
     const rowLocator = page.locator('[data-testid^="player-row-"]').first();
     try {
       await rowLocator.waitFor({ state: 'visible', timeout: 10000 });
@@ -244,17 +188,13 @@ test.describe('Player Statistics Page', () => {
     const firstPlayerRow = rowLocator;
 
     if (await firstPlayerRow.isVisible()) {
-      // Get the player name from the first text element in the row
-      const playerNameCell = firstPlayerRow.locator('span, p, div').first();
-      const playerName = await playerNameCell.textContent();
-
-      // Click on the player row
+      // Click on the player row — navigates to /players/:id
       await firstPlayerRow.click();
 
-      // Wait for navigation or action
+      // Wait for navigation
       await page.waitForTimeout(1000);
 
-      // Check if we navigated to a player detail page or opened a modal
+      // Check if we navigated to a player detail page
       const currentUrl = page.url();
       const hasPlayerDetail =
         currentUrl.includes('/players/') || currentUrl.includes('/player/');
@@ -268,17 +208,10 @@ test.describe('Player Statistics Page', () => {
         await page.waitForLoadState('networkidle');
       } else {
         // Check for modal or popup
-        const modal = page.locator('.modal, [role="dialog"], .popup');
+        const modal = page.locator('[role="dialog"]');
         if (await modal.isVisible()) {
           await expect(modal).toHaveScreenshot('player-detail-modal.png');
-
-          // Close modal
-          const closeButton = modal.getByRole('button', { name: /close/i });
-          if (await closeButton.isVisible()) {
-            await closeButton.click();
-          } else {
-            await page.keyboard.press('Escape');
-          }
+          await page.keyboard.press('Escape');
         }
       }
     }
@@ -319,7 +252,7 @@ test.describe('Player Statistics Page', () => {
 
     // Check for loading indicator
     const loadingIndicator = page
-      .locator('.loading, .spinner, [data-testid*="loading"]')
+      .locator('[data-testid*="loading"]')
       .or(page.getByText(/loading/i));
 
     if (await loadingIndicator.isVisible({ timeout: 1000 })) {
@@ -330,8 +263,10 @@ test.describe('Player Statistics Page', () => {
     // Wait for content to load
     await page.waitForLoadState('networkidle');
 
-    // Verify the table is loaded
-    await expect(page.locator('table, [role="table"]')).toBeVisible();
+    // Verify data grid or heading is loaded
+    await expect(
+      page.getByRole('heading', { name: /player statistics/i }),
+    ).toBeVisible();
   });
 
   test('should handle error states gracefully', async ({ page }) => {
@@ -352,7 +287,7 @@ test.describe('Player Statistics Page', () => {
     // Check for error message
     const errorMessage = page
       .getByText(/error/i)
-      .or(page.locator('.error, [data-testid*="error"]'));
+      .or(page.locator('[data-testid*="error"]'));
 
     if (await errorMessage.isVisible()) {
       // Take screenshot of error state

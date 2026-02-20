@@ -1,0 +1,32 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- banner:
+  - link "Legacy Sports home":
+    - /url: /
+    - paragraph:
+      - img "football": 🏈
+    - paragraph: Legacy Sports
+    - paragraph: Fantasy League
+  - button "E ▼":
+    - paragraph: E
+    - paragraph: ▼
+  - button "Open menu":
+    - paragraph: ☰
+- heading "Welcome to Legacy Sports" [level=1]
+- paragraph: Your fantasy sports hub for baseball and football
+- heading "baseball Baseball" [level=2]:
+  - img "baseball": ⚾
+  - text: Baseball
+- paragraph: Manage your fantasy baseball leagues, draft players, and track stats
+- button "View Leagues"
+- button "Create League"
+- heading "football Football" [level=2]:
+  - img "football": 🏈
+  - text: Football
+- paragraph: Manage your fantasy football leagues (coming soon)
+- button "View Leagues"
+- heading "stats Player Stats" [level=2]:
+  - img "stats": 📊
+  - text: Player Stats
+- paragraph: Browse player statistics, projections, and trends
+- button "View Stats"

@@ -292,3 +292,6 @@ terraform.tfvars
 
 # Tamagui generated files
 **/.tamagui/
+
+playwright-report/
+test-results/

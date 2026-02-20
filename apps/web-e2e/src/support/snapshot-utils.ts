@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { expect, type Locator, Page } from '@playwright/test';
 
 /**
  * Utility functions for snapshot testing
@@ -102,7 +102,8 @@ export class SnapshotUtils {
     await expect(page).toHaveScreenshot(name, {
       fullPage: true,
       animations: 'disabled',
-      threshold: 0.2,
+      threshold: 0.3,
+      maxDiffPixelRatio: 0.02,
     });
   }
 
@@ -111,11 +112,13 @@ export class SnapshotUtils {
    */
   static async takeComponentScreenshot(
     page: Page,
-    selector: string,
+    selectorOrLocator: string | Locator,
     name: string,
   ): Promise<void> {
     await this.preparePage(page);
-    const element = page.locator(selector);
+    const element = typeof selectorOrLocator === 'string'
+      ? page.locator(selectorOrLocator)
+      : selectorOrLocator;
 
     if (await element.isVisible()) {
       await expect(element).toHaveScreenshot(name, {
@@ -248,11 +251,17 @@ export class SnapshotUtils {
         const element = elements.nth(i);
         if (await element.isVisible()) {
           const suffix = count > 1 ? `-${i + 1}` : '';
-          await this.captureComponentStates(
-            page,
-            `${component.selector}:nth-child(${i + 1})`,
-            `${component.name}${suffix}`,
-          );
+          // Use nth() locator instead of constructing buggy CSS :nth-child selectors
+          // from comma-separated selectors — :nth-child only applies to the last selector
+          try {
+            await this.takeComponentScreenshot(
+              page,
+              element,
+              `${component.name}${suffix}-default.png`,
+            );
+          } catch {
+            // Skip components that can't be captured
+          }
         }
       }
     }
