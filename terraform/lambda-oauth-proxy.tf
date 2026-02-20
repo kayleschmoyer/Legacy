@@ -32,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_vpc" {
 
 # OAuth Lambda secrets - OAuth + Database secrets for secure user management
 resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
-  name        = "${local.name_prefix}-oauth-proxy-lambda-secrets-v5"
+  name        = "${local.name_prefix}-oauth-proxy-lambda-secrets"
   description = "IAM policy for OAuth Lambda to access OAuth and database secrets securely"
 
   policy = jsonencode({
@@ -78,7 +78,7 @@ resource "aws_iam_policy" "oauth_proxy_lambda_rds" {
           "rds-db:connect"
         ]
         Resource = [
-          "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/*"
+          "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/${var.database_username}"
         ]
       }
     ]

@@ -48,6 +48,11 @@ resource "aws_sqs_queue_policy" "load_season_stats" {
           "sqs:GetQueueAttributes"
         ]
         Resource = aws_sqs_queue.load_season_stats.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.stats.arn
+          }
+        }
       }
     ]
   })
@@ -103,6 +108,11 @@ resource "aws_sqs_queue_policy" "load_game_stats" {
           "sqs:GetQueueAttributes"
         ]
         Resource = aws_sqs_queue.load_game_stats.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.stats.arn
+          }
+        }
       },
       {
         Sid    = "AllowApplicationSendMessages"
@@ -174,6 +184,11 @@ resource "aws_sqs_queue_policy" "select_game" {
           "sqs:GetQueueAttributes"
         ]
         Resource = aws_sqs_queue.select_game.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.game_selection.arn
+          }
+        }
       },
       {
         Sid    = "AllowApplicationSendMessages"
@@ -245,6 +260,11 @@ resource "aws_sqs_queue_policy" "automatic_drafts" {
           "sqs:GetQueueAttributes"
         ]
         Resource = aws_sqs_queue.automatic_drafts.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.draft_processor.arn
+          }
+        }
       },
       {
         Sid    = "AllowApplicationSendMessages"

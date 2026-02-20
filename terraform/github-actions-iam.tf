@@ -1,54 +1,9 @@
-# IAM policy for GitHub Actions role to access SSM parameters
-# Required for Lambda deployment workflows to read versions and S3 bucket names
-
-data "aws_iam_role" "github_actions" {
-  name = "legacy-sports-dev-github-actions"
-}
-
-# Policy to allow GitHub Actions to read and write Lambda deployment SSM parameters
-resource "aws_iam_policy" "github_actions_ssm" {
-  name        = "legacy-sports-dev-github-actions-ssm"
-  description = "Allow GitHub Actions to read/write SSM parameters for Lambda deployments"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ReadDeploymentParameters"
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:GetParametersByPath"
-        ]
-        Resource = [
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/s3/lambda-deployments-bucket",
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*"
-        ]
-      },
-      {
-        Sid    = "WriteVersionParameters"
-        Effect = "Allow"
-        Action = [
-          "ssm:PutParameter"
-        ]
-        Resource = [
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/legacy-sports/${var.environment}/lambda/*"
-        ]
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "legacy-sports-dev-github-actions-ssm"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-    Project     = "legacy-sports"
-  }
-}
-
-# Attach the policy to the GitHub Actions role
-resource "aws_iam_role_policy_attachment" "github_actions_ssm" {
-  role       = data.aws_iam_role.github_actions.name
-  policy_arn = aws_iam_policy.github_actions_ssm.arn
-}
+# GitHub Actions SSM policy — CONSOLIDATED
+# SSM read/write permissions have been merged into the inline policy
+# in github-actions-oidc.tf (github_actions_additional) to eliminate
+# the triple-overlap between this policy, the inline policy, and the
+# data source lookup.
+#
+# The aws_iam_policy.github_actions_ssm and aws_iam_role_policy_attachment.github_actions_ssm
+# resources were removed. The data.aws_iam_role.github_actions lookup was also removed
+# in favor of the direct aws_iam_role.github_actions resource reference.

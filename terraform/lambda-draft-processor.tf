@@ -94,7 +94,7 @@ resource "aws_iam_policy" "draft_processor_lambda_rds" {
         Action = [
           "rds-db:connect"
         ]
-        Resource = "arn:aws:rds-db:${local.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.postgres.id}/*"
+        Resource = "arn:aws:rds-db:${local.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.postgres.id}/${var.database_username}"
       }
     ]
   })

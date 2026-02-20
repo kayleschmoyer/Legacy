@@ -82,7 +82,7 @@ resource "aws_iam_policy" "graphql_lambda_rds" {
           "rds-db:connect"
         ]
         Resource = [
-          "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/*"
+          "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${var.enable_rds_proxy ? aws_db_proxy.main[0].id : aws_db_instance.postgres.identifier}/${var.database_username}"
         ]
       }
     ]

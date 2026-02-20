@@ -255,6 +255,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ssm:GetParameter",
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
+          "ssm:PutParameter",
           "ssm:ListTagsForResource"
         ]
         Resource = [
@@ -287,7 +288,12 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "rds:AddTagsToResource",
           "rds:RemoveTagsFromResource"
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:rds:${local.region}:${local.account_id}:db:${local.name_prefix}-*",
+          "arn:aws:rds:${local.region}:${local.account_id}:db-proxy:*",
+          "arn:aws:rds:${local.region}:${local.account_id}:target-group:*",
+          "arn:aws:rds:${local.region}:${local.account_id}:subgrp:${local.name_prefix}-*"
+        ]
       },
       # SQS read permissions
       {
