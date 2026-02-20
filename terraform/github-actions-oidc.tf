@@ -335,12 +335,10 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:ListTags",
           "lambda:ListVersionsByFunction",
           "lambda:GetEventSourceMapping",
-          "lambda:ListEventSourceMappings"
+          "lambda:ListEventSourceMappings",
+          "lambda:ListFunctions"
         ]
-        Resource = [
-          "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*",
-          "arn:aws:lambda:${local.region}:${local.account_id}:event-source-mapping:*"
-        ]
+        Resource = "*"
       }
     ]
   })
