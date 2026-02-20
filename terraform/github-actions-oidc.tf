@@ -116,7 +116,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:DeleteItem",
-          "dynamodb:DescribeTable"
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:ListTagsOfResource"
         ]
         Resource = [
           "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-state-locks",
@@ -213,7 +215,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ec2:DescribeAddresses",
           "ec2:DescribeVpcAttribute",
           "ec2:DescribeImages",
-          "ec2:DescribePrefixLists"
+          "ec2:DescribePrefixLists",
+          "ec2:DescribeInstanceTypes"
         ]
         Resource = "*"
       },
@@ -223,7 +226,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Action = [
           "ssm:GetParameter",
           "ssm:GetParameters",
-          "ssm:GetParametersByPath"
+          "ssm:GetParametersByPath",
+          "ssm:ListTagsForResource"
         ]
         Resource = [
           "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*",
