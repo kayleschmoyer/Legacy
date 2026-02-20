@@ -11,7 +11,12 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
-      "rules": {}
+      "rules": {
+        "no-empty-pattern": [
+          "error",
+          { "allowObjectPatternsAsParameters": true }
+        ]
+      }
     },
     {
       "files": ["*.js", "*.jsx"],
