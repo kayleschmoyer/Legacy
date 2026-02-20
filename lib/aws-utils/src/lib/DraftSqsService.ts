@@ -4,7 +4,9 @@ import { LOGGER } from '@legacy-sports/logging';
 // Draft processing message types for SQS queue
 export interface StartDraftMessage {
   leagueId: number;
-  draftType: 'random-draft' | 'snake-draft' | 'auction';
+  draftMode: 'live' | 'automated';
+  selectionMethod: 'standard' | 'auction' | 'random';
+  draftOrder: 'snake' | 'linear';
   requestedBy: number; // User ID who requested the draft
   timestamp: string;
 }

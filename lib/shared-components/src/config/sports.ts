@@ -91,9 +91,26 @@ export const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze([
   { text: '16', value: '16' },
 ]);
 
-export const DRAFT_TYPES = Object.freeze([
-  { label: 'Standard Draft', value: 'NORMAL' },
-  { label: 'Blind Draft', value: 'BLIND' },
+export const DRAFT_MODES = Object.freeze([
+  { label: 'Live Draft', value: 'live' },
+  { label: 'Automated Draft', value: 'automated' },
+]);
+
+export const SELECTION_METHODS = Object.freeze([
+  { label: 'Standard', value: 'standard' },
+  { label: 'Auction', value: 'auction' },
+  { label: 'Random', value: 'random' },
+]);
+
+export const DRAFT_ORDERS = Object.freeze([
+  { label: 'Snake', value: 'snake' },
+  { label: 'Linear', value: 'linear' },
+]);
+
+export const PLAYER_POOLS = Object.freeze([
+  { label: 'All MLB', value: 'all' },
+  { label: 'National League', value: 'nl' },
+  { label: 'American League', value: 'al' },
 ]);
 
 export const SORT_DIRECTIONS = ['ASC', 'DESC'] as const;

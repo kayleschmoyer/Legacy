@@ -96,6 +96,13 @@
         "watch": true,
         "runInBand": true
       }
+    },
+    "print-schema": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx --tsconfig ../../tsconfig.base.json scripts/print-schema.ts",
+        "cwd": "lambdas/db"
+      }
     }
   }
 }

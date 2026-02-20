@@ -12,17 +12,25 @@ import {
 } from 'tamagui';
 import { Alert, Platform } from '../../platform-components';
 import {
-  DRAFT_TYPES,
   DROPDOWN_TEAM_COUNT_ITEMS,
+  PLAYER_POOLS,
   SPORT_CONFIGS,
 } from '../../config/sports';
-import { DraftType } from '../../types';
+import {
+  DraftMode,
+  DraftOrder,
+  PlayerPool,
+  SelectionMethod,
+} from '../../types';
 
 export interface CreateLeagueFormData {
   leagueName: string;
   sport: 'baseball' | 'football' | 'basketball' | 'hockey';
   numberOfTeams: number;
-  draftType: DraftType;
+  playerPool: PlayerPool;
+  draftMode?: DraftMode;
+  selectionMethod?: SelectionMethod;
+  draftOrder?: DraftOrder;
   draftDate?: Date;
 }
 
@@ -45,12 +53,15 @@ function CreateLeagueModal({
     leagueName: '',
     sport: 'baseball',
     numberOfTeams: 10,
-    draftType: DraftType.NORMAL,
+    playerPool: PlayerPool.ALL,
+    draftMode: DraftMode.LIVE,
+    selectionMethod: SelectionMethod.STANDARD,
+    draftOrder: DraftOrder.SNAKE,
   });
 
   const [showSportDropdown, setShowSportDropdown] = useState(false);
   const [showTeamCountDropdown, setShowTeamCountDropdown] = useState(false);
-  const [showDraftTypeDropdown, setShowDraftTypeDropdown] = useState(false);
+  const [showPlayerPoolDropdown, setShowPlayerPoolDropdown] = useState(false);
 
   const sportOptions = Object.keys(SPORT_CONFIGS);
 
@@ -82,7 +93,10 @@ function CreateLeagueModal({
         leagueName: '',
         sport: 'baseball',
         numberOfTeams: 10,
-        draftType: DraftType.NORMAL,
+        playerPool: PlayerPool.ALL,
+        draftMode: DraftMode.LIVE,
+        selectionMethod: SelectionMethod.STANDARD,
+        draftOrder: DraftOrder.SNAKE,
       });
     } catch {
       // Error handling is done via the error prop
@@ -307,7 +321,7 @@ function CreateLeagueModal({
               )}
             </YStack>
 
-            {/* Draft Type */}
+            {/* Player Pool */}
             <YStack marginBottom="$4">
               <Text
                 fontSize="$3"
@@ -315,7 +329,7 @@ function CreateLeagueModal({
                 color="$gray12"
                 marginBottom="$2"
               >
-                Draft Type
+                Player Pool
               </Text>
               <Button
                 backgroundColor="$gray1"
@@ -325,23 +339,25 @@ function CreateLeagueModal({
                 paddingHorizontal="$3"
                 paddingVertical="$3"
                 justifyContent="space-between"
-                onPress={() => setShowDraftTypeDropdown(!showDraftTypeDropdown)}
+                onPress={() =>
+                  setShowPlayerPoolDropdown(!showPlayerPoolDropdown)
+                }
                 disabled={loading}
                 unstyled
                 flexDirection="row"
                 alignItems="center"
               >
                 <Text fontSize="$4" color="$gray12">
-                  {DRAFT_TYPES.find(
-                    (type) => type.value === (formData.draftType as string),
-                  )?.label || 'Normal'}
+                  {PLAYER_POOLS.find(
+                    (p) => p.value === (formData.playerPool as string),
+                  )?.label || 'All MLB'}
                 </Text>
                 <Text fontSize="$3" color="$gray10" marginLeft="auto">
                   ▼
                 </Text>
               </Button>
 
-              {showDraftTypeDropdown && (
+              {showPlayerPoolDropdown && (
                 <YStack
                   backgroundColor="white"
                   borderRadius="$2"
@@ -349,9 +365,9 @@ function CreateLeagueModal({
                   borderColor="$gray6"
                   marginTop="$1"
                 >
-                  {DRAFT_TYPES.map((type) => (
+                  {PLAYER_POOLS.map((pool) => (
                     <Button
-                      key={type.value}
+                      key={pool.value}
                       padding="$3"
                       borderBottomWidth={1}
                       borderBottomColor="$gray4"
@@ -360,15 +376,15 @@ function CreateLeagueModal({
                       onPress={() => {
                         setFormData((prev) => ({
                           ...prev,
-                          draftType: type.value as DraftType,
+                          playerPool: pool.value as PlayerPool,
                         }));
-                        setShowDraftTypeDropdown(false);
+                        setShowPlayerPoolDropdown(false);
                       }}
                       unstyled
                       borderRadius={0}
                     >
                       <Text fontSize="$4" color="$gray12">
-                        {type.label}
+                        {pool.label}
                       </Text>
                     </Button>
                   ))}

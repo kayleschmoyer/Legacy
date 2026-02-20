@@ -141,7 +141,7 @@ export function NextStepControl({
         const result = await startDraft({
           variables: {
             leagueId,
-            draftType: 'random-draft',
+            selectionMethod: 'random',
           },
         });
 

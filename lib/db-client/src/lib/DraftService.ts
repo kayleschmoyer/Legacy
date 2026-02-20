@@ -23,7 +23,9 @@ export interface DraftTriggerResult {
 
 export interface DraftServiceOptions {
   leagueId: number;
-  draftType: 'random-draft' | 'snake-draft' | 'auction';
+  draftMode: 'live' | 'automated';
+  selectionMethod: 'standard' | 'auction' | 'random';
+  draftOrder: 'snake' | 'linear';
   requestedBy: number;
   validateUserAccess?: boolean; // Allow bypassing user access check for admin operations
 }
@@ -65,7 +67,9 @@ export class DraftService {
   async startDraft(options: DraftServiceOptions): Promise<DraftTriggerResult> {
     const {
       leagueId,
-      draftType,
+      draftMode,
+      selectionMethod,
+      draftOrder,
       requestedBy,
       validateUserAccess = true,
     } = options;
@@ -74,7 +78,9 @@ export class DraftService {
       // Validate draft request using shared utilities
       await validateDraftRequest({
         leagueId,
-        draftType,
+        draftMode,
+        selectionMethod,
+        draftOrder,
         userId: requestedBy,
         skipUserValidation: !validateUserAccess,
       });
@@ -100,7 +106,9 @@ export class DraftService {
         // Create and send draft message to SQS
         const message: StartDraftMessage = {
           leagueId,
-          draftType: draftType,
+          draftMode,
+          selectionMethod,
+          draftOrder,
           requestedBy,
           timestamp: new Date().toISOString(),
         };
@@ -118,9 +126,10 @@ export class DraftService {
             );
             LOGGER.info('✅ Database rollback completed');
           } catch (rollbackError: unknown) {
-            const errorMessage = rollbackError instanceof Error 
-              ? rollbackError.message 
-              : 'Unknown rollback error';
+            const errorMessage =
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : 'Unknown rollback error';
             LOGGER.error(
               '❌ Failed to rollback database update:',
               errorMessage,

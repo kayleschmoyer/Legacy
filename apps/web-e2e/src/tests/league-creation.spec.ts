@@ -37,9 +37,7 @@ test.describe('League Creation', () => {
     ).toBeVisible({ timeout: 30000 });
 
     // Verify the form is present
-    await expect(
-      page.getByPlaceholder('Enter your league name'),
-    ).toBeVisible();
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Verify we're on the correct URL
     await expect(page).toHaveURL('/baseball/league/create');
@@ -102,7 +100,10 @@ test.describe('League Creation', () => {
                   currentMatchup: null,
                   draftStatus: 'not-started',
                   numberOfTeams: 12,
-                  draftType: 'BLIND',
+                  playerPool: 'all',
+                  draftMode: 'live',
+                  selectionMethod: 'standard',
+                  draftOrder: 'snake',
                   isPublic: false,
                 },
               },
@@ -118,7 +119,9 @@ test.describe('League Creation', () => {
     // Navigate to league creation page
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Fill in valid league data
     const leagueName = `Test League ${Date.now()}`;
@@ -277,12 +280,12 @@ test.describe('League Creation', () => {
   test('should allow canceling league creation', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Fill in some form data
-    await page
-      .getByPlaceholder('Enter your league name')
-      .fill('Test League');
+    await page.getByPlaceholder('Enter your league name').fill('Test League');
 
     // Click cancel button
     await page.getByRole('button', { name: /cancel/i }).click();
@@ -308,9 +311,9 @@ test.describe('League Creation', () => {
     await page.getByRole('button', { name: /blind draft/i }).click();
 
     // Verify league name is still there
-    await expect(
-      page.getByPlaceholder('Enter your league name'),
-    ).toHaveValue(testName);
+    await expect(page.getByPlaceholder('Enter your league name')).toHaveValue(
+      testName,
+    );
 
     // Verify selections are visually applied (Tamagui uses style props, not CSS classes)
     const teamButton = page.getByRole('button', { name: '8', exact: true });
@@ -325,9 +328,9 @@ test.describe('League Creation', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for page to render
-    await expect(
-      page.getByPlaceholder('Enter your league name'),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Verify the Draft Date & Time label is visible
     await expect(page.getByText('Draft Date & Time')).toBeVisible();
@@ -335,7 +338,9 @@ test.describe('League Creation', () => {
     // DateTimePicker renders as a button (useNativeInput=false) showing the date
     // The default date is 1 week in the future, displayed like "Feb 26, 2026, 4:21 PM"
     // Find the date picker button by looking for a button with a date-like pattern
-    const datePickerButton = page.locator('button').filter({ hasText: /\d{4}/ });
+    const datePickerButton = page
+      .locator('button')
+      .filter({ hasText: /\d{4}/ });
     await expect(datePickerButton.first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -376,7 +381,9 @@ test.describe('League Creation', () => {
 
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
+      timeout: 15000,
+    });
 
     // Fill in form
     await page

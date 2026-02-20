@@ -295,3 +295,4 @@ terraform.tfvars
 
 playwright-report/
 test-results/
+logs/

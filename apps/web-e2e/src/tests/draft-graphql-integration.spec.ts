@@ -39,7 +39,14 @@ test.describe('Draft GraphQL Integration Tests', () => {
   function buildMockResponse(body: GraphQLRequest): GraphQLResponse {
     const op = (body.operationName ?? body.query ?? '').toLowerCase();
 
-    if (op.includes('getleaguebyid') || op.includes('league') && !op.includes('team') && !op.includes('position') && !op.includes('matchup') && !op.includes('scoring')) {
+    if (
+      op.includes('getleaguebyid') ||
+      (op.includes('league') &&
+        !op.includes('team') &&
+        !op.includes('position') &&
+        !op.includes('matchup') &&
+        !op.includes('scoring'))
+    ) {
       return {
         data: {
           league: {
@@ -52,7 +59,10 @@ test.describe('Draft GraphQL Integration Tests', () => {
             draftStatus: 'not-started',
             currentMatchup: null,
             numberOfTeams: 10,
-            draftType: 'NORMAL',
+            playerPool: 'all',
+            draftMode: 'live',
+            selectionMethod: 'standard',
+            draftOrder: 'snake',
             isPublic: false,
             maxBatters: 14,
             maxPitchers: 9,
@@ -76,7 +86,10 @@ test.describe('Draft GraphQL Integration Tests', () => {
             maxRosterSize: 25,
             currentMatchup: null,
             numberOfTeams: 10,
-            draftType: 'NORMAL',
+            playerPool: 'all',
+            draftMode: 'live',
+            selectionMethod: 'standard',
+            draftOrder: 'snake',
             isPublic: false,
             maxBatters: 14,
             maxPitchers: 9,
@@ -89,7 +102,18 @@ test.describe('Draft GraphQL Integration Tests', () => {
     }
 
     if (op.includes('position')) {
-      return { data: { leaguePositions: [{ __typename: 'LeaguePosition', id: 1, name: 'Catcher', abbrev: 'C' }] } };
+      return {
+        data: {
+          leaguePositions: [
+            {
+              __typename: 'LeaguePosition',
+              id: 1,
+              name: 'Catcher',
+              abbrev: 'C',
+            },
+          ],
+        },
+      };
     }
 
     if (op.includes('teammembers') || op.includes('getteammembers')) {
@@ -101,11 +125,18 @@ test.describe('Draft GraphQL Integration Tests', () => {
     }
 
     if (op.includes('getleagueteams')) {
-      return { data: { leagueTeams: [{ __typename: 'Team', id: 1, name: 'Team 1', owner: 1 }] } };
+      return {
+        data: {
+          leagueTeams: [
+            { __typename: 'Team', id: 1, name: 'Team 1', owner: 1 },
+          ],
+        },
+      };
     }
 
     if (op.includes('matchup')) {
-      if (op.includes('current')) return { data: { currentMatchupForLeague: null } };
+      if (op.includes('current'))
+        return { data: { currentMatchupForLeague: null } };
       if (op.includes('byid')) return { data: { matchup: null } };
       return { data: { matchupsForLeague: [] } };
     }
@@ -118,7 +149,9 @@ test.describe('Draft GraphQL Integration Tests', () => {
     return { data: {} };
   }
 
-  test('should make correct GraphQL queries and handle responses', async ({ page }) => {
+  test('should make correct GraphQL queries and handle responses', async ({
+    page,
+  }) => {
     // Track GraphQL requests
     const graphqlRequests: GraphQLRequest[] = [];
     const graphqlResponses: GraphQLResponse[] = [];
@@ -169,22 +202,27 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.waitForTimeout(2000);
 
     // Verify that league data was fetched
-    const leagueQueries = graphqlRequests.filter(req => 
-      req.query?.includes('league') || req.operationName?.includes('League')
+    const leagueQueries = graphqlRequests.filter(
+      (req) =>
+        req.query?.includes('league') || req.operationName?.includes('League'),
     );
-    
+
     expect(leagueQueries.length).toBeGreaterThan(0);
-    console.log(`✅ Found ${leagueQueries.length} league-related GraphQL queries`);
+    console.log(
+      `✅ Found ${leagueQueries.length} league-related GraphQL queries`,
+    );
 
     // Check if initial league data includes draft status
-    const leagueResponses = graphqlResponses.filter(resp => 
-      resp.data?.league || resp.data?.leagues
+    const leagueResponses = graphqlResponses.filter(
+      (resp) => resp.data?.league || resp.data?.leagues,
     );
 
     expect(leagueResponses.length).toBeGreaterThan(0);
-    
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const leagueData = leagueResponses[0]?.data?.league || leagueResponses[0]?.data?.leagues?.[0];
+    const leagueData =
+      leagueResponses[0]?.data?.league ||
+      leagueResponses[0]?.data?.leagues?.[0];
     if (leagueData) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       expect(leagueData).toHaveProperty('draftStatus');
@@ -193,7 +231,9 @@ test.describe('Draft GraphQL Integration Tests', () => {
     }
   });
 
-  test('should send startDraft mutation and handle response correctly', async ({ page }) => {
+  test('should send startDraft mutation and handle response correctly', async ({
+    page,
+  }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let startDraftMutation: any = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,15 +243,19 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.route('**/graphql', async (route) => {
       const request = route.request();
       const postData = request.postData();
-      
+
       if (postData) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const body = JSON.parse(postData);
-          
+
           // Check if this is a startDraft mutation
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          if (body.query?.includes('startDraft') || body.operationName === 'StartDraft') {
+          /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+          if (
+            body.query?.includes('startDraft') ||
+            body.operationName === 'StartDraft'
+          ) {
+            /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             startDraftMutation = body;
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -225,17 +269,21 @@ test.describe('Draft GraphQL Integration Tests', () => {
       // Get response and check for startDraft response
       const response = await route.fetch();
       const responseBody = await response.text();
-      
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsedResponse = JSON.parse(responseBody);
-        
+
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (startDraftMutation && parsedResponse.data?.startDraft) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           startDraftResponse = parsedResponse;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          console.log('✅ StartDraft response received:', parsedResponse.data.startDraft);
+          /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+          console.log(
+            '✅ StartDraft response received:',
+            parsedResponse.data.startDraft,
+          );
+          /* eslint-enable @typescript-eslint/no-unsafe-member-access */
         }
       } catch (e) {
         // Continue normally
@@ -252,27 +300,38 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.waitForLoadState('networkidle');
 
     // Find and click start draft button
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // SKIP-REASON: UI state - Start draft button not available (league may be drafted or user lacks permissions)
     // TODO: Ensure test runs against fresh league with 'not-started' status (LS-63)
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
-      console.log('⚠️  Start draft button not available - skipping mutation test');
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
+      console.log(
+        '⚠️  Start draft button not available - skipping mutation test',
+      );
       test.skip();
     }
 
     // Click the button and wait for mutation
     await startDraftButton.click();
-    
+
     // Wait for GraphQL mutation to complete
     await page.waitForTimeout(3000);
 
     // Verify mutation was sent
     expect(startDraftMutation).toBeTruthy();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(startDraftMutation.variables).toHaveProperty('leagueId', testLeagueId);
+    expect(startDraftMutation.variables).toHaveProperty(
+      'leagueId',
+      testLeagueId,
+    );
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(startDraftMutation.variables).toHaveProperty('draftType');
+    expect(startDraftMutation.variables).toHaveProperty('draftMode');
 
     // Verify response was received and has correct structure
     if (startDraftResponse) {
@@ -282,18 +341,25 @@ test.describe('Draft GraphQL Integration Tests', () => {
       expect(startDraftResponse.data.startDraft).toHaveProperty('draftStatus');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(startDraftResponse.data.startDraft.draftStatus).toBe('queued');
-      
+
       console.log('✅ StartDraft mutation completed successfully');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       console.log(`   League ID: ${startDraftResponse.data.startDraft.id}`);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      console.log(`   Draft Status: ${startDraftResponse.data.startDraft.draftStatus}`);
+      /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+      console.log(
+        `   Draft Status: ${startDraftResponse.data.startDraft.draftStatus}`,
+      );
+      /* eslint-enable @typescript-eslint/no-unsafe-member-access */
     } else {
-      console.log('⚠️  StartDraft response not captured - mutation may have failed');
+      console.log(
+        '⚠️  StartDraft response not captured - mutation may have failed',
+      );
     }
   });
 
-  test('should handle GraphQL errors gracefully in the UI', async ({ page }) => {
+  test('should handle GraphQL errors gracefully in the UI', async ({
+    page,
+  }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let graphqlError: any = null;
 
@@ -301,12 +367,12 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.route('**/graphql', (route) => {
       const request = route.request();
       const postData = request.postData();
-      
+
       if (postData) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const body = JSON.parse(postData);
-          
+
           // If this is a startDraft mutation, return an error
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           if (body.query?.includes('startDraft')) {
@@ -315,16 +381,16 @@ test.describe('Draft GraphQL Integration Tests', () => {
                 {
                   message: 'Test error: Draft queue URL not configured',
                   locations: [{ line: 1, column: 1 }],
-                  path: ['startDraft']
-                }
+                  path: ['startDraft'],
+                },
               ],
-              data: null
+              data: null,
             };
 
             void route.fulfill({
               status: 200,
               contentType: 'application/json',
-              body: JSON.stringify(graphqlError)
+              body: JSON.stringify(graphqlError),
             });
             return;
           }
@@ -340,23 +406,31 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
 
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // SKIP-REASON: UI state - Start draft button not available for error simulation
     // TODO: Ensure test runs against fresh league or implement mock state setup (LS-63)
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
       console.log('⚠️  Start draft button not available - skipping error test');
       test.skip();
     }
 
     // Click button to trigger the mocked error
     await startDraftButton.click();
-    
+
     // Wait for error handling
     await page.waitForTimeout(2000);
 
     // Look for error messages in the UI
-    const errorElements = await page.locator('[role="alert"], .error, .alert-error').all();
+    const errorElements = await page
+      .locator('[role="alert"], .error, .alert-error')
+      .all();
     const alertMessages: string[] = [];
 
     for (const element of errorElements) {
@@ -369,12 +443,16 @@ test.describe('Draft GraphQL Integration Tests', () => {
     // The UI should show some kind of error indication
     if (alertMessages.length > 0) {
       console.log('✅ Error messages displayed:', alertMessages);
-      expect(alertMessages.some(msg => msg.includes('error') || msg.includes('fail'))).toBe(true);
+      expect(
+        alertMessages.some(
+          (msg) => msg.includes('error') || msg.includes('fail'),
+        ),
+      ).toBe(true);
     } else {
       // Button state should indicate an error occurred (e.g., re-enabled, or showing error state)
       const buttonAfterError = await startDraftButton.textContent();
       console.log(`Button state after error: "${buttonAfterError}"`);
-      
+
       // Button should either be re-enabled or show an error state
       expect(buttonAfterError).toBeTruthy();
     }
@@ -382,7 +460,9 @@ test.describe('Draft GraphQL Integration Tests', () => {
     console.log('✅ GraphQL error handling test completed');
   });
 
-  test('should update Apollo Client cache correctly after mutation', async ({ page }) => {
+  test('should update Apollo Client cache correctly after mutation', async ({
+    page,
+  }) => {
     // This test validates that the Apollo Client cache is properly updated
     // after the startDraft mutation completes
 
@@ -398,7 +478,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await page.route('**/graphql', async (route) => {
       const request = route.request();
       const postData = request.postData();
-      
+
       if (postData) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -409,7 +489,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
             operation: body.operationName || 'Unknown',
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             variables: body.variables,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         } catch (e) {
           // Continue
@@ -417,7 +497,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
       }
 
       const response = await route.fetch();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment  
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const responseBody = await response.text();
 
       try {
@@ -426,10 +506,12 @@ test.describe('Draft GraphQL Integration Tests', () => {
         graphqlOperations.push({
           type: 'response',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          operation: graphqlOperations[graphqlOperations.length - 1]?.operation || 'Unknown',
+          operation:
+            graphqlOperations[graphqlOperations.length - 1]?.operation ||
+            'Unknown',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
           data: parsedResponse.data,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       } catch (e) {
         // Continue
@@ -447,11 +529,17 @@ test.describe('Draft GraphQL Integration Tests', () => {
     // Wait for initial queries
     await page.waitForTimeout(2000);
 
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // SKIP-REASON: UI state - Start draft button not available for cache validation
     // TODO: Implement test data setup to ensure repeatable test state (LS-63)
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
       console.log('⚠️  Start draft button not available - skipping cache test');
       test.skip();
     }
@@ -463,36 +551,47 @@ test.describe('Draft GraphQL Integration Tests', () => {
     await startDraftButton.click();
     await page.waitForTimeout(3000);
 
-    // Record operations after mutation  
-    const operationsAfterMutation = graphqlOperations.slice(operationsBeforeMutation.length);
+    // Record operations after mutation
+    const operationsAfterMutation = graphqlOperations.slice(
+      operationsBeforeMutation.length,
+    );
 
     // Look for startDraft mutation in operations
-    const startDraftOps = operationsAfterMutation.filter(op => 
-      op.operation === 'StartDraft' || (op.type === 'request' && 
-        op.variables && 
-        typeof op.variables === 'object' && 
-        'leagueId' in op.variables)
+    const startDraftOps = operationsAfterMutation.filter(
+      (op) =>
+        op.operation === 'StartDraft' ||
+        (op.type === 'request' &&
+          op.variables &&
+          typeof op.variables === 'object' &&
+          'leagueId' in op.variables),
     );
 
     expect(startDraftOps.length).toBeGreaterThan(0);
 
     // Look for subsequent league queries (cache updates should minimize these)
-    const subsequentLeagueQueries = operationsAfterMutation.filter(op =>
-      op.type === 'request' && 
-      (op.operation?.includes('League') || op.operation === 'GetLeague') &&
-      op.timestamp > (startDraftOps[0]?.timestamp || 0)
+    const subsequentLeagueQueries = operationsAfterMutation.filter(
+      (op) =>
+        op.type === 'request' &&
+        (op.operation?.includes('League') || op.operation === 'GetLeague') &&
+        op.timestamp > (startDraftOps[0]?.timestamp || 0),
     );
 
     console.log(`✅ Cache behavior analysis:`);
     console.log(`   StartDraft operations: ${startDraftOps.length}`);
-    console.log(`   Subsequent league queries: ${subsequentLeagueQueries.length}`);
+    console.log(
+      `   Subsequent league queries: ${subsequentLeagueQueries.length}`,
+    );
 
     // If Apollo Client cache is working properly, there should be minimal subsequent queries
     // since the mutation response should update the cache
     if (subsequentLeagueQueries.length === 0) {
-      console.log('✅ Excellent: No subsequent league queries - cache working optimally');
+      console.log(
+        '✅ Excellent: No subsequent league queries - cache working optimally',
+      );
     } else {
-      console.log('ℹ️  Some subsequent queries found - this may be expected for real-time updates');
+      console.log(
+        'ℹ️  Some subsequent queries found - this may be expected for real-time updates',
+      );
     }
   });
 });

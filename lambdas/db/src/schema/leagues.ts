@@ -219,7 +219,10 @@ const CreateLeagueAndTeamsInput = builder.inputType(
     fields: (t) => ({
       leagueName: t.string({ required: true }),
       numberOfTeams: t.int({ required: true }),
-      draftType: t.string({ required: true }), // 'NORMAL' | 'BLIND' | 'LEGACY' | 'RANDOM-DRAFT'
+      playerPool: t.string({ required: true }), // 'all' | 'nl' | 'al'
+      draftMode: t.string({ required: false }), // 'live' | 'automated' (optional, defaults to 'live')
+      selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random' (optional, defaults to 'standard')
+      draftOrder: t.string({ required: false }), // 'snake' | 'linear' (optional, defaults to 'snake')
       isPublic: t.boolean({ required: false }),
       maxBatters: t.int({ required: false }),
       maxPitchers: t.int({ required: false }),
@@ -531,7 +534,10 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const {
         leagueName,
         numberOfTeams,
-        draftType,
+        playerPool = 'all', // Default to all MLB
+        draftMode = 'live', // Default to live draft
+        selectionMethod = 'standard', // Default to standard selection
+        draftOrder = 'snake', // Default to snake order
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         maxBatters: _maxBatters = 12,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -556,6 +562,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           maxRosterSize: rosterSize, // Frontend-controlled with fallback
           currentMatchup: null,
           inviteCode: inviteCode,
+          playerPool: playerPool as 'all' | 'nl' | 'al',
         };
 
         // Insert league
@@ -688,7 +695,10 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           userId: context.user?.id,
           leagueName,
           numberOfTeams,
-          draftType,
+          playerPool,
+          draftMode,
+          selectionMethod,
+          draftOrder,
         });
 
         // Provide more specific error information
@@ -1039,7 +1049,9 @@ builder.mutationField('startDraft', (t) =>
     type: League,
     args: {
       leagueId: t.arg.int({ required: true }),
-      draftType: t.arg.string({ required: false }),
+      draftMode: t.arg.string({ required: false }), // 'live' | 'automated'
+      selectionMethod: t.arg.string({ required: false }), // 'standard' | 'auction' | 'random'
+      draftOrder: t.arg.string({ required: false }), // 'snake' | 'linear'
     },
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
@@ -1047,7 +1059,12 @@ builder.mutationField('startDraft', (t) =>
         throw new Error('Authentication required to start draft');
       }
 
-      const { leagueId, draftType = 'random-draft' } = args;
+      const {
+        leagueId,
+        draftMode = 'automated',
+        selectionMethod = 'random',
+        draftOrder = 'snake',
+      } = args;
       const userId = context.user.id;
 
       try {
@@ -1056,7 +1073,9 @@ builder.mutationField('startDraft', (t) =>
 
         const result = await draftService.startDraft({
           leagueId,
-          draftType: draftType as 'random-draft' | 'snake-draft' | 'auction',
+          draftMode: draftMode as 'live' | 'automated',
+          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
+          draftOrder: draftOrder as 'snake' | 'linear',
           requestedBy: userId,
           validateUserAccess: true, // GraphQL resolvers should validate user access
         });

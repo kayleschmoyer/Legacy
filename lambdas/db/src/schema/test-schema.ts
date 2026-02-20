@@ -85,7 +85,8 @@ export const matchupPlayers = sqliteTable('matchup_players', {
 export const drafts = sqliteTable('drafts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   leagueId: integer('league_id').notNull(),
-  draftType: text('draft_type').notNull(),
+  draftMode: text('draft_mode').notNull(),
+  selectionMethod: text('selection_method').notNull(),
   date: text('date'),
   draftOrder: text('draft_order').notNull(),
 });

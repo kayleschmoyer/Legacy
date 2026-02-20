@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WebSocketClient Tests
  * Uses mock-socket to test WebSocket functionality
  */
@@ -251,7 +251,7 @@ describe('WebSocketClient', () => {
       const notification: NotificationData = {
         type: 'draft-complete',
         leagueId: 123,
-        draftType: 'snake',
+        selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
       };
 
@@ -400,7 +400,7 @@ describe('WebSocketClient', () => {
       const notification: NotificationData = {
         type: 'draft-complete',
         leagueId: 123,
-        draftType: 'snake',
+        selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
       };
 

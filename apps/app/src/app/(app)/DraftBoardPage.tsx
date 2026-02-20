@@ -447,7 +447,7 @@ const DraftBoardPage: React.FC = () => {
     startDraft({
       variables: {
         leagueId: leagueId,
-        draftType: 'random-draft', // Could be configurable based on draft type
+        selectionMethod: 'random',
       },
     });
   }, [startDraft, draftId]);

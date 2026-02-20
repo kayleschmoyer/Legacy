@@ -92,7 +92,8 @@ export const drafts = sqliteTable('drafts', {
   leagueId: integer('league_id')
     .notNull()
     .references(() => leagues.id, { onDelete: 'cascade' }),
-  draftType: text('draft_type'),
+  draftMode: text('draft_mode').notNull(),
+  selectionMethod: text('selection_method').notNull(),
   date: text('date'), // DATE stored as ISO string in SQLite
   draftOrder: text('draft_order').notNull(),
   currentPick: integer('current_pick').notNull().default(0),

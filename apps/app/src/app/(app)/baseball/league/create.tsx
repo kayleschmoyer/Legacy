@@ -23,7 +23,10 @@ import {
 interface CreateLeagueFormData {
   leagueName: string;
   numberOfTeams: number;
-  draftType: 'NORMAL' | 'BLIND' | 'RANDOM-DRAFT';
+  playerPool: 'all' | 'nl' | 'al';
+  draftMode: 'live' | 'automated';
+  selectionMethod: 'standard' | 'auction' | 'random';
+  draftOrder: 'snake' | 'linear';
   maxRosterSize: number;
   draftDate?: Date;
 }
@@ -34,11 +37,30 @@ const TEAM_COUNT_OPTIONS = [6, 8, 10, 12, 14, 16];
 // Roster size options
 const ROSTER_SIZE_OPTIONS = [20, 22, 25, 30, 35, 40];
 
-// Draft type options
-const DRAFT_TYPES = [
-  { label: 'Standard Draft', value: 'NORMAL' },
-  { label: 'Blind Draft', value: 'BLIND' },
-  { label: 'Random Draft', value: 'RANDOM-DRAFT' },
+// Player pool options
+const PLAYER_POOL_OPTIONS = [
+  { label: 'All MLB', value: 'all' },
+  { label: 'NL Only', value: 'nl' },
+  { label: 'AL Only', value: 'al' },
+] as const;
+
+// Draft mode options
+const DRAFT_MODE_OPTIONS = [
+  { label: 'Live', value: 'live' },
+  { label: 'Auto', value: 'automated' },
+] as const;
+
+// Selection method options
+const SELECTION_METHOD_OPTIONS = [
+  { label: 'Standard', value: 'standard' },
+  { label: 'Auction', value: 'auction' },
+  { label: 'Random', value: 'random' },
+] as const;
+
+// Draft order options
+const DRAFT_ORDER_OPTIONS = [
+  { label: 'Snake', value: 'snake' },
+  { label: 'Linear', value: 'linear' },
 ] as const;
 
 export function LeagueCreatePage(): React.JSX.Element {
@@ -46,9 +68,12 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: 10,
-    draftType: 'NORMAL',
-    maxRosterSize: 25, // Default to 25 players
-    draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 1 week from now
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 25,
+    draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
   const [createLeagueAndTeams, { loading, error }] = useCreateLeagueMutation({
@@ -65,7 +90,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   });
 
   const handleInputChange = (field: keyof CreateLeagueFormData, value: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -117,13 +142,12 @@ export function LeagueCreatePage(): React.JSX.Element {
           input: {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
-            draftType: formData.draftType,
-            maxRosterSize: formData.maxRosterSize, // User-selected roster size
-            startDate: formData.draftDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-            // Optional fields can be added as needed:
-            // isPublic: false,
-            // tradingEnabled: true,
-            // waiverEnabled: true,
+            playerPool: formData.playerPool,
+            draftMode: formData.draftMode,
+            selectionMethod: formData.selectionMethod,
+            draftOrder: formData.draftOrder,
+            maxRosterSize: formData.maxRosterSize,
+            startDate: formData.draftDate.toISOString().split('T')[0],
           },
         },
       });
@@ -169,7 +193,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                 size="$4"
                 placeholder="Enter your league name"
                 value={formData.leagueName}
-                onChangeText={(text: string) => handleInputChange('leagueName', text)}
+                onChangeText={(text: string) =>
+                  handleInputChange('leagueName', text)
+                }
                 borderColor="$borderColor"
                 backgroundColor="$color1"
                 disabled={loading}
@@ -186,27 +212,44 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <Button
                     key={count}
                     size="$3"
-                    variant={formData.numberOfTeams === count ? 'active' : 'outlined'}
+                    variant={
+                      formData.numberOfTeams === count ? 'active' : 'outlined'
+                    }
                     onPress={() => {
                       handleInputChange('numberOfTeams', count);
                     }}
                     disabled={loading}
                     minWidth="$5"
-                    backgroundColor={formData.numberOfTeams === count ? '$blue8' : '$color2'}
-                    borderColor={formData.numberOfTeams === count ? '$blue8' : '$borderColor'}
+                    backgroundColor={
+                      formData.numberOfTeams === count ? '$blue8' : '$color2'
+                    }
+                    borderColor={
+                      formData.numberOfTeams === count
+                        ? '$blue8'
+                        : '$borderColor'
+                    }
                     borderWidth={formData.numberOfTeams === count ? 2 : 1}
-                    shadowColor={formData.numberOfTeams === count ? '$shadowColor' : 'transparent'}
+                    shadowColor={
+                      formData.numberOfTeams === count
+                        ? '$shadowColor'
+                        : 'transparent'
+                    }
                     shadowOpacity={formData.numberOfTeams === count ? 0.3 : 0}
                     shadowRadius={formData.numberOfTeams === count ? 4 : 0}
                     elevation={formData.numberOfTeams === count ? 3 : 1}
-                    pressStyle={{ 
+                    pressStyle={{
                       scale: 0.95,
-                      backgroundColor: formData.numberOfTeams === count ? '$blue7' : '$color4'
+                      backgroundColor:
+                        formData.numberOfTeams === count ? '$blue7' : '$color4',
                     }}
                   >
-                    <Text 
-                      color={formData.numberOfTeams === count ? '$blue12' : '$color'}
-                      fontWeight={formData.numberOfTeams === count ? '700' : '500'}
+                    <Text
+                      color={
+                        formData.numberOfTeams === count ? '$blue12' : '$color'
+                      }
+                      fontWeight={
+                        formData.numberOfTeams === count ? '700' : '500'
+                      }
                       fontSize={formData.numberOfTeams === count ? '$4' : '$3'}
                     >
                       {count}
@@ -229,7 +272,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <Button
                     key={size}
                     size="$3"
-                    variant={formData.maxRosterSize === size ? 'active' : 'outlined'}
+                    variant={
+                      formData.maxRosterSize === size ? 'active' : 'outlined'
+                    }
                     onPress={(e: any) => {
                       e?.preventDefault?.();
                       e?.stopPropagation?.();
@@ -237,21 +282,36 @@ export function LeagueCreatePage(): React.JSX.Element {
                     }}
                     disabled={loading}
                     minWidth="$5"
-                    backgroundColor={formData.maxRosterSize === size ? '$blue8' : '$color2'}
-                    borderColor={formData.maxRosterSize === size ? '$blue8' : '$borderColor'}
+                    backgroundColor={
+                      formData.maxRosterSize === size ? '$blue8' : '$color2'
+                    }
+                    borderColor={
+                      formData.maxRosterSize === size
+                        ? '$blue8'
+                        : '$borderColor'
+                    }
                     borderWidth={formData.maxRosterSize === size ? 2 : 1}
-                    shadowColor={formData.maxRosterSize === size ? '$shadowColor' : 'transparent'}
+                    shadowColor={
+                      formData.maxRosterSize === size
+                        ? '$shadowColor'
+                        : 'transparent'
+                    }
                     shadowOpacity={formData.maxRosterSize === size ? 0.3 : 0}
                     shadowRadius={formData.maxRosterSize === size ? 4 : 0}
                     elevation={formData.maxRosterSize === size ? 3 : 1}
-                    pressStyle={{ 
+                    pressStyle={{
                       scale: 0.95,
-                      backgroundColor: formData.maxRosterSize === size ? '$blue7' : '$color4'
+                      backgroundColor:
+                        formData.maxRosterSize === size ? '$blue7' : '$color4',
                     }}
                   >
-                    <Text 
-                      color={formData.maxRosterSize === size ? '$blue12' : '$color'}
-                      fontWeight={formData.maxRosterSize === size ? '700' : '500'}
+                    <Text
+                      color={
+                        formData.maxRosterSize === size ? '$blue12' : '$color'
+                      }
+                      fontWeight={
+                        formData.maxRosterSize === size ? '700' : '500'
+                      }
                       fontSize={formData.maxRosterSize === size ? '$4' : '$3'}
                     >
                       {size}
@@ -264,53 +324,257 @@ export function LeagueCreatePage(): React.JSX.Element {
               </Text>
             </YStack>
 
-            {/* Draft Type */}
+            {/* Player Pool */}
             <YStack space="$2">
               <Text size="$4" fontWeight="600" color="$gray12">
-                Draft Type *
+                Player Pool *
               </Text>
               <XStack space="$3">
-                {DRAFT_TYPES.map((type) => (
+                {PLAYER_POOL_OPTIONS.map((option) => (
                   <Button
-                    key={type.value}
+                    key={option.value}
                     size="$3"
-                    variant={formData.draftType === type.value ? 'active' : 'outlined'}
+                    variant={
+                      formData.playerPool === option.value
+                        ? 'active'
+                        : 'outlined'
+                    }
                     onPress={(e: any) => {
                       e?.preventDefault?.();
                       e?.stopPropagation?.();
-                      handleInputChange('draftType', type.value);
+                      handleInputChange('playerPool', option.value);
                     }}
                     disabled={loading}
                     flex={1}
-                    backgroundColor={formData.draftType === type.value ? '$green8' : '$color2'}
-                    borderColor={formData.draftType === type.value ? '$green8' : '$borderColor'}
-                    borderWidth={formData.draftType === type.value ? 2 : 1}
-                    shadowColor={formData.draftType === type.value ? '$shadowColor' : 'transparent'}
-                    shadowOpacity={formData.draftType === type.value ? 0.3 : 0}
-                    shadowRadius={formData.draftType === type.value ? 4 : 0}
-                    elevation={formData.draftType === type.value ? 3 : 1}
-                    pressStyle={{ 
+                    backgroundColor={
+                      formData.playerPool === option.value
+                        ? '$green8'
+                        : '$color2'
+                    }
+                    borderColor={
+                      formData.playerPool === option.value
+                        ? '$green8'
+                        : '$borderColor'
+                    }
+                    borderWidth={formData.playerPool === option.value ? 2 : 1}
+                    elevation={formData.playerPool === option.value ? 3 : 1}
+                    pressStyle={{
                       scale: 0.95,
-                      backgroundColor: formData.draftType === type.value ? '$green7' : '$color4'
+                      backgroundColor:
+                        formData.playerPool === option.value
+                          ? '$green7'
+                          : '$color4',
                     }}
                   >
-                    <Text 
-                      color={formData.draftType === type.value ? '$green12' : '$color'}
-                      fontWeight={formData.draftType === type.value ? '700' : '500'}
-                      fontSize={formData.draftType === type.value ? '$4' : '$3'}
+                    <Text
+                      color={
+                        formData.playerPool === option.value
+                          ? '$green12'
+                          : '$color'
+                      }
+                      fontWeight={
+                        formData.playerPool === option.value ? '700' : '500'
+                      }
                     >
-                      {type.label}
+                      {option.label}
                     </Text>
                   </Button>
                 ))}
               </XStack>
               <Text size="$2" color="$gray10">
-                {formData.draftType === 'NORMAL' 
-                  ? 'Standard draft where you can see other picks'
-                  : formData.draftType === 'BLIND'
-                  ? 'Blind draft where picks are hidden until reveal'
-                  : 'Random draft where players are automatically assigned to teams'
-                }
+                Which players can be drafted in this league
+              </Text>
+            </YStack>
+
+            {/* Draft Mode */}
+            <YStack space="$2">
+              <Text size="$4" fontWeight="600" color="$gray12">
+                Draft Mode
+              </Text>
+              <XStack space="$3">
+                {DRAFT_MODE_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    variant={
+                      formData.draftMode === option.value
+                        ? 'active'
+                        : 'outlined'
+                    }
+                    onPress={(e: any) => {
+                      e?.preventDefault?.();
+                      e?.stopPropagation?.();
+                      handleInputChange('draftMode', option.value);
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      formData.draftMode === option.value
+                        ? '$green8'
+                        : '$color2'
+                    }
+                    borderColor={
+                      formData.draftMode === option.value
+                        ? '$green8'
+                        : '$borderColor'
+                    }
+                    borderWidth={formData.draftMode === option.value ? 2 : 1}
+                    elevation={formData.draftMode === option.value ? 3 : 1}
+                    pressStyle={{
+                      scale: 0.95,
+                      backgroundColor:
+                        formData.draftMode === option.value
+                          ? '$green7'
+                          : '$color4',
+                    }}
+                  >
+                    <Text
+                      color={
+                        formData.draftMode === option.value
+                          ? '$green12'
+                          : '$color'
+                      }
+                      fontWeight={
+                        formData.draftMode === option.value ? '700' : '500'
+                      }
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                ))}
+              </XStack>
+              <Text size="$2" color="$gray10">
+                Live requires all managers online; automated runs on a schedule
+              </Text>
+            </YStack>
+
+            {/* Selection Method */}
+            <YStack space="$2">
+              <Text size="$4" fontWeight="600" color="$gray12">
+                Selection Method
+              </Text>
+              <XStack space="$3">
+                {SELECTION_METHOD_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    variant={
+                      formData.selectionMethod === option.value
+                        ? 'active'
+                        : 'outlined'
+                    }
+                    onPress={(e: any) => {
+                      e?.preventDefault?.();
+                      e?.stopPropagation?.();
+                      handleInputChange('selectionMethod', option.value);
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      formData.selectionMethod === option.value
+                        ? '$green8'
+                        : '$color2'
+                    }
+                    borderColor={
+                      formData.selectionMethod === option.value
+                        ? '$green8'
+                        : '$borderColor'
+                    }
+                    borderWidth={
+                      formData.selectionMethod === option.value ? 2 : 1
+                    }
+                    elevation={
+                      formData.selectionMethod === option.value ? 3 : 1
+                    }
+                    pressStyle={{
+                      scale: 0.95,
+                      backgroundColor:
+                        formData.selectionMethod === option.value
+                          ? '$green7'
+                          : '$color4',
+                    }}
+                  >
+                    <Text
+                      color={
+                        formData.selectionMethod === option.value
+                          ? '$green12'
+                          : '$color'
+                      }
+                      fontWeight={
+                        formData.selectionMethod === option.value
+                          ? '700'
+                          : '500'
+                      }
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                ))}
+              </XStack>
+              <Text size="$2" color="$gray10">
+                Standard picks, auction bidding, or random assignment
+              </Text>
+            </YStack>
+
+            {/* Draft Order */}
+            <YStack space="$2">
+              <Text size="$4" fontWeight="600" color="$gray12">
+                Draft Order
+              </Text>
+              <XStack space="$3">
+                {DRAFT_ORDER_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    variant={
+                      formData.draftOrder === option.value
+                        ? 'active'
+                        : 'outlined'
+                    }
+                    onPress={(e: any) => {
+                      e?.preventDefault?.();
+                      e?.stopPropagation?.();
+                      handleInputChange('draftOrder', option.value);
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      formData.draftOrder === option.value
+                        ? '$green8'
+                        : '$color2'
+                    }
+                    borderColor={
+                      formData.draftOrder === option.value
+                        ? '$green8'
+                        : '$borderColor'
+                    }
+                    borderWidth={formData.draftOrder === option.value ? 2 : 1}
+                    elevation={formData.draftOrder === option.value ? 3 : 1}
+                    pressStyle={{
+                      scale: 0.95,
+                      backgroundColor:
+                        formData.draftOrder === option.value
+                          ? '$green7'
+                          : '$color4',
+                    }}
+                  >
+                    <Text
+                      color={
+                        formData.draftOrder === option.value
+                          ? '$green12'
+                          : '$color'
+                      }
+                      fontWeight={
+                        formData.draftOrder === option.value ? '700' : '500'
+                      }
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                ))}
+              </XStack>
+              <Text size="$2" color="$gray10">
+                Snake order reverses each round; linear stays the same
               </Text>
             </YStack>
 
@@ -327,7 +591,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 minDate={new Date()} // Can't select past dates
               />
               <Text size="$2" color="$gray10">
-                When do you want to hold your draft? Include the time for scheduling.
+                When do you want to hold your draft? Include the time for
+                scheduling.
               </Text>
             </YStack>
 

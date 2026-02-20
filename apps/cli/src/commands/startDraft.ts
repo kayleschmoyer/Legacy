@@ -6,7 +6,9 @@ import { User } from '../types/cli-types';
 
 export interface StartDraftArgs extends CommandArgs {
   leagueId: number;
-  draftType?: 'random-draft' | 'snake-draft' | 'auction';
+  draftMode?: 'live' | 'automated';
+  selectionMethod?: 'standard' | 'auction' | 'random';
+  draftOrder?: 'snake' | 'linear';
   user?: string;
   skipUserValidation?: boolean;
   dryRun?: boolean;
@@ -15,7 +17,9 @@ export interface StartDraftArgs extends CommandArgs {
 export async function handleStartDraft(args: StartDraftArgs): Promise<void> {
   const {
     leagueId,
-    draftType = 'random-draft',
+    draftMode = 'automated',
+    selectionMethod = 'random',
+    draftOrder = 'snake',
     user,
     skipUserValidation,
     dryRun,
@@ -23,7 +27,9 @@ export async function handleStartDraft(args: StartDraftArgs): Promise<void> {
 
   try {
     LOGGER.info(`🎯 Starting draft for league ${leagueId}`);
-    LOGGER.info(`📋 Draft Type: ${draftType}`);
+    LOGGER.info(
+      `📋 Draft Mode: ${draftMode}, Selection: ${selectionMethod}, Order: ${draftOrder}`,
+    );
 
     if (dryRun) {
       LOGGER.info('🧪 DRY RUN MODE - No changes will be made');
@@ -98,7 +104,9 @@ export async function handleStartDraft(args: StartDraftArgs): Promise<void> {
     // In dry run mode, just show what would happen
     if (dryRun) {
       LOGGER.info('\n📋 DRY RUN - Would perform the following actions:');
-      LOGGER.info(`   1. Validate draft type: ${draftType}`);
+      LOGGER.info(
+        `   1. Validate draft mode: ${draftMode}, selection: ${selectionMethod}`,
+      );
 
       if (!skipUserValidation) {
         LOGGER.info(
@@ -131,7 +139,9 @@ export async function handleStartDraft(args: StartDraftArgs): Promise<void> {
 
     const result = await draftService.startDraft({
       leagueId,
-      draftType,
+      draftMode,
+      selectionMethod,
+      draftOrder,
       requestedBy: currentUser.id,
       validateUserAccess: !skipUserValidation,
     });

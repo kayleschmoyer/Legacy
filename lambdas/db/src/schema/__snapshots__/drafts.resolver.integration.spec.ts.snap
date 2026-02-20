@@ -5,11 +5,12 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should create a dra
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "live",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "normal",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "standard",
 }
 `;
 
@@ -18,11 +19,12 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should read a draft
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "automated",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "blind",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "random",
 }
 `;
 
@@ -31,11 +33,12 @@ exports[`Drafts Resolver - Integration Tests CRUD Operations should update draft
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "live",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "legacy",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "auction",
 }
 `;
 
@@ -44,11 +47,12 @@ exports[`Drafts Resolver - Integration Tests Draft Orders should support normal 
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
-  "draftOrder": "normal",
+  "draftMode": "live",
+  "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "normal",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "standard",
 }
 `;
 
@@ -57,49 +61,53 @@ exports[`Drafts Resolver - Integration Tests Draft Orders should support snake d
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "live",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "normal",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "standard",
 }
 `;
 
-exports[`Drafts Resolver - Integration Tests Draft Types should support blind draft type 1`] = `
+exports[`Drafts Resolver - Integration Tests Draft Types should support auction draft type 1`] = `
 {
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "live",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "blind",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "auction",
 }
 `;
 
-exports[`Drafts Resolver - Integration Tests Draft Types should support legacy draft type 1`] = `
+exports[`Drafts Resolver - Integration Tests Draft Types should support random-draft draft type 1`] = `
 {
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "automated",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "legacy",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "random",
 }
 `;
 
-exports[`Drafts Resolver - Integration Tests Draft Types should support normal draft type 1`] = `
+exports[`Drafts Resolver - Integration Tests Draft Types should support snake-draft draft type 1`] = `
 {
   "currentPick": 0,
   "date": "2024-03-15T00:00:00.000Z",
   "draftCompletedAt": null,
+  "draftMode": "live",
   "draftOrder": "snake",
   "draftStartedAt": null,
-  "draftType": "normal",
   "id": 1,
   "leagueId": 1,
+  "selectionMethod": "standard",
 }
 `;

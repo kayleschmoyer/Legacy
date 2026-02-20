@@ -37,7 +37,7 @@ export const test = base;
 
 export const adminTest = base.extend({
   /** Override storageState so this context has an admin JWT instead. */
-  storageState: async ({}, use) => {
+  storageState: async (_: unknown, use) => {
     const jwt = signTestJwt({
       email: 'admin@test.com',
       username: 'admin',
@@ -65,7 +65,7 @@ export function createCustomAuthTest(
   accessLevel: 'none' | 'admin' = 'none',
 ) {
   return base.extend({
-    storageState: async ({}, use) => {
+    storageState: async (_: unknown, use) => {
       const jwt = signTestJwt({
         email,
         username: email.split('@')[0],
@@ -91,7 +91,7 @@ export function createCustomAuthTest(
 // ---------------------------------------------------------------------------
 
 export const unauthTest = base.extend({
-  storageState: async ({}, use) => {
+  storageState: async (_: unknown, use) => {
     await use({ cookies: [], origins: [] });
   },
 });

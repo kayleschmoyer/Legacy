@@ -136,13 +136,16 @@ export type CareerPitching = {
 };
 
 export type CreateLeagueAndTeamsInput = {
-  draftType: Scalars['String']['input'];
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
+  playerPool: Scalars['String']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -165,6 +168,18 @@ export type CreateMatchupInput = {
   weekNumber: Scalars['Int']['input'];
 };
 
+/** Information about the current draft pick */
+export type CurrentDraftPick = {
+  __typename?: 'CurrentDraftPick';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  isComplete?: Maybe<Scalars['Boolean']['output']>;
+  overallPick?: Maybe<Scalars['Int']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  round?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type DeviceToken = {
   __typename?: 'DeviceToken';
   createdAt?: Maybe<Scalars['String']['output']>;
@@ -181,6 +196,61 @@ export type DeviceToken = {
 export type DeviceTokenInput = {
   deviceToken: Scalars['String']['input'];
   platform: Scalars['String']['input'];
+};
+
+/** A private direct message between two players */
+export type DirectMessage = {
+  __typename?: 'DirectMessage';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  deletedAt?: Maybe<Scalars['String']['output']>;
+  fromUserId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  messageText?: Maybe<Scalars['String']['output']>;
+  readAt?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<User>;
+  sender?: Maybe<User>;
+  toUserId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A draft event for a league */
+export type Draft = {
+  __typename?: 'Draft';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  currentPick?: Maybe<Scalars['Int']['output']>;
+  date?: Maybe<Scalars['String']['output']>;
+  draftCompletedAt?: Maybe<Scalars['String']['output']>;
+  draftMode?: Maybe<Scalars['String']['output']>;
+  draftOrder?: Maybe<Scalars['String']['output']>;
+  draftStartedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  selectionMethod?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single pick made during a draft */
+export type DraftPick = {
+  __typename?: 'DraftPick';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  overallPick?: Maybe<Scalars['Int']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  pickedAt?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  round?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player in the context of a draft */
+export type DraftPlayer = {
+  __typename?: 'DraftPlayer';
+  brefId?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
 };
 
 export type GameBatting = {
@@ -292,6 +362,17 @@ export type League = {
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
+};
+
+/** A message posted to the league-wide chat room */
+export type LeagueChatMessage = {
+  __typename?: 'LeagueChatMessage';
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  messageText?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<User>;
+  timestamp?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a league */
@@ -500,11 +581,15 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  initializeLiveDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  sendDirectMessage?: Maybe<DirectMessage>;
+  sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
@@ -552,6 +637,11 @@ export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
 };
 
+export type MutationInitializeLiveDraftArgs = {
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+};
+
 export type MutationJoinLeagueArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
@@ -562,12 +652,28 @@ export type MutationJoinLeagueByCodeArgs = {
   teamName: Scalars['String']['input'];
 };
 
+export type MutationMakeDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationSendDirectMessageArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  messageText: Scalars['String']['input'];
+  toUserId: Scalars['Int']['input'];
+};
+
+export type MutationSendLeagueMessageArgs = {
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationSendMatchupMessageArgs = {
@@ -578,8 +684,10 @@ export type MutationSendMatchupMessageArgs = {
 };
 
 export type MutationStartDraftArgs = {
-  draftType?: InputMaybe<Scalars['String']['input']>;
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationTriggerGameSelectionArgs = {
@@ -706,8 +814,15 @@ export type Query = {
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
+  getCurrentDraftPick?: Maybe<CurrentDraftPick>;
   getCurrentMatchupForLeague?: Maybe<Matchup>;
+  getDirectMessages?: Maybe<Array<DirectMessage>>;
+  getDraft?: Maybe<Draft>;
+  getDraftPicks?: Maybe<Array<DraftPick>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
+  getLeagueDraft?: Maybe<Draft>;
+  getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
@@ -787,14 +902,46 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryGetAvailableDraftPlayersArgs = {
+  draftId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryGetCurrentDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type QueryGetCurrentMatchupForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetDirectMessagesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  otherUserId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
   team2Id: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueDraftArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueMessagesArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetLeagueStandingsArgs = {
@@ -1444,7 +1591,7 @@ export type DeleteAllLeaguesMutation = {
 
 export type StartDraftMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
-  draftType?: InputMaybe<Scalars['String']['input']>;
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type StartDraftMutation = {
@@ -1639,6 +1786,150 @@ export type GetMatchupHistoryQuery = {
     startTime?: string | null;
     endTime?: string | null;
   }> | null;
+};
+
+export type LeagueChatMessageFieldsFragment = {
+  __typename?: 'LeagueChatMessage';
+  id?: string | null;
+  leagueId?: number | null;
+  userId?: number | null;
+  messageText?: string | null;
+  timestamp?: string | null;
+  sender?: {
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+  } | null;
+};
+
+export type DirectMessageFieldsFragment = {
+  __typename?: 'DirectMessage';
+  id?: string | null;
+  fromUserId?: number | null;
+  toUserId?: number | null;
+  leagueId?: number | null;
+  messageText?: string | null;
+  readAt?: string | null;
+  deletedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  sender?: {
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+  } | null;
+  recipient?: {
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+  } | null;
+};
+
+export type GetLeagueMessagesQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetLeagueMessagesQuery = {
+  __typename?: 'Query';
+  getLeagueMessages?: Array<{
+    __typename?: 'LeagueChatMessage';
+    id?: string | null;
+    leagueId?: number | null;
+    userId?: number | null;
+    messageText?: string | null;
+    timestamp?: string | null;
+    sender?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type GetDirectMessagesQueryVariables = Exact<{
+  otherUserId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetDirectMessagesQuery = {
+  __typename?: 'Query';
+  getDirectMessages?: Array<{
+    __typename?: 'DirectMessage';
+    id?: string | null;
+    fromUserId?: number | null;
+    toUserId?: number | null;
+    leagueId?: number | null;
+    messageText?: string | null;
+    readAt?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    sender?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+    recipient?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type SendLeagueMessageMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
+}>;
+
+export type SendLeagueMessageMutation = {
+  __typename?: 'Mutation';
+  sendLeagueMessage?: {
+    __typename?: 'LeagueChatMessage';
+    id?: string | null;
+    leagueId?: number | null;
+    userId?: number | null;
+    messageText?: string | null;
+    timestamp?: string | null;
+    sender?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+  } | null;
+};
+
+export type SendDirectMessageMutationVariables = Exact<{
+  toUserId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SendDirectMessageMutation = {
+  __typename?: 'Mutation';
+  sendDirectMessage?: {
+    __typename?: 'DirectMessage';
+    id?: string | null;
+    fromUserId?: number | null;
+    toUserId?: number | null;
+    leagueId?: number | null;
+    messageText?: string | null;
+    readAt?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    sender?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+    recipient?: {
+      __typename?: 'User';
+      id?: number | null;
+      username?: string | null;
+    } | null;
+  } | null;
 };
 
 export type NotificationPreferenceFragment = {
@@ -2319,6 +2610,40 @@ export const MatchupFragmentDoc = gql`
     endTime
   }
 `;
+export const LeagueChatMessageFieldsFragmentDoc = gql`
+  fragment LeagueChatMessageFields on LeagueChatMessage {
+    id
+    leagueId
+    userId
+    messageText
+    timestamp
+    sender {
+      id
+      username
+    }
+  }
+`;
+export const DirectMessageFieldsFragmentDoc = gql`
+  fragment DirectMessageFields on DirectMessage {
+    id
+    fromUserId
+    toUserId
+    leagueId
+    messageText
+    readAt
+    deletedAt
+    createdAt
+    updatedAt
+    sender {
+      id
+      username
+    }
+    recipient {
+      id
+      username
+    }
+  }
+`;
 export const NotificationPreferenceFragmentDoc = gql`
   fragment NotificationPreference on NotificationPreference {
     id
@@ -2860,8 +3185,8 @@ export type DeleteAllLeaguesMutationOptions = BaseMutationOptions<
   DeleteAllLeaguesMutationVariables
 >;
 export const StartDraft = gql`
-  mutation StartDraft($leagueId: Int!, $draftType: String) {
-    startDraft(leagueId: $leagueId, draftType: $draftType) {
+  mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
+    startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
       ...League
     }
   }
@@ -2886,7 +3211,7 @@ export type StartDraftMutationFn = MutationFunction<
  * const [startDraftMutation, { data, loading, error }] = useStartDraftMutation({
  *   variables: {
  *      leagueId: // value for 'leagueId'
- *      draftType: // value for 'draftType'
+ *      selectionMethod: // value for 'selectionMethod'
  *   },
  * });
  */
@@ -3660,6 +3985,303 @@ export type GetMatchupHistorySuspenseQueryHookResult = ReturnType<
 export type GetMatchupHistoryQueryResult = Apollo.QueryResult<
   GetMatchupHistoryQuery,
   GetMatchupHistoryQueryVariables
+>;
+export const GetLeagueMessages = gql`
+  query GetLeagueMessages($leagueId: Int!, $limit: Int) {
+    getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+      ...LeagueChatMessageFields
+    }
+  }
+  ${LeagueChatMessageFieldsFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueMessagesQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueMessagesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueMessagesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueMessagesQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetLeagueMessagesQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueMessagesQuery,
+    GetLeagueMessagesQueryVariables
+  > &
+    (
+      | { variables: GetLeagueMessagesQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueMessagesQuery,
+    GetLeagueMessagesQueryVariables
+  >(GetLeagueMessages, options);
+}
+export function useGetLeagueMessagesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueMessagesQuery,
+    GetLeagueMessagesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueMessagesQuery,
+    GetLeagueMessagesQueryVariables
+  >(GetLeagueMessages, options);
+}
+export function useGetLeagueMessagesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueMessagesQuery,
+        GetLeagueMessagesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueMessagesQuery,
+    GetLeagueMessagesQueryVariables
+  >(
+    GetLeagueMessages,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueMessagesQuery,
+          GetLeagueMessagesQueryVariables
+        >,
+  );
+}
+export type GetLeagueMessagesQueryHookResult = ReturnType<
+  typeof useGetLeagueMessagesQuery
+>;
+export type GetLeagueMessagesLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueMessagesLazyQuery
+>;
+export type GetLeagueMessagesSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueMessagesSuspenseQuery
+>;
+export type GetLeagueMessagesQueryResult = Apollo.QueryResult<
+  GetLeagueMessagesQuery,
+  GetLeagueMessagesQueryVariables
+>;
+export const GetDirectMessages = gql`
+  query GetDirectMessages($otherUserId: Int!, $limit: Int) {
+    getDirectMessages(otherUserId: $otherUserId, limit: $limit) {
+      ...DirectMessageFields
+    }
+  }
+  ${DirectMessageFieldsFragmentDoc}
+`;
+
+/**
+ * __useGetDirectMessagesQuery__
+ *
+ * To run a query within a React component, call `useGetDirectMessagesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDirectMessagesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDirectMessagesQuery({
+ *   variables: {
+ *      otherUserId: // value for 'otherUserId'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetDirectMessagesQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDirectMessagesQuery,
+    GetDirectMessagesQueryVariables
+  > &
+    (
+      | { variables: GetDirectMessagesQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDirectMessagesQuery,
+    GetDirectMessagesQueryVariables
+  >(GetDirectMessages, options);
+}
+export function useGetDirectMessagesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDirectMessagesQuery,
+    GetDirectMessagesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDirectMessagesQuery,
+    GetDirectMessagesQueryVariables
+  >(GetDirectMessages, options);
+}
+export function useGetDirectMessagesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDirectMessagesQuery,
+        GetDirectMessagesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDirectMessagesQuery,
+    GetDirectMessagesQueryVariables
+  >(
+    GetDirectMessages,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDirectMessagesQuery,
+          GetDirectMessagesQueryVariables
+        >,
+  );
+}
+export type GetDirectMessagesQueryHookResult = ReturnType<
+  typeof useGetDirectMessagesQuery
+>;
+export type GetDirectMessagesLazyQueryHookResult = ReturnType<
+  typeof useGetDirectMessagesLazyQuery
+>;
+export type GetDirectMessagesSuspenseQueryHookResult = ReturnType<
+  typeof useGetDirectMessagesSuspenseQuery
+>;
+export type GetDirectMessagesQueryResult = Apollo.QueryResult<
+  GetDirectMessagesQuery,
+  GetDirectMessagesQueryVariables
+>;
+export const SendLeagueMessage = gql`
+  mutation SendLeagueMessage($leagueId: Int!, $messageText: String!) {
+    sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+      ...LeagueChatMessageFields
+    }
+  }
+  ${LeagueChatMessageFieldsFragmentDoc}
+`;
+export type SendLeagueMessageMutationFn = MutationFunction<
+  SendLeagueMessageMutation,
+  SendLeagueMessageMutationVariables
+>;
+
+/**
+ * __useSendLeagueMessageMutation__
+ *
+ * To run a mutation, you first call `useSendLeagueMessageMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSendLeagueMessageMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [sendLeagueMessageMutation, { data, loading, error }] = useSendLeagueMessageMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      messageText: // value for 'messageText'
+ *   },
+ * });
+ */
+export function useSendLeagueMessageMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SendLeagueMessageMutation,
+    SendLeagueMessageMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SendLeagueMessageMutation,
+    SendLeagueMessageMutationVariables
+  >(SendLeagueMessage, options);
+}
+export type SendLeagueMessageMutationHookResult = ReturnType<
+  typeof useSendLeagueMessageMutation
+>;
+export type SendLeagueMessageMutationResult =
+  Apollo.MutationResult<SendLeagueMessageMutation>;
+export type SendLeagueMessageMutationOptions = BaseMutationOptions<
+  SendLeagueMessageMutation,
+  SendLeagueMessageMutationVariables
+>;
+export const SendDirectMessage = gql`
+  mutation SendDirectMessage(
+    $toUserId: Int!
+    $messageText: String!
+    $leagueId: Int
+  ) {
+    sendDirectMessage(
+      toUserId: $toUserId
+      messageText: $messageText
+      leagueId: $leagueId
+    ) {
+      ...DirectMessageFields
+    }
+  }
+  ${DirectMessageFieldsFragmentDoc}
+`;
+export type SendDirectMessageMutationFn = MutationFunction<
+  SendDirectMessageMutation,
+  SendDirectMessageMutationVariables
+>;
+
+/**
+ * __useSendDirectMessageMutation__
+ *
+ * To run a mutation, you first call `useSendDirectMessageMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSendDirectMessageMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [sendDirectMessageMutation, { data, loading, error }] = useSendDirectMessageMutation({
+ *   variables: {
+ *      toUserId: // value for 'toUserId'
+ *      messageText: // value for 'messageText'
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useSendDirectMessageMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SendDirectMessageMutation,
+    SendDirectMessageMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SendDirectMessageMutation,
+    SendDirectMessageMutationVariables
+  >(SendDirectMessage, options);
+}
+export type SendDirectMessageMutationHookResult = ReturnType<
+  typeof useSendDirectMessageMutation
+>;
+export type SendDirectMessageMutationResult =
+  Apollo.MutationResult<SendDirectMessageMutation>;
+export type SendDirectMessageMutationOptions = BaseMutationOptions<
+  SendDirectMessageMutation,
+  SendDirectMessageMutationVariables
 >;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences {

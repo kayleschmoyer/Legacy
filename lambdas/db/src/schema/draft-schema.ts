@@ -60,7 +60,8 @@ DraftPick.implement({
 export const Draft = builder.objectRef<{
   id: number;
   leagueId: number;
-  draftType: string;
+  draftMode: string;
+  selectionMethod: string;
   draftOrder: string;
   currentPick: number;
   draftStartedAt: Date | null;
@@ -75,7 +76,8 @@ Draft.implement({
   fields: (t) => ({
     id: t.exposeInt('id'),
     leagueId: t.exposeInt('leagueId'),
-    draftType: t.exposeString('draftType'),
+    draftMode: t.exposeString('draftMode'),
+    selectionMethod: t.exposeString('selectionMethod'),
     draftOrder: t.exposeString('draftOrder'),
     currentPick: t.exposeInt('currentPick'),
     draftStartedAt: t.string({
@@ -571,10 +573,12 @@ builder.mutationField('makeDraftPick', (t) =>
 
           // If draft completed, also send draft-completed notification
           if (isDraftComplete) {
+            /* eslint-disable @typescript-eslint/no-unsafe-argument */
             await context.notificationService.notifyDraftCompleted(
               draft.leagueId,
-              draft.draftType,
+              draft.selectionMethod,
             );
+            /* eslint-enable @typescript-eslint/no-unsafe-argument */
           }
         }
 
@@ -604,7 +608,7 @@ builder.mutationField('initializeLiveDraft', (t) =>
     type: Draft,
     args: {
       leagueId: t.arg.int({ required: true }),
-      draftOrder: t.arg.string({ required: false }), // 'snake' (default) | 'normal'
+      draftOrder: t.arg.string({ required: false }), // 'snake' (default) | 'linear'
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -614,8 +618,8 @@ builder.mutationField('initializeLiveDraft', (t) =>
       const { leagueId, draftOrder = 'snake' } = args;
       const userId = context.user.id;
 
-      if (draftOrder !== 'snake' && draftOrder !== 'normal') {
-        throw new Error("draftOrder must be 'snake' or 'normal'");
+      if (draftOrder !== 'snake' && draftOrder !== 'linear') {
+        throw new Error("draftOrder must be 'snake' or 'linear'");
       }
 
       try {
@@ -675,7 +679,8 @@ builder.mutationField('initializeLiveDraft', (t) =>
           .insert(PublicSchema.drafts)
           .values({
             leagueId,
-            draftType: 'normal',
+            draftMode: 'live',
+            selectionMethod: 'standard',
             draftOrder: draftOrder,
             currentPick: 0,
           })

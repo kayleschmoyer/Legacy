@@ -24,7 +24,8 @@ import {
   PublicSchema,
   runWithPublicClient,
   updateLeagueDraftStatus,
-  validateDraftType,
+  validateDraftMode,
+  validateSelectionMethod,
   validateUserAccess,
 } from '@legacy-sports/db-client';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
@@ -1045,18 +1046,27 @@ async function updateDraftStatus(
 async function processDraftMessage(
   message: SqsDraftMessage,
 ): Promise<DraftProcessingResult> {
-  const { leagueId, draftType, requestedBy, timestamp } = message.payload;
+  const {
+    leagueId,
+    draftMode,
+    selectionMethod,
+    draftOrder,
+    requestedBy,
+    timestamp,
+  } = message.payload;
 
   addBreadcrumb('Starting draft processing', {
     leagueId,
-    draftType,
+    draftMode,
+    selectionMethod,
+    draftOrder,
     requestedBy,
     timestamp,
     operation: 'processDraftMessage',
   });
 
   LOGGER.info(
-    `Processing draft for league ${leagueId}, type: ${draftType}, requested by user ${requestedBy}`,
+    `Processing draft for league ${leagueId}, mode: ${draftMode}, method: ${selectionMethod}, requested by user ${requestedBy}`,
   );
 
   try {
@@ -1075,29 +1085,36 @@ async function processDraftMessage(
 
     addBreadcrumb('User access verified', { leagueId, requestedBy });
 
-    // Step 2.5: Validate draft type using shared utility
-    validateDraftType(draftType);
-    addBreadcrumb('Draft type validated', { draftType, leagueId });
+    // Step 2.5: Validate draft fields using shared utilities
+    validateDraftMode(draftMode);
+    validateSelectionMethod(selectionMethod);
+    addBreadcrumb('Draft fields validated', {
+      draftMode,
+      selectionMethod,
+      leagueId,
+    });
 
-    // Step 3: Process based on draft type
-    addBreadcrumb('Processing draft by type', { draftType });
+    // Step 3: Process based on selection method
+    addBreadcrumb('Processing draft by selection method', { selectionMethod });
 
-    switch (draftType) {
-      case 'random-draft':
+    switch (selectionMethod) {
+      case 'random':
         await randomlyAssignPlayers(leagueId);
         break;
-      case 'snake-draft':
-        // TODO: Implement snake draft logic
-        throw new Error('Snake draft not yet implemented');
+      case 'standard':
+        // TODO: Implement snake/linear draft logic
+        throw new Error(
+          'Standard (pick-by-pick) draft processing not yet implemented in Lambda',
+        );
       case 'auction':
         // TODO: Implement auction draft logic
         throw new Error('Auction draft not yet implemented');
       default:
-        throw new Error(`Unknown draft type: ${String(draftType)}`);
+        throw new Error(`Unknown selection method: ${String(selectionMethod)}`);
     }
 
     addBreadcrumb('Draft processing completed successfully', {
-      draftType,
+      selectionMethod,
       leagueId,
     });
 
@@ -1111,8 +1128,14 @@ async function processDraftMessage(
     // Step 5: Send WebSocket notification
     try {
       if (notificationService) {
-        await notificationService.notifyDraftCompleted(leagueId, draftType);
-        addBreadcrumb('WebSocket notification sent', { leagueId, draftType });
+        await notificationService.notifyDraftCompleted(
+          leagueId,
+          selectionMethod,
+        );
+        addBreadcrumb('WebSocket notification sent', {
+          leagueId,
+          selectionMethod,
+        });
       } else {
         LOGGER.warn('Notification service not available');
       }
@@ -1128,17 +1151,19 @@ async function processDraftMessage(
           : new Error(String(notificationError)),
         {
           tags: { lambda: 'draft-processor', operation: 'notification' },
-          extra: { leagueId, draftType },
+          extra: { leagueId, selectionMethod },
         },
       );
     }
 
-    LOGGER.info(`Successfully completed ${draftType} for league ${leagueId}`);
+    LOGGER.info(
+      `Successfully completed ${selectionMethod} draft for league ${leagueId}`,
+    );
 
     return {
       success: true,
       leagueId,
-      message: `${draftType} completed successfully for league ${leagueId}`,
+      message: `${selectionMethod} draft completed successfully for league ${leagueId}`,
     };
   } catch (error) {
     const errorMessage =
@@ -1155,12 +1180,13 @@ async function processDraftMessage(
       tags: {
         lambda: 'draft-processor',
         operation: 'processDraftMessage',
-        draftType,
+        selectionMethod,
         failureType: 'processing_error',
       },
       extra: {
         leagueId,
-        draftType,
+        draftMode,
+        selectionMethod,
         requestedBy,
         timestamp,
         errorMessage,

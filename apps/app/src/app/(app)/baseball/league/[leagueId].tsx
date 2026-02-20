@@ -188,7 +188,7 @@ export default function LeagueId(): React.JSX.Element {
             startDraft({
               variables: {
                 leagueId: numLeagueId,
-                draftType: 'random-draft',
+                selectionMethod: 'random',
               },
             });
           },

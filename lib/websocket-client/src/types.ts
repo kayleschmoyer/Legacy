@@ -9,7 +9,7 @@
 export interface DraftCompletedNotification {
   type: 'draft-complete';
   leagueId: number;
-  draftType: string;
+  selectionMethod: string;
   completedAt: string;
 }
 

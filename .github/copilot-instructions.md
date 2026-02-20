@@ -40,5 +40,6 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **New skill**              | `skills/create-skill/SKILL.md`          |
 | **Install packages**       | `skills/install-packages/SKILL.md`      |
 | **Config reference**       | `skills/config-standards/SKILL.md`      |
+| **Never edit generated**   | `skills/no-edit-generated/SKILL.md`     |
 | All skills (40 guides)     | `skills/`                               |
 | CSV reference data         | `docs/agents/*.csv`                     |

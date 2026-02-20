@@ -1,13 +1,14 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const accessLevel = pgEnum('access_level', ['none', 'admin']);
-export const draftOrder = pgEnum('draft_order', ['snake', 'normal']);
-export const draftType = pgEnum('draft_type', [
-  'blind',
-  'normal',
-  'legacy',
-  'random-draft',
+export const draftOrder = pgEnum('draft_order', ['snake', 'linear']);
+export const draftMode = pgEnum('draft_mode', ['live', 'automated']);
+export const selectionMethod = pgEnum('selection_method', [
+  'standard',
+  'auction',
+  'random',
 ]);
+export const playerPool = pgEnum('player_pool', ['all', 'nl', 'al']);
 export const draftStatus = pgEnum('draft_status', [
   'not-started',
   'queued',

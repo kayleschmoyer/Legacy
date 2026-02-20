@@ -21,7 +21,7 @@ fragment League on League {
   #     ...LeagueMember
   #   }
   # }
-  # matchupByCurrentMatchup field not available  
+  # matchupByCurrentMatchup field not available
   # matchupByCurrentMatchup @include(if: $withMatchup) {
   #   ...Matchup
   # }
@@ -84,8 +84,8 @@ mutation DeleteAllLeagues {
   deleteAllLeagues
 }
 
-mutation StartDraft($leagueId: Int!, $draftType: String) {
-  startDraft(leagueId: $leagueId, draftType: $draftType) {
+mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
+  startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
     ...League
   }
 }

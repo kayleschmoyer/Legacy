@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+﻿import { eq } from 'drizzle-orm';
 import type { Database } from 'better-sqlite3';
 import {
   cleanupTestData,
@@ -52,9 +52,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -85,9 +86,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'blind',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'automated',
+          selectionMethod: 'random',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -124,16 +126,17 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
       // Update draft type
       const updated = await db
         .update(drafts)
-        .set({ draftType: 'legacy' })
+        .set({ selectionMethod: 'auction' })
         .where(eq(drafts.id, draft[0].id))
         .returning();
 
@@ -163,9 +166,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -182,7 +186,7 @@ describe('Drafts Resolver - Integration Tests', () => {
   });
 
   describe('Draft Types', () => {
-    it('should support blind draft type', async () => {
+    it('should support random-draft draft type', async () => {
       const user = getUser(1);
       const league = getLeague(0);
 
@@ -206,16 +210,17 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'blind',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'automated',
+          selectionMethod: 'random',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
       expect(draft[0]).toMatchSnapshot();
     });
 
-    it('should support normal draft type', async () => {
+    it('should support snake-draft draft type', async () => {
       const user = getUser(1);
       const league = getLeague(0);
 
@@ -239,16 +244,17 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
       expect(draft[0]).toMatchSnapshot();
     });
 
-    it('should support legacy draft type', async () => {
+    it('should support auction draft type', async () => {
       const user = getUser(1);
       const league = getLeague(0);
 
@@ -272,9 +278,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'legacy',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'auction',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -307,9 +314,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -340,9 +348,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
           date: new Date('2024-03-15').toISOString(),
-          draftOrder: 'normal',
         })
         .returning();
 
@@ -372,9 +381,10 @@ describe('Drafts Resolver - Integration Tests', () => {
 
       await db.insert(drafts).values({
         leagueId: league.id,
-        draftType: 'normal',
-        date: new Date('2024-03-15').toISOString(),
+        draftMode: 'live',
+        selectionMethod: 'standard',
         draftOrder: 'snake',
+        date: new Date('2024-03-15').toISOString(),
       });
 
       // Query with join
@@ -422,9 +432,10 @@ describe('Drafts Resolver - Integration Tests', () => {
         .insert(drafts)
         .values({
           leagueId: league.id,
-          draftType: 'normal',
-          date: new Date('2024-03-15').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'standard',
           draftOrder: 'snake',
+          date: new Date('2024-03-15').toISOString(),
         })
         .returning();
 
@@ -479,21 +490,24 @@ describe('Drafts Resolver - Integration Tests', () => {
       await db.insert(drafts).values([
         {
           leagueId: league.id,
-          draftType: 'blind',
+          draftMode: 'automated',
+          selectionMethod: 'random',
+          draftOrder: 'snake',
           date: new Date('2024-03-15').toISOString(),
-          draftOrder: 'snake',
         },
         {
           leagueId: league.id,
-          draftType: 'normal',
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
           date: new Date('2024-03-20').toISOString(),
-          draftOrder: 'snake',
         },
         {
           leagueId: league.id,
-          draftType: 'legacy',
-          date: new Date('2024-03-25').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'auction',
           draftOrder: 'snake',
+          date: new Date('2024-03-25').toISOString(),
         },
       ]);
 
@@ -530,21 +544,24 @@ describe('Drafts Resolver - Integration Tests', () => {
       await db.insert(drafts).values([
         {
           leagueId: league.id,
-          draftType: 'blind',
+          draftMode: 'automated',
+          selectionMethod: 'random',
+          draftOrder: 'snake',
           date: new Date('2024-03-15').toISOString(),
-          draftOrder: 'snake',
         },
         {
           leagueId: league.id,
-          draftType: 'normal',
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
           date: new Date('2024-03-20').toISOString(),
-          draftOrder: 'snake',
         },
         {
           leagueId: league.id,
-          draftType: 'legacy',
-          date: new Date('2024-03-25').toISOString(),
+          draftMode: 'live',
+          selectionMethod: 'auction',
           draftOrder: 'snake',
+          date: new Date('2024-03-25').toISOString(),
         },
       ]);
 
@@ -552,15 +569,15 @@ describe('Drafts Resolver - Integration Tests', () => {
       const blindDrafts = await db
         .select()
         .from(drafts)
-        .where(eq(drafts.draftType, 'blind'));
+        .where(eq(drafts.selectionMethod, 'random'));
       const normalDrafts = await db
         .select()
         .from(drafts)
-        .where(eq(drafts.draftType, 'normal'));
+        .where(eq(drafts.selectionMethod, 'standard'));
       const legacyDrafts = await db
         .select()
         .from(drafts)
-        .where(eq(drafts.draftType, 'legacy'));
+        .where(eq(drafts.selectionMethod, 'auction'));
 
       expect(blindDrafts).toHaveLength(1);
       expect(normalDrafts).toHaveLength(1);

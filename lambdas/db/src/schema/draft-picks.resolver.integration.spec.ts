@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Draft Picks - Integration Tests
  *
  * Tests database-level draft pick operations: schema constraints, ordering,
@@ -42,7 +42,7 @@ describe('Draft Picks - Integration Tests', () => {
   });
 
   /**
-   * Seed helper — creates the minimal rows needed for most draft pick tests.
+   * Seed helper â€” creates the minimal rows needed for most draft pick tests.
    */
   async function seedDraftFixture(teamCount = 2) {
     const owner = getUser(1);
@@ -82,7 +82,8 @@ describe('Draft Picks - Integration Tests', () => {
       .insert(drafts)
       .values({
         leagueId: league.id,
-        draftType: 'normal',
+        draftMode: 'live',
+        selectionMethod: 'standard',
         draftOrder: 'snake',
         currentPick: 0,
       })
@@ -190,7 +191,7 @@ describe('Draft Picks - Integration Tests', () => {
     });
 
     it('should store unique overall pick slots per draft (constraint exists in schema)', async () => {
-      // See note above — constraint is in DDL and enforced in production Postgres.
+      // See note above â€” constraint is in DDL and enforced in production Postgres.
       const {
         teams: teamFix,
         draft,
@@ -264,7 +265,7 @@ describe('Draft Picks - Integration Tests', () => {
         players: playerFix,
       } = await seedDraftFixture(2);
 
-      // Round 1: team 1 → team 2  |  Round 2 (snake): team 2 → team 1
+      // Round 1: team 1 â†’ team 2  |  Round 2 (snake): team 2 â†’ team 1
       await db.insert(draftPicks).values([
         {
           draftId: draft.id,
@@ -417,7 +418,7 @@ describe('Draft Picks - Integration Tests', () => {
   });
 
   // ---------------------------------------------------------------------------
-  describe('initializeLiveDraft — DB preconditions', () => {
+  describe('initializeLiveDraft â€” DB preconditions', () => {
     it('seeded league should have draftStatus = in-progress', async () => {
       const { league } = await seedDraftFixture();
 

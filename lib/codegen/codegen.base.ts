@@ -32,6 +32,7 @@ const config: CodegenConfig = {
         // Apollo Client 4.x configuration
         apolloClientVersion: 4,
         withHooks: true,
+        apolloImportFrom: '@apollo/client/react',
         reactApolloImportFrom: '@apollo/client/react',
         apolloReactCommonImportFrom: '@apollo/client/react',
       },
@@ -49,6 +50,9 @@ const config: CodegenConfig = {
     'src/api/db/graphql.schema.json': {
       plugins: ['introspection'],
     },
+  },
+  hooks: {
+    afterAllFileWrite: ['pnpm -w run codegen:fix-apollo', 'prettier --write'],
   },
 };
 

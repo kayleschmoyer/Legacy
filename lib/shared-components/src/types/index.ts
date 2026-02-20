@@ -82,14 +82,31 @@ export interface League {
   sport: string;
   numberOfTeams: number;
   draftDate: Date;
-  draftType: DraftType;
+  playerPool: PlayerPool;
   ownerId: string;
   teams?: TeamType[];
 }
 
-export enum DraftType {
-  NORMAL = 'NORMAL',
-  BLIND = 'BLIND',
+export enum DraftMode {
+  LIVE = 'live',
+  AUTOMATED = 'automated',
+}
+
+export enum SelectionMethod {
+  STANDARD = 'standard',
+  AUCTION = 'auction',
+  RANDOM = 'random',
+}
+
+export enum DraftOrder {
+  SNAKE = 'snake',
+  LINEAR = 'linear',
+}
+
+export enum PlayerPool {
+  ALL = 'all',
+  NL = 'nl',
+  AL = 'al',
 }
 
 export interface DropdownItem {

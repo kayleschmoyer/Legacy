@@ -2,7 +2,10 @@
 export interface CreateLeagueAndTeamsInput {
   leagueName: string;
   numberOfTeams: number;
-  draftType: 'NORMAL' | 'BLIND' | 'LEGACY' | 'RANDOM-DRAFT';
+  playerPool: 'all' | 'nl' | 'al';
+  draftMode?: 'live' | 'automated';
+  selectionMethod?: 'standard' | 'auction' | 'random';
+  draftOrder?: 'snake' | 'linear';
   isPublic?: boolean;
   maxBatters?: number;
   maxPitchers?: number;
@@ -18,7 +21,10 @@ export interface League {
   currentMatchup?: number;
   description?: string;
   numberOfTeams?: number;
-  draftType?: string;
+  playerPool?: string;
+  draftMode?: string;
+  selectionMethod?: string;
+  draftOrder?: string;
   isPublic?: boolean;
   maxBatters?: number;
   maxPitchers?: number;

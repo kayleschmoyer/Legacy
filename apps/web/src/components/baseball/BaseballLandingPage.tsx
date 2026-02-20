@@ -755,7 +755,10 @@ export function BaseballLandingPage() {
                         input: {
                           leagueName: leagueName.trim(),
                           numberOfTeams: teamCount,
-                          draftType: 'NORMAL',
+                          playerPool: 'all',
+                          draftMode: 'live',
+                          selectionMethod: 'standard',
+                          draftOrder: 'snake',
                           maxRosterSize: 25,
                           startDate,
                           isPublic: false,

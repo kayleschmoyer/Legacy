@@ -23,7 +23,7 @@ interface DynamoDBItem {
 export interface DraftCompletedNotification {
   type: 'DRAFT_COMPLETED';
   leagueId: number;
-  draftType: string;
+  selectionMethod: string;
   completedAt: string;
 }
 
@@ -331,18 +331,18 @@ export class WebSocketNotificationService {
    */
   async notifyDraftCompleted(
     leagueId: number,
-    draftType: string,
+    selectionMethod: string,
   ): Promise<void> {
     const notification: DraftCompletedNotification = {
       type: 'DRAFT_COMPLETED',
       leagueId,
-      draftType,
+      selectionMethod,
       completedAt: new Date().toISOString(),
     };
 
     LOGGER.info('Sending draft completion notification', {
       leagueId,
-      draftType,
+      selectionMethod,
     });
 
     await this.broadcast(

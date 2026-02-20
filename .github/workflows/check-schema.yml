@@ -1,0 +1,153 @@
+name: "GraphQL Schema Check"
+
+# =============================================================================
+# Two independent jobs run on every PR:
+#
+#   check-schema  — verifies that the committed `lambdas/db/schema.graphql` SDL
+#                   is in sync with the Pothos implementation. Fails + posts a
+#                   PR comment with the diff if they differ.
+#
+#   check-codegen — generates schema.graphql from the implementation, then runs
+#                   every project's `codegen` target against that file.  Fails
+#                   if any codegen target exits non-zero, meaning a .graphql
+#                   operation is incompatible with the current schema.
+#
+# Fix locally:
+#   pnpm exec nx run db:print-schema          # regen schema.graphql
+#   pnpm exec nx run-many -t codegen \
+#     --projects=app,web,cli,api,shared-components,data-loaders,bref-client
+# =============================================================================
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+concurrency:
+  group: schema-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JOB 1 — schema drift check
+  # ---------------------------------------------------------------------------
+  check-schema:
+    name: "GraphQL Schema Up-to-Date"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Generate schema.graphql from implementation"
+        run: pnpm exec nx run db:print-schema
+
+      - name: "Check for schema drift"
+        id: drift-check
+        shell: bash
+        run: |
+          if git diff --exit-code lambdas/db/schema.graphql; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            echo "✅  schema.graphql is up-to-date"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            echo "❌  schema.graphql is out of sync with the implementation"
+          fi
+
+      - name: "Show diff"
+        if: steps.drift-check.outputs.drift == 'true'
+        shell: bash
+        run: |
+          echo ""
+          echo "==========================================================="
+          echo "  schema.graphql is out of sync with lambdas/db/src/schema/"
+          echo "==========================================================="
+          echo ""
+          echo "Run the following command locally and commit the result:"
+          echo ""
+          echo "  pnpm exec nx run db:print-schema"
+          echo ""
+          echo "--- Diff (committed vs generated) ---"
+          git diff lambdas/db/schema.graphql
+
+      - name: "Post PR comment on drift"
+        if: >-
+          steps.drift-check.outputs.drift == 'true' &&
+          github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## ❌ GraphQL Schema Out of Sync',
+                '',
+                '`lambdas/db/schema.graphql` does not match the Pothos schema implementation.',
+                '',
+                'Please regenerate it and include the updated file in this PR:',
+                '',
+                '```bash',
+                'pnpm exec nx run db:print-schema',
+                'git add lambdas/db/schema.graphql',
+                '```',
+              ].join('\n'),
+            });
+
+      - name: "Fail on drift"
+        if: steps.drift-check.outputs.drift == 'true'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # JOB 2 — codegen compatibility check (independent of job 1)
+  # Regenerates schema.graphql from the implementation, then runs every
+  # project's codegen target against that file without a live server.
+  # ---------------------------------------------------------------------------
+  check-codegen:
+    name: "GraphQL Codegen Succeeds"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Generate schema.graphql from implementation"
+        run: pnpm exec nx run db:print-schema
+
+      - name: "Run all codegen targets against generated schema"
+        shell: bash
+        env:
+          # Point every codegen config at the generated SDL file instead of a
+          # live HTTP endpoint. graphql-codegen accepts file paths as schema
+          # sources; GRAPHQL_HOST is read first by all codegen.ts configs.
+          # pnpm run codegen also runs scripts/fix-apollo-codegen.js as a
+          # post-processing step (see root package.json "codegen" script).
+          GRAPHQL_HOST: ${{ github.workspace }}/lambdas/db/schema.graphql
+        run: pnpm run codegen

@@ -124,7 +124,8 @@ async function createTestSchema(
     CREATE TABLE IF NOT EXISTS drafts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       league_id INTEGER NOT NULL,
-      draft_type TEXT NOT NULL,
+      draft_mode TEXT NOT NULL,
+      selection_method TEXT NOT NULL,
       date TEXT,
       draft_order TEXT NOT NULL,
       current_pick INTEGER NOT NULL DEFAULT 0,

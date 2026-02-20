@@ -1,0 +1,1162 @@
+type AdvanceLeagueWeekResponse {
+  currentMatchupId: Int
+  matchups: [Matchup!]
+}
+
+type CareerBatting {
+  atBats: Int
+  baseOnBalls: Int
+  battingAverage: Float
+  caughtStealing: Int
+  doubles: Int
+  games: Int
+  groundedIntoDoublePlays: Int
+  hitByPitch: Int
+  hits: Int
+  homeRuns: Int
+  intentionalBaseOnBalls: Int
+  onBasePercentage: Float
+  plateAppearances: Int
+  player: Player
+  playerId: Int
+  positionsPlayed: String
+  primaryPosition: String
+  rbi: Int
+  runs: Int
+  sacrificeHits: Int
+  sluggingPercentage: Float
+  stolenBases: Int
+  strikeouts: Int
+  totalBases: Int
+  triples: Int
+}
+
+type CareerBattingConnection {
+  edges: [CareerBattingEdge]
+  pageInfo: PageInfo!
+
+  """
+  Total number of career batting records matching the filters
+  """
+  totalCount: Int
+}
+
+type CareerBattingEdge {
+  cursor: String!
+  node: CareerBatting
+}
+
+type CareerFielding {
+  assists: Int
+  caughtStealing: Int
+  chances: Float
+  completeGames: Int
+  doublePlays: Int
+  errors: Int
+  fieldingPercentage: Float
+  games: Int
+  gamesStarted: Int
+  inningsDefended: Float
+  pickoffs: Int
+  playerId: Int
+  positions: String
+  positionsPlayed: String
+  putouts: Int
+  stolenBases: Int
+  wildPitches: Int
+}
+
+type CareerPitching {
+  balks: Int
+  baseOnBalls: Int
+  battersFaced: Int
+  completeGames: Int
+  earnedRuns: Int
+  era: String
+  games: Int
+  gamesFinished: Int
+  gamesStarted: Int
+  hitByPitch: Int
+  hits: Int
+  homeRuns: Int
+  intentionalBaseOnBalls: Int
+  losses: Int
+  outRate: Int
+  outsRecorded: Int
+  playerId: Int
+  runs: Int
+  saves: Int
+  shutouts: Int
+  strikeouts: Int
+  wildPitches: Int
+  winPercentage: Float
+  wins: Int
+}
+
+input CreateLeagueAndTeamsInput {
+  draftMode: String
+  draftOrder: String
+  isPublic: Boolean
+  leagueName: String!
+  maxBatters: Int
+  maxPitchers: Int
+  maxRosterSize: Int
+  numberOfTeams: Int!
+  playerPool: String!
+  selectionMethod: String
+  startDate: String
+  tradingEnabled: Boolean
+  waiverEnabled: Boolean
+}
+
+type CreateLeagueAndTeamsPayload {
+  league: League
+  leagueMembers: [LeagueMember!]
+  teams: [Team!]
+}
+
+input CreateMatchupInput {
+  endTime: String
+  gamesPerMatchup: Int
+  leagueId: Int!
+  startTime: String
+  team1Id: Int
+  team2Id: Int
+  weekNumber: Int!
+}
+
+"""
+Information about the current draft pick
+"""
+type CurrentDraftPick {
+  draftId: Int
+  isComplete: Boolean
+  overallPick: Int
+  pickNumber: Int
+  round: Int
+  team: Team
+  teamId: Int
+}
+
+type DeviceToken {
+  createdAt: String
+  deviceToken: String
+  enabled: Boolean
+  endpointArn: String
+  id: Int
+  isActive: Boolean
+  platform: String
+  updatedAt: String
+  userId: Int
+}
+
+input DeviceTokenInput {
+  deviceToken: String!
+  platform: String!
+}
+
+"""
+A private direct message between two players
+"""
+type DirectMessage {
+  createdAt: String
+  deletedAt: String
+  fromUserId: Int
+  id: ID
+  leagueId: Int
+  messageText: String
+  readAt: String
+  recipient: User
+  sender: User
+  toUserId: Int
+  updatedAt: String
+}
+
+"""
+A draft event for a league
+"""
+type Draft {
+  createdAt: String
+  currentPick: Int
+  date: String
+  draftCompletedAt: String
+  draftMode: String
+  draftOrder: String
+  draftStartedAt: String
+  id: Int
+  leagueId: Int
+  selectionMethod: String
+  updatedAt: String
+}
+
+"""
+A single pick made during a draft
+"""
+type DraftPick {
+  draftId: Int
+  id: Int
+  overallPick: Int
+  pickNumber: Int
+  pickedAt: String
+  playerId: Int
+  round: Int
+  team: Team
+  teamId: Int
+}
+
+"""
+A player in the context of a draft
+"""
+type DraftPlayer {
+  brefId: String
+  firstName: String
+  id: Int
+  lastName: String
+}
+
+type GameBatting {
+  atBats: Int
+  baseOnBalls: Int
+  battingAverage: Float
+  caughtStealing: Int
+  doubles: Int
+  gameIdentifier: String
+  gameNum: Int
+  groundedIntoDoublePlays: Int
+  hitByPitch: Int
+  hits: Int
+  homeRuns: Int
+  intentionalBaseOnBalls: Int
+  plateAppearances: Int
+  playerId: Int
+  rbi: Int
+  runs: Int
+  sacrificeFlies: String
+  sacrificeHits: Int
+  season: Int
+  stolenBases: Int
+  strikeouts: Int
+  triples: Int
+}
+
+type GameFielding {
+  assists: Int
+  caughtStealing: Int
+  doublePlays: Int
+  errors: Int
+  fieldingPercentage: Float
+  gameIdentifier: String
+  gameNum: Int
+  games: Int
+  gamesStarted: Int
+  inningsPlayed: Float
+  passedBalls: Int
+  playerId: Int
+  position: String
+  putouts: Int
+  season: Int
+  stolenBasesAllowed: Int
+}
+
+type GamePitching {
+  baseOnBalls: Int
+  battersFaced: Int
+  completeGames: Int
+  earnedRuns: Int
+  era: Float
+  gameIdentifier: String
+  gameNum: Int
+  gamesFinished: Int
+  gamesStarted: Int
+  hitByPitch: Int
+  hits: Int
+  homeRuns: Int
+  inningsPitched: Float
+  intentionalBaseOnBalls: Int
+  losses: Int
+  outsRecorded: Int
+  playerId: Int
+  runs: Int
+  saves: Int
+  season: Int
+  shutouts: Int
+  strikeouts: Int
+  wins: Int
+}
+
+"""
+Head-to-head record between two teams
+"""
+type HeadToHeadRecord {
+  averageTeam1Score: Float
+  averageTeam2Score: Float
+  team1Id: ID
+  team1TotalPoints: Float
+  team1Wins: Int
+  team2Id: ID
+  team2TotalPoints: Float
+  team2Wins: Int
+  ties: Int
+  totalMatchups: Int
+}
+
+type JoinLeaguePayload {
+  leagueId: Int
+  message: String
+  success: Boolean
+  teamId: Int
+}
+
+"""
+A fantasy sports league
+"""
+type League {
+  currentMatchup: Int
+  draftStatus: String
+  id: Int
+  inviteCode: String
+  maxRosterSize: Int
+  name: String
+  owner: Int
+  scoringProfile: ScoringConfig
+  userMembership: LeagueMember
+  weekAdvanceStatus: String
+}
+
+"""
+A message posted to the league-wide chat room
+"""
+type LeagueChatMessage {
+  id: ID
+  leagueId: Int
+  messageText: String
+  sender: User
+  timestamp: String
+  userId: Int
+}
+
+"""
+A member of a league
+"""
+type LeagueMember {
+  leagueId: Int
+  permissionLevel: String
+  team: Team
+  teamId: Int
+  userId: Int
+}
+
+"""
+A position configuration in a league
+"""
+type LeaguePosition {
+  id: Int
+  leagueId: Int
+  positionType: String
+}
+
+"""
+A head-to-head matchup between two teams in a league
+"""
+type Matchup {
+  endTime: String
+  gamesPerMatchup: Int
+  id: ID
+  leagueId: Int
+
+  """
+  Number of unique games selected for this matchup
+  """
+  selectedGamesCount: Int
+  startTime: String
+  statsLoadingStatus: StatsLoadingStatus
+  status: MatchupStatus
+  team1: Team
+  team1Id: Int
+  team1Score: Float
+  team2: Team
+  team2Id: Int
+  team2Score: Float
+  weekNumber: Int
+}
+
+"""
+User blocking relationship for chat
+"""
+type MatchupChatBlock {
+  blockedUserId: Int
+  blockingUserId: Int
+  createdAt: String
+  expiresAt: String
+  id: ID
+  leagueId: Int
+  matchupId: Int
+  scope: MatchupChatBlockScope
+  updatedAt: String
+}
+
+"""
+Scope of chat block (matchup-specific, league-wide, or global)
+"""
+enum MatchupChatBlockScope {
+  global
+  league
+  matchup
+}
+
+"""
+Chat message in matchup with moderation features
+"""
+type MatchupMessage {
+  containsProfanity: Boolean
+  createdAt: String
+  deletedAt: String
+  flaggedBy: Int
+  flaggedReason: String
+  gifUrl: String
+  id: ID
+  isFlagged: Boolean
+  leagueId: Int
+  matchupId: Int
+  message: String
+  messageType: MatchupMessageType
+  moderatedAt: String
+  pinnedAt: String
+  replyToMessage: MatchupMessage
+  replyToMessageId: Int
+  sender: User
+  senderId: Int
+  updatedAt: String
+}
+
+"""
+WebSocket connection tracking for real-time chat
+"""
+type MatchupMessageConnection {
+  connectedAt: String
+  connectionId: String
+  lastSeenAt: String
+  leagueId: Int
+  matchupId: Int
+  platform: String
+  userId: Int
+}
+
+"""
+Reaction to a matchup message
+"""
+type MatchupMessageReaction {
+  createdAt: String
+  id: ID
+  messageId: Int
+  reactionType: MatchupMessageReactionType
+  updatedAt: String
+  userId: Int
+}
+
+"""
+Available reaction types for messages
+"""
+enum MatchupMessageReactionType {
+  fire
+  laugh
+  like
+  thumbs_down
+  trophy
+  wow
+}
+
+"""
+Message moderation report
+"""
+type MatchupMessageReport {
+  createdAt: String
+  id: ID
+  messageId: Int
+  moderatorNotes: String
+  reason: String
+  reportedBy: Int
+  resolution: String
+  resolvedAt: String
+  reviewedBy: Int
+  status: MatchupMessageReportStatus
+  updatedAt: String
+}
+
+"""
+Status of message moderation report
+"""
+enum MatchupMessageReportStatus {
+  dismissed
+  pending
+  resolved
+  reviewing
+}
+
+"""
+Type of matchup message
+"""
+enum MatchupMessageType {
+  gif
+  system
+  text
+}
+
+"""
+A player selected for a specific matchup
+"""
+type MatchupPlayer {
+  games: [MatchupPlayerGame!]
+  id: ID
+  matchupId: Int
+  player: Player
+  playerId: Int
+  positionId: Int
+  season: Int
+  seasonBatting: SeasonBatting
+  seasonFielding: SeasonFielding
+  seasonPitching: SeasonPitching
+  teamId: Int
+}
+
+type MatchupPlayerGame {
+  battingGame: GameBatting
+  fieldingGame: GameFielding
+  fieldingGamePos: String
+  gameIdentifier: String
+  gameNum: Int
+  id: Int
+  matchupPlayerId: Int
+  pitchingGame: GamePitching
+  statsLoadingStatus: String
+}
+
+enum MatchupStatus {
+  cancelled
+  completed
+  in_progress
+  scheduled
+}
+
+"""
+Count of matchups by status
+"""
+type MatchupStatusCounts {
+  cancelled: Int
+  completed: Int
+  inProgress: Int
+  scheduled: Int
+  total: Int
+}
+
+type Mutation {
+  _placeholder: Boolean
+  addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
+  advanceLeagueWeek(leagueId: Int!): AdvanceLeagueWeekResponse
+  createLeague(maxRosterSize: Int, name: String!): League
+  createLeagueAndTeams(
+    input: CreateLeagueAndTeamsInput!
+  ): CreateLeagueAndTeamsPayload
+  createMatchup(input: CreateMatchupInput!): Matchup
+  createTiebreakerRules(
+    allowCommissionerOverride: Boolean
+    leagueId: Int!
+    primaryMethod: TiebreakerMethod!
+    secondaryMethod: TiebreakerMethod
+    tertiaryMethod: TiebreakerMethod
+  ): TiebreakerRule
+  deleteAllLeagues: String
+  deleteLeague(leagueId: Int!): String
+  disableDeviceToken(deviceToken: String!): Boolean
+  initializeLiveDraft(draftOrder: String, leagueId: Int!): Draft
+  joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
+  joinLeagueByCode(inviteCode: String!, teamName: String!): Team
+  makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
+  markAllNotificationsAsRead: Boolean
+  markNotificationAsRead(notificationId: Int!): Boolean
+  registerDeviceToken(input: DeviceTokenInput!): DeviceToken
+  sendDirectMessage(
+    leagueId: Int
+    messageText: String!
+    toUserId: Int!
+  ): DirectMessage
+  sendLeagueMessage(leagueId: Int!, messageText: String!): LeagueChatMessage
+  sendMatchupMessage(
+    gifUrl: String
+    matchupId: Int!
+    message: String!
+    replyToMessageId: Int
+  ): MatchupMessage
+  startDraft(
+    draftMode: String
+    draftOrder: String
+    leagueId: Int!
+    selectionMethod: String
+  ): League
+  triggerGameSelection(gameNumber: Int!, matchupId: Int!): Boolean
+  updateLeagueScoringProfile(
+    leagueId: Int!
+    updates: [UpdateLeagueScoringMultiplierInput!]!
+  ): ScoringConfig
+  updateMatchupScore(
+    matchupId: Int!
+    team1Score: Float
+    team2Score: Float
+  ): Matchup
+  updateMatchupStatus(matchupId: Int!, status: MatchupStatus!): Matchup
+  updateNotificationPreferences(
+    input: NotificationPreferenceInput!
+  ): NotificationPreference
+  updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
+}
+
+type NotificationHistoryItem {
+  body: String
+  channel: String
+  createdAt: String
+  data: String
+  id: Int
+  isRead: Boolean
+  leagueId: Int
+  matchupId: Int
+  message: String
+  metadata: String
+  notificationType: String
+  read: Boolean
+  readAt: String
+  sentAt: String
+  title: String
+  updatedAt: String
+  userId: Int
+}
+
+type NotificationPreference {
+  closeGameThreshold: Int
+  createdAt: String
+  emailEnabled: Boolean
+  id: Int
+  matchupCloseGameEnabled: Boolean
+  matchupEndedEnabled: Boolean
+  matchupReminderEnabled: Boolean
+  matchupStartedEnabled: Boolean
+  pushEnabled: Boolean
+  updatedAt: String
+  userId: Int
+}
+
+input NotificationPreferenceInput {
+  closeGameThreshold: Int
+  emailEnabled: Boolean
+  matchupCloseGameEnabled: Boolean
+  matchupEndedEnabled: Boolean
+  matchupReminderEnabled: Boolean
+  matchupStartedEnabled: Boolean
+  pushEnabled: Boolean
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
+type Player {
+  brefId: String
+
+  """
+  List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)
+  """
+  eligiblePositions: [String!]
+  firstName: String
+  id: Int
+  lastName: String
+  statsLastFetchedAt: String
+}
+
+type PlayerGameScore {
+  battingScore: Float
+  computedAt: String
+  fieldingScore: Float
+  gameNum: Int
+  id: Int
+  pitchingScore: Float
+  playerId: Int
+  season: Int
+  totalScore: Float
+}
+
+"""
+Playoff qualification status for a team
+"""
+type PlayoffQualification {
+  isQualified: Boolean
+  seedNumber: Int
+  standing: TeamStanding
+  teamId: ID
+  teamName: String
+}
+
+type Query {
+  careerBattingStats(
+    after: String
+    first: Int
+    minBattingAvg: Float
+    minGames: Int
+    minHomeRuns: Int
+    minRBI: Int
+    orderBy: String
+    orderDirection: String
+    searchTerm: String
+  ): CareerBattingConnection
+  careerFieldingStats(
+    limit: Int
+    minGames: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+  ): [CareerFielding!]
+  careerPitchingStats(
+    limit: Int
+    minGames: Int
+    minStrikeouts: Int
+    minWins: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+  ): [CareerPitching!]
+  defaultScoringProfile: ScoringConfig
+  getAvailableDraftPlayers(
+    draftId: Int!
+    limit: Int
+    search: String
+  ): [DraftPlayer!]
+  getCurrentDraftPick(draftId: Int!): CurrentDraftPick
+  getCurrentMatchupForLeague(leagueId: Int!): Matchup
+  getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
+  getDraft(draftId: Int!): Draft
+  getDraftPicks(draftId: Int!): [DraftPick!]
+  getHeadToHeadRecord(
+    leagueId: Int!
+    team1Id: Int!
+    team2Id: Int!
+  ): HeadToHeadRecord
+  getLeagueDraft(leagueId: Int!): Draft
+  getLeagueMessages(leagueId: Int!, limit: Int): [LeagueChatMessage!]
+  getLeagueStandings(leagueId: Int!, season: Int): [TeamStanding!]
+  getMatchupById(id: Int!): Matchup
+  getMatchupHistory(
+    leagueId: Int!
+    limit: Int
+    season: Int
+    status: MatchupStatus
+    teamId: Int
+  ): [Matchup!]
+  getMatchupMessages(limit: Int, matchupId: Int!): [MatchupMessage!]
+  getMatchupPlayers(matchupId: Int!): [MatchupPlayer!]
+  getMatchupStatusCounts(leagueId: Int!, season: Int): MatchupStatusCounts
+  getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
+  getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
+  getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
+  getPlayerGameScores(
+    gameNum: Int
+    playerId: Int!
+    season: Int
+  ): [PlayerGameScore!]
+  getPlayoffRace(
+    leagueId: Int!
+    playoffSpots: Int!
+    season: Int
+  ): [PlayoffQualification!]
+  getPowerRankings(leagueId: Int!, season: Int): [TeamStanding!]
+  getSeasonResults(leagueId: Int!, season: Int): SeasonResults
+  getTeamRecentMatchups(limit: Int, teamId: Int!): [Matchup!]
+  getTiebreakerHistory(leagueId: Int, matchupId: Int): [TiebreakerHistory!]
+  getTiebreakerRules(leagueId: Int!): TiebreakerRule
+  getUnreadNotificationCount: Int
+  getUserDeviceTokens: [DeviceToken!]
+  getUserNotificationPreferences: NotificationPreference
+  hello: String
+  league(id: Int!): League
+  leaguePositions(leagueId: Int!): [LeaguePosition!]
+  leagueScoringProfile(leagueId: Int!): ScoringConfig
+  leagueTeams(leagueId: Int!): [Team!]
+  player(id: Int!): Player
+  playerByBrefId(brefId: String!): Player
+  playerCareerBatting(playerId: Int!): CareerBatting
+  playerCareerFielding(playerId: Int!): CareerFielding
+  playerCareerPitching(playerId: Int!): CareerPitching
+  playerSeasonBatting(playerId: Int!, season: Int): [SeasonBatting!]
+  playerSeasonFielding(playerId: Int!, season: Int): [SeasonFielding!]
+  playerSeasonPitching(playerId: Int!, season: Int): [SeasonPitching!]
+  players(
+    limit: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+  ): [Player!]
+  scoringDefinitions: [ScoringStatDefinition!]
+  searchPlayers(limit: Int, searchTerm: String!): [Player!]
+  searchUsers(limit: Int, searchTerm: String!): [User!]
+  seasonBattingStats(
+    limit: Int
+    minGames: Int
+    minHomeRuns: Int
+    minRBI: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+    playerId: Int
+    season: Int
+    team: String
+  ): [SeasonBatting!]
+  seasonFieldingStats(
+    limit: Int
+    minGames: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+    playerId: Int
+    season: Int
+    team: String
+  ): [SeasonFielding!]
+  seasonPitchingStats(
+    limit: Int
+    minGames: Int
+    minStrikeouts: Int
+    minWins: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+    playerId: Int
+    season: Int
+    team: String
+  ): [SeasonPitching!]
+  teamMembers(teamId: Int!): [TeamMember!]
+  user(id: Int!): User
+  userByEmail(email: String!): User
+  userLeagues: [League!]!
+  userTeamId(leagueId: Int!): Int
+  users(
+    limit: Int
+    offset: Int
+    orderBy: String
+    orderDirection: String
+  ): [User!]
+
+  """
+  Get version and deployment information for the GraphQL API
+  """
+  version: VersionInfo
+}
+
+type ScoringConfig {
+  definitions: [ScoringStatDefinition!]
+  entries: [ScoringConfigEntry!]
+  leagueId: Int
+  multiplierGroups: [ScoringRuleGroup!]
+  profileId: Int
+  profileName: String
+  stats: [ScoringRule!]
+}
+
+type ScoringConfigEntry {
+  createdAt: String
+  definition: ScoringStatDefinition
+  id: Int
+  isEnabled: Boolean
+  multiplier: Float
+  profileId: Int
+  statDefinitionId: Int
+  updatedAt: String
+}
+
+type ScoringMultiplierEntry {
+  multiplier: Float
+  sourceColumn: String
+  statKey: String
+}
+
+type ScoringRule {
+  defaultMultiplier: Float
+  definition: ScoringStatDefinition
+  isEnabled: Boolean
+  isOverride: Boolean
+  multiplier: Float
+}
+
+type ScoringRuleGroup {
+  group: ScoringStatGroup
+  values: [ScoringMultiplierEntry!]
+}
+
+type ScoringStatDefinition {
+  createdAt: String
+  defaultMultiplier: Float
+  description: String
+  displayName: String
+  enforceNegative: Boolean
+  enforcePositive: Boolean
+  id: Int
+  isRequired: Boolean
+  maxMultiplier: Float
+  minMultiplier: Float
+  sourceColumn: String
+  sourceTable: String
+  statGroup: ScoringStatGroup
+  statKey: String
+  stepSize: Float
+  updatedAt: String
+}
+
+"""
+Grouping for fantasy scoring statistics
+"""
+enum ScoringStatGroup {
+  batting
+  fielding
+  pitching
+}
+
+type SeasonBatting {
+  atBats: Int
+  baseOnBalls: Int
+  battingAverage: Float
+  caughtStealing: Int
+  doubles: Int
+  games: Int
+  groundedIntoDoublePlays: Int
+  hitByPitch: Int
+  hits: Int
+  homeRuns: Int
+  intentionalBaseOnBalls: Int
+  league: String
+  onBasePercentage: Float
+  plateAppearances: Int
+  playerId: Int
+  rbi: Int
+  runs: Int
+  sacrificeHits: Int
+  season: Int
+  sluggingPercentage: Float
+  stolenBases: Int
+  strikeouts: Int
+  team: String
+  totalBases: Int
+  triples: Int
+}
+
+type SeasonFielding {
+  assists: Int
+  awardSummary: String
+  caughtStealing: Int
+  caughtStealingPercentage: Float
+  caughtStealingPercentageLeague: Float
+  chances: Float
+  completeGames: Int
+  doublePlays: Int
+  errors: Int
+  fieldingPercentage: Float
+  fieldingPercentageLeague: Float
+  games: Int
+  gamesOfParts: Int
+  gamesStarted: Int
+  inningsDefended: Float
+  league: String
+  pickoffs: Int
+  playerId: Int
+  position: String
+  putouts: Int
+  rangeFactorPerGame: Float
+  rangeFactorPerGameLeague: Float
+  rangeFactorPerNine: Float
+  rangeFactorPerNineLeague: Float
+  rowId: String
+  season: Int
+  stolenBases: Int
+  team: String
+  wildPitches: Int
+}
+
+type SeasonPitching {
+  awardSummary: String
+  balks: Int
+  baseOnBalls: Int
+  basesOnBallsPerNine: Float
+  battersFaced: Int
+  completeGames: Int
+  earnedRunAverage: String
+  earnedRunAveragePlus: Float
+  earnedRuns: Int
+  fip: Float
+  games: Int
+  gamesFinished: Int
+  gamesStarted: Int
+  hitByPitch: Int
+  hits: Int
+  hitsPerNine: Float
+  homeRuns: Int
+  homeRunsPerNine: Float
+  inningsPitched: Float
+  intentionalBaseOnBalls: Int
+  league: String
+  losses: Int
+  outsRecorded: Int
+  playerId: Int
+  rowId: String
+  runs: Int
+  saves: Int
+  season: Int
+  shutouts: Int
+  strikeouts: Int
+  strikeoutsPerBaseOnBalls: Float
+  strikeoutsPerNine: Float
+  team: String
+  whip: Float
+  wildPitches: Int
+  winLossPercentage: String
+  winPercentage: Float
+  wins: Int
+}
+
+"""
+Complete season results with standings
+"""
+type SeasonResults {
+  completedMatchups: Int
+  leagueId: ID
+  season: Int
+  standings: [TeamStanding!]
+  totalMatchups: Int
+}
+
+enum StatsLoadingStatus {
+  completed
+  failed
+  loading
+  not_started
+  queued
+  retry
+}
+
+"""
+A team in a league
+"""
+type Team {
+  createdAt: String
+  id: Int
+  leagueId: Int
+  name: String
+  updatedAt: String
+}
+
+"""
+A member of a team
+"""
+type TeamMember {
+  id: Int
+  leagueId: Int
+  player: Player
+  playerId: Int
+  positionId: Int
+  teamId: Int
+}
+
+"""
+Team standing information with wins, losses, and scoring stats
+"""
+type TeamStanding {
+  averagePointsAgainst: Float
+  averagePointsFor: Float
+  losses: Int
+  pointsAgainst: Float
+  pointsFor: Float
+  rank: Int
+  teamId: ID
+  teamName: String
+  ties: Int
+  totalMatchups: Int
+  winPercentage: Float
+  wins: Int
+}
+
+"""
+Historical record of tiebreaker resolution
+"""
+type TiebreakerHistory {
+  appliedMethod: TiebreakerMethod
+  commissionerUserId: Int
+  createdAt: String
+  id: ID
+  matchupId: Int
+  reason: String
+  resolvedAt: String
+  updatedAt: String
+  wasCommissionerOverride: Boolean
+  winner: Team
+  winnerId: Int
+}
+
+"""
+Method for resolving tiebreaker scenarios
+"""
+enum TiebreakerMethod {
+  co_champion
+  head_to_head_record
+  highest_category
+  random
+  total_season_points
+}
+
+"""
+Tiebreaker configuration for a league
+"""
+type TiebreakerRule {
+  allowCommissionerOverride: Boolean
+  config: String
+  createdAt: String
+  id: ID
+  leagueId: Int
+  primaryMethod: TiebreakerMethod
+  secondaryMethod: TiebreakerMethod
+  tertiaryMethod: TiebreakerMethod
+  updatedAt: String
+}
+
+input UpdateLeagueScoringMultiplierInput {
+  isEnabled: Boolean
+  multiplier: Float
+  statDefinitionId: Int!
+}
+
+type User {
+  accessLevel: String
+  email: String
+  id: Int
+  username: String
+}
+
+"""
+Version and deployment information for the GraphQL API
+"""
+type VersionInfo {
+  """
+  Deployment timestamp (ISO 8601)
+  """
+  deployedAt: String
+
+  """
+  Runtime environment (development, production, etc.)
+  """
+  environment: String
+
+  """
+  Git commit hash (short)
+  """
+  gitCommit: String
+
+  """
+  Package version from package.json
+  """
+  version: String
+}

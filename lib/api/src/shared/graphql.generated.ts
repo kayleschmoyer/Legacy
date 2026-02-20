@@ -130,13 +130,16 @@ export type CareerPitching = {
 };
 
 export type CreateLeagueAndTeamsInput = {
-  draftType: Scalars['String']['input'];
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
+  playerPool: Scalars['String']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -159,6 +162,18 @@ export type CreateMatchupInput = {
   weekNumber: Scalars['Int']['input'];
 };
 
+/** Information about the current draft pick */
+export type CurrentDraftPick = {
+  __typename?: 'CurrentDraftPick';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  isComplete?: Maybe<Scalars['Boolean']['output']>;
+  overallPick?: Maybe<Scalars['Int']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  round?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type DeviceToken = {
   __typename?: 'DeviceToken';
   createdAt?: Maybe<Scalars['String']['output']>;
@@ -175,6 +190,61 @@ export type DeviceToken = {
 export type DeviceTokenInput = {
   deviceToken: Scalars['String']['input'];
   platform: Scalars['String']['input'];
+};
+
+/** A private direct message between two players */
+export type DirectMessage = {
+  __typename?: 'DirectMessage';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  deletedAt?: Maybe<Scalars['String']['output']>;
+  fromUserId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  messageText?: Maybe<Scalars['String']['output']>;
+  readAt?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<User>;
+  sender?: Maybe<User>;
+  toUserId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A draft event for a league */
+export type Draft = {
+  __typename?: 'Draft';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  currentPick?: Maybe<Scalars['Int']['output']>;
+  date?: Maybe<Scalars['String']['output']>;
+  draftCompletedAt?: Maybe<Scalars['String']['output']>;
+  draftMode?: Maybe<Scalars['String']['output']>;
+  draftOrder?: Maybe<Scalars['String']['output']>;
+  draftStartedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  selectionMethod?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single pick made during a draft */
+export type DraftPick = {
+  __typename?: 'DraftPick';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  overallPick?: Maybe<Scalars['Int']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  pickedAt?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  round?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A player in the context of a draft */
+export type DraftPlayer = {
+  __typename?: 'DraftPlayer';
+  brefId?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
 };
 
 export type GameBatting = {
@@ -286,6 +356,17 @@ export type League = {
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
+};
+
+/** A message posted to the league-wide chat room */
+export type LeagueChatMessage = {
+  __typename?: 'LeagueChatMessage';
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  messageText?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<User>;
+  timestamp?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a league */
@@ -494,11 +575,15 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  initializeLiveDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  sendDirectMessage?: Maybe<DirectMessage>;
+  sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
@@ -546,6 +631,11 @@ export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
 };
 
+export type MutationInitializeLiveDraftArgs = {
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+};
+
 export type MutationJoinLeagueArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
@@ -556,12 +646,28 @@ export type MutationJoinLeagueByCodeArgs = {
   teamName: Scalars['String']['input'];
 };
 
+export type MutationMakeDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationSendDirectMessageArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  messageText: Scalars['String']['input'];
+  toUserId: Scalars['Int']['input'];
+};
+
+export type MutationSendLeagueMessageArgs = {
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationSendMatchupMessageArgs = {
@@ -572,8 +678,10 @@ export type MutationSendMatchupMessageArgs = {
 };
 
 export type MutationStartDraftArgs = {
-  draftType?: InputMaybe<Scalars['String']['input']>;
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationTriggerGameSelectionArgs = {
@@ -700,8 +808,15 @@ export type Query = {
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
+  getCurrentDraftPick?: Maybe<CurrentDraftPick>;
   getCurrentMatchupForLeague?: Maybe<Matchup>;
+  getDirectMessages?: Maybe<Array<DirectMessage>>;
+  getDraft?: Maybe<Draft>;
+  getDraftPicks?: Maybe<Array<DraftPick>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
+  getLeagueDraft?: Maybe<Draft>;
+  getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
   getMatchupById?: Maybe<Matchup>;
   getMatchupHistory?: Maybe<Array<Matchup>>;
@@ -781,14 +896,46 @@ export type QueryCareerPitchingStatsArgs = {
   orderDirection?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryGetAvailableDraftPlayersArgs = {
+  draftId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryGetCurrentDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type QueryGetCurrentMatchupForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetDirectMessagesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  otherUserId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
   team2Id: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueDraftArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueMessagesArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetLeagueStandingsArgs = {

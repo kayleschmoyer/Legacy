@@ -14,7 +14,9 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   draftOrder,
-  draftType,
+  draftMode,
+  selectionMethod,
+  playerPool,
   draftStatus,
   leaguePermissionLevel,
   positionSlot,
@@ -48,6 +50,7 @@ export const leagues = pgTable(
     weekAdvanceStatus: weekAdvanceStatus('week_advance_status')
       .notNull()
       .default('idle'),
+    playerPool: playerPool('player_pool').notNull().default('all'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -106,7 +109,10 @@ export const drafts = pgTable(
       .notNull()
       .defaultNow(),
     leagueId: integer('league_id').notNull(),
-    draftType: draftType('draft_type').notNull(),
+    draftMode: draftMode('draft_mode').notNull().default('live'),
+    selectionMethod: selectionMethod('selection_method')
+      .notNull()
+      .default('standard'),
     date: date('date'),
     draftOrder: draftOrder('draft_order').default('snake').notNull(),
     currentPick: integer('current_pick').notNull().default(0),

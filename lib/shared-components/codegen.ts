@@ -38,9 +38,9 @@ const config: CodegenConfig = {
         // Apollo Client 4.x configuration
         apolloClientVersion: 4,
         withHooks: true,
-        apolloImportFrom: '@apollo/client',
-        reactApolloImportFrom: '@apollo/client',
-        apolloReactCommonImportFrom: '@apollo/client',
+        apolloImportFrom: '@apollo/client/react',
+        reactApolloImportFrom: '@apollo/client/react',
+        apolloReactCommonImportFrom: '@apollo/client/react',
       },
       plugins: [
         {
@@ -59,6 +59,9 @@ const config: CodegenConfig = {
         'typescript-react-apollo',
       ],
     },
+  },
+  hooks: {
+    afterAllFileWrite: ['pnpm -w run codegen:fix-apollo', 'prettier --write'],
   },
 };
 

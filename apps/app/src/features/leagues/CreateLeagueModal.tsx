@@ -1,26 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Modal, View } from 'react-native';
-import {
-  Button,
-  Checkbox,
-  Input,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
-import { Check } from '@tamagui/lucide-icons';
+import { Button, Input, Spinner, XStack, YStack } from 'tamagui';
 import { addDays } from '../../common/utilities/DateUtilities';
 import { useCreateLeagueMutation } from '../../api/db/leagues/Leagues.generated';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
 import { handleError } from '../../common/utilities/ErrorHandler';
 
-// DraftType enum constants since it's not exported from generated types
-const DraftType = {
-  Normal: 'NORMAL' as const,
-  Blind: 'BLIND' as const,
-} as const;
+// Draft field constants
+const PLAYER_POOL_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: 'All MLB', value: 'all' },
+  { text: 'National League', value: 'nl' },
+  { text: 'American League', value: 'al' },
+]);
+
+const DRAFT_MODE_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: 'Live Draft', value: 'live' },
+  { text: 'Automated Draft', value: 'automated' },
+]);
+
+const SELECTION_METHOD_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: 'Standard', value: 'standard' },
+  { text: 'Auction', value: 'auction' },
+  { text: 'Random', value: 'random' },
+]);
+
+const DROPDOWN_DRAFT_ORDER_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: 'Snake', value: 'snake' },
+  { text: 'Linear', value: 'linear' },
+]);
 
 const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
   { text: '6', value: '6' },
@@ -39,7 +47,12 @@ export default function CreateLeagueModal(
 ): React.JSX.Element {
   const { onOpenChange, open } = props;
   const [leagueName, setLeagueName] = useState('');
-  const [draftType, setDraftType] = useState<'NORMAL' | 'BLIND'>('NORMAL');
+  const [playerPool, setPlayerPool] = useState<'all' | 'nl' | 'al'>('all');
+  const [draftMode, setDraftMode] = useState<'live' | 'automated'>('live');
+  const [selectionMethod, setSelectionMethod] = useState<
+    'standard' | 'auction' | 'random'
+  >('standard');
+  const [draftOrder, setDraftOrder] = useState<'snake' | 'linear'>('snake');
   const [numberOfTeams, setNumberOfTeams] = useState(10);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
@@ -48,7 +61,10 @@ export default function CreateLeagueModal(
   const [createLeague, { data, loading, error }] = useCreateLeagueMutation({
     variables: {
       input: {
-        draftType: draftType,
+        playerPool: playerPool,
+        draftMode: draftMode,
+        selectionMethod: selectionMethod,
+        draftOrder: draftOrder,
         leagueName: leagueName,
         numberOfTeams: numberOfTeams,
         startDate: addDays(new Date(), 5).toISOString(),
@@ -122,19 +138,28 @@ export default function CreateLeagueModal(
               onChange={onNumberOfTeamsChanged}
               items={DROPDOWN_TEAM_COUNT_ITEMS}
             />
-            <XStack alignItems="center" space="$2">
-              <Checkbox
-                checked={draftType === DraftType.Blind}
-                onCheckedChange={(v) =>
-                  setDraftType(v ? DraftType.Blind : DraftType.Normal)
-                }
-              >
-                <Checkbox.Indicator>
-                  <Check />
-                </Checkbox.Indicator>
-              </Checkbox>
-              <Text>Use Blind Draft?</Text>
-            </XStack>
+            <Dropdown
+              value={playerPool}
+              onChange={(value) => setPlayerPool(value as 'all' | 'nl' | 'al')}
+              items={PLAYER_POOL_ITEMS}
+            />
+            <Dropdown
+              value={draftMode}
+              onChange={(value) => setDraftMode(value as 'live' | 'automated')}
+              items={DRAFT_MODE_ITEMS}
+            />
+            <Dropdown
+              value={selectionMethod}
+              onChange={(value) =>
+                setSelectionMethod(value as 'standard' | 'auction' | 'random')
+              }
+              items={SELECTION_METHOD_ITEMS}
+            />
+            <Dropdown
+              value={draftOrder}
+              onChange={(value) => setDraftOrder(value as 'snake' | 'linear')}
+              items={DROPDOWN_DRAFT_ORDER_ITEMS}
+            />
 
             <XStack space="$2" justifyContent="space-between">
               <Button

@@ -144,7 +144,7 @@ function SportHome({
           Draft: {new Date(item.draftDate).toLocaleDateString()}
         </Text>
         <Text fontSize="$2" fontWeight="600" color={sportConfig.colors.accent}>
-          {item.draftType} Draft
+          {item.playerPool} Pool
         </Text>
       </XStack>
     </Button>
