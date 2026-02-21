@@ -23,6 +23,8 @@ import {
   rosterLockTiming,
   emergencySubRule,
   schedulingStrategy,
+  waiverClaimStatus,
+  waiverType,
   weekAdvanceStatus,
 } from './Enums';
 import { players } from './Players';
@@ -51,6 +53,9 @@ export const leagues = pgTable(
       .notNull()
       .default('idle'),
     playerPool: playerPool('player_pool').notNull().default('all'),
+    waiverType: waiverType('waiver_type').notNull().default('standard'),
+    waiverEnabled: boolean('waiver_enabled').notNull().default(true),
+    faabBudgetDefault: integer('faab_budget_default').notNull().default(100),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -75,6 +80,8 @@ export const teams = pgTable(
     id: serial('id').primaryKey().notNull(),
     name: varchar('name').notNull(),
     leagueId: integer('league_id').notNull(),
+    waiverOrder: integer('waiver_order'),
+    faabBudget: integer('faab_budget'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -351,6 +358,50 @@ export const teamMembers = pgTable(
       teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
       playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
       leagueIdIdx: index('team_members_league_id_idx').on(table.leagueId),
+    };
+  },
+);
+
+export const waiverClaims = pgTable(
+  'waiver_claims',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    userId: integer('user_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    dropPlayerId: integer('drop_player_id'),
+    faabBid: integer('faab_bid'),
+    status: waiverClaimStatus('status').notNull().default('pending'),
+    errorMessage: varchar('error_message', { length: 500 }),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      waiverClaimsLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'waiver_claims_league_fk',
+      }).onDelete('cascade'),
+      waiverClaimsTeamFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'waiver_claims_team_fk',
+      }).onDelete('cascade'),
+      waiverClaimsPlayerFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'waiver_claims_player_fk',
+      }),
+      leagueIdIdx: index('waiver_claims_league_id_idx').on(table.leagueId),
+      teamIdIdx: index('waiver_claims_team_id_idx').on(table.teamId),
+      statusIdx: index('waiver_claims_status_idx').on(table.status),
     };
   },
 );

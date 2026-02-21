@@ -250,7 +250,7 @@ GameFieldingRef.implement({
 });
 
 // Career Batting type
-const CareerBattingRef = builder.objectRef<{
+export const CareerBattingRef = builder.objectRef<{
   playerId: number | null;
   g: number | null;
   pa: number | null;

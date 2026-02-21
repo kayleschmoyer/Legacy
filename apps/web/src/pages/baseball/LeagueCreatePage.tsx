@@ -20,6 +20,8 @@ interface CreateLeagueFormData {
   draftOrder: 'snake' | 'linear';
   maxRosterSize: number;
   draftDate?: Date;
+  waiverType: 'standard' | 'faab';
+  faabBudgetDefault: number;
 }
 
 // Team count options
@@ -54,6 +56,23 @@ const DRAFT_ORDER_OPTIONS = [
   { label: 'Linear', value: 'linear' },
 ] as const;
 
+// Waiver type options
+const WAIVER_TYPE_OPTIONS = [
+  {
+    label: 'Standard',
+    value: 'standard',
+    description: 'Priority order — worst team gets first pick',
+  },
+  {
+    label: 'FAAB',
+    value: 'faab',
+    description: 'Bid with budget — highest bid wins the player',
+  },
+] as const;
+
+// FAAB budget options
+const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
+
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
@@ -65,6 +84,8 @@ export function LeagueCreatePage(): React.JSX.Element {
     draftOrder: 'snake',
     maxRosterSize: 25,
     draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -175,6 +196,8 @@ export function LeagueCreatePage(): React.JSX.Element {
             isPublic: false,
             tradingEnabled: true,
             waiverEnabled: true,
+            waiverType: formData.waiverType,
+            faabBudgetDefault: formData.faabBudgetDefault,
           },
         },
       });
@@ -665,6 +688,153 @@ export function LeagueCreatePage(): React.JSX.Element {
                   Snake order reverses each round; linear order stays the same
                 </Text>
               </YStack>
+
+              {/* Waiver Type */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Waiver System
+                </Text>
+                <XStack space="$3">
+                  {WAIVER_TYPE_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      variant={
+                        formData.waiverType === option.value
+                          ? 'primary'
+                          : 'outlined'
+                      }
+                      onPress={() => {
+                        handleInputChange('waiverType', option.value);
+                      }}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        formData.waiverType === option.value
+                          ? '$purple8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.waiverType === option.value
+                          ? '$purple8'
+                          : '$borderColor'
+                      }
+                      borderWidth={formData.waiverType === option.value ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.waiverType === option.value
+                            ? '$purple9'
+                            : '$color3',
+                        borderColor:
+                          formData.waiverType === option.value
+                            ? '$purple9'
+                            : '$borderColorHover',
+                      }}
+                      pressStyle={{
+                        scale: 0.95,
+                        backgroundColor:
+                          formData.waiverType === option.value
+                            ? '$purple7'
+                            : '$color4',
+                      }}
+                    >
+                      <Text
+                        color={
+                          formData.waiverType === option.value
+                            ? '$purple12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.waiverType === option.value ? '600' : '400'
+                        }
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  {formData.waiverType === 'faab'
+                    ? 'Teams bid from a budget to claim free agents — highest bid wins'
+                    : 'Teams have a priority order — lower-ranked teams get first pick'}
+                </Text>
+              </YStack>
+
+              {/* FAAB Budget (only when FAAB selected) */}
+              {formData.waiverType === 'faab' && (
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    FAAB Budget Per Team
+                  </Text>
+                  <XStack space="$2" flexWrap="wrap">
+                    {FAAB_BUDGET_OPTIONS.map((amount) => (
+                      <Button
+                        key={amount}
+                        size="$3"
+                        variant={
+                          formData.faabBudgetDefault === amount
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('faabBudgetDefault', amount);
+                        }}
+                        disabled={loading}
+                        minWidth="$5"
+                        backgroundColor={
+                          formData.faabBudgetDefault === amount
+                            ? '$purple8'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.faabBudgetDefault === amount
+                            ? '$purple8'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.faabBudgetDefault === amount ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.faabBudgetDefault === amount
+                              ? '$purple9'
+                              : '$color3',
+                          borderColor:
+                            formData.faabBudgetDefault === amount
+                              ? '$purple9'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.faabBudgetDefault === amount
+                              ? '$purple7'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.faabBudgetDefault === amount
+                              ? '$purple12'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.faabBudgetDefault === amount
+                              ? '600'
+                              : '400'
+                          }
+                        >
+                          ${amount}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Each team starts with this budget to bid on free agents for
+                    the season
+                  </Text>
+                </YStack>
+              )}
 
               {/* Draft Date and Time */}
               <YStack space="$2">

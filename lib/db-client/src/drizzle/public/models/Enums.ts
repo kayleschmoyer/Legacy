@@ -120,6 +120,17 @@ export const matchupMessageType = pgEnum('matchup_message_type', [
   'system',
 ]);
 
+// Waiver claim system enums
+export const waiverClaimStatus = pgEnum('waiver_claim_status', [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+export const waiverType = pgEnum('waiver_type', ['standard', 'faab']);
+
 // Tiebreaker system enums
 export const tiebreakerMethod = pgEnum('tiebreaker_method', [
   'highest_category',

@@ -3,9 +3,44 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 
-// ---------------------------------------------------------------------------
-// Helper: chunk an array to keep OR-clause sizes manageable
-// ---------------------------------------------------------------------------
+/**
+ * DataLoader for career batting stats
+ */
+export const createCareerBattingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, typeof PublicSchema.careerBatting.$inferSelect | null>(
+    async (keys) => {
+      const rows = await db
+        .select()
+        .from(PublicSchema.careerBatting)
+        .where(inArray(PublicSchema.careerBatting.playerId, keys));
+      const map = new Map(rows.map((r) => [r.playerId ?? 0, r]));
+      return keys.map((key) => map.get(key) ?? null);
+    },
+  );
+
+/**
+ * DataLoader for count of seasons played (batting)
+ */
+export const createBattingSeasonsPlayedLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, number>(async (keys) => {
+    // Cast result to number because COUNT returns string or bigint depending on driver
+    const rows = await db
+      .select({
+        playerId: PublicSchema.seasonBatting.playerId,
+        seasons: sql<number>`count(distinct ${PublicSchema.seasonBatting.season})::int`,
+      })
+      .from(PublicSchema.seasonBatting)
+      .where(inArray(PublicSchema.seasonBatting.playerId, keys))
+      .groupBy(PublicSchema.seasonBatting.playerId);
+
+    const map = new Map(rows.map((r) => [r.playerId, r.seasons]));
+    return keys.map((key) => map.get(key) ?? 0);
+  });
+
 function chunk<T>(arr: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -755,6 +790,8 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   leagueWeekPlayerSeasons: createLeagueWeekPlayerSeasonsLoader(db),
   selectedGamesCount: createSelectedGamesCountLoader(db),
   careerFielding: createCareerFieldingLoader(db),
+  careerBatting: createCareerBattingLoader(db),
+  battingSeasonsPlayed: createBattingSeasonsPlayedLoader(db),
   matchupMessages: createMatchupMessagesLoader(db),
   playoffMatchupsByBracket: createPlayoffMatchupsByBracketLoader(db),
 });

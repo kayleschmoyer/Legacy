@@ -37,6 +37,21 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+export type AverageSeasonBatting = {
+  __typename?: 'AverageSeasonBatting';
+  atBats?: Maybe<Scalars['Float']['output']>;
+  battingAverage?: Maybe<Scalars['Float']['output']>;
+  games?: Maybe<Scalars['Float']['output']>;
+  hits?: Maybe<Scalars['Float']['output']>;
+  homeRuns?: Maybe<Scalars['Float']['output']>;
+  onBasePercentage?: Maybe<Scalars['Float']['output']>;
+  rbi?: Maybe<Scalars['Float']['output']>;
+  runs?: Maybe<Scalars['Float']['output']>;
+  seasons?: Maybe<Scalars['Int']['output']>;
+  sluggingPercentage?: Maybe<Scalars['Float']['output']>;
+  stolenBases?: Maybe<Scalars['Float']['output']>;
+};
+
 export type CareerBatting = {
   __typename?: 'CareerBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
@@ -132,6 +147,7 @@ export type CareerPitching = {
 export type CreateLeagueAndTeamsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
@@ -143,6 +159,7 @@ export type CreateLeagueAndTeamsInput = {
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  waiverType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateLeagueAndTeamsPayload = {
@@ -348,6 +365,7 @@ export type League = {
   __typename?: 'League';
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
@@ -355,6 +373,8 @@ export type League = {
   owner?: Maybe<Scalars['Int']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
+  waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
+  waiverType?: Maybe<Scalars['String']['output']>;
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -568,6 +588,8 @@ export type Mutation = {
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
+  cancelWaiverClaim?: Maybe<WaiverClaim>;
+  claimFreeAgent?: Maybe<WaiverClaim>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -581,6 +603,7 @@ export type Mutation = {
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   registerDeviceToken?: Maybe<DeviceToken>;
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
@@ -600,6 +623,17 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
 
 export type MutationAdvanceLeagueWeekArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationCancelWaiverClaimArgs = {
+  claimId: Scalars['Int']['input'];
+};
+
+export type MutationClaimFreeAgentArgs = {
+  dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
+  faabBid?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -653,6 +687,10 @@ export type MutationMakeDraftPickArgs = {
 
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
+};
+
+export type MutationProcessWaiverClaimsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationRegisterDeviceTokenArgs = {
@@ -770,7 +808,10 @@ export type PageInfo = {
 
 export type Player = {
   __typename?: 'Player';
+  averageSeasonBatting?: Maybe<AverageSeasonBatting>;
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career batting statistics for the player */
+  careerBatting?: Maybe<CareerBatting>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -800,6 +841,13 @@ export type PlayoffQualification = {
   standing?: Maybe<TeamStanding>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ProcessWaiverClaimsResult = {
+  __typename?: 'ProcessWaiverClaimsResult';
+  failed?: Maybe<Scalars['Int']['output']>;
+  processed?: Maybe<Scalars['Int']['output']>;
+  succeeded?: Maybe<Scalars['Int']['output']>;
 };
 
 export type Query = {
@@ -857,6 +905,7 @@ export type Query = {
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   teamMembers?: Maybe<Array<TeamMember>>;
+  teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
   userLeagues: Array<League>;
@@ -1072,10 +1121,12 @@ export type QueryPlayerSeasonPitchingArgs = {
 };
 
 export type QueryPlayersArgs = {
+  excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QuerySearchPlayersArgs = {
@@ -1126,6 +1177,11 @@ export type QuerySeasonPitchingStatsArgs = {
 };
 
 export type QueryTeamMembersArgs = {
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamWaiverClaimsArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
 
@@ -1347,10 +1403,12 @@ export enum StatsLoadingStatus {
 export type Team = {
   __typename?: 'Team';
   createdAt?: Maybe<Scalars['String']['output']>;
+  faabBudget?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+  waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a team */
@@ -1445,6 +1503,23 @@ export type VersionInfo = {
   gitCommit?: Maybe<Scalars['String']['output']>;
   /** Package version from package.json */
   version?: Maybe<Scalars['String']['output']>;
+};
+
+export type WaiverClaim = {
+  __typename?: 'WaiverClaim';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  dropPlayerId?: Maybe<Scalars['Int']['output']>;
+  dropPlayerName?: Maybe<Scalars['String']['output']>;
+  errorMessage?: Maybe<Scalars['String']['output']>;
+  faabBid?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  processedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type GetAllPlayersQueryVariables = Exact<{

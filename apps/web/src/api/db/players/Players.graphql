@@ -1,0 +1,51 @@
+# Query to fetch players with their career stats.
+# This is distinct from GetCareerBattingStats (in shared-components), which fetches stats records directly.
+# Use this query when PLAYER is the primary entity (e.g. rosters, free agents).
+query GetPlayersWithStats(
+  $limit: Int
+  $offset: Int
+  $orderBy: String = "lastName"
+  $orderDirection: String = "asc"
+  $position: String
+) {
+  players(
+    limit: $limit
+    offset: $offset
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    position: $position
+  ) {
+    id
+    firstName
+    lastName
+    brefId
+    eligiblePositions
+    averageSeasonBatting {
+      seasons
+      games
+      atBats
+      runs
+      hits
+      homeRuns
+      rbi
+      stolenBases
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+    }
+    careerBatting {
+      games
+      runs
+      homeRuns
+      rbi
+      stolenBases
+      hits
+      atBats
+      plateAppearances
+      baseOnBalls
+      hitByPitch
+      sacrificeHits
+      totalBases
+    }
+  }
+}

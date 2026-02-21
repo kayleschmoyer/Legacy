@@ -3,6 +3,20 @@ type AdvanceLeagueWeekResponse {
   matchups: [Matchup!]
 }
 
+type AverageSeasonBatting {
+  atBats: Float
+  battingAverage: Float
+  games: Float
+  hits: Float
+  homeRuns: Float
+  onBasePercentage: Float
+  rbi: Float
+  runs: Float
+  seasons: Int
+  sluggingPercentage: Float
+  stolenBases: Float
+}
+
 type CareerBatting {
   atBats: Int
   baseOnBalls: Int
@@ -96,6 +110,7 @@ type CareerPitching {
 input CreateLeagueAndTeamsInput {
   draftMode: String
   draftOrder: String
+  faabBudgetDefault: Int
   isPublic: Boolean
   leagueName: String!
   maxBatters: Int
@@ -107,6 +122,7 @@ input CreateLeagueAndTeamsInput {
   startDate: String
   tradingEnabled: Boolean
   waiverEnabled: Boolean
+  waiverType: String
 }
 
 type CreateLeagueAndTeamsPayload {
@@ -313,6 +329,7 @@ A fantasy sports league
 type League {
   currentMatchup: Int
   draftStatus: String
+  faabBudgetDefault: Int
   id: Int
   inviteCode: String
   maxRosterSize: Int
@@ -321,6 +338,8 @@ type League {
   playerPool: String
   scoringProfile: ScoringConfig
   userMembership: LeagueMember
+  waiverEnabled: Boolean
+  waiverType: String
   weekAdvanceStatus: String
 }
 
@@ -554,6 +573,13 @@ type Mutation {
   _placeholder: Boolean
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
   advanceLeagueWeek(leagueId: Int!): AdvanceLeagueWeekResponse
+  cancelWaiverClaim(claimId: Int!): WaiverClaim
+  claimFreeAgent(
+    dropPlayerId: Int
+    faabBid: Int
+    leagueId: Int!
+    playerId: Int!
+  ): WaiverClaim
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
@@ -575,6 +601,7 @@ type Mutation {
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
+  processWaiverClaims(leagueId: Int): ProcessWaiverClaimsResult
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
   sendDirectMessage(
     leagueId: Int
@@ -666,7 +693,13 @@ type PageInfo {
 }
 
 type Player {
+  averageSeasonBatting: AverageSeasonBatting
   brefId: String
+
+  """
+  Career batting statistics for the player
+  """
+  careerBatting: CareerBatting
 
   """
   List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)
@@ -699,6 +732,12 @@ type PlayoffQualification {
   standing: TeamStanding
   teamId: ID
   teamName: String
+}
+
+type ProcessWaiverClaimsResult {
+  failed: Int
+  processed: Int
+  succeeded: Int
 }
 
 type Query {
@@ -794,10 +833,12 @@ type Query {
   playerSeasonFielding(playerId: Int!, season: Int): [SeasonFielding!]
   playerSeasonPitching(playerId: Int!, season: Int): [SeasonPitching!]
   players(
+    excludeEmptyNames: Boolean = false
     limit: Int
     offset: Int
     orderBy: String
     orderDirection: String
+    position: String
   ): [Player!]
   scoringDefinitions: [ScoringStatDefinition!]
   searchPlayers(limit: Int, searchTerm: String!): [Player!]
@@ -837,6 +878,7 @@ type Query {
     team: String
   ): [SeasonPitching!]
   teamMembers(teamId: Int!): [TeamMember!]
+  teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]
   user(id: Int!): User
   userByEmail(email: String!): User
   userLeagues: [League!]!
@@ -1048,10 +1090,12 @@ A team in a league
 """
 type Team {
   createdAt: String
+  faabBudget: Int
   id: Int
   leagueId: Int
   name: String
   updatedAt: String
+  waiverOrder: Int
 }
 
 """
@@ -1186,4 +1230,20 @@ type VersionInfo {
   Package version from package.json
   """
   version: String
+}
+
+type WaiverClaim {
+  createdAt: String
+  dropPlayerId: Int
+  dropPlayerName: String
+  errorMessage: String
+  faabBid: Int
+  id: Int
+  leagueId: Int
+  playerId: Int
+  playerName: String
+  processedAt: String
+  status: String
+  teamId: Int
+  userId: Int
 }

@@ -1,4 +1,6 @@
 # Query to fetch career batting statistics with pagination and sorting support
+# This is distinct from GetPlayersWithStats (in web), which fetches player objects.
+# Use this query when STATS are the primary entity (e.g. leaderboards, advanced filtering).
 #import "./careerBatting.fragment.graphql"
 
 query GetCareerBattingStats(

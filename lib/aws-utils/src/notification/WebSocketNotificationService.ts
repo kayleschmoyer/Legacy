@@ -111,6 +111,12 @@ export interface NotificationMessage {
   data: unknown;
 }
 
+export interface RosterUpdateNotification {
+  type: 'ROSTER_UPDATE';
+  leagueId: number;
+  updatedAt: string;
+}
+
 /**
  * Service for sending real-time notifications via WebSocket
  */
@@ -682,6 +688,28 @@ export class WebSocketNotificationService {
       LOGGER.error('Error notifying matchup viewers', { error, matchupId });
       throw error;
     }
+  }
+
+  /**
+   * Notify all connections in a league that rosters have been updated
+   * (e.g. after waiver claims are processed).
+   */
+  async notifyRosterUpdate(leagueId: number): Promise<void> {
+    const notification: RosterUpdateNotification = {
+      type: 'ROSTER_UPDATE',
+      leagueId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending roster update notification', { leagueId });
+
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
   }
 }
 

@@ -1,15 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  or,
-  sql,
-  SQL,
-} from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, ne, or, sql, SQL } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
@@ -22,13 +11,25 @@ export interface PlayerFilters {
   fullName?: string;
   fullNameLike?: string;
   brefId?: string;
+  excludeEmptyNames?: boolean;
+  position?: string;
 }
 
 export interface PlayerQueryOptions {
   filters?: PlayerFilters;
   limit?: number;
   offset?: number;
-  orderBy?: 'id' | 'firstName' | 'lastName' | 'brefId';
+  orderBy?:
+    | 'id'
+    | 'firstName'
+    | 'lastName'
+    | 'brefId'
+    | 'careerGames'
+    | 'careerHits'
+    | 'careerHomeRuns'
+    | 'careerRBI'
+    | 'careerRuns'
+    | 'careerStolenBases';
   orderDirection?: 'asc' | 'desc';
 }
 
@@ -42,18 +43,128 @@ export class PlayerService {
    * Get all players with optional filtering and pagination
    */
   async getPlayers(queryOptions: PlayerQueryOptions = {}): Promise<Player[]> {
-    return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db.select().from(PublicSchema.players);
+    return runWithPublicClient(this.options, async (db): Promise<Player[]> => {
+      let queryBuilder = db.select().from(PublicSchema.players);
+
+      const isCareerSort = [
+        'careerGames',
+        'careerHits',
+        'careerHomeRuns',
+        'careerRBI',
+        'careerRuns',
+        'careerStolenBases',
+      ].includes(queryOptions.orderBy || '');
+
+      if (isCareerSort) {
+        queryBuilder = queryBuilder.leftJoin(
+          PublicSchema.careerBatting,
+          eq(PublicSchema.players.id, PublicSchema.careerBatting.playerId),
+        ) as unknown as typeof queryBuilder;
+      }
 
       // Build WHERE clause
       const conditions = queryOptions.filters
         ? this.buildPlayerFilters(queryOptions.filters)
         : [];
 
+      if (queryOptions.filters?.position) {
+        const pos = queryOptions.filters.position;
+
+        if (pos === 'P') {
+          // Pitchers (SP, RP, P)
+          conditions.push(
+            inArray(
+              PublicSchema.players.id,
+              db
+                .select({ id: PublicSchema.playerEligiblePositions.playerId })
+                .from(PublicSchema.playerEligiblePositions)
+                .where(
+                  inArray(PublicSchema.playerEligiblePositions.position, [
+                    'SP',
+                    'RP',
+                  ] as const),
+                ),
+            ),
+          );
+        } else if (pos === 'OF') {
+          // Outfielders (LF, CF, RF, OF)
+          conditions.push(
+            inArray(
+              PublicSchema.players.id,
+              db
+                .select({ id: PublicSchema.playerEligiblePositions.playerId })
+                .from(PublicSchema.playerEligiblePositions)
+                .where(
+                  inArray(PublicSchema.playerEligiblePositions.position, [
+                    'LF',
+                    'CF',
+                    'RF',
+                  ] as const),
+                ),
+            ),
+          );
+        } else if (pos === 'DH') {
+          // DH is a roster slot, not a fielding position in the DB.
+          // Any non-pitcher (player with a batting position) is DH-eligible.
+          conditions.push(
+            inArray(
+              PublicSchema.players.id,
+              db
+                .select({ id: PublicSchema.playerEligiblePositions.playerId })
+                .from(PublicSchema.playerEligiblePositions)
+                .where(
+                  inArray(PublicSchema.playerEligiblePositions.position, [
+                    'C',
+                    '1B',
+                    '2B',
+                    '3B',
+                    'SS',
+                    'LF',
+                    'CF',
+                    'RF',
+                  ] as const),
+                ),
+            ),
+          );
+        } else {
+          // Specific position
+          conditions.push(
+            inArray(
+              PublicSchema.players.id,
+              db
+                .select({ id: PublicSchema.playerEligiblePositions.playerId })
+                .from(PublicSchema.playerEligiblePositions)
+                .where(
+                  eq(
+                    PublicSchema.playerEligiblePositions.position,
+                    pos as (typeof PublicSchema.playerEligiblePositions.position.enumValues)[number],
+                  ),
+                ),
+            ),
+          );
+        }
+      }
+
       // Build final query parts
-      const orderColumn = queryOptions.orderBy
-        ? PublicSchema.players[queryOptions.orderBy]
-        : undefined;
+      let orderColumn;
+      if (queryOptions.orderBy) {
+        if (queryOptions.orderBy === 'careerGames') {
+          orderColumn = PublicSchema.careerBatting.g;
+        } else if (queryOptions.orderBy === 'careerHits') {
+          orderColumn = PublicSchema.careerBatting.h;
+        } else if (queryOptions.orderBy === 'careerHomeRuns') {
+          orderColumn = PublicSchema.careerBatting.hr;
+        } else if (queryOptions.orderBy === 'careerRBI') {
+          orderColumn = PublicSchema.careerBatting.rbi;
+        } else if (queryOptions.orderBy === 'careerRuns') {
+          orderColumn = PublicSchema.careerBatting.r;
+        } else if (queryOptions.orderBy === 'careerStolenBases') {
+          orderColumn = PublicSchema.careerBatting.sb;
+        } else {
+          orderColumn = PublicSchema.players[queryOptions.orderBy];
+        }
+      }
+
       const orderDirection = queryOptions.orderDirection || 'asc';
 
       // Execute query with all conditions
@@ -66,10 +177,17 @@ export class PlayerService {
       }
 
       if (orderColumn) {
+        // Need to specify the table for sorting if joined
+        // Use nullsLast to keep players with no stats at the bottom
+        // Using sql templates because .nullsLast() is failing at runtime in lambda
         finalQuery =
           orderDirection === 'desc'
-            ? (finalQuery.orderBy(desc(orderColumn)) as typeof finalQuery)
-            : (finalQuery.orderBy(asc(orderColumn)) as typeof finalQuery);
+            ? (finalQuery.orderBy(
+                sql`${orderColumn} DESC NULLS LAST`,
+              ) as typeof finalQuery)
+            : (finalQuery.orderBy(
+                sql`${orderColumn} ASC NULLS LAST`,
+              ) as typeof finalQuery);
       }
 
       if (queryOptions.limit) {
@@ -82,7 +200,22 @@ export class PlayerService {
         ) as typeof finalQuery;
       }
 
-      return finalQuery.execute();
+      const result = await finalQuery.execute();
+
+      // If we joined, the result structure might be different (e.g. { players: ..., career_batting: ... })
+      // Or Drizzle might return flattened result if not using select({ ... })
+      // Drizzle usually returns objects based on the tables.
+      // If returning joined result, we have to map back to Player[].
+      // Since we started with db.select().from(players), if we don't specify fields, it returns players.*
+      // But let's verify if Drizzle changes return type on join.
+      // Usually yes.
+      if (isCareerSort) {
+        // If we joined, Drizzle returns { players: Player, career_batting: CareerBatting }
+        return (result as unknown as Array<{ players: Player }>).map(
+          (row) => row.players,
+        );
+      }
+      return result as Player[];
     });
   }
 
@@ -214,6 +347,10 @@ export class PlayerService {
 
     if (filters.brefId) {
       conditions.push(eq(PublicSchema.players.brefId, filters.brefId));
+    }
+
+    if (filters.excludeEmptyNames) {
+      conditions.push(ne(PublicSchema.players.lastName, ''));
     }
 
     return conditions;

@@ -42,8 +42,10 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
+import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
+import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
@@ -84,6 +86,8 @@ const GET_LEAGUE_TEAMS = gql`
       id
       name
       leagueId
+      waiverOrder
+      faabBudget
     }
   }
 `;
@@ -200,6 +204,7 @@ function getDraftBadgeColors(status?: string | null) {
 type TabId =
   | 'overview'
   | 'roster'
+  | 'free-agents'
   | 'standings'
   | 'matchup'
   | 'chat'
@@ -215,6 +220,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutGrid size={16} /> },
   { id: 'roster', label: 'My Roster', icon: <ClipboardList size={16} /> },
+  { id: 'free-agents', label: 'Free Agents', icon: <UserPlus size={16} /> },
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
   { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
@@ -231,6 +237,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   info: 'overview',
   overview: 'overview',
   roster: 'roster',
+  'free-agents': 'free-agents',
   standings: 'standings',
   matchup: 'matchup',
   chat: 'chat',
@@ -361,6 +368,8 @@ export function LeagueDetailPage(): React.JSX.Element {
             id: number;
             name: string;
             leagueId: number;
+            waiverOrder?: number | null;
+            faabBudget?: number | null;
           }>,
         ),
       );
@@ -1199,6 +1208,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       id="panel-roster"
       aria-labelledby="tab-roster"
     >
+      {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
       <LeagueRosterManagement
         positions={positions}
         teamPlayers={teamMembers}
@@ -1480,6 +1490,15 @@ export function LeagueDetailPage(): React.JSX.Element {
       <ContentArea marginTop="$5">
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'roster' && renderRosterManagement()}
+        {activeTab === 'free-agents' && (
+          <YStack
+            role="tabpanel"
+            id="panel-free-agents"
+            aria-labelledby="tab-free-agents"
+          >
+            <LeagueFreeAgents leagueId={leagueId} />
+          </YStack>
+        )}
         {activeTab === 'standings' && (
           <YStack
             role="tabpanel"
@@ -1490,6 +1509,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               teams={leagueTeams}
               loading={leagueTeamsLoading}
               userTeamId={userTeamId}
+              waiverType={league?.waiverType}
             />
           </YStack>
         )}

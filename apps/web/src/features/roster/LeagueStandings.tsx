@@ -8,12 +8,15 @@ interface Team {
   id: number;
   name: string;
   leagueId: number;
+  waiverOrder?: number | null;
+  faabBudget?: number | null;
 }
 
 export interface LeagueStandingsProps {
   teams: readonly Team[];
   loading?: boolean;
   userTeamId?: number | null;
+  waiverType?: string | null;
 }
 
 const RankBadge = styled(YStack, {
@@ -46,6 +49,7 @@ export function LeagueStandings({
   teams,
   loading = false,
   userTeamId,
+  waiverType,
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
 
@@ -133,6 +137,17 @@ export function LeagueStandings({
           letterSpacing={0.5}
         >
           Team
+        </Text>
+        <Text
+          width={60}
+          fontSize="$2"
+          color="$textMuted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing={0.5}
+          textAlign="center"
+        >
+          {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
         </Text>
         <Text
           flex={1}
@@ -224,6 +239,23 @@ export function LeagueStandings({
                     View roster
                   </Text>
                 </YStack>
+
+                {/* Waiver Info */}
+                <Text
+                  width={60}
+                  fontSize="$3"
+                  fontWeight="500"
+                  color="$textMuted"
+                  textAlign="center"
+                >
+                  {waiverType === 'faab'
+                    ? team.faabBudget != null
+                      ? `$${team.faabBudget}`
+                      : '—'
+                    : team.waiverOrder != null
+                      ? `#${team.waiverOrder}`
+                      : '—'}
+                </Text>
 
                 {/* Points */}
                 <Text

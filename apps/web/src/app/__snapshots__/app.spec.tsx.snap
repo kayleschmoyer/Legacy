@@ -86,14 +86,18 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="management"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ⚙️
-              </span>
-               
-              Management
+                <span
+                  aria-label="management"
+                  role="img"
+                >
+                  ⚙️
+                </span>
+                 
+                Management
+              </p>
             </button>
           </a>
           <a
@@ -101,14 +105,18 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="info"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ℹ️
-              </span>
-               
-              About
+                <span
+                  aria-label="info"
+                  role="img"
+                >
+                  ℹ️
+                </span>
+                 
+                About
+              </p>
             </button>
           </a>
         </div>
@@ -238,14 +246,18 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="management"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ⚙️
-              </span>
-               
-              Management
+                <span
+                  aria-label="management"
+                  role="img"
+                >
+                  ⚙️
+                </span>
+                 
+                Management
+              </p>
             </button>
           </a>
           <a
@@ -253,14 +265,18 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="info"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ℹ️
-              </span>
-               
-              About
+                <span
+                  aria-label="info"
+                  role="img"
+                >
+                  ℹ️
+                </span>
+                 
+                About
+              </p>
             </button>
           </a>
         </div>
@@ -388,14 +404,18 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="management"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ⚙️
-              </span>
-               
-              Management
+                <span
+                  aria-label="management"
+                  role="img"
+                >
+                  ⚙️
+                </span>
+                 
+                Management
+              </p>
             </button>
           </a>
           <a
@@ -403,14 +423,18 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <span
-                aria-label="info"
-                role="img"
+              <p
+                marginbottom="0"
               >
-                ℹ️
-              </span>
-               
-              About
+                <span
+                  aria-label="info"
+                  role="img"
+                >
+                  ℹ️
+                </span>
+                 
+                About
+              </p>
             </button>
           </a>
         </div>

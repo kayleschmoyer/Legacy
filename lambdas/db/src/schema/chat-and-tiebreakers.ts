@@ -437,6 +437,8 @@ builder.objectType(TiebreakerHistory, {
             leagueId: PublicSchema.teams.leagueId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, history.winnerId))

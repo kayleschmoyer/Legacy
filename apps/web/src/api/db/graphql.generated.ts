@@ -43,6 +43,21 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+export type AverageSeasonBatting = {
+  __typename?: 'AverageSeasonBatting';
+  atBats?: Maybe<Scalars['Float']['output']>;
+  battingAverage?: Maybe<Scalars['Float']['output']>;
+  games?: Maybe<Scalars['Float']['output']>;
+  hits?: Maybe<Scalars['Float']['output']>;
+  homeRuns?: Maybe<Scalars['Float']['output']>;
+  onBasePercentage?: Maybe<Scalars['Float']['output']>;
+  rbi?: Maybe<Scalars['Float']['output']>;
+  runs?: Maybe<Scalars['Float']['output']>;
+  seasons?: Maybe<Scalars['Int']['output']>;
+  sluggingPercentage?: Maybe<Scalars['Float']['output']>;
+  stolenBases?: Maybe<Scalars['Float']['output']>;
+};
+
 export type CareerBatting = {
   __typename?: 'CareerBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
@@ -138,6 +153,7 @@ export type CareerPitching = {
 export type CreateLeagueAndTeamsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
@@ -149,6 +165,7 @@ export type CreateLeagueAndTeamsInput = {
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   waiverEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  waiverType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateLeagueAndTeamsPayload = {
@@ -354,6 +371,7 @@ export type League = {
   __typename?: 'League';
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
@@ -362,6 +380,8 @@ export type League = {
   playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
+  waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
+  waiverType?: Maybe<Scalars['String']['output']>;
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -575,6 +595,8 @@ export type Mutation = {
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
+  cancelWaiverClaim?: Maybe<WaiverClaim>;
+  claimFreeAgent?: Maybe<WaiverClaim>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -588,6 +610,7 @@ export type Mutation = {
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   registerDeviceToken?: Maybe<DeviceToken>;
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
@@ -608,6 +631,17 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
 
 export type MutationAdvanceLeagueWeekArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationCancelWaiverClaimArgs = {
+  claimId: Scalars['Int']['input'];
+};
+
+export type MutationClaimFreeAgentArgs = {
+  dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
+  faabBid?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -661,6 +695,10 @@ export type MutationMakeDraftPickArgs = {
 
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
+};
+
+export type MutationProcessWaiverClaimsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationRegisterDeviceTokenArgs = {
@@ -782,7 +820,10 @@ export type PageInfo = {
 
 export type Player = {
   __typename?: 'Player';
+  averageSeasonBatting?: Maybe<AverageSeasonBatting>;
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career batting statistics for the player */
+  careerBatting?: Maybe<CareerBatting>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -812,6 +853,13 @@ export type PlayoffQualification = {
   standing?: Maybe<TeamStanding>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ProcessWaiverClaimsResult = {
+  __typename?: 'ProcessWaiverClaimsResult';
+  failed?: Maybe<Scalars['Int']['output']>;
+  processed?: Maybe<Scalars['Int']['output']>;
+  succeeded?: Maybe<Scalars['Int']['output']>;
 };
 
 export type Query = {
@@ -869,6 +917,7 @@ export type Query = {
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   teamMembers?: Maybe<Array<TeamMember>>;
+  teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
   userLeagues: Array<League>;
@@ -1084,10 +1133,12 @@ export type QueryPlayerSeasonPitchingArgs = {
 };
 
 export type QueryPlayersArgs = {
+  excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QuerySearchPlayersArgs = {
@@ -1138,6 +1189,11 @@ export type QuerySeasonPitchingStatsArgs = {
 };
 
 export type QueryTeamMembersArgs = {
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamWaiverClaimsArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
 
@@ -1359,10 +1415,12 @@ export enum StatsLoadingStatus {
 export type Team = {
   __typename?: 'Team';
   createdAt?: Maybe<Scalars['String']['output']>;
+  faabBudget?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+  waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a team */
@@ -1481,6 +1539,23 @@ export type VersionInfo = {
   version?: Maybe<Scalars['String']['output']>;
 };
 
+export type WaiverClaim = {
+  __typename?: 'WaiverClaim';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  dropPlayerId?: Maybe<Scalars['Int']['output']>;
+  dropPlayerName?: Maybe<Scalars['String']['output']>;
+  errorMessage?: Maybe<Scalars['String']['output']>;
+  faabBid?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  processedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type LeagueFragment = {
   __typename?: 'League';
   id?: number | null;
@@ -1492,6 +1567,9 @@ export type LeagueFragment = {
   inviteCode?: string | null;
   playerPool?: string | null;
   weekAdvanceStatus?: string | null;
+  waiverType?: string | null;
+  waiverEnabled?: boolean | null;
+  faabBudgetDefault?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -1533,6 +1611,9 @@ export type GetLeagueByIdQuery = {
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1562,6 +1643,9 @@ export type CreateLeagueAndTeamsMutation = {
       inviteCode?: string | null;
       playerPool?: string | null;
       weekAdvanceStatus?: string | null;
+      waiverType?: string | null;
+      waiverEnabled?: boolean | null;
+      faabBudgetDefault?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -1588,6 +1672,9 @@ export type GetUserLeaguesQuery = {
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1646,6 +1733,9 @@ export type StartDraftMutation = {
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1682,6 +1772,8 @@ export type GetLeagueTeamsQuery = {
     id?: number | null;
     name?: string | null;
     leagueId?: number | null;
+    waiverOrder?: number | null;
+    faabBudget?: number | null;
   }> | null;
 };
 
@@ -2505,6 +2597,55 @@ export type GetAllPlayerSeasonStatsQuery = {
   }> | null;
 };
 
+export type GetPlayersWithStatsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetPlayersWithStatsQuery = {
+  __typename?: 'Query';
+  players?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+    eligiblePositions?: Array<string> | null;
+    averageSeasonBatting?: {
+      __typename?: 'AverageSeasonBatting';
+      seasons?: number | null;
+      games?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      battingAverage?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    } | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      games?: number | null;
+      runs?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      hits?: number | null;
+      atBats?: number | null;
+      plateAppearances?: number | null;
+      baseOnBalls?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      totalBases?: number | null;
+    } | null;
+  }> | null;
+};
+
 export type GetLeagueScoringProfileQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -2650,6 +2791,8 @@ export type TeamFragment = {
   id?: number | null;
   leagueId?: number | null;
   name?: string | null;
+  waiverOrder?: number | null;
+  faabBudget?: number | null;
 };
 
 export type TeamMemberFragment = {
@@ -2718,6 +2861,82 @@ export type UpdateTeamMemberPositionMutation = {
   } | null;
 };
 
+export type ClaimFreeAgentMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
+  faabBid?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type ClaimFreeAgentMutation = {
+  __typename?: 'Mutation';
+  claimFreeAgent?: {
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    dropPlayerId?: number | null;
+    faabBid?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type ProcessWaiverClaimsMutationVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type ProcessWaiverClaimsMutation = {
+  __typename?: 'Mutation';
+  processWaiverClaims?: {
+    __typename?: 'ProcessWaiverClaimsResult';
+    processed?: number | null;
+    succeeded?: number | null;
+    failed?: number | null;
+  } | null;
+};
+
+export type GetTeamWaiverClaimsQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetTeamWaiverClaimsQuery = {
+  __typename?: 'Query';
+  teamWaiverClaims?: Array<{
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    dropPlayerId?: number | null;
+    faabBid?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    playerName?: string | null;
+    dropPlayerName?: string | null;
+    processedAt?: string | null;
+    createdAt?: string | null;
+  }> | null;
+};
+
+export type CancelWaiverClaimMutationVariables = Exact<{
+  claimId: Scalars['Int']['input'];
+}>;
+
+export type CancelWaiverClaimMutation = {
+  __typename?: 'Mutation';
+  cancelWaiverClaim?: {
+    __typename?: 'WaiverClaim';
+    id?: number | null;
+    status?: string | null;
+    errorMessage?: string | null;
+    processedAt?: string | null;
+  } | null;
+};
+
 export type UserFragment = {
   __typename?: 'User';
   id?: number | null;
@@ -2758,6 +2977,9 @@ export const LeagueFragmentDoc = gql`
     inviteCode
     playerPool
     weekAdvanceStatus
+    waiverType
+    waiverEnabled
+    faabBudgetDefault
     userMembership {
       ...LeagueMember
     }
@@ -2987,6 +3209,8 @@ export const TeamFragmentDoc = gql`
     id
     leagueId
     name
+    waiverOrder
+    faabBudget
   }
 `;
 export const TeamMemberFragmentDoc = gql`
@@ -3539,6 +3763,8 @@ export const GetLeagueTeams = gql`
       id
       name
       leagueId
+      waiverOrder
+      faabBudget
     }
   }
 `;
@@ -5360,6 +5586,139 @@ export type GetAllPlayerSeasonStatsQueryResult = Apollo.QueryResult<
   GetAllPlayerSeasonStatsQuery,
   GetAllPlayerSeasonStatsQueryVariables
 >;
+export const GetPlayersWithStats = gql`
+  query GetPlayersWithStats(
+    $limit: Int
+    $offset: Int
+    $orderBy: String = "lastName"
+    $orderDirection: String = "asc"
+    $position: String
+  ) {
+    players(
+      limit: $limit
+      offset: $offset
+      orderBy: $orderBy
+      orderDirection: $orderDirection
+      position: $position
+    ) {
+      id
+      firstName
+      lastName
+      brefId
+      eligiblePositions
+      averageSeasonBatting {
+        seasons
+        games
+        atBats
+        runs
+        hits
+        homeRuns
+        rbi
+        stolenBases
+        battingAverage
+        onBasePercentage
+        sluggingPercentage
+      }
+      careerBatting {
+        games
+        runs
+        homeRuns
+        rbi
+        stolenBases
+        hits
+        atBats
+        plateAppearances
+        baseOnBalls
+        hitByPitch
+        sacrificeHits
+        totalBases
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetPlayersWithStatsQuery__
+ *
+ * To run a query within a React component, call `useGetPlayersWithStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayersWithStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayersWithStatsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      orderBy: // value for 'orderBy'
+ *      orderDirection: // value for 'orderDirection'
+ *      position: // value for 'position'
+ *   },
+ * });
+ */
+export function useGetPlayersWithStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(GetPlayersWithStats, options);
+}
+export function useGetPlayersWithStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(GetPlayersWithStats, options);
+}
+export function useGetPlayersWithStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayersWithStatsQuery,
+        GetPlayersWithStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayersWithStatsQuery,
+    GetPlayersWithStatsQueryVariables
+  >(
+    GetPlayersWithStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayersWithStatsQuery,
+          GetPlayersWithStatsQueryVariables
+        >,
+  );
+}
+export type GetPlayersWithStatsQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsQuery
+>;
+export type GetPlayersWithStatsLazyQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsLazyQuery
+>;
+export type GetPlayersWithStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayersWithStatsSuspenseQuery
+>;
+export type GetPlayersWithStatsQueryResult = Apollo.QueryResult<
+  GetPlayersWithStatsQuery,
+  GetPlayersWithStatsQueryVariables
+>;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {
     leagueScoringProfile(leagueId: $leagueId) {
@@ -5823,6 +6182,284 @@ export type UpdateTeamMemberPositionMutationResult =
 export type UpdateTeamMemberPositionMutationOptions = BaseMutationOptions<
   UpdateTeamMemberPositionMutation,
   UpdateTeamMemberPositionMutationVariables
+>;
+export const ClaimFreeAgent = gql`
+  mutation ClaimFreeAgent(
+    $leagueId: Int!
+    $playerId: Int!
+    $dropPlayerId: Int
+    $faabBid: Int
+  ) {
+    claimFreeAgent(
+      leagueId: $leagueId
+      playerId: $playerId
+      dropPlayerId: $dropPlayerId
+      faabBid: $faabBid
+    ) {
+      id
+      leagueId
+      teamId
+      playerId
+      dropPlayerId
+      faabBid
+      status
+      errorMessage
+      createdAt
+    }
+  }
+`;
+export type ClaimFreeAgentMutationFn = MutationFunction<
+  ClaimFreeAgentMutation,
+  ClaimFreeAgentMutationVariables
+>;
+
+/**
+ * __useClaimFreeAgentMutation__
+ *
+ * To run a mutation, you first call `useClaimFreeAgentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useClaimFreeAgentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [claimFreeAgentMutation, { data, loading, error }] = useClaimFreeAgentMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      playerId: // value for 'playerId'
+ *      dropPlayerId: // value for 'dropPlayerId'
+ *      faabBid: // value for 'faabBid'
+ *   },
+ * });
+ */
+export function useClaimFreeAgentMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ClaimFreeAgentMutation,
+    ClaimFreeAgentMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ClaimFreeAgentMutation,
+    ClaimFreeAgentMutationVariables
+  >(ClaimFreeAgent, options);
+}
+export type ClaimFreeAgentMutationHookResult = ReturnType<
+  typeof useClaimFreeAgentMutation
+>;
+export type ClaimFreeAgentMutationResult =
+  Apollo.MutationResult<ClaimFreeAgentMutation>;
+export type ClaimFreeAgentMutationOptions = BaseMutationOptions<
+  ClaimFreeAgentMutation,
+  ClaimFreeAgentMutationVariables
+>;
+export const ProcessWaiverClaims = gql`
+  mutation ProcessWaiverClaims($leagueId: Int) {
+    processWaiverClaims(leagueId: $leagueId) {
+      processed
+      succeeded
+      failed
+    }
+  }
+`;
+export type ProcessWaiverClaimsMutationFn = MutationFunction<
+  ProcessWaiverClaimsMutation,
+  ProcessWaiverClaimsMutationVariables
+>;
+
+/**
+ * __useProcessWaiverClaimsMutation__
+ *
+ * To run a mutation, you first call `useProcessWaiverClaimsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useProcessWaiverClaimsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [processWaiverClaimsMutation, { data, loading, error }] = useProcessWaiverClaimsMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useProcessWaiverClaimsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ProcessWaiverClaimsMutation,
+    ProcessWaiverClaimsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ProcessWaiverClaimsMutation,
+    ProcessWaiverClaimsMutationVariables
+  >(ProcessWaiverClaims, options);
+}
+export type ProcessWaiverClaimsMutationHookResult = ReturnType<
+  typeof useProcessWaiverClaimsMutation
+>;
+export type ProcessWaiverClaimsMutationResult =
+  Apollo.MutationResult<ProcessWaiverClaimsMutation>;
+export type ProcessWaiverClaimsMutationOptions = BaseMutationOptions<
+  ProcessWaiverClaimsMutation,
+  ProcessWaiverClaimsMutationVariables
+>;
+export const GetTeamWaiverClaims = gql`
+  query GetTeamWaiverClaims($teamId: Int!, $status: String) {
+    teamWaiverClaims(teamId: $teamId, status: $status) {
+      id
+      leagueId
+      teamId
+      playerId
+      dropPlayerId
+      faabBid
+      status
+      errorMessage
+      playerName
+      dropPlayerName
+      processedAt
+      createdAt
+    }
+  }
+`;
+
+/**
+ * __useGetTeamWaiverClaimsQuery__
+ *
+ * To run a query within a React component, call `useGetTeamWaiverClaimsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamWaiverClaimsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamWaiverClaimsQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      status: // value for 'status'
+ *   },
+ * });
+ */
+export function useGetTeamWaiverClaimsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  > &
+    (
+      | { variables: GetTeamWaiverClaimsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(GetTeamWaiverClaims, options);
+}
+export function useGetTeamWaiverClaimsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(GetTeamWaiverClaims, options);
+}
+export function useGetTeamWaiverClaimsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamWaiverClaimsQuery,
+        GetTeamWaiverClaimsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamWaiverClaimsQuery,
+    GetTeamWaiverClaimsQueryVariables
+  >(
+    GetTeamWaiverClaims,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamWaiverClaimsQuery,
+          GetTeamWaiverClaimsQueryVariables
+        >,
+  );
+}
+export type GetTeamWaiverClaimsQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsQuery
+>;
+export type GetTeamWaiverClaimsLazyQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsLazyQuery
+>;
+export type GetTeamWaiverClaimsSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverClaimsSuspenseQuery
+>;
+export type GetTeamWaiverClaimsQueryResult = Apollo.QueryResult<
+  GetTeamWaiverClaimsQuery,
+  GetTeamWaiverClaimsQueryVariables
+>;
+export const CancelWaiverClaim = gql`
+  mutation CancelWaiverClaim($claimId: Int!) {
+    cancelWaiverClaim(claimId: $claimId) {
+      id
+      status
+      errorMessage
+      processedAt
+    }
+  }
+`;
+export type CancelWaiverClaimMutationFn = MutationFunction<
+  CancelWaiverClaimMutation,
+  CancelWaiverClaimMutationVariables
+>;
+
+/**
+ * __useCancelWaiverClaimMutation__
+ *
+ * To run a mutation, you first call `useCancelWaiverClaimMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelWaiverClaimMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelWaiverClaimMutation, { data, loading, error }] = useCancelWaiverClaimMutation({
+ *   variables: {
+ *      claimId: // value for 'claimId'
+ *   },
+ * });
+ */
+export function useCancelWaiverClaimMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CancelWaiverClaimMutation,
+    CancelWaiverClaimMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CancelWaiverClaimMutation,
+    CancelWaiverClaimMutationVariables
+  >(CancelWaiverClaim, options);
+}
+export type CancelWaiverClaimMutationHookResult = ReturnType<
+  typeof useCancelWaiverClaimMutation
+>;
+export type CancelWaiverClaimMutationResult =
+  Apollo.MutationResult<CancelWaiverClaimMutation>;
+export type CancelWaiverClaimMutationOptions = BaseMutationOptions<
+  CancelWaiverClaimMutation,
+  CancelWaiverClaimMutationVariables
 >;
 export const GetUserById = gql`
   query GetUserById($id: Int!) {

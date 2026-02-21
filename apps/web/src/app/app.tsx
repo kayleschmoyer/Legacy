@@ -256,10 +256,12 @@ function Navigation() {
               aria-current={isActive('/management') ? 'page' : undefined}
             >
               <NavLinkButton active={isActive('/management')}>
-                <span role="img" aria-label="management">
-                  ⚙️
-                </span>{' '}
-                Management
+                <Paragraph marginBottom={0}>
+                  <span role="img" aria-label="management">
+                    ⚙️
+                  </span>{' '}
+                  Management
+                </Paragraph>
               </NavLinkButton>
             </Link>
 
@@ -269,10 +271,12 @@ function Navigation() {
               aria-current={isActive('/about') ? 'page' : undefined}
             >
               <NavLinkButton active={isActive('/about')}>
-                <span role="img" aria-label="info">
-                  ℹ️
-                </span>{' '}
-                About
+                <Paragraph marginBottom={0}>
+                  <span role="img" aria-label="info">
+                    ℹ️
+                  </span>{' '}
+                  About
+                </Paragraph>
               </NavLinkButton>
             </Link>
           </NavLinks>
@@ -336,10 +340,12 @@ function Navigation() {
               active={isActive('/players/stats')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="statistics">
-                📊
-              </span>{' '}
-              Player Stats
+              <Paragraph marginBottom={0}>
+                <span role="img" aria-label="statistics">
+                  📊
+                </span>{' '}
+                Player Stats
+              </Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/management" style={{ textDecoration: 'none' }}>
@@ -347,10 +353,12 @@ function Navigation() {
               active={isActive('/management')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="management">
-                ⚙️
-              </span>{' '}
-              Management
+              <Paragraph marginBottom={0}>
+                <span role="img" aria-label="management">
+                  ⚙️
+                </span>{' '}
+                Management
+              </Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/about" style={{ textDecoration: 'none' }}>
@@ -358,10 +366,12 @@ function Navigation() {
               active={isActive('/about')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="info">
-                ℹ️
-              </span>{' '}
-              About
+              <Paragraph marginBottom={0}>
+                <span role="img" aria-label="info">
+                  ℹ️
+                </span>{' '}
+                About
+              </Paragraph>
             </MobileNavLink>
           </Link>
         </MobileNavPanel>

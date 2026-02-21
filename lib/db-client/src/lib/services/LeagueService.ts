@@ -58,6 +58,9 @@ export interface CreateLeagueOptions {
   draftMode?: DraftMode;
   selectionMethod?: SelectionMethod;
   draftOrder?: DraftOrder;
+  waiverType?: 'standard' | 'faab';
+  waiverEnabled?: boolean;
+  faabBudgetDefault?: number;
 }
 
 export interface CreateLeagueResult {
@@ -70,6 +73,9 @@ export interface CreateLeagueResult {
     draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
+    waiverType?: 'standard' | 'faab';
+    waiverEnabled?: boolean;
+    faabBudgetDefault?: number;
   };
   teams: {
     id: number;
@@ -77,6 +83,8 @@ export interface CreateLeagueResult {
     leagueId: number;
     createdAt: Date;
     updatedAt: Date;
+    waiverOrder: number | null;
+    faabBudget: number | null;
   }[];
   leagueMembers: {
     leagueId: number;
@@ -109,6 +117,9 @@ export class LeagueService {
       draftMode = 'live',
       selectionMethod = 'standard',
       draftOrder = 'snake',
+      waiverType = 'standard',
+      waiverEnabled = true,
+      faabBudgetDefault = 100,
     } = input;
 
     return runWithPublicClient(this.options, async (db) => {
@@ -125,6 +136,9 @@ export class LeagueService {
           currentMatchup: null,
           inviteCode,
           playerPool,
+          waiverType,
+          waiverEnabled,
+          faabBudgetDefault,
         })
         .returning({
           id: PublicSchema.leagues.id,
@@ -135,15 +149,22 @@ export class LeagueService {
           draftStatus: PublicSchema.leagues.draftStatus,
           inviteCode: PublicSchema.leagues.inviteCode,
           playerPool: PublicSchema.leagues.playerPool,
+          waiverType: PublicSchema.leagues.waiverType,
+          waiverEnabled: PublicSchema.leagues.waiverEnabled,
+          faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
         });
 
       // 2. Create teams
       const teamNames = [`${ownerUsername}'s Team`, ...DEFAULT_TEAM_NAMES];
       const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-      const teamData = teamNames.slice(0, teamsToCreate).map((teamName) => ({
-        name: teamName,
-        leagueId: league.id,
-      }));
+      const teamData = teamNames
+        .slice(0, teamsToCreate)
+        .map((teamName, index) => ({
+          name: teamName,
+          leagueId: league.id,
+          waiverOrder: index + 1,
+          faabBudget: faabBudgetDefault,
+        }));
 
       const teams = await db
         .insert(PublicSchema.teams)
@@ -154,6 +175,8 @@ export class LeagueService {
           leagueId: PublicSchema.teams.leagueId,
           createdAt: PublicSchema.teams.createdAt,
           updatedAt: PublicSchema.teams.updatedAt,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+          faabBudget: PublicSchema.teams.faabBudget,
         });
 
       // 3. Create league member for owner (assign to first team)

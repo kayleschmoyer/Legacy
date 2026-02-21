@@ -16,6 +16,9 @@ interface LeagueState {
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];
@@ -23,6 +26,8 @@ interface LeagueState {
     id: number;
     name: string;
     leagueId: number;
+    waiverOrder?: number | null;
+    faabBudget?: number | null;
   }>;
   userTeamId: number | null;
   isCommissioner: boolean;

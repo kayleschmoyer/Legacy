@@ -5,9 +5,10 @@ import {
   createLeagueService,
   DraftService,
 } from '@legacy-sports/db-client';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { builder } from './builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from './scoring';
 
@@ -52,6 +53,9 @@ const League = builder.objectRef<{
   inviteCode: string;
   playerPool: 'all' | 'nl' | 'al';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
+  waiverType?: 'standard' | 'faab';
+  waiverEnabled?: boolean;
+  faabBudgetDefault?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -72,6 +76,9 @@ League.implement({
     inviteCode: t.exposeString('inviteCode'),
     playerPool: t.exposeString('playerPool'),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
+    waiverType: t.exposeString('waiverType', { nullable: true }),
+    waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
+    faabBudgetDefault: t.exposeInt('faabBudgetDefault', { nullable: true }),
     scoringProfile: t.field({
       type: ScoringConfigRef,
       resolve: async (parent, args, context) => {
@@ -99,6 +106,8 @@ Team.implement({
     id: t.exposeInt('id'),
     name: t.exposeString('name'),
     leagueId: t.exposeInt('leagueId'),
+    waiverOrder: t.exposeInt('waiverOrder', { nullable: true }),
+    faabBudget: t.exposeInt('faabBudget', { nullable: true }),
     createdAt: t.string({
       resolve: (team) => team.createdAt.toISOString(),
     }),
@@ -194,6 +203,8 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       maxRosterSize: t.int({ required: false }), // Allow frontend to control roster size
       tradingEnabled: t.boolean({ required: false }),
       waiverEnabled: t.boolean({ required: false }),
+      waiverType: t.string({ required: false }), // 'standard' | 'faab' (optional, defaults to 'standard')
+      faabBudgetDefault: t.int({ required: false }), // Default FAAB budget per team (defaults to 100)
       startDate: t.string({ required: false }), // ISO date string
     }),
   },
@@ -207,6 +218,10 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
+    draftStatus?: string;
+    waiverType?: string;
+    waiverEnabled?: boolean;
+    faabBudgetDefault?: number;
   };
   teams?: Array<{
     id: number;
@@ -214,6 +229,8 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     leagueId: number;
     createdAt: Date;
     updatedAt: Date;
+    waiverOrder: number | null;
+    faabBudget: number | null;
   }>;
   leagueMembers?: Array<{
     leagueId: number;
@@ -292,6 +309,9 @@ builder.queryField('league', (t) =>
             inviteCode: PublicSchema.leagues.inviteCode,
             playerPool: PublicSchema.leagues.playerPool,
             weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
+            waiverType: PublicSchema.leagues.waiverType,
+            waiverEnabled: PublicSchema.leagues.waiverEnabled,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -333,6 +353,9 @@ builder.queryField('league', (t) =>
           inviteCode: league.inviteCode,
           playerPool: league.playerPool,
           weekAdvanceStatus: league.weekAdvanceStatus,
+          waiverType: league.waiverType,
+          waiverEnabled: league.waiverEnabled,
+          faabBudgetDefault: league.faabBudgetDefault,
           userMembership,
         };
       } catch (error) {
@@ -372,6 +395,9 @@ builder.queryField('userLeagues', (t) =>
             inviteCode: PublicSchema.leagues.inviteCode,
             playerPool: PublicSchema.leagues.playerPool,
             weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
+            waiverType: PublicSchema.leagues.waiverType,
+            waiverEnabled: PublicSchema.leagues.waiverEnabled,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -391,6 +417,9 @@ builder.queryField('userLeagues', (t) =>
           inviteCode: league.inviteCode,
           playerPool: league.playerPool,
           weekAdvanceStatus: league.weekAdvanceStatus,
+          waiverType: league.waiverType,
+          waiverEnabled: league.waiverEnabled,
+          faabBudgetDefault: league.faabBudgetDefault,
         }));
       } catch (error) {
         LOGGER.error('Failed to fetch user leagues', {
@@ -508,6 +537,9 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         selectionMethod = 'standard',
         draftOrder = 'snake',
         maxRosterSize,
+        waiverEnabled: inputWaiverEnabled,
+        waiverType: inputWaiverType,
+        faabBudgetDefault: inputFaabBudgetDefault,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -523,6 +555,12 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
           draftOrder: draftOrder as 'snake' | 'linear',
+          waiverType:
+            inputWaiverType === 'faab'
+              ? ('faab' as const)
+              : ('standard' as const),
+          waiverEnabled: inputWaiverEnabled ?? true,
+          faabBudgetDefault: inputFaabBudgetDefault ?? 100,
         });
 
         return result;
@@ -771,6 +809,8 @@ builder.queryField('leagueTeams', (t) =>
             leagueId: PublicSchema.teams.leagueId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.leagueId, leagueId))
@@ -996,6 +1036,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
             name: PublicSchema.leagues.name,
             owner: PublicSchema.leagues.owner,
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.inviteCode, inviteCode.toUpperCase()))
@@ -1025,12 +1066,21 @@ builder.mutationField('joinLeagueByCode', (t) =>
           throw new Error('You are already a member of this league');
         }
 
+        // Calculate next waiver order for the new team
+        const maxWaiverOrder = await context.db
+          .select({ maxOrder: sql<number>`COALESCE(MAX(waiver_order), 0)` })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.leagueId, league.id));
+        const nextWaiverOrder = (Number(maxWaiverOrder[0]?.maxOrder) || 0) + 1;
+
         // Create a new team for the user
         const insertedTeams = await context.db
           .insert(PublicSchema.teams)
           .values({
             name: teamName,
             leagueId: league.id,
+            waiverOrder: nextWaiverOrder,
+            faabBudget: league.faabBudgetDefault,
           })
           .returning({
             id: PublicSchema.teams.id,
@@ -1038,6 +1088,8 @@ builder.mutationField('joinLeagueByCode', (t) =>
             leagueId: PublicSchema.teams.leagueId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
           });
 
         const team = insertedTeams[0];
@@ -1167,6 +1219,7 @@ builder.mutationField('joinLeague', (t) =>
             id: PublicSchema.leagues.id,
             name: PublicSchema.leagues.name,
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.inviteCode, inviteCode))
@@ -1198,12 +1251,22 @@ builder.mutationField('joinLeague', (t) =>
           };
         }
 
+        // Calculate next waiver order for the new team
+        const maxWaiverOrderResult = await context.db
+          .select({ maxOrder: sql<number>`COALESCE(MAX(waiver_order), 0)` })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.leagueId, league.id));
+        const nextWaiverOrder =
+          (Number(maxWaiverOrderResult[0]?.maxOrder) || 0) + 1;
+
         // Create team for the user
         const teams = await context.db
           .insert(PublicSchema.teams)
           .values({
             name: teamName,
             leagueId: league.id,
+            waiverOrder: nextWaiverOrder,
+            faabBudget: league.faabBudgetDefault,
           })
           .returning({
             id: PublicSchema.teams.id,
@@ -1211,6 +1274,8 @@ builder.mutationField('joinLeague', (t) =>
             leagueId: PublicSchema.teams.leagueId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
           });
 
         if (teams.length === 0) {
@@ -1476,6 +1541,869 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
         });
         throw new Error('Failed to update team member position');
       }
+    },
+  }),
+);
+
+// ── Waiver claim types ─────────────────────────────────────────────────────
+const WaiverClaim = builder.objectRef<{
+  id: number;
+  leagueId: number;
+  teamId: number;
+  userId: number;
+  playerId: number;
+  dropPlayerId: number | null;
+  faabBid: number | null;
+  status: string;
+  errorMessage: string | null;
+  processedAt: Date | null;
+  createdAt: Date;
+  playerName?: string;
+  dropPlayerName?: string | null;
+}>('WaiverClaim');
+
+WaiverClaim.implement({
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    leagueId: t.exposeInt('leagueId'),
+    teamId: t.exposeInt('teamId'),
+    userId: t.exposeInt('userId'),
+    playerId: t.exposeInt('playerId'),
+    dropPlayerId: t.exposeInt('dropPlayerId', { nullable: true }),
+    faabBid: t.exposeInt('faabBid', { nullable: true }),
+    status: t.exposeString('status'),
+    errorMessage: t.exposeString('errorMessage', { nullable: true }),
+    playerName: t.string({
+      nullable: true,
+      resolve: (parent) => parent.playerName ?? null,
+    }),
+    dropPlayerName: t.string({
+      nullable: true,
+      resolve: (parent) => parent.dropPlayerName ?? null,
+    }),
+    processedAt: t.string({
+      nullable: true,
+      resolve: (parent) =>
+        parent.processedAt ? parent.processedAt.toISOString() : null,
+    }),
+    createdAt: t.string({
+      resolve: (parent) => parent.createdAt.toISOString(),
+    }),
+  }),
+});
+
+// ── Team waiver claims query ───────────────────────────────────────────────
+builder.queryField('teamWaiverClaims', (t) =>
+  t.field({
+    type: [WaiverClaim],
+    args: {
+      teamId: t.arg.int({ required: true }),
+      status: t.arg.string({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const db = context.db;
+      const { teamId } = args;
+      const statusFilter = (args.status ?? 'pending') as
+        | 'pending'
+        | 'processing'
+        | 'completed'
+        | 'failed'
+        | 'cancelled';
+
+      // Fetch claims with player name joins
+      const claims = await db
+        .select({
+          id: PublicSchema.waiverClaims.id,
+          leagueId: PublicSchema.waiverClaims.leagueId,
+          teamId: PublicSchema.waiverClaims.teamId,
+          userId: PublicSchema.waiverClaims.userId,
+          playerId: PublicSchema.waiverClaims.playerId,
+          dropPlayerId: PublicSchema.waiverClaims.dropPlayerId,
+          faabBid: PublicSchema.waiverClaims.faabBid,
+          status: PublicSchema.waiverClaims.status,
+          errorMessage: PublicSchema.waiverClaims.errorMessage,
+          processedAt: PublicSchema.waiverClaims.processedAt,
+          createdAt: PublicSchema.waiverClaims.createdAt,
+          playerFirstName: PublicSchema.players.firstName,
+          playerLastName: PublicSchema.players.lastName,
+        })
+        .from(PublicSchema.waiverClaims)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.waiverClaims.playerId, PublicSchema.players.id),
+        )
+        .where(
+          and(
+            eq(PublicSchema.waiverClaims.teamId, teamId),
+            eq(PublicSchema.waiverClaims.status, statusFilter),
+          ),
+        )
+        .orderBy(PublicSchema.waiverClaims.createdAt);
+
+      // Resolve drop player names in a second pass
+      const dropPlayerIds = claims
+        .map((c) => c.dropPlayerId)
+        .filter((id): id is number => id != null);
+
+      let dropPlayerMap: Record<number, string> = {};
+      if (dropPlayerIds.length > 0) {
+        const dropPlayers = await db
+          .select({
+            id: PublicSchema.players.id,
+            firstName: PublicSchema.players.firstName,
+            lastName: PublicSchema.players.lastName,
+          })
+          .from(PublicSchema.players)
+          .where(inArray(PublicSchema.players.id, dropPlayerIds));
+
+        dropPlayerMap = Object.fromEntries(
+          dropPlayers.map((p) => [p.id, `${p.firstName} ${p.lastName}`.trim()]),
+        );
+      }
+
+      return claims.map((c) => {
+        const { playerFirstName, playerLastName, ...claim } = c;
+        return {
+          ...claim,
+          playerName: `${playerFirstName} ${playerLastName}`.trim(),
+          dropPlayerName: c.dropPlayerId
+            ? (dropPlayerMap[c.dropPlayerId] ?? null)
+            : null,
+        };
+      });
+    },
+  }),
+);
+
+// ── Cancel waiver claim mutation ───────────────────────────────────────────
+builder.mutationField('cancelWaiverClaim', (t) =>
+  t.field({
+    type: WaiverClaim,
+    args: {
+      claimId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const db = context.db;
+      const userId = context.user.id;
+
+      // Fetch the claim and verify ownership
+      const existing = await db
+        .select()
+        .from(PublicSchema.waiverClaims)
+        .where(eq(PublicSchema.waiverClaims.id, args.claimId))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new Error('Waiver claim not found');
+      }
+
+      const claim = existing[0];
+
+      if (claim.userId !== userId) {
+        throw new Error('You can only cancel your own waiver claims');
+      }
+
+      if (claim.status !== 'pending') {
+        throw new Error(
+          `Cannot cancel a waiver claim with status "${claim.status}"`,
+        );
+      }
+
+      // Atomically cancel only if still pending (prevents TOCTOU race
+      // with the processor which may have set it to 'processing')
+      const updated = await db
+        .update(PublicSchema.waiverClaims)
+        .set({
+          status: 'cancelled',
+          errorMessage: 'Cancelled by user',
+          processedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(PublicSchema.waiverClaims.id, args.claimId),
+            eq(PublicSchema.waiverClaims.status, 'pending'),
+          ),
+        )
+        .returning();
+
+      if (updated.length === 0) {
+        throw new Error(
+          'This claim is already being processed and can no longer be cancelled',
+        );
+      }
+
+      LOGGER.info('Waiver claim cancelled by user', {
+        claimId: args.claimId,
+        userId,
+        leagueId: claim.leagueId,
+        playerId: claim.playerId,
+      });
+
+      return updated[0];
+    },
+  }),
+);
+
+// ── Claim free agent mutation ──────────────────────────────────────────────
+// Creates a pending waiver claim to be processed later (via cron or manual trigger).
+builder.mutationField('claimFreeAgent', (t) =>
+  t.field({
+    type: WaiverClaim,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      playerId: t.arg.int({ required: true }),
+      dropPlayerId: t.arg.int({ required: false }),
+      faabBid: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { leagueId, playerId, dropPlayerId, faabBid } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // 1. Resolve the user's team in this league
+      const membership = await db
+        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0 || !membership[0].teamId) {
+        throw new Error('You do not have a team in this league');
+      }
+      const teamId = membership[0].teamId;
+
+      // 2. Check the player is not already on a team in this league
+      const alreadyTaken = await db
+        .select({ id: PublicSchema.teamMembers.id })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+            eq(PublicSchema.teamMembers.playerId, playerId),
+          ),
+        )
+        .limit(1);
+
+      if (alreadyTaken.length > 0) {
+        throw new Error('This player is already on a roster in this league');
+      }
+
+      // 3. Check for existing pending claim for this player in this league
+      const existingClaim = await db
+        .select({ id: PublicSchema.waiverClaims.id })
+        .from(PublicSchema.waiverClaims)
+        .where(
+          and(
+            eq(PublicSchema.waiverClaims.leagueId, leagueId),
+            eq(PublicSchema.waiverClaims.playerId, playerId),
+            eq(PublicSchema.waiverClaims.teamId, teamId),
+            eq(PublicSchema.waiverClaims.status, 'pending'),
+          ),
+        )
+        .limit(1);
+
+      if (existingClaim.length > 0) {
+        throw new Error('You already have a pending claim for this player');
+      }
+
+      // 4. If roster is full, verify a drop player was provided
+      const leagueRow = await db
+        .select({
+          maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          waiverType: PublicSchema.leagues.waiverType,
+          waiverEnabled: PublicSchema.leagues.waiverEnabled,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (leagueRow.length === 0) {
+        throw new Error('League not found');
+      }
+
+      if (!leagueRow[0].waiverEnabled) {
+        throw new Error('Waivers are not enabled for this league');
+      }
+
+      // FAAB validation
+      const leagueWaiverType = leagueRow[0].waiverType;
+      let resolvedFaabBid: number | null = null;
+      if (leagueWaiverType === 'faab') {
+        if (faabBid == null || faabBid < 0) {
+          throw new Error(
+            'A FAAB bid amount is required for this league (must be >= 0)',
+          );
+        }
+        // Check team's remaining FAAB budget
+        const teamRow = await db
+          .select({ faabBudget: PublicSchema.teams.faabBudget })
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, teamId))
+          .limit(1);
+
+        const remainingBudget = teamRow[0]?.faabBudget ?? 0;
+
+        // Calculate already-committed bids (pending claims)
+        const committedBids = await db
+          .select({ total: sql<number>`COALESCE(SUM(faab_bid), 0)` })
+          .from(PublicSchema.waiverClaims)
+          .where(
+            and(
+              eq(PublicSchema.waiverClaims.teamId, teamId),
+              eq(PublicSchema.waiverClaims.status, 'pending'),
+            ),
+          );
+        const alreadyCommitted = Number(committedBids[0]?.total ?? 0);
+
+        if (faabBid > remainingBudget - alreadyCommitted) {
+          throw new Error(
+            `Insufficient FAAB budget. You have $${remainingBudget - alreadyCommitted} available (total: $${remainingBudget}, committed: $${alreadyCommitted}).`,
+          );
+        }
+        resolvedFaabBid = faabBid;
+      }
+
+      const rosterCount = await db
+        .select({ total: count() })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.teamId, teamId),
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+          ),
+        );
+
+      const currentSize = rosterCount[0]?.total ?? 0;
+
+      if (currentSize >= leagueRow[0].maxRosterSize && !dropPlayerId) {
+        throw new Error(
+          'Roster is full. You must drop a player to add a free agent.',
+        );
+      }
+
+      // 5. If a drop player is specified, verify they're on the roster
+      if (dropPlayerId) {
+        const dropMember = await db
+          .select({ id: PublicSchema.teamMembers.id })
+          .from(PublicSchema.teamMembers)
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.teamId, teamId),
+              eq(PublicSchema.teamMembers.leagueId, leagueId),
+              eq(PublicSchema.teamMembers.playerId, dropPlayerId),
+            ),
+          )
+          .limit(1);
+
+        if (dropMember.length === 0) {
+          throw new Error(
+            'The player you are trying to drop is not on your roster',
+          );
+        }
+
+        // Warn if another pending claim already intends to drop this player
+        const conflictingDrop = await db
+          .select({ id: PublicSchema.waiverClaims.id })
+          .from(PublicSchema.waiverClaims)
+          .where(
+            and(
+              eq(PublicSchema.waiverClaims.teamId, teamId),
+              eq(PublicSchema.waiverClaims.dropPlayerId, dropPlayerId),
+              eq(PublicSchema.waiverClaims.status, 'pending'),
+            ),
+          )
+          .limit(1);
+
+        if (conflictingDrop.length > 0) {
+          throw new Error(
+            'You already have a pending claim that drops this player. Cancel it first or choose a different player to drop.',
+          );
+        }
+      }
+
+      // 6. Insert the pending waiver claim
+      const inserted = await db
+        .insert(PublicSchema.waiverClaims)
+        .values({
+          leagueId,
+          teamId,
+          userId,
+          playerId,
+          dropPlayerId: dropPlayerId ?? null,
+          faabBid: resolvedFaabBid,
+          status: 'pending',
+        })
+        .returning();
+
+      if (inserted.length === 0) {
+        throw new Error('Failed to create waiver claim');
+      }
+
+      LOGGER.info('Waiver claim created', {
+        claimId: inserted[0].id,
+        leagueId,
+        teamId,
+        playerId,
+        dropPlayerId: dropPlayerId ?? null,
+        faabBid: resolvedFaabBid,
+        userId,
+      });
+
+      return inserted[0];
+    },
+  }),
+);
+
+// ── Process waiver claims mutation ─────────────────────────────────────────
+// Processes all pending waiver claims. Can be triggered from the UI or via
+// EventBridge cron hitting the GraphQL endpoint.
+const ProcessWaiverClaimsResult = builder.objectRef<{
+  processed: number;
+  succeeded: number;
+  failed: number;
+}>('ProcessWaiverClaimsResult');
+
+ProcessWaiverClaimsResult.implement({
+  fields: (t) => ({
+    processed: t.exposeInt('processed'),
+    succeeded: t.exposeInt('succeeded'),
+    failed: t.exposeInt('failed'),
+  }),
+});
+
+builder.mutationField('processWaiverClaims', (t) =>
+  t.field({
+    type: ProcessWaiverClaimsResult,
+    args: {
+      leagueId: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      const db = context.db;
+      let succeeded = 0;
+      let failed = 0;
+      const succeededLeagueIds = new Set<number>();
+
+      // 1. Fetch all leagues with pending claims and their waiver settings
+      const pendingConditions = [
+        eq(PublicSchema.waiverClaims.status, 'pending'),
+      ];
+      if (args.leagueId) {
+        pendingConditions.push(
+          eq(PublicSchema.waiverClaims.leagueId, args.leagueId),
+        );
+      }
+
+      const pendingClaims = await db
+        .select()
+        .from(PublicSchema.waiverClaims)
+        .where(and(...pendingConditions))
+        .limit(500);
+
+      if (pendingClaims.length === 0) {
+        return { processed: 0, succeeded: 0, failed: 0 };
+      }
+
+      // Get unique league IDs from pending claims
+      const leagueIds = [...new Set(pendingClaims.map((c) => c.leagueId))];
+
+      // Fetch league settings for all involved leagues
+      const leagueSettings = await db
+        .select({
+          id: PublicSchema.leagues.id,
+          maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          waiverType: PublicSchema.leagues.waiverType,
+        })
+        .from(PublicSchema.leagues)
+        .where(inArray(PublicSchema.leagues.id, leagueIds));
+
+      const leagueSettingsMap = new Map(leagueSettings.map((l) => [l.id, l]));
+
+      // Fetch waiver_order for all teams
+      const teamIds = [...new Set(pendingClaims.map((c) => c.teamId))];
+      const teamSettings = await db
+        .select({
+          id: PublicSchema.teams.id,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+          faabBudget: PublicSchema.teams.faabBudget,
+        })
+        .from(PublicSchema.teams)
+        .where(inArray(PublicSchema.teams.id, teamIds));
+
+      const teamSettingsMap = new Map(teamSettings.map((t) => [t.id, t]));
+
+      LOGGER.info('Processing waiver claims', {
+        count: pendingClaims.length,
+        leagueId: args.leagueId ?? 'all',
+        leagues: leagueIds,
+      });
+
+      // 2. Group claims by league, then by player (to resolve competing claims)
+      const claimsByLeague = new Map<number, typeof pendingClaims>();
+      for (const claim of pendingClaims) {
+        const existing = claimsByLeague.get(claim.leagueId) ?? [];
+        existing.push(claim);
+        claimsByLeague.set(claim.leagueId, existing);
+      }
+
+      // 3. Process each league's claims
+      for (const [leagueId, leagueClaims] of claimsByLeague) {
+        const settings = leagueSettingsMap.get(leagueId);
+        const maxRoster = settings?.maxRosterSize ?? 25;
+        const waiverType = settings?.waiverType ?? 'standard';
+
+        // Group by player to resolve competing claims
+        const claimsByPlayer = new Map<number, typeof pendingClaims>();
+        for (const claim of leagueClaims) {
+          const existing = claimsByPlayer.get(claim.playerId) ?? [];
+          existing.push(claim);
+          claimsByPlayer.set(claim.playerId, existing);
+        }
+
+        // Sort each player's claims by priority
+        for (const [playerId, playerClaims] of claimsByPlayer) {
+          // Sort by priority: standard = waiver_order ASC; faab = faab_bid DESC, then waiver_order ASC as tiebreaker
+          playerClaims.sort((a, b) => {
+            if (waiverType === 'faab') {
+              const bidA = a.faabBid ?? 0;
+              const bidB = b.faabBid ?? 0;
+              if (bidB !== bidA) return bidB - bidA; // Higher bid first
+              // Tiebreaker: waiver order (lower = higher priority)
+              const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
+              const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
+              return orderA - orderB;
+            }
+            // Standard: waiver order ASC (lower = higher priority)
+            const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
+            const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
+            if (orderA !== orderB) return orderA - orderB;
+            // Fallback: earlier claim wins
+            return a.createdAt.getTime() - b.createdAt.getTime();
+          });
+
+          // Process claims in priority order — first successful claim wins
+          let claimed = false;
+          for (const claim of playerClaims) {
+            if (claimed) {
+              // Cancel losing claims for this player
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({
+                  status: 'cancelled',
+                  errorMessage: 'Player was claimed by another team',
+                  processedAt: new Date(),
+                })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+              failed++;
+              continue;
+            }
+
+            try {
+              // Mark as processing
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({ status: 'processing' })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+              // Check player is still available
+              const alreadyTaken = await db
+                .select({ id: PublicSchema.teamMembers.id })
+                .from(PublicSchema.teamMembers)
+                .where(
+                  and(
+                    eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
+                    eq(PublicSchema.teamMembers.playerId, claim.playerId),
+                  ),
+                )
+                .limit(1);
+
+              if (alreadyTaken.length > 0) {
+                await db
+                  .update(PublicSchema.waiverClaims)
+                  .set({
+                    status: 'failed',
+                    errorMessage: 'Player is no longer available',
+                    processedAt: new Date(),
+                  })
+                  .where(eq(PublicSchema.waiverClaims.id, claim.id));
+                failed++;
+                claimed = true; // No point trying other claims for same player
+                continue;
+              }
+
+              // FAAB: verify budget at processing time
+              if (
+                waiverType === 'faab' &&
+                claim.faabBid != null &&
+                claim.faabBid > 0
+              ) {
+                const teamBudget = await db
+                  .select({ faabBudget: PublicSchema.teams.faabBudget })
+                  .from(PublicSchema.teams)
+                  .where(eq(PublicSchema.teams.id, claim.teamId))
+                  .limit(1);
+
+                const remaining = teamBudget[0]?.faabBudget ?? 0;
+                if (claim.faabBid > remaining) {
+                  await db
+                    .update(PublicSchema.waiverClaims)
+                    .set({
+                      status: 'failed',
+                      errorMessage: `Insufficient FAAB budget ($${remaining} remaining, bid was $${claim.faabBid})`,
+                      processedAt: new Date(),
+                    })
+                    .where(eq(PublicSchema.waiverClaims.id, claim.id));
+                  failed++;
+                  continue; // Let next-priority team try
+                }
+              }
+
+              // Check roster size & handle drop if needed
+              const rosterCount = await db
+                .select({ total: count() })
+                .from(PublicSchema.teamMembers)
+                .where(
+                  and(
+                    eq(PublicSchema.teamMembers.teamId, claim.teamId),
+                    eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
+                  ),
+                );
+
+              const currentSize = rosterCount[0]?.total ?? 0;
+
+              if (currentSize >= maxRoster) {
+                if (!claim.dropPlayerId) {
+                  await db
+                    .update(PublicSchema.waiverClaims)
+                    .set({
+                      status: 'failed',
+                      errorMessage:
+                        'Roster is full and no drop player was specified',
+                      processedAt: new Date(),
+                    })
+                    .where(eq(PublicSchema.waiverClaims.id, claim.id));
+                  failed++;
+                  continue;
+                }
+
+                // Drop the player
+                const dropMember = await db
+                  .select({ id: PublicSchema.teamMembers.id })
+                  .from(PublicSchema.teamMembers)
+                  .where(
+                    and(
+                      eq(PublicSchema.teamMembers.teamId, claim.teamId),
+                      eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
+                      eq(PublicSchema.teamMembers.playerId, claim.dropPlayerId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (dropMember.length === 0) {
+                  await db
+                    .update(PublicSchema.waiverClaims)
+                    .set({
+                      status: 'failed',
+                      errorMessage: 'Drop player is no longer on roster',
+                      processedAt: new Date(),
+                    })
+                    .where(eq(PublicSchema.waiverClaims.id, claim.id));
+                  failed++;
+                  continue;
+                }
+
+                await db
+                  .delete(PublicSchema.teamMembers)
+                  .where(eq(PublicSchema.teamMembers.id, dropMember[0].id));
+
+                LOGGER.info('Dropped player for waiver claim', {
+                  claimId: claim.id,
+                  droppedPlayerId: claim.dropPlayerId,
+                  teamId: claim.teamId,
+                });
+              } else if (claim.dropPlayerId) {
+                // Drop was provided but roster isn't full — still honour it
+                const dropMember = await db
+                  .select({ id: PublicSchema.teamMembers.id })
+                  .from(PublicSchema.teamMembers)
+                  .where(
+                    and(
+                      eq(PublicSchema.teamMembers.teamId, claim.teamId),
+                      eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
+                      eq(PublicSchema.teamMembers.playerId, claim.dropPlayerId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (dropMember.length > 0) {
+                  await db
+                    .delete(PublicSchema.teamMembers)
+                    .where(eq(PublicSchema.teamMembers.id, dropMember[0].id));
+                }
+              }
+
+              // Add the player to the roster
+              await db.insert(PublicSchema.teamMembers).values({
+                teamId: claim.teamId,
+                leagueId: claim.leagueId,
+                playerId: claim.playerId,
+                positionId: null,
+                acquisitionType: 'waiver',
+              });
+
+              // Mark claim as completed
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({
+                  status: 'completed',
+                  processedAt: new Date(),
+                })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+              succeeded++;
+              claimed = true;
+              succeededLeagueIds.add(claim.leagueId);
+
+              LOGGER.info('Waiver claim processed successfully', {
+                claimId: claim.id,
+                leagueId: claim.leagueId,
+                teamId: claim.teamId,
+                playerId,
+                waiverType,
+                faabBid: claim.faabBid,
+              });
+
+              // FAAB: deduct bid from team's budget
+              if (
+                waiverType === 'faab' &&
+                claim.faabBid != null &&
+                claim.faabBid > 0
+              ) {
+                await db
+                  .update(PublicSchema.teams)
+                  .set({
+                    faabBudget: sql`${PublicSchema.teams.faabBudget} - ${claim.faabBid}`,
+                  })
+                  .where(eq(PublicSchema.teams.id, claim.teamId));
+
+                LOGGER.info('Deducted FAAB bid', {
+                  teamId: claim.teamId,
+                  bid: claim.faabBid,
+                });
+              }
+
+              // Standard waivers: rotate waiver order — winning team goes to last
+              if (waiverType === 'standard') {
+                const winnerOrder = teamSettingsMap.get(
+                  claim.teamId,
+                )?.waiverOrder;
+                if (winnerOrder != null) {
+                  // Move all teams with higher order numbers up by one
+                  await db.execute(sql`
+                    UPDATE teams
+                    SET waiver_order = waiver_order - 1
+                    WHERE league_id = ${claim.leagueId}
+                      AND waiver_order > ${winnerOrder}
+                  `);
+                  // Move winner to last
+                  const maxOrder = await db
+                    .select({ maxOrder: sql<number>`MAX(waiver_order)` })
+                    .from(PublicSchema.teams)
+                    .where(eq(PublicSchema.teams.leagueId, claim.leagueId));
+                  const lastOrder = (Number(maxOrder[0]?.maxOrder) || 0) + 1;
+                  await db
+                    .update(PublicSchema.teams)
+                    .set({ waiverOrder: lastOrder })
+                    .where(eq(PublicSchema.teams.id, claim.teamId));
+
+                  LOGGER.info('Rotated waiver order', {
+                    teamId: claim.teamId,
+                    previousOrder: winnerOrder,
+                    newOrder: lastOrder,
+                    leagueId: claim.leagueId,
+                  });
+
+                  // Update local cache for remaining claims in this batch
+                  // Refresh team settings for this league
+                  const updatedTeams = await db
+                    .select({
+                      id: PublicSchema.teams.id,
+                      waiverOrder: PublicSchema.teams.waiverOrder,
+                      faabBudget: PublicSchema.teams.faabBudget,
+                    })
+                    .from(PublicSchema.teams)
+                    .where(eq(PublicSchema.teams.leagueId, claim.leagueId));
+                  for (const ut of updatedTeams) {
+                    teamSettingsMap.set(ut.id, ut);
+                  }
+                }
+              }
+            } catch (error) {
+              LOGGER.error('Error processing waiver claim', {
+                claimId: claim.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+
+              await db
+                .update(PublicSchema.waiverClaims)
+                .set({
+                  status: 'failed',
+                  errorMessage:
+                    error instanceof Error ? error.message : 'Unknown error',
+                  processedAt: new Date(),
+                })
+                .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+              failed++;
+            }
+          }
+        }
+      }
+
+      // 4. Send websocket notifications for leagues with successful claims
+      const notificationService = createNotificationService();
+
+      if (notificationService && succeededLeagueIds.size > 0) {
+        for (const lid of succeededLeagueIds) {
+          try {
+            await notificationService.notifyRosterUpdate(lid);
+          } catch (err) {
+            LOGGER.warn('Failed to send roster update notification', {
+              leagueId: lid,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
+      const totalProcessed = succeeded + failed;
+      LOGGER.info('Waiver claim processing complete', {
+        processed: totalProcessed,
+        succeeded,
+        failed,
+      });
+
+      return {
+        processed: totalProcessed,
+        succeeded,
+        failed,
+      };
     },
   }),
 );

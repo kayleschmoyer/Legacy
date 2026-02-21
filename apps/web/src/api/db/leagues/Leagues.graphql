@@ -8,6 +8,9 @@ fragment League on League {
   inviteCode
   playerPool
   weekAdvanceStatus
+  waiverType
+  waiverEnabled
+  faabBudgetDefault
   userMembership {
     ...LeagueMember
   }
@@ -85,6 +88,8 @@ query GetLeagueTeams($leagueId: Int!) {
     id
     name
     leagueId
+    waiverOrder
+    faabBudget
   }
 }
 

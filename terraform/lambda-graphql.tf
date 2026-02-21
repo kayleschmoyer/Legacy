@@ -128,6 +128,44 @@ resource "aws_iam_role_policy_attachment" "graphql_lambda_sqs" {
   role       = aws_iam_role.graphql_lambda.name
 }
 
+# IAM policy for WebSocket/DynamoDB permissions (roster update notifications)
+resource "aws_iam_policy" "graphql_lambda_websocket" {
+  name        = "${local.name_prefix}-graphql-lambda-websocket"
+  description = "Allow GraphQL Lambda to send WebSocket notifications"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "execute-api:ManageConnections"
+        ]
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*/*/@connections/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = [
+          aws_dynamodb_table.websocket_connections.arn,
+          "${aws_dynamodb_table.websocket_connections.arn}/index/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "graphql_lambda_websocket" {
+  policy_arn = aws_iam_policy.graphql_lambda_websocket.arn
+  role       = aws_iam_role.graphql_lambda.name
+}
+
 # Lambda function
 resource "aws_lambda_function" "graphql" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
@@ -175,6 +213,10 @@ resource "aws_lambda_function" "graphql" {
       SENTRY_TRACES_SAMPLE_RATE = var.environment == "dev" ? "1.0" : "0.1"
       SENTRY_DEBUG              = var.environment == "dev" ? "true" : "false"
       SENTRY_RELEASE            = "legacy-sports-graphql@${data.aws_ssm_parameter.graphql_lambda_version.value}"
+
+      # WebSocket configuration for notifications
+      CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
+      WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
     }
   }
 
@@ -183,6 +225,7 @@ resource "aws_lambda_function" "graphql" {
     aws_iam_role_policy_attachment.graphql_lambda_vpc,
     aws_iam_role_policy_attachment.graphql_lambda_secrets,
     aws_iam_role_policy_attachment.graphql_lambda_rds,
+    aws_iam_role_policy_attachment.graphql_lambda_websocket,
   ]
 
   tags = local.common_tags

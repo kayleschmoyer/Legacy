@@ -91,6 +91,12 @@ export interface DirectMessageNotification {
   createdAt: string;
 }
 
+export interface RosterUpdateNotification {
+  type: 'ROSTER_UPDATE';
+  leagueId: number;
+  updatedAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -99,7 +105,8 @@ export type NotificationData =
   | PlayerStatsUpdatedNotification
   | MatchupStatsCompleteNotification
   | LeagueChatMessageNotification
-  | DirectMessageNotification;
+  | DirectMessageNotification
+  | RosterUpdateNotification;
 
 /**
  * WebSocket message structure

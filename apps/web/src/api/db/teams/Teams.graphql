@@ -2,6 +2,8 @@ fragment Team on Team {
   id
   leagueId
   name
+  waiverOrder
+  faabBudget
 }
 
 fragment TeamMember on TeamMember {
@@ -25,17 +27,69 @@ query GetTeamMembers($teamId: Int!) {
   }
 }
 
-query GetTeamMembers($teamId: Int!) {
-  teamMembers(teamId: $teamId) {
-    ...TeamMember
-  }
-}
-
 mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
   updateTeamMemberPosition(
     teamMemberId: $teamMemberId
     positionId: $positionId
   ) {
     ...TeamMember
+  }
+}
+
+mutation ClaimFreeAgent(
+  $leagueId: Int!
+  $playerId: Int!
+  $dropPlayerId: Int
+  $faabBid: Int
+) {
+  claimFreeAgent(
+    leagueId: $leagueId
+    playerId: $playerId
+    dropPlayerId: $dropPlayerId
+    faabBid: $faabBid
+  ) {
+    id
+    leagueId
+    teamId
+    playerId
+    dropPlayerId
+    faabBid
+    status
+    errorMessage
+    createdAt
+  }
+}
+
+mutation ProcessWaiverClaims($leagueId: Int) {
+  processWaiverClaims(leagueId: $leagueId) {
+    processed
+    succeeded
+    failed
+  }
+}
+
+query GetTeamWaiverClaims($teamId: Int!, $status: String) {
+  teamWaiverClaims(teamId: $teamId, status: $status) {
+    id
+    leagueId
+    teamId
+    playerId
+    dropPlayerId
+    faabBid
+    status
+    errorMessage
+    playerName
+    dropPlayerName
+    processedAt
+    createdAt
+  }
+}
+
+mutation CancelWaiverClaim($claimId: Int!) {
+  cancelWaiverClaim(claimId: $claimId) {
+    id
+    status
+    errorMessage
+    processedAt
   }
 }
