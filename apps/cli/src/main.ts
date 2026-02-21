@@ -258,7 +258,12 @@ async function run(): Promise<void> {
   program
     .command('generate-jwt')
     .description(
-      'Generate a JWT token for a specific user (development/testing)',
+      'Obtain a JWT via device flow authentication and output it in the requested format',
+    )
+    .option(
+      '-f, --format <format>',
+      'Output format: token (default), header, env, localstorage',
+      'token',
     )
     .action(handleGenerateJwt);
 

@@ -1,17 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  getUserByEmail,
-  runWithInternalClient,
-} from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
-import { sign, SignOptions } from 'jsonwebtoken';
+import { CLIAuthService } from '../services/AuthService';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { JWTPayload, User } from '../types/cli-types';
 
 export interface GenerateJwtArgs extends CommandArgs {
-  email: string;
-  expiration?: string;
-  accessLevel?: 'none' | 'admin';
   format?: 'token' | 'header' | 'env' | 'localstorage';
 }
 
@@ -19,93 +11,54 @@ export const handleGenerateJwt = async (
   args: GenerateJwtArgs,
 ): Promise<void> => {
   try {
-    const { email, expiration, accessLevel, format } = args;
+    const { format } = args;
+    const authService = new CLIAuthService();
 
-    LOGGER.info(`🔐 Generating JWT for user: ${email}`);
-
-    let user: {
-      id: number;
-      email: string;
-      username: string;
-      accessLevel: string;
-    } | null = null;
-
-    // Try to get user from database first
-    try {
-      const opts = getDbOptions();
-
-      await runWithInternalClient(opts, async (dbClient) => {
-        const dbUser = await getUserByEmail(dbClient, email);
-        if (dbUser) {
-          user = {
-            id: dbUser.id,
-            email: dbUser.email,
-            username: dbUser.username || dbUser.email,
-            accessLevel: dbUser.accessLevel || 'none',
-          };
-          LOGGER.info(
-            `✅ Found user in database: ID ${user.id}, Email: ${user.email}`,
-          );
-        }
-      });
-    } catch (dbError) {
-      LOGGER.warn(
-        `⚠️  Database not available: ${dbError instanceof Error ? dbError.message : String(dbError)}`,
-      );
-      LOGGER.info('🔧 Falling back to mock user for development testing...');
-    }
-
-    // If no user found in database, create a mock user for development
-    if (!user) {
-      user = {
-        id: 1,
-        email: email,
-        username: email.split('@')[0],
-        accessLevel: accessLevel || 'none',
-      };
-      LOGGER.info(`🧪 Using mock user: ID ${user.id}, Email: ${user.email}`);
+    // Authenticate via device flow if not already logged in
+    if (!(await authService.isAuthenticated())) {
       LOGGER.info(
-        '⚠️  This is a development-only token - not connected to real user data',
+        '🔐 Not authenticated. Starting device flow authentication...',
       );
+      await authService.authenticate();
+    } else {
+      LOGGER.info('✅ Using existing authentication session.');
     }
 
-    // Get JWT secret
-    const jwtSecret = getJwtSecret();
+    const jwt = await authService.getAuthToken();
+    if (!jwt) {
+      throw new Error('Authentication succeeded but no token was retrieved');
+    }
 
-    // Create JWT payload (same format as OAuth proxy)
-    const payload: JWTPayload = {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      accessLevel: accessLevel || user.accessLevel,
-      iat: Math.floor(Date.now() / 1000),
+    // Decode JWT payload for display info (no verification — we trust our stored tokens)
+    const payload = JSON.parse(
+      Buffer.from(jwt.split('.')[1], 'base64').toString(),
+    ) as JWTPayload;
+
+    const expirationDate = payload.exp
+      ? new Date(payload.exp * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const user: User = {
+      id: payload.id,
+      email: payload.email,
+      username: payload.username,
+      accessLevel: payload.accessLevel,
     };
-
-    // Sign JWT with expiration
-    const expirationValue = expiration || '7d';
-    const expMs = parseExpiration(expirationValue);
-    const expSeconds = Math.floor(expMs / 1000);
-    const signOptions: SignOptions = { expiresIn: expSeconds };
-    const jwtToken = sign(payload, jwtSecret, signOptions);
-
-    // Calculate expiration date for display
-    const expirationDate = new Date();
-    expirationDate.setTime(expirationDate.getTime() + expMs);
 
     // Output based on format
     switch (format) {
       case 'header':
-        outputHeaderFormat(jwtToken);
+        outputHeaderFormat(jwt);
         break;
       case 'env':
-        outputEnvFormat(jwtToken);
+        outputEnvFormat(jwt);
         break;
       case 'localstorage':
-        outputLocalStorageFormat(jwtToken);
+        outputLocalStorageFormat(jwt);
         break;
       case 'token':
       default:
-        outputTokenFormat(jwtToken, user, payload, expirationDate);
+        outputTokenFormat(jwt, user, payload, expirationDate);
         break;
     }
   } catch (error) {
@@ -150,7 +103,7 @@ function outputTokenFormat(
   payload: JWTPayload,
   expirationDate: Date,
 ): void {
-  LOGGER.info('\n🎉 JWT Generated Successfully!');
+  LOGGER.info('\n🎉 JWT Retrieved Successfully!');
   LOGGER.info('================================');
   LOGGER.info(`User: ${user.email} (ID: ${user.id})`);
   LOGGER.info(`Access Level: ${payload.accessLevel}`);
@@ -167,52 +120,4 @@ function outputTokenFormat(
   LOGGER.info(`    localStorage.setItem('auth_jwt', '${jwtToken}')`);
   LOGGER.info('  • Copy to E2E test auth fixture:');
   LOGGER.info(`    window.localStorage.setItem('auth_jwt', '${jwtToken}')`);
-}
-
-/**
- * Get JWT secret using same method as OAuth proxy
- */
-function getJwtSecret(): string {
-  try {
-    // For development, use a simple secret
-    // In production, this would read from AWS Secrets Manager
-    const secret =
-      process.env.JWT_SECRET ||
-      'dev-jwt-secret-key-not-for-production-use-only';
-
-    if (secret === 'dev-jwt-secret-key-not-for-production-use-only') {
-      LOGGER.warn(
-        '⚠️  Using development JWT secret. Do not use in production!',
-      );
-    }
-
-    return secret;
-  } catch {
-    LOGGER.warn(
-      '⚠️  Could not load JWT secret from environment, using development secret',
-    );
-    return 'dev-jwt-secret-key-not-for-production-use-only';
-  }
-}
-
-/**
- * Parse expiration string to milliseconds
- */
-function parseExpiration(exp: string): number {
-  const units: Record<string, number> = {
-    s: 1000,
-    m: 60 * 1000,
-    h: 60 * 60 * 1000,
-    d: 24 * 60 * 60 * 1000,
-  };
-
-  const match = exp.match(/^(\d+)([smhd])$/);
-  if (!match) {
-    throw new Error(
-      `Invalid expiration format: ${exp}. Use format like "1h", "7d", "30m"`,
-    );
-  }
-
-  const [, amount, unit] = match;
-  return parseInt(amount, 10) * units[unit];
 }
