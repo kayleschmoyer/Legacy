@@ -4,6 +4,8 @@ import {
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
+import { createNotificationService } from '@legacy-sports/aws-utils';
+import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import type {
   LeagueScoringProfileEntry,
@@ -493,7 +495,42 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         })),
       );
 
-      return loadLeagueScoringConfig(args.leagueId);
+      const config = await loadLeagueScoringConfig(args.leagueId);
+
+      // Post a system chat notification so all league members see the change
+      const userId = context.user.id;
+      const username = context.user.username ?? `user_${userId}`;
+      const notificationText = `${username} updated scoring settings.`;
+
+      const [chatMsg] = await context.db
+        .insert(PublicSchema.leagueMessages)
+        .values({
+          leagueId: args.leagueId,
+          userId,
+          messageText: notificationText,
+        })
+        .returning();
+
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        notificationService
+          .notifyLeagueChatMessage(args.leagueId, {
+            leagueId: args.leagueId,
+            messageId: chatMsg.id,
+            senderId: userId,
+            senderUsername: username,
+            messageText: notificationText,
+            timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+          })
+          .catch((err: unknown) => {
+            LOGGER.warn(
+              'Failed to send league chat WS notification for scoring settings update',
+              { err },
+            );
+          });
+      }
+
+      return config;
     },
   }),
 );

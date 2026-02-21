@@ -3,6 +3,7 @@
  */
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, notInArray, sql } from 'drizzle-orm';
 import { builder } from './builder';
@@ -952,6 +953,42 @@ builder.mutationField('updateDraftSettings', (t) =>
           draftOrder: existingDraft.draftOrder,
           playerPool: updatedPlayerPool,
         });
+
+        // Post a system chat notification so all league members see the change
+        const username = context.user.username ?? `user_${userId}`;
+        const changedFields: string[] = [];
+        if (draftMode) changedFields.push(`mode → ${draftMode}`);
+        if (selectionMethod)
+          changedFields.push(`selection → ${selectionMethod}`);
+        if (draftOrder) changedFields.push(`order → ${draftOrder}`);
+        if (playerPool) changedFields.push(`player pool → ${playerPool}`);
+        const changesSummary =
+          changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
+        const notificationText = `${username} updated draft settings${changesSummary}.`;
+
+        const [chatMsg] = await context.db
+          .insert(PublicSchema.leagueMessages)
+          .values({ leagueId, userId, messageText: notificationText })
+          .returning();
+
+        const notificationService = createNotificationService();
+        if (notificationService) {
+          notificationService
+            .notifyLeagueChatMessage(leagueId, {
+              leagueId,
+              messageId: chatMsg.id,
+              senderId: userId,
+              senderUsername: username,
+              messageText: notificationText,
+              timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+            })
+            .catch((err: unknown) => {
+              LOGGER.warn(
+                'Failed to send league chat WS notification for settings update',
+                { err },
+              );
+            });
+        }
 
         return {
           ...existingDraft,

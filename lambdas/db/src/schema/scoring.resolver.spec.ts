@@ -280,10 +280,26 @@ describe('League scoring GraphQL resolvers', () => {
       throw new Error('updateLeagueScoringProfile resolver not found');
     }
 
+    const mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, timestamp: new Date().toISOString() },
+            ]),
+        }),
+      }),
+    };
+
     const result = await updateField.resolve(
       {},
       { leagueId, updates },
-      { user: { id: 9, isAdmin: true } },
+      { user: { id: 9, isAdmin: true }, db: mockDb },
       undefined as never,
     );
 
