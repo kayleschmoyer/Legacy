@@ -12,9 +12,9 @@
  */
 
 import { printSchema } from 'graphql';
+import * as prettier from 'prettier';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as prettier from 'prettier';
 
 // Import the fully-assembled Pothos schema.
 // createDatabaseService() is called lazily inside builder.ts — it only opens a

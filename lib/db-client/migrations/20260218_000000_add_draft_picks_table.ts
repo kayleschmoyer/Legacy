@@ -39,23 +39,32 @@ export const up = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
     );
   `);
 
-  // Add foreign keys
+  // Add foreign keys (IF NOT EXISTS via exception handling for idempotency)
   await db.execute(`
-    ALTER TABLE "draft_picks"
-    ADD CONSTRAINT "draft_picks_drafts_id_fk"
-    FOREIGN KEY ("draft_id") REFERENCES "drafts"("id") ON DELETE CASCADE;
+    DO $$ BEGIN
+      ALTER TABLE "draft_picks"
+      ADD CONSTRAINT "draft_picks_drafts_id_fk"
+      FOREIGN KEY ("draft_id") REFERENCES "drafts"("id") ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
   `);
 
   await db.execute(`
-    ALTER TABLE "draft_picks"
-    ADD CONSTRAINT "draft_picks_teams_id_fk"
-    FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION;
+    DO $$ BEGIN
+      ALTER TABLE "draft_picks"
+      ADD CONSTRAINT "draft_picks_teams_id_fk"
+      FOREIGN KEY ("team_id") REFERENCES "teams"("id") ON DELETE NO ACTION;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
   `);
 
   await db.execute(`
-    ALTER TABLE "draft_picks"
-    ADD CONSTRAINT "draft_picks_players_id_fk"
-    FOREIGN KEY ("player_id") REFERENCES "players"("id") ON DELETE NO ACTION;
+    DO $$ BEGIN
+      ALTER TABLE "draft_picks"
+      ADD CONSTRAINT "draft_picks_players_id_fk"
+      FOREIGN KEY ("player_id") REFERENCES "players"("id") ON DELETE NO ACTION;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
   `);
 
   // Add indexes for performance
@@ -77,10 +86,14 @@ export const up = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
 
   // Add trigger for updated_at
   await db.execute(`
-    CREATE TRIGGER set_timestamp_draft_picks
-    BEFORE UPDATE ON draft_picks
+    DROP TRIGGER IF EXISTS "draft_picks_updated_at_trigger" ON public."draft_picks";
+  `);
+
+  await db.execute(`
+    CREATE TRIGGER "draft_picks_updated_at_trigger"
+    BEFORE UPDATE ON public."draft_picks"
     FOR EACH ROW
-    EXECUTE FUNCTION trigger_set_timestamp();
+    EXECUTE FUNCTION update_updated_at_column();
   `);
 
   // Optionally extend team_members to track draft information
@@ -114,7 +127,7 @@ export const down = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
 
   // Drop draft_picks table and related objects
   await db.execute(
-    `DROP TRIGGER IF EXISTS set_timestamp_draft_picks ON draft_picks;`,
+    `DROP TRIGGER IF EXISTS "draft_picks_updated_at_trigger" ON public."draft_picks";`,
   );
   await db.execute(`DROP INDEX IF EXISTS "draft_picks_overall_pick_idx";`);
   await db.execute(`DROP INDEX IF EXISTS "draft_picks_player_id_idx";`);
