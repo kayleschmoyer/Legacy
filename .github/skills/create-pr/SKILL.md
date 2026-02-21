@@ -161,9 +161,11 @@ Technical explanation of why the issue occurred.
 
 ## Testing Done
 
+- [ ] GraphQL schema regenerated (`pnpm exec nx run db:print-schema`)
+- [ ] Codegen types regenerated (`pnpm exec nx affected -t codegen`)
 - [ ] Unit tests pass
 - [ ] Manual testing completed
-- [ ] Pre-commit validation passes
+- [ ] Pre-commit validation passes (`make pre-commit`)
 ```
 
 ## Expected Output

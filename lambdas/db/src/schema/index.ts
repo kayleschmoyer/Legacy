@@ -11,6 +11,7 @@ import './scoring';
 import './notifications';
 import './chat-and-tiebreakers';
 import './draft-schema';
+import './gdpr';
 
 // Export the final schema
 export const schema = builder.toSchema();

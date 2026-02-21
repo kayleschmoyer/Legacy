@@ -383,6 +383,7 @@ export type League = {
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -622,6 +623,7 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
+  updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
@@ -737,6 +739,10 @@ export type MutationStartDraftArgs = {
 export type MutationTriggerGameSelectionArgs = {
   gameNumber: Scalars['Int']['input'];
   matchupId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateDraftSettingsArgs = {
+  input: UpdateDraftSettingsInput;
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -1488,6 +1494,28 @@ export type TiebreakerRule = {
   secondaryMethod?: Maybe<TiebreakerMethod>;
   tertiaryMethod?: Maybe<TiebreakerMethod>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type UpdateDraftSettingsInput = {
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  leagueId: Scalars['Int']['input'];
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Result of updating draft settings */
+export type UpdateDraftSettingsPayload = {
+  __typename?: 'UpdateDraftSettingsPayload';
+  currentPick?: Maybe<Scalars['Int']['output']>;
+  draftCompletedAt?: Maybe<Scalars['String']['output']>;
+  draftMode?: Maybe<Scalars['String']['output']>;
+  draftOrder?: Maybe<Scalars['String']['output']>;
+  draftStartedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  selectionMethod?: Maybe<Scalars['String']['output']>;
 };
 
 export type UpdateLeagueScoringMultiplierInput = {

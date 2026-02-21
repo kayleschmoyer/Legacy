@@ -107,6 +107,13 @@ type CareerPitching {
   wins: Int
 }
 
+enum ConsentType {
+  analytics
+  data_processing
+  marketing_emails
+  third_party_sharing
+}
+
 input CreateLeagueAndTeamsInput {
   draftMode: String
   draftOrder: String
@@ -152,6 +159,20 @@ type CurrentDraftPick {
   round: Int
   team: Team
   teamId: Int
+}
+
+type DataRequest {
+  completedAt: String
+  createdAt: String
+  exportUrl: String
+  id: Int
+  notes: String
+  processedAt: String
+  requestType: String
+  requestedAt: String
+  status: String
+  updatedAt: String
+  userId: Int
 }
 
 type DeviceToken {
@@ -571,6 +592,11 @@ type MatchupStatusCounts {
 
 type Mutation {
   _placeholder: Boolean
+
+  """
+  Record that the user has accepted the privacy policy
+  """
+  acceptPrivacyPolicy: PrivacyPolicyStatus
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
   advanceLeagueWeek(leagueId: Int!): AdvanceLeagueWeekResponse
   cancelWaiverClaim(claimId: Int!): WaiverClaim
@@ -602,7 +628,27 @@ type Mutation {
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
   processWaiverClaims(leagueId: Int): ProcessWaiverClaimsResult
+
+  """
+  Record user consent for a specific data processing type
+  """
+  recordConsent(input: RecordConsentInput!): UserConsent
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
+
+  """
+  Request deletion of all personal data (GDPR Art. 17 - Right to Erasure)
+  """
+  requestDataDeletion: DataRequest
+
+  """
+  Request an export of all personal data (GDPR Art. 15 - Right of Access)
+  """
+  requestDataExport: DataRequest
+
+  """
+  Revoke a previously granted consent
+  """
+  revokeConsent(consentType: ConsentType!): UserConsent
   sendDirectMessage(
     leagueId: Int
     messageText: String!
@@ -734,6 +780,11 @@ type PlayoffQualification {
   teamName: String
 }
 
+type PrivacyPolicyStatus {
+  accepted: Boolean
+  acceptedAt: String
+}
+
 type ProcessWaiverClaimsResult {
   failed: Int
   processed: Int
@@ -769,6 +820,11 @@ type Query {
     orderDirection: String
   ): [CareerPitching!]
   defaultScoringProfile: ScoringConfig
+
+  """
+  Get a complete export of all personal data for the authenticated user
+  """
+  exportMyData: UserDataExport
   getAvailableDraftPlayers(
     draftId: Int!
     limit: Int
@@ -824,6 +880,16 @@ type Query {
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
   leagueTeams(leagueId: Int!): [Team!]
+
+  """
+  Get all consent records for the authenticated user
+  """
+  myConsents: [UserConsent!]
+
+  """
+  Get all data export/deletion requests for the authenticated user
+  """
+  myDataRequests: [DataRequest!]
   player(id: Int!): Player
   playerByBrefId(brefId: String!): Player
   playerCareerBatting(playerId: Int!): CareerBatting
@@ -840,6 +906,11 @@ type Query {
     orderDirection: String
     position: String
   ): [Player!]
+
+  """
+  Check if the authenticated user has accepted the privacy policy
+  """
+  privacyPolicyStatus: PrivacyPolicyStatus
   scoringDefinitions: [ScoringStatDefinition!]
   searchPlayers(limit: Int, searchTerm: String!): [Player!]
   searchUsers(limit: Int, searchTerm: String!): [User!]
@@ -894,6 +965,12 @@ type Query {
   Get version and deployment information for the GraphQL API
   """
   version: VersionInfo
+}
+
+input RecordConsentInput {
+  consentType: ConsentType!
+  ipAddress: String
+  userAgent: String
 }
 
 type ScoringConfig {
@@ -1205,6 +1282,29 @@ type User {
   email: String
   id: Int
   username: String
+}
+
+type UserConsent {
+  consentType: String
+  createdAt: String
+  grantedAt: String
+  id: Int
+  ipAddress: String
+  revokedAt: String
+  status: String
+  updatedAt: String
+  userId: Int
+}
+
+type UserDataExport {
+  consentsJson: String
+  dataRequestsJson: String
+  leaguesJson: String
+  privacyPolicyAcceptedAt: String
+  teamsJson: String
+  userCreatedAt: String
+  userEmail: String
+  userUsername: String
 }
 
 """

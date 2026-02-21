@@ -16,6 +16,7 @@ import {
   NotificationService,
 } from './NotificationService';
 import { createLeagueService, LeagueService } from './LeagueService';
+import { createGdprService, GdprService } from './GdprService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
 
@@ -26,6 +27,7 @@ export class DatabaseService {
   public readonly scoring: ScoringService;
   public readonly notifications: NotificationService;
   public readonly leagues: LeagueService;
+  public readonly gdpr: GdprService;
   private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
 
   constructor(private options: DbOptions) {
@@ -35,6 +37,7 @@ export class DatabaseService {
     this.scoring = createScoringService(options);
     this.notifications = createNotificationService(options);
     this.leagues = createLeagueService(options);
+    this.gdpr = createGdprService(options);
   }
 
   /**
@@ -79,6 +82,7 @@ export {
   createNotificationService,
 } from './NotificationService';
 export { LeagueService, createLeagueService } from './LeagueService';
+export { GdprService, createGdprService } from './GdprService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
@@ -95,3 +99,13 @@ export type {
   NotificationPreferenceUpdate,
 } from './NotificationService';
 export type { CreateLeagueOptions, CreateLeagueResult } from './LeagueService';
+export type {
+  UserConsent,
+  DataRequest,
+  ConsentType,
+  ConsentStatus,
+  DataRequestType,
+  DataRequestStatus,
+  RecordConsentInput,
+  UserDataExport,
+} from './GdprService';

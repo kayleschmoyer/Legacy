@@ -69,10 +69,12 @@ acli jira workitem transition --key LS-1234 --status "In Progress"
 
 ```powershell
 # Run validation in order
-pnpm exec nx affected -t typecheck   # 1. Type checking
-pnpm exec nx affected -t lint --fix  # 2. Linting with auto-fix
-pnpm exec nx affected -t test        # 3. Testing
-pnpm exec nx affected -t build       # 4. Building
+pnpm exec nx run db:print-schema     # 1. Regenerate GraphQL schema
+pnpm exec nx affected -t codegen     # 2. Regenerate TypeScript types from schema
+pnpm exec nx affected -t typecheck   # 3. Type checking
+pnpm exec nx affected -t lint --fix  # 4. Linting with auto-fix
+pnpm exec nx affected -t test        # 5. Testing
+pnpm exec nx affected -t build       # 6. Building
 ```
 
 ### Step 6: Commit Changes

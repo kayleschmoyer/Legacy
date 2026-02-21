@@ -546,17 +546,21 @@ endif
 
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
-	@$(call echo_plain,1/6 Type checking...)
+	@$(call echo_plain,1/8 Schema generation...)
+	@pnpm exec nx run db:print-schema
+	@$(call echo_plain,2/8 Code generation...)
+	@pnpm exec nx affected -t codegen --base=main
+	@$(call echo_plain,3/8 Type checking...)
 	@pnpm exec nx affected -t typecheck --base=main
-	@$(call echo_plain,2/6 Formatting...)
+	@$(call echo_plain,4/8 Formatting...)
 	@pnpm exec nx format:write
-	@$(call echo_plain,3/6 Linting...)
+	@$(call echo_plain,5/8 Linting...)
 	@pnpm exec nx affected -t lint --fix --base=main
-	@$(call echo_plain,4/6 Workflow validation...)
+	@$(call echo_plain,6/8 Workflow validation...)
 	@node scripts/validate-workflows.js
-	@$(call echo_plain,5/6 Testing...)
+	@$(call echo_plain,7/8 Testing...)
 	@pnpm exec nx affected -t test --base=main
-	@$(call echo_plain,6/6 Building...)
+	@$(call echo_plain,8/8 Building...)
 	@pnpm exec nx affected -t build --base=main
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
