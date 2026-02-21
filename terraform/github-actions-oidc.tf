@@ -275,13 +275,19 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       {
         Effect = "Allow"
         Action = [
-          # Read permissions
+          # Read permissions (wildcard needed for Terraform refresh/plan)
           "rds:DescribeDBInstances",
           "rds:DescribeDBProxies",
           "rds:DescribeDBProxyTargetGroups",
           "rds:DescribeDBProxyTargets",
           "rds:DescribeDBSubnetGroups",
-          "rds:ListTagsForResource",
+          "rds:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           # Write permissions for Terraform apply
           "rds:ModifyDBProxy",
           "rds:ModifyDBProxyTargetGroup",
@@ -346,6 +352,21 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:ListFunctions"
         ]
         Resource = "*"
+      },
+      # EventBridge permissions for Terraform state refresh and resource management
+      {
+        Effect = "Allow"
+        Action = [
+          "events:DescribeRule",
+          "events:ListTargetsByRule",
+          "events:ListRules",
+          "events:ListTagsForResource",
+          "events:DeleteRule",
+          "events:RemoveTargets"
+        ]
+        Resource = [
+          "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*"
+        ]
       }
     ]
   })
