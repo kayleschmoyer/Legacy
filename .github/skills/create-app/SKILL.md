@@ -16,7 +16,7 @@ Create a new application under `apps/` with standardized configuration. This ski
 
 ## Prerequisites
 
-- Jira ticket assigned and branch created (`twig switch LS-####`)
+- Jira ticket assigned and branch created (`twig switch LS-#### -p=main`)
 
 ## Node / CLI App
 

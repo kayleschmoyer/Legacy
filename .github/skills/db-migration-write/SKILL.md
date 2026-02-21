@@ -22,6 +22,21 @@ Create a new database migration file to track schema changes in version control.
 - Know the migration system location: `lib/db-client/migrations/`
 - Familiar with Drizzle ORM and PostgreSQL
 
+## 🚨 Critical Rules
+
+The migration runner (`rollback-migrations.ts`) enforces strict conventions.
+Violating any of these will cause the migration to be **silently skipped**.
+
+| Rule          | Correct                                       | Wrong                                      |
+| ------------- | --------------------------------------------- | ------------------------------------------ |
+| **Directory** | `lib/db-client/migrations/`                   | `lib/db-client/src/drizzle/migrations/`    |
+| **Filename**  | `YYYYMMDD_HHMMSS_name.ts`                     | `0051_name.ts`                             |
+| **Exports**   | Named `export const up` / `export const down` | `export default { up, down }`              |
+| **Signature** | `up({ db }: { db: PgDatabase<any> })`         | `up(db: NodePgDatabase)`                   |
+| **SQL calls** | `db.execute(\`...\`)` (plain string)          | `db.execute(sql\`...\`)` (tagged template) |
+
+**Why**: The runner regex is `^(\d{8}_\d{6})_(.+)\.ts$` and calls `migrationModule.up({ db, sql })`.
+
 ## Steps
 
 ### 1. Create Migration File
@@ -155,6 +170,37 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
   `);
 };
 ```
+
+**Create SQL Function** (e.g. for DB-level scoring, search, or computed columns):
+
+```typescript
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const up = async ({ db }: { db: PgDatabase<any> }) => {
+  // Use $fn$ as the function body delimiter to avoid escaping issues
+  await db.execute(`
+    CREATE OR REPLACE FUNCTION public.my_function(p_arg INTEGER DEFAULT NULL)
+    RETURNS TABLE (
+        col1 INTEGER,
+        col2 NUMERIC
+    )
+    LANGUAGE sql STABLE
+    AS $fn$
+      SELECT id, value FROM my_table WHERE arg = p_arg;
+    $fn$;
+  `);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const down = async ({ db }: { db: PgDatabase<any> }) => {
+  await db.execute(`
+    DROP FUNCTION IF EXISTS public.my_function(INTEGER);
+  `);
+};
+```
+
+> **Note**: Use `db.execute(\`...\`)`with a plain template string, NOT`db.execute(sql\`...\`)`.
+The tagged `sql`template from Drizzle wraps the statement, which can cause issues with
+complex function bodies using`$fn$` delimiters.
 
 ### 4. Update Schema Models
 

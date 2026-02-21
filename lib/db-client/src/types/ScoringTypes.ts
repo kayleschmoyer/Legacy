@@ -16,3 +16,18 @@ export interface LeagueScoringProfileSummary {
   leagueId: number | null;
   profileName: string | null;
 }
+
+/**
+ * Result row from the compute_career_scores(league_id) SQL function.
+ * Contains per-player fantasy scoring computed at the database level
+ * using league-specific (or default) scoring multipliers.
+ */
+export interface PlayerCareerScore {
+  playerId: number;
+  battingScore: number;
+  pitchingScore: number;
+  fieldingScore: number;
+  totalScore: number;
+  careerGames: number;
+  avgPpg: number;
+}

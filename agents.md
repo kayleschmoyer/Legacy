@@ -6,7 +6,7 @@
 
 ## 🚨 CRITICAL
 
-**NEVER commit to main** branch first: `twig switch LS-####`
+**NEVER commit to main** branch first: `twig switch LS-#### -p=main`
 
 ## Workflow
 

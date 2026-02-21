@@ -1,4 +1,8 @@
-import { createDatabaseService } from '@legacy-sports/db-client';
+import {
+  createDatabaseService,
+  type PlayerCareerScore,
+} from '@legacy-sports/db-client';
+import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 import { CareerBattingRef } from './statistics';
@@ -7,13 +11,16 @@ import { CareerBattingRef } from './statistics';
 const dbService = createDatabaseService(getDbOptions());
 
 // Player type
-const PlayerRef = builder.objectRef<{
+interface PlayerShape {
   id: number;
   firstName: string;
   lastName: string;
   brefId: string;
   statsLastFetchedAt: Date | null;
-}>('Player');
+  scoring?: PlayerCareerScore | null;
+}
+
+const PlayerRef = builder.objectRef<PlayerShape>('Player');
 
 // Average per-season stats type
 const AverageSeasonBattingRef = builder.objectRef<{
@@ -43,6 +50,20 @@ AverageSeasonBattingRef.implement({
     battingAverage: t.exposeFloat('battingAverage'),
     onBasePercentage: t.exposeFloat('onBasePercentage'),
     sluggingPercentage: t.exposeFloat('sluggingPercentage'),
+  }),
+});
+
+// Player scoring type — returned by DB-level compute_career_scores()
+const PlayerScoringRef = builder.objectRef<PlayerCareerScore>('PlayerScoring');
+
+PlayerScoringRef.implement({
+  fields: (t) => ({
+    battingScore: t.exposeFloat('battingScore'),
+    pitchingScore: t.exposeFloat('pitchingScore'),
+    fieldingScore: t.exposeFloat('fieldingScore'),
+    totalScore: t.exposeFloat('totalScore'),
+    careerGames: t.exposeInt('careerGames'),
+    avgPointsPerGame: t.exposeFloat('avgPpg'),
   }),
 });
 
@@ -118,6 +139,15 @@ PlayerRef.implement({
         };
       },
     }),
+    scoring: t.field({
+      description:
+        'Fantasy scoring data (only populated when using scoring-based sort)',
+      type: PlayerScoringRef,
+      nullable: true,
+      resolve: (parent) => {
+        return parent.scoring ?? null;
+      },
+    }),
   }),
 });
 
@@ -135,27 +165,22 @@ builder.queryField('players', (t) =>
         required: false,
         defaultValue: false,
       }),
+      leagueId: t.arg.int({
+        required: false,
+        description:
+          'League ID for scoring-based sorting. Uses league-specific scoring multipliers when provided, system defaults otherwise.',
+      }),
     },
     resolve: async (root, args) => {
-      const orderBy = args.orderBy as
-        | 'id'
-        | 'firstName'
-        | 'lastName'
-        | 'brefId'
-        | 'careerGames'
-        | 'careerHits'
-        | 'careerHomeRuns'
-        | 'careerRBI'
-        | 'careerRuns'
-        | 'careerStolenBases'
-        | undefined;
+      const orderBy = (args.orderBy || 'careerGames') as PlayerOrderBy;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
 
       return dbService.players.getPlayers({
         limit: args.limit || undefined,
         offset: args.offset || undefined,
-        orderBy: orderBy || 'careerGames', // Default sort by career games for relevance
+        orderBy,
         orderDirection: orderDirection || 'desc',
+        leagueId: args.leagueId ?? undefined,
         filters: {
           excludeEmptyNames: args.excludeEmptyNames ?? false,
           position: args.position || undefined,

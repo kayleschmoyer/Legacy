@@ -16,7 +16,7 @@ Create a new AWS Lambda function under `lambdas/` with standardized configuratio
 
 ## Prerequisites
 
-- Jira ticket assigned and branch created (`twig switch LS-####`)
+- Jira ticket assigned and branch created (`twig switch LS-#### -p=main`)
 - Know the Lambda's purpose and AWS trigger type
 
 ## Steps

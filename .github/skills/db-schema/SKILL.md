@@ -136,6 +136,21 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `league_scoring_profile_entries` | Individual stat point values |
 | `league_scoring_change_log`      | Audit log                    |
 
+### Functions
+
+| Function                                     | Purpose                                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `compute_career_scores(p_league_id INTEGER)` | Returns per-player scoring (batting/pitching/fielding/total/avg_ppg) using league or default multipliers. Use for DB-level player sorting. |
+| `is_major_league()`                          | Checks if a player has MLB-level stats                                                                                                     |
+
+```sql
+-- Example: Top 10 players by average points per game (default scoring)
+SELECT * FROM compute_career_scores(NULL) ORDER BY avg_ppg DESC LIMIT 10;
+
+-- Example: League-specific scoring
+SELECT * FROM compute_career_scores(16) ORDER BY total_score DESC LIMIT 50;
+```
+
 ---
 
 ## Common Query Patterns

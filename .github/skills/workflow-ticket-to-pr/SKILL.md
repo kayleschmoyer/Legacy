@@ -38,10 +38,10 @@ git status
 ### Step 2: Create Feature Branch
 
 ```powershell
-# For new ticket from main
+# For new ticket from main (ALWAYS specify -p=main)
 git checkout main
 git pull
-twig switch LS-1234
+twig switch LS-1234 -p=main
 
 # For follow-up work from current branch
 twig switch LS-1234 -p=current
@@ -113,6 +113,21 @@ acli jira workitem transition --key LS-1234 --status "Done"
 
 ## Common Mistakes to Avoid
 
+### ❌ MISTAKE 5: Forgetting `-p=main` on `twig switch`
+
+```powershell
+# WRONG - no parent specified
+twig switch LS-1234  # ❌ twig may pick wrong parent!
+
+# CORRECT - always specify parent explicitly
+twig switch LS-1234 -p=main     # new independent feature
+twig switch LS-1234 -p=current  # follow-up/dependent work
+```
+
+Without `-p=main`, twig may not correctly track the branch's parent,
+causing issues with rebasing, PR targets, and the branch dependency tree.
+**Always use `-p=main` for new features or `-p=current` for dependent work.**
+
 ### ❌ MISTAKE 1: Committing to Main
 
 ```powershell
@@ -128,8 +143,8 @@ git commit -m "changes"  # ❌ WRONG!
 # Undo the commit (keep changes)
 git reset HEAD~1
 
-# Create proper branch
-twig switch LS-1234
+# Create proper branch (ALWAYS specify -p=main)
+twig switch LS-1234 -p=main
 
 # Now commit properly
 git add .
@@ -179,8 +194,8 @@ Before starting ANY work:
 ## Quick Reference
 
 ```powershell
-# 1. Create branch (ALWAYS FIRST)
-twig switch LS-1234
+# 1. Create branch (ALWAYS FIRST — specify parent!)
+twig switch LS-1234 -p=main
 
 # 2. Update Jira
 acli jira workitem transition --key LS-1234 --status "In Progress"
@@ -224,8 +239,8 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 # 1. Undo the commit (keep changes)
 git reset HEAD~1
 
-# 2. Create proper branch
-twig switch LS-1234
+# 2. Create proper branch (ALWAYS specify -p=main)
+twig switch LS-1234 -p=main
 
 # 3. Commit on branch
 git add .

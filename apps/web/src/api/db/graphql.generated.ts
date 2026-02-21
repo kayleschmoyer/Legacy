@@ -829,6 +829,8 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** Fantasy scoring data (only populated when using scoring-based sort) */
+  scoring?: Maybe<PlayerScoring>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -842,6 +844,16 @@ export type PlayerGameScore = {
   pitchingScore?: Maybe<Scalars['Float']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   season?: Maybe<Scalars['Int']['output']>;
+  totalScore?: Maybe<Scalars['Float']['output']>;
+};
+
+export type PlayerScoring = {
+  __typename?: 'PlayerScoring';
+  avgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+  battingScore?: Maybe<Scalars['Float']['output']>;
+  careerGames?: Maybe<Scalars['Int']['output']>;
+  fieldingScore?: Maybe<Scalars['Float']['output']>;
+  pitchingScore?: Maybe<Scalars['Float']['output']>;
   totalScore?: Maybe<Scalars['Float']['output']>;
 };
 
@@ -1134,6 +1146,7 @@ export type QueryPlayerSeasonPitchingArgs = {
 
 export type QueryPlayersArgs = {
   excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -2603,6 +2616,7 @@ export type GetPlayersWithStatsQueryVariables = Exact<{
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetPlayersWithStatsQuery = {
@@ -2614,6 +2628,15 @@ export type GetPlayersWithStatsQuery = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    scoring?: {
+      __typename?: 'PlayerScoring';
+      battingScore?: number | null;
+      pitchingScore?: number | null;
+      fieldingScore?: number | null;
+      totalScore?: number | null;
+      careerGames?: number | null;
+      avgPointsPerGame?: number | null;
+    } | null;
     averageSeasonBatting?: {
       __typename?: 'AverageSeasonBatting';
       seasons?: number | null;
@@ -5593,6 +5616,7 @@ export const GetPlayersWithStats = gql`
     $orderBy: String = "lastName"
     $orderDirection: String = "asc"
     $position: String
+    $leagueId: Int
   ) {
     players(
       limit: $limit
@@ -5600,12 +5624,21 @@ export const GetPlayersWithStats = gql`
       orderBy: $orderBy
       orderDirection: $orderDirection
       position: $position
+      leagueId: $leagueId
     ) {
       id
       firstName
       lastName
       brefId
       eligiblePositions
+      scoring {
+        battingScore
+        pitchingScore
+        fieldingScore
+        totalScore
+        careerGames
+        avgPointsPerGame
+      }
       averageSeasonBatting {
         seasons
         games
@@ -5654,6 +5687,7 @@ export const GetPlayersWithStats = gql`
  *      orderBy: // value for 'orderBy'
  *      orderDirection: // value for 'orderDirection'
  *      position: // value for 'position'
+ *      leagueId: // value for 'leagueId'
  *   },
  * });
  */

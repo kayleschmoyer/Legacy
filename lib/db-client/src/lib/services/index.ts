@@ -86,7 +86,14 @@ export { GdprService, createGdprService } from './GdprService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
-export type { PlayerFilters, PlayerQueryOptions } from './PlayerService';
+export type {
+  PlayerFilters,
+  PlayerQueryOptions,
+  PlayerOrderBy,
+  PlayerWithScoring,
+  CareerStatOrderBy,
+  ScoringOrderBy,
+} from './PlayerService';
 export type {
   StatisticsFilters,
   StatisticsQueryOptions,

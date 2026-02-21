@@ -16,7 +16,7 @@ Create a new shared library under `lib/` with standardized configuration files. 
 
 ## Prerequisites
 
-- Jira ticket assigned and branch created (`twig switch LS-####`)
+- Jira ticket assigned and branch created (`twig switch LS-#### -p=main`)
 
 ## Steps
 

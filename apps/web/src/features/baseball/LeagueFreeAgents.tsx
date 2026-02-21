@@ -21,6 +21,7 @@ import {
 import { WaiverClaimModal } from './WaiverClaimModal';
 import { useGetPlayersWithStatsQuery } from '../../api/db/graphql.generated';
 import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';
+import { useCurrentMatchup } from '../../hooks/useMatchup';
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
@@ -81,6 +82,54 @@ const STAT_COLUMNS: {
     sortKey: 'careerStolenBases',
     width: 48,
     description: 'Career Stolen Bases',
+  },
+];
+
+/** Scoring columns — populated by compute_career_scores DB function */
+const SCORING_COLUMNS: {
+  key: string;
+  label: string;
+  sortKey: SortKey;
+  width: number;
+  description: string;
+  isBold?: boolean;
+}[] = [
+  {
+    key: 'totalScore',
+    label: 'PTS',
+    sortKey: 'totalScore',
+    width: 60,
+    description: 'Total Fantasy Points',
+    isBold: true,
+  },
+  {
+    key: 'avgPointsPerGame',
+    label: 'PROJ',
+    sortKey: 'avgPointsPerGame',
+    width: 60,
+    description: 'Projected Points This Week',
+    isBold: true,
+  },
+  {
+    key: 'battingScore',
+    label: 'BAT',
+    sortKey: 'battingScore',
+    width: 56,
+    description: 'Batting Score',
+  },
+  {
+    key: 'pitchingScore',
+    label: 'PITCH',
+    sortKey: 'pitchingScore',
+    width: 56,
+    description: 'Pitching Score',
+  },
+  {
+    key: 'fieldingScore',
+    label: 'FLD',
+    sortKey: 'fieldingScore',
+    width: 56,
+    description: 'Fielding Score',
   },
 ];
 
@@ -203,7 +252,12 @@ type SortKey =
   | 'careerHomeRuns'
   | 'careerRBI'
   | 'careerRuns'
-  | 'careerStolenBases';
+  | 'careerStolenBases'
+  | 'totalScore'
+  | 'avgPointsPerGame'
+  | 'battingScore'
+  | 'pitchingScore'
+  | 'fieldingScore';
 
 /* ── Sub-components ────────────────────────────────────────────────────────── */
 
@@ -297,7 +351,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<SortKey>('careerGames');
+  const [sortBy, setSortBy] = useState<SortKey>('avgPointsPerGame');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [claimPlayer, setClaimPlayer] = useState<{
     id: number;
@@ -313,6 +367,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
       orderBy: sortBy,
       orderDirection: sortDirection,
       position: positionFilter === 'ALL' ? undefined : positionFilter,
+      leagueId,
     },
     fetchPolicy: 'cache-and-network',
   });
@@ -334,6 +389,9 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     setPositionFilter(pos);
     setPage(0);
   }, []);
+
+  const { matchup: currentMatchup } = useCurrentMatchup(leagueId);
+  const gamesPerMatchup = currentMatchup?.gamesPerMatchup ?? 1;
 
   const { takenPlayerIds, loading: takenLoading } =
     useLeagueTakenPlayers(leagueId);
@@ -430,6 +488,18 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
         >
           Pos
         </Text>
+        {SCORING_COLUMNS.map((col) => (
+          <SortableHeader
+            key={col.key}
+            label={col.label}
+            sortKey={col.sortKey}
+            currentSort={sortBy}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            width={col.width}
+            description={col.description}
+          />
+        ))}
         {STAT_COLUMNS.map((col) => (
           <SortableHeader
             key={col.key}
@@ -621,6 +691,39 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                       </Text>
                     )}
                   </XStack>
+
+                  {/* Scoring cells */}
+                  <StatCell width={60} fontWeight="700" color="$green11">
+                    {player.scoring?.totalScore != null
+                      ? Math.round(player.scoring.totalScore).toLocaleString()
+                      : '–'}
+                  </StatCell>
+                  <StatCell width={60} fontWeight="700" color="$blue11">
+                    {player.scoring?.avgPointsPerGame != null
+                      ? (
+                          player.scoring.avgPointsPerGame * gamesPerMatchup
+                        ).toFixed(1)
+                      : '–'}
+                  </StatCell>
+                  <StatCell width={56}>
+                    {player.scoring?.battingScore != null
+                      ? Math.round(player.scoring.battingScore).toLocaleString()
+                      : '–'}
+                  </StatCell>
+                  <StatCell width={56}>
+                    {player.scoring?.pitchingScore != null
+                      ? Math.round(
+                          player.scoring.pitchingScore,
+                        ).toLocaleString()
+                      : '–'}
+                  </StatCell>
+                  <StatCell width={56}>
+                    {player.scoring?.fieldingScore != null
+                      ? Math.round(
+                          player.scoring.fieldingScore,
+                        ).toLocaleString()
+                      : '–'}
+                  </StatCell>
 
                   {/* Career stat cells */}
                   <StatCell width={48}>{statVal(stats?.games)}</StatCell>

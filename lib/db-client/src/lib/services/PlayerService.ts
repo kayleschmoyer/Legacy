@@ -1,8 +1,24 @@
 import { and, count, eq, ilike, inArray, ne, or, sql, SQL } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
 import { runWithPublicClient } from '../client/Helpers';
-import { PublicSchema } from '../client/PublicDbClient';
+import { PublicDb, PublicSchema } from '../client/PublicDbClient';
 import { Player } from '../../types/DatabaseTypes';
+import { PlayerCareerScore } from '../../types/ScoringTypes';
+
+/** Shape of rows returned by the compute_career_scores raw SQL query */
+interface ScoringResultRow {
+  id: number;
+  first_name: string;
+  last_name: string;
+  bref_id: string;
+  stats_last_fetched_at: string | null;
+  batting_score: string | null;
+  pitching_score: string | null;
+  fielding_score: string | null;
+  total_score: string | null;
+  career_games: string | null;
+  avg_ppg: string | null;
+}
 
 export interface PlayerFilters {
   ids?: number[];
@@ -15,22 +31,48 @@ export interface PlayerFilters {
   position?: string;
 }
 
+/** Sort options that require a join to career_batting */
+export type CareerStatOrderBy =
+  | 'careerGames'
+  | 'careerHits'
+  | 'careerHomeRuns'
+  | 'careerRBI'
+  | 'careerRuns'
+  | 'careerStolenBases';
+
+/** Sort options that require the compute_career_scores DB function */
+export type ScoringOrderBy =
+  | 'totalScore'
+  | 'avgPointsPerGame'
+  | 'battingScore'
+  | 'pitchingScore'
+  | 'fieldingScore';
+
+export type PlayerOrderBy =
+  | 'id'
+  | 'firstName'
+  | 'lastName'
+  | 'brefId'
+  | CareerStatOrderBy
+  | ScoringOrderBy;
+
 export interface PlayerQueryOptions {
   filters?: PlayerFilters;
   limit?: number;
   offset?: number;
-  orderBy?:
-    | 'id'
-    | 'firstName'
-    | 'lastName'
-    | 'brefId'
-    | 'careerGames'
-    | 'careerHits'
-    | 'careerHomeRuns'
-    | 'careerRBI'
-    | 'careerRuns'
-    | 'careerStolenBases';
+  orderBy?: PlayerOrderBy;
   orderDirection?: 'asc' | 'desc';
+  /**
+   * League ID for scoring-based sorts. When provided with a scoring orderBy,
+   * the league's custom scoring multipliers are used. When omitted, system
+   * defaults are used.
+   */
+  leagueId?: number | null;
+}
+
+/** Player with scoring data attached from the DB function */
+export interface PlayerWithScoring extends Player {
+  scoring: PlayerCareerScore;
 }
 
 /**
@@ -46,20 +88,40 @@ export class PlayerService {
     return runWithPublicClient(this.options, async (db): Promise<Player[]> => {
       let queryBuilder = db.select().from(PublicSchema.players);
 
-      const isCareerSort = [
+      const careerSortOptions: CareerStatOrderBy[] = [
         'careerGames',
         'careerHits',
         'careerHomeRuns',
         'careerRBI',
         'careerRuns',
         'careerStolenBases',
-      ].includes(queryOptions.orderBy || '');
+      ];
+      const scoringSortOptions: ScoringOrderBy[] = [
+        'totalScore',
+        'avgPointsPerGame',
+        'battingScore',
+        'pitchingScore',
+        'fieldingScore',
+      ];
+      const isCareerSort = careerSortOptions.includes(
+        queryOptions.orderBy as CareerStatOrderBy,
+      );
+      const isScoringSort = scoringSortOptions.includes(
+        queryOptions.orderBy as ScoringOrderBy,
+      );
 
       if (isCareerSort) {
         queryBuilder = queryBuilder.leftJoin(
           PublicSchema.careerBatting,
           eq(PublicSchema.players.id, PublicSchema.careerBatting.playerId),
         ) as unknown as typeof queryBuilder;
+      }
+
+      // For scoring-based sorts, redirect to the dedicated method
+      if (isScoringSort) {
+        return this.getPlayersWithScoringSort(
+          queryOptions,
+        ) as unknown as Player[];
       }
 
       // Build WHERE clause
@@ -161,7 +223,14 @@ export class PlayerService {
         } else if (queryOptions.orderBy === 'careerStolenBases') {
           orderColumn = PublicSchema.careerBatting.sb;
         } else {
-          orderColumn = PublicSchema.players[queryOptions.orderBy];
+          // Only plain player-table columns reach here (scoring sorts
+          // are redirected above via isScoringSort)
+          const playerKey = queryOptions.orderBy as
+            | 'id'
+            | 'firstName'
+            | 'lastName'
+            | 'brefId';
+          orderColumn = PublicSchema.players[playerKey];
         }
       }
 
@@ -354,6 +423,176 @@ export class PlayerService {
     }
 
     return conditions;
+  }
+
+  /**
+   * Get players sorted by DB-level scoring using compute_career_scores().
+   * Returns PlayerWithScoring[] so callers can access the computed scores.
+   */
+  async getPlayersWithScoring(
+    queryOptions: PlayerQueryOptions = {},
+  ): Promise<PlayerWithScoring[]> {
+    return this.getPlayersWithScoringSort(queryOptions);
+  }
+
+  /**
+   * Internal: query players with a lateral join to the compute_career_scores
+   * SQL function, enabling ORDER BY on any scoring column.
+   */
+  private async getPlayersWithScoringSort(
+    queryOptions: PlayerQueryOptions,
+  ): Promise<PlayerWithScoring[]> {
+    return runWithPublicClient(
+      this.options,
+      async (db): Promise<PlayerWithScoring[]> => {
+        const leagueIdParam =
+          queryOptions.leagueId !== undefined ? queryOptions.leagueId : null;
+
+        // Map orderBy to the SQL column name in compute_career_scores
+        const scoringColumnMap: Record<string, string> = {
+          totalScore: 'total_score',
+          avgPointsPerGame: 'avg_ppg',
+          battingScore: 'batting_score',
+          pitchingScore: 'pitching_score',
+          fieldingScore: 'fielding_score',
+        };
+        const sortColumn =
+          scoringColumnMap[queryOptions.orderBy || 'avgPointsPerGame'] ||
+          'avg_ppg';
+        const sortDir =
+          queryOptions.orderDirection === 'asc' ? sql`ASC` : sql`DESC`;
+
+        // Build WHERE conditions
+        const conditions = queryOptions.filters
+          ? this.buildPlayerFilters(queryOptions.filters)
+          : [];
+
+        // Position filtering
+        if (queryOptions.filters?.position) {
+          conditions.push(
+            this.buildPositionFilter(db, queryOptions.filters.position),
+          );
+        }
+
+        const whereClause =
+          conditions.length > 0 ? and(...conditions) : undefined;
+
+        // Use raw SQL to join players with the scoring function.
+        // This is necessary because Drizzle doesn't support set-returning
+        // function calls as join targets.
+        const limitClause = queryOptions.limit
+          ? sql`LIMIT ${sql.raw(String(queryOptions.limit))}`
+          : sql``;
+        const offsetClause = queryOptions.offset
+          ? sql`OFFSET ${sql.raw(String(queryOptions.offset))}`
+          : sql``;
+
+        // Build a Drizzle-compatible query that selects from players
+        // and joins with the scoring function
+        const scoringQuery = sql`
+          SELECT
+            p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
+            cs.batting_score, cs.pitching_score, cs.fielding_score,
+            cs.total_score, cs.career_games, cs.avg_ppg
+          FROM public.players p
+          LEFT JOIN public.compute_career_scores(${leagueIdParam}) cs
+            ON p.id = cs.player_id
+          ${whereClause ? sql`WHERE ${whereClause}` : sql``}
+          ORDER BY cs.${sql.raw(sortColumn)} ${sortDir} NULLS LAST
+          ${limitClause}
+          ${offsetClause}
+        `;
+
+        const result = await db.execute(scoringQuery);
+        const rows = result.rows as unknown as ScoringResultRow[];
+
+        return rows.map((row) => ({
+          id: row.id,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          brefId: row.bref_id,
+          statsLastFetchedAt: row.stats_last_fetched_at
+            ? new Date(row.stats_last_fetched_at)
+            : null,
+          scoring: {
+            playerId: row.id,
+            battingScore: Number(row.batting_score) || 0,
+            pitchingScore: Number(row.pitching_score) || 0,
+            fieldingScore: Number(row.fielding_score) || 0,
+            totalScore: Number(row.total_score) || 0,
+            careerGames: Number(row.career_games) || 0,
+            avgPpg: Number(row.avg_ppg) || 0,
+          },
+        }));
+      },
+    );
+  }
+
+  /**
+   * Build a position filter SQL condition.
+   * Extracted to share between getPlayers and getPlayersWithScoringSort.
+   */
+  private buildPositionFilter(db: PublicDb, pos: string): SQL {
+    if (pos === 'P') {
+      return inArray(
+        PublicSchema.players.id,
+        db
+          .select({ id: PublicSchema.playerEligiblePositions.playerId })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            inArray(PublicSchema.playerEligiblePositions.position, [
+              'SP',
+              'RP',
+            ] as const),
+          ),
+      );
+    } else if (pos === 'OF') {
+      return inArray(
+        PublicSchema.players.id,
+        db
+          .select({ id: PublicSchema.playerEligiblePositions.playerId })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            inArray(PublicSchema.playerEligiblePositions.position, [
+              'LF',
+              'CF',
+              'RF',
+            ] as const),
+          ),
+      );
+    } else if (pos === 'DH') {
+      return inArray(
+        PublicSchema.players.id,
+        db
+          .select({ id: PublicSchema.playerEligiblePositions.playerId })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            inArray(PublicSchema.playerEligiblePositions.position, [
+              'C',
+              '1B',
+              '2B',
+              '3B',
+              'SS',
+              'LF',
+              'CF',
+              'RF',
+            ] as const),
+          ),
+      );
+    } else {
+      return inArray(
+        PublicSchema.players.id,
+        db
+          .select({ id: PublicSchema.playerEligiblePositions.playerId })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            eq(
+              PublicSchema.playerEligiblePositions.position,
+              pos as (typeof PublicSchema.playerEligiblePositions.position.enumValues)[number],
+            ),
+          ),
+      );
+    }
   }
 }
 

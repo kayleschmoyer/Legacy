@@ -287,23 +287,26 @@ pnpm run db:credentials:production
 ## Migration File Structure
 
 ```
-lib/db-client/drizzle/
-├── 0000_initial_schema.sql
-├── 0001_add_users_table.sql
-├── 0002_add_leagues_table.sql
-└── meta/
-    └── _journal.json
+lib/db-client/migrations/
+├── 20251108_000000_initial_schema.ts
+├── 20251108_010000_add_matchup_team_pairings_and_scoring.ts
+├── 20260221_010000_add_compute_career_scores_function.ts
+└── ... (YYYYMMDD_HHMMSS_name.ts format, TypeScript only)
 ```
+
+⚠️ **NOT** `lib/db-client/src/drizzle/migrations/` — that directory holds Drizzle ORM
+schema models, not runnable migrations.
 
 ## Drizzle Schema Location
 
 ```
-lib/db-client/src/lib/schema/
-├── users.ts
-├── leagues.ts
-├── teams.ts
-├── players.ts
-└── ...
+lib/db-client/src/drizzle/
+├── public/models/     # Public schema table definitions
+│   ├── Players.ts
+│   ├── Leagues.ts
+│   └── ...
+├── internal/models/   # app_internal schema tables
+└── migrations/        # ⚠️ NOT runnable migrations — schema model files only
 ```
 
 ## Exit Codes

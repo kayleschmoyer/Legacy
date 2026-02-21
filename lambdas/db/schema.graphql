@@ -754,6 +754,11 @@ type Player {
   firstName: String
   id: Int
   lastName: String
+
+  """
+  Fantasy scoring data (only populated when using scoring-based sort)
+  """
+  scoring: PlayerScoring
   statsLastFetchedAt: String
 }
 
@@ -766,6 +771,15 @@ type PlayerGameScore {
   pitchingScore: Float
   playerId: Int
   season: Int
+  totalScore: Float
+}
+
+type PlayerScoring {
+  avgPointsPerGame: Float
+  battingScore: Float
+  careerGames: Int
+  fieldingScore: Float
+  pitchingScore: Float
   totalScore: Float
 }
 
@@ -900,6 +914,11 @@ type Query {
   playerSeasonPitching(playerId: Int!, season: Int): [SeasonPitching!]
   players(
     excludeEmptyNames: Boolean = false
+
+    """
+    League ID for scoring-based sorting. Uses league-specific scoring multipliers when provided, system defaults otherwise.
+    """
+    leagueId: Int
     limit: Int
     offset: Int
     orderBy: String
