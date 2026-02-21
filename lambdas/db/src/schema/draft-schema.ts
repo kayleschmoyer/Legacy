@@ -674,17 +674,43 @@ builder.mutationField('initializeLiveDraft', (t) =>
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
 
-        // Create the drafts record
-        const [draft] = await context.db
-          .insert(PublicSchema.drafts)
-          .values({
-            leagueId,
-            draftMode: 'live',
-            selectionMethod: 'standard',
-            draftOrder: draftOrder,
-            currentPick: 0,
-          })
-          .returning();
+        // Upsert the draft record — update the existing one from league creation,
+        // or create a new one if somehow missing
+        const [existingDraft] = await context.db
+          .select({ id: PublicSchema.drafts.id })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, leagueId))
+          .orderBy(desc(PublicSchema.drafts.createdAt))
+          .limit(1);
+
+        let draft;
+        if (existingDraft) {
+          const [updated] = await context.db
+            .update(PublicSchema.drafts)
+            .set({
+              draftMode: 'live',
+              selectionMethod: 'standard',
+              draftOrder: draftOrder,
+              currentPick: 0,
+              draftStartedAt: new Date(),
+            })
+            .where(eq(PublicSchema.drafts.id, existingDraft.id))
+            .returning();
+          draft = updated;
+        } else {
+          const [created] = await context.db
+            .insert(PublicSchema.drafts)
+            .values({
+              leagueId,
+              draftMode: 'live',
+              selectionMethod: 'standard',
+              draftOrder: draftOrder,
+              currentPick: 0,
+              draftStartedAt: new Date(),
+            })
+            .returning();
+          draft = created;
+        }
 
         // Insert draft_teams with the randomized order (1-indexed)
         await context.db.insert(PublicSchema.draftTeams).values(
@@ -722,6 +748,217 @@ builder.mutationField('initializeLiveDraft', (t) =>
         return draft;
       } catch (error) {
         LOGGER.error('Error initializing live draft', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    },
+  }),
+);
+
+// ── Update Draft Settings ────────────────────────────────────────────────────
+
+// Input type for updating draft settings before a draft starts
+const UpdateDraftSettingsInput = builder.inputType('UpdateDraftSettingsInput', {
+  fields: (t) => ({
+    leagueId: t.int({ required: true }),
+    draftMode: t.string({ required: false }), // 'live' | 'automated'
+    selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random'
+    draftOrder: t.string({ required: false }), // 'snake' | 'linear'
+    playerPool: t.string({ required: false }), // 'all' | 'nl' | 'al'
+  }),
+});
+
+// Payload for draft settings update — returns the updated draft record
+const UpdateDraftSettingsPayload = builder.objectRef<{
+  id: number;
+  leagueId: number;
+  draftMode: string;
+  selectionMethod: string;
+  draftOrder: string;
+  currentPick: number;
+  draftStartedAt: Date | null;
+  draftCompletedAt: Date | null;
+  date: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  playerPool: string;
+}>('UpdateDraftSettingsPayload');
+
+UpdateDraftSettingsPayload.implement({
+  description: 'Result of updating draft settings',
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    leagueId: t.exposeInt('leagueId'),
+    draftMode: t.exposeString('draftMode'),
+    selectionMethod: t.exposeString('selectionMethod'),
+    draftOrder: t.exposeString('draftOrder'),
+    currentPick: t.exposeInt('currentPick'),
+    playerPool: t.exposeString('playerPool'),
+    draftStartedAt: t.string({
+      nullable: true,
+      resolve: (payload) => payload.draftStartedAt?.toISOString() || null,
+    }),
+    draftCompletedAt: t.string({
+      nullable: true,
+      resolve: (payload) => payload.draftCompletedAt?.toISOString() || null,
+    }),
+  }),
+});
+
+/**
+ * Mutation: Update draft settings (mode, selection method, order, player pool).
+ * Only allowed when the league's draftStatus is 'not-started'.
+ */
+builder.mutationField('updateDraftSettings', (t) =>
+  t.field({
+    type: UpdateDraftSettingsPayload,
+    args: {
+      input: t.arg({ type: UpdateDraftSettingsInput, required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required to update draft settings');
+      }
+
+      const { leagueId, draftMode, selectionMethod, draftOrder, playerPool } =
+        args.input;
+      const userId = context.user.id;
+
+      try {
+        // Verify user is the league owner
+        const [league] = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            owner: PublicSchema.leagues.owner,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            playerPool: PublicSchema.leagues.playerPool,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        if (!league) {
+          throw new Error('League not found');
+        }
+
+        if (league.owner !== userId) {
+          throw new Error('Only the league owner can update draft settings');
+        }
+
+        // Prevent changes after draft has started
+        if (league.draftStatus !== 'not-started') {
+          throw new Error(
+            'Draft settings cannot be changed after the draft has been started',
+          );
+        }
+
+        // Validate enum values
+        const validDraftModes = ['live', 'automated'];
+        const validSelectionMethods = ['standard', 'auction', 'random'];
+        const validDraftOrders = ['snake', 'linear'];
+        const validPlayerPools = ['all', 'nl', 'al'];
+
+        if (draftMode && !validDraftModes.includes(draftMode)) {
+          throw new Error(
+            `Invalid draft mode: ${draftMode}. Must be one of: ${validDraftModes.join(', ')}`,
+          );
+        }
+        if (
+          selectionMethod &&
+          !validSelectionMethods.includes(selectionMethod)
+        ) {
+          throw new Error(
+            `Invalid selection method: ${selectionMethod}. Must be one of: ${validSelectionMethods.join(', ')}`,
+          );
+        }
+        if (draftOrder && !validDraftOrders.includes(draftOrder)) {
+          throw new Error(
+            `Invalid draft order: ${draftOrder}. Must be one of: ${validDraftOrders.join(', ')}`,
+          );
+        }
+        if (playerPool && !validPlayerPools.includes(playerPool)) {
+          throw new Error(
+            `Invalid player pool: ${playerPool}. Must be one of: ${validPlayerPools.join(', ')}`,
+          );
+        }
+
+        // Update playerPool on the league if provided
+        let updatedPlayerPool = league.playerPool;
+        if (playerPool) {
+          const [updatedLeague] = await context.db
+            .update(PublicSchema.leagues)
+            .set({
+              playerPool: playerPool as 'all' | 'nl' | 'al',
+              updatedAt: new Date(),
+            })
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .returning({ playerPool: PublicSchema.leagues.playerPool });
+          updatedPlayerPool = updatedLeague.playerPool;
+        }
+
+        // Check if a draft record exists, create one if not
+        let [existingDraft] = await context.db
+          .select()
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, leagueId))
+          .limit(1);
+
+        const draftUpdates: Record<string, unknown> = {
+          updatedAt: new Date(),
+        };
+        if (draftMode) {
+          draftUpdates['draftMode'] = draftMode as 'live' | 'automated';
+        }
+        if (selectionMethod) {
+          draftUpdates['selectionMethod'] = selectionMethod as
+            | 'standard'
+            | 'auction'
+            | 'random';
+        }
+        if (draftOrder) {
+          draftUpdates['draftOrder'] = draftOrder as 'snake' | 'linear';
+        }
+
+        if (existingDraft) {
+          const [updated] = await context.db
+            .update(PublicSchema.drafts)
+            .set(draftUpdates)
+            .where(eq(PublicSchema.drafts.id, existingDraft.id))
+            .returning();
+          existingDraft = updated;
+        } else {
+          const [created] = await context.db
+            .insert(PublicSchema.drafts)
+            .values({
+              leagueId,
+              draftMode: (draftMode as 'live' | 'automated') || 'live',
+              selectionMethod:
+                (selectionMethod as 'standard' | 'auction' | 'random') ||
+                'standard',
+              draftOrder: (draftOrder as 'snake' | 'linear') || 'snake',
+              currentPick: 0,
+            })
+            .returning();
+          existingDraft = created;
+        }
+
+        LOGGER.info('Draft settings updated successfully', {
+          leagueId,
+          draftMode: existingDraft.draftMode,
+          selectionMethod: existingDraft.selectionMethod,
+          draftOrder: existingDraft.draftOrder,
+          playerPool: updatedPlayerPool,
+        });
+
+        return {
+          ...existingDraft,
+          playerPool: updatedPlayerPool,
+        };
+      } catch (error) {
+        LOGGER.error('Error updating draft settings', {
           leagueId,
           userId,
           error: error instanceof Error ? error.message : String(error),

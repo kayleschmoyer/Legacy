@@ -158,6 +158,7 @@ export async function fetchLeagueDetails(leagueId: number) {
         currentMatchup: PublicSchema.leagues.currentMatchup,
         draftStatus: PublicSchema.leagues.draftStatus,
         inviteCode: PublicSchema.leagues.inviteCode,
+        playerPool: PublicSchema.leagues.playerPool,
       })
       .from(PublicSchema.leagues)
       .where(eq(PublicSchema.leagues.id, leagueId))
@@ -171,6 +172,67 @@ export async function fetchLeagueDetails(leagueId: number) {
   });
 
   return league;
+}
+
+export interface CreateDraftOptions {
+  leagueId: number;
+  draftMode?: DraftMode;
+  selectionMethod?: SelectionMethod;
+  draftOrder?: DraftOrder;
+}
+
+/**
+ * Create a draft record for a league with the given settings.
+ * Should be called when a league is created so draft settings are always persisted.
+ * Safe to call if a draft already exists — it will skip the insert.
+ */
+export async function createDraftForLeague(
+  options: CreateDraftOptions,
+): Promise<void> {
+  const {
+    leagueId,
+    draftMode = 'live',
+    selectionMethod = 'standard',
+    draftOrder = 'snake',
+  } = options;
+
+  try {
+    await runWithPublicClient(getDbOptions(), async (db) => {
+      // Check if a draft record already exists
+      const existing = await db
+        .select({ id: PublicSchema.drafts.id })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.leagueId, leagueId))
+        .limit(1);
+
+      if (existing.length > 0) {
+        LOGGER.debug('Draft record already exists for league', { leagueId });
+        return;
+      }
+
+      await db.insert(PublicSchema.drafts).values({
+        leagueId,
+        draftMode,
+        selectionMethod,
+        draftOrder,
+      });
+
+      LOGGER.info('Created draft record for league', {
+        leagueId,
+        draftMode,
+        selectionMethod,
+        draftOrder,
+      });
+    });
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    LOGGER.error(
+      `Failed to create draft record for league ${leagueId}:`,
+      errorMessage,
+    );
+    throw error;
+  }
 }
 
 /**

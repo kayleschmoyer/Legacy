@@ -107,8 +107,36 @@ See [db-schema.md](db-schema.md) for full schema reference and [db-query.md](db-
 
 - **Framework**: Apollo Server + Pothos schema builder
 - **Type generation**: Codegen from schema → TypeScript types
-- **Service layer**: `PlayerService`, `StatisticsService`, `ScoringService`
+- **Service layer**: `LeagueService`, `PlayerService`, `StatisticsService`, `ScoringService`, `DraftService`
 - **Location**: `lambdas/db/` (the "db" lambda is the GraphQL Lambda)
+- **Service location**: `lib/db-client/src/lib/services/`
+
+### Service Layer Pattern
+
+All domain services live in `lib/db-client/src/lib/services/` and follow this pattern:
+
+```typescript
+// Class with DbOptions constructor + factory function
+export class FooService {
+  constructor(private options: DbOptions) {}
+  async doThing() { return runWithPublicClient(this.options, async (db) => { ... }); }
+}
+export function createFooService(options: DbOptions) { return new FooService(options); }
+```
+
+Services are registered on `DatabaseService` (the aggregate root) and re-exported from `@legacy-sports/db-client`.
+
+### League Creation — Always Use `LeagueService`
+
+**Never insert into the `leagues` table directly.** Use `LeagueService.createLeague()` — it atomically creates:
+
+1. League row (with unique invite code)
+2. Teams
+3. Owner league membership
+4. Roster positions
+5. **Draft record** (ensures draft settings always exist)
+
+Missing draft records cause the `startDraft` mutation to fall back to wrong defaults.
 
 ---
 
@@ -151,6 +179,8 @@ cd ..
 4. **PowerShell**: Windows dev environment, `;` for chaining
 5. **Conventional commits**: `type(scope): message`
 6. **Always add timestamps to new DB tables** — see [db-migration-write.md](db-migration-write.md)
+7. **Create leagues via `LeagueService.createLeague()`** — never raw-insert leagues. The service guarantees all related records (teams, positions, draft) are created together.
+8. **Draft records must exist for every league** — `startDraft` and `initializeLiveDraft` self-heal by upserting, but prevention is better than cure.
 
 ## Related Skills
 

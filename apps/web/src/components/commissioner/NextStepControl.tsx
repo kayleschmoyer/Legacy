@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   type Matchup,
   StatsLoadingStatus,
   useAdvanceLeagueWeekMutation,
+  useGetLeagueDraftQuery,
   useGetMatchupsForLeagueQuery,
   useStartDraftMutation,
   useTriggerGameSelectionMutation,
@@ -60,7 +62,10 @@ export function NextStepControl({
     ],
     awaitRefetchQueries: true,
   });
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation();
+  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
+    refetchQueries: ['GetLeagueDraft'],
+    awaitRefetchQueries: true,
+  });
   const [triggerGameSelection] = useTriggerGameSelectionMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
@@ -72,6 +77,14 @@ export function NextStepControl({
       variables: { leagueId },
       fetchPolicy: 'network-only',
     });
+
+  // Fetch draft settings to determine draft mode (live vs automated)
+  const { data: draftData } = useGetLeagueDraftQuery({
+    variables: { leagueId },
+    fetchPolicy: 'cache-and-network',
+  });
+  const draftMode = draftData?.getLeagueDraft?.draftMode ?? 'automated';
+  const isLiveDraft = draftMode === 'live';
 
   // Find the highest week number
   const highestWeek =
@@ -141,7 +154,6 @@ export function NextStepControl({
         const result = await startDraft({
           variables: {
             leagueId,
-            selectionMethod: 'random',
           },
         });
 
@@ -368,30 +380,73 @@ export function NextStepControl({
           )}
 
           <XStack justifyContent="flex-start" gap="$3">
-            <Button
-              theme="blue"
-              onPress={handleButtonClick}
-              disabled={
-                loading ||
-                startDraftLoading ||
-                matchupsLoading ||
-                isGameSelectionInProgress ||
-                isDraftInProgress ||
-                (actionType === 'draft' && isDraftCompleted)
-              }
-              icon={
-                loading ||
-                startDraftLoading ||
-                matchupsLoading ||
-                isGameSelectionInProgress ||
-                isDraftInProgress ? (
-                  <Spinner />
-                ) : undefined
-              }
-            >
-              {getButtonText()}
-            </Button>
+            {isDraftInProgress && isLiveDraft ? (
+              <Link to="/baseball/draft" style={{ textDecoration: 'none' }}>
+                <Button theme="green">Go to Draft Board</Button>
+              </Link>
+            ) : (
+              <Button
+                theme="blue"
+                onPress={handleButtonClick}
+                disabled={
+                  loading ||
+                  startDraftLoading ||
+                  matchupsLoading ||
+                  isGameSelectionInProgress ||
+                  isDraftInProgress ||
+                  (actionType === 'draft' && isDraftCompleted)
+                }
+                icon={
+                  loading ||
+                  startDraftLoading ||
+                  matchupsLoading ||
+                  isGameSelectionInProgress ||
+                  (isDraftInProgress && !isLiveDraft) ? (
+                    <Spinner />
+                  ) : undefined
+                }
+              >
+                {getButtonText()}
+              </Button>
+            )}
           </XStack>
+
+          {isDraftInProgress && !isLiveDraft && (
+            <XStack
+              alignItems="center"
+              gap="$2"
+              backgroundColor="$yellow3"
+              borderColor="$yellow8"
+              borderWidth={1}
+              borderRadius="$3"
+              paddingHorizontal="$3"
+              paddingVertical="$2"
+            >
+              <Spinner size="small" color="$yellow11" />
+              <Text color="$yellow11" fontWeight="600" fontSize="$3">
+                Automatic draft is in progress. Players are being assigned to
+                teams...
+              </Text>
+            </XStack>
+          )}
+
+          {isDraftInProgress && isLiveDraft && (
+            <XStack
+              alignItems="center"
+              gap="$2"
+              backgroundColor="$green3"
+              borderColor="$green8"
+              borderWidth={1}
+              borderRadius="$3"
+              paddingHorizontal="$3"
+              paddingVertical="$2"
+            >
+              <Text color="$green11" fontWeight="600" fontSize="$3">
+                Live draft is active! Click the button above to join the draft
+                board.
+              </Text>
+            </XStack>
+          )}
 
           <Text fontSize="$2" color="$gray10">
             {getDescriptionText()}

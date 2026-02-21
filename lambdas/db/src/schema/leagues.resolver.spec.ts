@@ -6,9 +6,11 @@ describe('League Mutations', () => {
   let schema: GraphQLSchema;
   let mockDb: any;
   let mockContext: any;
+  let mockCreateLeague: jest.Mock;
 
   beforeEach(async () => {
     jest.resetModules();
+    mockCreateLeague = jest.fn();
 
     // Mock database operations
     mockDb = {
@@ -33,6 +35,14 @@ describe('League Mutations', () => {
       runWithPublicClient: jest.fn(async (options, callback) => {
         return callback(mockDb);
       }),
+      createLeagueService: jest.fn(() => ({
+        createLeague: mockCreateLeague,
+      })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
       PublicSchema: {
         leagues: {
           id: 'id',
@@ -399,23 +409,21 @@ describe('League Mutations', () => {
     });
 
     it('should create a league with default roster size', async () => {
-      // Mock invite code uniqueness check (select query returns empty = unique)
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce([]); // Empty array = code is unique
-
-      // Mock league creation
-      mockDb.insert.mockReturnValue(mockDb);
-      mockDb.values.mockReturnValue(mockDb);
-      mockDb.returning.mockResolvedValue([
-        {
+      // Mock the LeagueService.createLeague method
+      mockCreateLeague.mockResolvedValueOnce({
+        league: {
           id: 1,
           name: 'Test League',
           maxRosterSize: 25,
           owner: 1,
+          currentMatchup: null,
+          draftStatus: 'not-started',
+          inviteCode: 'ABCD1234',
+          playerPool: 'all',
         },
-      ]);
+        teams: [],
+        leagueMembers: [],
+      });
 
       const mutationType = schema.getMutationType();
       const createLeagueField = mutationType?.getFields().createLeague;
@@ -438,23 +446,21 @@ describe('League Mutations', () => {
     });
 
     it('should create a league with custom roster size', async () => {
-      // Mock invite code uniqueness check (select query returns empty = unique)
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce([]); // Empty array = code is unique
-
-      // Mock league creation
-      mockDb.insert.mockReturnValue(mockDb);
-      mockDb.values.mockReturnValue(mockDb);
-      mockDb.returning.mockResolvedValue([
-        {
+      // Mock the LeagueService.createLeague method
+      mockCreateLeague.mockResolvedValueOnce({
+        league: {
           id: 1,
           name: 'Test League',
           maxRosterSize: 30,
           owner: 1,
+          currentMatchup: null,
+          draftStatus: 'not-started',
+          inviteCode: 'ABCD1234',
+          playerPool: 'all',
         },
-      ]);
+        teams: [],
+        leagueMembers: [],
+      });
 
       const mutationType = schema.getMutationType();
       const createLeagueField = mutationType?.getFields().createLeague;

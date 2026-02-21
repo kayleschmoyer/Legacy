@@ -38,6 +38,14 @@ describe('Matchup Queries', () => {
       runWithPublicClient: jest.fn(async (options, callback) => {
         return callback(mockDb);
       }),
+      createLeagueService: jest.fn(() => ({
+        createLeague: jest.fn(),
+      })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
       PublicSchema: {
         matchups: {
           id: 'id',

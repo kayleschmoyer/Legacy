@@ -14,8 +14,9 @@ export interface DraftTriggerResult {
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
-    draftStatus: string;
+    draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
     inviteCode: string;
+    playerPool: 'all' | 'nl' | 'al';
   };
   message: string;
   error?: string;
@@ -85,6 +86,28 @@ export class DraftService {
         skipUserValidation: !validateUserAccess,
       });
 
+      // Live drafts: set status to in-progress and return immediately
+      // (no SQS processing — the live draft board handles picks)
+      if (draftMode === 'live') {
+        await updateLeagueDraftStatus(
+          leagueId,
+          'in-progress',
+          'live draft started by commissioner',
+        );
+
+        const updatedLeague = await fetchLeagueDetails(leagueId);
+
+        LOGGER.info('✅ Live draft started, awaiting picks:', updatedLeague);
+
+        return {
+          success: true,
+          league: updatedLeague,
+          message:
+            'Live draft started — players will pick from the draft board',
+        };
+      }
+
+      // Automated drafts: queue via SQS for background processing
       // Ensure SQS service is available
       if (!this.sqsService) {
         throw new Error('Draft queue URL not configured');
@@ -169,8 +192,9 @@ export class DraftService {
           owner: requestedBy,
           maxRosterSize: 0,
           currentMatchup: null,
-          draftStatus: 'not-started',
+          draftStatus: 'not-started' as const,
           inviteCode: 'UNKNOWN',
+          playerPool: 'all' as const,
         };
       }
 
@@ -186,9 +210,10 @@ export class DraftService {
   /**
    * Get the current draft status of a league
    */
-  async getDraftStatus(
-    leagueId: number,
-  ): Promise<{ leagueId: number; draftStatus: string }> {
+  async getDraftStatus(leagueId: number): Promise<{
+    leagueId: number;
+    draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+  }> {
     const league = await fetchLeagueDetails(leagueId);
 
     return {

@@ -14,6 +14,8 @@ interface LeagueState {
     currentMatchup?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

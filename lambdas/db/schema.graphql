@@ -318,6 +318,7 @@ type League {
   maxRosterSize: Int
   name: String
   owner: Int
+  playerPool: String
   scoringProfile: ScoringConfig
   userMembership: LeagueMember
   weekAdvanceStatus: String
@@ -594,6 +595,9 @@ type Mutation {
     selectionMethod: String
   ): League
   triggerGameSelection(gameNumber: Int!, matchupId: Int!): Boolean
+  updateDraftSettings(
+    input: UpdateDraftSettingsInput!
+  ): UpdateDraftSettingsPayload
   updateLeagueScoringProfile(
     leagueId: Int!
     updates: [UpdateLeagueScoringMultiplierInput!]!
@@ -1121,6 +1125,29 @@ type TiebreakerRule {
   secondaryMethod: TiebreakerMethod
   tertiaryMethod: TiebreakerMethod
   updatedAt: String
+}
+
+input UpdateDraftSettingsInput {
+  draftMode: String
+  draftOrder: String
+  leagueId: Int!
+  playerPool: String
+  selectionMethod: String
+}
+
+"""
+Result of updating draft settings
+"""
+type UpdateDraftSettingsPayload {
+  currentPick: Int
+  draftCompletedAt: String
+  draftMode: String
+  draftOrder: String
+  draftStartedAt: String
+  id: Int
+  leagueId: Int
+  playerPool: String
+  selectionMethod: String
 }
 
 input UpdateLeagueScoringMultiplierInput {

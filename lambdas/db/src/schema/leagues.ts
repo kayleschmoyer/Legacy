@@ -1,55 +1,18 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import type { Team as DbTeam } from '@legacy-sports/db-client';
-import { DraftService } from '@legacy-sports/db-client';
+import {
+  createDraftForLeague,
+  createLeagueService,
+  DraftService,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq } from 'drizzle-orm';
+import { getDbOptions } from '@legacy-sports/utils';
+import { and, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from './scoring';
 
-// Helper function to generate unique invite codes
-// Uses uppercase letters and numbers (excluding confusable characters: 0, O, 1, I, l)
-function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
-// Helper to check if an invite code already exists
-async function isInviteCodeUnique(
-  db: PublicDb,
-  code: string,
-): Promise<boolean> {
-  const existing = await db
-    .select({ id: PublicSchema.leagues.id })
-    .from(PublicSchema.leagues)
-    .where(eq(PublicSchema.leagues.inviteCode, code))
-    .limit(1);
-  return existing.length === 0;
-}
-
-// Helper to generate a unique invite code
-async function generateUniqueInviteCode(db: PublicDb): Promise<string> {
-  let code: string;
-  let isUnique = false;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  do {
-    code = generateInviteCode();
-    isUnique = await isInviteCodeUnique(db, code);
-    attempts++;
-    if (attempts >= maxAttempts) {
-      throw new Error(
-        'Failed to generate unique invite code after maximum attempts',
-      );
-    }
-  } while (!isUnique);
-
-  return code;
-}
+// League service instance for create operations
+const leagueService = createLeagueService(getDbOptions());
 
 // Default roster positions for new leagues
 // These represent a standard fantasy baseball roster configuration
@@ -87,6 +50,7 @@ const League = builder.objectRef<{
   currentMatchup: number | null;
   draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
   inviteCode: string;
+  playerPool: 'all' | 'nl' | 'al';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   userMembership?: {
     leagueId: number;
@@ -106,6 +70,7 @@ League.implement({
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
     draftStatus: t.exposeString('draftStatus'),
     inviteCode: t.exposeString('inviteCode'),
+    playerPool: t.exposeString('playerPool'),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
     scoringProfile: t.field({
       type: ScoringConfigRef,
@@ -325,6 +290,7 @@ builder.queryField('league', (t) =>
             currentMatchup: PublicSchema.leagues.currentMatchup,
             draftStatus: PublicSchema.leagues.draftStatus,
             inviteCode: PublicSchema.leagues.inviteCode,
+            playerPool: PublicSchema.leagues.playerPool,
             weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
           })
           .from(PublicSchema.leagues)
@@ -365,6 +331,7 @@ builder.queryField('league', (t) =>
           currentMatchup: league.currentMatchup,
           draftStatus: league.draftStatus,
           inviteCode: league.inviteCode,
+          playerPool: league.playerPool,
           weekAdvanceStatus: league.weekAdvanceStatus,
           userMembership,
         };
@@ -403,6 +370,7 @@ builder.queryField('userLeagues', (t) =>
             currentMatchup: PublicSchema.leagues.currentMatchup,
             draftStatus: PublicSchema.leagues.draftStatus,
             inviteCode: PublicSchema.leagues.inviteCode,
+            playerPool: PublicSchema.leagues.playerPool,
             weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
           })
           .from(PublicSchema.leagues)
@@ -421,6 +389,7 @@ builder.queryField('userLeagues', (t) =>
           currentMatchup: league.currentMatchup,
           draftStatus: league.draftStatus,
           inviteCode: league.inviteCode,
+          playerPool: league.playerPool,
           weekAdvanceStatus: league.weekAdvanceStatus,
         }));
       } catch (error) {
@@ -534,160 +503,29 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const {
         leagueName,
         numberOfTeams,
-        playerPool = 'all', // Default to all MLB
-        draftMode = 'live', // Default to live draft
-        selectionMethod = 'standard', // Default to standard selection
-        draftOrder = 'snake', // Default to snake order
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        maxBatters: _maxBatters = 12,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        maxPitchers: _maxPitchers = 8,
+        playerPool = 'all',
+        draftMode = 'live',
+        selectionMethod = 'standard',
+        draftOrder = 'snake',
         maxRosterSize,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
 
       try {
-        // Create league and teams in the database with proper types
-        // Calculate roster size: use frontend value or fallback to 25
-        const rosterSize = maxRosterSize || 25;
-
-        // Generate unique invite code
-        const inviteCode = await generateUniqueInviteCode(context.db);
-
-        // Prepare league data for insert
-        const leagueData = {
+        const result = await leagueService.createLeague({
           name: leagueName,
-          owner: userId,
-          maxRosterSize: rosterSize, // Frontend-controlled with fallback
-          currentMatchup: null,
-          inviteCode: inviteCode,
+          ownerId: userId,
+          ownerUsername: username,
+          maxRosterSize: maxRosterSize || 25,
+          numberOfTeams,
           playerPool: playerPool as 'all' | 'nl' | 'al',
-        };
+          draftMode: draftMode as 'live' | 'automated',
+          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
+          draftOrder: draftOrder as 'snake' | 'linear',
+        });
 
-        // Insert league
-        const insertedLeagues = await context.db
-          .insert(PublicSchema.leagues)
-          .values(leagueData)
-          .returning({
-            id: PublicSchema.leagues.id,
-            name: PublicSchema.leagues.name,
-            owner: PublicSchema.leagues.owner,
-            maxRosterSize: PublicSchema.leagues.maxRosterSize,
-            currentMatchup: PublicSchema.leagues.currentMatchup,
-            draftStatus: PublicSchema.leagues.draftStatus,
-            inviteCode: PublicSchema.leagues.inviteCode,
-          });
-
-        const league = insertedLeagues[0];
-
-        interface InsertedTeam {
-          id: number;
-          name: string;
-          leagueId: number;
-          createdAt: Date;
-          updatedAt: Date;
-        }
-        let teams: InsertedTeam[] = [];
-        interface LeagueMemberInsert {
-          leagueId: number;
-          userId: number;
-          teamId: number;
-          permissionLevel: 'owner' | 'commissioner';
-        }
-        let leagueMembers: LeagueMemberInsert[] = [];
-
-        // Always create the specified number of teams, regardless of draft type
-        // Teams can exist without users assigned to them
-        const teamNames = [
-          `${username}'s Team`, // Owner's team first
-          'Team Alpha',
-          'Team Beta',
-          'Team Gamma',
-          'Team Delta',
-          'Team Epsilon',
-          'Team Zeta',
-          'Team Eta',
-          'Team Theta',
-          'Team Iota',
-          'Team Kappa',
-          'Team Lambda',
-          'Team Mu',
-          'Team Nu',
-          'Team Xi',
-          'Team Omicron',
-        ];
-
-        // Create teams up to numberOfTeams
-        const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-        interface TeamInsertData {
-          name: string;
-          leagueId: number;
-        }
-        const teamData: TeamInsertData[] = [];
-
-        for (let i = 0; i < teamsToCreate; i++) {
-          teamData.push({
-            name: teamNames[i],
-            leagueId: league.id,
-          });
-        }
-
-        // Insert all teams
-        const insertedTeams = await context.db
-          .insert(PublicSchema.teams)
-          .values(teamData)
-          .returning({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-          });
-
-        teams = insertedTeams;
-
-        // Create league member for owner (assign to first team)
-        const ownerLeagueMember = {
-          leagueId: league.id,
-          userId: userId,
-          teamId: teams[0].id,
-          permissionLevel: 'owner' as const,
-        };
-
-        await context.db
-          .insert(PublicSchema.leagueMembers)
-          .values(ownerLeagueMember);
-
-        leagueMembers = [ownerLeagueMember];
-
-        // NOTE: For RANDOM-DRAFT leagues, draft processing is handled asynchronously via SQS
-        // Use the startDraft mutation to trigger draft processing after league creation
-
-        // Create roster positions for the league
-        // Only create the defined starter positions, bench spots are inferred
-        const allPositions = DEFAULT_ROSTER_POSITIONS.slice();
-        const positionData = allPositions.map((positionType) => ({
-          leagueId: league.id,
-          positionType: positionType,
-        }));
-
-        await context.db
-          .insert(PublicSchema.leaguePosition)
-          .values(positionData);
-
-        return {
-          league: {
-            id: league.id,
-            name: league.name,
-            owner: league.owner,
-            maxRosterSize: league.maxRosterSize,
-            currentMatchup: league.currentMatchup,
-            draftStatus: league.draftStatus,
-          },
-          teams: teams,
-          leagueMembers: leagueMembers,
-        };
+        return result;
       } catch (error) {
         LOGGER.error('Error creating league and teams', {
           error: error instanceof Error ? error.message : String(error),
@@ -701,7 +539,6 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           draftOrder,
         });
 
-        // Provide more specific error information
         if (error instanceof Error) {
           throw new Error(
             `Failed to create league and teams: ${error.message}`,
@@ -1059,23 +896,52 @@ builder.mutationField('startDraft', (t) =>
         throw new Error('Authentication required to start draft');
       }
 
-      const {
-        leagueId,
-        draftMode = 'automated',
-        selectionMethod = 'random',
-        draftOrder = 'snake',
-      } = args;
+      const { leagueId } = args;
       const userId = context.user.id;
 
       try {
+        // Read saved draft settings from the database
+        const [savedDraft] = await context.db
+          .select({
+            draftMode: PublicSchema.drafts.draftMode,
+            selectionMethod: PublicSchema.drafts.selectionMethod,
+            draftOrder: PublicSchema.drafts.draftOrder,
+          })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, leagueId))
+          .orderBy(desc(PublicSchema.drafts.createdAt))
+          .limit(1);
+
+        // Use saved settings as defaults, then override with any explicit args
+        // Default to 'live' to match the drafts table column default and the UI default
+        const draftMode = (args.draftMode ??
+          savedDraft?.draftMode ??
+          'live') as 'live' | 'automated';
+        const selectionMethod = (args.selectionMethod ??
+          savedDraft?.selectionMethod ??
+          'standard') as 'standard' | 'auction' | 'random';
+        const draftOrder = (args.draftOrder ??
+          savedDraft?.draftOrder ??
+          'snake') as 'snake' | 'linear';
+
+        // If no draft record exists, create one so settings are always persisted
+        if (!savedDraft) {
+          await createDraftForLeague({
+            leagueId,
+            draftMode,
+            selectionMethod,
+            draftOrder,
+          });
+        }
+
         // Use the shared DraftService for consistency and reusability
         const draftService = new DraftService();
 
         const result = await draftService.startDraft({
           leagueId,
-          draftMode: draftMode as 'live' | 'automated',
-          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
-          draftOrder: draftOrder as 'snake' | 'linear',
+          draftMode,
+          selectionMethod,
+          draftOrder,
           requestedBy: userId,
           validateUserAccess: true, // GraphQL resolvers should validate user access
         });
@@ -1089,15 +955,7 @@ builder.mutationField('startDraft', (t) =>
           draftStatus: result.league?.draftStatus,
         });
 
-        // Return with proper typing for GraphQL resolver
-        return {
-          ...result.league,
-          draftStatus: result.league.draftStatus as
-            | 'not-started'
-            | 'queued'
-            | 'in-progress'
-            | 'completed',
-        };
+        return result.league;
       } catch (error) {
         LOGGER.error('Error starting draft', {
           leagueId: args.leagueId,
@@ -1262,36 +1120,17 @@ builder.mutationField('createLeague', (t) =>
       }
 
       const userId = context.user.id;
-      const maxRosterSize = args.maxRosterSize ?? 25; // Default to 25
+      const maxRosterSize = args.maxRosterSize ?? 25;
 
       try {
-        // Generate unique invite code
-        const inviteCode = await generateUniqueInviteCode(context.db);
+        const result = await leagueService.createLeague({
+          name: args.name,
+          ownerId: userId,
+          ownerUsername: context.user.username || 'User',
+          maxRosterSize,
+        });
 
-        // Create league
-        const leagues = await context.db
-          .insert(PublicSchema.leagues)
-          .values({
-            name: args.name,
-            owner: userId,
-            maxRosterSize,
-            inviteCode,
-          })
-          .returning({
-            id: PublicSchema.leagues.id,
-            name: PublicSchema.leagues.name,
-            owner: PublicSchema.leagues.owner,
-            maxRosterSize: PublicSchema.leagues.maxRosterSize,
-            currentMatchup: PublicSchema.leagues.currentMatchup,
-            draftStatus: PublicSchema.leagues.draftStatus,
-            inviteCode: PublicSchema.leagues.inviteCode,
-          });
-
-        if (leagues.length === 0) {
-          throw new Error('Failed to create league');
-        }
-
-        return leagues[0];
+        return result.league;
       } catch (error) {
         LOGGER.error('Error creating league', {
           userId,

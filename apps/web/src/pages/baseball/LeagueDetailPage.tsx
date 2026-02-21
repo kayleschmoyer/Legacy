@@ -46,6 +46,7 @@ import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
+import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
   useCurrentMatchup,
@@ -1300,6 +1301,19 @@ export function LeagueDetailPage(): React.JSX.Element {
           onLeagueUpdate={handleLeagueUpdate}
         />
       )}
+
+      <DraftSettingsControl
+        leagueId={leagueId}
+        draftStatus={league.draftStatus}
+        playerPool={league.playerPool}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
 
       <LeagueScoringEditor
         leagueId={leagueId}

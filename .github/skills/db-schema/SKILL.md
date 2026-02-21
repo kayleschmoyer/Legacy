@@ -125,6 +125,8 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `league_week_player_seasons` | Per-week player season assignments |
 | `drafts`, `draft_teams`      | Draft state                        |
 
+> 🚨 **Every league MUST have a `drafts` record.** Use `LeagueService.createLeague()` (in `lib/db-client/src/lib/services/LeagueService.ts`) which creates the draft record automatically. Never insert into `leagues` without also inserting into `drafts`. Missing draft records cause `startDraft` to use wrong defaults.
+
 ### Scoring
 
 | Table                            | Purpose                      |

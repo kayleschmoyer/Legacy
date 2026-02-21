@@ -6,6 +6,7 @@ fragment League on League {
   currentMatchup
   draftStatus
   inviteCode
+  playerPool
   weekAdvanceStatus
   userMembership {
     ...LeagueMember
@@ -84,5 +85,32 @@ query GetLeagueTeams($leagueId: Int!) {
     id
     name
     leagueId
+  }
+}
+
+query GetLeagueDraft($leagueId: Int!) {
+  getLeagueDraft(leagueId: $leagueId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    draftCompletedAt
+  }
+}
+
+mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
+  updateDraftSettings(input: $input) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    playerPool
+    draftStartedAt
+    draftCompletedAt
   }
 }
