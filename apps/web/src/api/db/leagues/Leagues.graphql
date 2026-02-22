@@ -83,6 +83,15 @@ mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
   }
 }
 
+query ValidateInviteCode($code: String!) {
+  validateInviteCode(code: $code) {
+    leagueName
+    totalSpots
+    availableSpots
+    isFull
+  }
+}
+
 query GetLeagueTeams($leagueId: Int!) {
   leagueTeams(leagueId: $leagueId) {
     id

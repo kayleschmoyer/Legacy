@@ -337,6 +337,13 @@ type HeadToHeadRecord {
   totalMatchups: Int
 }
 
+type InviteCodeInfo {
+  availableSpots: Int
+  isFull: Boolean
+  leagueName: String
+  totalSpots: Int
+}
+
 type JoinLeaguePayload {
   leagueId: Int
   message: String
@@ -985,6 +992,7 @@ type Query {
     orderBy: String
     orderDirection: String
   ): [User!]
+  validateInviteCode(code: String!): InviteCodeInfo
 
   """
   Get version and deployment information for the GraphQL API

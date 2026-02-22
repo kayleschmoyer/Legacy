@@ -380,6 +380,14 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type InviteCodeInfo = {
+  __typename?: 'InviteCodeInfo';
+  availableSpots?: Maybe<Scalars['Int']['output']>;
+  isFull?: Maybe<Scalars['Boolean']['output']>;
+  leagueName?: Maybe<Scalars['String']['output']>;
+  totalSpots?: Maybe<Scalars['Int']['output']>;
+};
+
 export type JoinLeaguePayload = {
   __typename?: 'JoinLeaguePayload';
   leagueId?: Maybe<Scalars['Int']['output']>;
@@ -997,6 +1005,7 @@ export type Query = {
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
+  validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
 };
@@ -1289,6 +1298,10 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryValidateInviteCodeArgs = {
+  code: Scalars['String']['input'];
 };
 
 export type RecordConsentInput = {
@@ -1864,6 +1877,21 @@ export type JoinLeagueByCodeMutation = {
     id?: number | null;
     name?: string | null;
     leagueId?: number | null;
+  } | null;
+};
+
+export type ValidateInviteCodeQueryVariables = Exact<{
+  code: Scalars['String']['input'];
+}>;
+
+export type ValidateInviteCodeQuery = {
+  __typename?: 'Query';
+  validateInviteCode?: {
+    __typename?: 'InviteCodeInfo';
+    leagueName?: string | null;
+    totalSpots?: number | null;
+    availableSpots?: number | null;
+    isFull?: boolean | null;
   } | null;
 };
 
@@ -3899,6 +3927,99 @@ export type JoinLeagueByCodeMutationResult =
 export type JoinLeagueByCodeMutationOptions = BaseMutationOptions<
   JoinLeagueByCodeMutation,
   JoinLeagueByCodeMutationVariables
+>;
+export const ValidateInviteCode = gql`
+  query ValidateInviteCode($code: String!) {
+    validateInviteCode(code: $code) {
+      leagueName
+      totalSpots
+      availableSpots
+      isFull
+    }
+  }
+`;
+
+/**
+ * __useValidateInviteCodeQuery__
+ *
+ * To run a query within a React component, call `useValidateInviteCodeQuery` and pass it any options that fit your needs.
+ * When your component renders, `useValidateInviteCodeQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useValidateInviteCodeQuery({
+ *   variables: {
+ *      code: // value for 'code'
+ *   },
+ * });
+ */
+export function useValidateInviteCodeQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  > &
+    (
+      | { variables: ValidateInviteCodeQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(ValidateInviteCode, options);
+}
+export function useValidateInviteCodeLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(ValidateInviteCode, options);
+}
+export function useValidateInviteCodeSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        ValidateInviteCodeQuery,
+        ValidateInviteCodeQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    ValidateInviteCodeQuery,
+    ValidateInviteCodeQueryVariables
+  >(
+    ValidateInviteCode,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          ValidateInviteCodeQuery,
+          ValidateInviteCodeQueryVariables
+        >,
+  );
+}
+export type ValidateInviteCodeQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeQuery
+>;
+export type ValidateInviteCodeLazyQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeLazyQuery
+>;
+export type ValidateInviteCodeSuspenseQueryHookResult = ReturnType<
+  typeof useValidateInviteCodeSuspenseQuery
+>;
+export type ValidateInviteCodeQueryResult = Apollo.QueryResult<
+  ValidateInviteCodeQuery,
+  ValidateInviteCodeQueryVariables
 >;
 export const GetLeagueTeams = gql`
   query GetLeagueTeams($leagueId: Int!) {

@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
-import { useJoinLeagueByCodeMutation } from '../../api/db/graphql.generated';
+import {
+  useJoinLeagueByCodeMutation,
+  useValidateInviteCodeLazyQuery,
+} from '../../api/db/graphql.generated';
 
 export function JoinLeagueByCode(): React.JSX.Element {
   const navigate = useNavigate();
@@ -19,6 +22,26 @@ export function JoinLeagueByCode(): React.JSX.Element {
   }, [urlInviteCode]);
 
   const [joinLeague, { loading }] = useJoinLeagueByCodeMutation();
+  const [validateCode, { data: validateData, loading: validating }] =
+    useValidateInviteCodeLazyQuery();
+
+  // Validate the code against the server whenever it reaches 8 chars
+  useEffect(() => {
+    const code = inviteCode.trim().toUpperCase();
+    const codePattern = /^[A-Z0-9]{8}$/;
+    if (codePattern.test(code)) {
+      void validateCode({ variables: { code } });
+    }
+  }, [inviteCode, validateCode]);
+
+  const leagueInfo = validateData?.validateInviteCode;
+  const isLeagueFull =
+    leagueInfo?.isFull ??
+    Boolean(
+      error &&
+      (error.toLowerCase().includes('league is full') ||
+        error.toLowerCase().includes('all teams have been claimed')),
+    );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +182,43 @@ export function JoinLeagueByCode(): React.JSX.Element {
               <Text color="$gray10" fontSize="$2" id="invite-code-help">
                 Example: ABC12XYZ
               </Text>
+
+              {/* Live invite code status */}
+              {validating && (
+                <XStack gap="$2" alignItems="center">
+                  <Spinner size="small" color="$blue9" />
+                  <Text color="$gray10" fontSize="$2">
+                    Checking code...
+                  </Text>
+                </XStack>
+              )}
+              {!validating &&
+                leagueInfo &&
+                (leagueInfo.isFull ? (
+                  <Text color="$orange10" fontSize="$2" fontWeight="600">
+                    <span role="img" aria-label="no entry">
+                      🚫
+                    </span>{' '}
+                    League full &mdash; all {leagueInfo.totalSpots} spots taken
+                  </Text>
+                ) : (
+                  <Text color="$green10" fontSize="$2" fontWeight="600">
+                    <span role="img" aria-label="check mark">
+                      ✅
+                    </span>{' '}
+                    {leagueInfo.leagueName} &mdash; {leagueInfo.availableSpots}{' '}
+                    of {leagueInfo.totalSpots} spot
+                    {leagueInfo.availableSpots !== 1 ? 's' : ''} available
+                  </Text>
+                ))}
+              {!validating && !leagueInfo && inviteCode.trim().length === 8 && (
+                <Text color="$red10" fontSize="$2" fontWeight="600">
+                  <span role="img" aria-label="error">
+                    ❌
+                  </span>{' '}
+                  Invalid invite code
+                </Text>
+              )}
             </YStack>
 
             {/* Team Name Input */}
@@ -197,8 +257,32 @@ export function JoinLeagueByCode(): React.JSX.Element {
               </Text>
             </YStack>
 
+            {/* League Full Banner */}
+            {isLeagueFull && (
+              <Card
+                backgroundColor="$orange2"
+                borderColor="$orange6"
+                padding="$4"
+                role="alert"
+                aria-live="assertive"
+              >
+                <YStack space="$2">
+                  <Text color="$orange11" fontSize="$4" fontWeight="700">
+                    <span role="img" aria-label="no entry">
+                      🚫
+                    </span>{' '}
+                    This league is full
+                  </Text>
+                  <Text color="$orange11" fontSize="$3">
+                    All teams have already been claimed. Contact the league
+                    commissioner for assistance.
+                  </Text>
+                </YStack>
+              </Card>
+            )}
+
             {/* Error Message */}
-            {error && (
+            {error && !isLeagueFull && (
               <Card
                 backgroundColor="$red2"
                 borderColor="$red6"
@@ -240,7 +324,12 @@ export function JoinLeagueByCode(): React.JSX.Element {
                 backgroundColor="$blue9"
                 color="white"
                 onPress={handleSubmit}
-                disabled={loading || !inviteCode.trim() || !teamName.trim()}
+                disabled={
+                  loading ||
+                  !inviteCode.trim() ||
+                  !teamName.trim() ||
+                  isLeagueFull
+                }
                 minWidth={150}
                 aria-label="Join league"
               >

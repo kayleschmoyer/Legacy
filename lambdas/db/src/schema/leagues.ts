@@ -16,6 +16,7 @@ import {
   gte,
   inArray,
   isNotNull,
+  isNull,
   or,
   sql,
 } from 'drizzle-orm';
@@ -1021,6 +1022,78 @@ builder.mutationField('startDraft', (t) =>
   }),
 );
 
+// Object type returned by validateInviteCode query
+const InviteCodeInfo = builder.objectRef<{
+  leagueName: string;
+  totalSpots: number;
+  availableSpots: number;
+  isFull: boolean;
+}>('InviteCodeInfo');
+
+InviteCodeInfo.implement({
+  fields: (t) => ({
+    leagueName: t.exposeString('leagueName'),
+    totalSpots: t.exposeInt('totalSpots'),
+    availableSpots: t.exposeInt('availableSpots'),
+    isFull: t.exposeBoolean('isFull'),
+  }),
+});
+
+// Query to check invite code validity and league capacity before joining
+builder.queryField('validateInviteCode', (t) =>
+  t.field({
+    type: InviteCodeInfo,
+    nullable: true,
+    args: {
+      code: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const code = args.code.trim().toUpperCase();
+
+      // Find league by invite code
+      const leagues = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          name: PublicSchema.leagues.name,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.inviteCode, code))
+        .limit(1);
+
+      if (leagues.length === 0) return null;
+
+      const league = leagues[0];
+
+      // Count total teams in the league
+      const totalResult = await context.db
+        .select({ total: count() })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, league.id));
+      const totalSpots = Number(totalResult[0]?.total ?? 0);
+
+      // Count assigned teams (those with a league_members entry)
+      const assignedResult = await context.db
+        .select({ assigned: count() })
+        .from(PublicSchema.leagueMembers)
+        .where(eq(PublicSchema.leagueMembers.leagueId, league.id));
+      const assignedSpots = Number(assignedResult[0]?.assigned ?? 0);
+
+      const availableSpots = Math.max(0, totalSpots - assignedSpots);
+
+      return {
+        leagueName: league.name,
+        totalSpots,
+        availableSpots,
+        isFull: availableSpots === 0,
+      };
+    },
+  }),
+);
+
 // Mutation field to join a league using an invite code
 builder.mutationField('joinLeagueByCode', (t) =>
   t.field({
@@ -1077,22 +1150,43 @@ builder.mutationField('joinLeagueByCode', (t) =>
           throw new Error('You are already a member of this league');
         }
 
-        // Calculate next waiver order for the new team
-        const maxWaiverOrder = await context.db
-          .select({ maxOrder: sql<number>`COALESCE(MAX(waiver_order), 0)` })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, league.id));
-        const nextWaiverOrder = (Number(maxWaiverOrder[0]?.maxOrder) || 0) + 1;
-
-        // Create a new team for the user
-        const insertedTeams = await context.db
-          .insert(PublicSchema.teams)
-          .values({
-            name: teamName,
-            leagueId: league.id,
-            waiverOrder: nextWaiverOrder,
-            faabBudget: league.faabBudgetDefault,
+        // Find an unassigned team in the league (one with no league_members entry)
+        const unassignedTeams = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
+          .from(PublicSchema.teams)
+          .leftJoin(
+            PublicSchema.leagueMembers,
+            and(
+              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+              eq(PublicSchema.leagueMembers.leagueId, league.id),
+            ),
+          )
+          .where(
+            and(
+              eq(PublicSchema.teams.leagueId, league.id),
+              isNull(PublicSchema.leagueMembers.userId),
+            ),
+          )
+          .orderBy(PublicSchema.teams.id)
+          .limit(1);
+
+        if (unassignedTeams.length === 0) {
+          throw new Error('This league is full. All teams have been claimed.');
+        }
+
+        // Claim the unassigned team by renaming it to the user's chosen name
+        const updatedTeams = await context.db
+          .update(PublicSchema.teams)
+          .set({ name: teamName, updatedAt: new Date() })
+          .where(eq(PublicSchema.teams.id, unassignedTeams[0].id))
           .returning({
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
@@ -1103,7 +1197,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
             faabBudget: PublicSchema.teams.faabBudget,
           });
 
-        const team = insertedTeams[0];
+        const team = updatedTeams[0];
 
         // Add user to league members with explicit typing
         const leagueMemberData: {
@@ -1262,23 +1356,47 @@ builder.mutationField('joinLeague', (t) =>
           };
         }
 
-        // Calculate next waiver order for the new team
-        const maxWaiverOrderResult = await context.db
-          .select({ maxOrder: sql<number>`COALESCE(MAX(waiver_order), 0)` })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.leagueId, league.id));
-        const nextWaiverOrder =
-          (Number(maxWaiverOrderResult[0]?.maxOrder) || 0) + 1;
-
-        // Create team for the user
-        const teams = await context.db
-          .insert(PublicSchema.teams)
-          .values({
-            name: teamName,
-            leagueId: league.id,
-            waiverOrder: nextWaiverOrder,
-            faabBudget: league.faabBudgetDefault,
+        // Find an unassigned team in the league (one with no league_members entry)
+        const unassignedTeamsForJoin = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+            leagueId: PublicSchema.teams.leagueId,
+            waiverOrder: PublicSchema.teams.waiverOrder,
+            faabBudget: PublicSchema.teams.faabBudget,
+            createdAt: PublicSchema.teams.createdAt,
+            updatedAt: PublicSchema.teams.updatedAt,
           })
+          .from(PublicSchema.teams)
+          .leftJoin(
+            PublicSchema.leagueMembers,
+            and(
+              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+              eq(PublicSchema.leagueMembers.leagueId, league.id),
+            ),
+          )
+          .where(
+            and(
+              eq(PublicSchema.teams.leagueId, league.id),
+              isNull(PublicSchema.leagueMembers.userId),
+            ),
+          )
+          .orderBy(PublicSchema.teams.id)
+          .limit(1);
+
+        if (unassignedTeamsForJoin.length === 0) {
+          return {
+            success: false,
+            message: 'This league is full. All teams have been claimed.',
+            leagueId: league.id,
+          };
+        }
+
+        // Claim the unassigned team by renaming it to the user's chosen name
+        const updatedTeamsForJoin = await context.db
+          .update(PublicSchema.teams)
+          .set({ name: teamName, updatedAt: new Date() })
+          .where(eq(PublicSchema.teams.id, unassignedTeamsForJoin[0].id))
           .returning({
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
@@ -1289,11 +1407,7 @@ builder.mutationField('joinLeague', (t) =>
             faabBudget: PublicSchema.teams.faabBudget,
           });
 
-        if (teams.length === 0) {
-          throw new Error('Failed to create team');
-        }
-
-        const team = teams[0];
+        const team = updatedTeamsForJoin[0];
 
         // Add user as league member
         await context.db.insert(PublicSchema.leagueMembers).values({

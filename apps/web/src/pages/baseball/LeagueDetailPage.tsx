@@ -878,7 +878,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     const baseUrl = env.baseUrl.endsWith('/')
       ? env.baseUrl.slice(0, -1)
       : env.baseUrl;
-    return `${window.location.origin}${baseUrl}/#/baseball/league/join/${data.league.inviteCode}`;
+    return `${window.location.origin}${baseUrl}/baseball/league/join/${data.league.inviteCode}`;
   }, [data?.league?.inviteCode]);
 
   const handleCopyInviteCode = useCallback(async () => {

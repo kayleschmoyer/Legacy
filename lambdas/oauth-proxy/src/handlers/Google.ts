@@ -62,6 +62,7 @@ const getOAuthClient = memoizeOne((clientId: string, clientSecret: string) => {
 interface GoogleAuthRequest {
   code?: string; // Authorization code (mobile flow)
   credential?: string; // ID token JWT (web flow)
+  redirect_uri?: string; // Explicit redirect_uri used when the code was obtained; defaults to 'postmessage' for GSI web flows
 }
 
 /**
@@ -160,10 +161,11 @@ export const handleGoogleCallback = async (
     }
 
     // Create a synthetic event for the existing Google auth handler
+    // Include the redirect_uri that Google used for this callback so the token exchange matches
     const syntheticEvent: APIGatewayEvent = {
       ...event,
       httpMethod: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, redirect_uri: getRedirectUri(event) }),
       queryStringParameters: { ...event.queryStringParameters, state },
     };
 
@@ -267,9 +269,13 @@ export const handleSecureGoogleAuth = async (
       const oauthClient = getOAuthClient(clientId, clientSecret);
 
       try {
+        // Use the redirect_uri from the request body if provided (device flow via callback),
+        // otherwise default to 'postmessage' which is what Google Identity Services uses
+        // for popup/iframe code flows (web GSI flow).
+        const redirectUri = body.redirect_uri || 'postmessage';
         const { tokens } = await oauthClient.getToken({
           code: body.code,
-          redirect_uri: getRedirectUri(event),
+          redirect_uri: redirectUri,
         });
         if (!tokens.id_token) {
           throw new Error(
