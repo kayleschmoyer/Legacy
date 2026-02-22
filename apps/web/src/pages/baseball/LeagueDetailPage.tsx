@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ClipboardList,
   Copy,
+  Edit3,
   Info,
   LayoutGrid,
   Link2,
@@ -30,10 +31,9 @@ import {
   Trophy,
   UserPlus,
   Users,
+  X,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
-import { gql } from '@apollo/client';
-import { useLazyQuery } from '@apollo/client/react';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -49,9 +49,12 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
+  useGetLeagueTeamsLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
+  useGetUserTeamIdLazyQuery,
+  useRenameTeamMutation,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
@@ -108,25 +111,7 @@ export interface PlayerMatchupData {
   isLocked: boolean;
 }
 
-// ── GraphQL ──────────────────────────────────────────────────────────────────
-
-const GET_USER_TEAM_ID = gql`
-  query GetUserTeamId($leagueId: Int!) {
-    userTeamId(leagueId: $leagueId)
-  }
-`;
-
-const GET_LEAGUE_TEAMS = gql`
-  query GetLeagueTeams($leagueId: Int!) {
-    leagueTeams(leagueId: $leagueId) {
-      id
-      name
-      leagueId
-      waiverOrder
-      faabBudget
-    }
-  }
-`;
+// ── GraphQL (all queries/mutations defined in src/api/db/**/*.graphql) ────────
 
 // ── Styled Components ────────────────────────────────────────────────────────
 
@@ -244,6 +229,7 @@ type TabId =
   | 'standings'
   | 'matchup'
   | 'chat'
+  | 'team-settings'
   | 'commissioner';
 
 interface TabDef {
@@ -260,6 +246,7 @@ const TABS: TabDef[] = [
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
   { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
+  { id: 'team-settings', label: 'My Team', icon: <Edit3 size={16} /> },
   {
     id: 'commissioner',
     label: 'Commissioner',
@@ -277,6 +264,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   standings: 'standings',
   matchup: 'matchup',
   chat: 'chat',
+  'team-settings': 'team-settings',
   commissioner: 'commissioner',
 };
 
@@ -316,6 +304,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [renameEditing, setRenameEditing] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
+  const [renameSuccess, setRenameSuccess] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const { user } = useAuth();
 
   // Ref to hold refetchCurrentMatchup so WebSocket callbacks can call it
@@ -384,40 +376,30 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [positionsData, dispatch]);
 
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID);
+    useGetUserTeamIdLazyQuery();
 
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+  ] = useGetLeagueTeamsLazyQuery();
 
   useEffect(() => {
-    if (
-      userTeamData &&
-      typeof userTeamData === 'object' &&
-      'userTeamId' in userTeamData &&
-      userTeamData.userTeamId !== undefined
-    ) {
-      dispatch(setUserTeamId(userTeamData.userTeamId as number | null));
+    if (userTeamData?.userTeamId !== undefined) {
+      dispatch(setUserTeamId(userTeamData.userTeamId ?? null));
     }
   }, [userTeamData, dispatch]);
 
   useEffect(() => {
-    if (
-      leagueTeamsData &&
-      typeof leagueTeamsData === 'object' &&
-      'leagueTeams' in leagueTeamsData &&
-      leagueTeamsData.leagueTeams
-    ) {
+    if (leagueTeamsData?.leagueTeams) {
       dispatch(
         setLeagueTeams(
-          leagueTeamsData.leagueTeams as Array<{
-            id: number;
-            name: string;
-            leagueId: number;
-            waiverOrder?: number | null;
-            faabBudget?: number | null;
-          }>,
+          leagueTeamsData.leagueTeams.map((t) => ({
+            id: t.id ?? 0,
+            name: t.name ?? '',
+            leagueId: t.leagueId ?? 0,
+            waiverOrder: t.waiverOrder ?? null,
+            faabBudget: t.faabBudget ?? null,
+          })),
         ),
       );
     }
@@ -502,13 +484,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Derived Data ──
 
-  const userTeamId =
-    reduxUserTeamId ??
-    (userTeamData &&
-    typeof userTeamData === 'object' &&
-    'userTeamId' in userTeamData
-      ? (userTeamData.userTeamId as number | null)
-      : null);
+  const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId ?? null;
   const league = reduxLeagueData ?? data?.league;
   const positions = useMemo(
     () =>
@@ -520,12 +496,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const leagueTeams =
     reduxLeagueTeams.length > 0
       ? reduxLeagueTeams
-      : leagueTeamsData &&
-          typeof leagueTeamsData === 'object' &&
-          'leagueTeams' in leagueTeamsData &&
-          Array.isArray(leagueTeamsData.leagueTeams)
-        ? leagueTeamsData.leagueTeams
-        : [];
+      : (leagueTeamsData?.leagueTeams ?? []).map((t) => ({
+          id: t.id ?? 0,
+          name: t.name ?? '',
+          leagueId: t.leagueId ?? 0,
+          waiverOrder: t.waiverOrder ?? null,
+          faabBudget: t.faabBudget ?? null,
+        }));
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
   const { data: teamMembersData, loading: teamMembersLoading } =
@@ -558,6 +535,8 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
+
+  const [renameTeamMutation, { loading: renaming }] = useRenameTeamMutation();
 
   const {
     settings: scoringSettings,
@@ -1511,6 +1490,191 @@ export function LeagueDetailPage(): React.JSX.Element {
     </YStack>
   );
 
+  const renderTeamSettings = () => {
+    const userTeam = leagueTeams.find((t) => t.id === userTeamId);
+    const currentName = String(userTeam?.name ?? '');
+
+    const startEditing = () => {
+      setRenameInput(currentName);
+      setRenameError(null);
+      setRenameSuccess(false);
+      setRenameEditing(true);
+    };
+
+    const cancelEditing = () => {
+      setRenameEditing(false);
+      setRenameInput('');
+      setRenameError(null);
+    };
+
+    const handleRename = async () => {
+      if (!userTeamId || !renameInput.trim()) return;
+      setRenameError(null);
+      try {
+        await renameTeamMutation({
+          variables: {
+            teamId: userTeamId,
+            leagueId,
+            newName: renameInput.trim(),
+          },
+        });
+        setRenameEditing(false);
+        setRenameInput('');
+        setRenameSuccess(true);
+        void refetchLeague();
+        void getLeagueTeams({ variables: { leagueId } });
+        setTimeout(() => setRenameSuccess(false), 4000);
+      } catch (err) {
+        setRenameError(
+          err instanceof Error ? err.message : 'Failed to rename team',
+        );
+      }
+    };
+
+    return (
+      <YStack
+        gap="$6"
+        padding="$4"
+        maxWidth={640}
+        role="tabpanel"
+        id="panel-team-settings"
+        aria-labelledby="tab-team-settings"
+      >
+        <Card
+          backgroundColor="$surfacePanel"
+          borderColor="$surfacePanelBorder"
+          borderWidth={1}
+          borderRadius="$6"
+          padding="$6"
+        >
+          <YStack gap="$4">
+            <XStack alignItems="center" gap="$3">
+              <Edit3 size={20} color="var(--blue9)" />
+              <Text fontSize="$6" fontWeight="700" color="$text">
+                Team Settings
+              </Text>
+            </XStack>
+            <Separator />
+
+            <YStack gap="$2">
+              <Text fontSize="$3" color="$textMuted" fontWeight="600">
+                Team Name
+              </Text>
+
+              {renameEditing ? (
+                <YStack gap="$3">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={renameInput}
+                    onChange={(e) => {
+                      setRenameInput(e.target.value);
+                      setRenameError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleRename();
+                      if (e.key === 'Escape') cancelEditing();
+                    }}
+                    maxLength={100}
+                    disabled={renaming}
+                    style={{
+                      backgroundColor: 'var(--color2)',
+                      border: '1px solid var(--blue8)',
+                      borderRadius: '8px',
+                      color: 'var(--color12)',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      padding: '8px 12px',
+                      outline: 'none',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      opacity: renaming ? 0.6 : 1,
+                    }}
+                  />
+                  {renameError && (
+                    <Text color="$red10" fontSize="$3">
+                      {renameError}
+                    </Text>
+                  )}
+                  <XStack gap="$2">
+                    <Button
+                      size="$3"
+                      backgroundColor="$blue9"
+                      borderRadius="$4"
+                      disabled={renaming || !renameInput.trim()}
+                      onPress={() => void handleRename()}
+                    >
+                      {renaming ? (
+                        <XStack alignItems="center" gap="$2">
+                          <Spinner size="small" color="white" />
+                          <Text fontWeight="600" color="white" fontSize="$3">
+                            Saving…
+                          </Text>
+                        </XStack>
+                      ) : (
+                        <XStack alignItems="center" gap="$2">
+                          <Check size={14} color="white" />
+                          <Text fontWeight="600" color="white" fontSize="$3">
+                            Save
+                          </Text>
+                        </XStack>
+                      )}
+                    </Button>
+                    <Button
+                      size="$3"
+                      backgroundColor="$gray4"
+                      borderRadius="$4"
+                      disabled={renaming}
+                      onPress={cancelEditing}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <X size={14} color="var(--color11)" />
+                        <Text fontWeight="600" color="$color11" fontSize="$3">
+                          Cancel
+                        </Text>
+                      </XStack>
+                    </Button>
+                  </XStack>
+                </YStack>
+              ) : (
+                <XStack alignItems="center" gap="$3">
+                  <Text fontSize="$5" fontWeight="600" color="$text">
+                    {currentName || '—'}
+                  </Text>
+                  {renameSuccess ? (
+                    <XStack alignItems="center" gap="$1">
+                      <Check size={14} color="var(--green10)" />
+                      <Text color="$green10" fontSize="$2">
+                        Saved
+                      </Text>
+                    </XStack>
+                  ) : (
+                    <Button
+                      size="$2"
+                      backgroundColor="transparent"
+                      borderWidth={1}
+                      borderColor="$color5"
+                      borderRadius="$3"
+                      onPress={startEditing}
+                      paddingHorizontal="$2"
+                    >
+                      <XStack alignItems="center" gap="$1">
+                        <Edit3 size={12} color="var(--color10)" />
+                        <Text fontSize="$2" color="$color10" fontWeight="600">
+                          Edit
+                        </Text>
+                      </XStack>
+                    </Button>
+                  )}
+                </XStack>
+              )}
+            </YStack>
+          </YStack>
+        </Card>
+      </YStack>
+    );
+  };
+
   const renderChat = () => (
     <YStack
       flex={1}
@@ -1950,6 +2114,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           </YStack>
         )}
         {activeTab === 'chat' && renderChat()}
+        {activeTab === 'team-settings' && renderTeamSettings()}
         {activeTab === 'commissioner' &&
           isCommissioner &&
           renderCommissionerSettings()}

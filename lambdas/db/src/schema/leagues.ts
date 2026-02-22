@@ -1716,6 +1716,150 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
   }),
 );
 
+// Mutation field for renaming a team
+builder.mutationField('renameTeam', (t) =>
+  t.field({
+    type: Team,
+    args: {
+      teamId: t.arg.int({ required: true }),
+      leagueId: t.arg.int({ required: true }),
+      newName: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const name = args.newName.trim();
+      if (name.length === 0) {
+        throw new Error('Team name cannot be empty');
+      }
+      if (name.length > 100) {
+        throw new Error('Team name cannot exceed 100 characters');
+      }
+
+      const { teamId, leagueId } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // Verify membership and team ownership
+      const membership = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      const isCommish =
+        membership[0].permissionLevel === 'commissioner' ||
+        membership[0].permissionLevel === 'owner';
+
+      if (!isCommish && membership[0].teamId !== teamId) {
+        throw new Error('You can only rename your own team');
+      }
+
+      // Fetch old name for the chat notification
+      const teamRows = await db
+        .select({ name: PublicSchema.teams.name })
+        .from(PublicSchema.teams)
+        .where(
+          and(
+            eq(PublicSchema.teams.id, teamId),
+            eq(PublicSchema.teams.leagueId, leagueId),
+          ),
+        )
+        .limit(1);
+
+      if (teamRows.length === 0) {
+        throw new Error('Team not found');
+      }
+
+      const oldName = teamRows[0].name;
+
+      // Update the team name
+      const updated = await db
+        .update(PublicSchema.teams)
+        .set({ name })
+        .where(
+          and(
+            eq(PublicSchema.teams.id, teamId),
+            eq(PublicSchema.teams.leagueId, leagueId),
+          ),
+        )
+        .returning({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+          leagueId: PublicSchema.teams.leagueId,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+          faabBudget: PublicSchema.teams.faabBudget,
+          createdAt: PublicSchema.teams.createdAt,
+          updatedAt: PublicSchema.teams.updatedAt,
+        });
+
+      if (updated.length === 0) {
+        throw new Error('Failed to rename team');
+      }
+
+      const senderUsername = context.user.username ?? `user_${context.user.id}`;
+
+      // Send league chat notification (fire-and-forget)
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        const chatText = `${senderUsername} renamed "${oldName}" to "${name}"`;
+        // Persist the system message
+        const msgRows = await db
+          .insert(PublicSchema.leagueMessages)
+          .values({
+            leagueId,
+            userId,
+            messageText: chatText,
+          })
+          .returning();
+
+        const msg = msgRows[0];
+
+        try {
+          await notificationService.notifyLeagueChatMessage(leagueId, {
+            leagueId,
+            messageId: msg.id,
+            senderId: userId,
+            senderUsername,
+            messageText: chatText,
+            timestamp: msg.timestamp ?? new Date().toISOString(),
+          });
+        } catch (err: unknown) {
+          LOGGER.warn('Failed to send rename chat WS notification', { err });
+        }
+
+        // Broadcast a roster-update so all connected clients refetch league data
+        try {
+          await notificationService.notifyRosterUpdate(leagueId);
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send roster update WS notification for rename',
+            {
+              err,
+            },
+          );
+        }
+      }
+
+      return updated[0];
+    },
+  }),
+);
+
 // ── Waiver helpers ─────────────────────────────────────────────────────────
 
 /**

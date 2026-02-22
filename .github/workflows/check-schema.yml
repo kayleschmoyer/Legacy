@@ -146,8 +146,8 @@ jobs:
         env:
           # Point every codegen config at the generated SDL file instead of a
           # live HTTP endpoint. graphql-codegen accepts file paths as schema
-          # sources; GRAPHQL_HOST is read first by all codegen.ts configs.
+          # sources; GRAPHQL_SCHEMA is read first by all codegen.ts configs.
           # pnpm run codegen also runs scripts/fix-apollo-codegen.js as a
           # post-processing step (see root package.json "codegen" script).
-          GRAPHQL_HOST: ${{ github.workspace }}/lambdas/db/schema.graphql
+          GRAPHQL_SCHEMA: ${{ github.workspace }}/lambdas/db/schema.graphql
         run: pnpm run codegen

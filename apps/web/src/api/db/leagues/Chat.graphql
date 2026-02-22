@@ -1,0 +1,23 @@
+query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
+  getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+    id
+    userId
+    messageText
+    timestamp
+    sender {
+      username
+    }
+  }
+}
+
+mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
+  sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+    id
+    userId
+    messageText
+    timestamp
+    sender {
+      username
+    }
+  }
+}

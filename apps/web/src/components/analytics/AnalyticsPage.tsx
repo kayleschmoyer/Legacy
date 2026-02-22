@@ -13,10 +13,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+// TODO: Migrate to codegen once getLeagueAnalytics and getHeadToHeadRecord are added to the schema
+// eslint-disable-next-line no-restricted-imports
 import { gql } from '@apollo/client';
 import { useQuery } from '@apollo/client/react';
 
 // GraphQL Queries
+// eslint-disable-next-line no-restricted-syntax
 const GET_LEAGUE_ANALYTICS = gql`
   query GetLeagueAnalytics($leagueId: Int!) {
     getLeagueAnalytics(leagueId: $leagueId) {
@@ -64,6 +67,7 @@ const GET_LEAGUE_ANALYTICS = gql`
   }
 `;
 
+// eslint-disable-next-line no-restricted-syntax
 const GET_HEAD_TO_HEAD = gql`
   query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
     getHeadToHeadRecord(

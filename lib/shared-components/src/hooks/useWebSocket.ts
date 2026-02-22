@@ -3,6 +3,7 @@ import {
   type DraftCompletedNotification,
   type DraftPickNotification,
   type DraftStartedNotification,
+  type LeagueChatMessageNotification,
   type MatchupStatsCompleteNotification,
   type NotificationData,
   type PlayerStatsLoadingNotification,
@@ -45,6 +46,7 @@ export type {
   DraftCompletedNotification,
   DraftPickNotification,
   DraftStartedNotification,
+  LeagueChatMessageNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
@@ -68,6 +70,7 @@ interface UseWebSocketOptions {
     notification: MatchupStatsCompleteNotification,
   ) => void;
   onRosterUpdate?: (notification: RosterUpdateNotification) => void;
+  onLeagueChatMessage?: (notification: LeagueChatMessageNotification) => void;
   onMessage?: (message: WebSocketMessage) => void;
   onError?: (error: Error) => void;
 }
@@ -103,6 +106,7 @@ export function useWebSocket({
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
   onRosterUpdate,
+  onLeagueChatMessage,
   onMessage,
   onError,
 }: UseWebSocketOptions = {}) {
@@ -337,6 +341,19 @@ export function useWebSocket({
         )
       : noop;
 
+    const unsubscribeLeagueChatMessage = onLeagueChatMessage
+      ? client.on(
+          ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+          (notification: NotificationData) => {
+            console.log(
+              '[useWebSocket] received league-chat-message',
+              notification,
+            );
+            onLeagueChatMessage(notification as LeagueChatMessageNotification);
+          },
+        )
+      : noop;
+
     // Cleanup on unmount
     return () => {
       cancelled = true;
@@ -351,6 +368,7 @@ export function useWebSocket({
       unsubscribePlayerStatsUpdated();
       unsubscribeMatchupStatsComplete();
       unsubscribeRosterUpdate();
+      unsubscribeLeagueChatMessage();
       client.dispose();
     };
   }, [
@@ -367,6 +385,7 @@ export function useWebSocket({
     onPlayerStatsUpdated,
     onMatchupStatsComplete,
     onRosterUpdate,
+    onLeagueChatMessage,
     onMessage,
     onError,
   ]);

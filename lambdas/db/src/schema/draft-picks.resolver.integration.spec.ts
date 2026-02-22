@@ -265,7 +265,7 @@ describe('Draft Picks - Integration Tests', () => {
         players: playerFix,
       } = await seedDraftFixture(2);
 
-      // Round 1: team 1 â†’ team 2  |  Round 2 (snake): team 2 â†’ team 1
+      // Round 1: Test Team Alpha â†' Test Team Beta  |  Round 2 (snake): Test Team Beta â†' Test Team Alpha
       await db.insert(draftPicks).values([
         {
           draftId: draft.id,

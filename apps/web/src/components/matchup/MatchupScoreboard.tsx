@@ -5,6 +5,7 @@ import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -107,6 +108,28 @@ export function MatchupScoreboard({
     };
   }, [playersData, scoringSettings, matchup]);
 
+  // Fetch team names
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+
+  const team1Name = useMemo(() => {
+    if (!matchup?.team1Id || !teamsData?.leagueTeams) return 'Team 1';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team1Id)?.name ??
+      'Team 1'
+    );
+  }, [matchup?.team1Id, teamsData]);
+
+  const team2Name = useMemo(() => {
+    if (!matchup?.team2Id || !teamsData?.leagueTeams) return 'Team 2';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team2Id)?.name ??
+      'Team 2'
+    );
+  }, [matchup?.team2Id, teamsData]);
+
   // Early return after all hooks
   if (!matchup) {
     return (
@@ -190,7 +213,7 @@ export function MatchupScoreboard({
           gap="$2"
         >
           <YStack flex={1} minWidth={150}>
-            <H3>Team 1</H3>
+            <H3>{team1Name}</H3>
             {team1Leading && !isTied && (
               <Text fontSize="$2" color="$green10">
                 Leading
@@ -220,7 +243,7 @@ export function MatchupScoreboard({
           gap="$2"
         >
           <YStack flex={1} minWidth={150}>
-            <H3>Team 2</H3>
+            <H3>{team2Name}</H3>
             {team2Leading && !isTied && (
               <Text fontSize="$2" color="$green10">
                 Leading

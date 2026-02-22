@@ -641,6 +641,7 @@ type Mutation {
   """
   recordConsent(input: RecordConsentInput!): UserConsent
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
+  renameTeam(leagueId: Int!, newName: String!, teamId: Int!): Team
 
   """
   Request deletion of all personal data (GDPR Art. 17 - Right to Erasure)

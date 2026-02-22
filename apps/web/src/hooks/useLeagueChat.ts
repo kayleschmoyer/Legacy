@@ -1,37 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { gql } from '@apollo/client';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import { env } from '../config/environment';
+import {
+  GetLeagueChatMessages,
+  type GetLeagueChatMessagesQuery,
+  useSendLeagueChatMessageMutation,
+} from '../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
-// GraphQL documents
+// GraphQL documents are defined in src/api/db/leagues/Chat.graphql and
+// code-generated into graphql.generated.ts. Never inline gql`` here.
 // ---------------------------------------------------------------------------
-const GET_LEAGUE_MESSAGES = gql`
-  query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
-    getLeagueMessages(leagueId: $leagueId, limit: $limit) {
-      id
-      userId
-      username
-      messageText
-      createdAt
-    }
-  }
-`;
-
-const SEND_LEAGUE_MESSAGE = gql`
-  mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
-    sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
-      id
-      userId
-      username
-      messageText
-      createdAt
-    }
-  }
-`;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +25,12 @@ export interface ChatMessage {
   messageText: string;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Debug helper — all chat logs include a high-resolution timestamp so we can
+// reconstruct the exact ordering of events across two browser windows.
+// ---------------------------------------------------------------------------
+const _ts = () => new Date().toISOString();
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -57,48 +45,102 @@ export function useLeagueChat(leagueId: number): {
   const clientRef = useRef<{ dispose: () => void } | null>(null);
 
   // Load message history
-  const { loading, data: historyData } = useQuery<{
-    getLeagueMessages: ChatMessage[] | null;
-  }>(GET_LEAGUE_MESSAGES, {
+  const {
+    loading,
+    data: historyData,
+    refetch: refetchHistory,
+  } = useQuery<GetLeagueChatMessagesQuery>(GetLeagueChatMessages, {
     variables: { leagueId, limit: 50 },
     skip: isNaN(leagueId),
+    fetchPolicy: 'network-only',
   });
 
-  // Sync history into local state; merge with any WS-appended messages
-  const [historySynced, setHistorySynced] = useState(false);
+  // Keep a stable ref so the WS effect can call refetch without re-running
+  const refetchRef = useRef(refetchHistory);
+  refetchRef.current = refetchHistory;
+
+  // Sync history into local state
   useEffect(() => {
-    if (historyData && !historySynced) {
-      setMessages(historyData.getLeagueMessages ?? []);
-      setHistorySynced(true);
-    }
-  }, [historyData, historySynced]);
+    if (!historyData) return;
+    const sorted = [...(historyData.getLeagueMessages ?? [])].reverse();
+    const historyItems: ChatMessage[] = sorted.map((msg) => ({
+      id: Number(msg.id),
+      userId: Number(msg.userId),
+      username: msg.sender?.username ?? `user_${msg.userId}`,
+      messageText: msg.messageText ?? '',
+      createdAt: msg.timestamp ?? '',
+    }));
+    console.log(`[chat ${_ts()}] history-effect fired`, {
+      historyCount: historyItems.length,
+      historyIds: historyItems.map((m) => m.id),
+      idTypes: historyItems.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
+    });
+    setMessages((prev) => {
+      const historyIds = new Set(historyItems.map((m) => m.id));
+      const wsOnly = prev.filter((m) => !historyIds.has(m.id));
+      const next = [...historyItems, ...wsOnly];
+      console.log(`[chat ${_ts()}] history-effect setMessages`, {
+        prevIds: prev.map((m) => m.id),
+        wsOnlyIds: wsOnly.map((m) => m.id),
+        nextIds: next.map((m) => m.id),
+      });
+      return next;
+    });
+  }, [historyData]);
 
   // Reset when leagueId changes
   useEffect(() => {
     setMessages([]);
-    setHistorySynced(false);
   }, [leagueId]);
 
   // Send mutation
-  const [sendMutation, { loading: sending }] = useMutation<{
-    sendLeagueMessage: ChatMessage;
-  }>(SEND_LEAGUE_MESSAGE);
+  const [sendMutation, { loading: sending }] =
+    useSendLeagueChatMessageMutation();
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+      console.log(`[chat ${_ts()}] sendMessage called`, { text: trimmed });
       await sendMutation({
         variables: { leagueId, messageText: trimmed },
-        onCompleted: (data: { sendLeagueMessage: ChatMessage }) => {
+        awaitRefetchQueries: true,
+        refetchQueries: [
+          {
+            query: GetLeagueChatMessages,
+            variables: { leagueId, limit: 50 },
+          },
+        ],
+        onCompleted: (data) => {
+          const raw = data.sendLeagueMessage;
+          if (!raw) return;
+          const msg: ChatMessage = {
+            id: Number(raw.id),
+            userId: Number(raw.userId),
+            username: raw.sender?.username ?? `user_${raw.userId}`,
+            messageText: raw.messageText ?? '',
+            createdAt: raw.timestamp ?? '',
+          };
+          console.log(`[chat ${_ts()}] onCompleted`, {
+            msgId: msg.id,
+            idType: typeof msg.id,
+            rawId: raw.id,
+            rawIdType: typeof raw.id,
+            text: msg.messageText.substring(0, 30),
+          });
           setMessages((prev) => {
-            if (prev.some((m) => m.id === data.sendLeagueMessage.id)) {
-              return prev;
-            }
-            return [...prev, data.sendLeagueMessage];
+            const isDupe = prev.some((m) => m.id === msg.id);
+            console.log(`[chat ${_ts()}] onCompleted setMessages`, {
+              msgId: msg.id,
+              isDupe,
+              prevIds: prev.map((m) => m.id),
+            });
+            if (isDupe) return prev;
+            return [...prev, msg];
           });
         },
       });
+      console.log(`[chat ${_ts()}] sendMessage await resolved`);
     },
     [sendMutation, leagueId],
   );
@@ -109,7 +151,6 @@ export function useLeagueChat(leagueId: number): {
     const wsUrl = env.websocketUrl;
     if (!wsUrl) return;
 
-    // Retrieve stored JWT from localStorage (set by AuthService)
     const token =
       typeof localStorage !== 'undefined'
         ? (localStorage.getItem('auth_jwt') ?? '')
@@ -121,32 +162,70 @@ export function useLeagueChat(leagueId: number): {
       token,
       leagueId,
       viewContext: 'chat',
-      autoConnect: true,
-      reconnect: true,
+      autoConnect: false,
     });
 
     client.on(
       ClientNotificationType.LEAGUE_CHAT_MESSAGE,
       (notification: NotificationData) => {
-        if (notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE)
-          return;
+        const n = notification as {
+          messageId: number;
+          senderId: number;
+          senderUsername: string;
+          messageText: string;
+          timestamp: string;
+        };
+        const numericId = Number(n.messageId);
+        console.log(`[chat ${_ts()}] ws-handler received`, {
+          messageId: numericId,
+          idType: typeof numericId,
+          rawMessageId: n.messageId,
+          rawIdType: typeof n.messageId,
+          senderId: n.senderId,
+          text: n.messageText?.substring(0, 30),
+        });
         setMessages((prev) => {
-          if (prev.some((m) => m.id === notification.messageId)) return prev;
+          const isDupe = prev.some((m) => m.id === numericId);
+          console.log(`[chat ${_ts()}] ws-handler setMessages`, {
+            messageId: numericId,
+            isDupe,
+            prevIds: prev.map((m) => m.id),
+            prevIdTypes: prev.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
+          });
+          if (isDupe) return prev;
           return [
             ...prev,
             {
-              id: notification.messageId,
-              userId: notification.senderId,
-              username: notification.senderUsername,
-              messageText: notification.messageText,
-              createdAt: notification.timestamp,
+              id: numericId,
+              userId: Number(n.senderId),
+              username: n.senderUsername,
+              messageText: n.messageText,
+              createdAt: n.timestamp,
             },
           ];
         });
       },
     );
 
+    // When the WS reconnects after a drop, refetch history to catch any
+    // messages that arrived while disconnected.
+    let wasConnected = false;
+    client.on('connected', () => {
+      if (wasConnected) {
+        console.log(`[chat ${_ts()}] ws reconnected — refetching history`);
+        void refetchRef.current();
+      }
+      wasConnected = true;
+    });
+
     clientRef.current = client;
+
+    // Deferred connect — if Strict Mode cancels before the microtask fires
+    // the socket is never opened, avoiding the "closed before established" error.
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      client.connect();
+    });
 
     return () => {
       active = false;

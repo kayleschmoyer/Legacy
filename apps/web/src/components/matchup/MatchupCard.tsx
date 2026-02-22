@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, styled, Text, XStack, YStack } from 'tamagui';
 import { Activity, CheckCircle, Clock } from '@tamagui/lucide-icons';
 import {
   type MatchupFragment,
   MatchupStatus,
+  useGetLeagueTeamsQuery,
 } from '../../api/db/graphql.generated';
 
 export interface MatchupCardProps {
@@ -54,6 +55,28 @@ export function MatchupCard({
   onPress,
   showWeek = true,
 }: MatchupCardProps) {
+  const leagueId = matchup?.leagueId ?? 0;
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId },
+    skip: !leagueId,
+  });
+
+  const team1Name = useMemo(() => {
+    if (!matchup?.team1Id || !teamsData?.leagueTeams) return 'Team 1';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team1Id)?.name ??
+      'Team 1'
+    );
+  }, [matchup?.team1Id, teamsData]);
+
+  const team2Name = useMemo(() => {
+    if (!matchup?.team2Id || !teamsData?.leagueTeams) return 'Team 2';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team2Id)?.name ??
+      'Team 2'
+    );
+  }, [matchup?.team2Id, teamsData]);
+
   if (!matchup) {
     return null;
   }
@@ -139,7 +162,7 @@ export function MatchupCard({
               color={team1Wins ? '$color' : '$textMuted'}
               numberOfLines={1}
             >
-              Team 1
+              {team1Name}
             </Text>
           </XStack>
           <ScoreValue fontSize="$6" color={team1Wins ? '$color' : '$textMuted'}>
@@ -160,7 +183,7 @@ export function MatchupCard({
               color={team2Wins ? '$color' : '$textMuted'}
               numberOfLines={1}
             >
-              Team 2
+              {team2Name}
             </Text>
           </XStack>
           <ScoreValue fontSize="$6" color={team2Wins ? '$color' : '$textMuted'}>

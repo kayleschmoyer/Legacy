@@ -128,3 +128,11 @@ mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
     draftCompletedAt
   }
 }
+
+mutation RenameTeam($teamId: Int!, $leagueId: Int!, $newName: String!) {
+  renameTeam(teamId: $teamId, leagueId: $leagueId, newName: $newName) {
+    id
+    name
+    leagueId
+  }
+}

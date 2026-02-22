@@ -74,6 +74,31 @@
       }
     },
     {
+      "files": ["*.ts", "*.tsx"],
+      "excludedFiles": ["**/graphql.generated.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@apollo/client",
+                "importNames": ["gql"],
+                "message": "Do not use inline gql tags. Define queries in .graphql files and import generated hooks from graphql.generated.ts."
+              }
+            ]
+          }
+        ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "TaggedTemplateExpression[tag.name='gql']",
+            "message": "Do not use inline gql`` template tags. Define queries in .graphql files and run codegen to generate typed hooks."
+          }
+        ]
+      }
+    },
+    {
       "files": ["*.js", "*.jsx"],
       "extends": ["plugin:@nx/javascript"],
       "rules": {}

@@ -144,6 +144,45 @@ pnpm exec nx affected -t codegen
 4. **Run affected** instead of all projects for speed
 5. **Commit generated files** (they are tracked in git)
 
+## 🚨 CRITICAL: Never Use Inline `gql` Tags
+
+**Always define GraphQL queries and mutations in `.graphql` files under `src/api/db/`**, never as inline `gql` tagged template literals in `.ts`/`.tsx` files.
+
+### Why
+
+Inline `gql` tags bypass codegen, which causes:
+
+- **`any` types** — `useQuery(MY_QUERY)` and `useLazyQuery(MY_QUERY)` return `data: any` because Apollo has no type information
+- **Runtime type guards** — developers add `typeof data === 'object'` and `'field' in data` checks to compensate, which are fragile and verbose
+- **`as` casts** — `(data.field as SomeType)` hides real type mismatches
+- **No schema validation** — inline queries are not checked against the schema at build time; typos and removed fields only fail at runtime
+
+### What to Do Instead
+
+```
+# 1. Define the query in a .graphql file
+apps/web/src/api/db/leagues/Chat.graphql
+
+# 2. Run codegen
+pnpm exec nx run web:codegen
+
+# 3. Import the generated typed hook
+import { useGetLeagueChatMessagesQuery } from '../api/db/graphql.generated';
+
+# 4. Use it — data is fully typed, no casts needed
+const { data, loading } = useGetLeagueChatMessagesQuery({ variables: { leagueId } });
+const messages = data?.leagueChatMessages; // typed as Array<{ id: number | null, ... }> | undefined
+```
+
+### Enforcement
+
+An ESLint rule (`no-restricted-imports` + `no-restricted-syntax`) in `apps/web/.eslintrc.json` prevents:
+
+- Importing `gql` from `@apollo/client`
+- Using `gql\`...\`` tagged template expressions
+
+If a query references schema fields that don't exist yet (aspirational code), add a targeted `// eslint-disable-next-line` with a `// TODO: Migrate to codegen once <field> is added to the schema` comment.
+
 ## Integration with Workflow
 
 ### After Schema Changes

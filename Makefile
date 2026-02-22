@@ -352,7 +352,11 @@ endif
 # Code Generation
 codegen: ## Run code generation
 	@$(call echo_blue,Running code generation...)
-	pnpm run codegen
+ifeq ($(DETECTED_OS),Windows)
+	set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm run codegen
+else
+	GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm run codegen
+endif
 
 # Infrastructure and Deployment
 deploy-lambdas: ## Deploy all lambda functions
@@ -549,7 +553,11 @@ pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_plain,1/8 Schema generation...)
 	@pnpm exec nx run db:print-schema
 	@$(call echo_plain,2/8 Code generation...)
-	@pnpm exec nx affected -t codegen --base=main
+ifeq ($(DETECTED_OS),Windows)
+	@set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=main
+else
+	@GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=main
+endif
 	@$(call echo_plain,3/8 Type checking...)
 	@pnpm exec nx affected -t typecheck --base=main
 	@$(call echo_plain,4/8 Formatting...)

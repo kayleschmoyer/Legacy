@@ -1,37 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { gql } from '@apollo/client';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
-
-// ---------------------------------------------------------------------------
-// GraphQL documents
-// ---------------------------------------------------------------------------
-const GET_LEAGUE_MESSAGES = gql`
-  query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
-    getLeagueMessages(leagueId: $leagueId, limit: $limit) {
-      id
-      userId
-      username
-      messageText
-      createdAt
-    }
-  }
-`;
-
-const SEND_LEAGUE_MESSAGE = gql`
-  mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
-    sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
-      id
-      userId
-      username
-      messageText
-      createdAt
-    }
-  }
-`;
+import {
+  GetLeagueMessages,
+  type GetLeagueMessagesQuery,
+  useSendLeagueMessageMutation,
+} from '../../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +19,21 @@ export interface ChatMessage {
   username: string;
   messageText: string;
   createdAt: string;
+}
+
+/** Map a generated LeagueChatMessage fragment to the flat ChatMessage shape. */
+function toMessage(
+  raw: NonNullable<
+    NonNullable<GetLeagueMessagesQuery['getLeagueMessages']>[number]
+  >,
+): ChatMessage {
+  return {
+    id: Number(raw.id ?? 0),
+    userId: raw.sender?.id ?? raw.userId ?? 0,
+    username: raw.sender?.username ?? '',
+    messageText: raw.messageText ?? '',
+    createdAt: raw.timestamp ?? '',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -57,18 +49,19 @@ export function useLeagueChat(leagueId: number): {
   const clientRef = useRef<WebSocketClient | null>(null);
 
   // Load message history
-  const { loading, data: historyData } = useQuery<{
-    getLeagueMessages: ChatMessage[] | null;
-  }>(GET_LEAGUE_MESSAGES, {
-    variables: { leagueId, limit: 50 },
-    skip: isNaN(leagueId),
-  });
+  const { loading, data: historyData } = useQuery<GetLeagueMessagesQuery>(
+    GetLeagueMessages,
+    {
+      variables: { leagueId, limit: 50 },
+      skip: isNaN(leagueId),
+    },
+  );
 
   // Sync history into local state; merge with any WS-appended messages
   const [historySynced, setHistorySynced] = useState(false);
   useEffect(() => {
     if (historyData && !historySynced) {
-      setMessages(historyData.getLeagueMessages ?? []);
+      setMessages((historyData.getLeagueMessages ?? []).map(toMessage));
       setHistorySynced(true);
     }
   }, [historyData, historySynced]);
@@ -80,9 +73,7 @@ export function useLeagueChat(leagueId: number): {
   }, [leagueId]);
 
   // Send mutation
-  const [sendMutation, { loading: sending }] = useMutation<{
-    sendLeagueMessage: ChatMessage;
-  }>(SEND_LEAGUE_MESSAGE);
+  const [sendMutation, { loading: sending }] = useSendLeagueMessageMutation();
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -90,13 +81,24 @@ export function useLeagueChat(leagueId: number): {
       if (!trimmed) return;
       await sendMutation({
         variables: { leagueId, messageText: trimmed },
-        onCompleted: (data: { sendLeagueMessage: ChatMessage }) => {
+        onCompleted: (data) => {
+          if (!data.sendLeagueMessage) return;
+          const sent: ChatMessage = {
+            id: Number(data.sendLeagueMessage.id ?? 0),
+            userId:
+              data.sendLeagueMessage.sender?.id ??
+              data.sendLeagueMessage.userId ??
+              0,
+            username: data.sendLeagueMessage.sender?.username ?? '',
+            messageText: data.sendLeagueMessage.messageText ?? '',
+            createdAt: data.sendLeagueMessage.timestamp ?? '',
+          };
           // Optimistically append; WS broadcast will be deduplicated
           setMessages((prev) => {
-            if (prev.some((m) => m.id === data.sendLeagueMessage.id)) {
+            if (prev.some((m) => m.id === sent.id)) {
               return prev;
             }
-            return [...prev, data.sendLeagueMessage];
+            return [...prev, sent];
           });
         },
       });

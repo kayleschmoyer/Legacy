@@ -69,6 +69,49 @@ Events → Lambda → WebSocket API → Connected Clients
 }
 ```
 
+## Critical Rules
+
+### ALWAYS `await` Notification Calls
+
+> **🚨 NEVER use fire-and-forget (unawaited) calls to `notificationService.notify*()`.**
+
+Every call to a notification method **must** be `await`ed and wrapped in a try/catch:
+
+```typescript
+// ✅ CORRECT — await + try/catch
+try {
+  await notificationService.notifyLeagueChatMessage(leagueId, payload);
+} catch (err) {
+  LOGGER.warn('WebSocket notification failed (non-fatal)', { err });
+}
+
+// ❌ WRONG — fire-and-forget
+notificationService.notifyLeagueChatMessage(leagueId, payload).catch((err) =>
+  LOGGER.warn('notification failed', { err }),
+);
+```
+
+#### Why This Matters
+
+AWS Lambda freezes the execution context as soon as the handler returns its response.
+Any **unawaited** async work (like `postToConnection` calls inside the notification
+service) will be killed mid-flight when the Lambda freezes, causing **silent,
+intermittent message loss**.
+
+This was the root cause of chat notifications never arriving: the GraphQL resolver
+returned the mutation response before the WebSocket `postToConnection` calls
+completed. Lambda froze the execution context and the notifications were lost.
+
+#### Rules
+
+1. **Always `await`** — every `notificationService.notify*()` call
+2. **Always wrap in try/catch** — notification failure should never break the
+   primary operation (insert, update, etc.). Log the error and continue.
+3. **Never use `.catch()` without `await`** — `.catch()` alone makes the promise
+   fire-and-forget; Lambda will freeze before it settles.
+4. **Place the notification call after the database write** — ensure data is
+   committed before notifying clients.
+
 ## Usage
 
 ### Backend: Sending Notifications
@@ -81,8 +124,12 @@ import { createNotificationService } from '@legacy-sports/aws-utils';
 
 const notificationService = createNotificationService();
 
-// After draft completion
-await notificationService.notifyDraftCompleted(leagueId, draftType);
+// After draft completion — ALWAYS await + try/catch
+try {
+  await notificationService.notifyDraftCompleted(leagueId, draftType);
+} catch (err) {
+  LOGGER.warn('Draft notification failed (non-fatal)', { err });
+}
 ```
 
 #### Player Stats Loading (Game Selection)
@@ -421,11 +468,14 @@ aws dynamodb query `
 
 ### Notifications Not Received
 
-1. Verify connection is established (`connected === true`)
-2. Check DynamoDB table for connection entry with correct leagueId/matchupId
-3. Verify leagueId/matchupId matches between client and server
-4. Check Lambda logs for notification send attempts
-5. Verify draft processor / game-selection / stats lambda has WebSocket permissions
+1. **Check that the notification call is `await`ed** — this is the #1 cause of
+   missing notifications. Search the resolver for the `notify*()` call and verify
+   it has `await` and a try/catch wrapper. See [Critical Rules](#critical-rules).
+2. Verify connection is established (`connected === true`)
+3. Check DynamoDB table for connection entry with correct leagueId/matchupId
+4. Verify leagueId/matchupId matches between client and server
+5. Check Lambda logs for notification send attempts
+6. Verify draft processor / game-selection / stats lambda has WebSocket permissions
 
 ### Stale Connections
 
@@ -485,6 +535,30 @@ Check logs for "removed stale connection" messages.
 8. **Typing Indicators**: Show when commissioners are making changes
 9. **Chat**: Real-time league chat
 10. **Game Updates**: Live score updates during matchups
+
+## Known Bugs Fixed
+
+### Fire-and-Forget Notification Loss (Feb 2026)
+
+**Symptom:** Chat messages or roster-update notifications silently failed to arrive
+at other connected clients, intermittently.
+
+**Root cause:** The GraphQL resolver called
+`notificationService.notifyLeagueChatMessage(...)` using a `.catch()` pattern
+without `await`. AWS Lambda froze the execution context after returning the
+GraphQL response, killing the pending `postToConnection` API calls before they
+completed.
+
+**Fix:** Changed all notification calls from fire-and-forget to
+`await` + try/catch. See [Critical Rules](#critical-rules).
+
+**Files fixed:**
+- `lambdas/db/src/schema/chat-and-tiebreakers.ts` — `sendLeagueMessage` resolver
+- `lambdas/db/src/schema/leagues.ts` — `renameTeam` resolver (2 calls)
+
+**Lesson:** In AWS Lambda, **any async work not `await`ed before the handler
+returns is at risk of being killed**. This applies to all fire-and-forget
+patterns, not just notifications.
 
 ## Related Documentation
 

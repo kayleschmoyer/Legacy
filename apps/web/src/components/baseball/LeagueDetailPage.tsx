@@ -24,8 +24,6 @@ import {
   Users,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
-import { gql } from '@apollo/client';
-import { useLazyQuery } from '@apollo/client/react';
 import { LeagueActivityFeed } from './LeagueActivityFeed';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
@@ -36,8 +34,10 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
+  useGetLeagueTeamsLazyQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
+  useGetUserTeamIdLazyQuery,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
@@ -63,23 +63,7 @@ import {
   setUserTeamId,
 } from '../../store/leagueSlice';
 
-// ── GraphQL ──────────────────────────────────────────────────────────────────
-
-const GET_USER_TEAM_ID = gql`
-  query GetUserTeamId($leagueId: Int!) {
-    userTeamId(leagueId: $leagueId)
-  }
-`;
-
-const GET_LEAGUE_TEAMS = gql`
-  query GetLeagueTeams($leagueId: Int!) {
-    leagueTeams(leagueId: $leagueId) {
-      id
-      name
-      leagueId
-    }
-  }
-`;
+// ── GraphQL (all queries/mutations defined in src/api/db/**/*.graphql) ────────
 
 // ── Styled Components ────────────────────────────────────────────────────────
 
@@ -307,38 +291,28 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [positionsData, dispatch]);
 
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useLazyQuery(GET_USER_TEAM_ID);
+    useGetUserTeamIdLazyQuery();
 
   const [
     getLeagueTeams,
     { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useLazyQuery(GET_LEAGUE_TEAMS);
+  ] = useGetLeagueTeamsLazyQuery();
 
   useEffect(() => {
-    if (
-      userTeamData &&
-      typeof userTeamData === 'object' &&
-      'userTeamId' in userTeamData &&
-      userTeamData.userTeamId !== undefined
-    ) {
-      dispatch(setUserTeamId(userTeamData.userTeamId as number | null));
+    if (userTeamData?.userTeamId !== undefined) {
+      dispatch(setUserTeamId(userTeamData.userTeamId ?? null));
     }
   }, [userTeamData, dispatch]);
 
   useEffect(() => {
-    if (
-      leagueTeamsData &&
-      typeof leagueTeamsData === 'object' &&
-      'leagueTeams' in leagueTeamsData &&
-      leagueTeamsData.leagueTeams
-    ) {
+    if (leagueTeamsData?.leagueTeams) {
       dispatch(
         setLeagueTeams(
-          leagueTeamsData.leagueTeams as Array<{
-            id: number;
-            name: string;
-            leagueId: number;
-          }>,
+          leagueTeamsData.leagueTeams.map((t) => ({
+            id: t.id ?? 0,
+            name: t.name ?? '',
+            leagueId: t.leagueId ?? 0,
+          })),
         ),
       );
     }
@@ -360,13 +334,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Derived Data ──
 
-  const userTeamId =
-    reduxUserTeamId ??
-    (userTeamData &&
-    typeof userTeamData === 'object' &&
-    'userTeamId' in userTeamData
-      ? (userTeamData.userTeamId as number | null)
-      : null);
+  const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId ?? null;
   const league = reduxLeagueData ?? data?.league;
   const positions =
     reduxPositions.length > 0
@@ -375,12 +343,11 @@ export function LeagueDetailPage(): React.JSX.Element {
   const leagueTeams =
     reduxLeagueTeams.length > 0
       ? reduxLeagueTeams
-      : leagueTeamsData &&
-          typeof leagueTeamsData === 'object' &&
-          'leagueTeams' in leagueTeamsData &&
-          Array.isArray(leagueTeamsData.leagueTeams)
-        ? leagueTeamsData.leagueTeams
-        : [];
+      : (leagueTeamsData?.leagueTeams ?? []).map((t) => ({
+          id: t.id ?? 0,
+          name: t.name ?? '',
+          leagueId: t.leagueId ?? 0,
+        }));
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
   const { data: teamMembersData, loading: teamMembersLoading } =

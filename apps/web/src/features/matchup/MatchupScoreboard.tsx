@@ -16,6 +16,7 @@ import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '../../api/db/graphql.generated';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -307,6 +308,28 @@ export function MatchupScoreboard({
       };
     }, [playersData, scoringSettings, matchup, seasonStatsMap]);
 
+  // Fetch team names
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+
+  const team1Name = useMemo(() => {
+    if (!matchup?.team1Id || !teamsData?.leagueTeams) return 'Team 1';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team1Id)?.name ??
+      'Team 1'
+    );
+  }, [matchup?.team1Id, teamsData]);
+
+  const team2Name = useMemo(() => {
+    if (!matchup?.team2Id || !teamsData?.leagueTeams) return 'Team 2';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === matchup.team2Id)?.name ??
+      'Team 2'
+    );
+  }, [matchup?.team2Id, teamsData]);
+
   // Early return after all hooks
   if (!matchup) {
     return (
@@ -408,7 +431,7 @@ export function MatchupScoreboard({
             fontWeight="700"
             color={team1Leading ? '$blue11' : '$color'}
           >
-            Team 1
+            {team1Name}
           </Text>
           <ScoreDisplay
             fontSize={48}
@@ -487,7 +510,7 @@ export function MatchupScoreboard({
             fontWeight="700"
             color={team2Leading ? '$blue11' : '$color'}
           >
-            Team 2
+            {team2Name}
           </Text>
           <ScoreDisplay
             fontSize={48}

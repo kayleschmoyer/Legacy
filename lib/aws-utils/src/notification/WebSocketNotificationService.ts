@@ -119,7 +119,26 @@ export interface RosterUpdateNotification {
 }
 
 /**
- * Service for sending real-time notifications via WebSocket
+ * Service for sending real-time notifications via WebSocket.
+ *
+ * **IMPORTANT: Always `await` every `notify*()` call and wrap it in try/catch.**
+ *
+ * AWS Lambda freezes the execution context after the handler returns.
+ * Any unawaited async work (fire-and-forget) will be silently killed,
+ * causing intermittent notification loss.
+ *
+ * @example
+ * ```typescript
+ * // ✅ Correct
+ * try {
+ *   await notificationService.notifyLeagueChatMessage(leagueId, payload);
+ * } catch (err) {
+ *   LOGGER.warn('WebSocket notification failed (non-fatal)', { err });
+ * }
+ *
+ * // ❌ Wrong — fire-and-forget, will be killed by Lambda freeze
+ * notificationService.notifyLeagueChatMessage(leagueId, payload).catch(...);
+ * ```
  */
 export class WebSocketNotificationService {
   private dynamoClient: DynamoDBClient;

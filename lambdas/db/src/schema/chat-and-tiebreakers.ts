@@ -828,21 +828,24 @@ builder.mutationField('sendLeagueMessage', (t) =>
 
       const msg = rows[0];
 
-      // Dispatch WebSocket notification (fire-and-forget — never block the mutation)
+      // Dispatch WebSocket notification — MUST be awaited so the Lambda
+      // execution context is not frozen before the API Gateway PostToConnection
+      // calls complete.  Fire-and-forget caused silent notification loss.
       const notificationService = createNotificationService();
       if (notificationService) {
-        notificationService
-          .notifyLeagueChatMessage(args.leagueId, {
+        try {
+          await notificationService.notifyLeagueChatMessage(args.leagueId, {
             leagueId: args.leagueId,
             messageId: msg.id,
             senderId: context.user.id,
             senderUsername: context.user.username ?? `user_${context.user.id}`,
             messageText: text,
             timestamp: msg.timestamp ?? new Date().toISOString(),
-          })
-          .catch((err: unknown) => {
-            LOGGER.warn('Failed to send league chat WS notification', { err });
           });
+        } catch (err: unknown) {
+          // Never let a notification failure block the mutation response
+          LOGGER.warn('Failed to send league chat WS notification', { err });
+        }
       }
 
       return {

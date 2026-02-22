@@ -380,6 +380,14 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type InviteCodeInfo = {
+  __typename?: 'InviteCodeInfo';
+  availableSpots?: Maybe<Scalars['Int']['output']>;
+  isFull?: Maybe<Scalars['Boolean']['output']>;
+  leagueName?: Maybe<Scalars['String']['output']>;
+  totalSpots?: Maybe<Scalars['Int']['output']>;
+};
+
 export type JoinLeaguePayload = {
   __typename?: 'JoinLeaguePayload';
   leagueId?: Maybe<Scalars['Int']['output']>;
@@ -638,6 +646,7 @@ export type Mutation = {
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  renameTeam?: Maybe<Team>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
@@ -740,6 +749,12 @@ export type MutationRecordConsentArgs = {
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationRenameTeamArgs = {
+  leagueId: Scalars['Int']['input'];
+  newName: Scalars['String']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationRevokeConsentArgs = {
@@ -877,6 +892,8 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** Fantasy scoring data (only populated when using scoring-based sort) */
+  scoring?: Maybe<PlayerScoring>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -890,6 +907,16 @@ export type PlayerGameScore = {
   pitchingScore?: Maybe<Scalars['Float']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   season?: Maybe<Scalars['Int']['output']>;
+  totalScore?: Maybe<Scalars['Float']['output']>;
+};
+
+export type PlayerScoring = {
+  __typename?: 'PlayerScoring';
+  avgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+  battingScore?: Maybe<Scalars['Float']['output']>;
+  careerGames?: Maybe<Scalars['Int']['output']>;
+  fieldingScore?: Maybe<Scalars['Float']['output']>;
+  pitchingScore?: Maybe<Scalars['Float']['output']>;
   totalScore?: Maybe<Scalars['Float']['output']>;
 };
 
@@ -985,6 +1012,7 @@ export type Query = {
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
+  validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
 };
@@ -1196,6 +1224,7 @@ export type QueryPlayerSeasonPitchingArgs = {
 
 export type QueryPlayersArgs = {
   excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -1276,6 +1305,10 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryValidateInviteCodeArgs = {
+  code: Scalars['String']['input'];
 };
 
 export type RecordConsentInput = {

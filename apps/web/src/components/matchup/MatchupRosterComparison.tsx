@@ -11,6 +11,7 @@ import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
+  useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '../../api/db/graphql.generated';
@@ -187,7 +188,13 @@ function SkeletonTotalsRow() {
   );
 }
 
-function SkeletonLoading() {
+function SkeletonLoading({
+  team1Name = 'Team 1',
+  team2Name = 'Team 2',
+}: {
+  team1Name?: string;
+  team2Name?: string;
+}) {
   return (
     <Card
       overflow="hidden"
@@ -279,7 +286,7 @@ function SkeletonLoading() {
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
-                Team 1
+                {team1Name}
               </Text>
             </YStack>
             <YStack width={60} flexShrink={0} alignItems="center">
@@ -337,7 +344,7 @@ function SkeletonLoading() {
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
-                Team 2
+                {team2Name}
               </Text>
             </YStack>
             <YStack width={40} flexShrink={0} alignItems="flex-end">
@@ -449,7 +456,7 @@ function SkeletonLoading() {
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
-                Team 1
+                {team1Name}
               </Text>
             </YStack>
             <YStack width={60} flexShrink={0} alignItems="center">
@@ -507,7 +514,7 @@ function SkeletonLoading() {
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
-                Team 2
+                {team2Name}
               </Text>
             </YStack>
             <YStack width={40} flexShrink={0} alignItems="flex-end">
@@ -591,6 +598,26 @@ export function MatchupRosterComparison({
     variables: { leagueId },
     skip: !leagueId,
   });
+
+  // Fetch team names
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId },
+    skip: !leagueId,
+  });
+
+  const team1Name = useMemo(() => {
+    if (!team1Id || !teamsData?.leagueTeams) return 'Team 1';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === team1Id)?.name ?? 'Team 1'
+    );
+  }, [team1Id, teamsData]);
+
+  const team2Name = useMemo(() => {
+    if (!team2Id || !teamsData?.leagueTeams) return 'Team 2';
+    return (
+      teamsData.leagueTeams.find((t) => t.id === team2Id)?.name ?? 'Team 2'
+    );
+  }, [team2Id, teamsData]);
 
   // Build season stats map directly from the matchup players data (no separate queries needed!)
   const seasonStatsMap = useMemo(() => {
@@ -1016,7 +1043,7 @@ export function MatchupRosterComparison({
   }
 
   if (loading) {
-    return <SkeletonLoading />;
+    return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
   }
 
   if (error) {
@@ -1795,7 +1822,7 @@ export function MatchupRosterComparison({
                 color="$blue11"
                 textTransform="uppercase"
               >
-                Team 1
+                {team1Name}
               </Text>
             </YStack>
             <YStack width={60} flexShrink={0} alignItems="center">
@@ -1849,7 +1876,7 @@ export function MatchupRosterComparison({
                 color="$blue11"
                 textTransform="uppercase"
               >
-                Team 2
+                {team2Name}
               </Text>
             </YStack>
             <YStack width={40} flexShrink={0} alignItems="flex-end">
@@ -2146,7 +2173,7 @@ export function MatchupRosterComparison({
                           color="$blue11"
                           textTransform="uppercase"
                         >
-                          Team 1 Bullpen
+                          {team1Name} Bullpen
                         </Text>
                       </YStack>
                       <YStack width={60} flexShrink={0} alignItems="center">
@@ -2205,7 +2232,7 @@ export function MatchupRosterComparison({
                           color="$blue11"
                           textTransform="uppercase"
                         >
-                          Team 2 Bullpen
+                          {team2Name} Bullpen
                         </Text>
                       </YStack>
                     </XStack>
@@ -2259,7 +2286,7 @@ export function MatchupRosterComparison({
                           color="$blue11"
                           textTransform="uppercase"
                         >
-                          Team 1 Bench
+                          {team1Name} Bench
                         </Text>
                       </YStack>
                       <YStack width={60} flexShrink={0} alignItems="center">
@@ -2318,7 +2345,7 @@ export function MatchupRosterComparison({
                           color="$blue11"
                           textTransform="uppercase"
                         >
-                          Team 2 Bench
+                          {team2Name} Bench
                         </Text>
                       </YStack>
                     </XStack>

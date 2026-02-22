@@ -124,8 +124,8 @@ describe('Teams Resolver - Integration Tests', () => {
         INSERT INTO teams (name, league_id)
         VALUES (?, ?)
       `);
-      const info1 = teamStmt.run('Team 1', league.id);
-      const info2 = teamStmt.run('Team 2', league.id);
+      const info1 = teamStmt.run('Test Team Alpha', league.id);
+      const info2 = teamStmt.run('Test Team Beta', league.id);
 
       const teams = client
         .prepare('SELECT * FROM teams WHERE league_id = ? ORDER BY id')
@@ -228,9 +228,9 @@ describe('Teams Resolver - Integration Tests', () => {
         INSERT INTO teams (name, league_id)
         VALUES (?, ?)
       `);
-      teamStmt.run('Team 1', league.id);
-      teamStmt.run('Team 2', league.id);
-      teamStmt.run('Team 3', league.id);
+      teamStmt.run('Test Team Alpha', league.id);
+      teamStmt.run('Test Team Beta', league.id);
+      teamStmt.run('Test Team Gamma', league.id);
 
       const teams = client
         .prepare('SELECT * FROM teams WHERE league_id = ? ORDER BY id')
@@ -293,10 +293,10 @@ describe('Teams Resolver - Integration Tests', () => {
         INSERT INTO teams (name, league_id)
         VALUES (?, ?)
       `);
-      teamStmt.run('L1 Team 1', 1);
-      teamStmt.run('L1 Team 2', 1);
-      teamStmt.run('L2 Team 1', 2);
-      teamStmt.run('L2 Team 2', 2);
+      teamStmt.run('Test Team Alpha', 1);
+      teamStmt.run('Test Team Beta', 1);
+      teamStmt.run('Test Team Gamma', 2);
+      teamStmt.run('Test Team Delta', 2);
       teamStmt.run('L2 Team 3', 2);
 
       const league1Teams = client

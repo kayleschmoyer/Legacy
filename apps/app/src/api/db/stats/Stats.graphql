@@ -228,3 +228,15 @@ query GetCareerPitchingStats {
     ...CareerPitchingStats
   }
 }
+
+query GetPlayerCareerStats($playerId: Int!) {
+  batting: playerCareerBatting(playerId: $playerId) {
+    ...CareerBattingStats
+  }
+  fielding: playerCareerFielding(playerId: $playerId) {
+    ...CareerFieldingStats
+  }
+  pitching: playerCareerPitching(playerId: $playerId) {
+    ...CareerPitchingStats
+  }
+}

@@ -604,7 +604,7 @@ builder.mutationField('advanceLeagueWeek', (t) =>
         for (const matchup of newMatchups) {
           const pair = teamPairs[matchup.teamIndex];
 
-          // Get team 1 players
+          // Get pair.team1Id players
           const team1Players = await context.db
             .select({
               playerId: PublicSchema.teamMembers.playerId,
@@ -618,7 +618,7 @@ builder.mutationField('advanceLeagueWeek', (t) =>
               ),
             );
 
-          // Get team 2 players
+          // Get pair.team2Id players
           const team2Players = await context.db
             .select({
               playerId: PublicSchema.teamMembers.playerId,

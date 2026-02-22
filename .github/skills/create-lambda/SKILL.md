@@ -306,13 +306,14 @@ Define the Lambda's AWS infrastructure in `terraform/`. See [Terraform Apply](te
 
 ## Common Mistakes
 
-| Mistake                                              | Why it fails                      |
-| ---------------------------------------------------- | --------------------------------- |
-| Missing `vite.config.ts`                             | `build` target fails              |
-| Using `tsconfig.lib.json` in typecheck command       | Lambda uses `tsconfig.app.json`   |
-| Forgetting `"dist"` in eslintrc ignorePatterns       | Lint tries to check build output  |
-| Not running `pnpm install` after adding package.json | Missing workspace link            |
-| Adding `"type": "module"` to package.json            | Breaks `require()` in jest config |
+| Mistake                                              | Why it fails                                                                                                                                                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing `vite.config.ts`                             | `build` target fails                                                                                                                                                                                                                          |
+| Using `tsconfig.lib.json` in typecheck command       | Lambda uses `tsconfig.app.json`                                                                                                                                                                                                               |
+| Forgetting `"dist"` in eslintrc ignorePatterns       | Lint tries to check build output                                                                                                                                                                                                              |
+| Not running `pnpm install` after adding package.json | Missing workspace link                                                                                                                                                                                                                        |
+| Adding `"type": "module"` to package.json            | Breaks `require()` in jest config                                                                                                                                                                                                             |
+| Fire-and-forget notification calls (no `await`)      | Lambda freezes execution context after returning; unawaited `postToConnection` calls are silently killed, causing intermittent notification loss. See [WebSocket Notifications](../../docs/guides/websocket-notifications.md#critical-rules). |
 
 ## Related Skills
 

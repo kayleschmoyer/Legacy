@@ -1,46 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { gql, useApolloClient } from '@apollo/client';
+import { useApolloClient } from '@apollo/client';
 import type {
   PlayerCareerStats,
   ScoringStatRecord,
 } from '@legacy-sports/shared-components';
-import type {
-  CareerBatting,
-  CareerFielding,
-  CareerPitching,
-} from '../../api/db/graphql.generated';
 import {
-  CareerBattingStatsFragmentDoc,
-  CareerFieldingStatsFragmentDoc,
-  CareerPitchingStatsFragmentDoc,
+  GetPlayerCareerStats,
+  type GetPlayerCareerStatsQuery,
+  type GetPlayerCareerStatsQueryVariables,
 } from '../../api/db/graphql.generated';
-
-interface GetPlayerCareerStatsQuery {
-  readonly batting?: CareerBatting | null;
-  readonly fielding?: CareerFielding | null;
-  readonly pitching?: CareerPitching | null;
-}
-
-interface GetPlayerCareerStatsQueryVariables {
-  readonly playerId: number;
-}
-
-const GetPlayerCareerStatsDocument = gql`
-  query GetPlayerCareerStats($playerId: Int!) {
-    batting: playerCareerBatting(playerId: $playerId) {
-      ...CareerBattingStats
-    }
-    fielding: playerCareerFielding(playerId: $playerId) {
-      ...CareerFieldingStats
-    }
-    pitching: playerCareerPitching(playerId: $playerId) {
-      ...CareerPitchingStats
-    }
-  }
-  ${CareerBattingStatsFragmentDoc}
-  ${CareerFieldingStatsFragmentDoc}
-  ${CareerPitchingStatsFragmentDoc}
-`;
 
 export interface CareerAverageStatsResult {
   readonly records: Map<number, PlayerCareerStats>;
@@ -181,7 +149,7 @@ export function useCareerAverageStats(
           GetPlayerCareerStatsQuery,
           GetPlayerCareerStatsQueryVariables
         >({
-          query: GetPlayerCareerStatsDocument,
+          query: GetPlayerCareerStats,
           variables: { playerId },
           fetchPolicy: 'cache-first',
         });

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable no-restricted-imports -- TODO: Migrate to codegen once getLeagueAnalytics is added to the schema */
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
 import {
@@ -19,7 +20,8 @@ import { gql } from '@apollo/client';
 import { useQuery } from '@apollo/client/react';
 import { useRoute } from '@react-navigation/native';
 
-// GraphQL Queries
+// TODO: Migrate to codegen once getLeagueAnalytics is added to the schema
+// eslint-disable-next-line no-restricted-syntax
 const GET_LEAGUE_ANALYTICS = gql`
   query GetLeagueAnalytics($leagueId: Int!) {
     getLeagueAnalytics(leagueId: $leagueId) {
@@ -67,6 +69,7 @@ const GET_LEAGUE_ANALYTICS = gql`
   }
 `;
 
+// eslint-disable-next-line no-restricted-syntax
 const GET_HEAD_TO_HEAD = gql`
   query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
     getHeadToHeadRecord(
