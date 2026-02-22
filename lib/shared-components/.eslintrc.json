@@ -14,7 +14,7 @@
     "src/features/players/usePlayerProjections.ts"
   ],
   "parserOptions": {
-    "project": ["./tsconfig.json", "./tsconfig.lib.json"]
+    "project": ["tsconfig.*?.json"]
   },
   "overrides": [
     {

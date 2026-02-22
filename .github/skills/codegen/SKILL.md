@@ -17,6 +17,19 @@ Regenerate TypeScript types and client code from GraphQL schemas using graphql-c
 - Getting "Cannot find type" errors for GraphQL types
 - Before running builds to ensure type safety
 
+> **🚨 CRITICAL: Always run `print-schema` before codegen when Pothos resolvers have changed.**
+>
+> `schema.graphql` is the single source of truth for codegen. It is a **generated file** —
+> never edit it manually. When you add or change a resolver/type/mutation in
+> `lambdas/db/src/schema/`, you MUST regenerate `schema.graphql` first:
+>
+> ```powershell
+> pnpm exec nx run db:print-schema   # Step 1: regenerate schema.graphql
+> pnpm exec nx affected -t codegen   # Step 2: generate TS types from updated schema
+> ```
+>
+> `make pre-commit` runs both steps automatically (schema generation is step 1/8).
+
 ## Command
 
 ```powershell
@@ -136,23 +149,29 @@ pnpm exec nx affected -t codegen
 ### After Schema Changes
 
 ```powershell
-# 1. Modify GraphQL schema files
-# Edit files in lambdas/db/src/schema/
+# 1. Modify Pothos resolvers/types in lambdas/db/src/schema/
 
-# 2. Restart GraphQL server (if running)
-# Ctrl+C in GraphQL terminal, then:
-pnpm exec nx run db:serve
+# 2. Regenerate schema.graphql from Pothos (REQUIRED before codegen)
+pnpm exec nx run db:print-schema
 
-# 3. Run codegen
+# 3. Run codegen to generate TS types from the updated schema
+$env:VITE_GRAPHQL_HOST = "lambdas/db/schema.graphql"
 pnpm exec nx affected -t codegen
 
 # 4. Verify types are correct
 pnpm exec nx affected -t typecheck
 
-# 5. Commit generated files
-git add .
+# 5. Commit schema + generated files together
+git add lambdas/db/schema.graphql
+git add **/graphql.generated.ts
+git add **/graphql.schema.json
 git commit -m "feat(graphql): update schema and regenerate types"
 ```
+
+> **Never skip step 2.** If you run codegen without `print-schema`, the generated
+> types will be based on a stale `schema.graphql` and won't include your changes.
+> Never manually edit `schema.graphql` — the `check-schema` CI job diffs the committed
+> file against a freshly generated one and will fail if they don't match.
 
 ### Pre-commit with Schema Changes
 

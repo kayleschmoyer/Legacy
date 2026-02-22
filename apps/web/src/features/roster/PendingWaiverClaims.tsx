@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
-import { Card, H5, Separator, Spinner, Text } from 'tamagui';
+import { Card, Separator, Spinner, Text } from 'tamagui';
 import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
 import {
   useCancelWaiverClaimMutation,
@@ -58,30 +58,57 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
 
   return (
     <Card
-      bordered
-      padding="$4"
-      backgroundColor="$background"
-      borderColor="$yellow6"
+      backgroundColor="rgba(17, 27, 47, 0.7)"
+      borderColor="$amber7"
       borderWidth={1}
-      elevate
+      borderRadius="$5"
+      overflow="hidden"
+      style={{
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 0 20px rgba(245, 158, 11, 0.08)',
+      }}
     >
-      <YStack gap="$3">
+      <YStack>
+        {/* Gradient accent bar */}
+        <YStack
+          height={2}
+          width="100%"
+          style={{
+            background: 'linear-gradient(90deg, #F59E0B, #FBBF24, transparent)',
+          }}
+        />
         {/* Header */}
-        <XStack alignItems="center" gap="$2">
-          <Clock size={18} color="$yellow10" />
-          <H5 color="$yellow10" margin={0}>
+        <XStack
+          alignItems="center"
+          gap="$2"
+          paddingHorizontal="$3"
+          paddingVertical="$2.5"
+          backgroundColor="rgba(245, 158, 11, 0.08)"
+          borderBottomWidth={1}
+          borderBottomColor="$amber6"
+        >
+          <Clock size={16} color="$amber9" />
+          <Text
+            fontSize="$2"
+            fontWeight="700"
+            color="$amber9"
+            textTransform="uppercase"
+            letterSpacing={0.8}
+            flex={1}
+          >
             Pending Waiver Claims
-          </H5>
-          {loading && <Spinner size="small" color="$yellow10" />}
+          </Text>
+          {loading && <Spinner size="small" color="$amber9" />}
         </XStack>
-
-        <Separator borderColor="$yellow6" />
 
         {error && (
           <XStack
             backgroundColor="$red3"
             borderRadius="$2"
             padding="$2"
+            marginHorizontal="$3"
+            marginTop="$2"
             alignItems="center"
             gap="$2"
           >
@@ -93,51 +120,63 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
         )}
 
         {/* Claims list */}
-        {claims.map((claim) => (
-          <Card
-            key={claim.id}
-            bordered
-            padding="$3"
-            backgroundColor="$yellow2"
-            borderColor="$yellow5"
-            borderRadius="$3"
-          >
-            <XStack alignItems="center" justifyContent="space-between" gap="$3">
+        {claims.map((claim, index) => (
+          <React.Fragment key={claim.id}>
+            <XStack
+              paddingVertical="$2.5"
+              paddingHorizontal="$3"
+              alignItems="center"
+              justifyContent="space-between"
+              gap="$3"
+              animation="quick"
+              hoverStyle={{ backgroundColor: '$surfaceSubtle' }}
+              pressStyle={{ scale: 0.995, opacity: 0.9 }}
+            >
               {/* Claim details */}
-              <YStack flex={1} gap="$1">
-                <XStack alignItems="center" gap="$2">
-                  <Text fontWeight="600" fontSize="$4" color="$color">
-                    {claim.playerName ?? `Player #${claim.playerId}`}
+              <YStack flex={1} gap="$0.5" minWidth={0}>
+                <Text
+                  fontWeight="600"
+                  fontSize="$3"
+                  color="$color12"
+                  numberOfLines={1}
+                >
+                  {claim.playerName ?? `Player #${claim.playerId}`}
+                </Text>
+                <XStack gap="$2" flexWrap="wrap" alignItems="center">
+                  {claim.dropPlayerId && (
+                    <XStack alignItems="center" gap="$0.5">
+                      <X size={10} color="$red9" />
+                      <Text fontSize={10} color="$red9" fontWeight="600">
+                        Drop:{' '}
+                        {claim.dropPlayerName ??
+                          `Player #${claim.dropPlayerId}`}
+                      </Text>
+                    </XStack>
+                  )}
+                  {claim.faabBid != null && claim.faabBid > 0 && (
+                    <Text
+                      fontSize={10}
+                      color="$blue11"
+                      fontWeight="700"
+                      backgroundColor="rgba(59, 130, 246, 0.12)"
+                      paddingHorizontal="$1"
+                      paddingVertical={1}
+                      borderRadius="$1"
+                    >
+                      ${claim.faabBid} FAAB
+                    </Text>
+                  )}
+                  <Text fontSize={10} color="$textMuted">
+                    {claim.createdAt ? formatDate(claim.createdAt) : ''}
                   </Text>
                 </XStack>
-                {claim.dropPlayerId && (
-                  <XStack alignItems="center" gap="$1">
-                    <X size={12} color="$red9" />
-                    <Text fontSize="$2" color="$red9">
-                      Dropping:{' '}
-                      {claim.dropPlayerName ?? `Player #${claim.dropPlayerId}`}
-                    </Text>
-                  </XStack>
-                )}
-                {claim.faabBid != null && claim.faabBid > 0 && (
-                  <Text fontSize="$2" color="$blue10" fontWeight="600">
-                    FAAB Bid: ${claim.faabBid}
-                  </Text>
-                )}
-                <Text fontSize="$1" color="$colorSubtle">
-                  Submitted{' '}
-                  {claim.createdAt ? formatDate(claim.createdAt) : 'Unknown'}
-                </Text>
               </YStack>
 
               {/* Cancel button */}
               <Button
-                size="$3"
-                backgroundColor="$red4"
-                borderColor="$red7"
-                borderWidth={1}
-                hoverStyle={{ backgroundColor: '$red5' }}
-                pressStyle={{ backgroundColor: '$red6' }}
+                size="$2"
+                variant="outlined"
+                theme="red"
                 onPress={() => {
                   if (claim.id != null) void handleCancel(claim.id);
                 }}
@@ -147,24 +186,35 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
                   cancellingId === claim.id ? (
                     <Spinner size="small" />
                   ) : (
-                    <Trash2 size={14} color="$red10" />
+                    <Trash2 size={12} color="$red10" />
                   )
                 }
               >
-                <Text fontSize="$2" color="$red10">
-                  {cancellingId === claim.id ? 'Cancelling…' : 'Cancel'}
+                <Text fontSize="$1" fontWeight="600">
+                  {cancellingId === claim.id ? 'Cancelling' : 'Cancel'}
                 </Text>
               </Button>
             </XStack>
-          </Card>
+            {index < claims.length - 1 && (
+              <Separator borderColor="$outlineSubtle" marginVertical={0} />
+            )}
+          </React.Fragment>
         ))}
 
         {/* Summary footer */}
         {claims.length > 0 && (
-          <Text fontSize="$1" color="$colorSubtle" textAlign="center">
-            {claims.length} pending claim{claims.length !== 1 ? 's' : ''} —
-            processed hourly
-          </Text>
+          <XStack
+            paddingVertical="$2"
+            paddingHorizontal="$3"
+            borderTopWidth={1}
+            borderTopColor="$outlineSubtle"
+            justifyContent="center"
+          >
+            <Text fontSize="$1" color="$textMuted" textAlign="center">
+              {claims.length} pending claim{claims.length !== 1 ? 's' : ''} —
+              processed hourly
+            </Text>
+          </XStack>
         )}
       </YStack>
     </Card>

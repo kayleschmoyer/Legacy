@@ -5,19 +5,11 @@
  * but the scoring system expects database column names (e.g., hr, so).
  */
 
-// import type {
-//   GameBatting,
-//   GameFielding,
-//   GamePitching,
-// } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholders until GraphQL schema implements these types
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
-type GameBatting = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
-type GameFielding = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LS-53: Temporary placeholder types
-type GamePitching = any;
+import type {
+  GameBatting,
+  GameFielding,
+  GamePitching,
+} from '../../api/db/graphql.generated';
 
 export interface ScoringBattingStats {
   [key: string]: number | null | undefined;
@@ -74,10 +66,8 @@ export interface ScoringFieldingStats {
 
 /**
  * Maps GraphQL GameBatting to scoring format
- * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
 export function mapBattingStats(
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GameBatting | null | undefined,
 ): ScoringBattingStats | null {
   if (!graphqlStats) return null;
@@ -98,10 +88,9 @@ export function mapBattingStats(
     gidp: graphqlStats.groundedIntoDoublePlays,
     hbp: graphqlStats.hitByPitch,
     sh: graphqlStats.sacrificeHits,
-    // sacrificeFlies is typed as string in GraphQL for some reason, so we need to parse it
+    // sacrificeFlies is typed as string in GraphQL, so we need to parse it
     sf: graphqlStats.sacrificeFlies
-      ? // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- LS-53: GraphQL placeholder type
-        parseInt(graphqlStats.sacrificeFlies, 10) || null
+      ? parseInt(graphqlStats.sacrificeFlies, 10) || null
       : null,
     ibb: graphqlStats.intentionalBaseOnBalls,
   };
@@ -109,10 +98,8 @@ export function mapBattingStats(
 
 /**
  * Maps GraphQL GamePitching to scoring format
- * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
 export function mapPitchingStats(
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GamePitching | null | undefined,
 ): ScoringPitchingStats | null {
   if (!graphqlStats) return null;
@@ -141,10 +128,8 @@ export function mapPitchingStats(
 
 /**
  * Maps GraphQL GameFielding to scoring format
- * Note: LS-53 - Using any type for now until GraphQL schema is updated
  */
 export function mapFieldingStats(
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- LS-53 placeholder type
   graphqlStats: GameFielding | null | undefined,
 ): ScoringFieldingStats | null {
   if (!graphqlStats) return null;

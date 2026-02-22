@@ -7,9 +7,11 @@ import {
   type NotificationData,
   type PlayerStatsLoadingNotification,
   type PlayerStatsUpdatedNotification,
+  type RosterUpdateNotification,
   WebSocketClient,
   type WebSocketMessage,
 } from '@legacy-sports/websocket-client';
+import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 
 // Noop function for optional callbacks
 const noop = () => {
@@ -46,6 +48,7 @@ export type {
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
+  RosterUpdateNotification,
   WebSocketMessage,
 };
 
@@ -64,6 +67,7 @@ interface UseWebSocketOptions {
   onMatchupStatsComplete?: (
     notification: MatchupStatsCompleteNotification,
   ) => void;
+  onRosterUpdate?: (notification: RosterUpdateNotification) => void;
   onMessage?: (message: WebSocketMessage) => void;
   onError?: (error: Error) => void;
 }
@@ -98,6 +102,7 @@ export function useWebSocket({
   onPlayerStatsLoading,
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
+  onRosterUpdate,
   onMessage,
   onError,
 }: UseWebSocketOptions = {}) {
@@ -108,8 +113,23 @@ export function useWebSocket({
   // Get WebSocket URL from environment or passed prop
   const wsUrl = url || process.env.NX_WEBSOCKET_URL;
 
+  // Log connection parameters on mount for debugging
+  useEffect(() => {
+    console.log('[useWebSocket] init', {
+      url: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
+      hasToken: !!token,
+      leagueId,
+      matchupId,
+      viewContext,
+      autoConnect,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const connect = useCallback(() => {
     if (!wsUrl) {
+      console.warn(
+        '[useWebSocket] connect failed: WebSocket URL not configured',
+      );
       setError('WebSocket URL not configured');
       return;
     }
@@ -147,32 +167,94 @@ export function useWebSocket({
   // Create and manage WebSocketClient
   useEffect(() => {
     if (!wsUrl) {
+      console.warn(
+        '[useWebSocket] useEffect: no wsUrl, skipping client creation',
+      );
       setError('WebSocket URL not configured');
       return;
     }
 
+    console.log('[useWebSocket] creating WebSocketClient', {
+      url: `${wsUrl.substring(0, 30)}...`,
+      hasToken: !!token,
+      leagueId,
+      viewContext,
+      autoConnect,
+    });
+
+    // Create client with autoConnect=false — we defer connection to avoid
+    // React Strict Mode double-invoke creating a WebSocket that gets
+    // immediately closed ("closed before the connection is established").
     const client = new WebSocketClient({
       url: wsUrl,
       token,
       leagueId,
       matchupId,
       viewContext,
-      autoConnect,
+      autoConnect: false,
     });
 
     clientRef.current = client;
 
+    // Defer connection to next microtask so Strict Mode cleanup can cancel it
+    let cancelled = false;
+    if (autoConnect) {
+      void Promise.resolve().then(() => {
+        if (!cancelled) {
+          client.connect();
+        }
+      });
+    }
+
     // Set up event handlers
+    let wasConnected = false;
+
     const unsubscribeConnected = client.on('connected', () => {
+      if (wasConnected) {
+        console.log(
+          '[useWebSocket] reconnected ✓',
+          viewContext,
+          'leagueId:',
+          leagueId,
+        );
+      } else {
+        console.log(
+          '[useWebSocket] connected ✓',
+          viewContext,
+          'leagueId:',
+          leagueId,
+        );
+      }
+      wasConnected = true;
       setConnected(true);
       setError(null);
     });
 
     const unsubscribeDisconnected = client.on('disconnected', () => {
+      if (wasConnected) {
+        console.warn(
+          '[useWebSocket] connection dropped — auto-reconnecting...',
+          viewContext,
+          'leagueId:',
+          leagueId,
+        );
+      } else {
+        console.log(
+          '[useWebSocket] disconnected',
+          viewContext,
+          'leagueId:',
+          leagueId,
+        );
+      }
       setConnected(false);
     });
 
     const unsubscribeError = client.on('error', (err) => {
+      console.error(
+        '[useWebSocket] error:',
+        err.message,
+        '(will auto-reconnect)',
+      );
       setError(err.message);
       onError?.(err);
     });
@@ -182,39 +264,62 @@ export function useWebSocket({
       : noop;
 
     const unsubscribeDraftCompleted = onDraftCompleted
-      ? client.on('draft-complete', (notification: NotificationData) => {
-          onDraftCompleted(notification as DraftCompletedNotification);
-        })
+      ? client.on(
+          ClientNotificationType.DRAFT_COMPLETED,
+          (notification: NotificationData) => {
+            onDraftCompleted(notification as DraftCompletedNotification);
+          },
+        )
       : noop;
 
     const unsubscribeDraftStarted = onDraftStarted
-      ? client.on('draft-started', (notification: NotificationData) => {
-          onDraftStarted(notification as DraftStartedNotification);
-        })
+      ? client.on(
+          ClientNotificationType.DRAFT_STARTED,
+          (notification: NotificationData) => {
+            onDraftStarted(notification as DraftStartedNotification);
+          },
+        )
       : noop;
 
     const unsubscribeDraftPickMade = onDraftPickMade
-      ? client.on('draft-pick-made', (notification: NotificationData) => {
-          onDraftPickMade(notification as DraftPickNotification);
-        })
+      ? client.on(
+          ClientNotificationType.DRAFT_PICK_MADE,
+          (notification: NotificationData) => {
+            onDraftPickMade(notification as DraftPickNotification);
+          },
+        )
       : noop;
 
     const unsubscribePlayerStatsLoading = onPlayerStatsLoading
-      ? client.on('player-stats-loading', (notification: NotificationData) => {
-          onPlayerStatsLoading(notification as PlayerStatsLoadingNotification);
-        })
+      ? client.on(
+          ClientNotificationType.PLAYER_STATS_LOADING,
+          (notification: NotificationData) => {
+            onPlayerStatsLoading(
+              notification as PlayerStatsLoadingNotification,
+            );
+          },
+        )
       : noop;
 
     const unsubscribePlayerStatsUpdated = onPlayerStatsUpdated
-      ? client.on('player-stats-updated', (notification: NotificationData) => {
-          onPlayerStatsUpdated(notification as PlayerStatsUpdatedNotification);
-        })
+      ? client.on(
+          ClientNotificationType.PLAYER_STATS_UPDATED,
+          (notification: NotificationData) => {
+            onPlayerStatsUpdated(
+              notification as PlayerStatsUpdatedNotification,
+            );
+          },
+        )
       : noop;
 
     const unsubscribeMatchupStatsComplete = onMatchupStatsComplete
       ? client.on(
-          'matchup-stats-complete',
+          ClientNotificationType.MATCHUP_STATS_COMPLETE,
           (notification: NotificationData) => {
+            console.log(
+              '[useWebSocket] received matchup-stats-complete',
+              notification,
+            );
             onMatchupStatsComplete(
               notification as MatchupStatsCompleteNotification,
             );
@@ -222,8 +327,19 @@ export function useWebSocket({
         )
       : noop;
 
+    const unsubscribeRosterUpdate = onRosterUpdate
+      ? client.on(
+          ClientNotificationType.ROSTER_UPDATE,
+          (notification: NotificationData) => {
+            console.log('[useWebSocket] received roster-update', notification);
+            onRosterUpdate(notification as RosterUpdateNotification);
+          },
+        )
+      : noop;
+
     // Cleanup on unmount
     return () => {
+      cancelled = true;
       unsubscribeConnected();
       unsubscribeDisconnected();
       unsubscribeError();
@@ -234,6 +350,7 @@ export function useWebSocket({
       unsubscribePlayerStatsLoading();
       unsubscribePlayerStatsUpdated();
       unsubscribeMatchupStatsComplete();
+      unsubscribeRosterUpdate();
       client.dispose();
     };
   }, [
@@ -249,6 +366,7 @@ export function useWebSocket({
     onPlayerStatsLoading,
     onPlayerStatsUpdated,
     onMatchupStatsComplete,
+    onRosterUpdate,
     onMessage,
     onError,
   ]);

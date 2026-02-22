@@ -26,6 +26,8 @@ const RankBadge = styled(YStack, {
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
+  animation: 'quick',
+  hoverStyle: { scale: 1.12 },
 });
 
 function getRankStyle(rank: number) {
@@ -98,12 +100,39 @@ export function LeagueStandings({
   }
 
   return (
-    <YStack gap="$4" role="region" aria-label="League standings">
-      <XStack justifyContent="space-between" alignItems="center">
+    <Card
+      backgroundColor="rgba(17, 27, 47, 0.7)"
+      borderColor="$surfacePanelBorder"
+      borderWidth={1}
+      borderRadius="$5"
+      overflow="hidden"
+      role="region"
+      aria-label="League standings"
+      style={{
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      {/* Gradient accent bar */}
+      <YStack
+        height={3}
+        width="100%"
+        style={{
+          background: 'linear-gradient(90deg, #F59E0B, #FBBF24, transparent)',
+        }}
+      />
+      {/* Title bar */}
+      <XStack
+        paddingHorizontal="$4"
+        paddingVertical="$3"
+        justifyContent="space-between"
+        alignItems="center"
+        backgroundColor="rgba(13, 21, 38, 0.6)"
+      >
         <XStack alignItems="center" gap="$2">
-          <Trophy size={20} color="var(--color)" />
+          <Trophy size={18} color="var(--color)" />
           <Text
-            fontSize="$6"
+            fontSize="$4"
             fontWeight="700"
             color="$color"
             id="standings-title"
@@ -111,97 +140,113 @@ export function LeagueStandings({
             Standings
           </Text>
         </XStack>
-        <Text fontSize="$3" color="$textMuted">
+        <Text fontSize="$2" color="$textMuted">
           {teams.length} {teams.length === 1 ? 'team' : 'teams'}
         </Text>
       </XStack>
 
       {/* Table Header */}
-      <XStack paddingHorizontal="$4" paddingVertical="$2">
+      <XStack
+        paddingHorizontal="$4"
+        paddingVertical="$2"
+        borderBottomWidth={1}
+        borderBottomColor="$outlineSubtle"
+      >
         <Text
-          width={48}
-          fontSize="$2"
+          width={44}
+          fontSize="$1"
           color="$textMuted"
-          fontWeight="600"
+          fontWeight="700"
           textTransform="uppercase"
-          letterSpacing={0.5}
+          letterSpacing={0.6}
         >
-          Rank
+          #
         </Text>
         <Text
           flex={2}
-          fontSize="$2"
+          fontSize="$1"
           color="$textMuted"
-          fontWeight="600"
+          fontWeight="700"
           textTransform="uppercase"
-          letterSpacing={0.5}
+          letterSpacing={0.6}
         >
           Team
         </Text>
         <Text
           width={60}
-          fontSize="$2"
+          fontSize="$1"
           color="$textMuted"
-          fontWeight="600"
+          fontWeight="700"
           textTransform="uppercase"
-          letterSpacing={0.5}
+          letterSpacing={0.6}
           textAlign="center"
+          display="none"
+          $gtSm={{ display: 'flex' }}
         >
           {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
         </Text>
         <Text
-          flex={1}
-          fontSize="$2"
+          width={70}
+          fontSize="$1"
           color="$textMuted"
-          fontWeight="600"
+          fontWeight="700"
           textTransform="uppercase"
-          letterSpacing={0.5}
+          letterSpacing={0.6}
           textAlign="right"
         >
           Points
         </Text>
       </XStack>
 
-      <Separator borderColor="$outlineSubtle" />
-
       {/* Team Rows */}
-      <YStack gap="$1" role="list">
+      <YStack role="list">
         {teams.map((team, index) => {
           const isUserTeam = userTeamId === team.id;
           const rank = index + 1;
           const rankStyle = getRankStyle(rank);
+          const isEven = index % 2 === 0;
 
           return (
-            <Card
-              key={team.id}
-              paddingHorizontal="$4"
-              paddingVertical="$3"
-              borderWidth={1}
-              borderColor={isUserTeam ? '$blue7' : 'transparent'}
-              backgroundColor={isUserTeam ? '$blue2' : 'transparent'}
-              borderRadius="$4"
-              role="listitem"
-              cursor="pointer"
-              hoverStyle={{
-                backgroundColor: isUserTeam ? '$blue3' : '$surfaceSubtle',
-              }}
-              pressStyle={{
-                backgroundColor: isUserTeam ? '$blue3' : '$surfaceInteractive',
-              }}
-              onPress={() => handleTeamClick(team.id)}
-              onClick={() => handleTeamClick(team.id)}
-              animation="quick"
-            >
-              <XStack alignItems="center">
+            <React.Fragment key={team.id}>
+              <XStack
+                paddingHorizontal="$4"
+                paddingVertical="$2.5"
+                backgroundColor={
+                  isUserTeam
+                    ? '$blue2'
+                    : isEven
+                      ? '$background'
+                      : '$surfaceSubtle'
+                }
+                borderLeftWidth={3}
+                borderLeftColor={isUserTeam ? '$blue9' : 'transparent'}
+                role="listitem"
+                cursor="pointer"
+                hoverStyle={{
+                  backgroundColor: isUserTeam ? '$blue3' : '$surfaceSubtle',
+                }}
+                pressStyle={{ scale: 0.995, opacity: 0.9 }}
+                onPress={() => handleTeamClick(team.id)}
+                alignItems="center"
+                animation="quick"
+                minHeight={48}
+                style={
+                  isUserTeam
+                    ? { boxShadow: 'inset 0 0 24px rgba(59, 130, 246, 0.1)' }
+                    : rank <= 3
+                      ? { boxShadow: 'inset 0 0 20px rgba(245, 158, 11, 0.06)' }
+                      : undefined
+                }
+              >
                 {/* Rank */}
-                <YStack width={48} alignItems="flex-start">
+                <YStack width={44} alignItems="flex-start">
                   <RankBadge
                     backgroundColor={rankStyle.bg}
                     borderColor={rankStyle.border}
                     borderWidth={1}
                   >
                     <Text
-                      fontSize="$3"
+                      fontSize="$2"
                       fontWeight="800"
                       color={rankStyle.color}
                     >
@@ -211,33 +256,30 @@ export function LeagueStandings({
                 </YStack>
 
                 {/* Team info */}
-                <YStack flex={2} gap="$1">
+                <YStack flex={2} gap="$0.5">
                   <XStack alignItems="center" gap="$2">
                     <Text
-                      fontSize="$4"
+                      fontSize="$3"
                       fontWeight={isUserTeam ? '700' : '500'}
                       color="$color"
+                      numberOfLines={1}
                     >
                       {team.name}
                     </Text>
                     {isUserTeam && (
-                      <XStack
+                      <Text
+                        fontSize={10}
+                        fontWeight="800"
+                        color="$blue11"
                         backgroundColor="$blue3"
-                        borderColor="$blue7"
-                        borderWidth={1}
-                        borderRadius="$10"
-                        paddingHorizontal="$2"
-                        paddingVertical="$0.5"
+                        paddingHorizontal="$1.5"
+                        paddingVertical={1}
+                        borderRadius="$2"
                       >
-                        <Text fontSize="$1" fontWeight="700" color="$blue11">
-                          YOU
-                        </Text>
-                      </XStack>
+                        YOU
+                      </Text>
                     )}
                   </XStack>
-                  <Text fontSize="$2" color="$textMuted">
-                    View roster
-                  </Text>
                 </YStack>
 
                 {/* Waiver Info */}
@@ -247,6 +289,8 @@ export function LeagueStandings({
                   fontWeight="500"
                   color="$textMuted"
                   textAlign="center"
+                  display="none"
+                  $gtSm={{ display: 'flex' }}
                 >
                   {waiverType === 'faab'
                     ? team.faabBudget != null
@@ -259,8 +303,8 @@ export function LeagueStandings({
 
                 {/* Points */}
                 <Text
-                  flex={1}
-                  fontSize="$4"
+                  width={70}
+                  fontSize="$3"
                   fontWeight="600"
                   color="$textMuted"
                   textAlign="right"
@@ -268,10 +312,13 @@ export function LeagueStandings({
                   —
                 </Text>
               </XStack>
-            </Card>
+              {index < teams.length - 1 && (
+                <Separator borderColor="$outlineSubtle" marginVertical={0} />
+              )}
+            </React.Fragment>
           );
         })}
       </YStack>
-    </YStack>
+    </Card>
   );
 }

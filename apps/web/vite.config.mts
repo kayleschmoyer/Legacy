@@ -200,6 +200,9 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_GRAPHQL_HOST': JSON.stringify(
         env.VITE_GRAPHQL_HOST || 'http://localhost:5000/graphql',
       ),
+      'import.meta.env.VITE_WEBSOCKET_URL': JSON.stringify(
+        env.VITE_WEBSOCKET_URL || '',
+      ),
       // Build information for About page
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),

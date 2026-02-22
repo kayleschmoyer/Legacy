@@ -145,7 +145,14 @@ export default function CreateLeagueModal(
             />
             <Dropdown
               value={draftMode}
-              onChange={(value) => setDraftMode(value as 'live' | 'automated')}
+              onChange={(value) => {
+                const mode = value as 'live' | 'automated';
+                setDraftMode(mode);
+                // Automated drafts only support 'random' selection method
+                if (mode === 'automated') {
+                  setSelectionMethod('random');
+                }
+              }}
               items={DRAFT_MODE_ITEMS}
             />
             <Dropdown
@@ -154,6 +161,7 @@ export default function CreateLeagueModal(
                 setSelectionMethod(value as 'standard' | 'auction' | 'random')
               }
               items={SELECTION_METHOD_ITEMS}
+              disabled={draftMode === 'automated'}
             />
             <Dropdown
               value={draftOrder}

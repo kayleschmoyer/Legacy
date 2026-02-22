@@ -169,7 +169,13 @@ export function DraftSettingsControl({
 
   const handleDraftModeChange = (value: string) => {
     setDraftMode(value);
-    checkChanges(value, selectionMethod, draftOrder, playerPool);
+    // Automated drafts only support 'random' selection method
+    if (value === 'automated') {
+      setSelectionMethod('random');
+      checkChanges(value, 'random', draftOrder, playerPool);
+    } else {
+      checkChanges(value, selectionMethod, draftOrder, playerPool);
+    }
   };
 
   const handleSelectionMethodChange = (value: string) => {
@@ -298,11 +304,15 @@ export function DraftSettingsControl({
             {/* Selection Method */}
             <OptionSelector
               label="Selection Method"
-              description="Standard lets managers pick players in order. Auction gives a budget for bidding. Random assigns players automatically."
+              description={
+                draftMode === 'automated'
+                  ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
+                  : 'Standard lets managers pick players in order. Auction gives a budget for bidding. Random assigns players automatically.'
+              }
               options={SELECTION_METHODS}
               value={selectionMethod}
               onChange={handleSelectionMethodChange}
-              disabled={isDraftLocked || saving}
+              disabled={isDraftLocked || saving || draftMode === 'automated'}
             />
 
             {/* Draft Order */}

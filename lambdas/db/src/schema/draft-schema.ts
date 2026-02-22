@@ -907,6 +907,21 @@ builder.mutationField('updateDraftSettings', (t) =>
           .where(eq(PublicSchema.drafts.leagueId, leagueId))
           .limit(1);
 
+        // Cross-validate: automated drafts only support 'random' selection
+        const effectiveDraftMode = draftMode ?? existingDraft?.draftMode;
+        const effectiveSelectionMethod =
+          selectionMethod ?? existingDraft?.selectionMethod;
+
+        if (
+          effectiveDraftMode === 'automated' &&
+          effectiveSelectionMethod &&
+          effectiveSelectionMethod !== 'random'
+        ) {
+          throw new Error(
+            "Automated drafts only support the 'random' selection method.",
+          );
+        }
+
         const draftUpdates: Record<string, unknown> = {
           updatedAt: new Date(),
         };

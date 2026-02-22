@@ -256,6 +256,13 @@ export async function validateDraftRequest(
   // Validate selection method
   validateSelectionMethod(selectionMethod);
 
+  // Cross-validate: automated drafts only support 'random' selection method
+  if (draftMode === 'automated' && selectionMethod !== 'random') {
+    throw new Error(
+      `Automated drafts only support the 'random' selection method. Got: '${selectionMethod}'`,
+    );
+  }
+
   // Validate draft order if provided
   if (draftOrder) {
     validateDraftOrder(draftOrder);

@@ -24,4 +24,5 @@ export type {
   MatchupStatsCompleteNotification,
   LeagueChatMessageNotification,
   DirectMessageNotification,
+  RosterUpdateNotification,
 } from './types';

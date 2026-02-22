@@ -150,6 +150,13 @@ export type CareerPitching = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+export enum ConsentType {
+  Analytics = 'analytics',
+  DataProcessing = 'data_processing',
+  MarketingEmails = 'marketing_emails',
+  ThirdPartySharing = 'third_party_sharing',
+}
+
 export type CreateLeagueAndTeamsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
@@ -195,6 +202,21 @@ export type CurrentDraftPick = {
   round?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type DataRequest = {
+  __typename?: 'DataRequest';
+  completedAt?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  exportUrl?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  processedAt?: Maybe<Scalars['String']['output']>;
+  requestType?: Maybe<Scalars['String']['output']>;
+  requestedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type DeviceToken = {
@@ -593,6 +615,8 @@ export type MatchupStatusCounts = {
 export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
+  /** Record that the user has accepted the privacy policy */
+  acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -611,11 +635,20 @@ export type Mutation = {
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
+  /** Record user consent for a specific data processing type */
+  recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
+  requestDataDeletion?: Maybe<DataRequest>;
+  /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
+  requestDataExport?: Maybe<DataRequest>;
+  /** Revoke a previously granted consent */
+  revokeConsent?: Maybe<UserConsent>;
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
+  swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
@@ -701,8 +734,16 @@ export type MutationProcessWaiverClaimsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationRecordConsentArgs = {
+  input: RecordConsentInput;
+};
+
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationRevokeConsentArgs = {
+  consentType: ConsentType;
 };
 
 export type MutationSendDirectMessageArgs = {
@@ -728,6 +769,13 @@ export type MutationStartDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationSwapTeamMemberPositionsArgs = {
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+  teamMemberIdA: Scalars['Int']['input'];
+  teamMemberIdB: Scalars['Int']['input'];
 };
 
 export type MutationTriggerGameSelectionArgs = {
@@ -867,6 +915,12 @@ export type PlayoffQualification = {
   teamName?: Maybe<Scalars['String']['output']>;
 };
 
+export type PrivacyPolicyStatus = {
+  __typename?: 'PrivacyPolicyStatus';
+  accepted?: Maybe<Scalars['Boolean']['output']>;
+  acceptedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type ProcessWaiverClaimsResult = {
   __typename?: 'ProcessWaiverClaimsResult';
   failed?: Maybe<Scalars['Int']['output']>;
@@ -880,6 +934,8 @@ export type Query = {
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
+  /** Get a complete export of all personal data for the authenticated user */
+  exportMyData?: Maybe<UserDataExport>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
   getCurrentMatchupForLeague?: Maybe<Matchup>;
@@ -913,6 +969,10 @@ export type Query = {
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
+  /** Get all consent records for the authenticated user */
+  myConsents?: Maybe<Array<UserConsent>>;
+  /** Get all data export/deletion requests for the authenticated user */
+  myDataRequests?: Maybe<Array<DataRequest>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -922,6 +982,8 @@ export type Query = {
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
+  /** Check if the authenticated user has accepted the privacy policy */
+  privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -1227,6 +1289,12 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type RecordConsentInput = {
+  consentType: ConsentType;
+  ipAddress?: InputMaybe<Scalars['String']['input']>;
+  userAgent?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type ScoringConfig = {
@@ -1537,6 +1605,31 @@ export type User = {
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;
+};
+
+export type UserConsent = {
+  __typename?: 'UserConsent';
+  consentType?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  grantedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  revokedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UserDataExport = {
+  __typename?: 'UserDataExport';
+  consentsJson?: Maybe<Scalars['String']['output']>;
+  dataRequestsJson?: Maybe<Scalars['String']['output']>;
+  leaguesJson?: Maybe<Scalars['String']['output']>;
+  privacyPolicyAcceptedAt?: Maybe<Scalars['String']['output']>;
+  teamsJson?: Maybe<Scalars['String']['output']>;
+  userCreatedAt?: Maybe<Scalars['String']['output']>;
+  userEmail?: Maybe<Scalars['String']['output']>;
+  userUsername?: Maybe<Scalars['String']['output']>;
 };
 
 /** Version and deployment information for the GraphQL API */
@@ -2882,6 +2975,33 @@ export type UpdateTeamMemberPositionMutation = {
       eligiblePositions?: Array<string> | null;
     } | null;
   } | null;
+};
+
+export type SwapTeamMemberPositionsMutationVariables = Exact<{
+  teamMemberIdA: Scalars['Int']['input'];
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  teamMemberIdB: Scalars['Int']['input'];
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SwapTeamMemberPositionsMutation = {
+  __typename?: 'Mutation';
+  swapTeamMemberPositions?: Array<{
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+  }> | null;
 };
 
 export type ClaimFreeAgentMutationVariables = Exact<{
@@ -6216,6 +6336,70 @@ export type UpdateTeamMemberPositionMutationResult =
 export type UpdateTeamMemberPositionMutationOptions = BaseMutationOptions<
   UpdateTeamMemberPositionMutation,
   UpdateTeamMemberPositionMutationVariables
+>;
+export const SwapTeamMemberPositions = gql`
+  mutation SwapTeamMemberPositions(
+    $teamMemberIdA: Int!
+    $positionIdA: Int
+    $teamMemberIdB: Int!
+    $positionIdB: Int
+  ) {
+    swapTeamMemberPositions(
+      teamMemberIdA: $teamMemberIdA
+      positionIdA: $positionIdA
+      teamMemberIdB: $teamMemberIdB
+      positionIdB: $positionIdB
+    ) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+export type SwapTeamMemberPositionsMutationFn = MutationFunction<
+  SwapTeamMemberPositionsMutation,
+  SwapTeamMemberPositionsMutationVariables
+>;
+
+/**
+ * __useSwapTeamMemberPositionsMutation__
+ *
+ * To run a mutation, you first call `useSwapTeamMemberPositionsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSwapTeamMemberPositionsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [swapTeamMemberPositionsMutation, { data, loading, error }] = useSwapTeamMemberPositionsMutation({
+ *   variables: {
+ *      teamMemberIdA: // value for 'teamMemberIdA'
+ *      positionIdA: // value for 'positionIdA'
+ *      teamMemberIdB: // value for 'teamMemberIdB'
+ *      positionIdB: // value for 'positionIdB'
+ *   },
+ * });
+ */
+export function useSwapTeamMemberPositionsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SwapTeamMemberPositionsMutation,
+    SwapTeamMemberPositionsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SwapTeamMemberPositionsMutation,
+    SwapTeamMemberPositionsMutationVariables
+  >(SwapTeamMemberPositions, options);
+}
+export type SwapTeamMemberPositionsMutationHookResult = ReturnType<
+  typeof useSwapTeamMemberPositionsMutation
+>;
+export type SwapTeamMemberPositionsMutationResult =
+  Apollo.MutationResult<SwapTeamMemberPositionsMutation>;
+export type SwapTeamMemberPositionsMutationOptions = BaseMutationOptions<
+  SwapTeamMemberPositionsMutation,
+  SwapTeamMemberPositionsMutationVariables
 >;
 export const ClaimFreeAgent = gql`
   mutation ClaimFreeAgent(

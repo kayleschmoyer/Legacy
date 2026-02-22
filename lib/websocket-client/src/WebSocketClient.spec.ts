@@ -4,6 +4,7 @@
  */
 
 import { Server } from 'mock-socket';
+import { ClientNotificationType } from '@legacy-sports/utils';
 import { WebSocketClient } from './WebSocketClient';
 import type { NotificationData, WebSocketMessage } from './types';
 
@@ -249,7 +250,7 @@ describe('WebSocketClient', () => {
       mockServer = new Server(mockUrl);
 
       const notification: NotificationData = {
-        type: 'draft-complete',
+        type: 'draft-completed' as const,
         leagueId: 123,
         selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
@@ -268,7 +269,7 @@ describe('WebSocketClient', () => {
         autoConnect: true,
       });
 
-      client.on('draft-complete', (data) => {
+      client.on(ClientNotificationType.DRAFT_COMPLETED, (data) => {
         expect(data).toEqual(notification);
         client.dispose();
         done();
@@ -386,7 +387,10 @@ describe('WebSocketClient', () => {
       });
 
       const handler = jest.fn();
-      const unsubscribe = client.on('draft-complete', handler);
+      const unsubscribe = client.on(
+        ClientNotificationType.DRAFT_COMPLETED,
+        handler,
+      );
 
       expect(typeof unsubscribe).toBe('function');
 
@@ -398,7 +402,7 @@ describe('WebSocketClient', () => {
       mockServer = new Server(mockUrl);
 
       const notification: NotificationData = {
-        type: 'draft-complete',
+        type: 'draft-completed' as const,
         leagueId: 123,
         selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
@@ -420,8 +424,8 @@ describe('WebSocketClient', () => {
       const handler1 = jest.fn();
       const handler2 = jest.fn();
 
-      client.on('draft-complete', handler1);
-      client.on('draft-complete', handler2);
+      client.on(ClientNotificationType.DRAFT_COMPLETED, handler1);
+      client.on(ClientNotificationType.DRAFT_COMPLETED, handler2);
 
       jest.advanceTimersByTime(200);
 
@@ -444,8 +448,8 @@ describe('WebSocketClient', () => {
       });
 
       const handler = jest.fn();
-      client.on('draft-complete', handler);
-      client.off('draft-complete', handler);
+      client.on(ClientNotificationType.DRAFT_COMPLETED, handler);
+      client.off(ClientNotificationType.DRAFT_COMPLETED, handler);
 
       client.dispose();
     });

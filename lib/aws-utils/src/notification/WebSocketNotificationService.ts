@@ -9,6 +9,7 @@ import {
   PostToConnectionCommand,
 } from '@aws-sdk/client-apigatewaymanagementapi';
 import { LOGGER } from '@legacy-sports/logging';
+import { WireNotificationType } from '@legacy-sports/utils';
 
 // Type for DynamoDB attribute values
 interface DynamoDBItem {
@@ -21,14 +22,14 @@ interface DynamoDBItem {
 }
 
 export interface DraftCompletedNotification {
-  type: 'DRAFT_COMPLETED';
+  type: typeof WireNotificationType.DRAFT_COMPLETED;
   leagueId: number;
   selectionMethod: string;
   completedAt: string;
 }
 
 export interface DraftStartedNotification {
-  type: 'DRAFT_STARTED';
+  type: typeof WireNotificationType.DRAFT_STARTED;
   leagueId: number;
   draftId: number;
   draftOrder: string;
@@ -37,7 +38,7 @@ export interface DraftStartedNotification {
 }
 
 export interface DraftPickNotification {
-  type: 'DRAFT_PICK_MADE';
+  type: typeof WireNotificationType.DRAFT_PICK_MADE;
   leagueId: number;
   draftId: number;
   pickId: number;
@@ -50,7 +51,7 @@ export interface DraftPickNotification {
 }
 
 export interface PlayerStatsLoadingNotification {
-  type: 'PLAYER_STATS_LOADING';
+  type: typeof WireNotificationType.PLAYER_STATS_LOADING;
   playerId: number;
   matchupId: number;
   leagueId: number;
@@ -61,7 +62,7 @@ export interface PlayerStatsLoadingNotification {
 }
 
 export interface PlayerStatsUpdatedNotification {
-  type: 'PLAYER_STATS_UPDATED';
+  type: typeof WireNotificationType.PLAYER_STATS_UPDATED;
   playerId: number;
   matchupId: number;
   leagueId: number;
@@ -69,7 +70,7 @@ export interface PlayerStatsUpdatedNotification {
 }
 
 export interface MatchupStatsCompleteNotification {
-  type: 'MATCHUP_STATS_COMPLETE';
+  type: typeof WireNotificationType.MATCHUP_STATS_COMPLETE;
   matchupId: number;
   leagueId: number;
   totalPlayers: number;
@@ -81,7 +82,7 @@ export interface MatchupStatsCompleteNotification {
  * Broadcast to all WebSocket connections scoped to the league.
  */
 export interface LeagueChatMessageNotification {
-  type: 'LEAGUE_CHAT_MESSAGE';
+  type: typeof WireNotificationType.LEAGUE_CHAT_MESSAGE;
   leagueId: number;
   messageId: number;
   senderId: number;
@@ -95,7 +96,7 @@ export interface LeagueChatMessageNotification {
  * A direct message pushed only to the recipient's active connections.
  */
 export interface DirectMessageNotification {
-  type: 'DIRECT_MESSAGE';
+  type: typeof WireNotificationType.DIRECT_MESSAGE;
   messageId: number;
   fromUserId: number;
   fromUsername: string;
@@ -112,7 +113,7 @@ export interface NotificationMessage {
 }
 
 export interface RosterUpdateNotification {
-  type: 'ROSTER_UPDATE';
+  type: typeof WireNotificationType.ROSTER_UPDATE;
   leagueId: number;
   updatedAt: string;
 }
@@ -340,7 +341,7 @@ export class WebSocketNotificationService {
     selectionMethod: string,
   ): Promise<void> {
     const notification: DraftCompletedNotification = {
-      type: 'DRAFT_COMPLETED',
+      type: WireNotificationType.DRAFT_COMPLETED,
       leagueId,
       selectionMethod,
       completedAt: new Date().toISOString(),
@@ -370,7 +371,7 @@ export class WebSocketNotificationService {
     teamCount: number,
   ): Promise<void> {
     const notification: DraftStartedNotification = {
-      type: 'DRAFT_STARTED',
+      type: WireNotificationType.DRAFT_STARTED,
       leagueId,
       draftId,
       draftOrder,
@@ -408,7 +409,7 @@ export class WebSocketNotificationService {
     overallPick: number,
   ): Promise<void> {
     const notification: DraftPickNotification = {
-      type: 'DRAFT_PICK_MADE',
+      type: WireNotificationType.DRAFT_PICK_MADE,
       leagueId,
       draftId,
       pickId,
@@ -449,7 +450,7 @@ export class WebSocketNotificationService {
     progress?: { loaded: number; total: number },
   ): Promise<void> {
     const notification: PlayerStatsLoadingNotification = {
-      type: 'PLAYER_STATS_LOADING',
+      type: WireNotificationType.PLAYER_STATS_LOADING,
       playerId,
       matchupId,
       leagueId,
@@ -474,7 +475,7 @@ export class WebSocketNotificationService {
     stats: unknown,
   ): Promise<void> {
     const notification: PlayerStatsUpdatedNotification = {
-      type: 'PLAYER_STATS_UPDATED',
+      type: WireNotificationType.PLAYER_STATS_UPDATED,
       playerId,
       matchupId,
       leagueId,
@@ -490,7 +491,13 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Notify matchup viewers that all stats loading is complete
+   * Notify matchup AND league viewers that all stats loading is complete.
+   *
+   * Previously this only called `notifyMatchupViewers` (viewContext='matchup'),
+   * so users on the league page (viewContext='league') never received the event
+   * and the UI never refreshed after game-selection finished.
+   *
+   * Now we also broadcast to the league so the LeagueDetailPage can refetch.
    */
   async notifyMatchupStatsComplete(
     matchupId: number,
@@ -498,7 +505,7 @@ export class WebSocketNotificationService {
     totalPlayers: number,
   ): Promise<void> {
     const notification: MatchupStatsCompleteNotification = {
-      type: 'MATCHUP_STATS_COMPLETE',
+      type: WireNotificationType.MATCHUP_STATS_COMPLETE,
       matchupId,
       leagueId,
       totalPlayers,
@@ -507,10 +514,21 @@ export class WebSocketNotificationService {
 
     LOGGER.info('Sending matchup stats complete notification', {
       matchupId,
+      leagueId,
       totalPlayers,
     });
 
+    // Notify matchup-level viewers (users on the matchup detail page)
     await this.notifyMatchupViewers(matchupId, notification);
+
+    // Also broadcast to league-level viewers so the league page refreshes
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
   }
 
   /**
@@ -561,7 +579,7 @@ export class WebSocketNotificationService {
     payload: Omit<LeagueChatMessageNotification, 'type'>,
   ): Promise<void> {
     const notification: LeagueChatMessageNotification = {
-      type: 'LEAGUE_CHAT_MESSAGE',
+      type: WireNotificationType.LEAGUE_CHAT_MESSAGE,
       ...payload,
     };
 
@@ -596,7 +614,7 @@ export class WebSocketNotificationService {
     }
 
     const notification: DirectMessageNotification = {
-      type: 'DIRECT_MESSAGE',
+      type: WireNotificationType.DIRECT_MESSAGE,
       ...payload,
     };
 
@@ -696,7 +714,7 @@ export class WebSocketNotificationService {
    */
   async notifyRosterUpdate(leagueId: number): Promise<void> {
     const notification: RosterUpdateNotification = {
-      type: 'ROSTER_UPDATE',
+      type: WireNotificationType.ROSTER_UPDATE,
       leagueId,
       updatedAt: new Date().toISOString(),
     };

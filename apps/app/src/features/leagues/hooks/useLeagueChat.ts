@@ -3,6 +3,7 @@ import { gql } from '@apollo/client';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
+import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 
 // ---------------------------------------------------------------------------
@@ -122,22 +123,26 @@ export function useLeagueChat(leagueId: number): {
         reconnect: true,
       });
 
-      client.on('LEAGUE_CHAT_MESSAGE', (notification: NotificationData) => {
-        if (notification.type !== 'LEAGUE_CHAT_MESSAGE') return;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === notification.messageId)) return prev;
-          return [
-            ...prev,
-            {
-              id: notification.messageId,
-              userId: notification.senderId,
-              username: notification.senderUsername,
-              messageText: notification.messageText,
-              createdAt: notification.timestamp,
-            },
-          ];
-        });
-      });
+      client.on(
+        ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+        (notification: NotificationData) => {
+          if (notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE)
+            return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === notification.messageId)) return prev;
+            return [
+              ...prev,
+              {
+                id: notification.messageId,
+                userId: notification.senderId,
+                username: notification.senderUsername,
+                messageText: notification.messageText,
+                createdAt: notification.timestamp,
+              },
+            ];
+          });
+        },
+      );
 
       clientRef.current = client;
     });

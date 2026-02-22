@@ -3,18 +3,20 @@
  * Framework-agnostic type definitions for WebSocket connections
  */
 
+import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+
 /**
  * Notification data for different event types
  */
 export interface DraftCompletedNotification {
-  type: 'draft-complete';
+  type: typeof ClientNotificationType.DRAFT_COMPLETED;
   leagueId: number;
   selectionMethod: string;
   completedAt: string;
 }
 
 export interface DraftStartedNotification {
-  type: 'draft-started';
+  type: typeof ClientNotificationType.DRAFT_STARTED;
   leagueId: number;
   draftId: number;
   draftOrder: string;
@@ -23,7 +25,7 @@ export interface DraftStartedNotification {
 }
 
 export interface DraftPickNotification {
-  type: 'draft-pick-made';
+  type: typeof ClientNotificationType.DRAFT_PICK_MADE;
   leagueId: number;
   draftId: number;
   pickId: number;
@@ -36,7 +38,7 @@ export interface DraftPickNotification {
 }
 
 export interface PlayerStatsLoadingNotification {
-  type: 'player-stats-loading';
+  type: typeof ClientNotificationType.PLAYER_STATS_LOADING;
   leagueId: number;
   status: 'loading' | 'complete' | 'error';
   progress?: {
@@ -46,14 +48,14 @@ export interface PlayerStatsLoadingNotification {
 }
 
 export interface PlayerStatsUpdatedNotification {
-  type: 'player-stats-updated';
+  type: typeof ClientNotificationType.PLAYER_STATS_UPDATED;
   leagueId: number;
   playerId: number;
   stats: Record<string, unknown>;
 }
 
 export interface MatchupStatsCompleteNotification {
-  type: 'matchup-stats-complete';
+  type: typeof ClientNotificationType.MATCHUP_STATS_COMPLETE;
   leagueId: number;
   matchupId: number;
   completedAt: string;
@@ -64,7 +66,7 @@ export interface MatchupStatsCompleteNotification {
  * Broadcast to all WebSocket connections scoped to `leagueId`.
  */
 export interface LeagueChatMessageNotification {
-  type: 'LEAGUE_CHAT_MESSAGE';
+  type: typeof ClientNotificationType.LEAGUE_CHAT_MESSAGE;
   leagueId: number;
   messageId: number;
   senderId: number;
@@ -79,7 +81,7 @@ export interface LeagueChatMessageNotification {
  * Pushed only to the recipient's active WebSocket connections.
  */
 export interface DirectMessageNotification {
-  type: 'DIRECT_MESSAGE';
+  type: typeof ClientNotificationType.DIRECT_MESSAGE;
   messageId: number;
   fromUserId: number;
   fromUsername: string;
@@ -92,7 +94,7 @@ export interface DirectMessageNotification {
 }
 
 export interface RosterUpdateNotification {
-  type: 'ROSTER_UPDATE';
+  type: typeof ClientNotificationType.ROSTER_UPDATE;
   leagueId: number;
   updatedAt: string;
 }

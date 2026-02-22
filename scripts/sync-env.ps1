@@ -91,6 +91,7 @@ $newEnvVars["VITE_OAUTH_PROXY_URL"] = $terraformOutput.oauth_proxy_endpoint.valu
 
 # Lambda Endpoints
 $newEnvVars["VITE_GRAPHQL_HOST"] = $terraformOutput.graphql_endpoint.value
+$newEnvVars["VITE_WEBSOCKET_URL"] = $terraformOutput.websocket_url.value
 $newEnvVars["INTERNAL_API_BASE_URL"] = $terraformOutput.api_gateway_url.value
 
 # Database Configuration (New Unified System)

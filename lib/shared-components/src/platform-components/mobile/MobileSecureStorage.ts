@@ -15,7 +15,9 @@ export class MobileSecureStorage implements ISecureStorage {
     try {
       await SecureStore.setItemAsync(this.prefix + key, value);
     } catch (error) {
-      throw new Error(`Failed to store item securely: ${error}`);
+      throw new Error(
+        `Failed to store item securely: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

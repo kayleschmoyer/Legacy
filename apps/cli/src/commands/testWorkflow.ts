@@ -1,5 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
+import {
+  ClientNotificationType,
+  wireToClientEventName,
+} from '@legacy-sports/utils';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
 
@@ -115,14 +119,15 @@ async function waitForEvent(
 
           // Map notification data types to expected event types
           const notificationTypeMap: Record<string, string> = {
-            DRAFT_COMPLETED: 'draft-complete',
-            MATCHUP_STATS_COMPLETE: 'matchup-stats-complete',
-            PLAYER_STATS_LOADING: 'player-stats-loading',
+            DRAFT_COMPLETED: ClientNotificationType.DRAFT_COMPLETED,
+            MATCHUP_STATS_COMPLETE:
+              ClientNotificationType.MATCHUP_STATS_COMPLETE,
+            PLAYER_STATS_LOADING: ClientNotificationType.PLAYER_STATS_LOADING,
             GAME_SELECTED: 'game-selected',
           };
 
           const mappedType = data.type
-            ? notificationTypeMap[data.type] || data.type.toLowerCase()
+            ? notificationTypeMap[data.type] || wireToClientEventName(data.type)
             : '';
           const messageLeagueId = data.leagueId || message.leagueId;
           const messageMatchupId = data.matchupId || message.matchupId;
@@ -573,7 +578,7 @@ export async function handleTestWorkflow(
         try {
           await waitForEvent(
             client,
-            'draft-complete',
+            ClientNotificationType.DRAFT_COMPLETED,
             leagueId,
             undefined,
             180000,

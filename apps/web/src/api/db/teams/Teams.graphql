@@ -36,6 +36,22 @@ mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
   }
 }
 
+mutation SwapTeamMemberPositions(
+  $teamMemberIdA: Int!
+  $positionIdA: Int
+  $teamMemberIdB: Int!
+  $positionIdB: Int
+) {
+  swapTeamMemberPositions(
+    teamMemberIdA: $teamMemberIdA
+    positionIdA: $positionIdA
+    teamMemberIdB: $teamMemberIdB
+    positionIdB: $positionIdB
+  ) {
+    ...TeamMember
+  }
+}
+
 mutation ClaimFreeAgent(
   $leagueId: Int!
   $playerId: Int!

@@ -275,6 +275,18 @@ async function selectGameForMatchup(
     }));
 
     await queueMatchupStatsLoad(matchupId, matchupData.leagueId, gamesToQueue);
+  } else if (notificationService) {
+    // All stats were cached — stats-lambda won't run, so notify here
+    await notificationService.notifyMatchupStatsComplete(
+      matchupId,
+      matchupData.leagueId,
+      totalPlayers,
+    );
+    LOGGER.info('Sent matchup-stats-complete notification (all stats cached)', {
+      matchupId,
+      leagueId: matchupData.leagueId,
+      totalPlayers,
+    });
   }
 
   // 5. Calculate how many games have been selected so far

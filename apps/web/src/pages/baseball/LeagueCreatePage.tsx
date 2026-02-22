@@ -131,10 +131,14 @@ export function LeagueCreatePage(): React.JSX.Element {
     field: keyof CreateLeagueFormData,
     value: string | number | boolean | Date,
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      // Automated drafts only support 'random' selection method
+      if (field === 'draftMode' && value === 'automated') {
+        next.selectionMethod = 'random';
+      }
+      return next;
+    });
   };
 
   const validateForm = (): string | null => {
@@ -565,7 +569,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       onPress={() => {
                         handleInputChange('selectionMethod', option.value);
                       }}
-                      disabled={loading}
+                      disabled={loading || formData.draftMode === 'automated'}
                       flex={1}
                       backgroundColor={
                         formData.selectionMethod === option.value
@@ -616,7 +620,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                   ))}
                 </XStack>
                 <Text size="$2" color="$gray10">
-                  Standard picks in order, auction bidding, or random assignment
+                  {formData.draftMode === 'automated'
+                    ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
+                    : 'Standard picks in order, auction bidding, or random assignment'}
                 </Text>
               </YStack>
 

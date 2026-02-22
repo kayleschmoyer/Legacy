@@ -17,6 +17,7 @@ Always regenerate them from source instead.
 
 | Pattern               | Example paths                                           |
 | --------------------- | ------------------------------------------------------- |
+| `schema.graphql`      | `lambdas/db/schema.graphql`                             |
 | `*.generated.ts`      | `apps/app/src/api/db/graphql.generated.ts`              |
 | `*.generated.ts`      | `lib/shared-components/src/api/db/graphql.generated.ts` |
 | `graphql.schema.json` | `apps/web/src/api/db/graphql.schema.json`               |
@@ -24,12 +25,22 @@ Always regenerate them from source instead.
 
 If you see one of these paths in a diff, a task, or a conflict — **stop and regenerate** instead of editing.
 
+> **🚨 `schema.graphql` is NEVER manually edited.**  
+> It is the canonical SDL output generated from the Pothos schema implementation.
+> Always run `pnpm exec nx run db:print-schema` (or `make pre-commit`, which runs it as step 1) to regenerate it.
+> Manual edits will be overwritten and will cause the `check-schema` CI job to fail.
+
 ## When to Regenerate
 
 - After changing anything in `lambdas/db/src/schema/` (Pothos type/query/mutation definitions)
 - After adding or modifying a `.graphql` operation file in any project
 - After resolving merge conflicts that touch these files
 - Before opening a PR that includes schema changes
+
+> **Important**: When you modify Pothos resolvers/types in `lambdas/db/src/schema/`,
+> `schema.graphql` must be regenerated via `print-schema` **before** running codegen.
+> The codegen step reads `schema.graphql` as its source of truth — if schema.graphql is
+> stale or manually edited, all downstream generated types will be wrong.
 
 ## How to Regenerate
 

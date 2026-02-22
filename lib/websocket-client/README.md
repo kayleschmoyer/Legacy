@@ -35,7 +35,7 @@ const client = new WebSocketClient({
 });
 
 // Subscribe to events
-const unsubscribe = client.on('draft-complete', (notification) => {
+const unsubscribe = client.on('draft-completed', (notification) => {
   console.log('Draft completed for league:', notification.leagueId);
 });
 
@@ -102,7 +102,7 @@ async function waitForDraft(leagueId: number) {
       reject(new Error('Timeout waiting for draft'));
     }, 180000); // 3 minutes
 
-    const unsubscribe = client.on('draft-complete', () => {
+    const unsubscribe = client.on('draft-completed', () => {
       clearTimeout(timeout);
       unsubscribe();
       client.dispose();
@@ -165,7 +165,7 @@ Subscribe to events. Returns an unsubscribe function.
 - `'disconnected'` - Connection closed
 - `'error'` - Error occurred
 - `'message'` - Any message received
-- `'draft-complete'` - Draft completed notification
+- `'draft-completed'` - Draft completed notification
 - `'player-stats-loading'` - Player stats loading status
 - `'player-stats-updated'` - Player stats updated
 - `'matchup-stats-complete'` - Matchup stats completed
@@ -199,7 +199,7 @@ Get current connection state: `'connecting' | 'connected' | 'disconnected' | 'er
 
 ```typescript
 interface DraftCompletedNotification {
-  type: 'draft-complete';
+  type: 'draft-completed';
   leagueId: number;
   draftType: string;
   completedAt: string;

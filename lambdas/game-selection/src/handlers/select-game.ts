@@ -8,9 +8,10 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/sentry';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
@@ -25,6 +26,9 @@ const sqsClient = new SQSClient({
   region: process.env.AWS_REGION || 'us-east-1',
 });
 const GAME_STATS_QUEUE_URL = process.env.SQS_LOAD_GAME_STATS_URL;
+
+// Initialize WebSocket notification service for real-time UI updates
+const notificationService = createNotificationService();
 
 interface SelectGameEvent {
   matchupId: number;
@@ -169,6 +173,40 @@ const baseSelectGameHandler = async (
             matchup.game,
             result.playersNeedingStatsLoading,
           );
+        } else if (notificationService) {
+          // All stats were cached — stats-lambda won't run, so notify here
+          const matchupRow = await db
+            .select({
+              leagueId: PublicSchema.matchups.leagueId,
+            })
+            .from(PublicSchema.matchups)
+            .where(eq(PublicSchema.matchups.id, matchup.matchupId))
+            .limit(1);
+
+          const leagueId = matchupRow[0]?.leagueId;
+          if (leagueId) {
+            const playerCount = await db
+              .select({ count: sql<number>`count(*)` })
+              .from(PublicSchema.matchupPlayers)
+              .where(
+                eq(PublicSchema.matchupPlayers.matchupId, matchup.matchupId),
+              );
+            const totalPlayers = Number(playerCount[0]?.count || 0);
+
+            await notificationService.notifyMatchupStatsComplete(
+              matchup.matchupId,
+              leagueId,
+              totalPlayers,
+            );
+            LOGGER.info(
+              'Sent matchup-stats-complete notification (all stats cached)',
+              {
+                matchupId: matchup.matchupId,
+                leagueId,
+                totalPlayers,
+              },
+            );
+          }
         }
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });

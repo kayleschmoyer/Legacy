@@ -61,6 +61,7 @@ SQS_SELECT_GAME_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.environment_variables_s
 SQS_QUEUE_URL=$SQS_LOAD_SEASON_STATS_URL
 OAUTH_PROXY_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.oauth_proxy_endpoint.value')
 GRAPHQL_ENDPOINT=$(echo "$TERRAFORM_OUTPUT" | jq -r '.graphql_endpoint.value')
+WEBSOCKET_URL=$(echo "$TERRAFORM_OUTPUT" | jq -r '.websocket_url.value')
 
 # Get direct database endpoint for migrations (if available)
 cd "$TERRAFORM_DIR"
@@ -110,6 +111,7 @@ VITE_OAUTH_PROXY_URL=$OAUTH_PROXY_ENDPOINT
 
 # Lambda Endpoints
 VITE_GRAPHQL_HOST=$GRAPHQL_ENDPOINT
+VITE_WEBSOCKET_URL=$WEBSOCKET_URL
 
 # Database Configuration (New Unified System)
 USE_LOCAL_CREDENTIALS=false

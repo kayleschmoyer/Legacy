@@ -667,6 +667,12 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): League
+  swapTeamMemberPositions(
+    positionIdA: Int
+    positionIdB: Int
+    teamMemberIdA: Int!
+    teamMemberIdB: Int!
+  ): [TeamMember!]
   triggerGameSelection(gameNumber: Int!, matchupId: Int!): Boolean
   updateDraftSettings(
     input: UpdateDraftSettingsInput!

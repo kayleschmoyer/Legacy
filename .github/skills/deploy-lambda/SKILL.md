@@ -13,19 +13,27 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 
 **ALWAYS follow this order**:
 
-1. **Clear Terraform locks** (if deploying infrastructure)
-2. **Deploy infrastructure first** (if terraform changes exist)
-3. **Then deploy Lambda code**
+1. **Rebuild with `--skip-nx-cache`** to ensure the bundle includes your changes
+2. **Clear Terraform locks** (if deploying infrastructure)
+3. **Deploy infrastructure first** (if terraform changes exist)
+4. **Then deploy Lambda code**
 
 ```powershell
 # Complete deployment workflow:
-node scripts/terraform-unlock.js    # Clear any locks
+pnpm exec nx run db:build --skip-nx-cache   # ALWAYS rebuild — cache may be stale
+node scripts/terraform-unlock.js             # Clear any locks
 cd terraform
-terraform plan                      # Check infrastructure changes
-terraform apply                     # Apply if needed
+terraform plan                               # Check infrastructure changes
+terraform apply                              # Apply if needed
 cd ..
 .\scripts\deploy-lambda.ps1 -FunctionName graphql  # Deploy code
 ```
+
+> **🚨 NEVER skip the `--skip-nx-cache` rebuild.**
+> The deploy script detects a pre-built bundle and says "Using pre-built lambda"
+> without rebuilding. If Nx served a cached build from before your code changes,
+> you will deploy a **stale bundle** that does not include your new code.
+> This has caused production incidents where new mutations/resolvers were missing.
 
 ## When to Use
 
@@ -150,6 +158,26 @@ $env:AWS_REGION = "us-east-1"
 aws sts get-caller-identity
 ```
 
+### Issue: Deployed Lambda is missing new code (stale Nx cache)
+
+**Symptom**: 400 Bad Request errors like `Cannot query field "newMutation" on type "Mutation"` despite the code existing in source
+**Cause**: Nx served a cached build from before your changes. The deploy script says "Using pre-built lambda" and packages the stale `dist/` output.
+**Solution**: Always rebuild with `--skip-nx-cache` before deploying
+
+```powershell
+# 1. Force a fresh build (REQUIRED before every deploy)
+pnpm exec nx run db:build --skip-nx-cache
+
+# 2. Verify your changes are in the build output
+Select-String -Path lambdas/db/dist/index.js -Pattern "yourNewFunctionName"
+
+# 3. Deploy
+.\scripts\deploy-lambda.ps1 -FunctionName graphql
+
+# 4. Apply Terraform
+cd terraform; terraform apply -target="aws_lambda_function.graphql" -auto-approve; cd ..
+```
+
 ### Issue: Build fails before deployment
 
 **Symptom**: TypeScript errors or build errors
@@ -266,7 +294,8 @@ cd ..
 
 - [ ] Code changes tested locally
 - [ ] All tests pass (`pnpm exec nx run <lambda>:test`)
-- [ ] Build succeeds (`pnpm exec nx build <lambda>`)
+- [ ] **Fresh build with `--skip-nx-cache`** (`pnpm exec nx run db:build --skip-nx-cache`)
+- [ ] **Verified new code is in build output** (`Select-String -Path lambdas/db/dist/index.js -Pattern "newFunction"`)
 - [ ] Environment variables updated (if needed)
 - [ ] Terraform state current (if infrastructure changed)
 - [ ] AWS credentials configured
@@ -281,7 +310,7 @@ cd ..
 # 1. Verify changes locally
 pnpm exec nx run db:serve  # Test locally
 pnpm exec nx run db:test   # Run tests
-pnpm exec nx build db      # Test build
+pnpm exec nx run db:build --skip-nx-cache  # ALWAYS skip cache to avoid stale bundles
 
 # 2. Deploy to dev environment
 .\scripts\deploy-lambda.ps1 -FunctionName graphql -Environment dev

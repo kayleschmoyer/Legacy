@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { wireToClientEventName } from '@legacy-sports/utils/notification-types';
 import type {
   ConnectionState,
   EventHandler,
@@ -34,7 +35,7 @@ const MAX_CONSECUTIVE_PINGS = 3;
  *   autoConnect: true
  * });
  *
- * const unsubscribe = client.on('draft-complete', (notification) => {
+ * const unsubscribe = client.on('draft-completed', (notification) => {
  *   console.log('Draft completed:', notification.leagueId);
  * });
  *
@@ -320,7 +321,13 @@ export class WebSocketClient {
    * Handle WebSocket open event
    */
   private handleOpen(): void {
-    LOGGER.info('WebSocket connected');
+    if (this.reconnectAttempts > 0) {
+      LOGGER.info(
+        `WebSocket reconnected after ${this.reconnectAttempts} attempt(s)`,
+      );
+    } else {
+      LOGGER.info('WebSocket connected (initial)');
+    }
     this.reconnectAttempts = 0;
     this.consecutivePings = 0;
     this.lastMessageTime = Date.now();
@@ -366,9 +373,9 @@ export class WebSocketClient {
         message.data &&
         typeof message.data['type'] === 'string'
       ) {
-        const notificationEventType = message.data['type']
-          .toLowerCase()
-          .replace(/_/g, '-');
+        const notificationEventType = wireToClientEventName(
+          message.data['type'],
+        );
         const notificationHandlers = this.eventHandlers.get(
           notificationEventType,
         );
@@ -397,7 +404,11 @@ export class WebSocketClient {
    * Handle WebSocket close event
    */
   private handleClose(): void {
-    LOGGER.info('WebSocket disconnected');
+    if (this.options.reconnect && !this.disposed) {
+      LOGGER.info('WebSocket connection dropped — will auto-reconnect');
+    } else {
+      LOGGER.info('WebSocket disconnected');
+    }
     this.stopHeartbeat();
     this.emitConnectionState('disconnected');
 

@@ -10,14 +10,15 @@ export interface DropdownProperties {
   value: string;
   onChange: (value: string) => void;
   items: readonly Readonly<DropdownItem>[];
+  disabled?: boolean;
 }
 
 export function Dropdown(props: DropdownProperties): React.JSX.Element {
-  const { value, onChange, items } = props;
+  const { value, onChange, items, disabled } = props;
 
   return (
-    <Select value={value} onValueChange={onChange}>
-      <Select.Trigger>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <Select.Trigger disabled={disabled} opacity={disabled ? 0.5 : 1}>
         <Select.Value placeholder="Select an option..." />
       </Select.Trigger>
 

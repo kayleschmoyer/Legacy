@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, H4, Separator, Text, XStack, YStack } from 'tamagui';
+import { Card, Separator, Text, XStack, YStack } from 'tamagui';
 
 export interface PlayerProjection {
   playerId: number;
@@ -18,8 +18,8 @@ export interface PlayerProjectionsProps {
 }
 
 /**
- * PlayerProjections - Displays both matchup and career projections side-by-side
- * Shows accumulated stats for selected games and games remaining counter
+ * PlayerProjections — Displays matchup and career projections in a compact
+ * table-style card that matches the modernized roster UI.
  */
 export function PlayerProjections({
   projections,
@@ -29,158 +29,256 @@ export function PlayerProjections({
 }: PlayerProjectionsProps) {
   if (loading) {
     return (
-      <Card padding="$4">
-        <Text color="$gray11">Loading projections...</Text>
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$5"
+        padding="$5"
+        alignItems="center"
+      >
+        <Text color="$textMuted" fontSize="$3">
+          Loading projections…
+        </Text>
       </Card>
     );
   }
 
   if (error) {
     return (
-      <Card padding="$4">
-        <Text color="$red10">Error: {error.message}</Text>
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$red6"
+        borderWidth={1}
+        borderRadius="$5"
+        padding="$4"
+      >
+        <Text color="$red10" fontSize="$3">
+          Error: {error.message}
+        </Text>
       </Card>
     );
   }
 
   if (projections.length === 0) {
     return (
-      <Card padding="$4">
-        <Text color="$gray11">No player projections available</Text>
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$5"
+        padding="$5"
+        alignItems="center"
+      >
+        <Text color="$textMuted" fontSize="$3">
+          No player projections available
+        </Text>
       </Card>
     );
   }
 
   return (
-    <Card elevate bordered padding="$4" width="100%">
-      <YStack space="$3">
-        <XStack justifyContent="space-between" alignItems="center">
-          <H4>Roster Projections</H4>
-          {gamesRemaining > 0 && (
-            <Text fontSize="$3" color="$orange10" fontWeight="bold">
-              {gamesRemaining} games remaining
-            </Text>
-          )}
-        </XStack>
-
-        <Separator />
-
-        {/* Header Row */}
-        <XStack
-          paddingVertical="$2"
-          paddingHorizontal="$2"
-          borderBottomWidth={1}
-          borderBottomColor="$gray6"
-          gap="$2"
+    <Card
+      backgroundColor="rgba(17, 27, 47, 0.7)"
+      borderColor="$surfacePanelBorder"
+      borderWidth={1}
+      borderRadius="$5"
+      overflow="hidden"
+      width="100%"
+      style={{
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      {/* Gradient accent bar */}
+      <YStack
+        height={2}
+        width="100%"
+        style={{
+          background: 'linear-gradient(90deg, #3B82F6, #8B5CF6, transparent)',
+        }}
+      />
+      {/* Title bar */}
+      <XStack
+        paddingHorizontal="$3"
+        paddingVertical="$2.5"
+        backgroundColor="rgba(13, 21, 38, 0.6)"
+        justifyContent="space-between"
+        alignItems="center"
+      >
+        <Text
+          fontSize="$2"
+          fontWeight="700"
+          color="$textMuted"
+          textTransform="uppercase"
+          letterSpacing={0.8}
         >
-          <YStack flex={1}>
-            <Text fontSize="$2" fontWeight="bold" color="$gray11">
-              Player
-            </Text>
-          </YStack>
-          <YStack width={80} alignItems="center">
-            <Text fontSize="$2" fontWeight="bold" color="$blue10">
-              Matchup
-            </Text>
-          </YStack>
-          <YStack width={80} alignItems="center">
-            <Text fontSize="$2" fontWeight="bold" color="$gray11">
-              Career
-            </Text>
-          </YStack>
-          <YStack
-            width={60}
-            alignItems="center"
-            display="none"
-            $gtSm={{ display: 'flex' }}
+          Projections
+        </Text>
+        {gamesRemaining > 0 && (
+          <Text
+            fontSize={10}
+            fontWeight="700"
+            color="$amber9"
+            backgroundColor="rgba(245, 158, 11, 0.12)"
+            paddingHorizontal="$1.5"
+            paddingVertical={2}
+            borderRadius="$2"
           >
-            <Text fontSize="$2" fontWeight="bold" color="$gray11">
-              Games
-            </Text>
-          </YStack>
-        </XStack>
+            {gamesRemaining} games left
+          </Text>
+        )}
+      </XStack>
 
-        {/* Player Rows */}
-        <YStack>
-          {projections.map((player, index) => (
+      {/* Column header */}
+      <XStack
+        paddingVertical="$1.5"
+        paddingHorizontal="$3"
+        borderBottomWidth={1}
+        borderBottomColor="$outlineSubtle"
+        gap="$2"
+      >
+        <Text
+          flex={1}
+          fontSize="$1"
+          fontWeight="700"
+          color="$textMuted"
+          textTransform="uppercase"
+          letterSpacing={0.6}
+        >
+          Player
+        </Text>
+        <Text
+          width={70}
+          fontSize="$1"
+          fontWeight="700"
+          color="$blue11"
+          textTransform="uppercase"
+          letterSpacing={0.6}
+          textAlign="center"
+        >
+          Matchup
+        </Text>
+        <Text
+          width={70}
+          fontSize="$1"
+          fontWeight="700"
+          color="$textMuted"
+          textTransform="uppercase"
+          letterSpacing={0.6}
+          textAlign="center"
+        >
+          Career
+        </Text>
+        <Text
+          width={50}
+          fontSize="$1"
+          fontWeight="700"
+          color="$textMuted"
+          textTransform="uppercase"
+          letterSpacing={0.6}
+          textAlign="center"
+          display="none"
+          $gtSm={{ display: 'flex' }}
+        >
+          GP
+        </Text>
+      </XStack>
+
+      {/* Player rows */}
+      <YStack>
+        {projections.map((player, index) => (
+          <React.Fragment key={player.playerId}>
             <XStack
-              key={player.playerId}
-              paddingVertical="$3"
-              paddingHorizontal="$2"
-              backgroundColor={index % 2 === 0 ? '$background' : '$gray2'}
+              paddingVertical="$2.5"
+              paddingHorizontal="$3"
+              backgroundColor={
+                index % 2 === 0 ? '$background' : '$surfaceSubtle'
+              }
               gap="$2"
               alignItems="center"
+              minHeight={44}
+              animation="quick"
+              hoverStyle={{ backgroundColor: '$surfaceCard' }}
+              pressStyle={{ scale: 0.995, opacity: 0.9 }}
             >
-              <YStack flex={1}>
-                <Text fontSize="$3" fontWeight="600">
-                  {player.playerName}
-                </Text>
-              </YStack>
-              <YStack width={80} alignItems="center">
-                <Text fontSize="$4" fontWeight="bold" color="$blue10">
-                  {player.matchupProjection.toFixed(2)}
-                </Text>
-              </YStack>
-              <YStack width={80} alignItems="center">
-                <Text fontSize="$4" color="$gray11">
-                  {player.careerProjection.toFixed(2)}
-                </Text>
-              </YStack>
-              <YStack
-                width={60}
-                alignItems="center"
+              <Text
+                flex={1}
+                fontSize="$3"
+                fontWeight="600"
+                color="$color12"
+                numberOfLines={1}
+              >
+                {player.playerName}
+              </Text>
+              <Text
+                width={70}
+                fontSize="$3"
+                fontWeight="700"
+                color="$blue11"
+                textAlign="center"
+              >
+                {player.matchupProjection.toFixed(2)}
+              </Text>
+              <Text
+                width={70}
+                fontSize="$3"
+                color="$textMuted"
+                textAlign="center"
+              >
+                {player.careerProjection.toFixed(2)}
+              </Text>
+              <Text
+                width={50}
+                fontSize="$2"
+                color="$textMuted"
+                textAlign="center"
                 display="none"
                 $gtSm={{ display: 'flex' }}
               >
-                <Text fontSize="$3" color="$gray10">
-                  {player.selectedGamesCount}
-                </Text>
-              </YStack>
+                {player.selectedGamesCount}
+              </Text>
             </XStack>
-          ))}
-        </YStack>
-
-        {/* Legend */}
-        <XStack
-          space="$4"
-          justifyContent="center"
-          paddingTop="$2"
-          flexWrap="wrap"
-        >
-          <XStack space="$1" alignItems="center">
-            <YStack
-              width={12}
-              height={12}
-              backgroundColor="$blue10"
-              borderRadius="$2"
-            />
-            <Text fontSize="$2" color="$gray11">
-              Matchup Projection (selected season)
-            </Text>
-          </XStack>
-          <XStack space="$1" alignItems="center">
-            <YStack
-              width={12}
-              height={12}
-              backgroundColor="$gray10"
-              borderRadius="$2"
-            />
-            <Text fontSize="$2" color="$gray11">
-              Career Average
-            </Text>
-          </XStack>
-        </XStack>
-
-        {/* Real-time update note */}
-        <Text
-          fontSize="$2"
-          color="$gray10"
-          textAlign="center"
-          fontStyle="italic"
-        >
-          Updates in real-time as games are selected
-        </Text>
+            {index < projections.length - 1 && (
+              <Separator borderColor="$outlineSubtle" marginVertical={0} />
+            )}
+          </React.Fragment>
+        ))}
       </YStack>
+
+      {/* Footer legend */}
+      <XStack
+        paddingVertical="$2"
+        paddingHorizontal="$3"
+        borderTopWidth={1}
+        borderTopColor="$outlineSubtle"
+        gap="$4"
+        justifyContent="center"
+        flexWrap="wrap"
+      >
+        <XStack gap="$1" alignItems="center">
+          <YStack
+            width={8}
+            height={8}
+            backgroundColor="$blue10"
+            borderRadius={4}
+          />
+          <Text fontSize="$1" color="$textMuted">
+            Matchup
+          </Text>
+        </XStack>
+        <XStack gap="$1" alignItems="center">
+          <YStack
+            width={8}
+            height={8}
+            backgroundColor="$textMuted"
+            borderRadius={4}
+          />
+          <Text fontSize="$1" color="$textMuted">
+            Career avg
+          </Text>
+        </XStack>
+      </XStack>
     </Card>
   );
 }

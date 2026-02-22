@@ -18,7 +18,11 @@ export class WebSecureStorage implements ISecureStorage {
       localStorage.setItem(this.prefix + key, value);
       return Promise.resolve();
     } catch (error) {
-      return Promise.reject(new Error(`Failed to store item: ${error}`));
+      return Promise.reject(
+        new Error(
+          `Failed to store item: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
     }
   }
 

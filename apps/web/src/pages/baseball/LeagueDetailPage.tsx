@@ -1,8 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
   useAuth,
+  useWebSocket,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
@@ -27,6 +34,11 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
+import {
+  calculateMatchupProjection,
+  computeScoring,
+  type SeasonStats,
+} from '@legacy-sports/scoring';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringSummary } from '../../features/baseball/LeagueScoringSummary';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
@@ -37,16 +49,24 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
+  useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
+  useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
+import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
 import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
 import { useLeagueScoringSettings } from '../../lib/scoring';
+import {
+  mapBattingStats,
+  mapFieldingStats,
+  mapPitchingStats,
+} from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
@@ -70,7 +90,23 @@ import {
   setTeamMembers,
   setTeamsLoading,
   setUserTeamId,
+  updateTeamMember,
 } from '../../store/leagueSlice';
+
+// ── Matchup Scoring Data (shared with roster component) ─────────────────────
+
+export interface PlayerMatchupData {
+  /** Actual score from games already played */
+  score: number;
+  /** Projected total score (actual + projected remaining) */
+  projection: number;
+  /** Number of games that have been selected/played */
+  gamesPlayed: number;
+  /** Total games in this matchup */
+  totalGames: number;
+  /** Whether this player has any game selections (and should be roster-locked) */
+  isLocked: boolean;
+}
 
 // ── GraphQL ──────────────────────────────────────────────────────────────────
 
@@ -282,6 +318,12 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [showQRCode, setShowQRCode] = useState(false);
   const { user } = useAuth();
 
+  // Ref to hold refetchCurrentMatchup so WebSocket callbacks can call it
+  // without creating a hook-ordering dependency
+  const refetchCurrentMatchupRef = useRef<
+    (() => void | Promise<unknown>) | undefined
+  >(undefined);
+
   // ── Effects ──
 
   useEffect(() => {
@@ -307,8 +349,13 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Data Fetching ──
 
-  const { data, loading, error } = useGetLeagueByIdQuery({
-    skip: isNaN(leagueId) || !!reduxLeagueData,
+  const {
+    data,
+    loading,
+    error,
+    refetch: refetchLeague,
+  } = useGetLeagueByIdQuery({
+    skip: isNaN(leagueId),
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
   });
@@ -390,6 +437,69 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
 
+  // ── WebSocket: listen for draft lifecycle events ──
+
+  const authToken = useMemo(
+    () =>
+      typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('auth_jwt') ?? '')
+        : '',
+    [],
+  );
+
+  const handleDraftCompleted = useCallback(() => {
+    void refetchLeague();
+  }, [refetchLeague]);
+
+  const handleDraftStarted = useCallback(() => {
+    void refetchLeague();
+  }, [refetchLeague]);
+
+  const handleRosterUpdate = useCallback(() => {
+    void refetchLeague();
+  }, [refetchLeague]);
+
+  const handleMatchupStatsComplete = useCallback(() => {
+    void refetchLeague();
+    // Also refetch matchup data so statsLoadingStatus updates and spinner clears
+    void refetchCurrentMatchupRef.current?.();
+  }, [refetchLeague]);
+
+  const wsAutoConnect = !!env.websocketUrl && !!authToken;
+  useEffect(() => {
+    console.log('[LeagueDetailPage] WebSocket config', {
+      websocketUrl: env.websocketUrl
+        ? `${env.websocketUrl.substring(0, 30)}...`
+        : 'NOT SET',
+      hasAuthToken: !!authToken,
+      authTokenLength: authToken?.length ?? 0,
+      leagueId,
+      autoConnect: wsAutoConnect,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { connected: wsConnected, error: wsError } = useWebSocket({
+    url: env.websocketUrl || undefined,
+    token: authToken || undefined,
+    leagueId,
+    viewContext: 'league',
+    autoConnect: wsAutoConnect,
+    onDraftCompleted: handleDraftCompleted,
+    onDraftStarted: handleDraftStarted,
+    onRosterUpdate: handleRosterUpdate,
+    onMatchupStatsComplete: handleMatchupStatsComplete,
+  });
+
+  useEffect(() => {
+    if (wsError) {
+      console.error('[LeagueDetailPage] WebSocket error:', wsError);
+    }
+  }, [wsError]);
+
+  useEffect(() => {
+    console.log('[LeagueDetailPage] WebSocket connected:', wsConnected);
+  }, [wsConnected]);
+
   // ── Derived Data ──
 
   const userTeamId =
@@ -400,10 +510,13 @@ export function LeagueDetailPage(): React.JSX.Element {
       ? (userTeamData.userTeamId as number | null)
       : null);
   const league = reduxLeagueData ?? data?.league;
-  const positions =
-    reduxPositions.length > 0
-      ? reduxPositions
-      : (positionsData?.leaguePositions as LeaguePositionFragment[]) || [];
+  const positions = useMemo(
+    () =>
+      reduxPositions.length > 0
+        ? reduxPositions
+        : (positionsData?.leaguePositions as LeaguePositionFragment[]) || [],
+    [reduxPositions, positionsData?.leaguePositions],
+  );
   const leagueTeams =
     reduxLeagueTeams.length > 0
       ? reduxLeagueTeams
@@ -433,14 +546,18 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [teamMembersData, dispatch]);
 
-  const teamMembers =
-    reduxTeamMembers.length > 0
-      ? reduxTeamMembers
-      : (teamMembersData?.teamMembers?.filter(
-          (m: TeamMemberFragment | null) => m !== null,
-        ) as TeamMemberFragment[]) || [];
+  const teamMembers = useMemo(
+    () =>
+      reduxTeamMembers.length > 0
+        ? reduxTeamMembers
+        : (teamMembersData?.teamMembers?.filter(
+            (m: TeamMemberFragment | null) => m !== null,
+          ) as TeamMemberFragment[]) || [],
+    [reduxTeamMembers, teamMembersData?.teamMembers],
+  );
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
+  const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
   const {
     settings: scoringSettings,
@@ -458,6 +575,9 @@ export function LeagueDetailPage(): React.JSX.Element {
     error: currentMatchupError,
     refetch: refetchCurrentMatchup,
   } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
+
+  // Keep the ref in sync so WebSocket callbacks can trigger matchup refetch
+  refetchCurrentMatchupRef.current = refetchCurrentMatchup;
 
   // Selected matchup state (null means show current matchup)
   // Initialize from URL route parameter if present
@@ -513,6 +633,105 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [currentMatchup?.id, selectedMatchupId]);
 
+  // ── Matchup Player Data (for scores, projections, and roster locking) ────
+
+  const displayedMatchupIdNum = displayedMatchup?.id
+    ? parseInt(displayedMatchup.id, 10)
+    : null;
+
+  const { data: matchupPlayersData } = useGetMatchupPlayersQuery({
+    variables: { matchupId: displayedMatchupIdNum ?? 0 },
+    skip: !displayedMatchupIdNum,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const gamesPerMatchup = displayedMatchup?.gamesPerMatchup ?? 10;
+
+  /** Map of playerId → scoring + lock data for the currently displayed matchup */
+  const playerMatchupDataMap = useMemo((): ReadonlyMap<
+    number,
+    PlayerMatchupData
+  > => {
+    const map = new Map<number, PlayerMatchupData>();
+    const players = matchupPlayersData?.getMatchupPlayers;
+    if (!players || !scoringSettings) return map;
+
+    for (const mp of players) {
+      const pid = mp.playerId;
+      if (pid == null) continue;
+
+      // Calculate actual score from played games
+      const gamesPlayed = mp.games?.length ?? 0;
+      let actualScore = 0;
+      for (const game of mp.games ?? []) {
+        if (game.battingGame) {
+          actualScore += computeScoring(
+            mapBattingStats(game.battingGame),
+            scoringSettings.batting ?? {},
+          );
+        }
+        if (game.pitchingGame) {
+          actualScore += computeScoring(
+            mapPitchingStats(game.pitchingGame),
+            scoringSettings.pitching ?? {},
+          );
+        }
+        if (game.fieldingGame) {
+          actualScore += computeScoring(
+            mapFieldingStats(game.fieldingGame),
+            scoringSettings.fielding ?? {},
+          );
+        }
+      }
+
+      // Calculate projection
+      const gamesRemaining = gamesPerMatchup - gamesPlayed;
+      let projection = actualScore;
+      if (gamesRemaining > 0) {
+        // Try season stats projection first
+        const seasonStats: SeasonStats = {
+          playerId: pid,
+          season: mp.season ?? new Date().getFullYear(),
+          battingStats: mp.seasonBatting ?? undefined,
+          pitchingStats: mp.seasonPitching ?? undefined,
+          fieldingStats: mp.seasonFielding ?? undefined,
+        };
+        if (
+          seasonStats.battingStats ||
+          seasonStats.pitchingStats ||
+          seasonStats.fieldingStats
+        ) {
+          try {
+            const proj = calculateMatchupProjection(
+              seasonStats,
+              scoringSettings,
+            );
+            projection = actualScore + proj.totalPerGame * gamesRemaining;
+          } catch {
+            // Fallback: avg of games played
+            if (gamesPlayed > 0) {
+              projection =
+                actualScore + (actualScore / gamesPlayed) * gamesRemaining;
+            }
+          }
+        } else if (gamesPlayed > 0) {
+          projection =
+            actualScore + (actualScore / gamesPlayed) * gamesRemaining;
+        }
+      }
+
+      map.set(pid, {
+        score: Math.round(actualScore * 10) / 10,
+        projection: Math.round(projection * 10) / 10,
+        gamesPlayed,
+        totalGames: gamesPerMatchup,
+        isLocked: gamesPlayed > 0,
+      });
+    }
+
+    return map;
+  }, [matchupPlayersData, scoringSettings, gamesPerMatchup]);
+
   const [matchupSuccessMessage, setMatchupSuccessMessage] = useState<
     string | null
   >(null);
@@ -564,33 +783,94 @@ export function LeagueDetailPage(): React.JSX.Element {
         return;
       }
       try {
-        await updateTeamMemberPosition({
+        const result = await updateTeamMemberPosition({
           variables: { teamMemberId: player.id, positionId: position.id },
         });
+        const updated = result.data?.updateTeamMemberPosition;
+        if (updated) {
+          dispatch(updateTeamMember(updated as TeamMemberFragment));
+        }
       } catch (error) {
         console.error('Error assigning player:', error);
       }
     },
-    [updateTeamMemberPosition],
+    [updateTeamMemberPosition, dispatch],
   );
 
   const handlePlayerRemove = useCallback(
     async (position: LeaguePositionFragment) => {
       try {
-        const assignedPlayer = teamMembersData?.teamMembers?.find(
-          (member: TeamMemberFragment | null) =>
-            member?.positionId === position.id,
+        const assignedPlayer = teamMembers.find(
+          (member: TeamMemberFragment) => member.positionId === position.id,
         );
         if (assignedPlayer?.id) {
-          await updateTeamMemberPosition({
+          const result = await updateTeamMemberPosition({
             variables: { teamMemberId: assignedPlayer.id, positionId: null },
           });
+          const updated = result.data?.updateTeamMemberPosition;
+          if (updated) {
+            dispatch(updateTeamMember(updated as TeamMemberFragment));
+          }
         }
       } catch (error) {
         console.error('Error removing player:', error);
       }
     },
-    [updateTeamMemberPosition, teamMembersData?.teamMembers],
+    [updateTeamMemberPosition, teamMembers, dispatch],
+  );
+
+  const handlePlayerSwap = useCallback(
+    async (
+      incomingPlayer: TeamMemberFragment,
+      targetPosition: LeaguePositionFragment,
+      displacedPlayer: TeamMemberFragment,
+    ) => {
+      if (!incomingPlayer.id || !displacedPlayer.id) {
+        console.error('Player IDs are required for swap');
+        return;
+      }
+      try {
+        // Determine where to move the displaced player
+        let displacedTargetPositionId: number | null = null;
+
+        if (incomingPlayer.positionId) {
+          // Incoming is from a lineup position — check if displaced can play there
+          const incomingOldPosition = positions.find(
+            (p) => p.id === incomingPlayer.positionId,
+          );
+          if (
+            incomingOldPosition &&
+            incomingOldPosition.id != null &&
+            canPlayerPlayPosition(displacedPlayer, incomingOldPosition)
+          ) {
+            // Direct swap: displaced goes to incoming's old position
+            displacedTargetPositionId = incomingOldPosition.id;
+          }
+          // else: displaced goes to bench (null)
+        }
+        // If incoming is from bench, displaced also goes to bench (null)
+
+        // Atomic swap: both moves happen in a single transaction on the server
+        const result = await swapTeamMemberPositions({
+          variables: {
+            teamMemberIdA: incomingPlayer.id,
+            positionIdA: targetPosition.id,
+            teamMemberIdB: displacedPlayer.id,
+            positionIdB: displacedTargetPositionId,
+          },
+        });
+
+        const swapped = result.data?.swapTeamMemberPositions;
+        if (swapped) {
+          for (const member of swapped) {
+            dispatch(updateTeamMember(member as TeamMemberFragment));
+          }
+        }
+      } catch (error) {
+        console.error('Error swapping players:', error);
+      }
+    },
+    [swapTeamMemberPositions, positions, dispatch],
   );
 
   const inviteUrl = useMemo(() => {
@@ -1216,7 +1496,11 @@ export function LeagueDetailPage(): React.JSX.Element {
           void handlePlayerAssign(player, position)
         }
         onPlayerRemove={(player) => void handlePlayerRemove(player)}
+        onPlayerSwap={(incoming, targetPos, displaced) =>
+          void handlePlayerSwap(incoming, targetPos, displaced)
+        }
         loading={positionsLoading || teamMembersLoading || userTeamLoading}
+        playerMatchupData={playerMatchupDataMap}
       />
       <LeagueScoringSummary
         loading={scoringLoading}
