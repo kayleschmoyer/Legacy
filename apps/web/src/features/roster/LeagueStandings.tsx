@@ -17,6 +17,8 @@ export interface LeagueStandingsProps {
   loading?: boolean;
   userTeamId?: number | null;
   waiverType?: string | null;
+  /** When provided, called instead of navigating to the team detail page */
+  onTeamClick?: (teamId: number) => void;
 }
 
 const RankBadge = styled(YStack, {
@@ -52,11 +54,16 @@ export function LeagueStandings({
   loading = false,
   userTeamId,
   waiverType,
+  onTeamClick,
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
 
   const handleTeamClick = (teamId: number) => {
-    navigate(`/baseball/team/${teamId}`);
+    if (onTeamClick) {
+      onTeamClick(teamId);
+    } else {
+      navigate(`/baseball/team/${teamId}`);
+    }
   };
 
   if (loading) {

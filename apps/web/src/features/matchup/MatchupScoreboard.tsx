@@ -89,6 +89,8 @@ const VsBadge = styled(YStack, {
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
   gamesRemaining?: number;
+  /** When provided, team names become clickable links to view that team's roster */
+  onTeamClick?: (teamId: number) => void;
 }
 
 /**
@@ -98,6 +100,7 @@ export interface MatchupScoreboardProps {
 export function MatchupScoreboard({
   matchup,
   gamesRemaining = 0,
+  onTeamClick,
 }: MatchupScoreboardProps) {
   // Extract IDs before early return to use in hooks
   const matchupIdStr = matchup?.id;
@@ -344,7 +347,7 @@ export function MatchupScoreboard({
     );
   }
 
-  const { weekNumber, status, gamesPerMatchup } = matchup;
+  const { weekNumber, status, gamesPerMatchup, team1Id, team2Id } = matchup;
 
   const team1Leading = (team1Score ?? 0) > (team2Score ?? 0);
   const team2Leading = (team2Score ?? 0) > (team1Score ?? 0);
@@ -430,6 +433,15 @@ export function MatchupScoreboard({
             fontSize="$5"
             fontWeight="700"
             color={team1Leading ? '$blue11' : '$color'}
+            cursor={onTeamClick && team1Id ? 'pointer' : undefined}
+            hoverStyle={
+              onTeamClick && team1Id
+                ? { textDecorationLine: 'underline', opacity: 0.85 }
+                : undefined
+            }
+            onPress={
+              onTeamClick && team1Id ? () => onTeamClick(team1Id) : undefined
+            }
           >
             {team1Name}
           </Text>
@@ -509,6 +521,15 @@ export function MatchupScoreboard({
             fontSize="$5"
             fontWeight="700"
             color={team2Leading ? '$blue11' : '$color'}
+            cursor={onTeamClick && team2Id ? 'pointer' : undefined}
+            hoverStyle={
+              onTeamClick && team2Id
+                ? { textDecorationLine: 'underline', opacity: 0.85 }
+                : undefined
+            }
+            onPress={
+              onTeamClick && team2Id ? () => onTeamClick(team2Id) : undefined
+            }
           >
             {team2Name}
           </Text>

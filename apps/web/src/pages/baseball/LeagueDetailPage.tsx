@@ -20,6 +20,7 @@ import {
   ClipboardList,
   Copy,
   Edit3,
+  Eye,
   Info,
   LayoutGrid,
   Link2,
@@ -53,6 +54,7 @@ import {
   useGetLeagueTeamsLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
+  useGetTeamMembersLazyQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
   useRenameTeamMutation,
@@ -318,6 +320,11 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [renameInput, setRenameInput] = useState('');
   const [renameSuccess, setRenameSuccess] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+
+  // ── Viewing Other Team State ──
+  /** When set, the roster tab shows another team's roster in read-only mode */
+  const [viewingTeamId, setViewingTeamId] = useState<number | null>(null);
+
   const { user } = useAuth();
 
   // Ref to hold refetchCurrentMatchup so WebSocket callbacks can call it
@@ -343,6 +350,10 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const changeTab = useCallback(
     (newTab: TabId) => {
+      // Clear "viewing other team" state when navigating away from roster
+      if (newTab !== 'roster') {
+        setViewingTeamId(null);
+      }
       setActiveTab(newTab);
       navigate(`/baseball/league/${leagueId}/${newTab}`, { replace: false });
     },
@@ -542,6 +553,54 @@ export function LeagueDetailPage(): React.JSX.Element {
           ) as TeamMemberFragment[]) || [],
     [reduxTeamMembers, teamMembersData?.teamMembers],
   );
+
+  // ── Other Team Viewing (lazy fetch when clicking a team in standings) ──
+
+  const [
+    fetchViewingTeamMembers,
+    { data: viewingTeamMembersData, loading: viewingTeamMembersLoading },
+  ] = useGetTeamMembersLazyQuery();
+
+  useEffect(() => {
+    if (viewingTeamId) {
+      void fetchViewingTeamMembers({ variables: { teamId: viewingTeamId } });
+    }
+  }, [viewingTeamId, fetchViewingTeamMembers]);
+
+  const viewingTeamMembers = useMemo(
+    () =>
+      viewingTeamId
+        ? ((viewingTeamMembersData?.teamMembers?.filter(
+            (m: TeamMemberFragment | null) => m !== null,
+          ) as TeamMemberFragment[]) ?? [])
+        : [],
+    [viewingTeamId, viewingTeamMembersData?.teamMembers],
+  );
+
+  const viewingTeamName = useMemo(() => {
+    if (!viewingTeamId) return undefined;
+    const team = leagueTeams.find((t) => t.id === viewingTeamId);
+    return team?.name ?? 'Team';
+  }, [viewingTeamId, leagueTeams]);
+
+  const isViewingOwnTeam = viewingTeamId === userTeamId;
+
+  const handleViewTeamRoster = useCallback(
+    (teamId: number) => {
+      if (teamId === userTeamId) {
+        // Clicking own team just goes to the roster tab normally
+        setViewingTeamId(null);
+      } else {
+        setViewingTeamId(teamId);
+      }
+      changeTab('roster');
+    },
+    [userTeamId, changeTab],
+  );
+
+  const handleBackToMyRoster = useCallback(() => {
+    setViewingTeamId(null);
+  }, []);
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
@@ -1155,6 +1214,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   (currentMatchup.gamesPerMatchup ?? 0) -
                   (currentMatchup.selectedGamesCount ?? 0)
                 }
+                onTeamClick={handleViewTeamRoster}
               />
             </Card>
           )}
@@ -1304,6 +1364,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                     backgroundColor={
                       userTeamId === team.id ? '$blue3' : 'transparent'
                     }
+                    cursor="pointer"
+                    hoverStyle={{
+                      backgroundColor:
+                        userTeamId === team.id ? '$blue4' : '$surfaceSubtle',
+                    }}
+                    pressStyle={{ scale: 0.98, opacity: 0.9 }}
+                    onPress={() => handleViewTeamRoster(team.id)}
+                    animation="quick"
                   >
                     <XStack alignItems="center" gap="$2">
                       <Text
@@ -1322,11 +1390,14 @@ export function LeagueDetailPage(): React.JSX.Element {
                         {team.name}
                       </Text>
                     </XStack>
-                    {userTeamId === team.id && (
-                      <Text fontSize="$1" fontWeight="700" color="$blue11">
-                        YOU
-                      </Text>
-                    )}
+                    <XStack alignItems="center" gap="$2">
+                      {userTeamId === team.id && (
+                        <Text fontSize="$1" fontWeight="700" color="$blue11">
+                          YOU
+                        </Text>
+                      )}
+                      <Eye size={14} color="var(--textMuted)" />
+                    </XStack>
                   </XStack>
                 ))}
                 {leagueTeams.length > 6 && (
@@ -1521,35 +1592,83 @@ export function LeagueDetailPage(): React.JSX.Element {
     </YStack>
   );
 
-  const renderRosterManagement = () => (
-    <YStack
-      gap="$5"
-      role="tabpanel"
-      id="panel-roster"
-      aria-labelledby="tab-roster"
-    >
-      {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
-      <LeagueRosterManagement
-        positions={positions}
-        teamPlayers={teamMembers}
-        onPlayerAssign={(player, position) =>
-          void handlePlayerAssign(player, position)
-        }
-        onPlayerRemove={(player) => void handlePlayerRemove(player)}
-        onPlayerSwap={(incoming, targetPos, displaced) =>
-          void handlePlayerSwap(incoming, targetPos, displaced)
-        }
-        loading={positionsLoading || teamMembersLoading || userTeamLoading}
-        playerMatchupData={playerMatchupDataMap}
-      />
-      <LeagueScoringSummary
-        loading={scoringLoading}
-        error={scoringError}
-        profileName={scoringProfileName}
-        settings={scoringSettings}
-      />
-    </YStack>
-  );
+  const renderRosterManagement = () => {
+    const isViewingOther = viewingTeamId !== null && !isViewingOwnTeam;
+
+    return (
+      <YStack
+        gap="$5"
+        role="tabpanel"
+        id="panel-roster"
+        aria-labelledby="tab-roster"
+      >
+        {isViewingOther && (
+          <XStack
+            alignItems="center"
+            gap="$3"
+            paddingVertical="$2"
+            paddingHorizontal="$1"
+          >
+            <Button
+              size="$3"
+              backgroundColor="rgba(59, 130, 246, 0.12)"
+              borderColor="$blue7"
+              borderWidth={1}
+              borderRadius="$4"
+              onPress={handleBackToMyRoster}
+              icon={<ChevronLeft size={16} color="var(--blue11)" />}
+              hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
+              pressStyle={{ scale: 0.97, opacity: 0.9 }}
+              animation="quick"
+            >
+              <Text fontSize="$3" fontWeight="600" color="$blue11">
+                Back to My Roster
+              </Text>
+            </Button>
+            <XStack alignItems="center" gap="$2">
+              <Eye size={16} color="var(--textMuted)" />
+              <Text fontSize="$3" color="$textMuted" fontStyle="italic">
+                Viewing {viewingTeamName}&apos;s roster
+              </Text>
+            </XStack>
+          </XStack>
+        )}
+
+        {!isViewingOther && userTeamId && (
+          <PendingWaiverClaims teamId={userTeamId} />
+        )}
+
+        <LeagueRosterManagement
+          positions={positions}
+          teamPlayers={isViewingOther ? viewingTeamMembers : teamMembers}
+          onPlayerAssign={(player, position) =>
+            void handlePlayerAssign(player, position)
+          }
+          onPlayerRemove={(player) => void handlePlayerRemove(player)}
+          onPlayerSwap={(incoming, targetPos, displaced) =>
+            void handlePlayerSwap(incoming, targetPos, displaced)
+          }
+          loading={
+            isViewingOther
+              ? viewingTeamMembersLoading
+              : positionsLoading || teamMembersLoading || userTeamLoading
+          }
+          playerMatchupData={playerMatchupDataMap}
+          readOnly={isViewingOther}
+          teamName={isViewingOther ? viewingTeamName : undefined}
+        />
+
+        {!isViewingOther && (
+          <LeagueScoringSummary
+            loading={scoringLoading}
+            error={scoringError}
+            profileName={scoringProfileName}
+            settings={scoringSettings}
+          />
+        )}
+      </YStack>
+    );
+  };
 
   const renderTeamSettings = () => {
     const userTeam = leagueTeams.find((t) => t.id === userTeamId);
@@ -1958,6 +2077,17 @@ export function LeagueDetailPage(): React.JSX.Element {
         {TABS.map((tab) => {
           if (tab.commissionerOnly && !isCommissioner) return null;
           const isActive = activeTab === tab.id;
+          // Dynamic roster tab label when viewing another team
+          const label =
+            tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam
+              ? (viewingTeamName ?? 'Team Roster')
+              : tab.label;
+          const icon =
+            tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam ? (
+              <Eye size={16} />
+            ) : (
+              tab.icon
+            );
           return (
             <Button
               key={tab.id}
@@ -1968,7 +2098,13 @@ export function LeagueDetailPage(): React.JSX.Element {
               borderRadius={0}
               paddingHorizontal="$4"
               paddingVertical="$3"
-              onPress={() => changeTab(tab.id)}
+              onPress={() => {
+                if (tab.id === 'roster') {
+                  // Clicking the roster tab resets to viewing own roster
+                  setViewingTeamId(null);
+                }
+                changeTab(tab.id);
+              }}
               role="tab"
               id={`tab-${tab.id}`}
               aria-selected={isActive}
@@ -1981,13 +2117,13 @@ export function LeagueDetailPage(): React.JSX.Element {
               }}
             >
               <XStack alignItems="center" gap="$2">
-                <YStack opacity={isActive ? 1 : 0.5}>{tab.icon}</YStack>
+                <YStack opacity={isActive ? 1 : 0.5}>{icon}</YStack>
                 <Text
                   fontSize="$3"
                   fontWeight={isActive ? '700' : '500'}
                   color={isActive ? '$blue11' : '$textMuted'}
                 >
-                  {tab.label}
+                  {label}
                 </Text>
               </XStack>
             </Button>
@@ -2022,6 +2158,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               loading={leagueTeamsLoading}
               userTeamId={userTeamId}
               waiverType={league?.waiverType}
+              onTeamClick={handleViewTeamRoster}
             />
           </YStack>
         )}
@@ -2090,6 +2227,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     (displayedMatchup.gamesPerMatchup ?? 0) -
                     (displayedMatchup.selectedGamesCount ?? 0)
                   }
+                  onTeamClick={handleViewTeamRoster}
                 />
                 {displayedMatchup.gamesPerMatchup && (
                   <GamesRemaining

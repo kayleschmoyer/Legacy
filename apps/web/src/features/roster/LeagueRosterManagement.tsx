@@ -1084,6 +1084,10 @@ export interface LeagueRosterManagementProps {
   ) => void;
   loading?: boolean;
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
+  /** When true, the roster is displayed in read-only mode (viewing another team) */
+  readOnly?: boolean;
+  /** Team name to display in the header (defaults to "My Roster") */
+  teamName?: string;
 }
 
 export function LeagueRosterManagement({
@@ -1094,6 +1098,8 @@ export function LeagueRosterManagement({
   onPlayerSwap,
   loading = false,
   playerMatchupData,
+  readOnly = false,
+  teamName,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const [selectedPlayer, setSelectedPlayer] =
     useState<TeamMemberFragment | null>(null);
@@ -1174,11 +1180,12 @@ export function LeagueRosterManagement({
 
   const handlePlayerAssign = useCallback(
     (player: TeamMemberFragment, position: LeaguePositionFragment) => {
+      if (readOnly) return;
       onPlayerAssign(player, position);
       setSelectedPlayer(null);
       flashIds(player.id, position.id);
     },
-    [onPlayerAssign, flashIds],
+    [readOnly, onPlayerAssign, flashIds],
   );
 
   const handlePlayerSwap = useCallback(
@@ -1187,15 +1194,17 @@ export function LeagueRosterManagement({
       targetPosition: LeaguePositionFragment,
       displacedPlayer: TeamMemberFragment,
     ) => {
+      if (readOnly) return;
       onPlayerSwap(incomingPlayer, targetPosition, displacedPlayer);
       setSelectedPlayer(null);
       flashIds(incomingPlayer.id, displacedPlayer.id, targetPosition.id);
     },
-    [onPlayerSwap, flashIds],
+    [readOnly, onPlayerSwap, flashIds],
   );
 
   const handleBenchPlayer = useCallback(
     (player: TeamMemberFragment) => {
+      if (readOnly) return;
       const pos = positions.find((p) => p.id === player.positionId);
       if (pos) {
         onPlayerRemove(pos);
@@ -1203,7 +1212,7 @@ export function LeagueRosterManagement({
         flashIds(player.id);
       }
     },
-    [positions, onPlayerRemove, flashIds],
+    [readOnly, positions, onPlayerRemove, flashIds],
   );
 
   // ── Computed stats ───────────────────────────────────────────────────────
@@ -1217,6 +1226,12 @@ export function LeagueRosterManagement({
     dualEligiblePlayers.length +
     unclassifiedPlayers.length;
   const totalBullpen = bullpenPlayers.length + dualEligiblePlayers.length;
+
+  // In read-only mode, use a no-op for player selection
+  const noopPlayerSelect = useCallback((_player: TeamMemberFragment | null) => {
+    /* read-only: interactions disabled */
+  }, []);
+  const handlePlayerSelect = readOnly ? noopPlayerSelect : setSelectedPlayer;
 
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -1239,16 +1254,24 @@ export function LeagueRosterManagement({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <YStack width="100%" role="region" aria-label="Roster management">
+    <YStack
+      width="100%"
+      role="region"
+      aria-label={
+        readOnly ? `${teamName ?? 'Team'} roster` : 'Roster management'
+      }
+    >
       <YStack gap="$4" width="100%" maxWidth={1280} alignSelf="center">
         {/* ── Header with glass effect ─────────────────────────────── */}
         <GlassHeader>
           <YStack gap="$1">
-            <H4 margin={0}>My Roster</H4>
+            <H4 margin={0}>{teamName ?? 'My Roster'}</H4>
             <Text fontSize="$2" color="$textMuted">
-              {selectedPlayer
-                ? 'Tap a lineup slot to assign the selected player'
-                : 'Tap lineup players or bench players to manage your roster'}
+              {readOnly
+                ? 'Viewing this team\u2019s roster (read-only)'
+                : selectedPlayer
+                  ? 'Tap a lineup slot to assign the selected player'
+                  : 'Tap lineup players or bench players to manage your roster'}
             </Text>
           </YStack>
           <XStack gap="$2" flexWrap="wrap">
@@ -1267,11 +1290,11 @@ export function LeagueRosterManagement({
         </GlassHeader>
 
         {/* ── Selected player banner ──────────────────────────────── */}
-        {selectedPlayer && (
+        {selectedPlayer && !readOnly && (
           <YStack paddingHorizontal="$3">
             <SelectedBanner
               player={selectedPlayer}
-              onClear={() => setSelectedPlayer(null)}
+              onClear={() => handlePlayerSelect(null)}
             />
           </YStack>
         )}
@@ -1333,7 +1356,7 @@ export function LeagueRosterManagement({
                   Player
                 </Text>
                 <Text
-                  width={40}
+                  width={50}
                   fontSize="$1"
                   fontWeight="700"
                   color="#F5F7FA"
@@ -1344,7 +1367,7 @@ export function LeagueRosterManagement({
                   Score
                 </Text>
                 <Text
-                  width={40}
+                  width={50}
                   fontSize="$1"
                   fontWeight="700"
                   color="#93C5FD"
@@ -1372,10 +1395,10 @@ export function LeagueRosterManagement({
                 title="Pitching"
                 positions={groupedPositions.pitching}
                 getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={selectedPlayer}
+                selectedPlayer={readOnly ? null : selectedPlayer}
                 onPlayerAssign={handlePlayerAssign}
                 onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={setSelectedPlayer}
+                onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
               />
@@ -1384,10 +1407,10 @@ export function LeagueRosterManagement({
                 title="Infield"
                 positions={groupedPositions.infield}
                 getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={selectedPlayer}
+                selectedPlayer={readOnly ? null : selectedPlayer}
                 onPlayerAssign={handlePlayerAssign}
                 onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={setSelectedPlayer}
+                onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
               />
@@ -1396,10 +1419,10 @@ export function LeagueRosterManagement({
                 title="Outfield"
                 positions={groupedPositions.outfield}
                 getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={selectedPlayer}
+                selectedPlayer={readOnly ? null : selectedPlayer}
                 onPlayerAssign={handlePlayerAssign}
                 onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={setSelectedPlayer}
+                onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
               />
@@ -1408,10 +1431,10 @@ export function LeagueRosterManagement({
                 title="Utility"
                 positions={groupedPositions.utility}
                 getAssignedPlayer={getAssignedPlayer}
-                selectedPlayer={selectedPlayer}
+                selectedPlayer={readOnly ? null : selectedPlayer}
                 onPlayerAssign={handlePlayerAssign}
                 onPlayerSwap={handlePlayerSwap}
-                onPlayerSelect={setSelectedPlayer}
+                onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
               />
@@ -1429,12 +1452,16 @@ export function LeagueRosterManagement({
           >
             <BenchPanel
               players={[...bullpenPlayers, ...dualEligiblePlayers]}
-              selectedPlayer={selectedPlayer}
-              onPlayerSelect={setSelectedPlayer}
+              selectedPlayer={readOnly ? null : selectedPlayer}
+              onPlayerSelect={handlePlayerSelect}
               title="Bullpen"
               titleId="bullpen-title"
               emptyLabel="Bullpen is empty"
-              emptyHint="Add pitchers or move them from the rotation."
+              emptyHint={
+                readOnly
+                  ? 'No pitchers on the bullpen.'
+                  : 'Add pitchers or move them from the rotation.'
+              }
               accentColor="$blue9"
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
@@ -1446,13 +1473,17 @@ export function LeagueRosterManagement({
                 ...dualEligiblePlayers,
                 ...unclassifiedPlayers,
               ]}
-              selectedPlayer={selectedPlayer}
-              onPlayerSelect={setSelectedPlayer}
-              onBench={handleBenchPlayer}
+              selectedPlayer={readOnly ? null : selectedPlayer}
+              onPlayerSelect={handlePlayerSelect}
+              onBench={readOnly ? undefined : handleBenchPlayer}
               title="Bench"
               titleId="bench-title"
               emptyLabel="Bench is empty"
-              emptyHint="Add free agents or move players from the lineup."
+              emptyHint={
+                readOnly
+                  ? 'No players on the bench.'
+                  : 'Add free agents or move players from the lineup.'
+              }
               accentColor="$green9"
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
