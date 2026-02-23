@@ -34,6 +34,7 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
+  useGetLeagueStandingsLazyQuery,
   useGetLeagueTeamsLazyQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
@@ -293,10 +294,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
     useGetUserTeamIdLazyQuery();
 
+  const [getLeagueTeams, { data: leagueTeamsData }] =
+    useGetLeagueTeamsLazyQuery();
+
   const [
-    getLeagueTeams,
-    { data: leagueTeamsData, loading: leagueTeamsLoading },
-  ] = useGetLeagueTeamsLazyQuery();
+    getLeagueStandings,
+    { data: leagueStandingsData, loading: leagueStandingsLoading },
+  ] = useGetLeagueStandingsLazyQuery();
 
   useEffect(() => {
     if (userTeamData?.userTeamId !== undefined) {
@@ -331,6 +335,27 @@ export function LeagueDetailPage(): React.JSX.Element {
       void getLeagueTeams({ variables: { leagueId } });
     }
   }, [leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
+
+  // Fetch standings when standings tab is active
+  useEffect(() => {
+    console.log('[Standings] activeTab:', activeTab, 'leagueId:', leagueId);
+    if (activeTab === 'standings' && !isNaN(leagueId)) {
+      console.log(
+        '[Standings] calling getLeagueStandings for leagueId:',
+        leagueId,
+      );
+      void getLeagueStandings({ variables: { leagueId } });
+    }
+  }, [activeTab, leagueId, getLeagueStandings]);
+
+  useEffect(() => {
+    console.log(
+      '[Standings] leagueStandingsData:',
+      leagueStandingsData,
+      'loading:',
+      leagueStandingsLoading,
+    );
+  }, [leagueStandingsData, leagueStandingsLoading]);
 
   // ── Derived Data ──
 
@@ -1363,8 +1388,8 @@ export function LeagueDetailPage(): React.JSX.Element {
             aria-labelledby="tab-standings"
           >
             <LeagueStandings
-              teams={leagueTeams}
-              loading={leagueTeamsLoading}
+              standings={leagueStandingsData?.getLeagueStandings ?? []}
+              loading={leagueStandingsLoading}
               userTeamId={userTeamId}
             />
           </YStack>

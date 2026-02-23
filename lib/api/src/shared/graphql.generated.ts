@@ -394,6 +394,8 @@ export type JoinLeaguePayload = {
 export type League = {
   __typename?: 'League';
   currentMatchup?: Maybe<Scalars['Int']['output']>;
+  /** The week number of the current matchup (resolved from the matchup record) */
+  currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;

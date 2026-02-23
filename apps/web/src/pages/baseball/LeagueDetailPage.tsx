@@ -524,6 +524,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           waiverOrder: t.waiverOrder ?? null,
           faabBudget: t.faabBudget ?? null,
         }));
+
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
   const { data: teamMembersData, loading: teamMembersLoading } =
@@ -2154,6 +2155,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             aria-labelledby="tab-standings"
           >
             <LeagueStandings
+              leagueId={leagueId}
               teams={leagueTeams}
               loading={leagueTeamsLoading}
               userTeamId={userTeamId}

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, XStack, YStack } from '@legacy-sports/shared-components';
-import { Separator, Spinner, styled, Text } from 'tamagui';
+import { XStack, YStack } from '@legacy-sports/shared-components';
+import { Card, Separator, Spinner, styled, Text } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
+import { useStandings } from '../../hooks/useStandings';
 
 interface Team {
   id: number;
@@ -13,6 +14,7 @@ interface Team {
 }
 
 export interface LeagueStandingsProps {
+  leagueId: number;
   teams: readonly Team[];
   loading?: boolean;
   userTeamId?: number | null;
@@ -50,6 +52,7 @@ function getRankStyle(rank: number) {
 }
 
 export function LeagueStandings({
+  leagueId,
   teams,
   loading = false,
   userTeamId,
@@ -57,6 +60,65 @@ export function LeagueStandings({
   onTeamClick,
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
+  const { standings, loading: standingsLoading } = useStandings(leagueId);
+
+  // Merge teams with standings data, sorted by standings rank
+  const rankedTeams = useMemo(() => {
+    if (standings.length === 0) {
+      // No standings data yet — show teams in their original order
+      return teams.map((t) => ({
+        ...t,
+        wins: null as number | null,
+        losses: null as number | null,
+        ties: null as number | null,
+        winPercentage: null as number | null,
+        pointsFor: null as number | null,
+        pointsAgainst: null as number | null,
+      }));
+    }
+    // Build a map from teamId → standings record
+    const standingsMap = new Map(standings.map((s) => [String(s.teamId), s]));
+    const teamsMap = new Map(teams.map((t) => [String(t.id), t]));
+
+    // Start from standings order (already sorted by winPct, pointsFor)
+    const merged = standings.map((s) => {
+      const team = teamsMap.get(String(s.teamId));
+      return {
+        id: team?.id ?? parseInt(String(s.teamId ?? '0'), 10),
+        name: team?.name ?? s.teamName ?? 'Unknown',
+        leagueId: team?.leagueId ?? leagueId,
+        waiverOrder: team?.waiverOrder ?? null,
+        faabBudget: team?.faabBudget ?? null,
+        wins: s.wins ?? null,
+        losses: s.losses ?? null,
+        ties: s.ties ?? null,
+        winPercentage: s.winPercentage ?? null,
+        pointsFor: s.pointsFor ?? null,
+        pointsAgainst: s.pointsAgainst ?? null,
+      };
+    });
+
+    // Append any teams not in standings (e.g. newly added)
+    for (const team of teams) {
+      if (!standingsMap.has(String(team.id))) {
+        merged.push({
+          ...team,
+          waiverOrder: team.waiverOrder ?? null,
+          faabBudget: team.faabBudget ?? null,
+          wins: null,
+          losses: null,
+          ties: null,
+          winPercentage: null,
+          pointsFor: null,
+          pointsAgainst: null,
+        });
+      }
+    }
+
+    return merged;
+  }, [teams, standings, leagueId]);
+
+  const isLoading = loading || standingsLoading;
 
   const handleTeamClick = (teamId: number) => {
     if (onTeamClick) {
@@ -66,7 +128,7 @@ export function LeagueStandings({
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <YStack
         padding="$6"
@@ -148,7 +210,7 @@ export function LeagueStandings({
           </Text>
         </XStack>
         <Text fontSize="$2" color="$textMuted">
-          {teams.length} {teams.length === 1 ? 'team' : 'teams'}
+          {rankedTeams.length} {rankedTeams.length === 1 ? 'team' : 'teams'}
         </Text>
       </XStack>
 
@@ -193,6 +255,17 @@ export function LeagueStandings({
           {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
         </Text>
         <Text
+          width={80}
+          fontSize="$1"
+          color="$textMuted"
+          fontWeight="700"
+          textTransform="uppercase"
+          letterSpacing={0.6}
+          textAlign="center"
+        >
+          Record
+        </Text>
+        <Text
           width={70}
           fontSize="$1"
           color="$textMuted"
@@ -207,7 +280,7 @@ export function LeagueStandings({
 
       {/* Team Rows */}
       <YStack role="list">
-        {teams.map((team, index) => {
+        {rankedTeams.map((team, index) => {
           const isUserTeam = userTeamId === team.id;
           const rank = index + 1;
           const rankStyle = getRankStyle(rank);
@@ -308,6 +381,19 @@ export function LeagueStandings({
                       : '—'}
                 </Text>
 
+                {/* Record (W-L-T) */}
+                <Text
+                  width={80}
+                  fontSize="$3"
+                  fontWeight="600"
+                  color="$color"
+                  textAlign="center"
+                >
+                  {team.wins != null
+                    ? `${team.wins}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
+                    : '—'}
+                </Text>
+
                 {/* Points */}
                 <Text
                   width={70}
@@ -316,10 +402,12 @@ export function LeagueStandings({
                   color="$textMuted"
                   textAlign="right"
                 >
-                  —
+                  {team.pointsFor != null
+                    ? (Math.round(team.pointsFor * 10) / 10).toLocaleString()
+                    : '—'}
                 </Text>
               </XStack>
-              {index < teams.length - 1 && (
+              {index < rankedTeams.length - 1 && (
                 <Separator borderColor="$outlineSubtle" marginVertical={0} />
               )}
             </React.Fragment>

@@ -34,16 +34,6 @@
         "cwd": "apps/app"
       },
       "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{projectRoot}/app.json",
-        "{projectRoot}/index.js",
-        "{projectRoot}/metro.config.js",
-        "{projectRoot}/.babelrc.js",
-        "{workspaceRoot}/app.json",
-        "{workspaceRoot}/babel.config.json"
-      ],
       "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     },
     "build-android-debug": {
@@ -54,16 +44,6 @@
         "cwd": "apps/app"
       },
       "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{projectRoot}/app.json",
-        "{projectRoot}/index.js",
-        "{projectRoot}/metro.config.js",
-        "{projectRoot}/.babelrc.js",
-        "{workspaceRoot}/app.json",
-        "{workspaceRoot}/babel.config.json"
-      ],
       "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
     },
     "test-android": {

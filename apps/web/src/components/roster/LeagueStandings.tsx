@@ -4,14 +4,19 @@ import { Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { Separator, Spinner, styled, Text } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
 
-interface Team {
-  id: number;
-  name: string;
-  leagueId: number;
+export interface TeamStandingData {
+  teamId?: string | null;
+  teamName?: string | null;
+  wins?: number | null;
+  losses?: number | null;
+  ties?: number | null;
+  winPercentage?: number | null;
+  pointsFor?: number | null;
+  pointsAgainst?: number | null;
 }
 
 export interface LeagueStandingsProps {
-  teams: readonly Team[];
+  standings: readonly TeamStandingData[];
   loading?: boolean;
   userTeamId?: number | null;
 }
@@ -43,13 +48,22 @@ function getRankStyle(rank: number) {
 }
 
 export function LeagueStandings({
-  teams,
+  standings,
   loading = false,
   userTeamId,
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
 
-  const handleTeamClick = (teamId: number) => {
+  console.log(
+    '[LeagueStandings] render — loading:',
+    loading,
+    'standings count:',
+    standings?.length,
+    'data:',
+    standings,
+  );
+
+  const handleTeamClick = (teamId: string) => {
     navigate(`/baseball/team/${teamId}`);
   };
 
@@ -70,7 +84,7 @@ export function LeagueStandings({
     );
   }
 
-  if (!teams || teams.length === 0) {
+  if (!standings || standings.length === 0) {
     return (
       <Card
         backgroundColor="$surfacePanel"
@@ -108,7 +122,7 @@ export function LeagueStandings({
           </Text>
         </XStack>
         <Text fontSize="$3" color="$textMuted">
-          {teams.length} {teams.length === 1 ? 'team' : 'teams'}
+          {standings.length} {standings.length === 1 ? 'team' : 'teams'}
         </Text>
       </XStack>
 
@@ -143,7 +157,18 @@ export function LeagueStandings({
           letterSpacing={0.5}
           textAlign="right"
         >
-          Points
+          Record
+        </Text>
+        <Text
+          flex={1}
+          fontSize="$2"
+          color="$textMuted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing={0.5}
+          textAlign="right"
+        >
+          Pts For
         </Text>
       </XStack>
 
@@ -151,14 +176,21 @@ export function LeagueStandings({
 
       {/* Team Rows */}
       <YStack gap="$1" role="list">
-        {teams.map((team, index) => {
-          const isUserTeam = userTeamId === team.id;
+        {standings.map((team, index) => {
+          const teamIdNum = team.teamId ? parseInt(team.teamId, 10) : null;
+          const isUserTeam = userTeamId != null && teamIdNum === userTeamId;
           const rank = index + 1;
           const rankStyle = getRankStyle(rank);
+          const wins = team.wins ?? 0;
+          const losses = team.losses ?? 0;
+          const ties = team.ties ?? 0;
+          const record =
+            ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+          const pts = team.pointsFor != null ? team.pointsFor.toFixed(1) : '—';
 
           return (
             <Card
-              key={team.id}
+              key={team.teamId ?? index}
               paddingHorizontal="$4"
               paddingVertical="$3"
               borderWidth={1}
@@ -173,8 +205,8 @@ export function LeagueStandings({
               pressStyle={{
                 backgroundColor: isUserTeam ? '$blue3' : '$surfaceInteractive',
               }}
-              onPress={() => handleTeamClick(team.id)}
-              onClick={() => handleTeamClick(team.id)}
+              onPress={() => team.teamId && handleTeamClick(team.teamId)}
+              onClick={() => team.teamId && handleTeamClick(team.teamId)}
               animation="quick"
             >
               <XStack alignItems="center">
@@ -203,7 +235,7 @@ export function LeagueStandings({
                       fontWeight={isUserTeam ? '700' : '500'}
                       color="$color"
                     >
-                      {team.name}
+                      {team.teamName ?? 'Unknown Team'}
                     </Text>
                     {isUserTeam && (
                       <XStack
@@ -225,7 +257,18 @@ export function LeagueStandings({
                   </Text>
                 </YStack>
 
-                {/* Points */}
+                {/* Record */}
+                <Text
+                  flex={1}
+                  fontSize="$4"
+                  fontWeight="600"
+                  color="$color"
+                  textAlign="right"
+                >
+                  {record}
+                </Text>
+
+                {/* Points For */}
                 <Text
                   flex={1}
                   fontSize="$4"
@@ -233,7 +276,7 @@ export function LeagueStandings({
                   color="$textMuted"
                   textAlign="right"
                 >
-                  —
+                  {pts}
                 </Text>
               </XStack>
             </Card>

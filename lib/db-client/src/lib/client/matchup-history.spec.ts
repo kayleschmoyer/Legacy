@@ -18,6 +18,19 @@ import {
 } from './matchup-history';
 import * as Schema from '../../drizzle/public/schema';
 
+// Mock getScoringMultipliersForLeague to avoid DB calls for scoring profiles.
+// Uses h=1 as the only batting multiplier so desired scores map directly to hit counts.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
+jest.mock('./PublicDbClient', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- test mock
+  ...jest.requireActual('./PublicDbClient'),
+  getScoringMultipliersForLeague: jest.fn().mockResolvedValue({
+    batting: { h: 1 },
+    pitching: {},
+    fielding: {},
+  }),
+}));
+
 // Helper to create a chainable mock database
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper using jest mocks
 function createMockDbChain(finalResult: any): any {
@@ -76,6 +89,113 @@ function createMockDbWithMultipleQueries(results: any[]): any {
   };
 
   return mockDb;
+}
+
+/**
+ * Build mock intermediate query results for calculateStandings tests.
+ *
+ * With the scoring mock set to { batting: { h: 1 } }, each team's score for a
+ * matchup equals the total `h` (hits) across its players' games.
+ *
+ * Each team gets one synthetic player (playerId = teamId * 100) with one game
+ * whose `h` value equals the desired team score.
+ */
+interface SimpleMatchup {
+  id: number;
+  leagueId: number;
+  team1Id: number;
+  team2Id: number;
+  team1Score: number;
+  team2Score: number;
+  status: string;
+}
+
+function buildStandingsGameData(matchups: SimpleMatchup[]) {
+  let mpId = 1;
+  let mpgId = 1;
+  const matchupPlayers: any[] = [];
+  const matchupPlayerGames: any[] = [];
+  const gameBatting: any[] = [];
+
+  for (const m of matchups) {
+    // Team 1 player
+    const t1PlayerId = m.team1Id * 100;
+    const t1MpId = mpId++;
+    matchupPlayers.push({
+      id: t1MpId,
+      matchupId: m.id,
+      playerId: t1PlayerId,
+      teamId: m.team1Id,
+    });
+    const t1GameId = `G${String(m.id).padStart(3, '0')}_T1`;
+    matchupPlayerGames.push({
+      id: mpgId++,
+      matchupPlayerId: t1MpId,
+      gameNum: 1,
+      gameIdentifier: t1GameId,
+    });
+    gameBatting.push({
+      playerId: t1PlayerId,
+      season: 2024,
+      gameNum: 1,
+      gameIdentifier: t1GameId,
+      h: m.team1Score,
+    });
+
+    // Team 2 player
+    const t2PlayerId = m.team2Id * 100;
+    const t2MpId = mpId++;
+    matchupPlayers.push({
+      id: t2MpId,
+      matchupId: m.id,
+      playerId: t2PlayerId,
+      teamId: m.team2Id,
+    });
+    const t2GameId = `G${String(m.id).padStart(3, '0')}_T2`;
+    matchupPlayerGames.push({
+      id: mpgId++,
+      matchupPlayerId: t2MpId,
+      gameNum: 1,
+      gameIdentifier: t2GameId,
+    });
+    gameBatting.push({
+      playerId: t2PlayerId,
+      season: 2024,
+      gameNum: 1,
+      gameIdentifier: t2GameId,
+      h: m.team2Score,
+    });
+  }
+
+  return { matchupPlayers, matchupPlayerGames, gameBatting };
+}
+
+/**
+ * Build mock DB for calculateStandings with game-stat-based scoring.
+ *
+ * Query order:
+ *  [0] teams, [1] matchups, [2] matchupPlayers,
+ *  [3] matchupPlayerGames, [4] gameBatting, [5] gamePitching, [6] gameFielding
+ */
+function buildStandingsMockDb(
+  teams: { id: number; name: string }[],
+  matchups: SimpleMatchup[],
+  extraPrefix: any[] = [],
+) {
+  const { matchupPlayers, matchupPlayerGames, gameBatting } =
+    buildStandingsGameData(matchups);
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
+  return createMockDbWithMultipleQueries([
+    ...extraPrefix,
+    teams,
+    matchups, // the function only reads id, team1Id, team2Id, status
+    matchupPlayers,
+    matchupPlayerGames,
+    gameBatting,
+    [], // pitching
+    [], // fielding
+  ]);
 }
 
 describe('Matchup History', () => {
@@ -338,41 +458,37 @@ describe('Matchup History', () => {
         { id: 3, name: 'Team C' },
       ];
 
-      const mockMatchups = [
-        // Team A wins over Team B
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '90',
+          team1Score: 100,
+          team2Score: 90,
           status: 'completed',
         },
-        // Team A wins over Team C
         {
           id: 2,
           leagueId: 1,
           team1Id: 1,
           team2Id: 3,
-          team1Score: '95',
-          team2Score: '85',
+          team1Score: 95,
+          team2Score: 85,
           status: 'completed',
         },
-        // Team B wins over Team C
         {
           id: 3,
           leagueId: 1,
           team1Id: 2,
           team2Id: 3,
-          team1Score: '105',
-          team2Score: '100',
+          team1Score: 105,
+          team2Score: 100,
           status: 'completed',
         },
       ];
 
-      // First query returns teams, second query returns matchups
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -410,14 +526,14 @@ describe('Matchup History', () => {
         { id: 2, name: 'Team B' },
       ];
 
-      const mockMatchups = [
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '90',
+          team1Score: 100,
+          team2Score: 90,
           status: 'completed',
         },
         {
@@ -425,13 +541,13 @@ describe('Matchup History', () => {
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '80',
-          team2Score: '90',
+          team1Score: 80,
+          team2Score: 90,
           status: 'completed',
         },
       ];
 
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -446,19 +562,19 @@ describe('Matchup History', () => {
         { id: 2, name: 'Team B' },
       ];
 
-      const mockMatchups = [
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '100',
+          team1Score: 100,
+          team2Score: 100,
           status: 'completed',
         },
       ];
 
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -474,14 +590,14 @@ describe('Matchup History', () => {
         { id: 3, name: 'Team C' },
       ];
 
-      const mockMatchups = [
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 3,
-          team1Score: '150',
-          team2Score: '90',
+          team1Score: 150,
+          team2Score: 90,
           status: 'completed',
         },
         {
@@ -489,13 +605,13 @@ describe('Matchup History', () => {
           leagueId: 1,
           team1Id: 2,
           team2Id: 3,
-          team1Score: '100',
-          team2Score: '85',
+          team1Score: 100,
+          team2Score: 85,
           status: 'completed',
         },
       ];
 
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const standings = await calculateStandings(mockDb, 1);
 
@@ -511,14 +627,14 @@ describe('Matchup History', () => {
         { id: 2, name: 'Team B' },
       ];
 
-      const mockMatchups = [
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '90',
+          team1Score: 100,
+          team2Score: 90,
           status: 'completed',
         },
         {
@@ -526,19 +642,60 @@ describe('Matchup History', () => {
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '80',
-          team2Score: '70',
+          team1Score: 80,
+          team2Score: 70,
           status: 'completed',
         },
       ];
 
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const standings = await calculateStandings(mockDb, 1);
 
       const teamA = standings.find((s) => s.teamId === 1);
       expect(teamA?.averagePointsFor).toBe(90); // (100 + 80) / 2
       expect(teamA?.averagePointsAgainst).toBe(80); // (90 + 70) / 2
+    });
+
+    it('should include in_progress matchups for points but not for record', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 50,
+          team2Score: 60,
+          status: 'in_progress',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      // W/L record only from completed: 1-0
+      expect(teamA?.wins).toBe(1);
+      expect(teamA?.losses).toBe(0);
+      expect(teamA?.totalMatchups).toBe(1);
+      // Points from both matchups: 100 + 50 = 150
+      expect(teamA?.pointsFor).toBe(150);
+      expect(teamA?.pointsAgainst).toBe(150);
     });
   });
 
@@ -549,34 +706,35 @@ describe('Matchup History', () => {
         { id: 2, name: 'Team B' },
       ];
 
-      const mockMatchups = [
+      const allMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
-          selectedSeason: 2023,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '90',
+          team1Score: 100,
+          team2Score: 90,
           status: 'completed',
         },
         {
           id: 2,
           leagueId: 1,
-          selectedSeason: 2023,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '85',
-          team2Score: '95',
+          team1Score: 85,
+          team2Score: 95,
           status: 'scheduled',
         },
       ];
 
-      // getSeasonResults makes 3 queries: allMatchups, then calculateStandings (teams + matchups)
-      mockDb = createMockDbWithMultipleQueries([
-        mockMatchups,
-        mockTeams,
-        mockMatchups.filter((m) => m.status === 'completed'),
+      // Only completed+in_progress matchups appear in calculateStandings query
+      const standingsMatchups = allMatchups.filter(
+        (m) => m.status === 'completed' || m.status === 'in_progress',
+      );
+
+      // getSeasonResults: [0] allMatchups, then calculateStandings: [1] teams, [2] matchups, ...game data
+      mockDb = buildStandingsMockDb(mockTeams, standingsMatchups, [
+        allMatchups,
       ]);
 
       const results = await getSeasonResults(mockDb, 1);
@@ -598,14 +756,14 @@ describe('Matchup History', () => {
         { id: 4, name: 'Team D' },
       ];
 
-      const mockMatchups = [
+      const mockMatchups: SimpleMatchup[] = [
         {
           id: 1,
           leagueId: 1,
           team1Id: 1,
           team2Id: 2,
-          team1Score: '100',
-          team2Score: '90',
+          team1Score: 100,
+          team2Score: 90,
           status: 'completed',
         },
         {
@@ -613,13 +771,13 @@ describe('Matchup History', () => {
           leagueId: 1,
           team1Id: 3,
           team2Id: 4,
-          team1Score: '95',
-          team2Score: '85',
+          team1Score: 95,
+          team2Score: 85,
           status: 'completed',
         },
       ];
 
-      mockDb = createMockDbWithMultipleQueries([mockTeams, mockMatchups]);
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
 
       const qualifications = await getPlayoffQualifications(mockDb, 1, null, 2);
 

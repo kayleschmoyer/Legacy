@@ -23,7 +23,10 @@
       "!{projectRoot}/src/test-setup.[jt]s",
       "!{projectRoot}/test-setup.[jt]s"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.github/workflows/integration-build.yml"]
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/nx.json"
+    ]
   },
   "parallel": 3,
   "plugins": [
@@ -55,12 +58,12 @@
     "@nx/esbuild:esbuild": {
       "cache": true,
       "dependsOn": ["^build"],
-      "inputs": ["default", "^default"]
+      "inputs": ["production", "^production"]
     },
     "build:lambda": {
       "cache": true,
       "executor": "nx:run-commands",
-      "inputs": ["production"],
+      "inputs": ["production", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
     "package": {
@@ -108,9 +111,7 @@
       "cache": true,
       "inputs": [
         "default",
-        "^default",
         "{workspaceRoot}/.eslintrc.json",
-        "{projectRoot}/.eslintrc.json",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         {
           "externalDependencies": ["eslint"]
@@ -131,7 +132,6 @@
       "cache": true,
       "inputs": [
         "default",
-        "^default",
         "{workspaceRoot}/.prettierrc",
         "{workspaceRoot}/prettier.config.js",
         "{projectRoot}/.prettierrc"
@@ -163,6 +163,7 @@
       "parallelism": false
     },
     "test": {
+      "inputs": ["default", "^production"],
       "options": {
         "passWithNoTests": true
       },

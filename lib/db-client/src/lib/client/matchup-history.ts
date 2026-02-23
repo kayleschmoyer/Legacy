@@ -1,7 +1,8 @@
-import { and, desc, eq, or, sql } from 'drizzle-orm';
-import { PublicDb } from './PublicDbClient';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { getScoringMultipliersForLeague, PublicDb } from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
 import { Matchup } from '../../types/DatabaseTypes';
+import { LeagueScoringMultipliers } from '../../types/ScoringTypes';
 
 /**
  * Head-to-head record between two teams
@@ -180,7 +181,53 @@ export async function getHeadToHeadRecord(
 }
 
 /**
- * Calculate standings for a league (optionally filtered by season)
+ * Convert snake_case to camelCase.
+ * Scoring stat definitions store source_column in snake_case (e.g. "outs_recorded", "e_def")
+ * but Drizzle returns rows with camelCase properties (e.g. "outsRecorded", "eDef").
+ */
+function snakeToCamel(s: string): string {
+  return s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/**
+ * Convert scoring multiplier keys from snake_case (DB column names) to camelCase (Drizzle property names).
+ */
+function camelCaseMultipliers(
+  multipliers: Record<string, number>,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(multipliers)) {
+    result[snakeToCamel(key)] = value;
+  }
+  return result;
+}
+
+/**
+ * Compute a fantasy score by applying multiplier weights to stat values.
+ * Inlined here to avoid circular dependency with @legacy-sports/scoring.
+ */
+function applyScoring(
+  stats: Record<string, unknown>,
+  weights: Record<string, number>,
+): number {
+  let sum = 0;
+  for (const [key, multiplier] of Object.entries(weights)) {
+    if (!multiplier || typeof multiplier !== 'number') continue;
+    const value = stats[key];
+    if (value === null || value === undefined || typeof value !== 'number')
+      continue;
+    sum += multiplier * value;
+  }
+  return sum;
+}
+
+/**
+ * Calculate standings for a league.
+ *
+ * Points (pointsFor / pointsAgainst) are computed from game stats
+ * (batting, pitching, fielding) using the league's scoring profile.
+ * Points accumulate from BOTH completed AND in-progress matchups.
+ * Win/loss/tie record is determined only from completed matchups.
  */
 export async function calculateStandings(
   db: PublicDb,
@@ -199,24 +246,8 @@ export async function calculateStandings(
     return [];
   }
 
-  // Build matchup query conditions
-  const matchupConditions = [
-    eq(Schema.matchups.leagueId, leagueId),
-    eq(Schema.matchups.status, 'completed'),
-  ];
-
-  // Note: Season filtering removed - matchups no longer have a selected_season field.
-  // Seasons are now per-player (league_week_player_seasons table).
-
-  // Get all completed matchups for the league/season
-  const matchups = await db
-    .select()
-    .from(Schema.matchups)
-    .where(and(...matchupConditions));
-
-  // Calculate stats for each team
+  // Initialize standings map
   const standingsMap = new Map<number, TeamStanding>();
-
   for (const team of teams) {
     standingsMap.set(team.id, {
       teamId: team.id,
@@ -233,54 +264,240 @@ export async function calculateStandings(
     });
   }
 
+  // Get scoring multipliers for this league (converted to camelCase for Drizzle rows)
+  const rawMultipliers = await getScoringMultipliersForLeague(db, leagueId);
+  const scoringWeights: LeagueScoringMultipliers = {
+    batting: camelCaseMultipliers(rawMultipliers.batting),
+    pitching: camelCaseMultipliers(rawMultipliers.pitching),
+    fielding: camelCaseMultipliers(rawMultipliers.fielding),
+  };
+
+  // Get all completed + in_progress matchups for the league
+  const matchups = await db
+    .select()
+    .from(Schema.matchups)
+    .where(
+      and(
+        eq(Schema.matchups.leagueId, leagueId),
+        or(
+          eq(Schema.matchups.status, 'completed'),
+          eq(Schema.matchups.status, 'in_progress'),
+        ),
+      ),
+    );
+
+  const matchupIds = matchups.map((m) => m.id);
+  if (matchupIds.length === 0) {
+    return Array.from(standingsMap.values()).map((s, i) => ({
+      ...s,
+      rank: i + 1,
+    }));
+  }
+
+  // Batch query: all matchup players across these matchups
+  const matchupPlayerRows = await db
+    .select()
+    .from(Schema.matchupPlayers)
+    .where(inArray(Schema.matchupPlayers.matchupId, matchupIds));
+
+  // Batch query: all matchup player games
+  const mpIds = matchupPlayerRows.map((mp) => mp.id);
+  const mpGameRows =
+    mpIds.length > 0
+      ? await db
+          .select()
+          .from(Schema.matchupPlayerGames)
+          .where(inArray(Schema.matchupPlayerGames.matchupPlayerId, mpIds))
+      : [];
+
+  // Collect unique game identifiers and player IDs for batch stat queries
+  const gameIdentifiers = [
+    ...new Set(
+      mpGameRows
+        .map((g) => g.gameIdentifier)
+        .filter((g): g is string => g != null),
+    ),
+  ];
+  const playerIds = [...new Set(matchupPlayerRows.map((mp) => mp.playerId))];
+
+  // Batch query game stats (batting, pitching, fielding) in parallel
+  const [battingRows, pitchingRows, fieldingRows] =
+    gameIdentifiers.length > 0 && playerIds.length > 0
+      ? await Promise.all([
+          db
+            .select()
+            .from(Schema.gameBatting)
+            .where(
+              and(
+                inArray(Schema.gameBatting.playerId, playerIds),
+                inArray(Schema.gameBatting.gameIdentifier, gameIdentifiers),
+              ),
+            ),
+          db
+            .select()
+            .from(Schema.gamePitching)
+            .where(
+              and(
+                inArray(Schema.gamePitching.playerId, playerIds),
+                inArray(Schema.gamePitching.gameIdentifier, gameIdentifiers),
+              ),
+            ),
+          db
+            .select()
+            .from(Schema.gameFielding)
+            .where(
+              and(
+                inArray(Schema.gameFielding.playerId, playerIds),
+                inArray(Schema.gameFielding.gameIdentifier, gameIdentifiers),
+              ),
+            ),
+        ])
+      : [[], [], []];
+
+  // Build lookups keyed by "playerId_gameIdentifier"
+  const battingLookup = new Map<string, (typeof battingRows)[0]>();
+  for (const row of battingRows) {
+    battingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+  }
+  const pitchingLookup = new Map<string, (typeof pitchingRows)[0]>();
+  for (const row of pitchingRows) {
+    pitchingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+  }
+  const fieldingLookup = new Map<string, (typeof fieldingRows)[0]>();
+  for (const row of fieldingRows) {
+    fieldingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+  }
+
+  // Build matchup player lookup
+  const mpLookup = new Map(matchupPlayerRows.map((mp) => [mp.id, mp]));
+
+  // Group matchup_player_games by matchupPlayerId
+  const mpGamesGrouped = new Map<number, (typeof mpGameRows)[0][]>();
+  for (const mpGame of mpGameRows) {
+    const group = mpGamesGrouped.get(mpGame.matchupPlayerId) ?? [];
+    group.push(mpGame);
+    mpGamesGrouped.set(mpGame.matchupPlayerId, group);
+  }
+
+  // Group matchup players by matchupId → teamId → matchupPlayerId[]
+  const mpByMatchupAndTeam = new Map<number, Map<number, number[]>>();
+  for (const mp of matchupPlayerRows) {
+    if (!mpByMatchupAndTeam.has(mp.matchupId)) {
+      mpByMatchupAndTeam.set(mp.matchupId, new Map());
+    }
+    const teamMap =
+      mpByMatchupAndTeam.get(mp.matchupId) ?? new Map<number, number[]>();
+    if (!teamMap.has(mp.teamId)) {
+      teamMap.set(mp.teamId, []);
+    }
+    const teamMpIds = teamMap.get(mp.teamId) ?? [];
+    teamMpIds.push(mp.id);
+    teamMap.set(mp.teamId, teamMpIds);
+    mpByMatchupAndTeam.set(mp.matchupId, teamMap);
+  }
+
+  // Compute a team's total fantasy score for a single matchup
+  function computeTeamMatchupScore(matchupId: number, teamId: number): number {
+    const teamMpIds = mpByMatchupAndTeam.get(matchupId)?.get(teamId) ?? [];
+    let totalScore = 0;
+
+    for (const mpId of teamMpIds) {
+      const mp = mpLookup.get(mpId);
+      if (!mp) continue;
+
+      const games = mpGamesGrouped.get(mpId) ?? [];
+      for (const game of games) {
+        if (!game.gameIdentifier) continue;
+        const key = `${mp.playerId}_${game.gameIdentifier}`;
+
+        const batting = battingLookup.get(key);
+        if (batting) {
+          totalScore += applyScoring(
+            batting as unknown as Record<string, unknown>,
+            scoringWeights.batting,
+          );
+        }
+
+        const pitching = pitchingLookup.get(key);
+        if (pitching) {
+          totalScore += applyScoring(
+            pitching as unknown as Record<string, unknown>,
+            scoringWeights.pitching,
+          );
+        }
+
+        const fielding = fieldingLookup.get(key);
+        if (fielding) {
+          totalScore += applyScoring(
+            fielding as unknown as Record<string, unknown>,
+            scoringWeights.fielding,
+          );
+        }
+      }
+    }
+
+    return totalScore;
+  }
+
   // Process each matchup
   for (const matchup of matchups) {
     if (!matchup.team1Id || !matchup.team2Id) continue;
 
-    const score1 = matchup.team1Score ? parseFloat(matchup.team1Score) : 0;
-    const score2 = matchup.team2Score ? parseFloat(matchup.team2Score) : 0;
+    const score1 = computeTeamMatchupScore(matchup.id, matchup.team1Id);
+    const score2 = computeTeamMatchupScore(matchup.id, matchup.team2Id);
 
     const team1Standing = standingsMap.get(matchup.team1Id);
     const team2Standing = standingsMap.get(matchup.team2Id);
-
     if (!team1Standing || !team2Standing) continue;
 
-    // Update stats for both teams
-    team1Standing.totalMatchups++;
-    team2Standing.totalMatchups++;
+    // Points accumulate from ALL matchups (completed + in_progress)
     team1Standing.pointsFor += score1;
     team1Standing.pointsAgainst += score2;
     team2Standing.pointsFor += score2;
     team2Standing.pointsAgainst += score1;
 
-    // Determine winner
-    if (score1 > score2) {
-      team1Standing.wins++;
-      team2Standing.losses++;
-    } else if (score2 > score1) {
-      team2Standing.wins++;
-      team1Standing.losses++;
-    } else {
-      team1Standing.ties++;
-      team2Standing.ties++;
+    // Win/loss/tie record only from completed matchups
+    if (matchup.status === 'completed') {
+      team1Standing.totalMatchups++;
+      team2Standing.totalMatchups++;
+
+      if (score1 > score2) {
+        team1Standing.wins++;
+        team2Standing.losses++;
+      } else if (score2 > score1) {
+        team2Standing.wins++;
+        team1Standing.losses++;
+      } else {
+        team1Standing.ties++;
+        team2Standing.ties++;
+      }
     }
   }
 
   // Calculate derived stats and convert to array
   const standings = Array.from(standingsMap.values()).map((standing) => {
     const totalGames = standing.wins + standing.losses + standing.ties;
+    // For averages, count all matchups with points (completed + in_progress)
+    const matchupsWithPoints =
+      standingsMap.size > 0
+        ? matchups.filter(
+            (m) =>
+              (m.team1Id === standing.teamId ||
+                m.team2Id === standing.teamId) &&
+              m.team1Id != null &&
+              m.team2Id != null,
+          ).length
+        : 0;
 
     return {
       ...standing,
       winPercentage:
         totalGames > 0 ? (standing.wins + standing.ties * 0.5) / totalGames : 0,
       averagePointsFor:
-        standing.totalMatchups > 0
-          ? standing.pointsFor / standing.totalMatchups
-          : 0,
+        matchupsWithPoints > 0 ? standing.pointsFor / matchupsWithPoints : 0,
       averagePointsAgainst:
-        standing.totalMatchups > 0
-          ? standing.pointsAgainst / standing.totalMatchups
+        matchupsWithPoints > 0
+          ? standing.pointsAgainst / matchupsWithPoints
           : 0,
     };
   });
