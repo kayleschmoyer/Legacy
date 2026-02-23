@@ -35,6 +35,24 @@ export interface DraftPickNotification {
   pickNumber: number;
   overallPick: number;
   pickedAt: string;
+  nextPick?: {
+    teamId: number;
+    round: number;
+    pickNumber: number;
+    overallPick: number;
+  };
+}
+
+export interface DraftPausedNotification {
+  type: typeof ClientNotificationType.DRAFT_PAUSED;
+  leagueId: number;
+  pausedAt: string;
+}
+
+export interface DraftResumedNotification {
+  type: typeof ClientNotificationType.DRAFT_RESUMED;
+  leagueId: number;
+  resumedAt: string;
 }
 
 export interface PlayerStatsLoadingNotification {
@@ -103,6 +121,8 @@ export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
   | DraftPickNotification
+  | DraftPausedNotification
+  | DraftResumedNotification
   | PlayerStatsLoadingNotification
   | PlayerStatsUpdatedNotification
   | MatchupStatsCompleteNotification

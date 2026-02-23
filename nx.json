@@ -28,7 +28,7 @@
       "{workspaceRoot}/nx.json"
     ]
   },
-  "parallel": 3,
+  "parallel": 5,
   "plugins": [
     {
       "plugin": "@nx/jest/plugin",

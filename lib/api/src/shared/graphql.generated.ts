@@ -625,6 +625,7 @@ export type Mutation = {
   advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
+  commissionerPick?: Maybe<DraftPick>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -638,6 +639,7 @@ export type Mutation = {
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  pauseDraft?: Maybe<Draft>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
@@ -647,6 +649,7 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
+  resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
   sendDirectMessage?: Maybe<DirectMessage>;
@@ -679,6 +682,11 @@ export type MutationClaimFreeAgentArgs = {
   dropPlayerId?: InputMaybe<Scalars['Int']['input']>;
   faabBid?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerPickArgs = {
+  draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
 };
 
@@ -735,6 +743,10 @@ export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
+export type MutationPauseDraftArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type MutationProcessWaiverClaimsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -751,6 +763,10 @@ export type MutationRenameTeamArgs = {
   leagueId: Scalars['Int']['input'];
   newName: Scalars['String']['input'];
   teamId: Scalars['Int']['input'];
+};
+
+export type MutationResumeDraftArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationRevokeConsentArgs = {

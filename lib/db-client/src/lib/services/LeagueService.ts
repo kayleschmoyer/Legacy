@@ -70,7 +70,12 @@ export interface CreateLeagueResult {
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
-    draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+    draftStatus:
+      | 'not-started'
+      | 'queued'
+      | 'in-progress'
+      | 'paused'
+      | 'completed';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
     waiverType?: 'standard' | 'faab';

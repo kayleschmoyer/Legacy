@@ -5,7 +5,7 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, notInArray, sql } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues';
 
@@ -229,7 +229,12 @@ builder.queryField('getDraft', (t) =>
         .where(eq(PublicSchema.drafts.id, args.draftId))
         .limit(1);
 
-      return draft || null;
+      if (!draft) return null;
+
+      // Verify user is a member of the league that owns this draft
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
+      return draft;
     },
   }),
 );
@@ -248,6 +253,9 @@ builder.queryField('getLeagueDraft', (t) =>
       if (!context.user) {
         throw new Error('Authentication required');
       }
+
+      // Verify user is a member of this league
+      await verifyLeagueMembership(context.db, args.leagueId, context.user.id);
 
       const [draft] = await context.db
         .select()
@@ -276,6 +284,17 @@ builder.queryField('getCurrentDraftPick', (t) =>
         throw new Error('Authentication required');
       }
 
+      // Verify user is a member of the league owning this draft
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, args.draftId))
+        .limit(1);
+
+      if (!draft) return null;
+
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
       return getCurrentDraftPickInfo(context.db, args.draftId);
     },
   }),
@@ -295,6 +314,19 @@ builder.queryField('getDraftPicks', (t) =>
         throw new Error('Authentication required');
       }
 
+      // Verify user is a member of the league owning this draft
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, args.draftId))
+        .limit(1);
+
+      if (!draft) {
+        throw new Error('Draft not found');
+      }
+
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
       const picks = await context.db
         .select()
         .from(PublicSchema.draftPicks)
@@ -309,7 +341,7 @@ builder.queryField('getDraftPicks', (t) =>
 /**
  * Query: Get available (un-drafted) players for a draft
  * Returns all players not yet picked in this draft, optionally
- * filtered by a name search term.
+ * filtered by a name search term. Respects the league's player pool setting.
  */
 builder.queryField('getAvailableDraftPlayers', (t) =>
   t.field({
@@ -326,6 +358,27 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
 
       const { draftId, search, limit: resultLimit } = args;
 
+      // Verify draft exists and get league info for player pool filtering
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+
+      if (!draft) {
+        throw new Error('Draft not found');
+      }
+
+      // Verify user is a member of this league
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
+      // Get league's player pool setting
+      const [league] = await context.db
+        .select({ playerPool: PublicSchema.leagues.playerPool })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, draft.leagueId))
+        .limit(1);
+
       // Get already-drafted player IDs for this draft
       const drafted = await context.db
         .select({ playerId: PublicSchema.draftPicks.playerId })
@@ -339,6 +392,18 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         draftedIds.length > 0
           ? [notInArray(PublicSchema.players.id, draftedIds)]
           : [];
+
+      // Apply player pool filter (AL/NL restriction)
+      // Uses the most recent season_batting record's lg_id to determine league affiliation
+      if (league && league.playerPool !== 'all') {
+        const poolUpper = league.playerPool.toUpperCase();
+        baseConditions.push(
+          sql`${PublicSchema.players.id} IN (
+            SELECT DISTINCT sb.player_id FROM season_batting sb
+            WHERE sb.lg_id = ${poolUpper}
+          )`,
+        );
+      }
 
       // Apply optional name filter
       if (search && search.trim().length > 0) {
@@ -385,6 +450,14 @@ DraftPlayer.implement({
 
 /**
  * Mutation: Make a draft pick
+ *
+ * Runs inside a serializable transaction with SELECT ... FOR UPDATE on the
+ * drafts row to prevent race conditions from concurrent requests.
+ *
+ * Validates:
+ * - Auth, draft status (in-progress, not paused), turn ownership
+ * - Player availability, player pool eligibility, roster limits
+ * - Idempotency (returns existing pick if same player at same overallPick)
  */
 builder.mutationField('makeDraftPick', (t) =>
   t.field({
@@ -402,188 +475,294 @@ builder.mutationField('makeDraftPick', (t) =>
       const userId = context.user.id;
 
       try {
-        // Get draft information
-        const [draft] = await context.db
-          .select()
-          .from(PublicSchema.drafts)
-          .where(eq(PublicSchema.drafts.id, draftId))
-          .limit(1);
-
-        if (!draft) {
-          throw new Error('Draft not found');
-        }
-
-        // Fetch league to validate draft status and get maxRosterSize
-        const [league] = await context.db
-          .select()
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draft.leagueId))
-          .limit(1);
-
-        if (!league) {
-          throw new Error('League not found');
-        }
-
-        if (league.draftStatus !== 'in-progress') {
-          throw new Error(
-            `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+        // Entire pick operation runs in a transaction with row-level locking
+        const result = await context.db.transaction(async (tx) => {
+          // Lock the draft row to serialize concurrent pick attempts
+          const draftRows = await tx.execute(
+            sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
           );
-        }
+          const draft = draftRows.rows[0] as
+            | {
+                id: number;
+                league_id: number;
+                current_pick: number;
+                draft_order: string;
+                draft_mode: string;
+                selection_method: string;
+                draft_started_at: Date | null;
+                draft_completed_at: Date | null;
+              }
+            | undefined;
 
-        // Get current pick information
-        const currentPickInfo = await getCurrentDraftPickInfo(
-          context.db,
-          draftId,
-        );
+          if (!draft) {
+            throw new Error('Draft not found');
+          }
 
-        if (!currentPickInfo) {
-          throw new Error('Could not determine current pick');
-        }
-
-        if (currentPickInfo.isComplete) {
-          throw new Error('Draft is already complete');
-        }
-
-        // Get the league membership to verify user owns the team
-        const leagueMembers = await context.db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        const membership = leagueMembers[0];
-
-        if (!membership || membership.teamId !== currentPickInfo.teamId) {
-          throw new Error(
-            'Not authorized: It is not your turn to pick or you do not own this team',
-          );
-        }
-
-        // Check if player has already been drafted
-        const existingPick = await context.db
-          .select()
-          .from(PublicSchema.draftPicks)
-          .where(
-            and(
-              eq(PublicSchema.draftPicks.draftId, draftId),
-              eq(PublicSchema.draftPicks.playerId, playerId),
-            ),
-          )
-          .limit(1);
-
-        if (existingPick.length > 0) {
-          throw new Error('Player has already been drafted');
-        }
-
-        // Verify player exists
-        const players = await context.db
-          .select()
-          .from(PublicSchema.players)
-          .where(eq(PublicSchema.players.id, playerId))
-          .limit(1);
-
-        if (!players[0]) {
-          throw new Error('Player not found');
-        }
-
-        const now = new Date();
-
-        // Create the draft pick
-        const [draftPick] = await context.db
-          .insert(PublicSchema.draftPicks)
-          .values({
-            draftId,
-            teamId: currentPickInfo.teamId,
-            playerId,
-            round: currentPickInfo.round,
-            pickNumber: currentPickInfo.pickNumber,
-            overallPick: currentPickInfo.overallPick,
-            pickedAt: now,
-          })
-          .returning();
-
-        // Determine if this is the first pick (set draftStartedAt)
-        const isFirstPick = draft.currentPick === 0;
-
-        // Determine if the draft is now complete
-        const numTeams = (
-          await context.db
+          // Fetch league to validate draft status and get maxRosterSize
+          const [league] = await tx
             .select()
-            .from(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId))
-        ).length;
-        const totalPicks = numTeams * league.maxRosterSize;
-        const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, draft.league_id))
+            .limit(1);
 
-        // Update draft: advance currentPick, conditionally set started/completed timestamps
-        await context.db
-          .update(PublicSchema.drafts)
-          .set({
-            currentPick: currentPickInfo.overallPick,
-            updatedAt: now,
-            ...(isFirstPick ? { draftStartedAt: now } : {}),
-            ...(isDraftComplete ? { draftCompletedAt: now } : {}),
-          })
-          .where(eq(PublicSchema.drafts.id, draftId));
+          if (!league) {
+            throw new Error('League not found');
+          }
 
-        // If draft is complete, update league status
-        if (isDraftComplete) {
-          await context.db
-            .update(PublicSchema.leagues)
-            .set({ draftStatus: 'completed' })
-            .where(eq(PublicSchema.leagues.id, draft.leagueId));
-        }
+          if (league.draftStatus === 'paused') {
+            throw new Error(
+              'Draft is currently paused. Wait for the commissioner to resume.',
+            );
+          }
 
-        // Add player to team roster
-        await context.db.insert(PublicSchema.teamMembers).values({
-          teamId: currentPickInfo.teamId,
-          leagueId: draft.leagueId,
-          playerId,
-          draftRound: currentPickInfo.round,
-          draftPick: currentPickInfo.pickNumber,
-          acquisitionType: 'draft',
+          if (league.draftStatus !== 'in-progress') {
+            throw new Error(
+              `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+            );
+          }
+
+          // Calculate current pick info using the locked draft row
+          const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+
+          if (!currentPickInfo) {
+            throw new Error('Could not determine current pick');
+          }
+
+          if (currentPickInfo.isComplete) {
+            throw new Error('Draft is already complete');
+          }
+
+          // Idempotency: if this exact pick was already made, return it
+          const [existingOwnPick] = await tx
+            .select()
+            .from(PublicSchema.draftPicks)
+            .where(
+              and(
+                eq(PublicSchema.draftPicks.draftId, draftId),
+                eq(PublicSchema.draftPicks.playerId, playerId),
+                eq(PublicSchema.draftPicks.teamId, currentPickInfo.teamId),
+                eq(
+                  PublicSchema.draftPicks.overallPick,
+                  currentPickInfo.overallPick,
+                ),
+              ),
+            )
+            .limit(1);
+
+          if (existingOwnPick) {
+            LOGGER.info('Idempotent pick detected, returning existing pick', {
+              draftId,
+              playerId,
+              pickId: existingOwnPick.id,
+            });
+            return {
+              draftPick: existingOwnPick,
+              isDraftComplete: false,
+              leagueId: draft.league_id,
+              selectionMethod: draft.selection_method,
+              currentPickInfo,
+              nextPickInfo: null,
+            };
+          }
+
+          // Verify user owns the team whose turn it is
+          const leagueMembers = await tx
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, draft.league_id),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1);
+
+          const membership = leagueMembers[0];
+
+          if (!membership || membership.teamId !== currentPickInfo.teamId) {
+            throw new Error(
+              'Not authorized: It is not your turn to pick or you do not own this team',
+            );
+          }
+
+          // Check if player has already been drafted (by another team)
+          const existingPick = await tx
+            .select()
+            .from(PublicSchema.draftPicks)
+            .where(
+              and(
+                eq(PublicSchema.draftPicks.draftId, draftId),
+                eq(PublicSchema.draftPicks.playerId, playerId),
+              ),
+            )
+            .limit(1);
+
+          if (existingPick.length > 0) {
+            throw new Error('Player has already been drafted');
+          }
+
+          // Verify player exists
+          const [player] = await tx
+            .select()
+            .from(PublicSchema.players)
+            .where(eq(PublicSchema.players.id, playerId))
+            .limit(1);
+
+          if (!player) {
+            throw new Error('Player not found');
+          }
+
+          // Validate player is in the league's player pool (AL/NL restriction)
+          if (league.playerPool !== 'all') {
+            const poolUpper = league.playerPool.toUpperCase();
+            const poolResult = await tx.execute(
+              sql`SELECT 1 FROM season_batting
+                  WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
+                  LIMIT 1`,
+            );
+            const inPool = poolResult.rows[0];
+            if (!inPool) {
+              throw new Error(`Player is not in the ${poolUpper} player pool`);
+            }
+          }
+
+          // Validate roster limit — count existing team members
+          const [rosterCount] = await tx
+            .select({ count: count() })
+            .from(PublicSchema.teamMembers)
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
+                eq(PublicSchema.teamMembers.leagueId, draft.league_id),
+              ),
+            );
+
+          if (
+            rosterCount &&
+            Number(rosterCount.count) >= league.maxRosterSize
+          ) {
+            throw new Error(
+              `Team roster is full (${league.maxRosterSize} players maximum)`,
+            );
+          }
+
+          const now = new Date();
+
+          // Create the draft pick
+          const [draftPick] = await tx
+            .insert(PublicSchema.draftPicks)
+            .values({
+              draftId,
+              teamId: currentPickInfo.teamId,
+              playerId,
+              round: currentPickInfo.round,
+              pickNumber: currentPickInfo.pickNumber,
+              overallPick: currentPickInfo.overallPick,
+              pickedAt: now,
+            })
+            .returning();
+
+          // Determine if this is the first pick (set draftStartedAt)
+          const isFirstPick = draft.current_pick === 0;
+
+          // Compute total picks dynamically from current league settings
+          const numTeams = (
+            await tx
+              .select()
+              .from(PublicSchema.draftTeams)
+              .where(eq(PublicSchema.draftTeams.draftId, draftId))
+          ).length;
+          const totalPicks = numTeams * league.maxRosterSize;
+          const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
+
+          // Update draft: advance currentPick, conditionally set started/completed timestamps
+          await tx
+            .update(PublicSchema.drafts)
+            .set({
+              currentPick: currentPickInfo.overallPick,
+              updatedAt: now,
+              ...(isFirstPick ? { draftStartedAt: now } : {}),
+              ...(isDraftComplete ? { draftCompletedAt: now } : {}),
+            })
+            .where(eq(PublicSchema.drafts.id, draftId));
+
+          // If draft is complete, update league status
+          if (isDraftComplete) {
+            await tx
+              .update(PublicSchema.leagues)
+              .set({ draftStatus: 'completed' })
+              .where(eq(PublicSchema.leagues.id, draft.league_id));
+          }
+
+          // Add player to team roster
+          await tx.insert(PublicSchema.teamMembers).values({
+            teamId: currentPickInfo.teamId,
+            leagueId: draft.league_id,
+            playerId,
+            draftRound: currentPickInfo.round,
+            draftPick: currentPickInfo.pickNumber,
+            acquisitionType: 'draft',
+          });
+
+          // Calculate next pick info for notification payload
+          let nextPickInfo: Awaited<
+            ReturnType<typeof getCurrentDraftPickInfo>
+          > = null;
+          if (!isDraftComplete) {
+            nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+          }
+
+          return {
+            draftPick,
+            isDraftComplete,
+            leagueId: draft.league_id,
+            selectionMethod: draft.selection_method,
+            currentPickInfo,
+            nextPickInfo,
+          };
         });
 
         LOGGER.info('Draft pick made successfully', {
           draftId,
           playerId,
-          teamId: currentPickInfo.teamId,
-          round: currentPickInfo.round,
-          pick: currentPickInfo.pickNumber,
-          overallPick: currentPickInfo.overallPick,
-          isDraftComplete,
+          teamId: result.currentPickInfo.teamId,
+          round: result.currentPickInfo.round,
+          pick: result.currentPickInfo.pickNumber,
+          overallPick: result.currentPickInfo.overallPick,
+          isDraftComplete: result.isDraftComplete,
         });
 
-        // Send WebSocket notification for the pick
+        // Send WebSocket notification for the pick (outside transaction)
         if (context.notificationService) {
           await context.notificationService.notifyDraftPickMade(
-            draft.leagueId,
+            result.leagueId,
             draftId,
-            draftPick.id,
-            currentPickInfo.teamId,
+            result.draftPick.id,
+            result.currentPickInfo.teamId,
             playerId,
-            currentPickInfo.round,
-            currentPickInfo.pickNumber,
-            currentPickInfo.overallPick,
+            result.currentPickInfo.round,
+            result.currentPickInfo.pickNumber,
+            result.currentPickInfo.overallPick,
+            result.nextPickInfo
+              ? {
+                  teamId: result.nextPickInfo.teamId,
+                  round: result.nextPickInfo.round,
+                  pickNumber: result.nextPickInfo.pickNumber,
+                  overallPick: result.nextPickInfo.overallPick,
+                }
+              : undefined,
           );
 
           // If draft completed, also send draft-completed notification
-          if (isDraftComplete) {
-            /* eslint-disable @typescript-eslint/no-unsafe-argument */
+          if (result.isDraftComplete) {
             await context.notificationService.notifyDraftCompleted(
-              draft.leagueId,
-              draft.selectionMethod,
+              result.leagueId,
+              result.selectionMethod,
             );
-            /* eslint-enable @typescript-eslint/no-unsafe-argument */
           }
         }
 
-        return draftPick;
+        return result.draftPick;
       } catch (error) {
         LOGGER.error('Error making draft pick', {
           draftId,
@@ -686,6 +865,16 @@ builder.mutationField('initializeLiveDraft', (t) =>
 
         let draft;
         if (existingDraft) {
+          // Clear any leftover draft_teams from a previous initialization
+          await context.db
+            .delete(PublicSchema.draftTeams)
+            .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
+
+          // Clear any leftover draft_picks from a previous initialization
+          await context.db
+            .delete(PublicSchema.draftPicks)
+            .where(eq(PublicSchema.draftPicks.draftId, existingDraft.id));
+
           const [updated] = await context.db
             .update(PublicSchema.drafts)
             .set({
@@ -694,6 +883,7 @@ builder.mutationField('initializeLiveDraft', (t) =>
               draftOrder: draftOrder,
               currentPick: 0,
               draftStartedAt: new Date(),
+              draftCompletedAt: null,
             })
             .where(eq(PublicSchema.drafts.id, existingDraft.id))
             .returning();
@@ -1012,6 +1202,435 @@ builder.mutationField('updateDraftSettings', (t) =>
       } catch (error) {
         LOGGER.error('Error updating draft settings', {
           leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    },
+  }),
+);
+
+// ── Helper: Verify League Membership ─────────────────────────────────────────
+
+/**
+ * Verify that a user is a member of a league. Throws if not.
+ */
+async function verifyLeagueMembership(
+  db: PublicDb,
+  leagueId: number,
+  userId: number,
+): Promise<void> {
+  const [membership] = await db
+    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw new Error('You are not a member of this league');
+  }
+}
+
+// ── Pause / Resume Draft ────────────────────────────────────────────────────
+
+/**
+ * Mutation: Pause a live draft
+ * Only the league owner/commissioner can pause. Sets status to 'paused'
+ * so makeDraftPick will reject picks until resumed.
+ */
+builder.mutationField('pauseDraft', (t) =>
+  t.field({
+    type: Draft,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+
+      // Verify user is a league owner/commissioner
+      const [membership] = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !membership ||
+        (membership.permissionLevel !== 'owner' &&
+          membership.permissionLevel !== 'commissioner')
+      ) {
+        throw new Error(
+          'Only the league owner or commissioner can pause the draft',
+        );
+      }
+
+      // Verify draft is in-progress
+      const [league] = await context.db
+        .select()
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!league) {
+        throw new Error('League not found');
+      }
+
+      if (league.draftStatus !== 'in-progress') {
+        throw new Error(
+          `Cannot pause draft: current status is '${league.draftStatus}'`,
+        );
+      }
+
+      // Update league status to paused
+      await context.db
+        .update(PublicSchema.leagues)
+        .set({ draftStatus: 'paused' })
+        .where(eq(PublicSchema.leagues.id, leagueId));
+
+      // Get the draft record to return
+      const [draft] = await context.db
+        .select()
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.leagueId, leagueId))
+        .orderBy(desc(PublicSchema.drafts.createdAt))
+        .limit(1);
+
+      LOGGER.info('Draft paused', { leagueId, userId });
+
+      // Notify all league connections
+      if (context.notificationService) {
+        await context.notificationService.notifyDraftPaused(leagueId);
+      }
+
+      return draft;
+    },
+  }),
+);
+
+/**
+ * Mutation: Resume a paused draft
+ * Only the league owner/commissioner can resume. Sets status back to 'in-progress'.
+ */
+builder.mutationField('resumeDraft', (t) =>
+  t.field({
+    type: Draft,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+
+      // Verify user is a league owner/commissioner
+      const [membership] = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !membership ||
+        (membership.permissionLevel !== 'owner' &&
+          membership.permissionLevel !== 'commissioner')
+      ) {
+        throw new Error(
+          'Only the league owner or commissioner can resume the draft',
+        );
+      }
+
+      // Verify draft is paused
+      const [league] = await context.db
+        .select()
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!league) {
+        throw new Error('League not found');
+      }
+
+      if (league.draftStatus !== 'paused') {
+        throw new Error(
+          `Cannot resume draft: current status is '${league.draftStatus}'`,
+        );
+      }
+
+      // Update league status back to in-progress
+      await context.db
+        .update(PublicSchema.leagues)
+        .set({ draftStatus: 'in-progress' })
+        .where(eq(PublicSchema.leagues.id, leagueId));
+
+      // Get the draft record to return
+      const [draft] = await context.db
+        .select()
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.leagueId, leagueId))
+        .orderBy(desc(PublicSchema.drafts.createdAt))
+        .limit(1);
+
+      LOGGER.info('Draft resumed', { leagueId, userId });
+
+      // Notify all league connections
+      if (context.notificationService) {
+        await context.notificationService.notifyDraftResumed(leagueId);
+      }
+
+      return draft;
+    },
+  }),
+);
+
+// ── Commissioner Pick ───────────────────────────────────────────────────────
+
+/**
+ * Mutation: Commissioner makes a pick on behalf of a team owner
+ *
+ * Allows the league owner/commissioner to make a pick for any team when
+ * that team's owner is absent (e.g., timed out, disconnected).
+ * Same validation as makeDraftPick except the turn-ownership check
+ * is replaced by a commissioner permission check.
+ */
+builder.mutationField('commissionerPick', (t) =>
+  t.field({
+    type: DraftPick,
+    args: {
+      draftId: t.arg.int({ required: true }),
+      playerId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { draftId, playerId } = args;
+      const userId = context.user.id;
+
+      try {
+        const result = await context.db.transaction(async (tx) => {
+          // Lock the draft row
+          const draftRows = await tx.execute(
+            sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+          );
+          const draft = draftRows.rows[0] as
+            | {
+                id: number;
+                league_id: number;
+                current_pick: number;
+                draft_order: string;
+                selection_method: string;
+              }
+            | undefined;
+
+          if (!draft) {
+            throw new Error('Draft not found');
+          }
+
+          // Verify user is league owner or commissioner
+          const [membership] = await tx
+            .select()
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, draft.league_id),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1);
+
+          if (
+            !membership ||
+            (membership.permissionLevel !== 'owner' &&
+              membership.permissionLevel !== 'commissioner')
+          ) {
+            throw new Error(
+              'Only the league owner or commissioner can make picks on behalf of others',
+            );
+          }
+
+          const [league] = await tx
+            .select()
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, draft.league_id))
+            .limit(1);
+
+          if (!league) {
+            throw new Error('League not found');
+          }
+
+          if (
+            league.draftStatus !== 'in-progress' &&
+            league.draftStatus !== 'paused'
+          ) {
+            throw new Error(
+              `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+            );
+          }
+
+          const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+
+          if (!currentPickInfo || currentPickInfo.isComplete) {
+            throw new Error('Draft is already complete');
+          }
+
+          // Check player availability
+          const existingPick = await tx
+            .select()
+            .from(PublicSchema.draftPicks)
+            .where(
+              and(
+                eq(PublicSchema.draftPicks.draftId, draftId),
+                eq(PublicSchema.draftPicks.playerId, playerId),
+              ),
+            )
+            .limit(1);
+
+          if (existingPick.length > 0) {
+            throw new Error('Player has already been drafted');
+          }
+
+          const [player] = await tx
+            .select()
+            .from(PublicSchema.players)
+            .where(eq(PublicSchema.players.id, playerId))
+            .limit(1);
+
+          if (!player) {
+            throw new Error('Player not found');
+          }
+
+          const now = new Date();
+
+          const [draftPick] = await tx
+            .insert(PublicSchema.draftPicks)
+            .values({
+              draftId,
+              teamId: currentPickInfo.teamId,
+              playerId,
+              round: currentPickInfo.round,
+              pickNumber: currentPickInfo.pickNumber,
+              overallPick: currentPickInfo.overallPick,
+              pickedAt: now,
+            })
+            .returning();
+
+          const numTeams = (
+            await tx
+              .select()
+              .from(PublicSchema.draftTeams)
+              .where(eq(PublicSchema.draftTeams.draftId, draftId))
+          ).length;
+          const totalPicks = numTeams * league.maxRosterSize;
+          const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
+
+          await tx
+            .update(PublicSchema.drafts)
+            .set({
+              currentPick: currentPickInfo.overallPick,
+              updatedAt: now,
+              ...(isDraftComplete ? { draftCompletedAt: now } : {}),
+            })
+            .where(eq(PublicSchema.drafts.id, draftId));
+
+          if (isDraftComplete) {
+            await tx
+              .update(PublicSchema.leagues)
+              .set({ draftStatus: 'completed' })
+              .where(eq(PublicSchema.leagues.id, draft.league_id));
+          }
+
+          await tx.insert(PublicSchema.teamMembers).values({
+            teamId: currentPickInfo.teamId,
+            leagueId: draft.league_id,
+            playerId,
+            draftRound: currentPickInfo.round,
+            draftPick: currentPickInfo.pickNumber,
+            acquisitionType: 'draft',
+          });
+
+          let nextPickInfo: Awaited<
+            ReturnType<typeof getCurrentDraftPickInfo>
+          > = null;
+          if (!isDraftComplete) {
+            nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+          }
+
+          return {
+            draftPick,
+            isDraftComplete,
+            leagueId: draft.league_id,
+            selectionMethod: draft.selection_method,
+            currentPickInfo,
+            nextPickInfo,
+          };
+        });
+
+        LOGGER.info('Commissioner pick made', {
+          draftId,
+          playerId,
+          byUserId: userId,
+          teamId: result.currentPickInfo.teamId,
+          overallPick: result.currentPickInfo.overallPick,
+        });
+
+        if (context.notificationService) {
+          await context.notificationService.notifyDraftPickMade(
+            result.leagueId,
+            draftId,
+            result.draftPick.id,
+            result.currentPickInfo.teamId,
+            playerId,
+            result.currentPickInfo.round,
+            result.currentPickInfo.pickNumber,
+            result.currentPickInfo.overallPick,
+            result.nextPickInfo
+              ? {
+                  teamId: result.nextPickInfo.teamId,
+                  round: result.nextPickInfo.round,
+                  pickNumber: result.nextPickInfo.pickNumber,
+                  overallPick: result.nextPickInfo.overallPick,
+                }
+              : undefined,
+          );
+
+          if (result.isDraftComplete) {
+            await context.notificationService.notifyDraftCompleted(
+              result.leagueId,
+              result.selectionMethod,
+            );
+          }
+        }
+
+        return result.draftPick;
+      } catch (error) {
+        LOGGER.error('Error making commissioner pick', {
+          draftId,
+          playerId,
           userId,
           error: error instanceof Error ? error.message : String(error),
         });

@@ -48,6 +48,24 @@ export interface DraftPickNotification {
   pickNumber: number;
   overallPick: number;
   pickedAt: string;
+  nextPick?: {
+    teamId: number;
+    round: number;
+    pickNumber: number;
+    overallPick: number;
+  };
+}
+
+export interface DraftPausedNotification {
+  type: typeof WireNotificationType.DRAFT_PAUSED;
+  leagueId: number;
+  pausedAt: string;
+}
+
+export interface DraftResumedNotification {
+  type: typeof WireNotificationType.DRAFT_RESUMED;
+  leagueId: number;
+  resumedAt: string;
 }
 
 export interface PlayerStatsLoadingNotification {
@@ -426,6 +444,12 @@ export class WebSocketNotificationService {
     round: number,
     pickNumber: number,
     overallPick: number,
+    nextPick?: {
+      teamId: number;
+      round: number;
+      pickNumber: number;
+      overallPick: number;
+    },
   ): Promise<void> {
     const notification: DraftPickNotification = {
       type: WireNotificationType.DRAFT_PICK_MADE,
@@ -438,6 +462,7 @@ export class WebSocketNotificationService {
       pickNumber,
       overallPick,
       pickedAt: new Date().toISOString(),
+      ...(nextPick ? { nextPick } : {}),
     };
 
     LOGGER.info('Sending draft pick notification', {
@@ -455,6 +480,42 @@ export class WebSocketNotificationService {
         type: 'notification',
         data: notification,
       },
+      leagueId,
+    );
+  }
+
+  /**
+   * Send draft paused notification to all connections for a specific league
+   */
+  async notifyDraftPaused(leagueId: number): Promise<void> {
+    const notification: DraftPausedNotification = {
+      type: WireNotificationType.DRAFT_PAUSED,
+      leagueId,
+      pausedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft paused notification', { leagueId });
+
+    await this.broadcast(
+      { type: 'notification', data: notification },
+      leagueId,
+    );
+  }
+
+  /**
+   * Send draft resumed notification to all connections for a specific league
+   */
+  async notifyDraftResumed(leagueId: number): Promise<void> {
+    const notification: DraftResumedNotification = {
+      type: WireNotificationType.DRAFT_RESUMED,
+      leagueId,
+      resumedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft resumed notification', { leagueId });
+
+    await this.broadcast(
+      { type: 'notification', data: notification },
       leagueId,
     );
   }

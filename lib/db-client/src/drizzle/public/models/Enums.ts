@@ -13,6 +13,7 @@ export const draftStatus = pgEnum('draft_status', [
   'not-started',
   'queued',
   'in-progress',
+  'paused',
   'completed',
 ]);
 export const leaguePermissionLevel = pgEnum('league_permission_level', [

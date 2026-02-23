@@ -618,6 +618,7 @@ type Mutation {
     leagueId: Int!
     playerId: Int!
   ): WaiverClaim
+  commissionerPick(draftId: Int!, playerId: Int!): DraftPick
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
@@ -639,6 +640,7 @@ type Mutation {
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
+  pauseDraft(leagueId: Int!): Draft
   processWaiverClaims(leagueId: Int): ProcessWaiverClaimsResult
 
   """
@@ -657,6 +659,7 @@ type Mutation {
   Request an export of all personal data (GDPR Art. 15 - Right of Access)
   """
   requestDataExport: DataRequest
+  resumeDraft(leagueId: Int!): Draft
 
   """
   Revoke a previously granted consent

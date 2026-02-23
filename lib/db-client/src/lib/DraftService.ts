@@ -14,7 +14,12 @@ export interface DraftTriggerResult {
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
-    draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+    draftStatus:
+      | 'not-started'
+      | 'queued'
+      | 'in-progress'
+      | 'paused'
+      | 'completed';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
   };
@@ -212,7 +217,12 @@ export class DraftService {
    */
   async getDraftStatus(leagueId: number): Promise<{
     leagueId: number;
-    draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+    draftStatus:
+      | 'not-started'
+      | 'queued'
+      | 'in-progress'
+      | 'paused'
+      | 'completed';
   }> {
     const league = await fetchLeagueDetails(leagueId);
 

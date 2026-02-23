@@ -61,7 +61,12 @@ const League = builder.objectRef<{
   owner: number;
   maxRosterSize: number;
   currentMatchup: number | null;
-  draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
+  draftStatus:
+    | 'not-started'
+    | 'queued'
+    | 'in-progress'
+    | 'paused'
+    | 'completed';
   inviteCode: string;
   playerPool: 'all' | 'nl' | 'al';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
