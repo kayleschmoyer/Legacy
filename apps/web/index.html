@@ -9,6 +9,33 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="stylesheet" href="/src/styles.css" />
 
+    <!--
+      Restore the full URL after a GitHub Pages 404 redirect.
+      The 404.html encodes the original path into a query-string; this script
+      reads it back and replaces the browser history entry with the real URL
+      so React Router sees the intended route.
+      See public/404.html for the other half of this mechanism.
+    -->
+    <script>
+      (function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&');
+            });
+          window.history.replaceState(
+            null,
+            null,
+            decoded.shift() +
+              (decoded.length ? '?' + decoded.join('&') : '') +
+              l.hash,
+          );
+        }
+      })(window.location);
+    </script>
+
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
