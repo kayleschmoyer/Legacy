@@ -3,7 +3,7 @@ import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, or } from 'drizzle-orm';
 import { builder } from './builder';
-import { Team } from './leagues';
+import { Team } from './leagues/types';
 
 /**
  * Chat System & Tiebreaker Rules Schema (LS-90)

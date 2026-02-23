@@ -5,12 +5,14 @@ import './users';
 import './players';
 import './statistics';
 import './leagues';
+import './teams';
+import './waivers';
 import './matchups';
 import './version';
 import './scoring';
 import './notifications';
 import './chat-and-tiebreakers';
-import './draft-schema';
+import './drafts';
 import './gdpr';
 
 // Export the final schema

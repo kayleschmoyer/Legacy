@@ -1,7 +1,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
-import { Team } from './leagues';
+import { Team } from './leagues/types';
 
 /**
  * Playoff System Schema (LS-28)
