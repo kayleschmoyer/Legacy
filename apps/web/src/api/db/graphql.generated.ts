@@ -404,6 +404,7 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
+  gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
@@ -411,6 +412,7 @@ export type League = {
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
   waiverType?: Maybe<Scalars['String']['output']>;
@@ -455,6 +457,7 @@ export type Matchup = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
+  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
   statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
@@ -582,6 +585,8 @@ export type MatchupPlayer = {
   games?: Maybe<Array<MatchupPlayerGame>>;
   id?: Maybe<Scalars['ID']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
+  /** Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup) */
+  numberOfGames?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
@@ -666,6 +671,7 @@ export type Mutation = {
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
+  updateLeagueSettings?: Maybe<League>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
@@ -823,6 +829,10 @@ export type MutationUpdateDraftSettingsArgs = {
 export type MutationUpdateLeagueScoringProfileArgs = {
   leagueId: Scalars['Int']['input'];
   updates: Array<UpdateLeagueScoringMultiplierInput>;
+};
+
+export type MutationUpdateLeagueSettingsArgs = {
+  input: UpdateLeagueSettingsInput;
 };
 
 export type MutationUpdateMatchupScoreArgs = {
@@ -1637,6 +1647,12 @@ export type UpdateLeagueScoringMultiplierInput = {
   statDefinitionId: Scalars['Int']['input'];
 };
 
+export type UpdateLeagueSettingsInput = {
+  gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
@@ -1749,6 +1765,8 @@ export type LeagueFragment = {
   waiverType?: string | null;
   waiverEnabled?: boolean | null;
   faabBudgetDefault?: number | null;
+  spStartsPerMatchup?: number | null;
+  gamesPerMatchup?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -1794,6 +1812,8 @@ export type GetLeagueByIdQuery = {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1827,6 +1847,8 @@ export type CreateLeagueAndTeamsMutation = {
       waiverType?: string | null;
       waiverEnabled?: boolean | null;
       faabBudgetDefault?: number | null;
+      spStartsPerMatchup?: number | null;
+      gamesPerMatchup?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -1857,6 +1879,8 @@ export type GetUserLeaguesQuery = {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1919,6 +1943,8 @@ export type StartDraftMutation = {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2030,6 +2056,39 @@ export type RenameTeamMutation = {
   } | null;
 };
 
+export type UpdateLeagueSettingsMutationVariables = Exact<{
+  input: UpdateLeagueSettingsInput;
+}>;
+
+export type UpdateLeagueSettingsMutation = {
+  __typename?: 'Mutation';
+  updateLeagueSettings?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+    } | null;
+  } | null;
+};
+
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -2051,6 +2110,7 @@ export type MatchupFragment = {
   status?: MatchupStatus | null;
   statsLoadingStatus?: StatsLoadingStatus | null;
   gamesPerMatchup?: number | null;
+  spStartsPerMatchup?: number | null;
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -2074,6 +2134,7 @@ export type GetMatchupByIdQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -2099,6 +2160,7 @@ export type GetMatchupsForLeagueQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -2123,6 +2185,7 @@ export type GetCurrentMatchupForLeagueQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -2148,6 +2211,7 @@ export type GetMatchupsByWeekQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -2195,6 +2259,7 @@ export type GetMatchupHistoryQuery = {
     status?: MatchupStatus | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
@@ -2209,6 +2274,7 @@ export type MatchupPlayerFragment = {
   teamId?: number | null;
   positionId?: number | null;
   season?: number | null;
+  numberOfGames?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -2373,6 +2439,7 @@ export type GetMatchupPlayersQuery = {
     teamId?: number | null;
     positionId?: number | null;
     season?: number | null;
+    numberOfGames?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -2555,6 +2622,7 @@ export type AdvanceLeagueWeekMutation = {
       status?: MatchupStatus | null;
       statsLoadingStatus?: StatsLoadingStatus | null;
       gamesPerMatchup?: number | null;
+      spStartsPerMatchup?: number | null;
       selectedGamesCount?: number | null;
       startTime?: string | null;
       endTime?: string | null;
@@ -3232,6 +3300,8 @@ export const LeagueFragmentDoc = gql`
     waiverType
     waiverEnabled
     faabBudgetDefault
+    spStartsPerMatchup
+    gamesPerMatchup
     userMembership {
       ...LeagueMember
     }
@@ -3257,6 +3327,7 @@ export const MatchupFragmentDoc = gql`
     status
     statsLoadingStatus
     gamesPerMatchup
+    spStartsPerMatchup
     selectedGamesCount
     startTime
     endTime
@@ -3270,6 +3341,7 @@ export const MatchupPlayerFragmentDoc = gql`
     teamId
     positionId
     season
+    numberOfGames
     player {
       id
       firstName
@@ -4558,6 +4630,57 @@ export type RenameTeamMutationResult =
 export type RenameTeamMutationOptions = BaseMutationOptions<
   RenameTeamMutation,
   RenameTeamMutationVariables
+>;
+export const UpdateLeagueSettings = gql`
+  mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
+    updateLeagueSettings(input: $input) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type UpdateLeagueSettingsMutationFn = MutationFunction<
+  UpdateLeagueSettingsMutation,
+  UpdateLeagueSettingsMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateLeagueSettingsMutation, { data, loading, error }] = useUpdateLeagueSettingsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateLeagueSettingsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueSettingsMutation,
+    UpdateLeagueSettingsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateLeagueSettingsMutation,
+    UpdateLeagueSettingsMutationVariables
+  >(UpdateLeagueSettings, options);
+}
+export type UpdateLeagueSettingsMutationHookResult = ReturnType<
+  typeof useUpdateLeagueSettingsMutation
+>;
+export type UpdateLeagueSettingsMutationResult =
+  Apollo.MutationResult<UpdateLeagueSettingsMutation>;
+export type UpdateLeagueSettingsMutationOptions = BaseMutationOptions<
+  UpdateLeagueSettingsMutation,
+  UpdateLeagueSettingsMutationVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

@@ -87,28 +87,46 @@ export const createMatchupPlayersLoader = (
 export const createMatchupsLoader = (
   db: GenericDatabase<typeof PublicSchema>,
 ) =>
-  new DataLoader<number, { leagueId: number; weekNumber: number } | null>(
-    async (keys) => {
-      const ids = [...new Set(keys)] as number[];
-      const rows = await db
-        .select({
-          id: PublicSchema.matchups.id,
-          leagueId: PublicSchema.matchups.leagueId,
-          weekNumber: PublicSchema.matchups.weekNumber,
-        })
-        .from(PublicSchema.matchups)
-        .where(inArray(PublicSchema.matchups.id, ids));
+  new DataLoader<
+    number,
+    {
+      leagueId: number;
+      weekNumber: number;
+      gamesPerMatchup: number | null;
+      spStartsPerMatchup: number | null;
+    } | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select({
+        id: PublicSchema.matchups.id,
+        leagueId: PublicSchema.matchups.leagueId,
+        weekNumber: PublicSchema.matchups.weekNumber,
+        gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
+        spStartsPerMatchup: PublicSchema.matchups.spStartsPerMatchup,
+      })
+      .from(PublicSchema.matchups)
+      .where(inArray(PublicSchema.matchups.id, ids));
 
-      const mMap = new Map<number, { leagueId: number; weekNumber: number }>();
-      for (const row of rows) {
-        mMap.set(row.id, {
-          leagueId: row.leagueId,
-          weekNumber: row.weekNumber,
-        });
+    const mMap = new Map<
+      number,
+      {
+        leagueId: number;
+        weekNumber: number;
+        gamesPerMatchup: number | null;
+        spStartsPerMatchup: number | null;
       }
-      return keys.map((key) => mMap.get(key) ?? null);
-    },
-  );
+    >();
+    for (const row of rows) {
+      mMap.set(row.id, {
+        leagueId: row.leagueId,
+        weekNumber: row.weekNumber,
+        gamesPerMatchup: row.gamesPerMatchup,
+        spStartsPerMatchup: row.spStartsPerMatchup,
+      });
+    }
+    return keys.map((key) => mMap.get(key) ?? null);
+  });
 
 /**
  * DataLoader for league-week-player seasons

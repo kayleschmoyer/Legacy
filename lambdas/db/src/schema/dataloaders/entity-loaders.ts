@@ -98,6 +98,32 @@ export const createUsersLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   });
 
 /**
+ * DataLoader for league positions by ID
+ * Key: positionId (number)
+ * Returns: league position record with positionType
+ */
+export const createLeaguePositionByIdLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.leaguePosition.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const allPositions = await db
+      .select()
+      .from(PublicSchema.leaguePosition)
+      .where(inArray(PublicSchema.leaguePosition.id, ids));
+
+    const posMap = new Map<
+      number,
+      typeof PublicSchema.leaguePosition.$inferSelect
+    >();
+    for (const pos of allPositions) posMap.set(pos.id, pos);
+    return keys.map((key) => posMap.get(key) ?? null);
+  });
+
+/**
  * DataLoader for player eligible positions
  * Key: playerId (number)
  * Returns: string[] of position codes, sorted by games played (most to least)

@@ -1,12 +1,17 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, isNotNull, notInArray } from 'drizzle-orm';
+import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
 
 export interface GameSelectionResult {
   gameIdentifier: string | null;
   fieldingGamePos: string | null;
   statsAreCached: boolean;
+  /** True if game was skipped due to SP start probability */
+  skipped?: boolean;
 }
+
+/** Player's roster position type for game selection purposes */
+type PitcherRole = 'SP' | 'RP' | 'non-pitcher';
 
 /**
  * Get the primary fielding position for a player in a season.
@@ -42,20 +47,27 @@ async function getPrimaryFieldingPosition(
 /**
  * Select a random game_identifier for a player/season from cached game stats.
  * Excludes game_identifiers already used by other game slots.
+ *
+ * For pitchers, filters by GS (games started):
+ * - SP: only games where GS = 1 (pitcher was the starter)
+ * - RP: only games where GS = 0 (pitcher was a reliever)
+ * - non-pitcher: all games (no pitching filter)
  */
 async function selectGameIdentifier(
   db: PublicDb,
   playerId: number,
   season: number,
   excludeGameIdentifiers: string[],
+  pitcherRole: PitcherRole = 'non-pitcher',
 ): Promise<string | null> {
-  const conditions = [
+  // Start with batting games as the base (every player has batting stats)
+  const battingConditions = [
     eq(PublicSchema.gameBatting.playerId, playerId),
     eq(PublicSchema.gameBatting.season, season),
   ];
 
   if (excludeGameIdentifiers.length > 0) {
-    conditions.push(
+    battingConditions.push(
       notInArray(
         PublicSchema.gameBatting.gameIdentifier,
         excludeGameIdentifiers,
@@ -63,10 +75,50 @@ async function selectGameIdentifier(
     );
   }
 
+  // For pitchers, we need to filter by GS from game_pitching
+  if (pitcherRole === 'SP' || pitcherRole === 'RP') {
+    const gsValue = pitcherRole === 'SP' ? 1 : 0;
+
+    // Join game_batting with game_pitching to filter by GS
+    const availableGames = await db
+      .selectDistinct({
+        gameIdentifier: PublicSchema.gameBatting.gameIdentifier,
+      })
+      .from(PublicSchema.gameBatting)
+      .innerJoin(
+        PublicSchema.gamePitching,
+        and(
+          eq(
+            PublicSchema.gameBatting.gameIdentifier,
+            PublicSchema.gamePitching.gameIdentifier,
+          ),
+          eq(
+            PublicSchema.gameBatting.playerId,
+            PublicSchema.gamePitching.playerId,
+          ),
+          eq(PublicSchema.gameBatting.season, PublicSchema.gamePitching.season),
+        ),
+      )
+      .where(
+        and(...battingConditions, eq(PublicSchema.gamePitching.gs, gsValue)),
+      );
+
+    if (availableGames.length === 0) {
+      LOGGER.warn(
+        `No available ${pitcherRole} games (GS=${gsValue}) for player ${playerId} season ${season}`,
+      );
+      return null;
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableGames.length);
+    return availableGames[randomIndex].gameIdentifier;
+  }
+
+  // Non-pitcher: select from all games
   const availableGames = await db
     .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
     .from(PublicSchema.gameBatting)
-    .where(and(...conditions));
+    .where(and(...battingConditions));
 
   if (availableGames.length === 0) {
     return null;
@@ -83,12 +135,17 @@ async function selectGameIdentifier(
  *
  * This ensures batting, pitching, and fielding stats all come from the
  * same real baseball game instead of mixing stats from different games.
+ *
+ * For pitchers:
+ * - SP: only games where GS=1 are eligible
+ * - RP: only games where GS=0 are eligible
  */
 export async function selectGamesForMatchupPlayer(
   db: PublicDb,
   matchupPlayerId: number,
   playerId: number,
   season: number,
+  pitcherRole: PitcherRole = 'non-pitcher',
 ): Promise<GameSelectionResult> {
   // Check if batting stats are cached (indicates stats for this player/season are loaded)
   const cachedCheck = await db
@@ -135,6 +192,7 @@ export async function selectGamesForMatchupPlayer(
     playerId,
     season,
     excludeIds,
+    pitcherRole,
   );
 
   if (!gameIdentifier) {
@@ -160,8 +218,88 @@ export async function selectGamesForMatchupPlayer(
 }
 
 /**
+ * Determine a player's pitcher role from their roster position in the league.
+ * Looks up team_members → league_positions to find if the player is slotted as SP or RP.
+ */
+async function getPlayerPitcherRole(
+  db: PublicDb,
+  playerId: number,
+  teamId: number,
+  leagueId: number,
+): Promise<PitcherRole> {
+  const result = await db
+    .select({
+      positionType: PublicSchema.leaguePosition.positionType,
+    })
+    .from(PublicSchema.teamMembers)
+    .innerJoin(
+      PublicSchema.leaguePosition,
+      eq(PublicSchema.teamMembers.positionId, PublicSchema.leaguePosition.id),
+    )
+    .where(
+      and(
+        eq(PublicSchema.teamMembers.playerId, playerId),
+        eq(PublicSchema.teamMembers.teamId, teamId),
+        eq(PublicSchema.teamMembers.leagueId, leagueId),
+      ),
+    )
+    .limit(1);
+
+  if (result.length === 0) {
+    return 'non-pitcher';
+  }
+
+  const positionType = result[0].positionType;
+  if (positionType === 'SP') return 'SP';
+  if (positionType === 'RP') return 'RP';
+  return 'non-pitcher';
+}
+
+/**
+ * Determine whether a starting pitcher should get a game this matchup day.
+ *
+ * Uses probability: numberOfStarts / gamesRemaining
+ * - If the SP has already been selected for their max starts, return false.
+ * - If numberOfStarts >= gamesRemaining, always select (100%).
+ * - Otherwise, roll a random number against the probability.
+ *
+ * @param spStartsPerMatchup - Max starts allowed for SP in this matchup
+ * @param startsAlreadySelected - How many starts this SP already has in this matchup
+ * @param gamesRemaining - How many game slots remain in this matchup (including current)
+ */
+function shouldSelectSpGame(
+  spStartsPerMatchup: number,
+  startsAlreadySelected: number,
+  gamesRemaining: number,
+): boolean {
+  const startsNeeded = spStartsPerMatchup - startsAlreadySelected;
+
+  // SP already has their full allotment
+  if (startsNeeded <= 0) {
+    return false;
+  }
+
+  // Must start every remaining game to hit the target
+  if (startsNeeded >= gamesRemaining) {
+    return true;
+  }
+
+  // Probabilistic selection
+  const probability = startsNeeded / gamesRemaining;
+  const roll = Math.random();
+  return roll < probability;
+}
+
+/**
  * Select games for all players in a matchup for a specific game number.
  * Uses game_identifier for real game selection - all stat types come from the same game.
+ *
+ * Position-based rules:
+ * - SP (Starting Pitcher): probabilistic selection based on spStartsPerMatchup,
+ *   only games where GS=1 in game_pitching
+ * - RP (Relief Pitcher): selects every game, only games where GS=0
+ * - All other positions: selects every game, no GS filtering
+ *
  * Returns list of players that need stats loading (uncached).
  */
 export async function selectGamesForMatchup(
@@ -187,7 +325,14 @@ export async function selectGamesForMatchup(
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  LOGGER.info(`Selecting games for matchup ${matchupId}, game ${gameNumber}`);
+  const spStartsPerMatchup = matchup.spStartsPerMatchup ?? 1;
+  const gamesPerMatchup = matchup.gamesPerMatchup ?? 5;
+  const gamesRemainingInMatchup = gamesPerMatchup - gameNumber + 1;
+
+  LOGGER.info(
+    `Selecting games for matchup ${matchupId}, game ${gameNumber} ` +
+      `(spStarts=${spStartsPerMatchup}, gamesPerMatchup=${gamesPerMatchup})`,
+  );
 
   // Update matchup stats loading status to 'loading' (transitioning from 'queued')
   await db
@@ -261,8 +406,60 @@ export async function selectGamesForMatchup(
       );
     }
 
+    // Determine the player's pitcher role from their roster position
+    const pitcherRole = await getPlayerPitcherRole(
+      db,
+      matchupPlayer.playerId,
+      matchupPlayer.teamId,
+      matchup.leagueId,
+    );
+
+    // For SPs: apply probabilistic start selection
+    if (pitcherRole === 'SP') {
+      // Count how many starts this SP already has in this matchup
+      const existingStarts = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(PublicSchema.matchupPlayerGames)
+        .where(
+          and(
+            eq(
+              PublicSchema.matchupPlayerGames.matchupPlayerId,
+              matchupPlayer.id,
+            ),
+            isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+          ),
+        );
+
+      const startsAlreadySelected = Number(existingStarts[0]?.count ?? 0);
+
+      if (
+        !shouldSelectSpGame(
+          spStartsPerMatchup,
+          startsAlreadySelected,
+          gamesRemainingInMatchup,
+        )
+      ) {
+        LOGGER.debug(
+          `SP player ${matchupPlayer.playerId} skipped for game ${gameNumber} ` +
+            `(starts=${startsAlreadySelected}/${spStartsPerMatchup}, ` +
+            `remaining=${gamesRemainingInMatchup})`,
+        );
+
+        // Insert a record with null gameIdentifier to indicate intentional skip
+        await db.insert(PublicSchema.matchupPlayerGames).values({
+          gameNum: gameNumber,
+          matchupPlayerId: matchupPlayer.id,
+          gameIdentifier: null,
+          fieldingGamePos: null,
+          statsLoadingStatus: 'completed',
+        });
+        continue;
+      }
+    }
+
     LOGGER.debug(
-      `Selecting game for player ${matchupPlayer.playerId} using season ${playerSeason}`,
+      `Selecting game for player ${matchupPlayer.playerId} ` +
+        `(role=${pitcherRole}) using season ${playerSeason}`,
     );
 
     // Select a real game for this player using game_identifier
@@ -271,6 +468,7 @@ export async function selectGamesForMatchup(
       matchupPlayer.id,
       matchupPlayer.playerId,
       playerSeason,
+      pitcherRole,
     );
 
     // Insert the selected game into the database
@@ -285,7 +483,7 @@ export async function selectGamesForMatchup(
 
     LOGGER.debug(
       `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber} ` +
-        `(gameIdentifier=${result.gameIdentifier}, cached=${result.statsAreCached})`,
+        `(gameIdentifier=${result.gameIdentifier}, cached=${result.statsAreCached}, role=${pitcherRole})`,
     );
 
     // Track players that need stats loading

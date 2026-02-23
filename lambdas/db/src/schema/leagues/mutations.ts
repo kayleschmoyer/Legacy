@@ -12,6 +12,7 @@ import {
   DraftService,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import { getDbOptions } from '@legacy-sports/utils';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import {
@@ -829,6 +830,259 @@ builder.mutationField('deleteAllLeagues', (t) =>
           error instanceof Error ? error.message : String(error);
         throw new Error('Failed to delete leagues: ' + errorMessage);
       }
+    },
+  }),
+);
+
+// ── Update League Settings ────────────────────────────────────────────────
+
+const UpdateLeagueSettingsInput = builder.inputType(
+  'UpdateLeagueSettingsInput',
+  {
+    fields: (t) => ({
+      leagueId: t.int({ required: true }),
+      spStartsPerMatchup: t.int({ required: false }),
+      gamesPerMatchup: t.int({ required: false }),
+    }),
+  },
+);
+
+// Mutation: updateLeagueSettings - Update league-level settings
+// When spStartsPerMatchup is changed, also updates any scheduled (not in-progress)
+// matchups for the league to keep them in sync.
+builder.mutationField('updateLeagueSettings', (t) =>
+  t.field({
+    type: League,
+    args: {
+      input: t.arg({ type: UpdateLeagueSettingsInput, required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { leagueId, spStartsPerMatchup, gamesPerMatchup } = args.input;
+      const userId = context.user.id;
+
+      // Verify user is owner or commissioner
+      const membership = await context.db
+        .select({
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('You are not a member of this league');
+      }
+
+      // Both 'owner' and 'commissioner' can update settings
+      // (In this schema, the owner has 'owner' permission level)
+
+      // Build change descriptions for the chat notification
+      const changeDescriptions: string[] = [];
+
+      // Build update payload for the league
+      const leagueUpdate: {
+        spStartsPerMatchup?: number;
+        gamesPerMatchup?: number;
+      } = {};
+
+      if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
+        if (spStartsPerMatchup < 1) {
+          throw new Error('SP starts per matchup must be at least 1');
+        }
+
+        // Fetch current value for the change description
+        const current = await context.db
+          .select({
+            spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const currentGames =
+          gamesPerMatchup ?? current[0]?.gamesPerMatchup ?? 5;
+        if (spStartsPerMatchup > currentGames) {
+          throw new Error(
+            `SP starts per matchup (${spStartsPerMatchup}) cannot exceed games per matchup (${currentGames})`,
+          );
+        }
+
+        const oldValue = current[0]?.spStartsPerMatchup ?? 1;
+
+        if (oldValue !== spStartsPerMatchup) {
+          leagueUpdate.spStartsPerMatchup = spStartsPerMatchup;
+          changeDescriptions.push(
+            `SP starts per matchup: ${oldValue} → ${spStartsPerMatchup}`,
+          );
+        }
+      }
+
+      if (gamesPerMatchup !== null && gamesPerMatchup !== undefined) {
+        if (gamesPerMatchup < 1) {
+          throw new Error('Games per matchup must be at least 1');
+        }
+
+        // Validate spStartsPerMatchup doesn't exceed new gamesPerMatchup
+        const effectiveSpStarts =
+          spStartsPerMatchup ?? leagueUpdate.spStartsPerMatchup;
+        if (effectiveSpStarts === undefined) {
+          // Need to fetch current spStartsPerMatchup
+          const current = await context.db
+            .select({
+              spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+              gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .limit(1);
+
+          const currentSpStarts = current[0]?.spStartsPerMatchup ?? 1;
+          if (currentSpStarts > gamesPerMatchup) {
+            throw new Error(
+              `Games per matchup (${gamesPerMatchup}) cannot be less than SP starts per matchup (${currentSpStarts})`,
+            );
+          }
+
+          const oldGames = current[0]?.gamesPerMatchup ?? 5;
+          if (oldGames !== gamesPerMatchup) {
+            leagueUpdate.gamesPerMatchup = gamesPerMatchup;
+            changeDescriptions.push(
+              `Games per matchup: ${oldGames} → ${gamesPerMatchup}`,
+            );
+          }
+        } else {
+          if (effectiveSpStarts > gamesPerMatchup) {
+            throw new Error(
+              `Games per matchup (${gamesPerMatchup}) cannot be less than SP starts per matchup (${effectiveSpStarts})`,
+            );
+          }
+
+          // Fetch old value for change description
+          const current = await context.db
+            .select({
+              gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .limit(1);
+
+          const oldGames = current[0]?.gamesPerMatchup ?? 5;
+          if (oldGames !== gamesPerMatchup) {
+            leagueUpdate.gamesPerMatchup = gamesPerMatchup;
+            changeDescriptions.push(
+              `Games per matchup: ${oldGames} → ${gamesPerMatchup}`,
+            );
+          }
+        }
+      }
+
+      if (Object.keys(leagueUpdate).length === 0) {
+        // No changes — just return the current league
+        const [league] = await context.db
+          .select()
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        if (!league) {
+          throw new Error('League not found');
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+        return league as any;
+      }
+
+      // 1. Update the league record
+      const [updatedLeague] = await context.db
+        .update(PublicSchema.leagues)
+        .set(leagueUpdate)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .returning();
+
+      if (!updatedLeague) {
+        throw new Error('League not found');
+      }
+
+      // 2. Propagate settings to any scheduled (not yet in-progress) matchups
+      const matchupUpdate: {
+        spStartsPerMatchup?: number;
+        gamesPerMatchup?: number;
+      } = {};
+      if (leagueUpdate.spStartsPerMatchup !== undefined) {
+        matchupUpdate.spStartsPerMatchup = leagueUpdate.spStartsPerMatchup;
+      }
+      if (leagueUpdate.gamesPerMatchup !== undefined) {
+        matchupUpdate.gamesPerMatchup = leagueUpdate.gamesPerMatchup;
+      }
+
+      if (Object.keys(matchupUpdate).length > 0) {
+        const result = await context.db
+          .update(PublicSchema.matchups)
+          .set(matchupUpdate)
+          .where(
+            and(
+              eq(PublicSchema.matchups.leagueId, leagueId),
+              eq(PublicSchema.matchups.status, 'scheduled'),
+            ),
+          )
+          .returning({ id: PublicSchema.matchups.id });
+
+        LOGGER.info(
+          `Updated matchup settings on ${result.length} scheduled matchups for league ${leagueId}`,
+        );
+      }
+
+      // 3. Send league chat notification
+      const senderUsername = context.user.username ?? `user_${context.user.id}`;
+      const changeSummary = changeDescriptions.join(', ');
+      const notificationText = `⚙️ ${senderUsername} updated league settings: ${changeSummary}`;
+
+      const [chatMsg] = await context.db
+        .insert(PublicSchema.leagueMessages)
+        .values({
+          leagueId,
+          userId,
+          messageText: notificationText,
+        })
+        .returning();
+
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        try {
+          await notificationService.notifyLeagueChatMessage(leagueId, {
+            leagueId,
+            messageId: chatMsg.id,
+            senderId: userId,
+            senderUsername,
+            messageText: notificationText,
+            timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+          });
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send league chat WS notification for settings update',
+            { err },
+          );
+        }
+      }
+
+      LOGGER.info('League settings updated', {
+        leagueId,
+        changes: changeDescriptions,
+        userId,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      return updatedLeague as any;
     },
   }),
 );

@@ -19,6 +19,8 @@ interface LeagueState {
     waiverType?: string | null;
     waiverEnabled?: boolean | null;
     faabBudgetDefault?: number | null;
+    gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

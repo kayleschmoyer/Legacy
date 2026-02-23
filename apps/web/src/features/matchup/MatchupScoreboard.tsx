@@ -250,7 +250,9 @@ export function MatchupScoreboard({
             (sum, game) => sum + calculateGameScore(game),
             0,
           ) ?? 0;
-        const remaining = gamesPerMatchup - gamesPlayed;
+        // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+        const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
+        const remaining = playerTotalGames - gamesPlayed;
 
         if (remaining <= 0) return actualScore;
 

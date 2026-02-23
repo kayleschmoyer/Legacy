@@ -75,6 +75,7 @@ import {
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
+import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
   useCurrentMatchup,
@@ -734,7 +735,9 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
 
       // Calculate projection
-      const gamesRemaining = gamesPerMatchup - gamesPlayed;
+      // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+      const playerTotalGames = mp.numberOfGames ?? gamesPerMatchup;
+      const gamesRemaining = playerTotalGames - gamesPlayed;
       let projection = actualScore;
       if (gamesRemaining > 0) {
         // Try season stats projection first
@@ -773,7 +776,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         score: Math.round(actualScore * 10) / 10,
         projection: Math.round(projection * 10) / 10,
         gamesPlayed,
-        totalGames: gamesPerMatchup,
+        totalGames: playerTotalGames,
         isLocked: gamesPlayed > 0,
       });
     }
@@ -1936,6 +1939,19 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         draftStatus={league.draftStatus}
         playerPool={league.playerPool}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
+
+      <LeagueSettingsControl
+        leagueId={leagueId}
+        currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
+        currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

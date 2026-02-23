@@ -56,6 +56,7 @@ export const leagues = pgTable(
     waiverType: waiverType('waiver_type').notNull().default('standard'),
     waiverEnabled: boolean('waiver_enabled').notNull().default(true),
     faabBudgetDefault: integer('faab_budget_default').notNull().default(100),
+    spStartsPerMatchup: integer('sp_starts_per_matchup').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

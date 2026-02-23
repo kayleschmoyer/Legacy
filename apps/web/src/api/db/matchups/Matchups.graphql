@@ -9,6 +9,7 @@ fragment Matchup on Matchup {
   status
   statsLoadingStatus
   gamesPerMatchup
+  spStartsPerMatchup
   selectedGamesCount
   startTime
   endTime
@@ -76,6 +77,7 @@ fragment MatchupPlayer on MatchupPlayer {
   teamId
   positionId
   season
+  numberOfGames
   player {
     id
     firstName

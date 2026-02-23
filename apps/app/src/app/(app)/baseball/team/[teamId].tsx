@@ -113,7 +113,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         computeAverageScoring(battingStats, battingSettings) +
         computeAverageScoring(fieldingStats, fieldingSettings);
 
-      result[hitter.playerId] = value * (matchup?.numberOfGames || 1);
+      result[hitter.playerId] = value * (matchup?.gamesPerMatchup || 1);
     }
     return result;
   }, [
@@ -146,10 +146,20 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         pitchingSettings,
       );
 
-      result[pitcher.playerId] = value;
+      // Determine number of games for this pitcher based on position type
+      // SP uses spStartsPerMatchup, RP uses gamesPerMatchup
+      const posSlot = pitchingSlots.find(
+        (s) => s?.id != null && Number(s.id) === pitcher.positionId,
+      );
+      const pitcherGames =
+        posSlot?.positionType === 'SP'
+          ? (matchup?.spStartsPerMatchup ?? matchup?.gamesPerMatchup ?? 1)
+          : (matchup?.gamesPerMatchup ?? 1);
+
+      result[pitcher.playerId] = value * pitcherGames;
     }
     return result;
-  }, [stats, pitchers, loadingStats, pitchingSettings]);
+  }, [stats, pitchers, loadingStats, pitchingSettings, matchup, pitchingSlots]);
 
   const hittersActual = useMemo(() => {
     const result: Record<number, number> = {};

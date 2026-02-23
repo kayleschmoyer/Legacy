@@ -52,6 +52,7 @@ export const Matchup = builder.objectRef<{
     | 'failed'
     | 'retry';
   gamesPerMatchup: number | null;
+  spStartsPerMatchup: number | null;
   startTime: string | null;
   endTime: string | null;
 }>('Matchup');
@@ -83,6 +84,7 @@ builder.objectType(Matchup, {
       resolve: (matchup) => matchup.statsLoadingStatus,
     }),
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
+    spStartsPerMatchup: t.exposeInt('spStartsPerMatchup', { nullable: true }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
     // Relational fields - using Team type imported from leagues.ts
@@ -147,6 +149,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
       | 'failed'
       | 'retry';
     gamesPerMatchup: number | null;
+    spStartsPerMatchup: number | null;
     startTime: string | null;
     endTime: string | null;
   }>;
@@ -342,6 +345,35 @@ builder.objectType(MatchupPlayer, {
     teamId: t.exposeInt('teamId'),
     positionId: t.exposeInt('positionId', { nullable: true }),
     season: t.exposeInt('season', { nullable: true }),
+    // Computed field: number of games this player will play in the matchup
+    // SP players get spStartsPerMatchup; all others get gamesPerMatchup
+    numberOfGames: t.int({
+      description:
+        'Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup)',
+      resolve: async (matchupPlayer, _args, context) => {
+        const matchup = await context.loaders.matchupsById.load(
+          matchupPlayer.matchupId,
+        );
+        if (!matchup) return 0;
+
+        const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
+
+        // If no position assigned or no spStarts setting, use full games
+        if (!matchupPlayer.positionId || matchup.spStartsPerMatchup == null) {
+          return gamesPerMatchup;
+        }
+
+        // Look up the position type to check if SP
+        const position = await context.loaders.leaguePositionById.load(
+          matchupPlayer.positionId,
+        );
+        if (position?.positionType === 'SP') {
+          return matchup.spStartsPerMatchup;
+        }
+
+        return gamesPerMatchup;
+      },
+    }),
     // Player details
     player: t.field({
       type: 'Player',
@@ -440,8 +472,8 @@ MatchupPlayerGameRef.implement({
       type: GamePitchingRef,
       nullable: true,
       resolve: async (game, _args, context) => {
-        // Pitchers only throw one game per week (game slot 1)
-        if (game.gameNum !== 1) return null;
+        // Only show pitching stats for games where the player was selected
+        // (gameIdentifier will be null for skipped SP slots or unselected games)
         if (!game.gameIdentifier) return null;
 
         const mp = await context.loaders.matchupPlayersById.load(

@@ -21,6 +21,7 @@ import {
 
 import {
   createEligiblePositionsLoader,
+  createLeaguePositionByIdLoader,
   createPlayersLoader,
   createTeamsLoader,
   createUsersLoader,
@@ -70,6 +71,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   battingSeasonsPlayed: createBattingSeasonsPlayedLoader(db),
   matchupMessages: createMatchupMessagesLoader(db),
   playoffMatchupsByBracket: createPlayoffMatchupsByBracketLoader(db),
+  leaguePositionById: createLeaguePositionByIdLoader(db),
 });
 
 /**

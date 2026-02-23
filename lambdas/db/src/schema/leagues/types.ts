@@ -56,6 +56,8 @@ export const League = builder.objectRef<{
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;
   faabBudgetDefault?: number;
+  spStartsPerMatchup?: number;
+  gamesPerMatchup?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -79,6 +81,8 @@ League.implement({
     waiverType: t.exposeString('waiverType', { nullable: true }),
     waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
     faabBudgetDefault: t.exposeInt('faabBudgetDefault', { nullable: true }),
+    spStartsPerMatchup: t.exposeInt('spStartsPerMatchup', { nullable: true }),
+    gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:

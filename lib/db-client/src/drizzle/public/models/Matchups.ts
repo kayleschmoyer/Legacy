@@ -57,6 +57,7 @@ export const matchups = pgTable(
       .notNull()
       .default('not_started'),
     gamesPerMatchup: integer('games_per_matchup'),
+    spStartsPerMatchup: integer('sp_starts_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
     endTime: timestamp('end_time', { mode: 'string' }),
     createdAt: timestamp('created_at', { withTimezone: true })

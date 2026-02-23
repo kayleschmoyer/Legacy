@@ -34,6 +34,7 @@ export interface CreateMatchupParams {
   team1Id: number | null;
   team2Id: number | null;
   gamesPerMatchup: number | null;
+  spStartsPerMatchup?: number | null;
   status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 }
 
@@ -223,6 +224,19 @@ export class MatchupService {
       .delete(PublicSchema.matchups)
       .where(eq(PublicSchema.matchups.leagueId, leagueId));
 
+    // Fetch league's settings to copy onto matchups
+    const leagueSettings = await db
+      .select({
+        gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+        spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+      })
+      .from(PublicSchema.leagues)
+      .where(eq(PublicSchema.leagues.id, leagueId))
+      .limit(1);
+
+    const gamesPerMatchup = leagueSettings[0]?.gamesPerMatchup ?? 5;
+    const spStartsPerMatchup = leagueSettings[0]?.spStartsPerMatchup ?? 1;
+
     // Insert new matchups
     for (const matchup of scheduleResult.matchups) {
       await db.insert(PublicSchema.matchups).values({
@@ -230,7 +244,8 @@ export class MatchupService {
         leagueId: matchup.leagueId,
         team1Id: matchup.team1Id,
         team2Id: matchup.team2Id,
-        gamesPerMatchup: matchup.gamesPerMatchup,
+        gamesPerMatchup,
+        spStartsPerMatchup,
         status: matchup.status,
         team1Score: null,
         team2Score: null,
@@ -267,6 +282,7 @@ export class MatchupService {
         team1Id: params.team1Id,
         team2Id: params.team2Id,
         gamesPerMatchup: params.gamesPerMatchup,
+        spStartsPerMatchup: params.spStartsPerMatchup ?? null,
         status: params.status ?? 'scheduled',
         team1Score: null,
         team2Score: null,

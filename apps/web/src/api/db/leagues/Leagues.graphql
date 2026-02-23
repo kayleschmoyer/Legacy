@@ -12,6 +12,8 @@ fragment League on League {
   waiverType
   waiverEnabled
   faabBudgetDefault
+  spStartsPerMatchup
+  gamesPerMatchup
   userMembership {
     ...LeagueMember
   }
@@ -135,5 +137,11 @@ mutation RenameTeam($teamId: Int!, $leagueId: Int!, $newName: String!) {
     id
     name
     leagueId
+  }
+}
+
+mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    ...League
   }
 }

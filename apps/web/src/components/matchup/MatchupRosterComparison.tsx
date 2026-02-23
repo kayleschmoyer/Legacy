@@ -794,7 +794,9 @@ export function MatchupRosterComparison({
       const gamesPlayed = player.games?.length ?? 0;
       const actualScore =
         player.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ?? 0;
-      const gamesRemaining = gamesPerMatchup - gamesPlayed;
+      // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
+      const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
+      const gamesRemaining = playerTotalGames - gamesPlayed;
 
       // If all games played, no projection needed
       if (gamesRemaining <= 0) {
@@ -1445,7 +1447,8 @@ export function MatchupRosterComparison({
                       <>
                         <Text color="$green10">
                           {' '}
-                          • {team1Player.games.length}/{gamesPerMatchup} games
+                          • {team1Player.games.length}/
+                          {team1Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
                           const loadingCount = team1Player.games.filter(
@@ -1645,7 +1648,8 @@ export function MatchupRosterComparison({
                       <>
                         <Text color="$green10">
                           {' '}
-                          • {team2Player.games.length}/{gamesPerMatchup} games
+                          • {team2Player.games.length}/
+                          {team2Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
                           const loadingCount = team2Player.games.filter(

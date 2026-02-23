@@ -34,6 +34,7 @@ builder.mutationField('createMatchup', (t) =>
         .select({
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           minGamesPerSeason: PublicSchema.leagues.minGamesPerSeason,
+          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, args.input.leagueId))
@@ -45,6 +46,7 @@ builder.mutationField('createMatchup', (t) =>
 
       const gamesPerMatchup =
         args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
+      const spStartsPerMatchup = league[0].spStartsPerMatchup ?? 1;
 
       // Insert the matchup
       const results = await context.db
@@ -55,6 +57,7 @@ builder.mutationField('createMatchup', (t) =>
           team1Id: args.input.team1Id ?? null,
           team2Id: args.input.team2Id ?? null,
           gamesPerMatchup,
+          spStartsPerMatchup,
           startTime: args.input.startTime ?? null,
           endTime: args.input.endTime ?? null,
           status: 'scheduled',
@@ -247,6 +250,7 @@ builder.mutationField('advanceLeagueWeek', (t) =>
           id: PublicSchema.leagues.id,
           gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
+          spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, args.leagueId))
@@ -276,6 +280,7 @@ builder.mutationField('advanceLeagueWeek', (t) =>
 
       try {
         const gamesPerMatchup = league.gamesPerMatchup ?? 5;
+        const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
 
         // 2. Get all teams in the league
         const teams = await context.db
@@ -360,6 +365,7 @@ builder.mutationField('advanceLeagueWeek', (t) =>
               team1Id: pair.team1Id,
               team2Id: pair.team2Id,
               gamesPerMatchup,
+              spStartsPerMatchup,
               status: 'scheduled',
               team1Score: null,
               team2Score: null,

@@ -363,6 +363,7 @@ type League {
   currentWeekNumber: Int
   draftStatus: String
   faabBudgetDefault: Int
+  gamesPerMatchup: Int
   id: Int
   inviteCode: String
   maxRosterSize: Int
@@ -370,6 +371,7 @@ type League {
   owner: Int
   playerPool: String
   scoringProfile: ScoringConfig
+  spStartsPerMatchup: Int
   userMembership: LeagueMember
   waiverEnabled: Boolean
   waiverType: String
@@ -421,6 +423,7 @@ type Matchup {
   Number of unique games selected for this matchup
   """
   selectedGamesCount: Int
+  spStartsPerMatchup: Int
   startTime: String
   statsLoadingStatus: StatsLoadingStatus
   status: MatchupStatus
@@ -562,6 +565,11 @@ type MatchupPlayer {
   games: [MatchupPlayerGame!]
   id: ID
   matchupId: Int
+
+  """
+  Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup)
+  """
+  numberOfGames: Int
   player: Player
   playerId: Int
   positionId: Int
@@ -697,6 +705,7 @@ type Mutation {
     leagueId: Int!
     updates: [UpdateLeagueScoringMultiplierInput!]!
   ): ScoringConfig
+  updateLeagueSettings(input: UpdateLeagueSettingsInput!): League
   updateMatchupScore(
     matchupId: Int!
     team1Score: Float
@@ -1317,6 +1326,12 @@ input UpdateLeagueScoringMultiplierInput {
   isEnabled: Boolean
   multiplier: Float
   statDefinitionId: Int!
+}
+
+input UpdateLeagueSettingsInput {
+  gamesPerMatchup: Int
+  leagueId: Int!
+  spStartsPerMatchup: Int
 }
 
 type User {
