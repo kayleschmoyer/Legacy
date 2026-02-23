@@ -59,7 +59,7 @@ function AuthenticatedApp() {
 
   return (
     <ReduxProvider store={store}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <AppProvider
           apolloClient={apolloClient}
           colorScheme={initialColorScheme}
