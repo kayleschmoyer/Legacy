@@ -305,7 +305,7 @@ describe('League scoring GraphQL resolvers', () => {
 
     assertIsScoringConfig(result);
 
-    expect(updateActiveProfileMock).toHaveBeenCalledWith(leagueId, updates);
+    expect(updateActiveProfileMock).toHaveBeenCalledWith(leagueId, updates, 9);
     expect(result).toMatchObject({
       profileId: profileDetails.profileId,
       leagueId: profileDetails.leagueId,

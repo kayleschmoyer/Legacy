@@ -272,7 +272,7 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'This will create Week 1 matchups, pairing up all teams in the league. Players will be automatically assigned random historical seasons for their first matchup.';
     } else if (actionType === 'selectGame') {
-      return `This will automatically select game ${nextGameNumber} for all teams in the current matchup. The system will choose games based on the configured rules and selected season.`;
+      return `This will automatically select game ${nextGameNumber} for all matchups in the current week. The system will choose games based on the configured rules and selected season.`;
     }
 
     if (hasCurrentMatchup) {
@@ -290,7 +290,7 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'Draft complete! Next: Create matchups for Week 1.';
     } else if (actionType === 'selectGame') {
-      return `Next: Select game ${nextGameNumber} of ${gamesPerMatchup} for all teams in the current matchup.`;
+      return `Next: Select game ${nextGameNumber} of ${gamesPerMatchup} for all matchups in the current week.`;
     } else {
       return 'All games selected! Next: Advance to the next league week.';
     }

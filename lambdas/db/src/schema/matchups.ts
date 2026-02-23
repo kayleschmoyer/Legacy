@@ -373,11 +373,27 @@ builder.mutationField('triggerGameSelection', (t) =>
         throw new Error('Matchup not found');
       }
 
-      // Update status to 'queued' before triggering game selection
+      const { leagueId, weekNumber } = matchup[0];
+
+      // Find ALL matchups for the same league and week so we trigger
+      // game selection across the entire week, not just one matchup
+      const allMatchups = await context.db
+        .select({ id: PublicSchema.matchups.id })
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, leagueId),
+            eq(PublicSchema.matchups.weekNumber, weekNumber),
+          ),
+        );
+
+      const matchupIds = allMatchups.map((m) => m.id);
+
+      // Update status to 'queued' for ALL matchups in the week
       await context.db
         .update(PublicSchema.matchups)
         .set({ statsLoadingStatus: 'queued' })
-        .where(eq(PublicSchema.matchups.id, args.matchupId));
+        .where(inArray(PublicSchema.matchups.id, matchupIds));
 
       // Trigger the game-selection lambda via SQS
       const sqsQueueUrl = process.env.SQS_SELECT_GAME_URL;
@@ -391,22 +407,27 @@ builder.mutationField('triggerGameSelection', (t) =>
       });
 
       try {
-        const message = {
-          matchupId: args.matchupId,
-          game: args.gameNumber,
-        };
+        // Send an SQS message for each matchup in the week
+        for (const matchupId of matchupIds) {
+          const message = {
+            matchupId,
+            game: args.gameNumber,
+          };
 
-        const command = new SendMessageCommand({
-          QueueUrl: sqsQueueUrl,
-          MessageBody: JSON.stringify(message),
-          MessageGroupId: `matchup-${args.matchupId}`,
-          MessageDeduplicationId: `${args.matchupId}-${args.gameNumber}-${Date.now()}`,
-        });
+          const command = new SendMessageCommand({
+            QueueUrl: sqsQueueUrl,
+            MessageBody: JSON.stringify(message),
+            MessageGroupId: `matchup-${matchupId}`,
+            MessageDeduplicationId: `${matchupId}-${args.gameNumber}-${Date.now()}`,
+          });
 
-        await sqsClient.send(command);
+          await sqsClient.send(command);
+        }
 
-        LOGGER.info('Game selection triggered', {
-          matchupId: args.matchupId,
+        LOGGER.info('Game selection triggered for all matchups in week', {
+          leagueId,
+          weekNumber,
+          matchupIds,
           gameNumber: args.gameNumber,
         });
 
@@ -414,7 +435,9 @@ builder.mutationField('triggerGameSelection', (t) =>
       } catch (error) {
         LOGGER.error('Failed to trigger game selection', {
           error: error instanceof Error ? error.message : String(error),
-          matchupId: args.matchupId,
+          leagueId,
+          weekNumber,
+          matchupIds,
           gameNumber: args.gameNumber,
         });
         throw new Error('Failed to trigger game selection');
