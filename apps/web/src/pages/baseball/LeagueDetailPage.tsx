@@ -1045,7 +1045,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             Week
           </Text>
           <Text fontSize="$8" fontWeight="800" color="$color">
-            {league.currentMatchup || '\u2014'}
+            {currentMatchup?.weekNumber || '\u2014'}
           </Text>
         </QuickStatCard>
       </XStack>
@@ -1102,7 +1102,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           <LeagueActivityFeed
             leagueId={leagueId}
             draftStatus={String(league.draftStatus)}
-            currentMatchup={league.currentMatchup}
+            currentMatchup={currentMatchup?.weekNumber}
             teamCount={teamCount}
           />
 
@@ -1169,7 +1169,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   Week
                 </Text>
                 <Text color="$color" fontWeight="600" fontSize="$3">
-                  {league.currentMatchup || 'Pre-season'}
+                  {currentMatchup?.weekNumber || 'Pre-season'}
                 </Text>
               </XStack>
               {isCommissioner && (
@@ -1848,13 +1848,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                   {formatDraftStatus(String(league.draftStatus))}
                 </Text>
               </DraftBadge>
-              {league.currentMatchup && (
+              {currentMatchup?.weekNumber && (
                 <>
                   <Text fontSize="$3" color="rgba(255,255,255,0.3)">
                     |
                   </Text>
                   <Text fontSize="$3" color="rgba(255,255,255,0.7)">
-                    Week {league.currentMatchup}
+                    Week {currentMatchup.weekNumber}
                   </Text>
                 </>
               )}

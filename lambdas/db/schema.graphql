@@ -356,6 +356,11 @@ A fantasy sports league
 """
 type League {
   currentMatchup: Int
+
+  """
+  The week number of the current matchup (resolved from the matchup record)
+  """
+  currentWeekNumber: Int
   draftStatus: String
   faabBudgetDefault: Int
   id: Int

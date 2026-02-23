@@ -4,6 +4,7 @@ fragment League on League {
   owner
   maxRosterSize
   currentMatchup
+  currentWeekNumber
   draftStatus
   inviteCode
   playerPool

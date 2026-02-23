@@ -363,8 +363,8 @@ export function BaseballLandingPage() {
   const currentWeek =
     leagues.reduce(
       (maxWeek, league) =>
-        league.currentMatchup && league.currentMatchup > maxWeek
-          ? league.currentMatchup
+        league.currentWeekNumber && league.currentWeekNumber > maxWeek
+          ? league.currentWeekNumber
           : maxWeek,
       1,
     ) || 1;

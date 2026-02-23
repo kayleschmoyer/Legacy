@@ -99,6 +99,7 @@ export interface League {
   owner?: number | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
+  currentWeekNumber?: number | null;
   draftStatus?: string | null;
 }
 
@@ -125,7 +126,7 @@ export function LeagueCard({
 
   const summaryParts = [
     league.maxRosterSize ? `${league.maxRosterSize}-slot rosters` : undefined,
-    league.currentMatchup ? `Week ${league.currentMatchup}` : undefined,
+    league.currentWeekNumber ? `Week ${league.currentWeekNumber}` : undefined,
   ].filter(Boolean);
 
   const summary = summaryParts.join(' • ');
@@ -133,8 +134,8 @@ export function LeagueCard({
   const metrics = [
     {
       label: 'Matchup',
-      value: league.currentMatchup
-        ? `Week ${league.currentMatchup}`
+      value: league.currentWeekNumber
+        ? `Week ${league.currentWeekNumber}`
         : 'Preseason Slate',
       accentColor: '$blue11',
     },

@@ -91,6 +91,22 @@ League.implement({
     waiverType: t.exposeString('waiverType', { nullable: true }),
     waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
     faabBudgetDefault: t.exposeInt('faabBudgetDefault', { nullable: true }),
+    currentWeekNumber: t.int({
+      nullable: true,
+      description:
+        'The week number of the current matchup (resolved from the matchup record)',
+      resolve: async (parent, _args, context) => {
+        if (!parent.currentMatchup) return null;
+        const rows = await context.db
+          .select({
+            weekNumber: PublicSchema.matchups.weekNumber,
+          })
+          .from(PublicSchema.matchups)
+          .where(eq(PublicSchema.matchups.id, parent.currentMatchup))
+          .limit(1);
+        return rows[0]?.weekNumber ?? null;
+      },
+    }),
     scoringProfile: t.field({
       type: ScoringConfigRef,
       resolve: async (parent, args, context) => {

@@ -400,6 +400,8 @@ export type JoinLeaguePayload = {
 export type League = {
   __typename?: 'League';
   currentMatchup?: Maybe<Scalars['Int']['output']>;
+  /** The week number of the current matchup (resolved from the matchup record) */
+  currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
@@ -1689,6 +1691,7 @@ export type LeagueFragment = {
   owner?: number | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
+  currentWeekNumber?: number | null;
   draftStatus?: string | null;
   inviteCode?: string | null;
   userMembership?: {
@@ -1731,6 +1734,7 @@ export type GetLeagueByIdQuery = {
     owner?: number | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
     userMembership?: {
@@ -1761,6 +1765,7 @@ export type CreateLeagueMutation = {
       owner?: number | null;
       maxRosterSize?: number | null;
       currentMatchup?: number | null;
+      currentWeekNumber?: number | null;
       draftStatus?: string | null;
       inviteCode?: string | null;
       userMembership?: {
@@ -1799,6 +1804,7 @@ export type GetUserLeaguesQuery = {
     owner?: number | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
     userMembership?: {
@@ -1832,6 +1838,7 @@ export type StartDraftMutation = {
     owner?: number | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
     draftStatus?: string | null;
     inviteCode?: string | null;
     userMembership?: {
@@ -2888,6 +2895,7 @@ export const LeagueFragmentDoc = gql`
     owner
     maxRosterSize
     currentMatchup
+    currentWeekNumber
     draftStatus
     inviteCode
     userMembership {
