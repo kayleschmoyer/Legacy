@@ -32,6 +32,7 @@ import {
   UserPlus,
   Users,
   X,
+  Zap,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -177,6 +178,15 @@ const QuickStatCard = styled(YStack, {
   borderRadius: '$5',
   padding: '$3',
   gap: '$1',
+});
+
+const DraftBanner = styled(Card, {
+  backgroundColor: '$blue2',
+  borderColor: '$blue7',
+  borderWidth: 2,
+  borderRadius: '$6',
+  padding: '$5',
+  overflow: 'hidden',
 });
 
 const InviteCard = styled(Card, {
@@ -981,6 +991,57 @@ export function LeagueDetailPage(): React.JSX.Element {
       id="panel-overview"
       aria-labelledby="tab-overview"
     >
+      {/* Draft In Progress Banner */}
+      {league.draftStatus === 'in-progress' && (
+        <DraftBanner role="alert" aria-label="Draft in progress">
+          <XStack
+            alignItems="center"
+            justifyContent="space-between"
+            flexWrap="wrap"
+            gap="$3"
+          >
+            <XStack alignItems="center" gap="$3" flex={1}>
+              <XStack
+                backgroundColor="$blue4"
+                borderRadius="$10"
+                padding="$2"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Zap size={22} color="var(--blue10)" fill="var(--blue10)" />
+              </XStack>
+              <YStack gap="$1" flex={1}>
+                <Text fontSize="$5" fontWeight="800" color="$blue11">
+                  Draft Is Live!
+                </Text>
+                <Text fontSize="$3" color="$blue10">
+                  Your league draft is in progress right now. Join before your
+                  picks are auto-drafted.
+                </Text>
+              </YStack>
+            </XStack>
+            <Button
+              backgroundColor="$blue9"
+              color="white"
+              borderRadius="$4"
+              onPress={() => navigate('/baseball/draft')}
+              pressStyle={{ scale: 0.97, opacity: 0.9 }}
+              hoverStyle={{ backgroundColor: '$blue10' }}
+              animation="quick"
+              size="$4"
+              aria-label="Join draft room"
+            >
+              <XStack gap="$2" alignItems="center">
+                <Zap size={14} color="white" />
+                <Text color="white" fontWeight="700" fontSize="$3">
+                  Join Draft Room
+                </Text>
+              </XStack>
+            </Button>
+          </XStack>
+        </DraftBanner>
+      )}
+
       {/* Quick Stats */}
       <XStack gap="$3" flexWrap="wrap">
         <QuickStatCard>
