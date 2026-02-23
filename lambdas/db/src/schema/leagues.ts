@@ -2520,6 +2520,15 @@ builder.mutationField('processWaiverClaims', (t) =>
       let succeeded = 0;
       let failed = 0;
       const succeededLeagueIds = new Set<number>();
+      const succeededClaims: Array<{
+        leagueId: number;
+        teamId: number;
+        userId: number;
+        playerId: number;
+        dropPlayerId: number | null;
+        faabBid: number | null;
+        waiverType: string;
+      }> = [];
 
       // 1. Fetch all leagues with pending claims and their waiver settings
       const pendingConditions = [
@@ -2821,6 +2830,15 @@ builder.mutationField('processWaiverClaims', (t) =>
               succeeded++;
               claimed = true;
               succeededLeagueIds.add(claim.leagueId);
+              succeededClaims.push({
+                leagueId: claim.leagueId,
+                teamId: claim.teamId,
+                userId: claim.userId,
+                playerId: claim.playerId,
+                dropPlayerId: claim.dropPlayerId ?? null,
+                faabBid: claim.faabBid ?? null,
+                waiverType,
+              });
 
               LOGGER.info('Waiver claim processed successfully', {
                 claimId: claim.id,
@@ -2929,6 +2947,101 @@ builder.mutationField('processWaiverClaims', (t) =>
             LOGGER.warn('Failed to send roster update notification', {
               leagueId: lid,
               error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
+      // 5. Send chat notifications for successful claims
+      if (succeededClaims.length > 0) {
+        // Batch-resolve player names
+        const allPlayerIds = [
+          ...new Set(
+            succeededClaims.flatMap((c) =>
+              c.dropPlayerId != null
+                ? [c.playerId, c.dropPlayerId]
+                : [c.playerId],
+            ),
+          ),
+        ];
+        const playerRows = await db
+          .select({
+            id: PublicSchema.players.id,
+            firstName: PublicSchema.players.firstName,
+            lastName: PublicSchema.players.lastName,
+          })
+          .from(PublicSchema.players)
+          .where(inArray(PublicSchema.players.id, allPlayerIds));
+        const playerNameMap = new Map(
+          playerRows.map((p) => [p.id, `${p.firstName} ${p.lastName}`.trim()]),
+        );
+
+        // Batch-resolve team names
+        const allTeamIds = [...new Set(succeededClaims.map((c) => c.teamId))];
+        const teamRows = await db
+          .select({
+            id: PublicSchema.teams.id,
+            name: PublicSchema.teams.name,
+          })
+          .from(PublicSchema.teams)
+          .where(inArray(PublicSchema.teams.id, allTeamIds));
+        const teamNameMap = new Map(teamRows.map((t) => [t.id, t.name]));
+
+        const notifyService =
+          notificationService ?? createNotificationService();
+
+        for (const sc of succeededClaims) {
+          const teamName = teamNameMap.get(sc.teamId) ?? `Team ${sc.teamId}`;
+          const playerName =
+            playerNameMap.get(sc.playerId) ?? `Player ${sc.playerId}`;
+          const dropName =
+            sc.dropPlayerId != null
+              ? (playerNameMap.get(sc.dropPlayerId) ??
+                `Player ${sc.dropPlayerId}`)
+              : null;
+
+          let messageText = `🔄 ${teamName} claimed ${playerName}`;
+          if (dropName) {
+            messageText += `, dropped ${dropName}`;
+          }
+          if (sc.waiverType === 'faab' && sc.faabBid != null) {
+            messageText += ` ($${sc.faabBid} bid)`;
+          }
+
+          try {
+            const [chatMsg] = await db
+              .insert(PublicSchema.leagueMessages)
+              .values({
+                leagueId: sc.leagueId,
+                userId: sc.userId,
+                messageText,
+              })
+              .returning();
+
+            if (notifyService && chatMsg) {
+              notifyService
+                .notifyLeagueChatMessage(sc.leagueId, {
+                  leagueId: sc.leagueId,
+                  messageId: chatMsg.id,
+                  senderId: sc.userId,
+                  senderUsername: 'Waiver Wire',
+                  messageText,
+                  timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+                })
+                .catch((err: unknown) => {
+                  LOGGER.warn(
+                    'Failed to send league chat WS notification for waiver claim',
+                    { leagueId: sc.leagueId, err },
+                  );
+                });
+            }
+          } catch (chatErr) {
+            LOGGER.warn('Failed to insert waiver chat notification', {
+              leagueId: sc.leagueId,
+              teamId: sc.teamId,
+              playerId: sc.playerId,
+              error:
+                chatErr instanceof Error ? chatErr.message : String(chatErr),
             });
           }
         }
