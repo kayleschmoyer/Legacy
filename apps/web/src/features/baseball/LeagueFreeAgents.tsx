@@ -21,7 +21,6 @@ import {
 import { WaiverClaimModal } from './WaiverClaimModal';
 import { useGetPlayersWithStatsQuery } from '../../api/db/graphql.generated';
 import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';
-import { useCurrentMatchup } from '../../hooks/useMatchup';
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
@@ -188,6 +187,7 @@ const HeaderRow = styled(XStack, {
   alignItems: 'center',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
+  minWidth: 900,
 });
 
 const DataRow = styled(XStack, {
@@ -244,6 +244,8 @@ const StatCell = styled(Text, {
 
 interface LeagueFreeAgentsProps {
   leagueId: number;
+  /** Games per matchup from league settings. Defaults to 5. */
+  gamesPerMatchup?: number;
 }
 
 type SortKey =
@@ -303,6 +305,8 @@ const SortableHeader: React.FC<{
         textTransform="uppercase"
         letterSpacing={0.5}
         color={isSorted ? '$blue10' : '$color9'}
+        numberOfLines={1}
+        whiteSpace="nowrap"
       >
         {label}
       </Text>
@@ -347,6 +351,7 @@ function computeRateStats(career: {
 
 export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
   leagueId,
+  gamesPerMatchup = 5,
 }) => {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -389,9 +394,6 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     setPositionFilter(pos);
     setPage(0);
   }, []);
-
-  const { matchup: currentMatchup } = useCurrentMatchup(leagueId);
-  const gamesPerMatchup = currentMatchup?.gamesPerMatchup ?? 1;
 
   const { takenPlayerIds, loading: takenLoading } =
     useLeagueTakenPlayers(leagueId);

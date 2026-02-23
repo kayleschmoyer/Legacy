@@ -1944,7 +1944,10 @@ export function LeagueDetailPage(): React.JSX.Element {
             id="panel-free-agents"
             aria-labelledby="tab-free-agents"
           >
-            <LeagueFreeAgents leagueId={leagueId} />
+            <LeagueFreeAgents
+              leagueId={leagueId}
+              gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 5}
+            />
           </YStack>
         )}
         {activeTab === 'standings' && (

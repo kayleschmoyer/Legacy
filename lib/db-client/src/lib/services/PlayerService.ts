@@ -462,24 +462,34 @@ export class PlayerService {
         const sortDir =
           queryOptions.orderDirection === 'asc' ? sql`ASC` : sql`DESC`;
 
-        // Build WHERE conditions
-        const conditions = queryOptions.filters
-          ? this.buildPlayerFilters(queryOptions.filters)
-          : [];
+        // Build WHERE conditions using raw SQL (must reference alias "p",
+        // not the Drizzle column refs which would emit "players"."col").
+        const rawConditions: SQL[] = [];
 
-        // Position filtering
+        if (queryOptions.filters?.excludeEmptyNames) {
+          rawConditions.push(sql`p.last_name <> ''`);
+        }
+        if (queryOptions.filters?.ids && queryOptions.filters.ids.length > 0) {
+          const idList = queryOptions.filters.ids.join(',');
+          rawConditions.push(sql`p.id IN (${sql.raw(idList)})`);
+        }
+        if (queryOptions.filters?.brefId) {
+          rawConditions.push(sql`p.bref_id = ${queryOptions.filters.brefId}`);
+        }
+
+        // Position filtering — use raw SQL subquery referencing "p.id"
         if (queryOptions.filters?.position) {
-          conditions.push(
-            this.buildPositionFilter(db, queryOptions.filters.position),
+          rawConditions.push(
+            this.buildRawPositionFilter(queryOptions.filters.position),
           );
         }
 
         const whereClause =
-          conditions.length > 0 ? and(...conditions) : undefined;
+          rawConditions.length > 0
+            ? sql`WHERE ${sql.join(rawConditions, sql` AND `)}`
+            : sql``;
 
         // Use raw SQL to join players with the scoring function.
-        // This is necessary because Drizzle doesn't support set-returning
-        // function calls as join targets.
         const limitClause = queryOptions.limit
           ? sql`LIMIT ${sql.raw(String(queryOptions.limit))}`
           : sql``;
@@ -487,8 +497,6 @@ export class PlayerService {
           ? sql`OFFSET ${sql.raw(String(queryOptions.offset))}`
           : sql``;
 
-        // Build a Drizzle-compatible query that selects from players
-        // and joins with the scoring function
         const scoringQuery = sql`
           SELECT
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
@@ -497,7 +505,7 @@ export class PlayerService {
           FROM public.players p
           LEFT JOIN public.compute_career_scores(${leagueIdParam}) cs
             ON p.id = cs.player_id
-          ${whereClause ? sql`WHERE ${whereClause}` : sql``}
+          ${whereClause}
           ORDER BY cs.${sql.raw(sortColumn)} ${sortDir} NULLS LAST
           ${limitClause}
           ${offsetClause}
@@ -526,6 +534,25 @@ export class PlayerService {
         }));
       },
     );
+  }
+
+  /**
+   * Build a position filter SQL condition using raw SQL with alias "p.id".
+   * Used by getPlayersWithScoringSort where the table is aliased as "p".
+   */
+  private buildRawPositionFilter(pos: string): SQL {
+    const posMap: Record<string, string[]> = {
+      P: ['SP', 'RP'],
+      OF: ['LF', 'CF', 'RF'],
+      DH: ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'],
+    };
+    const positions = posMap[pos] ?? [pos];
+    const placeholders = positions.map((p) => sql`${p}`);
+
+    return sql`p.id IN (
+      SELECT player_id FROM public.player_eligible_positions
+      WHERE position IN (${sql.join(placeholders, sql`, `)})
+    )`;
   }
 
   /**
