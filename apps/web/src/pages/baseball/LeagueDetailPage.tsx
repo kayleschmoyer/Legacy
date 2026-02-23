@@ -1658,15 +1658,6 @@ export function LeagueDetailPage(): React.JSX.Element {
           readOnly={isViewingOther}
           teamName={isViewingOther ? viewingTeamName : undefined}
         />
-
-        {!isViewingOther && (
-          <LeagueScoringSummary
-            loading={scoringLoading}
-            error={scoringError}
-            profileName={scoringProfileName}
-            settings={scoringSettings}
-          />
-        )}
       </YStack>
     );
   };

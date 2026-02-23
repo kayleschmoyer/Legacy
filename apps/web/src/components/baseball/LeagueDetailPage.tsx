@@ -1122,12 +1122,6 @@ export function LeagueDetailPage(): React.JSX.Element {
         onPlayerRemove={(player) => void handlePlayerRemove(player)}
         loading={positionsLoading || teamMembersLoading || userTeamLoading}
       />
-      <LeagueScoringSummary
-        loading={scoringLoading}
-        error={scoringError}
-        profileName={scoringProfileName}
-        settings={scoringSettings}
-      />
     </YStack>
   );
 
