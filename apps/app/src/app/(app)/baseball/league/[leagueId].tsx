@@ -22,6 +22,8 @@ import {
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
+import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
+import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 // Manual GraphQL query for getting user's team ID in a league
@@ -166,6 +168,14 @@ export default function LeagueId(): React.JSX.Element {
     if (!leagueData?.league || !userInfo) return false;
     return leagueData.league.owner === userInfo.id || userInfo.isAdmin;
   }, [leagueData?.league, userInfo]);
+
+  // Fetch league scoring settings for commissioner scoring editor
+  const {
+    profile: scoringProfile,
+    loading: scoringLoading,
+    error: scoringError,
+    refetch: refetchScoringProfile,
+  } = useLeagueScoringSettings(numLeagueId);
 
   const handleStartDraft = useCallback(() => {
     if (!isCommissioner) {
@@ -338,21 +348,15 @@ export default function LeagueId(): React.JSX.Element {
                 </YStack>
               </Card>
 
-              <Card
-                backgroundColor="$yellow2"
-                borderColor="$yellow6"
-                padding="$4"
-              >
-                <YStack space="$2">
-                  <Text fontSize="$4" fontWeight="600" color="$yellow11">
-                    ⚠️ Commissioner Features
-                  </Text>
-                  <Text color="$yellow11" fontSize="$3">
-                    Additional commissioner features like member management,
-                    league settings, and advanced draft options are coming soon.
-                  </Text>
-                </YStack>
-              </Card>
+              <LeagueScoringEditor
+                leagueId={numLeagueId}
+                profile={scoringProfile}
+                loading={scoringLoading}
+                error={scoringError}
+                onRefetch={async () => {
+                  await refetchScoringProfile();
+                }}
+              />
             </YStack>
           </Tabs.Content>
         )}

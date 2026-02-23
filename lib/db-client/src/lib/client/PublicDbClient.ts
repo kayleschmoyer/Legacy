@@ -1066,6 +1066,7 @@ export async function updateLeagueScoringProfileEntries(
   db: PublicDb,
   profileId: number,
   updates: LeagueScoringMultiplierUpdateInput[],
+  changedBy?: number | null,
 ): Promise<LeagueScoringProfileEntry[]> {
   if (updates.length === 0) {
     return getScoringProfileEntriesForProfile(db, profileId);
@@ -1175,6 +1176,54 @@ export async function updateLeagueScoringProfileEntries(
           'createdAt',
         ]),
       });
+
+    // Write audit entries to the change log
+    const changeLogEntries = statDefinitionIds
+      .map((statDefinitionId) => {
+        const existing = existingByDefinitionId.get(statDefinitionId);
+        const definition = definitionById.get(statDefinitionId);
+        const update = mergedUpdates.get(statDefinitionId);
+        if (!definition || !update) return null;
+
+        const previousMultiplier =
+          normalizeNumeric(existing?.multiplier) ??
+          normalizeNumeric(definition.defaultMultiplier);
+        const newMultiplier =
+          update.multiplier ??
+          normalizeNumeric(existing?.multiplier) ??
+          normalizeNumeric(definition.defaultMultiplier);
+
+        const action: 'created' | 'updated' | 'disabled' = !existing
+          ? 'created'
+          : update.isEnabled === false
+            ? 'disabled'
+            : 'updated';
+
+        return {
+          profileId,
+          statDefinitionId,
+          previousMultiplier: previousMultiplier?.toString() ?? null,
+          newMultiplier: newMultiplier?.toString() ?? null,
+          changedBy: changedBy ?? null,
+          action,
+        };
+      })
+      .filter(
+        (
+          entry,
+        ): entry is {
+          profileId: number;
+          statDefinitionId: number;
+          previousMultiplier: string | null;
+          newMultiplier: string | null;
+          changedBy: number | null;
+          action: 'created' | 'updated' | 'disabled';
+        } => entry !== null,
+      );
+
+    if (changeLogEntries.length > 0) {
+      await tx.insert(Schema.leagueScoringChangeLog).values(changeLogEntries);
+    }
 
     return tx
       .select()

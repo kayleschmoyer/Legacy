@@ -4,13 +4,8 @@ import { useMemo, useState } from 'react';
 import { Separator, Tabs, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import {
-  computeAverageScoring,
-  computeScoring,
-  DEFAULT_BATTING_SCORING,
-  DEFAULT_FIELDING_SCORING,
-  DEFAULT_PITCHING_SCORING,
-} from '@legacy-sports/scoring';
+import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
+import { applyMultiplierGroups } from '../../../../common/scoring';
 import { useGetMatchupStatsQuery } from '../../../../api/db/matchups/Matchups.generated';
 import {
   useGetTeamByIdQuery,
@@ -21,7 +16,6 @@ import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/League
 import {
   LeaguePositionFragment,
   MatchupFragment,
-  ScoringStatGroup,
   TeamMemberFragment,
   useGetLeagueScoringProfileQuery,
   useGetUserTeamIdQuery,
@@ -299,54 +293,13 @@ export default function Team(): React.JSX.Element {
       },
     });
 
-  const scoringSettings = useMemo(() => {
-    const base = {
-      batting: { ...DEFAULT_BATTING_SCORING },
-      fielding: { ...DEFAULT_FIELDING_SCORING },
-      pitching: { ...DEFAULT_PITCHING_SCORING },
-    } as {
-      batting: Partial<Record<string, number>>;
-      fielding: Partial<Record<string, number>>;
-      pitching: Partial<Record<string, number>>;
-    };
-
-    const groups =
-      scoringProfileData?.leagueScoringProfile?.multiplierGroups ?? [];
-
-    for (const group of groups) {
-      if (!group?.group || !group.values) {
-        continue;
-      }
-
-      let target: Partial<Record<string, number>>;
-
-      switch (group.group) {
-        case ScoringStatGroup.Batting:
-          target = base.batting;
-          break;
-        case ScoringStatGroup.Fielding:
-          target = base.fielding;
-          break;
-        case ScoringStatGroup.Pitching:
-          target = base.pitching;
-          break;
-        default:
-          continue;
-      }
-
-      for (const entry of group.values) {
-        if (
-          entry?.sourceColumn &&
-          typeof entry.multiplier === 'number' &&
-          Number.isFinite(entry.multiplier)
-        ) {
-          target[entry.sourceColumn] = entry.multiplier;
-        }
-      }
-    }
-
-    return base;
-  }, [scoringProfileData]);
+  const scoringSettings = useMemo(
+    () =>
+      applyMultiplierGroups(
+        scoringProfileData?.leagueScoringProfile?.multiplierGroups,
+      ),
+    [scoringProfileData?.leagueScoringProfile?.multiplierGroups],
+  );
 
   const battingSettings = scoringSettings.batting;
   const fieldingSettings = scoringSettings.fielding;

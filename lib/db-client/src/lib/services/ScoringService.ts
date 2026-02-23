@@ -19,8 +19,7 @@ import {
 
 export type LeagueScoringMultiplierUpdate = LeagueScoringMultiplierUpdateInput;
 
-export interface LeagueScoringProfileDetails
-  extends LeagueScoringProfileSummary {
+export interface LeagueScoringProfileDetails extends LeagueScoringProfileSummary {
   entries: LeagueScoringProfileEntry[];
   definitions: ScoringStatDefinition[];
 }
@@ -100,6 +99,7 @@ export class ScoringService {
   async updateActiveProfile(
     leagueId: number,
     updates: LeagueScoringMultiplierUpdate[],
+    changedBy?: number | null,
   ): Promise<LeagueScoringProfileDetails> {
     if (!Number.isFinite(leagueId)) {
       throw new Error('A valid leagueId is required');
@@ -122,6 +122,7 @@ export class ScoringService {
         db,
         profile.id,
         updates,
+        changedBy,
       );
       const definitions = await getScoringStatDefinitions(db);
 

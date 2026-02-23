@@ -480,6 +480,12 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         }
       }
 
+      // Fetch the current config BEFORE updating so we can describe what changed
+      const previousConfig = await loadLeagueScoringConfig(args.leagueId);
+      const previousStatsByDefId = new Map(
+        previousConfig.stats.map((s) => [s.definition.id, s]),
+      );
+
       await dbService.scoring.updateActiveProfile(
         args.leagueId,
         updates.map((update) => ({
@@ -493,14 +499,40 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
               ? update.isEnabled
               : undefined,
         })),
+        context.user.id,
       );
 
       const config = await loadLeagueScoringConfig(args.leagueId);
 
-      // Post a system chat notification so all league members see the change
+      // Build a detailed change summary for the chat message
       const userId = context.user.id;
       const username = context.user.username ?? `user_${userId}`;
-      const notificationText = `${username} updated scoring settings.`;
+
+      const changeDescriptions: string[] = [];
+      for (const update of updates) {
+        const prevStat = previousStatsByDefId.get(update.statDefinitionId);
+        if (!prevStat) continue;
+
+        const statName = prevStat.definition.displayName;
+        const prevMultiplier = prevStat.multiplier;
+
+        if (typeof update.isEnabled === 'boolean' && !update.isEnabled) {
+          changeDescriptions.push(`disabled ${statName}`);
+        } else if (typeof update.multiplier === 'number') {
+          changeDescriptions.push(
+            `${statName}: ${prevMultiplier}x → ${update.multiplier}x`,
+          );
+        }
+      }
+
+      const changeSummary =
+        changeDescriptions.length > 0
+          ? changeDescriptions.length <= 5
+            ? changeDescriptions.join(', ')
+            : `${changeDescriptions.slice(0, 5).join(', ')} and ${changeDescriptions.length - 5} more`
+          : 'scoring multipliers';
+
+      const notificationText = `⚙️ ${username} updated scoring settings: ${changeSummary}`;
 
       const [chatMsg] = await context.db
         .insert(PublicSchema.leagueMessages)

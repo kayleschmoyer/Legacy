@@ -63,9 +63,26 @@ jest.mock('../../../api/db/graphql.generated', () => {
   };
 });
 
-jest.mock('@legacy-sports/shared-components', () => {
+jest.mock('@tamagui/lucide-icons', () => {
   const React = jest.requireActual<typeof import('react')>('react');
+  return new Proxy(
+    {},
+    {
+      get: (_target, name) => {
+        if (typeof name === 'string' && name[0] === name[0].toUpperCase()) {
+          const Ic = React.forwardRef<HTMLSpanElement>((p, ref) => (
+            <span ref={ref} data-icon={name} {...p} />
+          ));
+          Ic.displayName = name;
+          return Ic;
+        }
+        return undefined;
+      },
+    },
+  );
+});
 
+jest.mock('@legacy-sports/shared-components', () => {
   function Stack(allProps: Record<string, unknown>) {
     const props = { ...allProps };
     const children = props.children as React.ReactNode;
@@ -227,10 +244,15 @@ jest.mock('tamagui', () => {
   );
   Input.displayName = 'MockedTamaguiInput';
 
+  const AnimatePresence = (allProps: Record<string, unknown>) => {
+    return (allProps.children as React.ReactNode) ?? null;
+  };
+
   return {
     __esModule: true,
     Text,
     Input,
+    AnimatePresence,
     YStack: View,
     XStack: View,
     Stack: View,
@@ -331,7 +353,7 @@ describe('LeagueScoringEditor', () => {
     const homeRunsInput = screen.getByLabelText('Home Runs multiplier');
     fireEvent.change(homeRunsInput, { target: { value: '2.5' } });
 
-    const saveButton = screen.getByRole('button', { name: 'Save Changes' });
+    const saveButton = screen.getByRole('button', { name: /save.*change/i });
     expect(saveButton).not.toBeDisabled();
 
     fireEvent.click(saveButton);
