@@ -831,6 +831,11 @@ type Player {
   careerBatting: CareerBatting
 
   """
+  Career pitching statistics for the player
+  """
+  careerPitching: CareerPitching
+
+  """
   List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)
   """
   eligiblePositions: [String!]

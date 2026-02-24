@@ -446,7 +446,7 @@ const CareerBattingConnection = builder.connectionObject({
 });
 
 // Career Pitching type
-const CareerPitchingRef = builder.objectRef<{
+export const CareerPitchingRef = builder.objectRef<{
   playerId: number | null;
   w: number | null;
   l: number | null;

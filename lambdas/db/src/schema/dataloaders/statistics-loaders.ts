@@ -35,6 +35,24 @@ export const createCareerBattingLoader = (
   );
 
 /**
+ * DataLoader for career pitching stats
+ */
+export const createCareerPitchingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerPitching.$inferSelect | null
+  >(async (keys) => {
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerPitching)
+      .where(inArray(PublicSchema.careerPitching.playerId, keys));
+    const map = new Map(rows.map((r) => [r.playerId ?? 0, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
  * DataLoader for count of seasons played (batting)
  */
 export const createBattingSeasonsPlayedLoader = (

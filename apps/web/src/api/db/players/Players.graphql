@@ -57,5 +57,19 @@ query GetPlayersWithStats(
       sacrificeHits
       totalBases
     }
+    careerPitching {
+      wins
+      losses
+      era
+      games
+      gamesStarted
+      saves
+      strikeouts
+      baseOnBalls
+      hits
+      earnedRuns
+      outsRecorded
+      winPercentage
+    }
   }
 }

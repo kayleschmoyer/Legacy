@@ -7,7 +7,7 @@ import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
-import { CareerBattingRef } from './statistics';
+import { CareerBattingRef, CareerPitchingRef } from './statistics';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -95,6 +95,14 @@ PlayerRef.implement({
       nullable: true,
       resolve: async (parent, _args, context) => {
         return context.loaders.careerBatting.load(parent.id);
+      },
+    }),
+    careerPitching: t.field({
+      description: 'Career pitching statistics for the player',
+      type: CareerPitchingRef,
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        return context.loaders.careerPitching.load(parent.id);
       },
     }),
     averageSeasonBatting: t.field({

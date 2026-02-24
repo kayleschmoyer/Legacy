@@ -26,9 +26,10 @@ import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';
 
 const PAGE_SIZE = 50;
 
-const POSITIONS = [
+type PlayerType = 'hitters' | 'pitchers';
+
+const HITTER_POSITIONS = [
   'ALL',
-  'P',
   'C',
   '1B',
   '2B',
@@ -37,9 +38,10 @@ const POSITIONS = [
   'OF',
   'DH',
 ] as const;
+const PITCHER_POSITIONS = ['ALL', 'SP', 'RP'] as const;
 
-/** Stat columns rendered in the data grid */
-const STAT_COLUMNS: {
+/** Hitting stat columns shown for the Hitters tab */
+const HITTING_STAT_COLUMNS: {
   key: string;
   label: string;
   sortKey?: SortKey;
@@ -84,8 +86,68 @@ const STAT_COLUMNS: {
   },
 ];
 
-/** Scoring columns — populated by compute_career_scores DB function */
-const SCORING_COLUMNS: {
+/** Pitching stat columns shown for the Pitchers tab */
+const PITCHING_STAT_COLUMNS: {
+  key: string;
+  label: string;
+  sortKey?: SortKey;
+  width: number;
+  description: string;
+  isBold?: boolean;
+}[] = [
+  {
+    key: 'wins',
+    label: 'W',
+    width: 48,
+    description: 'Career Wins',
+  },
+  {
+    key: 'losses',
+    label: 'L',
+    width: 48,
+    description: 'Career Losses',
+  },
+  {
+    key: 'era',
+    label: 'ERA',
+    width: 56,
+    description: 'Earned Run Average',
+    isBold: true,
+  },
+  {
+    key: 'pitchingGames',
+    label: 'G',
+    width: 48,
+    description: 'Career Games Pitched',
+  },
+  {
+    key: 'gamesStarted',
+    label: 'GS',
+    width: 48,
+    description: 'Games Started',
+  },
+  {
+    key: 'saves',
+    label: 'SV',
+    width: 48,
+    description: 'Career Saves',
+  },
+  {
+    key: 'strikeouts',
+    label: 'K',
+    width: 48,
+    description: 'Career Strikeouts',
+  },
+  {
+    key: 'baseOnBalls',
+    label: 'BB',
+    width: 48,
+    description: 'Career Walks',
+  },
+];
+
+/** Scoring columns for Hitters — batting + fielding focus */
+const HITTER_SCORING_COLUMNS: {
   key: string;
   label: string;
   sortKey: SortKey;
@@ -117,18 +179,45 @@ const SCORING_COLUMNS: {
     description: 'Batting Score',
   },
   {
-    key: 'pitchingScore',
-    label: 'PITCH',
-    sortKey: 'pitchingScore',
-    width: 56,
-    description: 'Pitching Score',
-  },
-  {
     key: 'fieldingScore',
     label: 'FLD',
     sortKey: 'fieldingScore',
     width: 56,
     description: 'Fielding Score',
+  },
+];
+
+/** Scoring columns for Pitchers — pitching focus */
+const PITCHER_SCORING_COLUMNS: {
+  key: string;
+  label: string;
+  sortKey: SortKey;
+  width: number;
+  description: string;
+  isBold?: boolean;
+}[] = [
+  {
+    key: 'totalScore',
+    label: 'PTS',
+    sortKey: 'totalScore',
+    width: 60,
+    description: 'Total Fantasy Points',
+    isBold: true,
+  },
+  {
+    key: 'avgPointsPerGame',
+    label: 'PROJ',
+    sortKey: 'avgPointsPerGame',
+    width: 60,
+    description: 'Projected Points This Week',
+    isBold: true,
+  },
+  {
+    key: 'pitchingScore',
+    label: 'PITCH',
+    sortKey: 'pitchingScore',
+    width: 56,
+    description: 'Pitching Score',
   },
 ];
 
@@ -224,6 +313,33 @@ const PaginationBar = styled(XStack, {
   borderTopWidth: 1,
   borderTopColor: '$borderColor',
   backgroundColor: '$color1',
+});
+
+const PlayerTypeToggleContainer = styled(XStack, {
+  backgroundColor: '$color2',
+  borderRadius: '$3',
+  padding: '$0.5',
+  gap: '$0.5',
+});
+
+const PlayerTypeButton = styled(Button, {
+  size: '$3',
+  borderRadius: '$2',
+  paddingHorizontal: '$4',
+  variants: {
+    selected: {
+      true: {
+        backgroundColor: '$blue4',
+        borderColor: '$blue7',
+        borderWidth: 1,
+      },
+      false: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: 'transparent',
+      },
+    },
+  } as const,
 });
 
 const EmptyState = styled(YStack, {
@@ -353,6 +469,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
   leagueId,
   gamesPerMatchup = 5,
 }) => {
+  const [playerType, setPlayerType] = useState<PlayerType>('hitters');
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
@@ -365,13 +482,23 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     eligiblePositions?: string[] | null;
   } | null>(null);
 
+  // Determine the position filter to send to the query
+  const queryPosition = (() => {
+    if (playerType === 'pitchers') {
+      // For pitchers, use the pitcher-specific filter or 'P' for all pitchers
+      return positionFilter === 'ALL' ? 'P' : positionFilter;
+    }
+    // For hitters, pass through the position filter (undefined = all hitters)
+    return positionFilter === 'ALL' ? undefined : positionFilter;
+  })();
+
   const { data, loading, error } = useGetPlayersWithStatsQuery({
     variables: {
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       orderBy: sortBy,
       orderDirection: sortDirection,
-      position: positionFilter === 'ALL' ? undefined : positionFilter,
+      position: queryPosition,
       leagueId,
     },
     fetchPolicy: 'cache-and-network',
@@ -395,20 +522,44 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     setPage(0);
   }, []);
 
+  const handlePlayerTypeChange = useCallback((type: PlayerType) => {
+    setPlayerType(type);
+    setPositionFilter('ALL');
+    setSortBy('avgPointsPerGame');
+    setSortDirection('desc');
+    setPage(0);
+  }, []);
+
   const { takenPlayerIds, loading: takenLoading } =
     useLeagueTakenPlayers(leagueId);
 
   const players = data?.players ?? [];
 
-  // Client-side filtering: exclude taken players and apply local search
+  // Client-side filtering: exclude taken players, apply local search,
+  // and for hitters mode exclude pure pitchers (SP/RP only)
   const displayPlayers = players.filter((player) => {
     if (!player?.id || takenPlayerIds.has(player.id)) return false;
     if (search) {
       const fullName = `${player.firstName} ${player.lastName}`.toLowerCase();
       if (!fullName.includes(search.toLowerCase())) return false;
     }
+    // When viewing hitters with ALL positions, exclude players whose only positions are SP/RP
+    if (playerType === 'hitters' && positionFilter === 'ALL') {
+      const positions = player.eligiblePositions ?? [];
+      const onlyPitcher =
+        positions.length > 0 &&
+        positions.every((p) => p === 'SP' || p === 'RP');
+      if (onlyPitcher) return false;
+    }
     return true;
   });
+
+  const positions =
+    playerType === 'hitters' ? HITTER_POSITIONS : PITCHER_POSITIONS;
+  const scoringColumns =
+    playerType === 'hitters' ? HITTER_SCORING_COLUMNS : PITCHER_SCORING_COLUMNS;
+  const statColumns =
+    playerType === 'hitters' ? HITTING_STAT_COLUMNS : PITCHING_STAT_COLUMNS;
 
   const isLoading = loading || takenLoading;
   const hasNextPage = players.length >= PAGE_SIZE;
@@ -418,6 +569,34 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
       {/* ── Toolbar ──────────────────────────────────────────────── */}
       <ToolbarContainer>
         <XStack gap="$3" alignItems="center" flexWrap="wrap">
+          {/* Player type toggle */}
+          <PlayerTypeToggleContainer>
+            <PlayerTypeButton
+              selected={playerType === 'hitters'}
+              onPress={() => handlePlayerTypeChange('hitters')}
+            >
+              <Text
+                fontSize={13}
+                fontWeight={playerType === 'hitters' ? '700' : '500'}
+                color={playerType === 'hitters' ? '$blue11' : '$color10'}
+              >
+                Hitters
+              </Text>
+            </PlayerTypeButton>
+            <PlayerTypeButton
+              selected={playerType === 'pitchers'}
+              onPress={() => handlePlayerTypeChange('pitchers')}
+            >
+              <Text
+                fontSize={13}
+                fontWeight={playerType === 'pitchers' ? '700' : '500'}
+                color={playerType === 'pitchers' ? '$blue11' : '$color10'}
+              >
+                Pitchers
+              </Text>
+            </PlayerTypeButton>
+          </PlayerTypeToggleContainer>
+
           {/* Search */}
           <SearchBox>
             <Search size={14} color="$color9" />
@@ -448,7 +627,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
 
           {/* Position filter chips */}
           <XStack gap="$1.5" flexWrap="wrap" alignItems="center">
-            {POSITIONS.map((pos) => (
+            {positions.map((pos: string) => (
               <PositionChip
                 key={pos}
                 selected={positionFilter === pos}
@@ -490,7 +669,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
         >
           Pos
         </Text>
-        {SCORING_COLUMNS.map((col) => (
+        {scoringColumns.map((col) => (
           <SortableHeader
             key={col.key}
             label={col.label}
@@ -502,7 +681,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
             description={col.description}
           />
         ))}
-        {STAT_COLUMNS.map((col) => (
+        {statColumns.map((col) => (
           <SortableHeader
             key={col.key}
             label={col.label}
@@ -514,22 +693,36 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
             description={col.description}
           />
         ))}
-        <SortableHeader
-          label="AVG"
-          currentSort={sortBy}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          width={56}
-          description="Batting Average"
-        />
-        <SortableHeader
-          label="OPS"
-          currentSort={sortBy}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          width={56}
-          description="On-base Plus Slugging"
-        />
+        {playerType === 'hitters' && (
+          <>
+            <SortableHeader
+              label="AVG"
+              currentSort={sortBy}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              width={56}
+              description="Batting Average"
+            />
+            <SortableHeader
+              label="OPS"
+              currentSort={sortBy}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              width={56}
+              description="On-base Plus Slugging"
+            />
+          </>
+        )}
+        {playerType === 'pitchers' && (
+          <SortableHeader
+            label="WHIP"
+            currentSort={sortBy}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            width={56}
+            description="Walks + Hits per Inning Pitched"
+          />
+        )}
         {/* Spacer for action button column */}
         <XStack width={44} />
       </HeaderRow>
@@ -582,10 +775,26 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
             )}
 
             {displayPlayers.map((player, index) => {
-              const stats = player.careerBatting;
-              const rates = stats ? computeRateStats(stats) : null;
-              const statVal = (v: number | undefined | null) =>
+              const battingStats = player.careerBatting;
+              const pitchingStats = player.careerPitching;
+              const rates = battingStats
+                ? computeRateStats(battingStats)
+                : null;
+              const statVal = (v: number | string | undefined | null) =>
                 v != null ? String(v) : '–';
+
+              // Compute WHIP for pitchers: (BB + H) / (outsRecorded / 3)
+              const whip = (() => {
+                if (
+                  !pitchingStats?.outsRecorded ||
+                  pitchingStats.outsRecorded === 0
+                )
+                  return null;
+                const innings = pitchingStats.outsRecorded / 3;
+                const bb = pitchingStats.baseOnBalls ?? 0;
+                const h = pitchingStats.hits ?? 0;
+                return ((bb + h) / innings).toFixed(2);
+              })();
 
               return (
                 <DataRow
@@ -694,7 +903,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                     )}
                   </XStack>
 
-                  {/* Scoring cells */}
+                  {/* Scoring cells — dynamic per player type */}
                   <StatCell width={60} fontWeight="700" color="$green11">
                     {player.scoring?.totalScore != null
                       ? Math.round(player.scoring.totalScore).toLocaleString()
@@ -707,40 +916,95 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                         ).toFixed(1)
                       : '–'}
                   </StatCell>
-                  <StatCell width={56}>
-                    {player.scoring?.battingScore != null
-                      ? Math.round(player.scoring.battingScore).toLocaleString()
-                      : '–'}
-                  </StatCell>
-                  <StatCell width={56}>
-                    {player.scoring?.pitchingScore != null
-                      ? Math.round(
-                          player.scoring.pitchingScore,
-                        ).toLocaleString()
-                      : '–'}
-                  </StatCell>
-                  <StatCell width={56}>
-                    {player.scoring?.fieldingScore != null
-                      ? Math.round(
-                          player.scoring.fieldingScore,
-                        ).toLocaleString()
-                      : '–'}
-                  </StatCell>
+                  {playerType === 'hitters' ? (
+                    <>
+                      <StatCell width={56}>
+                        {player.scoring?.battingScore != null
+                          ? Math.round(
+                              player.scoring.battingScore,
+                            ).toLocaleString()
+                          : '–'}
+                      </StatCell>
+                      <StatCell width={56}>
+                        {player.scoring?.fieldingScore != null
+                          ? Math.round(
+                              player.scoring.fieldingScore,
+                            ).toLocaleString()
+                          : '–'}
+                      </StatCell>
+                    </>
+                  ) : (
+                    <StatCell width={56}>
+                      {player.scoring?.pitchingScore != null
+                        ? Math.round(
+                            player.scoring.pitchingScore,
+                          ).toLocaleString()
+                        : '–'}
+                    </StatCell>
+                  )}
 
-                  {/* Career stat cells */}
-                  <StatCell width={48}>{statVal(stats?.games)}</StatCell>
-                  <StatCell width={48}>{statVal(stats?.runs)}</StatCell>
-                  <StatCell width={48}>{statVal(stats?.homeRuns)}</StatCell>
-                  <StatCell width={48}>{statVal(stats?.rbi)}</StatCell>
-                  <StatCell width={48}>{statVal(stats?.stolenBases)}</StatCell>
+                  {/* Stat cells — dynamic per player type */}
+                  {playerType === 'hitters' ? (
+                    <>
+                      {/* Career batting stats */}
+                      <StatCell width={48}>
+                        {statVal(battingStats?.games)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(battingStats?.runs)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(battingStats?.homeRuns)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(battingStats?.rbi)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(battingStats?.stolenBases)}
+                      </StatCell>
 
-                  {/* Rates */}
-                  <StatCell width={56} fontWeight="700">
-                    {rates?.hasData ? formatRate(rates.avg) : '–'}
-                  </StatCell>
-                  <StatCell width={56}>
-                    {rates?.hasData ? formatRate(rates.ops) : '–'}
-                  </StatCell>
+                      {/* Rate stats */}
+                      <StatCell width={56} fontWeight="700">
+                        {rates?.hasData ? formatRate(rates.avg) : '–'}
+                      </StatCell>
+                      <StatCell width={56}>
+                        {rates?.hasData ? formatRate(rates.ops) : '–'}
+                      </StatCell>
+                    </>
+                  ) : (
+                    <>
+                      {/* Career pitching stats */}
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.wins)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.losses)}
+                      </StatCell>
+                      <StatCell width={56} fontWeight="700">
+                        {pitchingStats?.era ?? '–'}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.games)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.gamesStarted)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.saves)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.strikeouts)}
+                      </StatCell>
+                      <StatCell width={48}>
+                        {statVal(pitchingStats?.baseOnBalls)}
+                      </StatCell>
+
+                      {/* WHIP */}
+                      <StatCell width={56} fontWeight="700">
+                        {whip ?? '–'}
+                      </StatCell>
+                    </>
+                  )}
 
                   {/* Action */}
                   <XStack width={44} justifyContent="center">

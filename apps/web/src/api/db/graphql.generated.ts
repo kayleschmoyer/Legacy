@@ -956,6 +956,8 @@ export type Player = {
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
+  /** Career pitching statistics for the player */
+  careerPitching?: Maybe<CareerPitching>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -3536,6 +3538,21 @@ export type GetPlayersWithStatsQuery = {
       hitByPitch?: number | null;
       sacrificeHits?: number | null;
       totalBases?: number | null;
+    } | null;
+    careerPitching?: {
+      __typename?: 'CareerPitching';
+      wins?: number | null;
+      losses?: number | null;
+      era?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      saves?: number | null;
+      strikeouts?: number | null;
+      baseOnBalls?: number | null;
+      hits?: number | null;
+      earnedRuns?: number | null;
+      outsRecorded?: number | null;
+      winPercentage?: number | null;
     } | null;
   }> | null;
 };
@@ -7257,6 +7274,20 @@ export const GetPlayersWithStats = gql`
         hitByPitch
         sacrificeHits
         totalBases
+      }
+      careerPitching {
+        wins
+        losses
+        era
+        games
+        gamesStarted
+        saves
+        strikeouts
+        baseOnBalls
+        hits
+        earnedRuns
+        outsRecorded
+        winPercentage
       }
     }
   }
