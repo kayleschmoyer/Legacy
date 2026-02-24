@@ -216,7 +216,7 @@ jobs:
           include-optional-deps: false
 
       - name: "Setup uv"
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: "Lint Agent Skills"
         run: node scripts/lint-skills.js
