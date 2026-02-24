@@ -979,6 +979,8 @@ export type Player = {
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
+  /** Career pitching statistics for the player */
+  careerPitching?: Maybe<CareerPitching>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;

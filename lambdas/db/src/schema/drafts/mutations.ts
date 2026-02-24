@@ -2,7 +2,12 @@
  * Draft domain — mutation fields
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  isPlayerInPool,
+  playerMeetsMinCareerGames,
+  playerMeetsMinCareerSeasons,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
@@ -183,17 +188,36 @@ builder.mutationField('makeDraftPick', (t) =>
           }
 
           // Validate player is in the league's player pool (AL/NL restriction)
-          if (league.playerPool !== 'all') {
-            const poolUpper = league.playerPool.toUpperCase();
-            const poolResult = await tx.execute(
-              sql`SELECT 1 FROM season_batting
-                  WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
-                  LIMIT 1`,
+          if (!(await isPlayerInPool(tx, playerId, league.playerPool))) {
+            throw new Error(
+              `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
             );
-            const inPool = poolResult.rows[0];
-            if (!inPool) {
-              throw new Error(`Player is not in the ${poolUpper} player pool`);
-            }
+          }
+
+          // Validate player meets minimum career games requirement
+          if (
+            !(await playerMeetsMinCareerGames(
+              tx,
+              playerId,
+              league.minCareerGames,
+            ))
+          ) {
+            throw new Error(
+              `Player does not meet the minimum career games requirement (${league.minCareerGames})`,
+            );
+          }
+
+          // Validate player meets minimum career seasons requirement
+          if (
+            !(await playerMeetsMinCareerSeasons(
+              tx,
+              playerId,
+              league.minCareerSeasons,
+            ))
+          ) {
+            throw new Error(
+              `Player does not meet the minimum career seasons requirement (${league.minCareerSeasons})`,
+            );
           }
 
           // Validate roster limit — count existing team members
@@ -1112,6 +1136,37 @@ builder.mutationField('commissionerPick', (t) =>
 
           if (!player) {
             throw new Error('Player not found');
+          }
+
+          // Validate player eligibility against league settings
+          if (!(await isPlayerInPool(tx, playerId, league.playerPool))) {
+            throw new Error(
+              `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
+            );
+          }
+
+          if (
+            !(await playerMeetsMinCareerGames(
+              tx,
+              playerId,
+              league.minCareerGames,
+            ))
+          ) {
+            throw new Error(
+              `Player does not meet the minimum career games requirement (${league.minCareerGames})`,
+            );
+          }
+
+          if (
+            !(await playerMeetsMinCareerSeasons(
+              tx,
+              playerId,
+              league.minCareerSeasons,
+            ))
+          ) {
+            throw new Error(
+              `Player does not meet the minimum career seasons requirement (${league.minCareerSeasons})`,
+            );
           }
 
           const now = new Date();

@@ -20,6 +20,7 @@ import {
   withSentry,
 } from '@legacy-sports/sentry';
 import {
+  filterPlayerIdsByLeagueEligibility,
   PublicDb,
   PublicSchema,
   runWithPublicClient,
@@ -495,6 +496,9 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         tx
           .select({
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            playerPool: PublicSchema.leagues.playerPool,
+            minCareerGames: PublicSchema.leagues.minCareerGames,
+            minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -505,9 +509,17 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const gamesPerMatchup = leagueConfig[0]?.gamesPerMatchup ?? 5;
       const minGames = gamesPerMatchup * 2; // Same logic as matchup season selection
 
+      // League eligibility settings
+      const playerPool = leagueConfig[0]?.playerPool ?? 'all';
+      const minCareerGames = leagueConfig[0]?.minCareerGames ?? 50;
+      const minCareerSeasons = leagueConfig[0]?.minCareerSeasons ?? 3;
+
       LOGGER.info('Draft season requirements', {
         gamesPerMatchup,
         minGames,
+        playerPool,
+        minCareerGames,
+        minCareerSeasons,
         leagueId,
       });
 
@@ -636,7 +648,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       }
 
       // Filter to only players with valid seasons
-      const players = candidatePlayers.filter((p) =>
+      let players = candidatePlayers.filter((p) =>
         playersWithValidSeasons.has(p.id),
       );
 
@@ -645,6 +657,22 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       );
       LOGGER.info(
         `Excluded ${candidatePlayers.length - players.length} players without valid seasons`,
+      );
+
+      // Step 1.7: Apply league eligibility settings (playerPool, minCareerGames, minCareerSeasons)
+      const preEligibilityCount = players.length;
+      const eligibilityResult = await filterPlayerIdsByLeagueEligibility(
+        tx,
+        players.map((p) => p.id),
+        { playerPool, minCareerGames, minCareerSeasons },
+      );
+      players = players.filter((p) => eligibilityResult.eligibleIds.has(p.id));
+
+      LOGGER.info(
+        `League eligibility filters: ${preEligibilityCount} → ${players.length} players ` +
+          `(pool: -${eligibilityResult.excludedByPool}, ` +
+          `career games: -${eligibilityResult.excludedByCareerGames}, ` +
+          `career seasons: -${eligibilityResult.excludedByCareerSeasons})`,
       );
 
       if (teams.length === 0) {

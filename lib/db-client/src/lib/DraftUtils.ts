@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { PublicSchema, runWithPublicClient } from '../index';
+import { PublicDb, PublicSchema, runWithPublicClient } from '../index';
 
 /**
  * Shared utilities for draft operations
@@ -275,4 +275,205 @@ export async function validateDraftRequest(
 
   // Verify league exists
   await fetchLeagueDetails(leagueId);
+}
+
+// ---------------------------------------------------------------------------
+// League-level player eligibility filtering
+// ---------------------------------------------------------------------------
+
+export interface LeagueEligibilitySettings {
+  /** 'all' | 'nl' | 'al' — restricts to players who appeared in that league */
+  playerPool: string;
+  /** Minimum total career games (batting + pitching) a player must have */
+  minCareerGames: number;
+  /** Minimum distinct seasons a player must have appeared in */
+  minCareerSeasons: number;
+}
+
+export interface EligibilityFilterResult {
+  /** Player IDs that passed all filters */
+  eligibleIds: Set<number>;
+  /** How many were removed by each filter (for logging) */
+  excludedByPool: number;
+  excludedByCareerGames: number;
+  excludedByCareerSeasons: number;
+}
+
+/**
+ * Check whether a single player passes the league's player-pool restriction.
+ *
+ * Use this in the live-draft `makeDraftPick` path where you validate one
+ * player at a time inside a transaction.
+ */
+export async function isPlayerInPool(
+  db: PublicDb,
+  playerId: number,
+  playerPool: string,
+): Promise<boolean> {
+  if (playerPool === 'all') return true;
+
+  const poolUpper = playerPool.toUpperCase();
+  const result = await db.execute(
+    sql`SELECT 1 FROM season_batting
+        WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
+        LIMIT 1`,
+  );
+  return result.rows.length > 0;
+}
+
+/**
+ * Check whether a single player meets the minimum career games threshold.
+ */
+export async function playerMeetsMinCareerGames(
+  db: PublicDb,
+  playerId: number,
+  minCareerGames: number,
+): Promise<boolean> {
+  if (minCareerGames <= 0) return true;
+
+  const result = await db.execute(
+    sql`SELECT COALESCE(
+          (SELECT g FROM career_batting WHERE player_id = ${playerId} LIMIT 1), 0
+        ) + COALESCE(
+          (SELECT g FROM career_pitching WHERE player_id = ${playerId} LIMIT 1), 0
+        ) AS total_games`,
+  );
+  return Number(result.rows[0]?.total_games ?? 0) >= minCareerGames;
+}
+
+/**
+ * Check whether a single player meets the minimum career seasons threshold.
+ */
+export async function playerMeetsMinCareerSeasons(
+  db: PublicDb,
+  playerId: number,
+  minCareerSeasons: number,
+): Promise<boolean> {
+  if (minCareerSeasons <= 0) return true;
+
+  const result = await db.execute(
+    sql`SELECT COUNT(DISTINCT season) AS season_count
+        FROM (
+          SELECT season FROM season_batting  WHERE player_id = ${playerId}
+          UNION
+          SELECT season FROM season_pitching WHERE player_id = ${playerId}
+        ) s`,
+  );
+  return Number(result.rows[0]?.season_count ?? 0) >= minCareerSeasons;
+}
+
+/**
+ * Batch-filter a set of player IDs by league eligibility settings.
+ *
+ * Applies three successive filters (player pool → career games → career
+ * seasons) and returns the surviving IDs plus per-filter exclusion counts.
+ *
+ * Use this in the auto-draft / random-assignment path where you need to
+ * narrow a large candidate pool in bulk.
+ */
+export async function filterPlayerIdsByLeagueEligibility(
+  db: PublicDb,
+  playerIds: number[],
+  settings: LeagueEligibilitySettings,
+): Promise<EligibilityFilterResult> {
+  let currentIds = [...playerIds];
+  let excludedByPool = 0;
+  let excludedByCareerGames = 0;
+  let excludedByCareerSeasons = 0;
+
+  // 1. Player pool (AL / NL restriction)
+  if (settings.playerPool !== 'all' && currentIds.length > 0) {
+    const poolUpper = settings.playerPool.toUpperCase();
+    const poolResults = await db
+      .selectDistinct({
+        playerId: PublicSchema.seasonBatting.playerId,
+      })
+      .from(PublicSchema.seasonBatting)
+      .where(
+        and(
+          inArray(PublicSchema.seasonBatting.playerId, currentIds),
+          sql`${PublicSchema.seasonBatting.lgId} = ${poolUpper}`,
+        ),
+      );
+
+    const poolEligible = new Set(poolResults.map((r) => r.playerId));
+    const before = currentIds.length;
+    currentIds = currentIds.filter((id) => poolEligible.has(id));
+    excludedByPool = before - currentIds.length;
+
+    LOGGER.info(
+      `Player pool filter (${poolUpper}): ${before} → ${currentIds.length} (excluded ${excludedByPool})`,
+    );
+  }
+
+  // 2. Minimum career games
+  if (settings.minCareerGames > 0 && currentIds.length > 0) {
+    const rows = await db.execute(
+      sql`
+        SELECT player_id,
+               COALESCE(batting_games, 0) + COALESCE(pitching_games, 0) AS total_games
+        FROM (
+          SELECT p.id AS player_id,
+                 (SELECT cb.g FROM career_batting  cb WHERE cb.player_id = p.id LIMIT 1) AS batting_games,
+                 (SELECT cp.g FROM career_pitching cp WHERE cp.player_id = p.id LIMIT 1) AS pitching_games
+          FROM players p
+          WHERE p.id = ANY(${currentIds})
+        ) sub
+      `,
+    );
+
+    const eligible = new Set(
+      rows.rows
+        .filter(
+          (r: Record<string, unknown>) =>
+            Number(r.total_games) >= settings.minCareerGames,
+        )
+        .map((r: Record<string, unknown>) => Number(r.player_id)),
+    );
+    const before = currentIds.length;
+    currentIds = currentIds.filter((id) => eligible.has(id));
+    excludedByCareerGames = before - currentIds.length;
+
+    LOGGER.info(
+      `Min career games filter (≥${settings.minCareerGames}): ${before} → ${currentIds.length} (excluded ${excludedByCareerGames})`,
+    );
+  }
+
+  // 3. Minimum career seasons
+  if (settings.minCareerSeasons > 0 && currentIds.length > 0) {
+    const rows = await db.execute(
+      sql`
+        SELECT player_id, COUNT(DISTINCT season) AS season_count
+        FROM (
+          SELECT player_id, season FROM season_batting  WHERE player_id = ANY(${currentIds})
+          UNION
+          SELECT player_id, season FROM season_pitching WHERE player_id = ANY(${currentIds})
+        ) all_seasons
+        GROUP BY player_id
+      `,
+    );
+
+    const eligible = new Set(
+      rows.rows
+        .filter(
+          (r: Record<string, unknown>) =>
+            Number(r.season_count) >= settings.minCareerSeasons,
+        )
+        .map((r: Record<string, unknown>) => Number(r.player_id)),
+    );
+    const before = currentIds.length;
+    currentIds = currentIds.filter((id) => eligible.has(id));
+    excludedByCareerSeasons = before - currentIds.length;
+
+    LOGGER.info(
+      `Min career seasons filter (≥${settings.minCareerSeasons}): ${before} → ${currentIds.length} (excluded ${excludedByCareerSeasons})`,
+    );
+  }
+
+  return {
+    eligibleIds: new Set(currentIds),
+    excludedByPool,
+    excludedByCareerGames,
+    excludedByCareerSeasons,
+  };
 }
