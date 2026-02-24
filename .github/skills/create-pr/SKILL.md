@@ -91,7 +91,7 @@ with properly escaped content via a variable.
 #    File location: .github/tmp-pr-body.md (or $env:TEMP/pr-body.md)
 
 # 2. Create PR using --body-file
-gh pr create --title "fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 3. Clean up the temp file
 Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
@@ -224,7 +224,7 @@ gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
 2. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 3. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
 4. **Run pre-commit validation** before creating PR (`make pre-commit`)
-5. **Use conventional commit format** in the PR title: `type(scope): description`
+5. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
 6. **Link Jira ticket** in PR description
 7. **Add screenshots** for UI changes
 8. **Keep PRs focused** — split large changes into multiple PRs
@@ -232,15 +232,18 @@ gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
 ## PR Title Format
 
 ```
-type(scope): Brief description
+LS-#### type(scope): Brief description
 ```
+
+Always prefix the title with the Jira ticket key so GitHub, Jira, and reviewers
+can immediately trace the PR back to its ticket.
 
 **Examples**:
 
-- `feat(db): add career statistics resolver`
-- `fix(auth): fix OAuth token refresh issue`
-- `docs(graphql): update GraphQL schema documentation`
-- `fix(ci): fix invalid Playwright CLI options in E2E action`
+- `LS-1234 feat(db): add career statistics resolver`
+- `LS-1235 fix(auth): fix OAuth token refresh issue`
+- `LS-1236 docs(graphql): update GraphQL schema documentation`
+- `LS-1237 fix(ci): fix invalid Playwright CLI options in E2E action`
 
 ## Integration with Workflow
 
@@ -261,7 +264,7 @@ git push origin HEAD
 #    File: .github/tmp-pr-body.md
 
 # 5. Create PR
-gh pr create --title "feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 6. Clean up temp file
 Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
@@ -285,7 +288,7 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 
 ### After Creating PR Checklist
 
-- [ ] PR title references Jira ticket or uses conventional commit format
+- [ ] PR title includes Jira ticket key prefix (e.g. `LS-1234 feat(scope): description`)
 - [ ] PR description renders correctly (check in browser)
 - [ ] Jira ticket updated to "In Review"
 - [ ] Reviewers assigned
