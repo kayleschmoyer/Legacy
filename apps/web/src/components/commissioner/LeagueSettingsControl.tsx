@@ -18,6 +18,7 @@ export interface LeagueSettingsControlProps {
   currentSpStartsPerMatchup: number;
   currentMinCareerGames?: number;
   currentMinCareerSeasons?: number;
+  currentTotalMatchups?: number;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -50,6 +51,15 @@ const MIN_CAREER_SEASONS_OPTIONS = [
   { label: '7', value: 7 },
 ] as const;
 
+const TOTAL_MATCHUPS_OPTIONS = [
+  { label: '5', value: 5 },
+  { label: '8', value: 8 },
+  { label: '10', value: 10 },
+  { label: '12', value: 12 },
+  { label: '15', value: 15 },
+  { label: '20', value: 20 },
+] as const;
+
 /**
  * LeagueSettingsControl — Commissioner control for league-level matchup settings.
  *
@@ -62,6 +72,7 @@ export function LeagueSettingsControl({
   currentSpStartsPerMatchup,
   currentMinCareerGames = 50,
   currentMinCareerSeasons = 3,
+  currentTotalMatchups = 10,
   onSuccess,
   onError,
 }: LeagueSettingsControlProps) {
@@ -73,6 +84,7 @@ export function LeagueSettingsControl({
   const [minCareerSeasons, setMinCareerSeasons] = useState(
     currentMinCareerSeasons,
   );
+  const [totalMatchups, setTotalMatchups] = useState(currentTotalMatchups);
   const [hasChanges, setHasChanges] = useState(false);
 
   const [updateLeagueSettings, { loading: saving }] =
@@ -84,12 +96,14 @@ export function LeagueSettingsControl({
       starts: number,
       careerGames: number,
       careerSeasons: number,
+      totMatchups: number,
     ) => {
       setHasChanges(
         games !== currentGamesPerMatchup ||
           starts !== currentSpStartsPerMatchup ||
           careerGames !== currentMinCareerGames ||
-          careerSeasons !== currentMinCareerSeasons,
+          careerSeasons !== currentMinCareerSeasons ||
+          totMatchups !== currentTotalMatchups,
       );
     },
     [
@@ -97,6 +111,7 @@ export function LeagueSettingsControl({
       currentSpStartsPerMatchup,
       currentMinCareerGames,
       currentMinCareerSeasons,
+      currentTotalMatchups,
     ],
   );
 
@@ -106,33 +121,77 @@ export function LeagueSettingsControl({
       // If SP starts exceed the new games count, clamp it down
       const clampedStarts = Math.min(spStarts, value);
       setSpStarts(clampedStarts);
-      checkChanges(value, clampedStarts, minCareerGames, minCareerSeasons);
+      checkChanges(
+        value,
+        clampedStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+      );
     },
-    [spStarts, minCareerGames, minCareerSeasons, checkChanges],
+    [spStarts, minCareerGames, minCareerSeasons, totalMatchups, checkChanges],
   );
 
   const handleSpStartsChange = useCallback(
     (value: number) => {
       setSpStarts(value);
-      checkChanges(gamesPerMatchup, value, minCareerGames, minCareerSeasons);
+      checkChanges(
+        gamesPerMatchup,
+        value,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+      );
     },
-    [gamesPerMatchup, minCareerGames, minCareerSeasons, checkChanges],
+    [
+      gamesPerMatchup,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      checkChanges,
+    ],
   );
 
   const handleMinCareerGamesChange = useCallback(
     (value: number) => {
       setMinCareerGames(value);
-      checkChanges(gamesPerMatchup, spStarts, value, minCareerSeasons);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        value,
+        minCareerSeasons,
+        totalMatchups,
+      );
     },
-    [gamesPerMatchup, spStarts, minCareerSeasons, checkChanges],
+    [gamesPerMatchup, spStarts, minCareerSeasons, totalMatchups, checkChanges],
   );
 
   const handleMinCareerSeasonsChange = useCallback(
     (value: number) => {
       setMinCareerSeasons(value);
-      checkChanges(gamesPerMatchup, spStarts, minCareerGames, value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        value,
+        totalMatchups,
+      );
     },
-    [gamesPerMatchup, spStarts, minCareerGames, checkChanges],
+    [gamesPerMatchup, spStarts, minCareerGames, totalMatchups, checkChanges],
+  );
+
+  const handleTotalMatchupsChange = useCallback(
+    (value: number) => {
+      setTotalMatchups(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        value,
+      );
+    },
+    [gamesPerMatchup, spStarts, minCareerGames, minCareerSeasons, checkChanges],
   );
 
   const validationError =
@@ -152,6 +211,7 @@ export function LeagueSettingsControl({
             spStartsPerMatchup: spStarts,
             minCareerGames,
             minCareerSeasons,
+            totalMatchups,
           },
         },
         refetchQueries: ['GetLeagueById'],
@@ -172,6 +232,7 @@ export function LeagueSettingsControl({
     setSpStarts(currentSpStartsPerMatchup);
     setMinCareerGames(currentMinCareerGames);
     setMinCareerSeasons(currentMinCareerSeasons);
+    setTotalMatchups(currentTotalMatchups);
     setHasChanges(false);
   };
 
@@ -384,6 +445,59 @@ export function LeagueSettingsControl({
                   icon={isSelected ? <Check size={14} /> : undefined}
                   aria-pressed={isSelected}
                   aria-label={`Minimum career seasons: ${option.label}`}
+                  hoverStyle={
+                    saving
+                      ? undefined
+                      : {
+                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                        }
+                  }
+                >
+                  <Text
+                    fontSize="$2"
+                    fontWeight={isSelected ? '700' : '400'}
+                    color={isSelected ? 'white' : '$color'}
+                  >
+                    {option.label}
+                  </Text>
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
+
+        <Separator />
+
+        {/* Total Matchups */}
+        <YStack gap="$2">
+          <YStack gap="$1">
+            <Text fontSize="$3" fontWeight="600" color="$color">
+              Total Matchups
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Total number of matchup weeks in a season. Adding weeks creates
+              new scheduled matchups. Removing weeks only removes future
+              unplayed (scheduled) matchups.
+            </Text>
+          </YStack>
+          <XStack gap="$2" flexWrap="wrap">
+            {TOTAL_MATCHUPS_OPTIONS.map((option) => {
+              const isSelected = totalMatchups === option.value;
+              return (
+                <Button
+                  key={option.value}
+                  size="$3"
+                  theme={isSelected ? 'active' : 'alt2'}
+                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
+                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  borderWidth={1}
+                  borderRadius="$3"
+                  onPress={() => handleTotalMatchupsChange(option.value)}
+                  disabled={saving}
+                  opacity={saving ? 0.5 : 1}
+                  icon={isSelected ? <Check size={14} /> : undefined}
+                  aria-pressed={isSelected}
+                  aria-label={`Total matchups: ${option.label}`}
                   hoverStyle={
                     saving
                       ? undefined

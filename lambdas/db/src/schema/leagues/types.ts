@@ -60,6 +60,7 @@ export const League = builder.objectRef<{
   gamesPerMatchup?: number;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  totalMatchups?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -87,6 +88,7 @@ League.implement({
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
     minCareerGames: t.exposeInt('minCareerGames', { nullable: true }),
     minCareerSeasons: t.exposeInt('minCareerSeasons', { nullable: true }),
+    totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:

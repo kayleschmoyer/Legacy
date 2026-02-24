@@ -111,21 +111,40 @@ twig init
 - Working on unrelated tickets
 - First ticket in a new sprint
 
-**Use `-p` or `-p=current` (with `-FromCurrent` flag) when:**
+**Use `-p=current` (with `-FromCurrent` flag) when:**
 
 - Creating a follow-up ticket to current work
 - Building on changes in the current branch
 - Working on a series of dependent tickets
+
+**Use `-p=<explicit-branch-name>` when:**
+
+- The ticket explicitly depends on ANOTHER ticket that is in-progress (not yet merged to main)
+- Check the Jira ticket description and linked issues to identify dependencies
+- First switch to the parent branch, then create the child:
+
+```powershell
+# If LS-200 depends on LS-199 (which is in-progress):
+git checkout LS-199/some-branch-name
+twig switch LS-200 -p=current  # branches from LS-199
+# OR equivalently:
+twig switch LS-200 -p=LS-199/some-branch-name
+```
+
+> **⚠️ CRITICAL**: If a ticket builds on code from an unmerged branch, parent MUST be
+> that branch — not main. Using `-p=main` when there's an in-progress dependency creates
+> sibling branches that will have merge conflicts when both are merged.
 
 **The script will prompt you** if you're already on a feature branch to help you decide.
 
 ### Other Best Practices
 
 1. **Always set parent explicitly** with `-p=main` or `-p=current` (equals-sign syntax, not space-separated) to avoid incorrect parent tracking
-2. **Verify ticket exists** before creating branch
-3. **Pull latest main** before branching from main (script does this automatically)
-4. **Check branch name** follows convention: feature/LS-####-description
-5. **Verify parent with `twig tree`** after creating branch
+2. **Check for in-progress dependencies** before branching — if the ticket depends on another unmerged ticket, branch from that ticket's branch, not main
+3. **Verify parent with `twig tree`** after creating branch — the new branch must appear nested under the correct parent
+4. **Verify ticket exists** before creating branch
+5. **Pull latest main** before branching from main (script does this automatically)
+6. **Check branch name** follows convention: feature/LS-####-description
 
 ## Branch Naming Convention
 

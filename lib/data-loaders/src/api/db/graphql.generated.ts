@@ -415,6 +415,7 @@ export type League = {
   playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
+  totalMatchups?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
   waiverType?: Maybe<Scalars['String']['output']>;
@@ -640,6 +641,7 @@ export type Mutation = {
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
+  createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -705,6 +707,10 @@ export type MutationClaimFreeAgentArgs = {
 export type MutationCommissionerPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCreateAllMatchupsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -1685,6 +1691,7 @@ export type UpdateLeagueSettingsInput = {
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
+  totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type User = {

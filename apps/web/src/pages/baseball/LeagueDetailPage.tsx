@@ -1970,6 +1970,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
         currentMinCareerGames={league.minCareerGames ?? 50}
         currentMinCareerSeasons={league.minCareerSeasons ?? 3}
+        currentTotalMatchups={league.totalMatchups ?? 10}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

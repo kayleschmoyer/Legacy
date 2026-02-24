@@ -16,6 +16,7 @@ fragment League on League {
   gamesPerMatchup
   minCareerGames
   minCareerSeasons
+  totalMatchups
   userMembership {
     ...LeagueMember
   }

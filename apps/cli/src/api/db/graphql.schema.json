@@ -3653,6 +3653,18 @@
             "deprecationReason": null
           },
           {
+            "name": "totalMatchups",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "userMembership",
             "description": null,
             "args": [],
@@ -5580,6 +5592,35 @@
             "type": {
               "kind": "OBJECT",
               "name": "DraftPick",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "createAllMatchups",
+            "description": null,
+            "args": [
+              {
+                "name": "leagueId",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "OBJECT",
+              "name": "AdvanceLeagueWeekResponse",
               "ofType": null
             },
             "isDeprecated": false,
@@ -14079,6 +14120,18 @@
           },
           {
             "name": "spStartsPerMatchup",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "totalMatchups",
             "description": null,
             "type": {
               "kind": "SCALAR",

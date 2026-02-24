@@ -45,7 +45,16 @@ twig switch LS-1234 -p=main
 
 # For follow-up work from current branch
 twig switch LS-1234 -p=current
+
+# For ticket that depends on ANOTHER in-progress ticket (not yet merged)
+# First check out the parent ticket's branch, then branch from it:
+git checkout LS-XXXX/parent-branch-name
+twig switch LS-1234 -p=current
 ```
+
+> **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for linked issues
+> or descriptions that indicate a dependency on another in-progress ticket.
+> Always verify with `twig tree` that the new branch appears under the right parent.
 
 **⚠️ DO NOT SKIP THIS STEP**
 
@@ -127,6 +136,35 @@ twig switch LS-1234 -p=current  # follow-up/dependent work
 Without `-p=main`, twig may not correctly track the branch's parent,
 causing issues with rebasing, PR targets, and the branch dependency tree.
 **Always use `-p=main` for new features or `-p=current` for dependent work.**
+
+### ❌ MISTAKE 6: Branching from main when ticket depends on an in-progress branch
+
+```powershell
+# WRONG - LS-200 depends on unmerged LS-199, but branched from main
+git checkout main
+twig switch LS-200 -p=main  # ❌ creates sibling branch, loses LS-199 changes!
+
+# CORRECT - branch from the in-progress parent ticket
+git checkout LS-199/branch-name
+twig switch LS-200 -p=current  # ✅ properly stacked under LS-199
+```
+
+If you made this mistake, fix it by rebasing and updating twig:
+
+```powershell
+# Rebase child onto correct parent
+git checkout LS-200/branch-name
+git rebase LS-199/branch-name  # resolve any conflicts
+
+# Update twig dependency map
+twig branch depend --exclusive LS-200/branch-name LS-199/branch-name
+
+# Force push
+git push --force-with-lease origin HEAD
+
+# Verify tree
+twig tree
+```
 
 ### ❌ MISTAKE 1: Committing to Main
 

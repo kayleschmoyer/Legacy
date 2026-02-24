@@ -15,6 +15,7 @@ import {
 } from './types';
 import { getCurrentDraftPickInfo } from './helpers';
 import { builder } from '../builder';
+import { createAllMatchupsForLeague } from '../matchups/mutations';
 
 /**
  * Mutation: Make a draft pick
@@ -327,6 +328,29 @@ builder.mutationField('makeDraftPick', (t) =>
               result.leagueId,
               result.selectionMethod,
             );
+          }
+        }
+
+        // Auto-create all matchups when draft completes
+        if (result.isDraftComplete) {
+          try {
+            const matchupResult = await createAllMatchupsForLeague(
+              context.db,
+              result.leagueId,
+            );
+            LOGGER.info('Auto-created matchups after draft completion', {
+              leagueId: result.leagueId,
+              matchupCount: matchupResult.matchupCount,
+            });
+          } catch (matchupError) {
+            // Log but don't fail the draft pick — matchups can be created manually
+            LOGGER.error('Failed to auto-create matchups after draft', {
+              leagueId: result.leagueId,
+              error:
+                matchupError instanceof Error
+                  ? matchupError.message
+                  : String(matchupError),
+            });
           }
         }
 
@@ -1114,6 +1138,34 @@ builder.mutationField('commissionerPick', (t) =>
             await context.notificationService.notifyDraftCompleted(
               result.leagueId,
               result.selectionMethod,
+            );
+          }
+        }
+
+        // Auto-create all matchups when draft completes
+        if (result.isDraftComplete) {
+          try {
+            const matchupResult = await createAllMatchupsForLeague(
+              context.db,
+              result.leagueId,
+            );
+            LOGGER.info(
+              'Auto-created matchups after commissioner draft completion',
+              {
+                leagueId: result.leagueId,
+                matchupCount: matchupResult.matchupCount,
+              },
+            );
+          } catch (matchupError) {
+            LOGGER.error(
+              'Failed to auto-create matchups after commissioner draft',
+              {
+                leagueId: result.leagueId,
+                error:
+                  matchupError instanceof Error
+                    ? matchupError.message
+                    : String(matchupError),
+              },
             );
           }
         }

@@ -23,6 +23,7 @@ interface LeagueState {
     spStartsPerMatchup?: number | null;
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

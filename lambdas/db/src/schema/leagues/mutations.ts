@@ -23,6 +23,7 @@ import {
   Team,
 } from './types';
 import { builder } from '../builder';
+import { adjustMatchupsForNewTotal } from '../matchups/mutations';
 
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
@@ -845,6 +846,7 @@ const UpdateLeagueSettingsInput = builder.inputType(
       gamesPerMatchup: t.int({ required: false }),
       minCareerGames: t.int({ required: false }),
       minCareerSeasons: t.int({ required: false }),
+      totalMatchups: t.int({ required: false }),
     }),
   },
 );
@@ -869,6 +871,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         gamesPerMatchup,
         minCareerGames,
         minCareerSeasons,
+        totalMatchups,
       } = args.input;
       const userId = context.user.id;
 
@@ -902,6 +905,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         gamesPerMatchup?: number;
         minCareerGames?: number;
         minCareerSeasons?: number;
+        totalMatchups?: number;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -1036,6 +1040,26 @@ builder.mutationField('updateLeagueSettings', (t) =>
         }
       }
 
+      if (totalMatchups !== null && totalMatchups !== undefined) {
+        if (totalMatchups < 1) {
+          throw new Error('Total matchups must be at least 1');
+        }
+
+        const current = await context.db
+          .select({ totalMatchups: PublicSchema.leagues.totalMatchups })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const oldValue = current[0]?.totalMatchups ?? 10;
+        if (oldValue !== totalMatchups) {
+          leagueUpdate.totalMatchups = totalMatchups;
+          changeDescriptions.push(
+            `Total matchups: ${oldValue} → ${totalMatchups}`,
+          );
+        }
+      }
+
       if (Object.keys(leagueUpdate).length === 0) {
         // No changes — just return the current league
         const [league] = await context.db
@@ -1090,6 +1114,21 @@ builder.mutationField('updateLeagueSettings', (t) =>
         LOGGER.info(
           `Updated matchup settings on ${result.length} scheduled matchups for league ${leagueId}`,
         );
+      }
+
+      // 2.5. Adjust matchup count if totalMatchups changed
+      if (leagueUpdate.totalMatchups !== undefined) {
+        const adjustResult = await adjustMatchupsForNewTotal(
+          context.db,
+          leagueId,
+          leagueUpdate.totalMatchups,
+        );
+        LOGGER.info('Adjusted matchup count for new totalMatchups', {
+          leagueId,
+          newTotal: leagueUpdate.totalMatchups,
+          added: adjustResult.added,
+          removed: adjustResult.removed,
+        });
       }
 
       // 3. Send league chat notification

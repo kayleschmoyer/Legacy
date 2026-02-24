@@ -374,6 +374,7 @@ type League {
   playerPool: String
   scoringProfile: ScoringConfig
   spStartsPerMatchup: Int
+  totalMatchups: Int
   userMembership: LeagueMember
   waiverEnabled: Boolean
   waiverType: String
@@ -630,6 +631,7 @@ type Mutation {
     playerId: Int!
   ): WaiverClaim
   commissionerPick(draftId: Int!, playerId: Int!): DraftPick
+  createAllMatchups(leagueId: Int!): AdvanceLeagueWeekResponse
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
@@ -1354,6 +1356,7 @@ input UpdateLeagueSettingsInput {
   minCareerGames: Int
   minCareerSeasons: Int
   spStartsPerMatchup: Int
+  totalMatchups: Int
 }
 
 type User {

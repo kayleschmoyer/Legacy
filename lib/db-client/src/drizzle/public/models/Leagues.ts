@@ -59,6 +59,7 @@ export const leagues = pgTable(
     spStartsPerMatchup: integer('sp_starts_per_matchup').notNull().default(1),
     minCareerGames: integer('min_career_games').notNull().default(50),
     minCareerSeasons: integer('min_career_seasons').notNull().default(3),
+    totalMatchups: integer('total_matchups').notNull().default(10),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

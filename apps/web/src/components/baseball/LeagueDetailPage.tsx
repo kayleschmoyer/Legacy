@@ -1215,6 +1215,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
         currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+        currentTotalMatchups={league.totalMatchups ?? 10}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);
