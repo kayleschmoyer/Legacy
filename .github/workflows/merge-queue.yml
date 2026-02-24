@@ -459,6 +459,23 @@ jobs:
 
                   console.log(`   ✅ PR #${dependentPR.number} (${dependentPR.title}) re-targeted to '${targetBase}'`);
 
+                  // Remove "Waiting on Parent" label if present
+                  const waitingLabel = 'Waiting on Parent';
+                  const hasWaitingLabel = dependentPR.labels.some(label => label.name === waitingLabel);
+                  if (hasWaitingLabel) {
+                    try {
+                      await github.rest.issues.removeLabel({
+                        owner,
+                        repo,
+                        issue_number: dependentPR.number,
+                        name: waitingLabel
+                      });
+                      console.log(`   🏷️ Removed '${waitingLabel}' label from PR #${dependentPR.number}`);
+                    } catch (labelError) {
+                      console.warn(`   ⚠️ Could not remove '${waitingLabel}' label from PR #${dependentPR.number}: ${labelError.message}`);
+                    }
+                  }
+
                   // Notify on the dependent PR
                   await github.rest.issues.createComment({
                     owner,
