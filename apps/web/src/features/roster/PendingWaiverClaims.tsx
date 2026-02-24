@@ -41,8 +41,11 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
 
   const claims = data?.teamWaiverClaims ?? [];
 
-  // Don't render anything if no pending claims and not loading
-  if (!loading && claims.length === 0) {
+  // Don't render until we've received at least one response (prevents flash on load)
+  if (!data) return null;
+
+  // Don't render if there are no pending claims
+  if (claims.length === 0) {
     return null;
   }
 
