@@ -203,7 +203,6 @@ pnpm exec nx affected -t typecheck
 # 5. Commit schema + generated files together
 git add lambdas/db/schema.graphql
 git add **/graphql.generated.ts
-git add **/graphql.schema.json
 git commit -m "feat(graphql): update schema and regenerate types"
 ```
 

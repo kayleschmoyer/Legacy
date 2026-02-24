@@ -37,6 +37,32 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** Result of the automated weekly matchup advancement across all active leagues */
+export type AutoAdvanceMatchupsResult = {
+  __typename?: 'AutoAdvanceMatchupsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesAdvanced?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+  leaguesSkipped?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the automated draft pick processing for expired deadlines */
+export type AutoProcessDraftPicksResult = {
+  __typename?: 'AutoProcessDraftPicksResult';
+  draftsCompleted?: Maybe<Scalars['Int']['output']>;
+  draftsProcessed?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  picksAutoMade?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the automated nightly game selection across all active leagues */
+export type AutoSelectGamesResult = {
+  __typename?: 'AutoSelectGamesResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  gamesTriggered?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AverageSeasonBatting = {
   __typename?: 'AverageSeasonBatting';
   atBats?: Maybe<Scalars['Float']['output']>;
@@ -252,6 +278,7 @@ export type Draft = {
   __typename?: 'Draft';
   createdAt?: Maybe<Scalars['String']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
+  currentPickDeadline?: Maybe<Scalars['String']['output']>;
   date?: Maybe<Scalars['String']['output']>;
   draftCompletedAt?: Maybe<Scalars['String']['output']>;
   draftMode?: Maybe<Scalars['String']['output']>;
@@ -259,6 +286,7 @@ export type Draft = {
   draftStartedAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
@@ -402,11 +430,14 @@ export type League = {
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  minCareerGames?: Maybe<Scalars['Int']['output']>;
+  minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
+  totalMatchups?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
   waiverType?: Maybe<Scalars['String']['output']>;
@@ -628,10 +659,16 @@ export type Mutation = {
   /** Record that the user has accepted the privacy policy */
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
+  /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
+  autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
+  /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
+  autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
+  /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
+  autoSelectGames?: Maybe<AutoSelectGamesResult>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
+  createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -662,11 +699,12 @@ export type Mutation = {
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
+  swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
-  triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
+  updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
@@ -677,8 +715,16 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-export type MutationAdvanceLeagueWeekArgs = {
-  leagueId: Scalars['Int']['input'];
+export type MutationAutoAdvanceMatchupsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAutoProcessDraftPicksArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAutoSelectGamesArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationCancelWaiverClaimArgs = {
@@ -695,6 +741,10 @@ export type MutationClaimFreeAgentArgs = {
 export type MutationCommissionerPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCreateAllMatchupsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -805,16 +855,18 @@ export type MutationStartDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationSwapMatchupPlayerPositionsArgs = {
+  matchupPlayerIdA: Scalars['Int']['input'];
+  matchupPlayerIdB: Scalars['Int']['input'];
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type MutationSwapTeamMemberPositionsArgs = {
   positionIdA?: InputMaybe<Scalars['Int']['input']>;
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
-};
-
-export type MutationTriggerGameSelectionArgs = {
-  gameNumber: Scalars['Int']['input'];
-  matchupId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateDraftSettingsArgs = {
@@ -828,6 +880,11 @@ export type MutationUpdateLeagueScoringProfileArgs = {
 
 export type MutationUpdateLeagueSettingsArgs = {
   input: UpdateLeagueSettingsInput;
+};
+
+export type MutationUpdateMatchupPlayerPositionArgs = {
+  matchupPlayerId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationUpdateMatchupScoreArgs = {
@@ -910,6 +967,8 @@ export type Player = {
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
+  /** Career pitching statistics for the player */
+  careerPitching?: Maybe<CareerPitching>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -917,6 +976,8 @@ export type Player = {
   lastName?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
   scoring?: Maybe<PlayerScoring>;
+  /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
+  seasonsPlayed?: Maybe<Scalars['Int']['output']>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -988,6 +1049,7 @@ export type Query = {
   getMatchupHistory?: Maybe<Array<Matchup>>;
   getMatchupMessages?: Maybe<Array<MatchupMessage>>;
   getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
+  getMatchupRoster?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
@@ -996,6 +1058,7 @@ export type Query = {
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
+  getTeamMatchupHistory?: Maybe<Array<Matchup>>;
   getTeamRecentMatchups?: Maybe<Array<Matchup>>;
   getTiebreakerHistory?: Maybe<Array<TiebreakerHistory>>;
   getTiebreakerRules?: Maybe<TiebreakerRule>;
@@ -1138,6 +1201,11 @@ export type QueryGetMatchupPlayersArgs = {
   matchupId: Scalars['Int']['input'];
 };
 
+export type QueryGetMatchupRosterArgs = {
+  matchupId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
 export type QueryGetMatchupStatusCountsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
@@ -1178,6 +1246,12 @@ export type QueryGetPowerRankingsArgs = {
 export type QueryGetSeasonResultsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetTeamMatchupHistoryArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryGetTeamRecentMatchupsArgs = {
@@ -1618,6 +1692,7 @@ export type UpdateDraftSettingsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1632,6 +1707,7 @@ export type UpdateDraftSettingsPayload = {
   draftStartedAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
 };
@@ -1645,7 +1721,10 @@ export type UpdateLeagueScoringMultiplierInput = {
 export type UpdateLeagueSettingsInput = {
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
+  minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
+  totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type User = {

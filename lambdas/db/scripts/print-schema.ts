@@ -11,7 +11,7 @@
  * to ensure schema changes are always tracked in version control.
  */
 
-import { printSchema } from 'graphql';
+import { lexicographicSortSchema, printSchema } from 'graphql';
 import * as prettier from 'prettier';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,7 +24,11 @@ import { schema } from '../src/schema/index';
 
 const outputPath = path.resolve(__dirname, '..', 'schema.graphql');
 
-const sdl = printSchema(schema);
+// Sort the schema lexicographically before printing so that types, fields,
+// arguments, and enum values are always in deterministic alphabetical order.
+// This prevents merge conflicts when multiple branches independently add or
+// modify different parts of the schema.
+const sdl = printSchema(lexicographicSortSchema(schema));
 
 void (async () => {
   // Resolve the workspace prettier config and format the SDL as GraphQL.

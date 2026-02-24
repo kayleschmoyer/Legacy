@@ -12,9 +12,7 @@
 $graphqlGeneratedFiles = @(
     "apps/app/src/api/db/graphql.generated.ts",
     "apps/web/src/api/db/graphql.generated.ts",
-    "apps/cli/src/api/db/graphql.generated.ts",
-    "apps/app/src/api/db/graphql.schema.json",
-    "apps/web/src/api/db/graphql.schema.json"
+    "apps/cli/src/api/db/graphql.generated.ts"
 )
 
 $schemaFiles = @(

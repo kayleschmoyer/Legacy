@@ -1,13 +1,13 @@
 ---
 name: no-edit-generated
-description: 'Never manually edit *.generated.ts or graphql.schema.json files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
+description: 'Never manually edit *.generated.ts files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
 ---
 
 # Skill: Never Edit Generated Files Directly
 
 ## Overview
 
-Files ending in `.generated.ts` and `graphql.schema.json` are **auto-generated** by
+Files ending in `.generated.ts` are **auto-generated** by
 `graphql-codegen`. Editing them by hand will be overwritten the next time codegen
 runs, will cause merge conflicts, and will cause the `check-codegen` CI job to fail.
 
@@ -15,13 +15,11 @@ Always regenerate them from source instead.
 
 ## Files This Applies To
 
-| Pattern               | Example paths                                           |
-| --------------------- | ------------------------------------------------------- |
-| `schema.graphql`      | `lambdas/db/schema.graphql`                             |
-| `*.generated.ts`      | `apps/app/src/api/db/graphql.generated.ts`              |
-| `*.generated.ts`      | `lib/shared-components/src/api/db/graphql.generated.ts` |
-| `graphql.schema.json` | `apps/web/src/api/db/graphql.schema.json`               |
-| `graphql.schema.json` | `lib/bref-client/src/api/db/graphql.schema.json`        |
+| Pattern          | Example paths                                           |
+| ---------------- | ------------------------------------------------------- |
+| `schema.graphql` | `lambdas/db/schema.graphql`                             |
+| `*.generated.ts` | `apps/app/src/api/db/graphql.generated.ts`              |
+| `*.generated.ts` | `lib/shared-components/src/api/db/graphql.generated.ts` |
 
 If you see one of these paths in a diff, a task, or a conflict — **stop and regenerate** instead of editing.
 
@@ -79,7 +77,6 @@ pnpm exec nx affected -t codegen
 ```powershell
 git add lambdas/db/schema.graphql
 git add **/graphql.generated.ts
-git add **/graphql.schema.json
 git commit -m "chore(codegen): regenerate types from updated schema"
 ```
 
@@ -105,7 +102,7 @@ pnpm exec nx run db:print-schema
 pnpm exec nx run-many -t codegen \
   --projects=app,web,cli,api,shared-components,data-loaders,bref-client
 
-git add lambdas/db/schema.graphql **/graphql.generated.ts **/graphql.schema.json
+git add lambdas/db/schema.graphql **/graphql.generated.ts
 ```
 
 See also: `skills/codegen/SKILL.md`

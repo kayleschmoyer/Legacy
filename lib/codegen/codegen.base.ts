@@ -45,9 +45,6 @@ const config: CodegenConfig = {
         'typescript-react-apollo',
       ],
     },
-    'src/api/db/graphql.schema.json': {
-      plugins: ['introspection'],
-    },
   },
   hooks: {
     afterAllFileWrite: ['pnpm -w run codegen:fix-apollo', 'prettier --write'],
