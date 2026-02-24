@@ -175,6 +175,8 @@ export const matchupPlayerGames = pgTable(
     statsLoadingStatus: varchar('stats_loading_status', { length: 20 }).default(
       'pending',
     ),
+    /** True when an SP was probabilistically skipped for this game day (not starting). */
+    spSkipped: boolean('sp_skipped').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -789,7 +789,7 @@ export function MatchupRosterComparison({
     const calculatePlayerProjection = (
       player: MatchupPlayerFragment,
     ): number => {
-      const gamesPlayed = player.games?.length ?? 0;
+      const gamesPlayed = player.games?.filter((g) => !g.spSkipped).length ?? 0;
       const actualScore =
         player.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ?? 0;
       // Use player-specific numberOfGames (SP gets spStartsPerMatchup, others get gamesPerMatchup)
@@ -1317,12 +1317,16 @@ export function MatchupRosterComparison({
     const team2Proj = team2Player ? calculatePlayerProjection(team2Player) : 0;
 
     // Check if any games have been played
-    const team1HasPlayed = (team1Player?.games?.length ?? 0) > 0;
-    const team2HasPlayed = (team2Player?.games?.length ?? 0) > 0;
+    const team1HasPlayed =
+      (team1Player?.games?.filter((g) => !g.spSkipped).length ?? 0) > 0;
+    const team2HasPlayed =
+      (team2Player?.games?.filter((g) => !g.spSkipped).length ?? 0) > 0;
 
     // Calculate expected score based on games played (for color coding)
-    const team1GamesPlayed = team1Player?.games?.length ?? 0;
-    const team2GamesPlayed = team2Player?.games?.length ?? 0;
+    const team1GamesPlayed =
+      team1Player?.games?.filter((g) => !g.spSkipped).length ?? 0;
+    const team2GamesPlayed =
+      team2Player?.games?.filter((g) => !g.spSkipped).length ?? 0;
     const team1ExpectedForGamesPlayed =
       team1GamesPlayed > 0
         ? (team1Proj / gamesPerMatchup) * team1GamesPlayed
@@ -1432,17 +1436,23 @@ export function MatchupRosterComparison({
                       <>
                         <Text color="$green10">
                           {' '}
-                          • {team1Player.games.length}/
-                          {team1Player.numberOfGames ?? gamesPerMatchup} games
+                          •{' '}
+                          {team1Player.games.filter((g) => !g.spSkipped).length}
+                          /{team1Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
+                          const skippedCount = team1Player.games.filter(
+                            (g) => g.spSkipped,
+                          ).length;
                           const loadingCount = team1Player.games.filter(
                             (g) =>
-                              g.statsLoadingStatus === 'loading' ||
-                              g.statsLoadingStatus === 'pending',
+                              !g.spSkipped &&
+                              (g.statsLoadingStatus === 'loading' ||
+                                g.statsLoadingStatus === 'pending'),
                           ).length;
                           const failedCount = team1Player.games.filter(
-                            (g) => g.statsLoadingStatus === 'failed',
+                            (g) =>
+                              !g.spSkipped && g.statsLoadingStatus === 'failed',
                           ).length;
 
                           if (loadingCount > 0) {
@@ -1458,6 +1468,15 @@ export function MatchupRosterComparison({
                               <Text color="$red10">
                                 {' '}
                                 • Failed ({failedCount})
+                              </Text>
+                            );
+                          }
+                          if (skippedCount > 0) {
+                            return (
+                              <Text color="$gray9">
+                                {' '}
+                                • {skippedCount} off day
+                                {skippedCount > 1 ? 's' : ''}
                               </Text>
                             );
                           }
@@ -1633,17 +1652,23 @@ export function MatchupRosterComparison({
                       <>
                         <Text color="$green10">
                           {' '}
-                          • {team2Player.games.length}/
-                          {team2Player.numberOfGames ?? gamesPerMatchup} games
+                          •{' '}
+                          {team2Player.games.filter((g) => !g.spSkipped).length}
+                          /{team2Player.numberOfGames ?? gamesPerMatchup} games
                         </Text>
                         {(() => {
+                          const skippedCount = team2Player.games.filter(
+                            (g) => g.spSkipped,
+                          ).length;
                           const loadingCount = team2Player.games.filter(
                             (g) =>
-                              g.statsLoadingStatus === 'loading' ||
-                              g.statsLoadingStatus === 'pending',
+                              !g.spSkipped &&
+                              (g.statsLoadingStatus === 'loading' ||
+                                g.statsLoadingStatus === 'pending'),
                           ).length;
                           const failedCount = team2Player.games.filter(
-                            (g) => g.statsLoadingStatus === 'failed',
+                            (g) =>
+                              !g.spSkipped && g.statsLoadingStatus === 'failed',
                           ).length;
 
                           if (loadingCount > 0) {
@@ -1659,6 +1684,15 @@ export function MatchupRosterComparison({
                               <Text color="$red10">
                                 {' '}
                                 • Failed ({failedCount})
+                              </Text>
+                            );
+                          }
+                          if (skippedCount > 0) {
+                            return (
+                              <Text color="$gray9">
+                                {' '}
+                                • {skippedCount} off day
+                                {skippedCount > 1 ? 's' : ''}
                               </Text>
                             );
                           }

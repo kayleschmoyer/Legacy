@@ -445,13 +445,14 @@ export async function selectGamesForMatchup(
             `remaining=${gamesRemainingInMatchup})`,
         );
 
-        // Insert a record with null gameIdentifier to indicate intentional skip
+        // Insert a record with null gameIdentifier and spSkipped=true to indicate intentional skip
         await db.insert(PublicSchema.matchupPlayerGames).values({
           gameNum: gameNumber,
           matchupPlayerId: matchupPlayer.id,
           gameIdentifier: null,
           fieldingGamePos: null,
           statsLoadingStatus: 'completed',
+          spSkipped: true,
         });
         continue;
       }

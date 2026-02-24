@@ -589,6 +589,7 @@ type MatchupPlayerGame {
   id: Int
   matchupPlayerId: Int
   pitchingGame: GamePitching
+  spSkipped: Boolean
   statsLoadingStatus: String
 }
 

@@ -429,6 +429,8 @@ export const MatchupPlayerGameRef = builder.objectRef<{
   gameIdentifier: string | null;
   fieldingGamePos: string | null;
   statsLoadingStatus: string | null;
+  /** True when an SP was probabilistically skipped for this game day */
+  spSkipped: boolean;
 }>('MatchupPlayerGame');
 
 MatchupPlayerGameRef.implement({
@@ -441,6 +443,8 @@ MatchupPlayerGameRef.implement({
     statsLoadingStatus: t.exposeString('statsLoadingStatus', {
       nullable: true,
     }),
+    /** True when an SP was probabilistically skipped for this game day (not starting). */
+    spSkipped: t.exposeBoolean('spSkipped'),
 
     // Resolve the actual game stats for this selected game
     battingGame: t.field({

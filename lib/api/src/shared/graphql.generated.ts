@@ -398,6 +398,7 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
+  gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
@@ -405,6 +406,7 @@ export type League = {
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
   waiverType?: Maybe<Scalars['String']['output']>;
@@ -449,6 +451,7 @@ export type Matchup = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
+  spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;
   statsLoadingStatus?: Maybe<StatsLoadingStatus>;
   status?: Maybe<MatchupStatus>;
@@ -576,6 +579,8 @@ export type MatchupPlayer = {
   games?: Maybe<Array<MatchupPlayerGame>>;
   id?: Maybe<Scalars['ID']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;
+  /** Number of games this player is expected to play in this matchup (SP uses spStartsPerMatchup, others use gamesPerMatchup) */
+  numberOfGames?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
@@ -596,6 +601,7 @@ export type MatchupPlayerGame = {
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGame?: Maybe<GamePitching>;
+  spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -660,6 +666,7 @@ export type Mutation = {
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
+  updateLeagueSettings?: Maybe<League>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
@@ -817,6 +824,10 @@ export type MutationUpdateDraftSettingsArgs = {
 export type MutationUpdateLeagueScoringProfileArgs = {
   leagueId: Scalars['Int']['input'];
   updates: Array<UpdateLeagueScoringMultiplierInput>;
+};
+
+export type MutationUpdateLeagueSettingsArgs = {
+  input: UpdateLeagueSettingsInput;
 };
 
 export type MutationUpdateMatchupScoreArgs = {
@@ -1629,6 +1640,12 @@ export type UpdateLeagueScoringMultiplierInput = {
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   multiplier?: InputMaybe<Scalars['Float']['input']>;
   statDefinitionId: Scalars['Int']['input'];
+};
+
+export type UpdateLeagueSettingsInput = {
+  gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type User = {

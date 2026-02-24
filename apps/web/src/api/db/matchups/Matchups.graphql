@@ -150,6 +150,7 @@ fragment MatchupPlayer on MatchupPlayer {
     gameIdentifier
     fieldingGamePos
     statsLoadingStatus
+    spSkipped
     battingGame {
       playerId
       season

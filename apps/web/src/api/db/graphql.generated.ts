@@ -607,6 +607,7 @@ export type MatchupPlayerGame = {
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGame?: Maybe<GamePitching>;
+  spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
@@ -2352,6 +2353,7 @@ export type MatchupPlayerFragment = {
     gameIdentifier?: string | null;
     fieldingGamePos?: string | null;
     statsLoadingStatus?: string | null;
+    spSkipped?: boolean | null;
     battingGame?: {
       __typename?: 'GameBatting';
       playerId?: number | null;
@@ -2517,6 +2519,7 @@ export type GetMatchupPlayersQuery = {
       gameIdentifier?: string | null;
       fieldingGamePos?: string | null;
       statsLoadingStatus?: string | null;
+      spSkipped?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -3414,6 +3417,7 @@ export const MatchupPlayerFragmentDoc = gql`
       gameIdentifier
       fieldingGamePos
       statsLoadingStatus
+      spSkipped
       battingGame {
         playerId
         season

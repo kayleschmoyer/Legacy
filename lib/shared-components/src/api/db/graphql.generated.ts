@@ -613,6 +613,7 @@ export type MatchupPlayerGame = {
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
   pitchingGame?: Maybe<GamePitching>;
+  spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
 };
 
