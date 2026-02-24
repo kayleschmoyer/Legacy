@@ -18,6 +18,10 @@ fragment TeamMember on TeamMember {
     lastName
     brefId
     eligiblePositions
+    careerBatting {
+      games
+    }
+    seasonsPlayed
   }
 }
 

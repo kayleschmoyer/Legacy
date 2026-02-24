@@ -843,6 +843,8 @@ const UpdateLeagueSettingsInput = builder.inputType(
       leagueId: t.int({ required: true }),
       spStartsPerMatchup: t.int({ required: false }),
       gamesPerMatchup: t.int({ required: false }),
+      minCareerGames: t.int({ required: false }),
+      minCareerSeasons: t.int({ required: false }),
     }),
   },
 );
@@ -861,7 +863,13 @@ builder.mutationField('updateLeagueSettings', (t) =>
         throw new Error('Authentication required');
       }
 
-      const { leagueId, spStartsPerMatchup, gamesPerMatchup } = args.input;
+      const {
+        leagueId,
+        spStartsPerMatchup,
+        gamesPerMatchup,
+        minCareerGames,
+        minCareerSeasons,
+      } = args.input;
       const userId = context.user.id;
 
       // Verify user is owner or commissioner
@@ -892,6 +900,8 @@ builder.mutationField('updateLeagueSettings', (t) =>
       const leagueUpdate: {
         spStartsPerMatchup?: number;
         gamesPerMatchup?: number;
+        minCareerGames?: number;
+        minCareerSeasons?: number;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -983,6 +993,46 @@ builder.mutationField('updateLeagueSettings', (t) =>
               `Games per matchup: ${oldGames} → ${gamesPerMatchup}`,
             );
           }
+        }
+      }
+
+      if (minCareerGames !== null && minCareerGames !== undefined) {
+        if (minCareerGames < 0) {
+          throw new Error('Minimum career games must be 0 or greater');
+        }
+
+        const current = await context.db
+          .select({ minCareerGames: PublicSchema.leagues.minCareerGames })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const oldValue = current[0]?.minCareerGames ?? 50;
+        if (oldValue !== minCareerGames) {
+          leagueUpdate.minCareerGames = minCareerGames;
+          changeDescriptions.push(
+            `Min career games: ${oldValue} → ${minCareerGames}`,
+          );
+        }
+      }
+
+      if (minCareerSeasons !== null && minCareerSeasons !== undefined) {
+        if (minCareerSeasons < 0) {
+          throw new Error('Minimum career seasons must be 0 or greater');
+        }
+
+        const current = await context.db
+          .select({ minCareerSeasons: PublicSchema.leagues.minCareerSeasons })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        const oldValue = current[0]?.minCareerSeasons ?? 3;
+        if (oldValue !== minCareerSeasons) {
+          leagueUpdate.minCareerSeasons = minCareerSeasons;
+          changeDescriptions.push(
+            `Min career seasons: ${oldValue} → ${minCareerSeasons}`,
+          );
         }
       }
 

@@ -1660,6 +1660,8 @@ export function LeagueDetailPage(): React.JSX.Element {
           playerMatchupData={playerMatchupDataMap}
           readOnly={isViewingOther}
           teamName={isViewingOther ? viewingTeamName : undefined}
+          minCareerGames={league.minCareerGames ?? 50}
+          minCareerSeasons={league.minCareerSeasons ?? 3}
         />
       </YStack>
     );
@@ -1952,6 +1954,8 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
         currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+        currentMinCareerGames={league.minCareerGames ?? 50}
+        currentMinCareerSeasons={league.minCareerSeasons ?? 3}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

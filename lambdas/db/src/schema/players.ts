@@ -2,7 +2,9 @@ import {
   createDatabaseService,
   type PlayerCareerScore,
 } from '@legacy-sports/db-client';
+import { PublicSchema } from '@legacy-sports/db-client';
 import type { PlayerOrderBy } from '@legacy-sports/db-client';
+import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 import { CareerBattingRef } from './statistics';
@@ -148,6 +150,14 @@ PlayerRef.implement({
         return parent.scoring ?? null;
       },
     }),
+    seasonsPlayed: t.int({
+      description:
+        'Number of distinct MLB seasons the player has batting stats for (AL/NL only)',
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        return context.loaders.battingSeasonsPlayed.load(parent.id);
+      },
+    }),
   }),
 });
 
@@ -168,12 +178,32 @@ builder.queryField('players', (t) =>
       leagueId: t.arg.int({
         required: false,
         description:
-          'League ID for scoring-based sorting. Uses league-specific scoring multipliers when provided, system defaults otherwise.',
+          'League ID for scoring-based sorting and player pool filtering (career minimums). Uses league-specific scoring multipliers when provided, system defaults otherwise.',
       }),
     },
-    resolve: async (root, args) => {
+    resolve: async (root, args, context) => {
       const orderBy = (args.orderBy || 'careerGames') as PlayerOrderBy;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
+
+      let minCareerGames: number | undefined;
+      let minCareerSeasons: number | undefined;
+
+      // When a leagueId is provided, fetch the league's career minimums
+      if (args.leagueId != null) {
+        const [leagueSettings] = await context.db
+          .select({
+            minCareerGames: PublicSchema.leagues.minCareerGames,
+            minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, args.leagueId))
+          .limit(1);
+
+        if (leagueSettings) {
+          minCareerGames = leagueSettings.minCareerGames ?? 50;
+          minCareerSeasons = leagueSettings.minCareerSeasons ?? 3;
+        }
+      }
 
       return dbService.players.getPlayers({
         limit: args.limit || undefined,
@@ -184,6 +214,8 @@ builder.queryField('players', (t) =>
         filters: {
           excludeEmptyNames: args.excludeEmptyNames ?? false,
           position: args.position || undefined,
+          minCareerGames,
+          minCareerSeasons,
         },
       });
     },

@@ -408,6 +408,8 @@ export type League = {
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  minCareerGames?: Maybe<Scalars['Int']['output']>;
+  minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
@@ -923,6 +925,8 @@ export type Player = {
   lastName?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
   scoring?: Maybe<PlayerScoring>;
+  /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
+  seasonsPlayed?: Maybe<Scalars['Int']['output']>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -1651,6 +1655,8 @@ export type UpdateLeagueScoringMultiplierInput = {
 export type UpdateLeagueSettingsInput = {
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
+  minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -1768,6 +1774,8 @@ export type LeagueFragment = {
   faabBudgetDefault?: number | null;
   spStartsPerMatchup?: number | null;
   gamesPerMatchup?: number | null;
+  minCareerGames?: number | null;
+  minCareerSeasons?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -1815,6 +1823,8 @@ export type GetLeagueByIdQuery = {
     faabBudgetDefault?: number | null;
     spStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1850,6 +1860,8 @@ export type CreateLeagueAndTeamsMutation = {
       faabBudgetDefault?: number | null;
       spStartsPerMatchup?: number | null;
       gamesPerMatchup?: number | null;
+      minCareerGames?: number | null;
+      minCareerSeasons?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -1882,6 +1894,8 @@ export type GetUserLeaguesQuery = {
     faabBudgetDefault?: number | null;
     spStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -1946,6 +1960,8 @@ export type StartDraftMutation = {
     faabBudgetDefault?: number | null;
     spStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2080,6 +2096,8 @@ export type UpdateLeagueSettingsMutation = {
     faabBudgetDefault?: number | null;
     spStartsPerMatchup?: number | null;
     gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3104,6 +3122,11 @@ export type TeamMemberFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    seasonsPlayed?: number | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      games?: number | null;
+    } | null;
   } | null;
 };
 
@@ -3127,6 +3150,11 @@ export type GetTeamMembersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
     } | null;
   }> | null;
 };
@@ -3152,6 +3180,11 @@ export type UpdateTeamMemberPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
     } | null;
   } | null;
 };
@@ -3179,6 +3212,11 @@ export type SwapTeamMemberPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
     } | null;
   }> | null;
 };
@@ -3305,6 +3343,8 @@ export const LeagueFragmentDoc = gql`
     faabBudgetDefault
     spStartsPerMatchup
     gamesPerMatchup
+    minCareerGames
+    minCareerSeasons
     userMembership {
       ...LeagueMember
     }
@@ -3554,6 +3594,10 @@ export const TeamMemberFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
+      careerBatting {
+        games
+      }
+      seasonsPlayed
     }
   }
 `;

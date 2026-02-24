@@ -173,9 +173,13 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Verify user is a member of this league
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
 
-      // Get league's player pool setting
+      // Get league's player pool setting and career minimums
       const [league] = await context.db
-        .select({ playerPool: PublicSchema.leagues.playerPool })
+        .select({
+          playerPool: PublicSchema.leagues.playerPool,
+          minCareerGames: PublicSchema.leagues.minCareerGames,
+          minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+        })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
         .limit(1);
@@ -211,6 +215,35 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         const term = `%${search.trim().toLowerCase()}%`;
         baseConditions.push(
           sql`(LOWER(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) LIKE ${term})`,
+        );
+      }
+
+      // Apply career games minimum (defaults to 50 if the league has no setting)
+      const minCareerGames = league?.minCareerGames ?? 50;
+      if (minCareerGames > 0) {
+        baseConditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = ${PublicSchema.players.id})
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.career_batting WHERE g >= ${minCareerGames}
+            )
+          )`,
+        );
+      }
+
+      // Apply career seasons minimum (defaults to 3 if the league has no setting)
+      const minCareerSeasons = league?.minCareerSeasons ?? 3;
+      if (minCareerSeasons > 0) {
+        baseConditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.season_batting
+              WHERE lg_id IN ('AL', 'NL')
+              GROUP BY player_id
+              HAVING COUNT(DISTINCT season) >= ${minCareerSeasons}
+            )
+          )`,
         );
       }
 

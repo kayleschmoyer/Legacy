@@ -58,6 +58,8 @@ export const League = builder.objectRef<{
   faabBudgetDefault?: number;
   spStartsPerMatchup?: number;
   gamesPerMatchup?: number;
+  minCareerGames?: number;
+  minCareerSeasons?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -83,6 +85,8 @@ League.implement({
     faabBudgetDefault: t.exposeInt('faabBudgetDefault', { nullable: true }),
     spStartsPerMatchup: t.exposeInt('spStartsPerMatchup', { nullable: true }),
     gamesPerMatchup: t.exposeInt('gamesPerMatchup', { nullable: true }),
+    minCareerGames: t.exposeInt('minCareerGames', { nullable: true }),
+    minCareerSeasons: t.exposeInt('minCareerSeasons', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:

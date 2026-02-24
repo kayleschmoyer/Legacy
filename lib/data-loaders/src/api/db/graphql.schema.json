@@ -3569,6 +3569,30 @@
             "deprecationReason": null
           },
           {
+            "name": "minCareerGames",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "minCareerSeasons",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "name",
             "description": null,
             "args": [],
@@ -7561,6 +7585,18 @@
             "deprecationReason": null
           },
           {
+            "name": "seasonsPlayed",
+            "description": "Number of distinct MLB seasons the player has batting stats for (AL/NL only)",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "statsLastFetchedAt",
             "description": null,
             "args": [],
@@ -9962,7 +9998,7 @@
               },
               {
                 "name": "leagueId",
-                "description": "League ID for scoring-based sorting. Uses league-specific scoring multipliers when provided, system defaults otherwise.",
+                "description": "League ID for scoring-based sorting and player pool filtering (career minimums). Uses league-specific scoring multipliers when provided, system defaults otherwise.",
                 "type": {
                   "kind": "SCALAR",
                   "name": "Int",
@@ -13776,6 +13812,30 @@
                 "name": "Int",
                 "ofType": null
               }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "minCareerGames",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "minCareerSeasons",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
             },
             "defaultValue": null,
             "isDeprecated": false,

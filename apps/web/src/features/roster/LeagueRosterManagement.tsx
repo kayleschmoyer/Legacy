@@ -12,7 +12,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { H4, styled, Text } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { AlertTriangle, Lock } from '@tamagui/lucide-icons';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
@@ -275,6 +275,8 @@ interface RosterRowProps {
   isSelected: boolean;
   recentlyMoved: boolean;
   matchupData?: PlayerMatchupData;
+  minCareerGames?: number;
+  minCareerSeasons?: number;
 }
 
 function RosterRow({
@@ -287,9 +289,22 @@ function RosterRow({
   isSelected,
   recentlyMoved,
   matchupData,
+  minCareerGames,
+  minCareerSeasons,
 }: RosterRowProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const posType = position.positionType ?? '';
+
+  const isCareerIneligible = Boolean(
+    assignedPlayer?.player &&
+    assignedPlayer.player.careerBatting != null && // only flag position players (batters), not pitchers
+    ((minCareerGames != null &&
+      minCareerGames > 0 &&
+      (assignedPlayer.player.careerBatting.games ?? 0) < minCareerGames) ||
+      (minCareerSeasons != null &&
+        minCareerSeasons > 0 &&
+        (assignedPlayer.player.seasonsPlayed ?? 0) < minCareerSeasons)),
+  );
   const category = getPositionCategory(posType);
   const colors = CATEGORY_COLORS[category];
   const hasPlayer = Boolean(assignedPlayer);
@@ -473,6 +488,14 @@ function RosterRow({
             Tap to swap with {getPlayerName(selectedPlayer)}
           </Text>
         )}
+        {hasPlayer && isCareerIneligible && (
+          <XStack alignItems="center" gap="$1" marginTop={2}>
+            <AlertTriangle size={11} color="#F59E0B" />
+            <Text fontSize={10} fontWeight="700" color="#F59E0B">
+              Ineligible — does not meet career minimums
+            </Text>
+          </XStack>
+        )}
       </YStack>
 
       {/* Score & Projection */}
@@ -565,6 +588,8 @@ interface RosterSectionProps {
   onPlayerSelect: (player: TeamMemberFragment | null) => void;
   recentlyMovedIds: ReadonlySet<number>;
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
+  minCareerGames?: number;
+  minCareerSeasons?: number;
 }
 
 function RosterSection({
@@ -577,6 +602,8 @@ function RosterSection({
   onPlayerSelect,
   recentlyMovedIds,
   playerMatchupData,
+  minCareerGames,
+  minCareerSeasons,
 }: RosterSectionProps): React.JSX.Element | null {
   if (positions.length === 0) return null;
 
@@ -656,6 +683,8 @@ function RosterSection({
               (position.id != null && recentlyMovedIds.has(position.id))
             }
             matchupData={mData}
+            minCareerGames={minCareerGames}
+            minCareerSeasons={minCareerSeasons}
           />
         );
       })}
@@ -1088,6 +1117,10 @@ export interface LeagueRosterManagementProps {
   readOnly?: boolean;
   /** Team name to display in the header (defaults to "My Roster") */
   teamName?: string;
+  /** Minimum career MLB games a player must have to occupy a starting slot */
+  minCareerGames?: number;
+  /** Minimum distinct MLB seasons a player must have to occupy a starting slot */
+  minCareerSeasons?: number;
 }
 
 export function LeagueRosterManagement({
@@ -1100,6 +1133,8 @@ export function LeagueRosterManagement({
   playerMatchupData,
   readOnly = false,
   teamName,
+  minCareerGames,
+  minCareerSeasons,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const [selectedPlayer, setSelectedPlayer] =
     useState<TeamMemberFragment | null>(null);
@@ -1401,6 +1436,8 @@ export function LeagueRosterManagement({
                 onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
+                minCareerGames={minCareerGames}
+                minCareerSeasons={minCareerSeasons}
               />
 
               <RosterSection
@@ -1413,6 +1450,8 @@ export function LeagueRosterManagement({
                 onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
+                minCareerGames={minCareerGames}
+                minCareerSeasons={minCareerSeasons}
               />
 
               <RosterSection
@@ -1425,6 +1464,8 @@ export function LeagueRosterManagement({
                 onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
+                minCareerGames={minCareerGames}
+                minCareerSeasons={minCareerSeasons}
               />
 
               <RosterSection
@@ -1437,6 +1478,8 @@ export function LeagueRosterManagement({
                 onPlayerSelect={handlePlayerSelect}
                 recentlyMovedIds={recentlyMovedIds}
                 playerMatchupData={playerMatchupData}
+                minCareerGames={minCareerGames}
+                minCareerSeasons={minCareerSeasons}
               />
             </YStack>
           </YStack>

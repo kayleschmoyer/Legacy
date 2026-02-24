@@ -21,6 +21,8 @@ interface LeagueState {
     faabBudgetDefault?: number | null;
     gamesPerMatchup?: number | null;
     spStartsPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

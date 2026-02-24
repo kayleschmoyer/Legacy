@@ -29,6 +29,10 @@ export interface PlayerFilters {
   brefId?: string;
   excludeEmptyNames?: boolean;
   position?: string;
+  /** Minimum total career MLB games (across all AL/NL seasons) */
+  minCareerGames?: number;
+  /** Minimum distinct MLB seasons in which the player appeared */
+  minCareerSeasons?: number;
 }
 
 /** Sort options that require a join to career_batting */
@@ -422,6 +426,34 @@ export class PlayerService {
       conditions.push(ne(PublicSchema.players.lastName, ''));
     }
 
+    if (filters.minCareerGames !== undefined && filters.minCareerGames > 0) {
+      conditions.push(
+        sql`(
+          NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = ${PublicSchema.players.id})
+          OR ${PublicSchema.players.id} IN (
+            SELECT player_id FROM public.career_batting WHERE g >= ${filters.minCareerGames}
+          )
+        )`,
+      );
+    }
+
+    if (
+      filters.minCareerSeasons !== undefined &&
+      filters.minCareerSeasons > 0
+    ) {
+      conditions.push(
+        sql`(
+          NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
+          OR ${PublicSchema.players.id} IN (
+            SELECT player_id FROM public.season_batting
+            WHERE lg_id IN ('AL', 'NL')
+            GROUP BY player_id
+            HAVING COUNT(DISTINCT season) >= ${filters.minCareerSeasons}
+          )
+        )`,
+      );
+    }
+
     return conditions;
   }
 
@@ -481,6 +513,24 @@ export class PlayerService {
         if (queryOptions.filters?.position) {
           rawConditions.push(
             this.buildRawPositionFilter(queryOptions.filters.position),
+          );
+        }
+
+        if (
+          queryOptions.filters?.minCareerGames !== undefined &&
+          queryOptions.filters.minCareerGames > 0
+        ) {
+          rawConditions.push(
+            sql`(NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = p.id) OR p.id IN (SELECT player_id FROM public.career_batting WHERE g >= ${queryOptions.filters.minCareerGames}))`,
+          );
+        }
+
+        if (
+          queryOptions.filters?.minCareerSeasons !== undefined &&
+          queryOptions.filters.minCareerSeasons > 0
+        ) {
+          rawConditions.push(
+            sql`(NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = p.id AND lg_id IN ('AL', 'NL')) OR p.id IN (SELECT player_id FROM public.season_batting WHERE lg_id IN ('AL', 'NL') GROUP BY player_id HAVING COUNT(DISTINCT season) >= ${queryOptions.filters.minCareerSeasons}))`,
           );
         }
 

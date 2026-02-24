@@ -16,6 +16,8 @@ export interface LeagueSettingsControlProps {
   leagueId: number;
   currentGamesPerMatchup: number;
   currentSpStartsPerMatchup: number;
+  currentMinCareerGames?: number;
+  currentMinCareerSeasons?: number;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -30,6 +32,24 @@ const GAMES_PER_MATCHUP_OPTIONS = [
   { label: '7 games', value: 7 },
 ] as const;
 
+const MIN_CAREER_GAMES_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '25', value: 25 },
+  { label: '50', value: 50 },
+  { label: '75', value: 75 },
+  { label: '100', value: 100 },
+  { label: '200', value: 200 },
+] as const;
+
+const MIN_CAREER_SEASONS_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '1', value: 1 },
+  { label: '2', value: 2 },
+  { label: '3', value: 3 },
+  { label: '5', value: 5 },
+  { label: '7', value: 7 },
+] as const;
+
 /**
  * LeagueSettingsControl — Commissioner control for league-level matchup settings.
  *
@@ -40,6 +60,8 @@ export function LeagueSettingsControl({
   leagueId,
   currentGamesPerMatchup,
   currentSpStartsPerMatchup,
+  currentMinCareerGames = 50,
+  currentMinCareerSeasons = 3,
   onSuccess,
   onError,
 }: LeagueSettingsControlProps) {
@@ -47,19 +69,35 @@ export function LeagueSettingsControl({
     currentGamesPerMatchup,
   );
   const [spStarts, setSpStarts] = useState(currentSpStartsPerMatchup);
+  const [minCareerGames, setMinCareerGames] = useState(currentMinCareerGames);
+  const [minCareerSeasons, setMinCareerSeasons] = useState(
+    currentMinCareerSeasons,
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   const [updateLeagueSettings, { loading: saving }] =
     useUpdateLeagueSettingsMutation();
 
   const checkChanges = useCallback(
-    (games: number, starts: number) => {
+    (
+      games: number,
+      starts: number,
+      careerGames: number,
+      careerSeasons: number,
+    ) => {
       setHasChanges(
         games !== currentGamesPerMatchup ||
-          starts !== currentSpStartsPerMatchup,
+          starts !== currentSpStartsPerMatchup ||
+          careerGames !== currentMinCareerGames ||
+          careerSeasons !== currentMinCareerSeasons,
       );
     },
-    [currentGamesPerMatchup, currentSpStartsPerMatchup],
+    [
+      currentGamesPerMatchup,
+      currentSpStartsPerMatchup,
+      currentMinCareerGames,
+      currentMinCareerSeasons,
+    ],
   );
 
   const handleGamesChange = useCallback(
@@ -68,17 +106,33 @@ export function LeagueSettingsControl({
       // If SP starts exceed the new games count, clamp it down
       const clampedStarts = Math.min(spStarts, value);
       setSpStarts(clampedStarts);
-      checkChanges(value, clampedStarts);
+      checkChanges(value, clampedStarts, minCareerGames, minCareerSeasons);
     },
-    [spStarts, checkChanges],
+    [spStarts, minCareerGames, minCareerSeasons, checkChanges],
   );
 
   const handleSpStartsChange = useCallback(
     (value: number) => {
       setSpStarts(value);
-      checkChanges(gamesPerMatchup, value);
+      checkChanges(gamesPerMatchup, value, minCareerGames, minCareerSeasons);
     },
-    [gamesPerMatchup, checkChanges],
+    [gamesPerMatchup, minCareerGames, minCareerSeasons, checkChanges],
+  );
+
+  const handleMinCareerGamesChange = useCallback(
+    (value: number) => {
+      setMinCareerGames(value);
+      checkChanges(gamesPerMatchup, spStarts, value, minCareerSeasons);
+    },
+    [gamesPerMatchup, spStarts, minCareerSeasons, checkChanges],
+  );
+
+  const handleMinCareerSeasonsChange = useCallback(
+    (value: number) => {
+      setMinCareerSeasons(value);
+      checkChanges(gamesPerMatchup, spStarts, minCareerGames, value);
+    },
+    [gamesPerMatchup, spStarts, minCareerGames, checkChanges],
   );
 
   const validationError =
@@ -96,6 +150,8 @@ export function LeagueSettingsControl({
             leagueId,
             gamesPerMatchup,
             spStartsPerMatchup: spStarts,
+            minCareerGames,
+            minCareerSeasons,
           },
         },
         refetchQueries: ['GetLeagueById'],
@@ -114,6 +170,8 @@ export function LeagueSettingsControl({
   const handleReset = () => {
     setGamesPerMatchup(currentGamesPerMatchup);
     setSpStarts(currentSpStartsPerMatchup);
+    setMinCareerGames(currentMinCareerGames);
+    setMinCareerSeasons(currentMinCareerSeasons);
     setHasChanges(false);
   };
 
@@ -220,6 +278,112 @@ export function LeagueSettingsControl({
                   icon={isSelected ? <Check size={14} /> : undefined}
                   aria-pressed={isSelected}
                   aria-label={`SP starts per matchup: ${option.label}`}
+                  hoverStyle={
+                    saving
+                      ? undefined
+                      : {
+                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                        }
+                  }
+                >
+                  <Text
+                    fontSize="$2"
+                    fontWeight={isSelected ? '700' : '400'}
+                    color={isSelected ? 'white' : '$color'}
+                  >
+                    {option.label}
+                  </Text>
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
+
+        <Separator />
+
+        {/* Min Career Games */}
+        <YStack gap="$2">
+          <YStack gap="$1">
+            <Text fontSize="$3" fontWeight="600" color="$color">
+              Minimum Career Games
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Players with fewer career MLB games than this threshold are
+              excluded from the draft pool, free agent pool, and cannot hold a
+              starting roster spot. Set to "Off" to disable.
+            </Text>
+          </YStack>
+          <XStack gap="$2" flexWrap="wrap">
+            {MIN_CAREER_GAMES_OPTIONS.map((option) => {
+              const isSelected = minCareerGames === option.value;
+              return (
+                <Button
+                  key={option.value}
+                  size="$3"
+                  theme={isSelected ? 'active' : 'alt2'}
+                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
+                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  borderWidth={1}
+                  borderRadius="$3"
+                  onPress={() => handleMinCareerGamesChange(option.value)}
+                  disabled={saving}
+                  opacity={saving ? 0.5 : 1}
+                  icon={isSelected ? <Check size={14} /> : undefined}
+                  aria-pressed={isSelected}
+                  aria-label={`Minimum career games: ${option.label}`}
+                  hoverStyle={
+                    saving
+                      ? undefined
+                      : {
+                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                        }
+                  }
+                >
+                  <Text
+                    fontSize="$2"
+                    fontWeight={isSelected ? '700' : '400'}
+                    color={isSelected ? 'white' : '$color'}
+                  >
+                    {option.label}
+                  </Text>
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
+
+        <Separator />
+
+        {/* Min Career Seasons */}
+        <YStack gap="$2">
+          <YStack gap="$1">
+            <Text fontSize="$3" fontWeight="600" color="$color">
+              Minimum Career Seasons
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Players with fewer distinct MLB seasons (AL/NL) than this
+              threshold are excluded from the draft pool, free agent pool, and
+              cannot hold a starting roster spot. Set to "Off" to disable.
+            </Text>
+          </YStack>
+          <XStack gap="$2" flexWrap="wrap">
+            {MIN_CAREER_SEASONS_OPTIONS.map((option) => {
+              const isSelected = minCareerSeasons === option.value;
+              return (
+                <Button
+                  key={option.value}
+                  size="$3"
+                  theme={isSelected ? 'active' : 'alt2'}
+                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
+                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  borderWidth={1}
+                  borderRadius="$3"
+                  onPress={() => handleMinCareerSeasonsChange(option.value)}
+                  disabled={saving}
+                  opacity={saving ? 0.5 : 1}
+                  icon={isSelected ? <Check size={14} /> : undefined}
+                  aria-pressed={isSelected}
+                  aria-label={`Minimum career seasons: ${option.label}`}
                   hoverStyle={
                     saving
                       ? undefined
