@@ -7,12 +7,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
 import { applyMultiplierGroups } from '../../../../common/scoring';
 import { useGetMatchupStatsQuery } from '../../../../api/db/matchups/Matchups.generated';
+import { useGetTeamByIdQuery } from '../../../../api/db/teams/Teams.generated';
 import {
-  useGetTeamByIdQuery,
+  useGetPositionsForLeagueQuery,
   useUpdateTeamMemberPositionMutation,
-} from '../../../../api/db/teams/Teams.generated';
+} from '../../../../api/db/graphql.generated';
 import { LoadingPanel } from '../../../../common/components/LoadingPanel';
-import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
 import {
   LeaguePositionFragment,
   MatchupFragment,

@@ -8,7 +8,7 @@ import {
   useGetCareerBattingStatsQuery,
   useGetCareerFieldingStatsQuery,
   useGetCareerPitchingStatsQuery,
-} from '../../api/db/stats/Stats.generated';
+} from '../../api/db/graphql.generated';
 import {
   CareerBattingsOrderBy,
   CareerBattingStatsFragment,

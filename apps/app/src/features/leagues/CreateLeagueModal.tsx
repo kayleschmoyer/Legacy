@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Modal, View } from 'react-native';
 import { Button, Input, Spinner, XStack, YStack } from 'tamagui';
 import { addDays } from '../../common/utilities/DateUtilities';
-import { useCreateLeagueMutation } from '../../api/db/leagues/Leagues.generated';
+import { useCreateLeagueMutation } from '../../api/db/graphql.generated';
 import { Dropdown, DropdownItem } from '../../common/components/Dropdown';
 import { handleError } from '../../common/utilities/ErrorHandler';
 

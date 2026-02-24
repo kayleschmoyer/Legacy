@@ -5,6 +5,11 @@
   "projectType": "application",
   "tags": ["platform:web", "scope:app", "type:dev-tool"],
   "targets": {
+    "typecheck": {
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json"
+      }
+    },
     "build": {
       "executor": "@nx/vite:build",
       "outputs": ["{options.outputPath}"],

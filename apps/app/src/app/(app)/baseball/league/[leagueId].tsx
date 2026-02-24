@@ -13,8 +13,10 @@ import {
   TeamMemberFragment,
   useStartDraftMutation,
 } from '../../../../api/db/graphql.generated';
-import { useGetLeagueByIdQuery } from '../../../../api/db/leagues/Leagues.generated';
-import { useGetPositionsForLeagueQuery } from '../../../../api/db/leagues/Leagues.generated';
+import {
+  useGetLeagueByIdQuery,
+  useGetPositionsForLeagueQuery,
+} from '../../../../api/db/graphql.generated';
 import {
   useGetTeamMembersQuery,
   useUpdateTeamMemberPositionMutation,

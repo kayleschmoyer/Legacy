@@ -1,4 +1,4 @@
-import { sign } from 'jsonwebtoken';
+import { sign, type SignOptions } from 'jsonwebtoken';
 
 /**
  * Dev-only fallback secret — matches apps/cli/src/commands/generateJwt.ts.
@@ -34,7 +34,7 @@ export class E2EJwtUtil {
         iat: Math.floor(Date.now() / 1000),
       },
       secret,
-      { algorithm: 'HS256', expiresIn: expiration },
+      { algorithm: 'HS256', expiresIn: expiration as SignOptions['expiresIn'] },
     );
   }
 

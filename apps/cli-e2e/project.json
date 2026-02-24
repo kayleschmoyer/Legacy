@@ -4,6 +4,11 @@
   "projectType": "application",
   "implicitDependencies": ["cli"],
   "targets": {
+    "typecheck": {
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    },
     "e2e": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
