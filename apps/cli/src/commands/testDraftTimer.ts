@@ -38,23 +38,6 @@ async function showDraftTimerStatus(leagueId?: number): Promise<void> {
       )
       .where(and(...conditions));
 
-    // Fetch raw timer fields separately to avoid drizzle type issues
-    const timerData = await db.execute(sql`
-      SELECT id, pick_time_limit_seconds, current_pick_deadline
-      FROM drafts
-      WHERE id = ANY(${drafts.map((d) => d.draftId)})
-    `);
-    const timerMap = new Map<
-      number,
-      { pickTimeLimitSeconds: number; currentPickDeadline: string | null }
-    >();
-    for (const row of timerData.rows) {
-      timerMap.set(row.id as number, {
-        pickTimeLimitSeconds: (row.pick_time_limit_seconds as number) ?? 120,
-        currentPickDeadline: row.current_pick_deadline as string | null,
-      });
-    }
-
     if (drafts.length === 0) {
       if (leagueId) {
         LOGGER.info(`ℹ️  No in-progress draft found for league ${leagueId}`);
@@ -85,6 +68,23 @@ async function showDraftTimerStatus(leagueId?: number): Promise<void> {
 
     LOGGER.info(`\n📋 Draft Timer Status — ${drafts.length} draft(s)`);
     LOGGER.info('='.repeat(70));
+
+    // Fetch raw timer fields separately to avoid drizzle type issues
+    const timerData = await db.execute(sql`
+      SELECT id, pick_time_limit_seconds, current_pick_deadline
+      FROM drafts
+      WHERE id = ANY(${drafts.map((d) => d.draftId)})
+    `);
+    const timerMap = new Map<
+      number,
+      { pickTimeLimitSeconds: number; currentPickDeadline: string | null }
+    >();
+    for (const row of timerData.rows) {
+      timerMap.set(row.id as number, {
+        pickTimeLimitSeconds: (row.pick_time_limit_seconds as number) ?? 120,
+        currentPickDeadline: row.current_pick_deadline as string | null,
+      });
+    }
 
     const now = new Date();
 
