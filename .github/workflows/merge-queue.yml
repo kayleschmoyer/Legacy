@@ -321,6 +321,9 @@ jobs:
                 // Note: GitHub App tokens automatically trigger workflows after merge
                 // No manual workflow dispatch needed
                 
+                // Re-target any dependent PRs that used this branch as their base
+                await retargetDependentPRs(pr);
+                
                 // Post success comment (reuse existing comment if available)
                 const successComment = "## 🎉 Successfully Merged!\n\n" +
                       "This PR has been automatically merged via the merge queue.\n\n" +
@@ -421,4 +424,59 @@ jobs:
               errorComment += "---\n*Automated message from merge queue system*";
               
               await findOrCreateComment(pr, errorComment, 'error');
+            }
+
+            async function retargetDependentPRs(mergedPR) {
+              const mergedBranch = mergedPR.head.ref;
+              const targetBase = mergedPR.base.ref; // typically 'main'
+
+              console.log(`\n🔀 Checking for open PRs based on merged branch '${mergedBranch}'...`);
+
+              // Find all open PRs whose base branch is the one we just merged
+              const openPRs = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                base: mergedBranch
+              });
+
+              if (openPRs.data.length === 0) {
+                console.log(`   No dependent PRs found for '${mergedBranch}'`);
+                return;
+              }
+
+              console.log(`   Found ${openPRs.data.length} dependent PR(s) to re-target → '${targetBase}'`);
+
+              for (const dependentPR of openPRs.data) {
+                try {
+                  // Update the base branch of the dependent PR
+                  await github.rest.pulls.update({
+                    owner,
+                    repo,
+                    pull_number: dependentPR.number,
+                    base: targetBase
+                  });
+
+                  console.log(`   ✅ PR #${dependentPR.number} (${dependentPR.title}) re-targeted to '${targetBase}'`);
+
+                  // Notify on the dependent PR
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: dependentPR.number,
+                    body: `🔀 **Base branch updated automatically**\n\n` +
+                          `PR #${mergedPR.number} (\`${mergedBranch}\`) was merged into \`${targetBase}\`. ` +
+                          `This PR's base has been re-targeted from \`${mergedBranch}\` → \`${targetBase}\`.\n\n` +
+                          `If you have merge conflicts, rebase onto \`${targetBase}\`:\n` +
+                          '```bash\n' +
+                          `git fetch origin\n` +
+                          `git rebase origin/${targetBase}\n` +
+                          `git push --force-with-lease\n` +
+                          '```\n\n' +
+                          `---\n*Automated message from merge queue system*`
+                  });
+                } catch (error) {
+                  console.error(`   ❌ Failed to re-target PR #${dependentPR.number}: ${error.message}`);
+                }
+              }
             }
