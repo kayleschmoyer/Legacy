@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
+  formatDraftStatusForBadge,
+  getDraftStatusColors,
   useAuth,
   XStack,
   YStack,
@@ -142,37 +144,7 @@ const InviteCard = styled(Card, {
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDraftStatus(status?: string | null): string {
-  if (!status) return 'Unknown';
-  switch (status) {
-    case 'not-started':
-      return 'Pre-Draft';
-    case 'queued':
-      return 'Queued';
-    case 'in-progress':
-      return 'Drafting';
-    case 'completed':
-      return 'Season Active';
-    default:
-      return status.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-  }
-}
-
-function getDraftBadgeColors(status?: string | null) {
-  switch (status) {
-    case 'not-started':
-      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
-    case 'queued':
-      return { bg: '$amber3', border: '$amber7', text: '$amber11' };
-    case 'in-progress':
-      return { bg: '$blue3', border: '$blue7', text: '$blue11' };
-    case 'completed':
-      return { bg: '$green3', border: '$green7', text: '$green11' };
-    default:
-      return { bg: '$gray3', border: '$gray7', text: '$gray11' };
-  }
-}
+// Draft status formatting & colours imported from @legacy-sports/shared-components
 
 // ── Tab Definitions ──────────────────────────────────────────────────────────
 
@@ -543,7 +515,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const assignedCount = teamMembers.filter((p) => p?.positionId).length;
   const benchCount = teamMembers.length - assignedCount;
   const teamCount = leagueTeams.length;
-  const draftColors = getDraftBadgeColors(String(league?.draftStatus));
+  const draftColors = getDraftStatusColors(String(league?.draftStatus));
 
   // ── Loading / Error States ──
 
@@ -788,7 +760,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   borderColor={draftColors.border}
                 >
                   <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
-                    {formatDraftStatus(String(league.draftStatus))}
+                    {formatDraftStatusForBadge(String(league.draftStatus))}
                   </Text>
                 </DraftBadge>
               </XStack>
@@ -1297,7 +1269,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 borderColor={draftColors.border}
               >
                 <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
-                  {formatDraftStatus(String(league.draftStatus))}
+                  {formatDraftStatusForBadge(String(league.draftStatus))}
                 </Text>
               </DraftBadge>
               {currentMatchup?.weekNumber && (

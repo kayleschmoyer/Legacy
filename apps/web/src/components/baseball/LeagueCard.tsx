@@ -1,6 +1,10 @@
 import React from 'react';
 import {
   Button,
+  formatDraftStatusForCard,
+  getDraftNextActionCopy,
+  getDraftStatusColors,
+  getDraftStatusDescription,
   H3,
   HolographicCard,
   Paragraph,
@@ -8,90 +12,6 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { Text } from 'tamagui';
-
-function formatDraftStatus(status?: string | null): string {
-  if (!status) return 'Unknown';
-
-  switch (status) {
-    case 'not-started':
-      return 'Not Started';
-    case 'queued':
-      return 'Queued';
-    case 'in-progress':
-      return 'In Progress';
-    case 'completed':
-      return 'Completed';
-    default:
-      return status
-        .replace('-', ' ')
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-  }
-}
-
-function getDraftStatusStyles(status?: string | null) {
-  switch (status) {
-    case 'not-started':
-      return {
-        backgroundColor: 'rgba(148, 163, 184, 0.12)',
-        borderColor: 'rgba(148, 163, 184, 0.32)',
-        textColor: '$gray11',
-      };
-    case 'queued':
-      return {
-        backgroundColor: 'rgba(251, 191, 36, 0.12)',
-        borderColor: 'rgba(251, 191, 36, 0.32)',
-        textColor: '$orange11',
-      };
-    case 'in-progress':
-      return {
-        backgroundColor: 'rgba(59, 130, 246, 0.14)',
-        borderColor: 'rgba(59, 130, 246, 0.4)',
-        textColor: '$blue11',
-      };
-    case 'completed':
-      return {
-        backgroundColor: 'rgba(34, 197, 94, 0.14)',
-        borderColor: 'rgba(34, 197, 94, 0.38)',
-        textColor: '$green11',
-      };
-    default:
-      return {
-        backgroundColor: 'rgba(148, 163, 184, 0.12)',
-        borderColor: 'rgba(148, 163, 184, 0.32)',
-        textColor: '$gray11',
-      };
-  }
-}
-
-function getStatusDescription(status?: string | null): string {
-  switch (status) {
-    case 'not-started':
-      return 'Lock in a draft window and share invites to fill the league.';
-    case 'queued':
-      return 'Draft room is warming up. Double-check keepers and queue sleepers.';
-    case 'in-progress':
-      return 'Live draft underway. Stay nimble on positional needs and matchups.';
-    case 'completed':
-      return 'Rosters are set. Shift focus to lineups, waivers, and weekly matchups.';
-    default:
-      return 'Keep your managers engaged with updates, trades, and matchup highlights.';
-  }
-}
-
-function getNextActionCopy(status?: string | null): string {
-  switch (status) {
-    case 'not-started':
-      return 'Prep the rulebook and pin commissioner notes before managers join.';
-    case 'queued':
-      return 'Confirm every manager has draft access and a prioritized queue.';
-    case 'in-progress':
-      return 'Monitor the board and be ready to counter draft snipes in real time.';
-    case 'completed':
-      return 'Schedule weekly reminders so managers submit lineups ahead of first pitch.';
-    default:
-      return 'Keep the league vibrant with quick updates and timely reminders.';
-  }
-}
 
 export interface League {
   id?: number | null;
@@ -121,9 +41,9 @@ export function LeagueCard({
     }
   };
 
-  const statusStyles = getDraftStatusStyles(league.draftStatus);
-  const statusDescription = getStatusDescription(league.draftStatus);
-  const nextActionCopy = getNextActionCopy(league.draftStatus);
+  const statusColors = getDraftStatusColors(league.draftStatus);
+  const statusDescription = getDraftStatusDescription(league.draftStatus);
+  const nextActionCopy = getDraftNextActionCopy(league.draftStatus);
 
   const summaryParts = [
     league.maxRosterSize ? `${league.maxRosterSize}-slot rosters` : undefined,
@@ -149,8 +69,8 @@ export function LeagueCard({
     },
     {
       label: 'Draft Status',
-      value: formatDraftStatus(league.draftStatus),
-      accentColor: statusStyles.textColor,
+      value: formatDraftStatusForCard(league.draftStatus),
+      accentColor: statusColors.text,
     },
   ];
 
@@ -187,8 +107,8 @@ export function LeagueCard({
               </YStack>
               <YStack alignItems="flex-end">
                 <XStack
-                  backgroundColor={statusStyles.backgroundColor}
-                  borderColor={statusStyles.borderColor}
+                  backgroundColor={statusColors.bg}
+                  borderColor={statusColors.border}
                   borderWidth={1}
                   borderRadius="$5"
                   paddingHorizontal="$3"
@@ -197,10 +117,10 @@ export function LeagueCard({
                   <Text
                     fontSize={12}
                     fontWeight="700"
-                    color={statusStyles.textColor}
+                    color={statusColors.text}
                     textTransform="uppercase"
                   >
-                    {formatDraftStatus(league.draftStatus)}
+                    {formatDraftStatusForCard(league.draftStatus)}
                   </Text>
                 </XStack>
               </YStack>

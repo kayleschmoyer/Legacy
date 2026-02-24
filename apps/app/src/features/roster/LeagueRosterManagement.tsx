@@ -17,25 +17,12 @@ import {
 } from '../../api/db/graphql.generated';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import { useTeamMemberProjections } from '../scoring';
-
-const PITCHING_POSITIONS = new Set(['SP', 'RP']);
-
-const ALLOWED_POSITIONS: Record<string, string[]> = {
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP'],
-  SP: ['SP'],
-  SS: ['SS'],
-  XDH: ['DH'],
-};
+import {
+  PITCHING_POSITIONS,
+  ALLOWED_POSITIONS,
+  getPositionDisplayName,
+} from '@legacy-sports/shared-components';
+import { getPlayerName } from '@legacy-sports/shared-components';
 
 /** Returns the list of eligible position strings for a team member */
 const getEligiblePositions = (player: TeamMemberFragment): string[] =>
@@ -62,16 +49,6 @@ const canPlayerPlayPosition = (
   const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
   if (!allowed) return false;
   return eligible.some((pos) => allowed.includes(pos));
-};
-
-// Get player name from TeamMember's player field
-const getPlayerName = (
-  teamMember: TeamMemberFragment | null | undefined,
-): string => {
-  if (!teamMember?.player) return 'Unknown Player';
-
-  const { firstName, lastName } = teamMember.player;
-  return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
 };
 
 interface RosterSlotProps {
@@ -134,26 +111,6 @@ function RosterSlot({
       onPlayerRemove(position);
     }
   }, [assignedPlayer, position, onPlayerRemove]);
-
-  const getPositionDisplayName = (positionType: string) => {
-    const displayNames: Record<string, string> = {
-      SP: 'SP',
-      RP: 'RP',
-      C: 'C',
-      '1B': '1B',
-      '2B': '2B',
-      '3B': '3B',
-      SS: 'SS',
-      LF: 'LF',
-      CF: 'CF',
-      RF: 'RF',
-      OF: 'OF',
-      IF: 'IF',
-      DH: 'DH',
-      XDH: 'DH',
-    };
-    return displayNames[positionType] || positionType;
-  };
 
   const canAcceptSelectedPlayer =
     selectedPlayer && canPlayerPlayPosition(selectedPlayer, position);

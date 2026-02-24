@@ -14,8 +14,23 @@ import {
 import { Alert, LayoutAnimation, Pressable } from 'react-native';
 import { AnimatePresence } from 'tamagui';
 import {
+  collectProfileStats,
+  createInitialErrors,
+  createInitialValues,
+  type FieldErrorState,
+  formatMultiplier,
+  type FormValueState,
+  groupStatsByGroup,
+  isStatDirty,
+  isStatOverridden,
+  type ProfileStat,
+  SCORING_GROUP_COPY,
+  SCORING_GROUP_ORDER,
+  validateStat,
+  valuesToUpdates,
+} from '@legacy-sports/scoring';
+import {
   type GetLeagueScoringProfileQuery,
-  ScoringStatGroup,
   useUpdateLeagueScoringProfileMutation,
 } from '../../api/db/graphql.generated';
 
@@ -25,158 +40,12 @@ type LeagueScoringProfile = NonNullable<
   GetLeagueScoringProfileQuery['leagueScoringProfile']
 >;
 
-interface ProfileStat {
-  id: number;
-  group: ScoringStatGroup;
-  displayName: string;
-  description: string | null | undefined;
-  multiplier: number;
-  defaultMultiplier: number;
-  enforcePositive: boolean;
-  enforceNegative: boolean;
-  minMultiplier: number | null;
-  maxMultiplier: number | null;
-}
-
-type FormValueState = Record<number, string>;
-type FieldErrorState = Record<number, string | null>;
-
 interface LeagueScoringEditorProps {
   readonly leagueId: number;
   readonly profile: LeagueScoringProfile | null | undefined;
   readonly loading: boolean;
   readonly error?: Error | null;
   readonly onRefetch: () => Promise<unknown>;
-}
-
-// ── Group config ─────────────────────────────────────────────────────────────
-
-const GROUP_COPY: Record<
-  ScoringStatGroup,
-  { title: string; description: string; accent: string }
-> = {
-  [ScoringStatGroup.Batting]: {
-    title: 'Batting',
-    description: 'Home runs, RBIs, steals, and more.',
-    accent: '#3B82F6',
-  },
-  [ScoringStatGroup.Pitching]: {
-    title: 'Pitching',
-    description: 'Wins, strikeouts, saves, and ERA impact.',
-    accent: '#22C55E',
-  },
-  [ScoringStatGroup.Fielding]: {
-    title: 'Fielding',
-    description: 'Fielding bonuses and errors.',
-    accent: '#F97316',
-  },
-};
-
-const GROUP_ORDER: readonly ScoringStatGroup[] = [
-  ScoringStatGroup.Batting,
-  ScoringStatGroup.Pitching,
-  ScoringStatGroup.Fielding,
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatMultiplier(value: number): string {
-  if (!Number.isFinite(value)) return '';
-  if (Number.isInteger(value)) return value.toString();
-  return value
-    .toFixed(3)
-    .replace(/\.0+$/, '')
-    .replace(/(\.\d*?)0+$/, '$1');
-}
-
-function parseInput(value: string | undefined): number | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return null;
-  const parsed = Number.parseFloat(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function validateStat(
-  stat: ProfileStat,
-  value: string | undefined,
-): string | null {
-  const parsed = parseInput(value);
-  if (parsed === null) return 'Enter a number';
-  if (stat.enforcePositive && parsed <= 0) return 'Must be > 0';
-  if (stat.enforceNegative && parsed >= 0) return 'Must be < 0';
-
-  const min = stat.minMultiplier;
-  const max = stat.maxMultiplier;
-  if (min !== null && !(stat.defaultMultiplier < min) && parsed < min) {
-    return `Must be >= ${min}`;
-  }
-  if (max !== null && !(stat.defaultMultiplier > max) && parsed > max) {
-    return `Must be <= ${max}`;
-  }
-  return null;
-}
-
-function collectProfileStats(
-  profile: LeagueScoringProfile | null | undefined,
-): ProfileStat[] {
-  if (!profile?.stats) return [];
-
-  const stats: ProfileStat[] = [];
-  for (const raw of profile.stats) {
-    if (!raw?.definition) continue;
-    const { definition } = raw;
-    if (definition.id == null || definition.statGroup == null) continue;
-    const defId: number = definition.id;
-    const defGroup: ScoringStatGroup = definition.statGroup;
-
-    const defaultMultiplier =
-      typeof definition.defaultMultiplier === 'number'
-        ? definition.defaultMultiplier
-        : typeof raw.defaultMultiplier === 'number'
-          ? raw.defaultMultiplier
-          : typeof raw.multiplier === 'number'
-            ? raw.multiplier
-            : 0;
-    const multiplier =
-      typeof raw.multiplier === 'number' ? raw.multiplier : defaultMultiplier;
-
-    stats.push({
-      id: defId,
-      group: defGroup,
-      displayName: definition.displayName ?? `Stat ${defId}`,
-      description: definition.description,
-      multiplier,
-      defaultMultiplier,
-      enforcePositive: Boolean(definition.enforcePositive),
-      enforceNegative: Boolean(definition.enforceNegative),
-      minMultiplier:
-        typeof definition.minMultiplier === 'number'
-          ? definition.minMultiplier
-          : null,
-      maxMultiplier:
-        typeof definition.maxMultiplier === 'number'
-          ? definition.maxMultiplier
-          : null,
-    });
-  }
-
-  return stats;
-}
-
-function createInitialValues(stats: ProfileStat[]): FormValueState {
-  return stats.reduce<FormValueState>((acc, stat) => {
-    acc[stat.id] = formatMultiplier(stat.multiplier);
-    return acc;
-  }, {});
-}
-
-function createInitialErrors(stats: ProfileStat[]): FieldErrorState {
-  const next: FieldErrorState = {};
-  for (const stat of stats) {
-    next[stat.id] = null;
-  }
-  return next;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -187,24 +56,10 @@ export function LeagueScoringEditor(
   const { leagueId, profile, loading, error, onRefetch } = props;
 
   const stats = useMemo(() => collectProfileStats(profile), [profile]);
-  const groupedStats = useMemo(() => {
-    const groups: Record<ScoringStatGroup, ProfileStat[]> = {
-      [ScoringStatGroup.Batting]: [],
-      [ScoringStatGroup.Pitching]: [],
-      [ScoringStatGroup.Fielding]: [],
-    };
-
-    for (const stat of stats) {
-      if (!GROUP_ORDER.includes(stat.group)) continue;
-      groups[stat.group].push(stat);
-    }
-
-    for (const group of GROUP_ORDER) {
-      groups[group].sort((a, b) => a.displayName.localeCompare(b.displayName));
-    }
-
-    return groups;
-  }, [stats]);
+  const groupedStats = useMemo(
+    () => groupStatsByGroup(stats, SCORING_GROUP_ORDER),
+    [stats],
+  );
 
   const [formValues, setFormValues] = useState<FormValueState>(() =>
     createInitialValues(stats),
@@ -238,23 +93,10 @@ export function LeagueScoringEditor(
     [fieldErrors],
   );
 
-  const pendingUpdates = useMemo(() => {
-    return stats
-      .map((stat) => {
-        const value = formValues[stat.id];
-        const parsed = parseInput(value);
-        if (parsed === null) return null;
-        if (Math.abs(parsed - stat.multiplier) <= 0.0001) return null;
-        return {
-          statDefinitionId: stat.id,
-          multiplier: Number(parsed.toFixed(4)),
-        };
-      })
-      .filter(
-        (u): u is { statDefinitionId: number; multiplier: number } =>
-          u !== null,
-      );
-  }, [stats, formValues]);
+  const pendingUpdates = useMemo(
+    () => valuesToUpdates(stats, formValues),
+    [stats, formValues],
+  );
 
   const canSave =
     !loading && !saving && !hasValidationErrors && pendingUpdates.length > 0;
@@ -325,7 +167,7 @@ export function LeagueScoringEditor(
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     () =>
-      GROUP_ORDER.reduce(
+      SCORING_GROUP_ORDER.reduce(
         (acc, g) => {
           acc[g] = true;
           return acc;
@@ -334,7 +176,7 @@ export function LeagueScoringEditor(
       ),
   );
 
-  const toggleGroup = useCallback((group: ScoringStatGroup) => {
+  const toggleGroup = useCallback((group: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   }, []);
@@ -435,14 +277,12 @@ export function LeagueScoringEditor(
         )}
 
         {/* Group sections */}
-        {GROUP_ORDER.map((group) => {
+        {SCORING_GROUP_ORDER.map((group) => {
           const statsForGroup = groupedStats[group];
           if (!statsForGroup || statsForGroup.length === 0) return null;
-          const copy = GROUP_COPY[group];
+          const copy = SCORING_GROUP_COPY[group];
           const isExpanded = expandedGroups[group] !== false;
-          const overrideCount = statsForGroup.filter(
-            (s) => Math.abs(s.multiplier - s.defaultMultiplier) > 0.0001,
-          ).length;
+          const overrideCount = statsForGroup.filter(isStatOverridden).length;
 
           return (
             <Card
@@ -515,13 +355,8 @@ export function LeagueScoringEditor(
                   {statsForGroup.map((stat, idx) => {
                     const value = formValues[stat.id] ?? '';
                     const errorMessage = fieldErrors[stat.id];
-                    const isOverride =
-                      Math.abs(stat.multiplier - stat.defaultMultiplier) >
-                      0.0001;
-                    const parsed = parseInput(value);
-                    const isDirty =
-                      parsed !== null &&
-                      Math.abs(parsed - stat.multiplier) > 0.0001;
+                    const isOverride = isStatOverridden(stat);
+                    const isDirty = isStatDirty(stat, value);
 
                     return (
                       <YStack key={stat.id}>

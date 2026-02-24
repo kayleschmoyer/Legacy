@@ -2,29 +2,22 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   Card,
+  getPlayerName,
   Separator,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { PITCHING_POSITIONS } from '@legacy-sports/shared-components';
 import { H4, H5, Text } from 'tamagui';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 
-const pitchingPositions = new Set(['SP', 'RP']);
+const pitchingPositions = PITCHING_POSITIONS;
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
 const outfieldPositions = new Set(['LF', 'CF', 'RF', 'OF']);
 const utilityPositions = new Set(['IF', 'XDH', 'DH']);
-
-const getPlayerName = (
-  teamMember: TeamMemberFragment | null | undefined,
-): string => {
-  if (!teamMember?.player) return 'Unknown Player';
-
-  const { firstName, lastName } = teamMember.player;
-  return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';
-};
 
 const canPlayerPlayPosition = (
   player: TeamMemberFragment,
@@ -34,6 +27,7 @@ const canPlayerPlayPosition = (
   return Boolean(player) && Boolean(position);
 };
 
+/** Full display names for the web UI (e.g. "Starting Pitcher") */
 const getPositionDisplayName = (positionType: string): string => {
   const displayNames: Record<string, string> = {
     SP: 'Starting Pitcher',
@@ -216,8 +210,8 @@ function RosterSlot({
   const hasPlayer = Boolean(assignedPlayer);
   const canAcceptSelectedPlayer = Boolean(
     selectedPlayer &&
-      selectedPlayer.id &&
-      canPlayerPlayPosition(selectedPlayer, position),
+    selectedPlayer.id &&
+    canPlayerPlayPosition(selectedPlayer, position),
   );
 
   const handleSlotPress = useCallback(() => {
@@ -283,7 +277,7 @@ function RosterSlot({
       cursor="pointer"
       width="100%"
       onPress={handleSlotPress}
-  role="button"
+      role="button"
       tabIndex={0}
       aria-pressed={Boolean(isSelected)}
       aria-label={
@@ -506,7 +500,7 @@ const BenchList = ({
           </Text>
         </YStack>
       ) : (
-  <YStack space="$2">
+        <YStack space="$2">
           {players.map((player) => {
             const isActive = selectedPlayer?.id === player.id;
 

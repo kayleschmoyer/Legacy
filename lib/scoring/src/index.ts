@@ -4,3 +4,4 @@ export * from './baseball/ScoringSettingsLoader';
 export * from './ComputeScoring';
 export * from './matchup-scoring';
 export * from './matchup-projections';
+export * from './scoring-profile-utils';
