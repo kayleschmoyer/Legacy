@@ -46,6 +46,7 @@ import { handleTriggerGameSelection } from './commands/triggerGameSelection';
 import { handleTestWorkflow } from './commands/testWorkflow';
 import { handleRetryFailedPlayers } from './commands/retryFailedPlayers';
 import { handleStatsLoadingStatus } from './commands/statsLoadingStatus';
+import { handleTestDraftTimer } from './commands/testDraftTimer';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -445,6 +446,31 @@ async function run(): Promise<void> {
           dryRun: options.dryRun,
           processDlq: options.processDlq,
         }),
+    );
+
+  program
+    .command('test-draft-timer')
+    .description('Test draft pick deadline timer and auto-pick processing')
+    .option('-l, --league-id <id>', 'Target league ID', parseInt)
+    .option(
+      '-s, --set-deadline <seconds>',
+      'Set a short deadline (seconds from now) on the league draft for testing',
+      parseInt,
+    )
+    .option(
+      '-p, --process',
+      'Process all expired draft deadlines (trigger auto-pick)',
+    )
+    .option('--status', 'Show current draft timer status')
+    .option('--dry-run', 'Show what would happen without making changes')
+    .action(
+      (options: {
+        leagueId?: number;
+        setDeadline?: number;
+        process?: boolean;
+        status?: boolean;
+        dryRun?: boolean;
+      }) => handleTestDraftTimer(options),
     );
 
   await program.parseAsync(process.argv);
