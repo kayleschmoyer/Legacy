@@ -16,7 +16,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { leagues, teams } from './Leagues';
+import { leagues, leaguePosition, teams } from './Leagues';
 import { players } from './Players';
 import { users } from './Users';
 import {
@@ -102,6 +102,8 @@ export const matchupPlayers = pgTable(
     matchupId: integer('matchup_id').notNull(),
     playerId: integer('player_id').notNull(),
     teamId: integer('team_id').notNull(),
+    /** Position assignment for this matchup (persisted separately from team_members) */
+    positionId: integer('position_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -126,8 +128,17 @@ export const matchupPlayers = pgTable(
         foreignColumns: [teams.id],
         name: 'matchup_players_team_fk',
       }).onDelete('cascade'),
+      matchupPlayersPositionFk: foreignKey({
+        columns: [table.positionId],
+        foreignColumns: [leaguePosition.id],
+        name: 'matchup_players_position_fk',
+      }),
       teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
       playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
+      matchupTeamIdx: index('matchup_players_matchup_team_idx').on(
+        table.matchupId,
+        table.teamId,
+      ),
     };
   },
 );

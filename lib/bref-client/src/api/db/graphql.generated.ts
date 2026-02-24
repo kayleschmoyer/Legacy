@@ -670,11 +670,13 @@ export type Mutation = {
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   startDraft?: Maybe<League>;
+  swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
   triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
+  updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
@@ -813,6 +815,13 @@ export type MutationStartDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationSwapMatchupPlayerPositionsArgs = {
+  matchupPlayerIdA: Scalars['Int']['input'];
+  matchupPlayerIdB: Scalars['Int']['input'];
+  positionIdA?: InputMaybe<Scalars['Int']['input']>;
+  positionIdB?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type MutationSwapTeamMemberPositionsArgs = {
   positionIdA?: InputMaybe<Scalars['Int']['input']>;
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
@@ -836,6 +845,11 @@ export type MutationUpdateLeagueScoringProfileArgs = {
 
 export type MutationUpdateLeagueSettingsArgs = {
   input: UpdateLeagueSettingsInput;
+};
+
+export type MutationUpdateMatchupPlayerPositionArgs = {
+  matchupPlayerId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationUpdateMatchupScoreArgs = {
@@ -998,6 +1012,7 @@ export type Query = {
   getMatchupHistory?: Maybe<Array<Matchup>>;
   getMatchupMessages?: Maybe<Array<MatchupMessage>>;
   getMatchupPlayers?: Maybe<Array<MatchupPlayer>>;
+  getMatchupRoster?: Maybe<Array<MatchupPlayer>>;
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
@@ -1006,6 +1021,7 @@ export type Query = {
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
+  getTeamMatchupHistory?: Maybe<Array<Matchup>>;
   getTeamRecentMatchups?: Maybe<Array<Matchup>>;
   getTiebreakerHistory?: Maybe<Array<TiebreakerHistory>>;
   getTiebreakerRules?: Maybe<TiebreakerRule>;
@@ -1148,6 +1164,11 @@ export type QueryGetMatchupPlayersArgs = {
   matchupId: Scalars['Int']['input'];
 };
 
+export type QueryGetMatchupRosterArgs = {
+  matchupId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
 export type QueryGetMatchupStatusCountsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
@@ -1188,6 +1209,12 @@ export type QueryGetPowerRankingsArgs = {
 export type QueryGetSeasonResultsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetTeamMatchupHistoryArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryGetTeamRecentMatchupsArgs = {

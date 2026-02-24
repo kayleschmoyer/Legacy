@@ -3,8 +3,12 @@ import {
   useGetCurrentMatchupForLeagueQuery,
   useGetMatchupByIdQuery,
   useGetMatchupHistoryQuery,
+  useGetMatchupRosterQuery,
   useGetMatchupsByWeekQuery,
   useGetMatchupsForLeagueQuery,
+  useGetTeamMatchupHistoryQuery,
+  useSwapMatchupPlayerPositionsMutation,
+  useUpdateMatchupPlayerPositionMutation,
 } from '../api/db/graphql.generated';
 
 /**
@@ -116,4 +120,104 @@ export function useMatchupHistory(
     error,
     refetch,
   };
+}
+
+/**
+ * Hook for fetching the roster of a specific team in a specific matchup.
+ * Useful for viewing historical lineups from previous weeks.
+ */
+export function useMatchupRoster(
+  matchupId: number | null | undefined,
+  teamId: number | null | undefined,
+) {
+  const { data, loading, error, refetch } = useGetMatchupRosterQuery({
+    variables: {
+      matchupId: matchupId ?? 0,
+      teamId: teamId ?? 0,
+    },
+    skip: !matchupId || !teamId,
+  });
+
+  return {
+    roster: data?.getMatchupRoster ?? [],
+    loading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook for fetching all matchups for a team, ordered by week (newest first).
+ * Allows users to browse their lineup history across weeks.
+ */
+export function useTeamMatchupHistory(
+  leagueId: number | null | undefined,
+  teamId: number | null | undefined,
+  limit?: number,
+) {
+  const { data, loading, error, refetch } = useGetTeamMatchupHistoryQuery({
+    variables: {
+      leagueId: leagueId ?? 0,
+      teamId: teamId ?? 0,
+      limit: limit ?? null,
+    },
+    skip: !leagueId || !teamId,
+  });
+
+  return {
+    matchups: data?.getTeamMatchupHistory ?? [],
+    loading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook for updating a matchup player's position.
+ * Only works when the matchup status is 'scheduled'.
+ */
+export function useUpdateMatchupPlayerPosition() {
+  const [mutate, { loading, error }] = useUpdateMatchupPlayerPositionMutation();
+
+  const updatePosition = async (
+    matchupPlayerId: number,
+    positionId: number | null,
+  ) => {
+    const result = await mutate({
+      variables: {
+        matchupPlayerId,
+        positionId: positionId ?? null,
+      },
+    });
+    return result.data?.updateMatchupPlayerPosition ?? null;
+  };
+
+  return { updatePosition, loading, error };
+}
+
+/**
+ * Hook for atomically swapping two matchup players' positions.
+ * Only works when the matchup status is 'scheduled'.
+ */
+export function useSwapMatchupPlayerPositions() {
+  const [mutate, { loading, error }] = useSwapMatchupPlayerPositionsMutation();
+
+  const swapPositions = async (
+    matchupPlayerIdA: number,
+    positionIdA: number | null,
+    matchupPlayerIdB: number,
+    positionIdB: number | null,
+  ) => {
+    const result = await mutate({
+      variables: {
+        matchupPlayerIdA,
+        positionIdA: positionIdA ?? null,
+        matchupPlayerIdB,
+        positionIdB: positionIdB ?? null,
+      },
+    });
+    return result.data?.swapMatchupPlayerPositions ?? null;
+  };
+
+  return { swapPositions, loading, error };
 }

@@ -12,9 +12,10 @@ import {
   AdvanceLeagueWeekResponse,
   CreateMatchupInput,
   Matchup,
+  MatchupPlayer,
   MatchupStatus,
 } from './types';
-import { builder } from '../builder';
+import { builder, Context } from '../builder';
 import { selectSeasonsForPlayers } from '../../services/season-selector';
 
 // Mutation: createMatchup
@@ -378,10 +379,49 @@ builder.mutationField('advanceLeagueWeek', (t) =>
         }
 
         // 7. Auto-populate matchup players for each new matchup
+        // Carry forward positions from the most recent prior matchup when available,
+        // falling back to team_members positions for new players
+        // Build a map of prior matchup positions per team (from current week's matchups)
+        const priorPositionsByTeam = new Map<
+          number,
+          Map<number, number | null>
+        >();
+        if (currentWeek > 0) {
+          const priorMatchupPlayers = await context.db
+            .select({
+              playerId: PublicSchema.matchupPlayers.playerId,
+              teamId: PublicSchema.matchupPlayers.teamId,
+              positionId: PublicSchema.matchupPlayers.positionId,
+            })
+            .from(PublicSchema.matchupPlayers)
+            .innerJoin(
+              PublicSchema.matchups,
+              eq(
+                PublicSchema.matchupPlayers.matchupId,
+                PublicSchema.matchups.id,
+              ),
+            )
+            .where(
+              and(
+                eq(PublicSchema.matchups.leagueId, args.leagueId),
+                eq(PublicSchema.matchups.weekNumber, currentWeek),
+              ),
+            );
+
+          for (const mp of priorMatchupPlayers) {
+            if (!priorPositionsByTeam.has(mp.teamId)) {
+              priorPositionsByTeam.set(mp.teamId, new Map());
+            }
+            priorPositionsByTeam
+              .get(mp.teamId)!
+              .set(mp.playerId, mp.positionId);
+          }
+        }
+
         for (const matchup of newMatchups) {
           const pair = teamPairs[matchup.teamIndex];
 
-          // Get pair.team1Id players
+          // Get current team_members for both teams
           const team1Players = await context.db
             .select({
               playerId: PublicSchema.teamMembers.playerId,
@@ -395,7 +435,6 @@ builder.mutationField('advanceLeagueWeek', (t) =>
               ),
             );
 
-          // Get pair.team2Id players
           const team2Players = await context.db
             .select({
               playerId: PublicSchema.teamMembers.playerId,
@@ -409,17 +448,40 @@ builder.mutationField('advanceLeagueWeek', (t) =>
               ),
             );
 
-          // Insert matchup players
+          // Resolve positions: prefer prior matchup positions, fall back to team_members
+          const resolvePosition = (
+            teamId: number,
+            playerId: number,
+            teamMembersPositionId: number | null,
+          ): number | null => {
+            const priorPositions = priorPositionsByTeam.get(teamId);
+            if (priorPositions?.has(playerId)) {
+              return priorPositions.get(playerId) ?? null;
+            }
+            return teamMembersPositionId;
+          };
+
+          // Insert matchup players with positions
           const allPlayers = [
             ...team1Players.map((p) => ({
               matchupId: matchup.id,
               playerId: p.playerId,
               teamId: pair.team1Id,
+              positionId: resolvePosition(
+                pair.team1Id,
+                p.playerId,
+                p.positionId,
+              ),
             })),
             ...team2Players.map((p) => ({
               matchupId: matchup.id,
               playerId: p.playerId,
               teamId: pair.team2Id,
+              positionId: resolvePosition(
+                pair.team2Id,
+                p.playerId,
+                p.positionId,
+              ),
             })),
           ];
 
@@ -595,6 +657,295 @@ builder.mutationField('advanceLeagueWeek', (t) =>
         // Re-throw the error
         throw error;
       }
+    },
+  }),
+);
+
+// ── Matchup Roster Mutations ───────────────────────────────────────────────
+
+/**
+ * Helper: Verify that the calling user owns the team in this matchup.
+ * Returns the matchup row so callers can check status.
+ */
+async function verifyMatchupTeamOwnership(
+  context: Context,
+  matchupPlayerId: number,
+): Promise<{
+  matchupPlayer: {
+    id: number;
+    matchupId: number;
+    playerId: number;
+    teamId: number;
+    positionId: number | null;
+  };
+  matchup: {
+    id: number;
+    leagueId: number;
+    weekNumber: number;
+    status: string;
+  };
+}> {
+  if (!context.user) {
+    throw new Error('Authentication required');
+  }
+
+  // Get the matchup player
+  const mpResult = await context.db
+    .select({
+      id: PublicSchema.matchupPlayers.id,
+      matchupId: PublicSchema.matchupPlayers.matchupId,
+      playerId: PublicSchema.matchupPlayers.playerId,
+      teamId: PublicSchema.matchupPlayers.teamId,
+      positionId: PublicSchema.matchupPlayers.positionId,
+    })
+    .from(PublicSchema.matchupPlayers)
+    .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerId))
+    .limit(1);
+
+  if (mpResult.length === 0) {
+    throw new Error('Matchup player not found');
+  }
+
+  const matchupPlayer = mpResult[0];
+
+  // Get the matchup
+  const matchupResult = await context.db
+    .select({
+      id: PublicSchema.matchups.id,
+      leagueId: PublicSchema.matchups.leagueId,
+      weekNumber: PublicSchema.matchups.weekNumber,
+      status: PublicSchema.matchups.status,
+    })
+    .from(PublicSchema.matchups)
+    .where(eq(PublicSchema.matchups.id, matchupPlayer.matchupId))
+    .limit(1);
+
+  if (matchupResult.length === 0) {
+    throw new Error('Matchup not found');
+  }
+
+  const matchup = matchupResult[0];
+
+  // Verify the user owns this team via league_members
+  const memberResult = await context.db
+    .select({
+      teamId: PublicSchema.leagueMembers.teamId,
+      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+    })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, matchup.leagueId),
+        eq(PublicSchema.leagueMembers.userId, context.user.id),
+      ),
+    )
+    .limit(1);
+
+  if (memberResult.length === 0) {
+    throw new Error('Not a member of this league');
+  }
+
+  const isCommissioner =
+    memberResult[0].permissionLevel === 'commissioner' ||
+    memberResult[0].permissionLevel === 'owner';
+
+  if (!isCommissioner && memberResult[0].teamId !== matchupPlayer.teamId) {
+    throw new Error('You can only modify your own team roster');
+  }
+
+  return { matchupPlayer, matchup };
+}
+
+// Mutation: updateMatchupPlayerPosition
+// Allows changing a player's position within a matchup before it starts
+builder.mutationField('updateMatchupPlayerPosition', (t) =>
+  t.field({
+    type: MatchupPlayer,
+    args: {
+      matchupPlayerId: t.arg.int({ required: true }),
+      positionId: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      const { matchup } = await verifyMatchupTeamOwnership(
+        context,
+        args.matchupPlayerId,
+      );
+
+      // Only allow edits when matchup is scheduled (not yet locked)
+      if (matchup.status !== 'scheduled') {
+        throw new Error(
+          'Cannot modify roster after the matchup has started or completed',
+        );
+      }
+
+      const db = context.db;
+
+      // Update the position
+      const updated = await db
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: args.positionId ?? null })
+        .where(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId))
+        .returning({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        });
+
+      if (updated.length === 0) {
+        throw new Error('Failed to update matchup player position');
+      }
+
+      // Resolve season for response
+      const seasonsResult = await db
+        .select({
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              matchup.weekNumber,
+            ),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.playerId,
+              updated[0].playerId,
+            ),
+          ),
+        )
+        .limit(1);
+
+      return {
+        ...updated[0],
+        positionId: updated[0].positionId ?? null,
+        season: seasonsResult[0]?.season ?? null,
+      };
+    },
+  }),
+);
+
+// Mutation: swapMatchupPlayerPositions
+// Atomically swaps two matchup players' positions within the same matchup
+builder.mutationField('swapMatchupPlayerPositions', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    args: {
+      matchupPlayerIdA: t.arg.int({ required: true }),
+      positionIdA: t.arg.int({ required: false }),
+      matchupPlayerIdB: t.arg.int({ required: true }),
+      positionIdB: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { matchupPlayerIdA, positionIdA, matchupPlayerIdB, positionIdB } =
+        args;
+
+      // Verify ownership of both players
+      const { matchup: matchupA } = await verifyMatchupTeamOwnership(
+        context,
+        matchupPlayerIdA,
+      );
+      const { matchup: matchupB } = await verifyMatchupTeamOwnership(
+        context,
+        matchupPlayerIdB,
+      );
+
+      if (matchupA.id !== matchupB.id) {
+        throw new Error('Both players must be in the same matchup');
+      }
+
+      if (matchupA.status !== 'scheduled') {
+        throw new Error(
+          'Cannot modify roster after the matchup has started or completed',
+        );
+      }
+
+      const db = context.db;
+
+      // Perform atom swap in a transaction
+      const results = await db.transaction(async (tx) => {
+        // Clear both positions first to avoid unique constraint violations
+        await tx
+          .update(PublicSchema.matchupPlayers)
+          .set({ positionId: null })
+          .where(
+            inArray(PublicSchema.matchupPlayers.id, [
+              matchupPlayerIdA,
+              matchupPlayerIdB,
+            ]),
+          );
+
+        // Assign new positions
+        const updatedA = await tx
+          .update(PublicSchema.matchupPlayers)
+          .set({ positionId: positionIdA ?? null })
+          .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA))
+          .returning({
+            id: PublicSchema.matchupPlayers.id,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+            playerId: PublicSchema.matchupPlayers.playerId,
+            teamId: PublicSchema.matchupPlayers.teamId,
+            positionId: PublicSchema.matchupPlayers.positionId,
+          });
+
+        const updatedB = await tx
+          .update(PublicSchema.matchupPlayers)
+          .set({ positionId: positionIdB ?? null })
+          .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB))
+          .returning({
+            id: PublicSchema.matchupPlayers.id,
+            matchupId: PublicSchema.matchupPlayers.matchupId,
+            playerId: PublicSchema.matchupPlayers.playerId,
+            teamId: PublicSchema.matchupPlayers.teamId,
+            positionId: PublicSchema.matchupPlayers.positionId,
+          });
+
+        if (updatedA.length === 0 || updatedB.length === 0) {
+          throw new Error('Failed to swap matchup player positions');
+        }
+
+        return [updatedA[0], updatedB[0]];
+      });
+
+      // Resolve seasons for response
+      const seasonsResults = await db
+        .select({
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.leagueId,
+              matchupA.leagueId,
+            ),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              matchupA.weekNumber,
+            ),
+            inArray(PublicSchema.leagueWeekPlayerSeasons.playerId, [
+              results[0].playerId,
+              results[1].playerId,
+            ]),
+          ),
+        );
+
+      const seasonMap = new Map(
+        seasonsResults.map((s) => [s.playerId, s.season]),
+      );
+
+      return results.map((r) => ({
+        ...r,
+        positionId: r.positionId ?? null,
+        season: seasonMap.get(r.playerId) ?? null,
+      }));
     },
   }),
 );

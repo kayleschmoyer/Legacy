@@ -694,6 +694,12 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): League
+  swapMatchupPlayerPositions(
+    matchupPlayerIdA: Int!
+    matchupPlayerIdB: Int!
+    positionIdA: Int
+    positionIdB: Int
+  ): [MatchupPlayer!]
   swapTeamMemberPositions(
     positionIdA: Int
     positionIdB: Int
@@ -709,6 +715,10 @@ type Mutation {
     updates: [UpdateLeagueScoringMultiplierInput!]!
   ): ScoringConfig
   updateLeagueSettings(input: UpdateLeagueSettingsInput!): League
+  updateMatchupPlayerPosition(
+    matchupPlayerId: Int!
+    positionId: Int
+  ): MatchupPlayer
   updateMatchupScore(
     matchupId: Int!
     team1Score: Float
@@ -906,6 +916,7 @@ type Query {
   ): [Matchup!]
   getMatchupMessages(limit: Int, matchupId: Int!): [MatchupMessage!]
   getMatchupPlayers(matchupId: Int!): [MatchupPlayer!]
+  getMatchupRoster(matchupId: Int!, teamId: Int!): [MatchupPlayer!]
   getMatchupStatusCounts(leagueId: Int!, season: Int): MatchupStatusCounts
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
@@ -922,6 +933,7 @@ type Query {
   ): [PlayoffQualification!]
   getPowerRankings(leagueId: Int!, season: Int): [TeamStanding!]
   getSeasonResults(leagueId: Int!, season: Int): SeasonResults
+  getTeamMatchupHistory(leagueId: Int!, limit: Int, teamId: Int!): [Matchup!]
   getTeamRecentMatchups(limit: Int, teamId: Int!): [Matchup!]
   getTiebreakerHistory(leagueId: Int, matchupId: Int): [TiebreakerHistory!]
   getTiebreakerRules(leagueId: Int!): TiebreakerRule

@@ -4,6 +4,7 @@ import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { MatchupScoreboard } from './MatchupScoreboard';
 import { GamesRemaining } from './GamesRemaining';
 import { MatchupNavigationControls } from './MatchupNavigationControls';
+import { MatchupRosterComparison } from './MatchupRosterComparison';
 import { useMatchupById, useMatchupsForLeague } from '../../hooks/useMatchup';
 
 /**
@@ -153,7 +154,8 @@ export function MatchupDetailPage() {
         </YStack>
       </YStack>
 
-      {/* TODO: Add team rosters and player projections */}
+      {/* Team Rosters & Player Matchups */}
+      <MatchupRosterComparison matchup={matchup} />
     </YStack>
   );
 }

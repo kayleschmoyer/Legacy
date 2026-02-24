@@ -2,6 +2,7 @@ export { MatchupCard } from './MatchupCard';
 export { MatchupGrid } from './MatchupGrid';
 export { MatchupScoreboard } from './MatchupScoreboard';
 export { MatchupRosterComparison } from './MatchupRosterComparison';
+export { MatchupRosterEditor } from './MatchupRosterEditor';
 export { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 export { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 export { StandingsTable } from './StandingsTable';

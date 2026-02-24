@@ -4,6 +4,12 @@ import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
+import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
+import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
+import {
+  MatchupStatus,
+  useGetUserTeamIdQuery,
+} from '../../api/db/graphql.generated';
 import { useMatchupById, useMatchupsForLeague } from '../../hooks/useMatchup';
 
 /**
@@ -23,6 +29,13 @@ export function MatchupDetailPage() {
 
   // Fetch all matchups for the league to determine available weeks
   const { matchups: allLeagueMatchups } = useMatchupsForLeague(leagueIdNum);
+
+  // Determine the current user's team in this league
+  const { data: userTeamData } = useGetUserTeamIdQuery({
+    variables: { leagueId: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+  const userTeamId = userTeamData?.userTeamId ?? null;
 
   if (loading) {
     return (
@@ -153,7 +166,15 @@ export function MatchupDetailPage() {
         </YStack>
       </YStack>
 
-      {/* TODO: Add team rosters and player projections */}
+      {/* Roster Editor — shown when the matchup is still editable */}
+      {userTeamId &&
+        matchup.status === MatchupStatus.Scheduled &&
+        (matchup.team1Id === userTeamId || matchup.team2Id === userTeamId) && (
+          <MatchupRosterEditor matchup={matchup} userTeamId={userTeamId} />
+        )}
+
+      {/* Team Rosters & Player Matchups */}
+      <MatchupRosterComparison matchup={matchup} />
     </YStack>
   );
 }

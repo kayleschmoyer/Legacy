@@ -3,7 +3,7 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import {
   HeadToHeadRecord,
@@ -366,7 +366,7 @@ builder.queryField('getMatchupPlayers', (t) =>
         throw new Error('Authentication required');
       }
 
-      // Get matchup players with their selected seasons from league_week_player_seasons
+      // Get matchup metadata for season lookup
       const matchupResults = await context.db
         .select({
           matchupId: PublicSchema.matchups.id,
@@ -383,40 +383,23 @@ builder.queryField('getMatchupPlayers', (t) =>
 
       const { leagueId, weekNumber } = matchupResults[0];
 
-      // Get matchup players
+      // Get matchup players — positionId is now stored directly on matchup_players
       const playersResults = await context.db
         .select({
           id: PublicSchema.matchupPlayers.id,
           matchupId: PublicSchema.matchupPlayers.matchupId,
           playerId: PublicSchema.matchupPlayers.playerId,
           teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
         })
         .from(PublicSchema.matchupPlayers)
         .where(eq(PublicSchema.matchupPlayers.matchupId, args.matchupId));
 
-      // Get team members to find position assignments
       const playerIds = playersResults.map((p) => p.playerId);
 
       if (playerIds.length === 0) {
         return [];
       }
-
-      const teamMembersResults = await context.db
-        .select({
-          playerId: PublicSchema.teamMembers.playerId,
-          positionId: PublicSchema.teamMembers.positionId,
-        })
-        .from(PublicSchema.teamMembers)
-        .where(
-          and(
-            eq(PublicSchema.teamMembers.leagueId, leagueId),
-            inArray(PublicSchema.teamMembers.playerId, playerIds),
-          ),
-        );
-
-      const positionMap = new Map(
-        teamMembersResults.map((tm) => [tm.playerId, tm.positionId]),
-      );
 
       // Get selected seasons from league_week_player_seasons
       const seasonsResults = await context.db
@@ -436,12 +419,149 @@ builder.queryField('getMatchupPlayers', (t) =>
         seasonsResults.map((s) => [s.playerId, s.season]),
       );
 
-      // Combine the data
+      // Combine the data — positions come directly from matchup_players
       return playersResults.map((player) => ({
         ...player,
-        positionId: positionMap.get(player.playerId) ?? null,
+        positionId: player.positionId ?? null,
         season: seasonMap.get(player.playerId) ?? null,
       }));
+    },
+  }),
+);
+
+// Query: getMatchupRoster
+// Returns the roster for a specific team within a matchup.
+// Useful for viewing historical lineups from previous weeks.
+builder.queryField('getMatchupRoster', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    args: {
+      matchupId: t.arg.int({ required: true }),
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      // Get matchup metadata
+      const matchupResults = await context.db
+        .select({
+          leagueId: PublicSchema.matchups.leagueId,
+          weekNumber: PublicSchema.matchups.weekNumber,
+        })
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .limit(1);
+
+      if (!matchupResults[0]) {
+        return [];
+      }
+
+      const { leagueId, weekNumber } = matchupResults[0];
+
+      // Get the team's matchup players
+      const playersResults = await context.db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, args.matchupId),
+            eq(PublicSchema.matchupPlayers.teamId, args.teamId),
+          ),
+        );
+
+      if (playersResults.length === 0) {
+        return [];
+      }
+
+      // Get seasons
+      const seasonsResults = await context.db
+        .select({
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+            eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+          ),
+        );
+
+      const seasonMap = new Map(
+        seasonsResults.map((s) => [s.playerId, s.season]),
+      );
+
+      return playersResults.map((player) => ({
+        ...player,
+        positionId: player.positionId ?? null,
+        season: seasonMap.get(player.playerId) ?? null,
+      }));
+    },
+  }),
+);
+
+// Query: getTeamMatchupHistory
+// Returns all matchups for a team with their rosters, ordered by week (newest first).
+// Allows users to browse their lineup history across weeks.
+builder.queryField('getTeamMatchupHistory', (t) =>
+  t.field({
+    type: [Matchup],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      teamId: t.arg.int({ required: true }),
+      limit: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const query = context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            // Team can be either team1 or team2
+            inArray(PublicSchema.matchups.team1Id, [args.teamId]),
+          ),
+        )
+        .orderBy(desc(PublicSchema.matchups.weekNumber));
+
+      const asTeam1 = await (args.limit ? query.limit(args.limit) : query);
+
+      const query2 = context.db
+        .select()
+        .from(PublicSchema.matchups)
+        .where(
+          and(
+            eq(PublicSchema.matchups.leagueId, args.leagueId),
+            eq(PublicSchema.matchups.team2Id, args.teamId),
+          ),
+        )
+        .orderBy(desc(PublicSchema.matchups.weekNumber));
+
+      const asTeam2 = await (args.limit ? query2.limit(args.limit) : query2);
+
+      // Merge / dedupe and sort descending by week
+      const matchupMap = new Map<number, (typeof asTeam1)[0]>();
+      for (const m of [...asTeam1, ...asTeam2]) {
+        matchupMap.set(m.id, m);
+      }
+
+      const all = Array.from(matchupMap.values()).sort(
+        (a, b) => b.weekNumber - a.weekNumber,
+      );
+
+      return args.limit ? all.slice(0, args.limit) : all;
     },
   }),
 );

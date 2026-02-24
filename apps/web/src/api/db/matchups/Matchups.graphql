@@ -239,3 +239,40 @@ mutation AdvanceLeagueWeek($leagueId: Int!) {
     currentMatchupId
   }
 }
+
+query GetMatchupRoster($matchupId: Int!, $teamId: Int!) {
+  getMatchupRoster(matchupId: $matchupId, teamId: $teamId) {
+    ...MatchupPlayer
+  }
+}
+
+query GetTeamMatchupHistory($leagueId: Int!, $teamId: Int!, $limit: Int) {
+  getTeamMatchupHistory(leagueId: $leagueId, teamId: $teamId, limit: $limit) {
+    ...Matchup
+  }
+}
+
+mutation UpdateMatchupPlayerPosition($matchupPlayerId: Int!, $positionId: Int) {
+  updateMatchupPlayerPosition(
+    matchupPlayerId: $matchupPlayerId
+    positionId: $positionId
+  ) {
+    ...MatchupPlayer
+  }
+}
+
+mutation SwapMatchupPlayerPositions(
+  $matchupPlayerIdA: Int!
+  $positionIdA: Int
+  $matchupPlayerIdB: Int!
+  $positionIdB: Int
+) {
+  swapMatchupPlayerPositions(
+    matchupPlayerIdA: $matchupPlayerIdA
+    positionIdA: $positionIdA
+    matchupPlayerIdB: $matchupPlayerIdB
+    positionIdB: $positionIdB
+  ) {
+    ...MatchupPlayer
+  }
+}
