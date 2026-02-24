@@ -183,6 +183,22 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
         ]
       },
+      # Secrets Manager write permissions for Terraform apply (creating/managing secrets)
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:RestoreSecret"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*"
+        ]
+      },
       # S3 read permissions for Lambda deployment bucket
       {
         Effect = "Allow"
@@ -362,7 +378,11 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "events:ListRules",
           "events:ListTagsForResource",
           "events:DeleteRule",
-          "events:RemoveTargets"
+          "events:RemoveTargets",
+          "events:PutRule",
+          "events:PutTargets",
+          "events:TagResource",
+          "events:UntagResource"
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*"
