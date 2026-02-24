@@ -6,11 +6,6 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "build": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
-    "build:declarations": "tsc --emitDeclarationOnly --declaration --outDir dist/web",
-    "build:web": "pnpm run build:declarations && cross-env BUILD_PLATFORM=web vite build",
-    "build:mobile": "cross-env BUILD_PLATFORM=mobile vite build",
-    "build:all": "pnpm run build:web && pnpm run build:mobile",
     "codegen": "graphql-codegen --config codegen.ts",
     "storybook": "storybook dev -p 6009 -c .storybook",
     "build-storybook": "storybook build -c .storybook -o ../../dist/storybook",

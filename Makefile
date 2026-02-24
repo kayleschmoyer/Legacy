@@ -275,7 +275,7 @@ build-lambdas: ## Build all lambda functions
 
 build-libs: ## Build all libraries
 	@$(call echo_blue,Building libraries...)
-	pnpm exec nx run-many -t build --projects=api,shared-components,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
+	pnpm exec nx run-many -t build --projects=api,db-client,data-loaders,bref-client,scoring,utils,logging,env-utilities
 
 # Development
 start: ## Start the dev server

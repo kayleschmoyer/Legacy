@@ -472,7 +472,6 @@ jobs:
           fi
 
           # Build shared libraries first
-          $NX_CMD build lib-shared-components || true
           $NX_CMD build lib-tamagui-config || true
 
           # Build applications
