@@ -9,6 +9,7 @@ import { and, count, eq, sql } from 'drizzle-orm';
 
 import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
+import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
@@ -306,6 +307,10 @@ builder.mutationField('claimFreeAgent', (t) =>
 
 // Process all pending waiver claims. Can be triggered from the UI or via
 // EventBridge cron hitting the GraphQL endpoint.
+//
+// Auth: system API key (EventBridge) → all leagues,
+//       admin → all leagues,
+//       commissioner/owner → own league only (leagueId required).
 builder.mutationField('processWaiverClaims', (t) =>
   t.field({
     type: ProcessWaiverClaimsResult,
@@ -313,6 +318,8 @@ builder.mutationField('processWaiverClaims', (t) =>
       leagueId: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
+      await assertAuthorized(context, args.leagueId);
+
       const processor = new WaiverClaimProcessor(context.db);
       return processor.process({ leagueId: args.leagueId });
     },

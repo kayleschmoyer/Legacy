@@ -5,12 +5,14 @@
 # manual (UI) and automatic (cron) triggers.
 
 # ── Waiver Claim Processing ─────────────────────────────────────────────────
-# Processes pending waiver claims every hour
+# Processes pending waiver claims nightly at 2am EST.
+# 2am EST = 07:00 UTC (standard time) / 06:00 UTC (daylight saving).
+# Using 07:00 UTC (EST year-round); adjust if DST precision is needed.
 
 resource "aws_cloudwatch_event_rule" "process_waiver_claims" {
   name                = "${local.name_prefix}-process-waiver-claims"
-  description         = "Trigger waiver claim processing every hour"
-  schedule_expression = "rate(1 hour)"
+  description         = "Trigger nightly waiver claim processing at 2am EST"
+  schedule_expression = "cron(0 7 * * ? *)"
 
   tags = local.common_tags
 }

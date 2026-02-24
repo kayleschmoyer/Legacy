@@ -73,7 +73,7 @@ builder.objectType(AutoAdvanceMatchupsResult, {
  *    provided (single-league scope).
  *  - Anyone else → rejected.
  */
-async function assertAuthorized(
+export async function assertAuthorized(
   context: Context,
   leagueId: number | null | undefined,
 ): Promise<void> {
