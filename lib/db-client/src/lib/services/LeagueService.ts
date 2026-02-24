@@ -19,12 +19,12 @@ const DEFAULT_ROSTER_POSITIONS = [
   'OF',
   'DH', // Designated Hitter
   // Pitching positions
-  'SP', // Starting Pitcher (4 slots)
+  'SP', // Starting Pitcher (5 slots)
   'SP',
   'SP',
   'SP',
-  'RP', // Relief Pitcher (4 slots)
-  'RP',
+  'SP',
+  'RP', // Relief Pitcher (3 slots)
   'RP',
   'RP',
 ] as const;
