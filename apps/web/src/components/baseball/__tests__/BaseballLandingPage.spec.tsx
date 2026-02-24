@@ -111,7 +111,7 @@ describe('BaseballLandingPage', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders leagues grid and supports search', () => {
+  it('renders leagues list and supports search', () => {
     const {
       useGetUserLeaguesQuery,
     }: any = require('../../../api/db/graphql.generated');
@@ -131,14 +131,15 @@ describe('BaseballLandingPage', () => {
       </MemoryRouter>,
     );
 
-    // Two league cards rendered
-    expect(screen.getAllByTestId('league-card')).toHaveLength(2);
+    // Both league names rendered in the list
+    expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
+    expect(screen.getByText('Sunday Stars')).toBeInTheDocument();
 
     // Search filters list
     const search = screen.getByPlaceholderText(/Search leagues/i);
     fireEvent.change(search, { target: { value: 'Saturday' } });
-    expect(screen.getAllByTestId('league-card')).toHaveLength(1);
     expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
+    expect(screen.queryByText('Sunday Stars')).not.toBeInTheDocument();
   });
 
   it('opens create league dialog when clicking Create League', () => {

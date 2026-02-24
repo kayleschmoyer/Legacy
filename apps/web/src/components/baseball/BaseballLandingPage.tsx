@@ -11,7 +11,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { Dialog, Input, Separator, styled, Text } from 'tamagui';
-import { League, LeagueCard } from './LeagueCard';
+import type { League } from './LeagueCard';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -19,12 +19,57 @@ import {
   useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
 
+/* ─── Draft Status Helpers ─── */
+
+function getLeagueBadge(
+  draftStatus?: string | null,
+  weekNumber?: number | null,
+): { label: string; bg: string; border: string; text: string } {
+  switch (draftStatus) {
+    case 'in-progress':
+      return {
+        label: 'Drafting',
+        bg: 'rgba(59, 130, 246, 0.14)',
+        border: 'rgba(59, 130, 246, 0.38)',
+        text: '$blue11',
+      };
+    case 'completed':
+      return {
+        label: weekNumber ? `Week ${weekNumber}` : 'In Season',
+        bg: 'rgba(34, 197, 94, 0.14)',
+        border: 'rgba(34, 197, 94, 0.36)',
+        text: '$green11',
+      };
+    case 'queued':
+    case 'not-started':
+      return {
+        label: 'Draft Scheduled',
+        bg: 'rgba(251, 191, 36, 0.12)',
+        border: 'rgba(251, 191, 36, 0.30)',
+        text: '$orange11',
+      };
+    default:
+      return {
+        label: draftStatus
+          ? draftStatus
+              .replace('-', ' ')
+              .replace(/\b\w/g, (l) => l.toUpperCase())
+          : 'Unknown',
+        bg: 'rgba(148, 163, 184, 0.12)',
+        border: 'rgba(148, 163, 184, 0.30)',
+        text: '$gray11',
+      };
+  }
+}
+
+/* ─── Styled Components ─── */
+
 const PageContainer = styled(YStack, {
   flex: 1,
   minHeight: '100vh',
   backgroundColor: '$background',
   paddingHorizontal: '$4',
-  paddingBottom: '$8',
+  paddingBottom: '$10',
   paddingTop: '$6',
   $sm: {
     paddingHorizontal: '$3',
@@ -36,19 +81,21 @@ const ContentContainer = styled(YStack, {
   maxWidth: 1280,
   width: '100%',
   alignSelf: 'center',
-  gap: '$8',
+  gap: '$9',
 });
 
 const HeroSection = styled(XStack, {
   position: 'relative',
   overflow: 'hidden',
-  borderRadius: '$7',
+  borderRadius: '$8',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.18)',
+  borderColor: 'rgba(59, 130, 246, 0.22)',
   padding: '$9',
   gap: '$8',
   alignItems: 'stretch',
   backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 20 },
   $md: {
     flexDirection: 'column',
     padding: '$7',
@@ -68,12 +115,14 @@ const HeroBadge = styled(XStack, {
   alignSelf: 'flex-start',
   alignItems: 'center',
   gap: '$2',
-  paddingHorizontal: '$3',
-  paddingVertical: '$1',
+  paddingHorizontal: '$4',
+  paddingVertical: '$1.5',
   borderRadius: '$10',
   backgroundColor: 'rgba(59, 130, 246, 0.16)',
   borderWidth: 1,
-  borderColor: 'rgba(37, 99, 235, 0.35)',
+  borderColor: 'rgba(37, 99, 235, 0.40)',
+  animation: 'medium',
+  enterStyle: { opacity: 0, scale: 0.9 },
 });
 
 const HeroTitle = styled(H1, {
@@ -82,6 +131,8 @@ const HeroTitle = styled(H1, {
   lineHeight: '$12',
   color: '$color',
   letterSpacing: -0.5,
+  animation: 'medium',
+  enterStyle: { opacity: 0, x: -15 },
   $sm: {
     fontSize: '$10',
     lineHeight: '$10',
@@ -93,6 +144,8 @@ const HeroSubtitle = styled(Paragraph, {
   color: 'rgba(226, 232, 240, 0.92)',
   lineHeight: '$6',
   maxWidth: 520,
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 10 },
   $sm: {
     fontSize: '$4',
     lineHeight: '$5',
@@ -114,12 +167,18 @@ const PrimaryButton = styled(Button, {
   color: '$color1',
   backgroundColor: '$blue10',
   borderColor: 'transparent',
+  animation: 'quick',
   hoverStyle: {
     backgroundColor: '$blue9',
-    transform: 'translateY(-1px)',
+    transform: 'translateY(-2px)',
+    shadowColor: 'rgba(59, 130, 246, 0.45)',
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
   },
   pressStyle: {
     backgroundColor: '$blue11',
+    scale: 0.98,
   },
 });
 
@@ -133,12 +192,15 @@ const SecondaryButton = styled(Button, {
   borderColor: 'rgba(59, 130, 246, 0.35)',
   borderWidth: 1,
   color: '$blue10',
+  animation: 'quick',
   hoverStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.14)',
-    borderColor: 'rgba(59, 130, 246, 0.45)',
+    backgroundColor: 'rgba(59, 130, 246, 0.16)',
+    borderColor: 'rgba(59, 130, 246, 0.55)',
+    transform: 'translateY(-1px)',
   },
   pressStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+    backgroundColor: 'rgba(59, 130, 246, 0.20)',
+    scale: 0.98,
   },
 });
 
@@ -151,15 +213,20 @@ const HeroSidePanel = styled(YStack, {
 
 const StatsCard = styled(YStack, {
   backgroundColor: 'rgba(15, 23, 42, 0.92)',
-  borderRadius: '$6',
-  padding: '$5',
+  borderRadius: '$7',
+  padding: '$6',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.16)',
+  borderColor: 'rgba(59, 130, 246, 0.18)',
   gap: '$4',
-  shadowColor: '#0f172a',
-  shadowOpacity: 0.35,
-  shadowRadius: 20,
+  shadowColor: 'rgba(59, 130, 246, 0.12)',
+  shadowOpacity: 0.6,
+  shadowRadius: 24,
   shadowOffset: { width: 0, height: 12 },
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 15 },
+  hoverStyle: {
+    borderColor: 'rgba(59, 130, 246, 0.30)',
+  },
 });
 
 const StatsHeader = styled(YStack, {
@@ -180,7 +247,9 @@ const StatItem = styled(YStack, {
 const StatValue = styled(H2, {
   fontSize: '$9',
   fontWeight: '800',
-  color: '$color',
+  color: '$blue10',
+  animation: 'medium',
+  enterStyle: { opacity: 0, scale: 0.8 },
 });
 
 const StatLabel = styled(Paragraph, {
@@ -192,11 +261,16 @@ const StatLabel = styled(Paragraph, {
 
 const QuickGlanceCard = styled(YStack, {
   backgroundColor: 'rgba(30, 41, 59, 0.72)',
-  borderRadius: '$6',
+  borderRadius: '$7',
   padding: '$5',
   borderWidth: 1,
   borderColor: 'rgba(148, 163, 184, 0.14)',
   gap: '$3',
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 15 },
+  hoverStyle: {
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+  },
 });
 
 const QuickGlanceRow = styled(XStack, {
@@ -209,6 +283,10 @@ const QuickGlanceDot = styled(YStack, {
   height: 10,
   borderRadius: 9999,
   backgroundColor: '$blue9',
+  shadowColor: '$blue9',
+  shadowOpacity: 0.6,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 0 },
 });
 
 const LeaguesSection = styled(YStack, {
@@ -229,6 +307,8 @@ const SectionTitle = styled(H2, {
   fontSize: '$9',
   fontWeight: '700',
   color: '$color',
+  animation: 'medium',
+  enterStyle: { opacity: 0, x: -10 },
 });
 
 const SectionDescription = styled(Paragraph, {
@@ -236,13 +316,83 @@ const SectionDescription = styled(Paragraph, {
   color: 'rgba(148, 163, 184, 0.9)',
 });
 
-const LeaguesGrid = styled(XStack, {
+const LeaguesList = styled(YStack, {
+  gap: '$3',
+  width: '100%',
+});
+
+const LeagueRowOuter = styled(XStack, {
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: '$6',
+  borderWidth: 1,
+  borderColor: 'rgba(148, 163, 184, 0.14)',
+  padding: '$4',
+  paddingHorizontal: '$5',
+  alignItems: 'center',
   gap: '$5',
-  rowGap: '$6',
+  cursor: 'pointer',
+  animation: 'medium',
+  enterStyle: { opacity: 0, x: -12 },
+  hoverStyle: {
+    borderColor: 'rgba(59, 130, 246, 0.40)',
+    transform: 'translateX(4px)',
+  },
+  pressStyle: {
+    scale: 0.995,
+    borderColor: 'rgba(59, 130, 246, 0.50)',
+  },
+  $sm: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    padding: '$4',
+    gap: '$3',
+  },
+});
+
+const LeagueRowMeta = styled(XStack, {
+  alignItems: 'center',
+  gap: '$4',
   flexWrap: 'wrap',
-  justifyContent: 'center',
-  $gtSm: {
-    justifyContent: 'flex-start',
+  $sm: {
+    gap: '$3',
+  },
+});
+
+const WeekStatusChip = styled(XStack, {
+  alignItems: 'center',
+  gap: '$1.5',
+  paddingHorizontal: '$3',
+  paddingVertical: '$1',
+  borderRadius: '$5',
+  borderWidth: 1,
+});
+
+const DraftBadge = styled(XStack, {
+  alignItems: 'center',
+  paddingHorizontal: '$3',
+  paddingVertical: '$1',
+  borderRadius: '$5',
+  borderWidth: 1,
+});
+
+const ViewLeagueButton = styled(Button, {
+  borderRadius: '$5',
+  paddingHorizontal: '$4',
+  height: '$3',
+  backgroundColor: 'rgba(37, 99, 235, 0.14)',
+  borderColor: 'rgba(59, 130, 246, 0.40)',
+  borderWidth: 1,
+  color: '$blue11',
+  animation: 'quick',
+  hoverStyle: {
+    backgroundColor: 'rgba(37, 99, 235, 0.22)',
+    borderColor: 'rgba(59, 130, 246, 0.60)',
+    transform: 'translateY(-1px)',
+  },
+  pressStyle: {
+    backgroundColor: 'rgba(37, 99, 235, 0.18)',
+    scale: 0.98,
   },
 });
 
@@ -251,20 +401,24 @@ const EmptyState = styled(YStack, {
   padding: '$10',
   gap: '$5',
   backgroundColor: 'rgba(15, 23, 42, 0.72)',
-  borderRadius: '$6',
+  borderRadius: '$7',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.16)',
+  borderColor: 'rgba(59, 130, 246, 0.18)',
   minHeight: 320,
   justifyContent: 'center',
   textAlign: 'center',
-  shadowColor: '#0f172a',
-  shadowOpacity: 0.2,
-  shadowRadius: 18,
+  shadowColor: 'rgba(59, 130, 246, 0.08)',
+  shadowOpacity: 0.5,
+  shadowRadius: 24,
   shadowOffset: { width: 0, height: 10 },
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 20 },
 });
 
 const EmptyStateIcon = styled(YStack, {
   fontSize: '3.2rem',
+  animation: 'bouncy',
+  enterStyle: { opacity: 0, scale: 0.5, y: -20 },
 });
 
 const EmptyStateTitle = styled(H2, {
@@ -288,15 +442,25 @@ const SearchContainer = styled(XStack, {
   borderColor: 'rgba(148, 163, 184, 0.24)',
   paddingHorizontal: '$3',
   paddingVertical: '$2',
+  animation: 'quick',
+  hoverStyle: {
+    borderColor: 'rgba(59, 130, 246, 0.40)',
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+  },
+  focusStyle: {
+    borderColor: 'rgba(59, 130, 246, 0.55)',
+  },
 });
 
 const NoticeCard = styled(YStack, {
   backgroundColor: 'rgba(37, 99, 235, 0.12)',
-  borderRadius: '$5',
-  padding: '$4',
+  borderRadius: '$6',
+  padding: '$5',
   borderWidth: 1,
-  borderColor: 'rgba(37, 99, 235, 0.28)',
-  gap: '$2',
+  borderColor: 'rgba(37, 99, 235, 0.30)',
+  gap: '$3',
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 10 },
 });
 
 export function BaseballLandingPage() {
@@ -347,7 +511,9 @@ export function BaseballLandingPage() {
       owner: league.owner || 0,
       maxRosterSize: league.maxRosterSize || 25,
       currentMatchup: league.currentMatchup,
+      currentWeekNumber: league.currentWeekNumber,
       draftStatus: league.draftStatus || undefined,
+      weekAdvanceStatus: league.weekAdvanceStatus,
     })) as League[]) || [];
 
   const leaguesCount = leagues.length;
@@ -399,10 +565,11 @@ export function BaseballLandingPage() {
   const pageBackgroundStyle = React.useMemo(
     () => ({
       background: `
-        radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.18) 0%, transparent 45%),
-        radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.12) 0%, transparent 45%),
-        radial-gradient(circle at 15% 80%, rgba(15, 118, 110, 0.08) 0%, transparent 55%),
-        linear-gradient(180deg, rgba(2, 6, 23, 0.92) 0%, hsl(var(--background)) 100%)
+        radial-gradient(ellipse at 10% 15%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, rgba(14, 165, 233, 0.14) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 50%, rgba(37, 99, 235, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse at 15% 85%, rgba(15, 118, 110, 0.10) 0%, transparent 50%),
+        linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, hsl(var(--background)) 100%)
       `,
       backgroundAttachment: 'fixed',
     }),
@@ -490,13 +657,19 @@ export function BaseballLandingPage() {
           aria-labelledby="baseball-hero-title"
           style={{
             background:
-              'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 64, 175, 0.68) 100%)',
-            backdropFilter: 'blur(24px)',
+              'linear-gradient(135deg, rgba(15, 23, 42, 0.88) 0%, rgba(30, 64, 175, 0.55) 50%, rgba(37, 99, 235, 0.35) 100%)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            boxShadow:
+              '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
           }}
         >
           <HeroContent>
             <HeroBadge>
               <Text fontSize="$2" fontWeight="600" color="$blue11">
+                <span role="img" aria-label="baseball">
+                  ⚾
+                </span>{' '}
                 {currentYear} Season Hub
               </Text>
             </HeroBadge>
@@ -529,7 +702,14 @@ export function BaseballLandingPage() {
           </HeroContent>
 
           <HeroSidePanel>
-            <StatsCard>
+            <StatsCard
+              style={{
+                background:
+                  'linear-gradient(160deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+              }}
+            >
               <StatsHeader>
                 <Paragraph
                   fontSize="$3"
@@ -564,7 +744,14 @@ export function BaseballLandingPage() {
               </StatsGrid>
             </StatsCard>
 
-            <QuickGlanceCard>
+            <QuickGlanceCard
+              style={{
+                background:
+                  'linear-gradient(160deg, rgba(30, 41, 59, 0.80) 0%, rgba(15, 23, 42, 0.65) 100%)',
+                backdropFilter: 'blur(14px)',
+                WebkitBackdropFilter: 'blur(14px)',
+              }}
+            >
               <Paragraph
                 fontSize="$3"
                 color="rgba(148, 163, 184, 0.85)"
@@ -633,18 +820,108 @@ export function BaseballLandingPage() {
           </SectionHeader>
 
           {filteredLeagues.length > 0 ? (
-            <LeaguesGrid data-testid="leagues-grid">
-              {filteredLeagues.map((league, index) => (
-                <LeagueCard
-                  key={league.id}
-                  league={league}
-                  onViewLeague={handleViewLeague}
-                  animationDelay={index * 100}
-                />
-              ))}
-            </LeaguesGrid>
+            <LeaguesList data-testid="leagues-grid">
+              {filteredLeagues.map((league) => {
+                const badge = getLeagueBadge(
+                  league.draftStatus,
+                  league.currentWeekNumber,
+                );
+
+                return (
+                  <LeagueRowOuter
+                    key={league.id}
+                    onPress={() => league.id && handleViewLeague(league.id)}
+                    accessibilityLabel={`View ${league.name || 'league'}`}
+                    role="link"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, rgba(15, 23, 42, 0.78) 0%, rgba(30, 41, 59, 0.55) 100%)',
+                      backdropFilter: 'blur(14px)',
+                      WebkitBackdropFilter: 'blur(14px)',
+                    }}
+                  >
+                    {/* League identity */}
+                    <YStack gap="$1" flex={1} minWidth={180}>
+                      <H3 fontSize="$6" fontWeight="700" color="$color">
+                        {league.name || 'Unnamed League'}
+                      </H3>
+                      <Paragraph fontSize="$2" color="$textMuted">
+                        {league.maxRosterSize
+                          ? `${league.maxRosterSize}-slot roster`
+                          : 'Season dashboard'}
+                      </Paragraph>
+                    </YStack>
+
+                    {/* Status indicators */}
+                    <LeagueRowMeta>
+                      <DraftBadge
+                        backgroundColor={badge.bg}
+                        borderColor={badge.border}
+                      >
+                        <Text
+                          fontSize={11}
+                          fontWeight="700"
+                          color={badge.text}
+                          textTransform="uppercase"
+                          letterSpacing={0.5}
+                        >
+                          {badge.label}
+                        </Text>
+                      </DraftBadge>
+                      {league.weekAdvanceStatus === 'processing' ||
+                      league.weekAdvanceStatus === 'queued' ? (
+                        <WeekStatusChip
+                          backgroundColor="rgba(234, 179, 8, 0.12)"
+                          borderColor="rgba(234, 179, 8, 0.35)"
+                        >
+                          <Text
+                            fontSize={11}
+                            fontWeight="600"
+                            color="$yellow10"
+                          >
+                            <span role="img" aria-label="hourglass">
+                              ⏳
+                            </span>{' '}
+                            Advancing
+                          </Text>
+                        </WeekStatusChip>
+                      ) : league.weekAdvanceStatus === 'failed' ? (
+                        <WeekStatusChip
+                          backgroundColor="rgba(239, 68, 68, 0.12)"
+                          borderColor="rgba(239, 68, 68, 0.35)"
+                        >
+                          <Text fontSize={11} fontWeight="600" color="$red10">
+                            <span role="img" aria-label="warning">
+                              ⚠
+                            </span>{' '}
+                            Advance failed
+                          </Text>
+                        </WeekStatusChip>
+                      ) : null}
+                    </LeagueRowMeta>
+
+                    {/* Action */}
+                    <ViewLeagueButton
+                      onPress={() => league.id && handleViewLeague(league.id)}
+                      accessibilityLabel={`View ${league.name || 'league'}`}
+                    >
+                      <Text fontWeight="700" color="$blue11" fontSize="$2">
+                        View
+                      </Text>
+                    </ViewLeagueButton>
+                  </LeagueRowOuter>
+                );
+              })}
+            </LeaguesList>
           ) : (
-            <EmptyState>
+            <EmptyState
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(15, 23, 42, 0.80) 0%, rgba(30, 64, 175, 0.18) 100%)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+              }}
+            >
               <EmptyStateIcon>
                 <Text aria-hidden="true">⚾</Text>
               </EmptyStateIcon>
@@ -670,9 +947,10 @@ export function BaseballLandingPage() {
       <Dialog modal open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <Dialog.Portal>
           <Dialog.Overlay
-            animation="quick"
+            animation="medium"
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
+            backgroundColor="rgba(0, 0, 0, 0.65)"
           />
           <Dialog.Content
             bordered
@@ -680,12 +958,19 @@ export function BaseballLandingPage() {
             maxWidth={560}
             width="100%"
             backgroundColor="$color2"
-            borderColor="$borderColor"
-            animation="quick"
-            enterStyle={{ opacity: 0, y: -10 }}
-            exitStyle={{ opacity: 0, y: 10 }}
+            borderColor="rgba(59, 130, 246, 0.22)"
+            borderRadius="$7"
+            animation="bouncy"
+            enterStyle={{ opacity: 0, y: -20, scale: 0.96 }}
+            exitStyle={{ opacity: 0, y: 10, scale: 0.98 }}
             aria-labelledby="create-league-title"
             aria-describedby="create-league-desc"
+            style={{
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              boxShadow:
+                '0 16px 48px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.08)',
+            }}
           >
             <YStack space="$4">
               <YStack>

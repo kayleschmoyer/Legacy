@@ -101,6 +101,7 @@ export interface League {
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
   draftStatus?: string | null;
+  weekAdvanceStatus?: string | null;
 }
 
 interface LeagueCardProps {
