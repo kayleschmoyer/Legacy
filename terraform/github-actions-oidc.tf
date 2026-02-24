@@ -71,6 +71,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
         ]
       },
@@ -82,7 +83,10 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:UpdateFunctionConfiguration",
           "lambda:GetFunction",
           "lambda:GetFunctionConfiguration",
-          "lambda:ListVersionsByFunction"
+          "lambda:ListVersionsByFunction",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:GetPolicy"
         ]
         Resource = [
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*"
