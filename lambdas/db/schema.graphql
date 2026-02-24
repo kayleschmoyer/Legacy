@@ -3,6 +3,25 @@ type AdvanceLeagueWeekResponse {
   matchups: [Matchup!]
 }
 
+"""
+Result of the automated weekly matchup advancement across all active leagues
+"""
+type AutoAdvanceMatchupsResult {
+  errors: [String!]
+  leaguesAdvanced: Int
+  leaguesProcessed: Int
+  leaguesSkipped: Int
+}
+
+"""
+Result of the automated nightly game selection across all active leagues
+"""
+type AutoSelectGamesResult {
+  errors: [String!]
+  gamesTriggered: Int
+  leaguesProcessed: Int
+}
+
 type AverageSeasonBatting {
   atBats: Float
   battingAverage: Float
@@ -622,7 +641,26 @@ type Mutation {
   """
   acceptPrivacyPolicy: PrivacyPolicyStatus
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
-  advanceLeagueWeek(leagueId: Int!): AdvanceLeagueWeekResponse
+
+  """
+  Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.
+  """
+  autoAdvanceMatchups(
+    """
+    Optional: restrict to a single league. Required for commissioner-level access.
+    """
+    leagueId: Int
+  ): AutoAdvanceMatchupsResult
+
+  """
+  Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge.
+  """
+  autoSelectGames(
+    """
+    Optional: restrict to a single league. Required for commissioner-level access.
+    """
+    leagueId: Int
+  ): AutoSelectGamesResult
   cancelWaiverClaim(claimId: Int!): WaiverClaim
   claimFreeAgent(
     dropPlayerId: Int
@@ -708,7 +746,6 @@ type Mutation {
     teamMemberIdA: Int!
     teamMemberIdB: Int!
   ): [TeamMember!]
-  triggerGameSelection(gameNumber: Int!, matchupId: Int!): Boolean
   updateDraftSettings(
     input: UpdateDraftSettingsInput!
   ): UpdateDraftSettingsPayload

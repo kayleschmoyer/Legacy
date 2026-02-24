@@ -14,11 +14,11 @@ import {
   type LeagueFragment,
   type Matchup,
   StatsLoadingStatus,
-  useAdvanceLeagueWeekMutation,
+  useAutoAdvanceMatchupsMutation,
+  useAutoSelectGamesMutation,
   useGetLeagueDraftQuery,
   useGetMatchupsForLeagueQuery,
   useStartDraftMutation,
-  useTriggerGameSelectionMutation,
 } from '../../api/db/graphql.generated';
 
 export interface NextStepControlProps {
@@ -54,7 +54,7 @@ export function NextStepControl({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation({
+  const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
       'GetCurrentMatchupForLeague',
       'GetMatchupsForLeague',
@@ -66,7 +66,7 @@ export function NextStepControl({
     refetchQueries: ['GetLeagueDraft'],
     awaitRefetchQueries: true,
   });
-  const [triggerGameSelection] = useTriggerGameSelectionMutation({
+  const [autoSelectGames] = useAutoSelectGamesMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
   });
@@ -167,22 +167,16 @@ export function NextStepControl({
         onSuccess?.('draft');
       } else if (actionType === 'createWeek1') {
         // Create Week 1 matchups after draft is complete
-        await advanceLeagueWeek({
+        await autoAdvanceMatchups({
           variables: { leagueId },
         });
 
         setLoading(false);
         onSuccess?.('createWeek1');
       } else if (actionType === 'selectGame') {
-        // Trigger the game-selection lambda via SQS
-        await triggerGameSelection({
-          variables: {
-            matchupId:
-              typeof currentMatchup?.id === 'string'
-                ? parseInt(currentMatchup.id, 10)
-                : (currentMatchup?.id ?? 0),
-            gameNumber: nextGameNumber,
-          },
+        // Trigger game selection for this league via the scheduled mutation
+        await autoSelectGames({
+          variables: { leagueId },
         });
 
         // Wait for refetch to complete (awaitRefetchQueries: true)
@@ -192,7 +186,7 @@ export function NextStepControl({
         onSuccess?.('selectGame');
       } else {
         // Advance to next week
-        await advanceLeagueWeek({
+        await autoAdvanceMatchups({
           variables: { leagueId },
         });
 

@@ -43,6 +43,23 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** Result of the automated weekly matchup advancement across all active leagues */
+export type AutoAdvanceMatchupsResult = {
+  __typename?: 'AutoAdvanceMatchupsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesAdvanced?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+  leaguesSkipped?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the automated nightly game selection across all active leagues */
+export type AutoSelectGamesResult = {
+  __typename?: 'AutoSelectGamesResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  gamesTriggered?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AverageSeasonBatting = {
   __typename?: 'AverageSeasonBatting';
   atBats?: Maybe<Scalars['Float']['output']>;
@@ -637,7 +654,10 @@ export type Mutation = {
   /** Record that the user has accepted the privacy policy */
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
+  /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
+  autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
+  /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
+  autoSelectGames?: Maybe<AutoSelectGamesResult>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
@@ -674,7 +694,6 @@ export type Mutation = {
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
-  triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
@@ -689,8 +708,12 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-export type MutationAdvanceLeagueWeekArgs = {
-  leagueId: Scalars['Int']['input'];
+export type MutationAutoAdvanceMatchupsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAutoSelectGamesArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationCancelWaiverClaimArgs = {
@@ -833,11 +856,6 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
-};
-
-export type MutationTriggerGameSelectionArgs = {
-  gameNumber: Scalars['Int']['input'];
-  matchupId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateDraftSettingsArgs = {
@@ -2652,42 +2670,32 @@ export type GetMatchupPlayersQuery = {
   }> | null;
 };
 
-export type TriggerGameSelectionMutationVariables = Exact<{
-  matchupId: Scalars['Int']['input'];
-  gameNumber: Scalars['Int']['input'];
+export type AutoSelectGamesMutationVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
-export type TriggerGameSelectionMutation = {
+export type AutoSelectGamesMutation = {
   __typename?: 'Mutation';
-  triggerGameSelection?: boolean | null;
+  autoSelectGames?: {
+    __typename?: 'AutoSelectGamesResult';
+    leaguesProcessed?: number | null;
+    gamesTriggered?: number | null;
+    errors?: Array<string> | null;
+  } | null;
 };
 
-export type AdvanceLeagueWeekMutationVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
+export type AutoAdvanceMatchupsMutationVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
-export type AdvanceLeagueWeekMutation = {
+export type AutoAdvanceMatchupsMutation = {
   __typename?: 'Mutation';
-  advanceLeagueWeek?: {
-    __typename?: 'AdvanceLeagueWeekResponse';
-    currentMatchupId?: number | null;
-    matchups?: Array<{
-      __typename?: 'Matchup';
-      id?: string | null;
-      weekNumber?: number | null;
-      leagueId?: number | null;
-      team1Id?: number | null;
-      team2Id?: number | null;
-      team1Score?: number | null;
-      team2Score?: number | null;
-      status?: MatchupStatus | null;
-      statsLoadingStatus?: StatsLoadingStatus | null;
-      gamesPerMatchup?: number | null;
-      spStartsPerMatchup?: number | null;
-      selectedGamesCount?: number | null;
-      startTime?: string | null;
-      endTime?: string | null;
-    }> | null;
+  autoAdvanceMatchups?: {
+    __typename?: 'AutoAdvanceMatchupsResult';
+    leaguesProcessed?: number | null;
+    leaguesAdvanced?: number | null;
+    leaguesSkipped?: number | null;
+    errors?: Array<string> | null;
   } | null;
 };
 
@@ -6053,108 +6061,110 @@ export type GetMatchupPlayersQueryResult = Apollo.QueryResult<
   GetMatchupPlayersQuery,
   GetMatchupPlayersQueryVariables
 >;
-export const TriggerGameSelection = gql`
-  mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
-    triggerGameSelection(matchupId: $matchupId, gameNumber: $gameNumber)
-  }
-`;
-export type TriggerGameSelectionMutationFn = MutationFunction<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
->;
-
-/**
- * __useTriggerGameSelectionMutation__
- *
- * To run a mutation, you first call `useTriggerGameSelectionMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useTriggerGameSelectionMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [triggerGameSelectionMutation, { data, loading, error }] = useTriggerGameSelectionMutation({
- *   variables: {
- *      matchupId: // value for 'matchupId'
- *      gameNumber: // value for 'gameNumber'
- *   },
- * });
- */
-export function useTriggerGameSelectionMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >(TriggerGameSelection, options);
-}
-export type TriggerGameSelectionMutationHookResult = ReturnType<
-  typeof useTriggerGameSelectionMutation
->;
-export type TriggerGameSelectionMutationResult =
-  Apollo.MutationResult<TriggerGameSelectionMutation>;
-export type TriggerGameSelectionMutationOptions = BaseMutationOptions<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
->;
-export const AdvanceLeagueWeek = gql`
-  mutation AdvanceLeagueWeek($leagueId: Int!) {
-    advanceLeagueWeek(leagueId: $leagueId) {
-      matchups {
-        ...Matchup
-      }
-      currentMatchupId
+export const AutoSelectGames = gql`
+  mutation AutoSelectGames($leagueId: Int) {
+    autoSelectGames(leagueId: $leagueId) {
+      leaguesProcessed
+      gamesTriggered
+      errors
     }
   }
-  ${MatchupFragmentDoc}
 `;
-export type AdvanceLeagueWeekMutationFn = MutationFunction<
-  AdvanceLeagueWeekMutation,
-  AdvanceLeagueWeekMutationVariables
+export type AutoSelectGamesMutationFn = MutationFunction<
+  AutoSelectGamesMutation,
+  AutoSelectGamesMutationVariables
 >;
 
 /**
- * __useAdvanceLeagueWeekMutation__
+ * __useAutoSelectGamesMutation__
  *
- * To run a mutation, you first call `useAdvanceLeagueWeekMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useAdvanceLeagueWeekMutation` returns a tuple that includes:
+ * To run a mutation, you first call `useAutoSelectGamesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAutoSelectGamesMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
  * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
  *
  * @example
- * const [advanceLeagueWeekMutation, { data, loading, error }] = useAdvanceLeagueWeekMutation({
+ * const [autoSelectGamesMutation, { data, loading, error }] = useAutoSelectGamesMutation({
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *   },
  * });
  */
-export function useAdvanceLeagueWeekMutation(
+export function useAutoSelectGamesMutation(
   baseOptions?: Apollo.MutationHookOptions<
-    AdvanceLeagueWeekMutation,
-    AdvanceLeagueWeekMutationVariables
+    AutoSelectGamesMutation,
+    AutoSelectGamesMutationVariables
   >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useMutation<
-    AdvanceLeagueWeekMutation,
-    AdvanceLeagueWeekMutationVariables
-  >(AdvanceLeagueWeek, options);
+    AutoSelectGamesMutation,
+    AutoSelectGamesMutationVariables
+  >(AutoSelectGames, options);
 }
-export type AdvanceLeagueWeekMutationHookResult = ReturnType<
-  typeof useAdvanceLeagueWeekMutation
+export type AutoSelectGamesMutationHookResult = ReturnType<
+  typeof useAutoSelectGamesMutation
 >;
-export type AdvanceLeagueWeekMutationResult =
-  Apollo.MutationResult<AdvanceLeagueWeekMutation>;
-export type AdvanceLeagueWeekMutationOptions = BaseMutationOptions<
-  AdvanceLeagueWeekMutation,
-  AdvanceLeagueWeekMutationVariables
+export type AutoSelectGamesMutationResult =
+  Apollo.MutationResult<AutoSelectGamesMutation>;
+export type AutoSelectGamesMutationOptions = BaseMutationOptions<
+  AutoSelectGamesMutation,
+  AutoSelectGamesMutationVariables
+>;
+export const AutoAdvanceMatchups = gql`
+  mutation AutoAdvanceMatchups($leagueId: Int) {
+    autoAdvanceMatchups(leagueId: $leagueId) {
+      leaguesProcessed
+      leaguesAdvanced
+      leaguesSkipped
+      errors
+    }
+  }
+`;
+export type AutoAdvanceMatchupsMutationFn = MutationFunction<
+  AutoAdvanceMatchupsMutation,
+  AutoAdvanceMatchupsMutationVariables
+>;
+
+/**
+ * __useAutoAdvanceMatchupsMutation__
+ *
+ * To run a mutation, you first call `useAutoAdvanceMatchupsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAutoAdvanceMatchupsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [autoAdvanceMatchupsMutation, { data, loading, error }] = useAutoAdvanceMatchupsMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useAutoAdvanceMatchupsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AutoAdvanceMatchupsMutation,
+    AutoAdvanceMatchupsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AutoAdvanceMatchupsMutation,
+    AutoAdvanceMatchupsMutationVariables
+  >(AutoAdvanceMatchups, options);
+}
+export type AutoAdvanceMatchupsMutationHookResult = ReturnType<
+  typeof useAutoAdvanceMatchupsMutation
+>;
+export type AutoAdvanceMatchupsMutationResult =
+  Apollo.MutationResult<AutoAdvanceMatchupsMutation>;
+export type AutoAdvanceMatchupsMutationOptions = BaseMutationOptions<
+  AutoAdvanceMatchupsMutation,
+  AutoAdvanceMatchupsMutationVariables
 >;
 export const GetMatchupRoster = gql`
   query GetMatchupRoster($matchupId: Int!, $teamId: Int!) {

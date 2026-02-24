@@ -82,3 +82,21 @@ resource "aws_secretsmanager_secret_version" "oauth_proxy_cookie_secret" {
   secret_id     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.id
   secret_string = var.oauth_proxy_cookie_secret
 }
+
+# System API key for EventBridge / admin CLI access to system mutations
+resource "random_password" "system_api_key" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "system_api_key" {
+  name_prefix = "${local.name_prefix}-system-api-key-"
+  description = "System API key for EventBridge and admin CLI to call system mutations"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "system_api_key" {
+  secret_id     = aws_secretsmanager_secret.system_api_key.id
+  secret_string = random_password.system_api_key.result
+}

@@ -25,6 +25,8 @@ export interface Context {
   loaders: Loaders; // DataLoaders for batching queries
   db: GenericDatabase<typeof PublicSchema>; // Shared database connection for this request
   notificationService?: WebSocketNotificationService | null; // WebSocket notification service
+  /** True when the request was authenticated via the system API key (EventBridge / admin CLI). */
+  isSystemRequest: boolean;
 }
 
 // Define the schema builder with comprehensive types

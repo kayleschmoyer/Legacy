@@ -227,16 +227,20 @@ query GetMatchupPlayers($matchupId: Int!) {
   }
 }
 
-mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
-  triggerGameSelection(matchupId: $matchupId, gameNumber: $gameNumber)
+mutation AutoSelectGames($leagueId: Int) {
+  autoSelectGames(leagueId: $leagueId) {
+    leaguesProcessed
+    gamesTriggered
+    errors
+  }
 }
 
-mutation AdvanceLeagueWeek($leagueId: Int!) {
-  advanceLeagueWeek(leagueId: $leagueId) {
-    matchups {
-      ...Matchup
-    }
-    currentMatchupId
+mutation AutoAdvanceMatchups($leagueId: Int) {
+  autoAdvanceMatchups(leagueId: $leagueId) {
+    leaguesProcessed
+    leaguesAdvanced
+    leaguesSkipped
+    errors
   }
 }
 

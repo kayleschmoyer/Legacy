@@ -49,6 +49,23 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** Result of the automated weekly matchup advancement across all active leagues */
+export type AutoAdvanceMatchupsResult = {
+  __typename?: 'AutoAdvanceMatchupsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesAdvanced?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+  leaguesSkipped?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the automated nightly game selection across all active leagues */
+export type AutoSelectGamesResult = {
+  __typename?: 'AutoSelectGamesResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  gamesTriggered?: Maybe<Scalars['Int']['output']>;
+  leaguesProcessed?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AverageSeasonBatting = {
   __typename?: 'AverageSeasonBatting';
   atBats?: Maybe<Scalars['Float']['output']>;
@@ -643,7 +660,10 @@ export type Mutation = {
   /** Record that the user has accepted the privacy policy */
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
-  advanceLeagueWeek?: Maybe<AdvanceLeagueWeekResponse>;
+  /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
+  autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
+  /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
+  autoSelectGames?: Maybe<AutoSelectGamesResult>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
@@ -680,7 +700,6 @@ export type Mutation = {
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
-  triggerGameSelection?: Maybe<Scalars['Boolean']['output']>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
@@ -695,8 +714,12 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
-export type MutationAdvanceLeagueWeekArgs = {
-  leagueId: Scalars['Int']['input'];
+export type MutationAutoAdvanceMatchupsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAutoSelectGamesArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationCancelWaiverClaimArgs = {
@@ -839,11 +862,6 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
-};
-
-export type MutationTriggerGameSelectionArgs = {
-  gameNumber: Scalars['Int']['input'];
-  matchupId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateDraftSettingsArgs = {
@@ -1959,16 +1977,6 @@ export type PlayerFragment = {
   statsLastFetchedAt?: string | null;
 };
 
-export type TriggerGameSelectionMutationVariables = Exact<{
-  matchupId: Scalars['Int']['input'];
-  gameNumber: Scalars['Int']['input'];
-}>;
-
-export type TriggerGameSelectionMutation = {
-  __typename?: 'Mutation';
-  triggerGameSelection?: boolean | null;
-};
-
 export const CareerBattingFragmentDoc = gql`
   fragment CareerBatting on CareerBatting {
     playerId
@@ -2374,53 +2382,4 @@ export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<
 export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsQuery,
   GetCareerPitchingStatsQueryVariables
->;
-export const TriggerGameSelection = gql`
-  mutation TriggerGameSelection($matchupId: Int!, $gameNumber: Int!) {
-    triggerGameSelection(matchupId: $matchupId, gameNumber: $gameNumber)
-  }
-`;
-export type TriggerGameSelectionMutationFn = MutationFunction<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
->;
-
-/**
- * __useTriggerGameSelectionMutation__
- *
- * To run a mutation, you first call `useTriggerGameSelectionMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useTriggerGameSelectionMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [triggerGameSelectionMutation, { data, loading, error }] = useTriggerGameSelectionMutation({
- *   variables: {
- *      matchupId: // value for 'matchupId'
- *      gameNumber: // value for 'gameNumber'
- *   },
- * });
- */
-export function useTriggerGameSelectionMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    TriggerGameSelectionMutation,
-    TriggerGameSelectionMutationVariables
-  >(TriggerGameSelection, options);
-}
-export type TriggerGameSelectionMutationHookResult = ReturnType<
-  typeof useTriggerGameSelectionMutation
->;
-export type TriggerGameSelectionMutationResult =
-  Apollo.MutationResult<TriggerGameSelectionMutation>;
-export type TriggerGameSelectionMutationOptions = BaseMutationOptions<
-  TriggerGameSelectionMutation,
-  TriggerGameSelectionMutationVariables
 >;

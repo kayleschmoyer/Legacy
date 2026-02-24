@@ -11,7 +11,7 @@ import {
 } from 'tamagui';
 import {
   type Matchup,
-  useAdvanceLeagueWeekMutation,
+  useAutoAdvanceMatchupsMutation,
   useGetMatchupsForLeagueQuery,
 } from '../../api/db/graphql.generated';
 
@@ -39,7 +39,7 @@ export function MatchupControl({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [advanceLeagueWeek] = useAdvanceLeagueWeekMutation({
+  const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
       'GetCurrentMatchupForLeague',
       'GetMatchupsForLeague',
@@ -80,11 +80,11 @@ export function MatchupControl({
     setLoading(true);
 
     try {
-      // Use the new advanceLeagueWeek mutation which:
+      // Use the autoAdvanceMatchups mutation which:
       // 1. Completes all current week matchups
       // 2. Creates new matchups for all team pairs
       // 3. Auto-populates players for each matchup
-      await advanceLeagueWeek({
+      await autoAdvanceMatchups({
         variables: { leagueId },
       });
 

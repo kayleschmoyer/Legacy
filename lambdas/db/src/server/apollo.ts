@@ -58,6 +58,16 @@ export function createApolloHandler(
           event.headers.authorization || event.headers.Authorization;
         const user: User | null = await extractUserFromEvent(authorization);
 
+        // Check for system API key (EventBridge / admin CLI invocations)
+        const systemApiKey = process.env.SYSTEM_API_KEY;
+        const requestApiKey =
+          event.headers['x-system-api-key'] ||
+          event.headers['X-System-Api-Key'];
+        const isSystemRequest =
+          !!systemApiKey &&
+          systemApiKey.length > 0 &&
+          requestApiKey === systemApiKey;
+
         // Create a shared database connection for this request
         // This prevents each resolver from creating its own connection
         const db = await dbService.getDb();
@@ -65,6 +75,7 @@ export function createApolloHandler(
         return {
           notificationService, // WebSocket notification service
           user,
+          isSystemRequest,
           loaders: createLoaders(db), // Pass shared connection to loaders
           db, // Shared connection for all resolvers in this request
         };
