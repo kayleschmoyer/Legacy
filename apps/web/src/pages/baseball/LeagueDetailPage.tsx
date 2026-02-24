@@ -334,6 +334,12 @@ export function LeagueDetailPage(): React.JSX.Element {
     (() => void | Promise<unknown>) | undefined
   >(undefined);
 
+  // Ref to hold refetchTeamMembers so handleDraftCompleted can call it
+  // without creating a hook-ordering dependency (query is declared later)
+  const refetchTeamMembersRef = useRef<
+    (() => void | Promise<unknown>) | undefined
+  >(undefined);
+
   // ── Effects ──
 
   useEffect(() => {
@@ -453,7 +459,10 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const handleDraftCompleted = useCallback(() => {
     void refetchLeague();
-  }, [refetchLeague]);
+    // Clear cached team members so the skip guard lifts and we get fresh data
+    dispatch(setTeamMembers([]));
+    void refetchTeamMembersRef.current?.();
+  }, [refetchLeague, dispatch]);
 
   const handleDraftStarted = useCallback(() => {
     void refetchLeague();
@@ -528,11 +537,16 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
-  const { data: teamMembersData, loading: teamMembersLoading } =
-    useGetTeamMembersQuery({
-      skip: !userTeamId || reduxTeamMembers.length > 0,
-      variables: { teamId: userTeamId || 0 },
-    });
+  const {
+    data: teamMembersData,
+    loading: teamMembersLoading,
+    refetch: refetchTeamMembers,
+  } = useGetTeamMembersQuery({
+    skip: !userTeamId || reduxTeamMembers.length > 0,
+    variables: { teamId: userTeamId || 0 },
+  });
+  // Keep a stable ref so handleDraftCompleted (defined earlier) can call refetch
+  refetchTeamMembersRef.current = refetchTeamMembers;
 
   useEffect(() => {
     if (teamMembersData?.teamMembers) {
