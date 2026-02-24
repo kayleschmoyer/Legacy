@@ -39,22 +39,12 @@ Use Twig's branch tree management features to:
 - Verify unique commits per branch
 - Cascade rebases across dependent branches
 - Detect and fix duplicate commits early
-
-<<<<<<< HEAD
-
-- Visualize branch dependencies
-- Verify unique commits per branch
-- Cascade rebases across dependent branches
-- Detect and fix duplicate commits early
-- # ✅ Track rewritten commits that already landed upstream (record old → new after resolving conflicts)
+- ✅ Track rewritten commits that already landed upstream (record old → new after resolving conflicts)
 
 ---
 
-> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
-
 ## 🌳 Understanding the Branch Tree
 
-<<<<<<< HEAD
 When a rebase rewrites a commit because you resolved conflicts, you must capture the old hash before adding it to any skip list. This keeps downstream cascades safe and prevents accidental data loss.
 
 1. **Let Git tell you the offender** – during `git rebase`, note the SHA shown in the “could not apply <sha> …” line.
@@ -64,10 +54,6 @@ When a rebase rewrites a commit because you resolved conflicts, you must capture
 5. **Reuse the list downstream** – pass that skip file (or hash set) to `twig rebase --skip-commits` / cascade scripts so child branches automatically skip the redundant commit.
 
 > **Never pre-populate skip lists with hashes that haven’t actually been rewritten upstream.** If you skip too aggressively you will drop real work, as we saw when the LS-17 tree temporarily lost feature commits.
-
-=======
-
-> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
 
 ### Viewing Your Tree
 
@@ -652,8 +638,6 @@ git merge-base parent current
 
 ---
 
-<<<<<<< HEAD
-
 ## 📼 Non-Interactive Rebase Demo (Nov 20, 2025)
 
 The Matchup branch tree (LS-17 → LS-53) was taken through a full, non-interactive cascade to validate the scripted workflow. Each command below was executed from `D:\code\legacy-sports` and produced the noted outcome:
@@ -674,7 +658,4 @@ The Matchup branch tree (LS-17 → LS-53) was taken through a full, non-interact
 
 ---
 
-=======
-
-> > > > > > > cf968417 (fix(Graphql-Contract-Refresh): refresh matchup contracts and clients (LS-51))
-> > > > > > > **Remember**: A clean branch tree is a happy branch tree! 🌳✨
+**Remember**: A clean branch tree is a happy branch tree! 🌳✨
