@@ -1101,7 +1101,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               backgroundColor="$blue9"
               color="white"
               borderRadius="$4"
-              onPress={() => navigate('/baseball/draft')}
+              onPress={() => navigate(`/baseball/league/${leagueId}/draft`)}
               pressStyle={{ scale: 0.97, opacity: 0.9 }}
               hoverStyle={{ backgroundColor: '$blue10' }}
               animation="quick"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useParams } from 'react-router-dom';
 
 interface BaseballPlayer {
   id: number;
@@ -324,6 +325,7 @@ const getPositionColor = (position: string): string => {
 };
 
 export function DraftBoardPage(): React.JSX.Element {
+  const { id: leagueId } = useParams<{ id: string }>();
   const [selectedPosition, setSelectedPosition] = React.useState('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [currentPick, setCurrentPick] = React.useState(1);
@@ -487,7 +489,8 @@ export function DraftBoardPage(): React.JSX.Element {
               LIVE DRAFT
             </h2>
             <div style={{ fontSize: '14px', opacity: 0.9, marginTop: '4px' }}>
-              Pick #{currentPick} • Round {Math.ceil(currentPick / 12)}
+              {leagueId ? `League ${leagueId} • ` : ''}Pick #{currentPick} •
+              Round {Math.ceil(currentPick / 12)}
             </div>
           </div>
 

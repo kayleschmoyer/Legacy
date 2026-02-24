@@ -381,7 +381,10 @@ export function NextStepControl({
 
           <XStack justifyContent="flex-start" gap="$3">
             {isDraftInProgress && isLiveDraft ? (
-              <Link to="/baseball/draft" style={{ textDecoration: 'none' }}>
+              <Link
+                to={`/baseball/league/${leagueId}/draft`}
+                style={{ textDecoration: 'none' }}
+              >
                 <Button theme="green">Go to Draft Board</Button>
               </Link>
             ) : (

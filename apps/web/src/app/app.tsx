@@ -428,7 +428,10 @@ function App() {
           <Route path="/" element={<NavigableHomeScreen />} />
           <Route path="/football" element={<FootballScreen />} />
           <Route path="/baseball" element={<BaseballScreen />} />
-          <Route path="/baseball/draft" element={<DraftBoardPage />} />
+          <Route
+            path="/baseball/league/:id/draft"
+            element={<DraftBoardPage />}
+          />
           <Route
             path="/baseball/league/create"
             element={<LeagueCreatePage />}
