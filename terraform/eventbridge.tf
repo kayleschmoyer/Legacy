@@ -132,3 +132,46 @@ resource "aws_lambda_permission" "auto_advance_matchups_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.auto_advance_matchups.arn
 }
+
+# ── Draft Pick Deadline Processing ──────────────────────────────────────────
+# Auto-picks for teams that exceed their pick deadline during live drafts.
+# Runs every minute. Short-circuits immediately if no drafts have expired
+# deadlines, so cost is negligible (~$0.04/month).
+
+resource "aws_cloudwatch_event_rule" "auto_process_draft_picks" {
+  name                = "${local.name_prefix}-auto-process-draft-picks"
+  description         = "Process expired draft pick deadlines every minute"
+  schedule_expression = "rate(1 minute)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "auto_process_draft_picks" {
+  rule      = aws_cloudwatch_event_rule.auto_process_draft_picks.name
+  target_id = "auto-process-draft-picks"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { autoProcessDraftPicks { draftsProcessed picksAutoMade draftsCompleted errors } }"
+    })
+    headers = {
+      "content-type"       = "application/json"
+      "x-system-api-key"   = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "auto_process_draft_picks_eventbridge" {
+  statement_id  = "AllowEventBridgeAutoProcessDraftPicks"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.auto_process_draft_picks.arn
+}

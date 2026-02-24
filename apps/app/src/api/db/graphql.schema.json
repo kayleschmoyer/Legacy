@@ -124,6 +124,74 @@
       },
       {
         "kind": "OBJECT",
+        "name": "AutoProcessDraftPicksResult",
+        "description": "Result of the automated draft pick processing for expired deadlines",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "draftsCompleted",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "draftsProcessed",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "errors",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "picksAutoMade",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "AutoSelectGamesResult",
         "description": "Result of the automated nightly game selection across all active leagues",
         "isOneOf": null,
@@ -2244,6 +2312,18 @@
             "deprecationReason": null
           },
           {
+            "name": "currentPickDeadline",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "date",
             "description": null,
             "args": [],
@@ -2317,6 +2397,18 @@
           },
           {
             "name": "leagueId",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pickTimeLimitSeconds",
             "description": null,
             "args": [],
             "type": {
@@ -5569,6 +5661,31 @@
             "type": {
               "kind": "OBJECT",
               "name": "AutoAdvanceMatchupsResult",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "autoProcessDraftPicks",
+            "description": "Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge.",
+            "args": [
+              {
+                "name": "leagueId",
+                "description": "Optional: restrict to a single league. Required for commissioner-level access.",
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "OBJECT",
+              "name": "AutoProcessDraftPicksResult",
               "ofType": null
             },
             "isDeprecated": false,
@@ -13959,6 +14076,18 @@
             "deprecationReason": null
           },
           {
+            "name": "pickTimeLimitSeconds",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "playerPool",
             "description": null,
             "type": {
@@ -14067,6 +14196,18 @@
           },
           {
             "name": "leagueId",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pickTimeLimitSeconds",
             "description": null,
             "args": [],
             "type": {

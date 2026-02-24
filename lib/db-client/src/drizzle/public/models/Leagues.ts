@@ -127,6 +127,12 @@ export const drafts = pgTable(
     date: date('date'),
     draftOrder: draftOrder('draft_order').default('snake').notNull(),
     currentPick: integer('current_pick').notNull().default(0),
+    pickTimeLimitSeconds: integer('pick_time_limit_seconds')
+      .notNull()
+      .default(120),
+    currentPickDeadline: timestamp('current_pick_deadline', {
+      withTimezone: true,
+    }),
     draftStartedAt: timestamp('draft_started_at', { withTimezone: true }),
     draftCompletedAt: timestamp('draft_completed_at', { withTimezone: true }),
   },

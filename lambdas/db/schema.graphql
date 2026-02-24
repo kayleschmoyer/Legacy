@@ -14,6 +14,16 @@ type AutoAdvanceMatchupsResult {
 }
 
 """
+Result of the automated draft pick processing for expired deadlines
+"""
+type AutoProcessDraftPicksResult {
+  draftsCompleted: Int
+  draftsProcessed: Int
+  errors: [String!]
+  picksAutoMade: Int
+}
+
+"""
 Result of the automated nightly game selection across all active leagues
 """
 type AutoSelectGamesResult {
@@ -234,6 +244,7 @@ A draft event for a league
 type Draft {
   createdAt: String
   currentPick: Int
+  currentPickDeadline: String
   date: String
   draftCompletedAt: String
   draftMode: String
@@ -241,6 +252,7 @@ type Draft {
   draftStartedAt: String
   id: Int
   leagueId: Int
+  pickTimeLimitSeconds: Int
   selectionMethod: String
   updatedAt: String
 }
@@ -651,6 +663,16 @@ type Mutation {
     """
     leagueId: Int
   ): AutoAdvanceMatchupsResult
+
+  """
+  Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge.
+  """
+  autoProcessDraftPicks(
+    """
+    Optional: restrict to a single league. Required for commissioner-level access.
+    """
+    leagueId: Int
+  ): AutoProcessDraftPicksResult
 
   """
   Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge.
@@ -1367,6 +1389,7 @@ input UpdateDraftSettingsInput {
   draftMode: String
   draftOrder: String
   leagueId: Int!
+  pickTimeLimitSeconds: Int
   playerPool: String
   selectionMethod: String
 }
@@ -1382,6 +1405,7 @@ type UpdateDraftSettingsPayload {
   draftStartedAt: String
   id: Int
   leagueId: Int
+  pickTimeLimitSeconds: Int
   playerPool: String
   selectionMethod: String
 }

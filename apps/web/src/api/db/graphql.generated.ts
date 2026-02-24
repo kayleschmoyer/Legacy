@@ -52,6 +52,15 @@ export type AutoAdvanceMatchupsResult = {
   leaguesSkipped?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Result of the automated draft pick processing for expired deadlines */
+export type AutoProcessDraftPicksResult = {
+  __typename?: 'AutoProcessDraftPicksResult';
+  draftsCompleted?: Maybe<Scalars['Int']['output']>;
+  draftsProcessed?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  picksAutoMade?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Result of the automated nightly game selection across all active leagues */
 export type AutoSelectGamesResult = {
   __typename?: 'AutoSelectGamesResult';
@@ -275,6 +284,7 @@ export type Draft = {
   __typename?: 'Draft';
   createdAt?: Maybe<Scalars['String']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
+  currentPickDeadline?: Maybe<Scalars['String']['output']>;
   date?: Maybe<Scalars['String']['output']>;
   draftCompletedAt?: Maybe<Scalars['String']['output']>;
   draftMode?: Maybe<Scalars['String']['output']>;
@@ -282,6 +292,7 @@ export type Draft = {
   draftStartedAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
@@ -656,6 +667,8 @@ export type Mutation = {
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
+  /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
+  autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -709,6 +722,10 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
 };
 
 export type MutationAutoAdvanceMatchupsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAutoProcessDraftPicksArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -1681,6 +1698,7 @@ export type UpdateDraftSettingsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1695,6 +1713,7 @@ export type UpdateDraftSettingsPayload = {
   draftStartedAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
 };

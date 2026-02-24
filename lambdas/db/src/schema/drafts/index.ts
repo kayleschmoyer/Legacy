@@ -14,5 +14,8 @@ import './queries';
 // Mutation fields
 import './mutations';
 
+// Scheduled (system) mutation fields
+import './scheduled-mutations';
+
 // Re-export types that other schema modules may need
 export { DraftPick, Draft, CurrentDraftPick, DraftPlayer } from './types';

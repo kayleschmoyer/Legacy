@@ -34,6 +34,8 @@ export interface DraftStartedNotification {
   draftId: number;
   draftOrder: string;
   teamCount: number;
+  pickTimeLimitSeconds: number;
+  currentPickDeadline: string;
   startedAt: string;
 }
 
@@ -48,6 +50,8 @@ export interface DraftPickNotification {
   pickNumber: number;
   overallPick: number;
   pickedAt: string;
+  wasAutoPick: boolean;
+  currentPickDeadline: string | null;
   nextPick?: {
     teamId: number;
     round: number;
@@ -65,6 +69,7 @@ export interface DraftPausedNotification {
 export interface DraftResumedNotification {
   type: typeof WireNotificationType.DRAFT_RESUMED;
   leagueId: number;
+  currentPickDeadline: string;
   resumedAt: string;
 }
 
@@ -406,6 +411,8 @@ export class WebSocketNotificationService {
     draftId: number,
     draftOrder: string,
     teamCount: number,
+    pickTimeLimitSeconds: number,
+    currentPickDeadline: string,
   ): Promise<void> {
     const notification: DraftStartedNotification = {
       type: WireNotificationType.DRAFT_STARTED,
@@ -413,6 +420,8 @@ export class WebSocketNotificationService {
       draftId,
       draftOrder,
       teamCount,
+      pickTimeLimitSeconds,
+      currentPickDeadline,
       startedAt: new Date().toISOString(),
     };
 
@@ -421,6 +430,7 @@ export class WebSocketNotificationService {
       draftId,
       draftOrder,
       teamCount,
+      pickTimeLimitSeconds,
     });
 
     await this.broadcast(
@@ -450,6 +460,10 @@ export class WebSocketNotificationService {
       pickNumber: number;
       overallPick: number;
     },
+    options?: {
+      wasAutoPick?: boolean;
+      currentPickDeadline?: string | null;
+    },
   ): Promise<void> {
     const notification: DraftPickNotification = {
       type: WireNotificationType.DRAFT_PICK_MADE,
@@ -462,6 +476,8 @@ export class WebSocketNotificationService {
       pickNumber,
       overallPick,
       pickedAt: new Date().toISOString(),
+      wasAutoPick: options?.wasAutoPick ?? false,
+      currentPickDeadline: options?.currentPickDeadline ?? null,
       ...(nextPick ? { nextPick } : {}),
     };
 
@@ -505,14 +521,21 @@ export class WebSocketNotificationService {
   /**
    * Send draft resumed notification to all connections for a specific league
    */
-  async notifyDraftResumed(leagueId: number): Promise<void> {
+  async notifyDraftResumed(
+    leagueId: number,
+    currentPickDeadline: string,
+  ): Promise<void> {
     const notification: DraftResumedNotification = {
       type: WireNotificationType.DRAFT_RESUMED,
       leagueId,
+      currentPickDeadline,
       resumedAt: new Date().toISOString(),
     };
 
-    LOGGER.info('Sending draft resumed notification', { leagueId });
+    LOGGER.info('Sending draft resumed notification', {
+      leagueId,
+      currentPickDeadline,
+    });
 
     await this.broadcast(
       { type: 'notification', data: notification },

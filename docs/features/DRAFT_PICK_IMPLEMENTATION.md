@@ -193,6 +193,8 @@ To use this functionality:
 
 4. **WebSocket Setup**: Ensure WebSocket lambda is configured with `CONNECTIONS_TABLE_NAME` and `WEBSOCKET_ENDPOINT` environment variables
 
+5. **Pick Timer**: See [DRAFT_TIMER_IMPLEMENTATION.md](./DRAFT_TIMER_IMPLEMENTATION.md) for the deadline-based auto-pick system that runs on a 1-minute EventBridge cron
+
 ## Files Modified/Created
 
 ### Created:

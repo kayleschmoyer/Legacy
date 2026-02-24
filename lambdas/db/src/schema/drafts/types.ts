@@ -63,6 +63,8 @@ export const Draft = builder.objectRef<{
   selectionMethod: string;
   draftOrder: string;
   currentPick: number;
+  pickTimeLimitSeconds: number;
+  currentPickDeadline: Date | null;
   draftStartedAt: Date | null;
   draftCompletedAt: Date | null;
   date: string | null;
@@ -79,6 +81,11 @@ Draft.implement({
     selectionMethod: t.exposeString('selectionMethod'),
     draftOrder: t.exposeString('draftOrder'),
     currentPick: t.exposeInt('currentPick'),
+    pickTimeLimitSeconds: t.exposeInt('pickTimeLimitSeconds'),
+    currentPickDeadline: t.string({
+      nullable: true,
+      resolve: (draft) => draft.currentPickDeadline?.toISOString() || null,
+    }),
     draftStartedAt: t.string({
       nullable: true,
       resolve: (draft) => draft.draftStartedAt?.toISOString() || null,
@@ -169,6 +176,7 @@ export const UpdateDraftSettingsInput = builder.inputType(
       selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random'
       draftOrder: t.string({ required: false }), // 'snake' | 'linear'
       playerPool: t.string({ required: false }), // 'all' | 'nl' | 'al'
+      pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
     }),
   },
 );
@@ -181,6 +189,7 @@ export const UpdateDraftSettingsPayload = builder.objectRef<{
   selectionMethod: string;
   draftOrder: string;
   currentPick: number;
+  pickTimeLimitSeconds: number;
   draftStartedAt: Date | null;
   draftCompletedAt: Date | null;
   date: string | null;
@@ -199,6 +208,7 @@ UpdateDraftSettingsPayload.implement({
     draftOrder: t.exposeString('draftOrder'),
     currentPick: t.exposeInt('currentPick'),
     playerPool: t.exposeString('playerPool'),
+    pickTimeLimitSeconds: t.exposeInt('pickTimeLimitSeconds'),
     draftStartedAt: t.string({
       nullable: true,
       resolve: (payload) => payload.draftStartedAt?.toISOString() || null,

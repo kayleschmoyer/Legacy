@@ -21,6 +21,8 @@ export interface DraftStartedNotification {
   draftId: number;
   draftOrder: string;
   teamCount: number;
+  pickTimeLimitSeconds: number;
+  currentPickDeadline: string;
   startedAt: string;
 }
 
@@ -35,6 +37,8 @@ export interface DraftPickNotification {
   pickNumber: number;
   overallPick: number;
   pickedAt: string;
+  wasAutoPick: boolean;
+  currentPickDeadline: string | null;
   nextPick?: {
     teamId: number;
     round: number;
@@ -52,6 +56,7 @@ export interface DraftPausedNotification {
 export interface DraftResumedNotification {
   type: typeof ClientNotificationType.DRAFT_RESUMED;
   leagueId: number;
+  currentPickDeadline: string;
   resumedAt: string;
 }
 

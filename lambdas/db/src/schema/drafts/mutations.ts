@@ -58,6 +58,7 @@ builder.mutationField('makeDraftPick', (t) =>
                 draft_order: string;
                 draft_mode: string;
                 selection_method: string;
+                pick_time_limit_seconds: number;
                 draft_started_at: Date | null;
                 draft_completed_at: Date | null;
               }
@@ -245,10 +246,16 @@ builder.mutationField('makeDraftPick', (t) =>
           const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
 
           // Update draft: advance currentPick, conditionally set started/completed timestamps
+          // and set the next pick deadline (or clear it if complete)
+          const nextDeadline = isDraftComplete
+            ? null
+            : new Date(now.getTime() + draft.pick_time_limit_seconds * 1000);
+
           await tx
             .update(PublicSchema.drafts)
             .set({
               currentPick: currentPickInfo.overallPick,
+              currentPickDeadline: nextDeadline,
               updatedAt: now,
               ...(isFirstPick ? { draftStartedAt: now } : {}),
               ...(isDraftComplete ? { draftCompletedAt: now } : {}),
@@ -288,6 +295,7 @@ builder.mutationField('makeDraftPick', (t) =>
             selectionMethod: draft.selection_method,
             currentPickInfo,
             nextPickInfo,
+            nextDeadline,
           };
         });
 
@@ -320,6 +328,10 @@ builder.mutationField('makeDraftPick', (t) =>
                   overallPick: result.nextPickInfo.overallPick,
                 }
               : undefined,
+            {
+              wasAutoPick: false,
+              currentPickDeadline: result.nextDeadline?.toISOString() ?? null,
+            },
           );
 
           // If draft completed, also send draft-completed notification
@@ -455,7 +467,7 @@ builder.mutationField('initializeLiveDraft', (t) =>
           .orderBy(desc(PublicSchema.drafts.createdAt))
           .limit(1);
 
-        let draft;
+        let draft: typeof PublicSchema.drafts.$inferSelect;
         if (existingDraft) {
           // Clear any leftover draft_teams from a previous initialization
           await context.db
@@ -476,6 +488,7 @@ builder.mutationField('initializeLiveDraft', (t) =>
               currentPick: 0,
               draftStartedAt: new Date(),
               draftCompletedAt: null,
+              currentPickDeadline: null, // Will be set after we read pickTimeLimitSeconds
             })
             .where(eq(PublicSchema.drafts.id, existingDraft.id))
             .returning();
@@ -511,6 +524,16 @@ builder.mutationField('initializeLiveDraft', (t) =>
           .set({ draftStatus: 'in-progress' })
           .where(eq(PublicSchema.leagues.id, leagueId));
 
+        // Set the initial pick deadline now that draft is live
+        const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
+        const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
+        const [draftWithDeadline] = await context.db
+          .update(PublicSchema.drafts)
+          .set({ currentPickDeadline: initialDeadline })
+          .where(eq(PublicSchema.drafts.id, draft.id))
+          .returning();
+        draft = draftWithDeadline;
+
         LOGGER.info('Live draft initialized', {
           leagueId,
           draftId: draft.id,
@@ -525,6 +548,8 @@ builder.mutationField('initializeLiveDraft', (t) =>
             draft.id,
             draftOrder,
             teams.length,
+            pickTimeLimit,
+            initialDeadline.toISOString(),
           );
         }
 
@@ -556,8 +581,14 @@ builder.mutationField('updateDraftSettings', (t) =>
         throw new Error('Authentication required to update draft settings');
       }
 
-      const { leagueId, draftMode, selectionMethod, draftOrder, playerPool } =
-        args.input;
+      const {
+        leagueId,
+        draftMode,
+        selectionMethod,
+        draftOrder,
+        playerPool,
+        pickTimeLimitSeconds,
+      } = args.input;
       const userId = context.user.id;
 
       try {
@@ -618,6 +649,17 @@ builder.mutationField('updateDraftSettings', (t) =>
           );
         }
 
+        if (
+          pickTimeLimitSeconds !== undefined &&
+          pickTimeLimitSeconds !== null
+        ) {
+          if (pickTimeLimitSeconds < 10 || pickTimeLimitSeconds > 3600) {
+            throw new Error(
+              'Pick time limit must be between 10 and 3600 seconds',
+            );
+          }
+        }
+
         // Update playerPool on the league if provided
         let updatedPlayerPool = league.playerPool;
         if (playerPool) {
@@ -669,6 +711,12 @@ builder.mutationField('updateDraftSettings', (t) =>
         if (draftOrder) {
           draftUpdates['draftOrder'] = draftOrder as 'snake' | 'linear';
         }
+        if (
+          pickTimeLimitSeconds !== undefined &&
+          pickTimeLimitSeconds !== null
+        ) {
+          draftUpdates['pickTimeLimitSeconds'] = pickTimeLimitSeconds;
+        }
 
         if (existingDraft) {
           const [updated] = await context.db
@@ -709,6 +757,8 @@ builder.mutationField('updateDraftSettings', (t) =>
           changedFields.push(`selection → ${selectionMethod}`);
         if (draftOrder) changedFields.push(`order → ${draftOrder}`);
         if (playerPool) changedFields.push(`player pool → ${playerPool}`);
+        if (pickTimeLimitSeconds)
+          changedFields.push(`pick timer → ${pickTimeLimitSeconds}s`);
         const changesSummary =
           changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
         const notificationText = `${username} updated draft settings${changesSummary}.`;
@@ -819,6 +869,12 @@ builder.mutationField('pauseDraft', (t) =>
         .set({ draftStatus: 'paused' })
         .where(eq(PublicSchema.leagues.id, leagueId));
 
+      // Clear the pick deadline while paused
+      await context.db
+        .update(PublicSchema.drafts)
+        .set({ currentPickDeadline: null })
+        .where(eq(PublicSchema.drafts.leagueId, leagueId));
+
       // Get the draft record to return
       const [draft] = await context.db
         .select()
@@ -902,7 +958,7 @@ builder.mutationField('resumeDraft', (t) =>
         .set({ draftStatus: 'in-progress' })
         .where(eq(PublicSchema.leagues.id, leagueId));
 
-      // Get the draft record to return
+      // Get the draft record and set a fresh pick deadline
       const [draft] = await context.db
         .select()
         .from(PublicSchema.drafts)
@@ -910,11 +966,28 @@ builder.mutationField('resumeDraft', (t) =>
         .orderBy(desc(PublicSchema.drafts.createdAt))
         .limit(1);
 
-      LOGGER.info('Draft resumed', { leagueId, userId });
+      if (draft) {
+        const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
+        const resumeDeadline = new Date(Date.now() + pickTimeLimit * 1000);
+        await context.db
+          .update(PublicSchema.drafts)
+          .set({ currentPickDeadline: resumeDeadline })
+          .where(eq(PublicSchema.drafts.id, draft.id));
 
-      // Notify all league connections
-      if (context.notificationService) {
-        await context.notificationService.notifyDraftResumed(leagueId);
+        LOGGER.info('Draft resumed', { leagueId, userId });
+
+        // Notify all league connections
+        if (context.notificationService) {
+          await context.notificationService.notifyDraftResumed(
+            leagueId,
+            resumeDeadline.toISOString(),
+          );
+        }
+      } else {
+        LOGGER.info('Draft resumed (no draft record found)', {
+          leagueId,
+          userId,
+        });
       }
 
       return draft;
@@ -960,6 +1033,7 @@ builder.mutationField('commissionerPick', (t) =>
                 current_pick: number;
                 draft_order: string;
                 selection_method: string;
+                pick_time_limit_seconds: number;
               }
             | undefined;
 
@@ -1064,10 +1138,15 @@ builder.mutationField('commissionerPick', (t) =>
           const totalPicks = numTeams * league.maxRosterSize;
           const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
 
+          const nextDeadline = isDraftComplete
+            ? null
+            : new Date(now.getTime() + draft.pick_time_limit_seconds * 1000);
+
           await tx
             .update(PublicSchema.drafts)
             .set({
               currentPick: currentPickInfo.overallPick,
+              currentPickDeadline: nextDeadline,
               updatedAt: now,
               ...(isDraftComplete ? { draftCompletedAt: now } : {}),
             })
@@ -1103,6 +1182,7 @@ builder.mutationField('commissionerPick', (t) =>
             selectionMethod: draft.selection_method,
             currentPickInfo,
             nextPickInfo,
+            nextDeadline,
           };
         });
 
@@ -1132,6 +1212,10 @@ builder.mutationField('commissionerPick', (t) =>
                   overallPick: result.nextPickInfo.overallPick,
                 }
               : undefined,
+            {
+              wasAutoPick: false,
+              currentPickDeadline: result.nextDeadline?.toISOString() ?? null,
+            },
           );
 
           if (result.isDraftComplete) {
