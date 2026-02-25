@@ -237,7 +237,11 @@ export function LeagueDetailPage(): React.JSX.Element {
   // ── Data Fetching ──
 
   const { data, loading, error } = useGetLeagueByIdQuery({
-    skip: isNaN(leagueId) || !!reduxLeagueData,
+    // Only skip the fetch when the cached Redux data is for THIS specific league.
+    // If the cached data is for a different leagueId (stale navigation), we must
+    // re-fetch so the page doesn't briefly render the wrong league's content.
+    skip:
+      isNaN(leagueId) || (!!reduxLeagueData && reduxLeagueData.id === leagueId),
     variables: { id: leagueId },
     notifyOnNetworkStatusChange: true,
   });
@@ -312,29 +316,18 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // Fetch standings when standings tab is active
   useEffect(() => {
-    console.log('[Standings] activeTab:', activeTab, 'leagueId:', leagueId);
     if (activeTab === 'standings' && !isNaN(leagueId)) {
-      console.log(
-        '[Standings] calling getLeagueStandings for leagueId:',
-        leagueId,
-      );
       void getLeagueStandings({ variables: { leagueId } });
     }
   }, [activeTab, leagueId, getLeagueStandings]);
 
-  useEffect(() => {
-    console.log(
-      '[Standings] leagueStandingsData:',
-      leagueStandingsData,
-      'loading:',
-      leagueStandingsLoading,
-    );
-  }, [leagueStandingsData, leagueStandingsLoading]);
-
   // ── Derived Data ──
 
   const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId ?? null;
-  const league = reduxLeagueData ?? data?.league;
+  // Only use the Redux-cached league data when it belongs to the current league;
+  // stale data from a previous navigation must not bleed through.
+  const league =
+    (reduxLeagueData?.id === leagueId ? reduxLeagueData : null) ?? data?.league;
   const positions =
     reduxPositions.length > 0
       ? reduxPositions
@@ -520,7 +513,15 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Loading / Error States ──
 
-  if (loading || positionsLoading || teamMembersLoading) {
+  // Also gate on `!league && !error`: covers the single render gap where Apollo
+  // has not yet set its own `loading=true` after the skip flag transitions,
+  // preventing the "League not found" error from flashing transiently.
+  if (
+    loading ||
+    positionsLoading ||
+    teamMembersLoading ||
+    (!league && !error)
+  ) {
     return (
       <PageContainer>
         <YStack
