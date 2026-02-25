@@ -35,20 +35,33 @@ Create feature branches with automatic Jira integration using the branch-create 
 ### Using Twig Directly
 
 ```powershell
-# From main branch - Always set parent explicitly!
-git checkout main
-git pull
+# From main branch (new independent ticket)
 twig switch LS-1234 -p=main
 
 # From current branch (dependent work)
 twig switch LS-1234 -p=current
 # Or equivalently, bare -p defaults to current:
 twig switch LS-1234 -p
+
+# From another Jira ticket's branch (without checking it out first)
+twig switch LS-1234 -p=LS-1233
+
+# No parent tracking (same as branching from root)
+twig switch LS-1234 -p=none
 ```
 
 > **⚠️ CRITICAL**: The `-p` flag requires equals-sign syntax when providing a
-> value (e.g., `-p=main`, `-p=current`). Space-separated `-p main` will fail.
+> value (e.g., `-p=main`, `-p=current`, `-p=LS-1233`). Space-separated `-p main` will fail.
 > Bare `-p` (no value) defaults to using the current branch as parent.
+
+### Twig `-p` Parent Values Reference
+
+| Value                     | Meaning                                           |
+| ------------------------- | ------------------------------------------------- |
+| `-p=main`                 | Branch from `main` (or any branch name)           |
+| `-p=current` or bare `-p` | Branch from the currently checked-out branch      |
+| `-p=LS-####`              | Branch from the branch linked to that Jira ticket |
+| `-p=none`                 | No parent dependency tracking                     |
 
 ### Manual Branch Creation
 
@@ -117,18 +130,22 @@ twig init
 - Building on changes in the current branch
 - Working on a series of dependent tickets
 
-**Use `-p=<explicit-branch-name>` when:**
+**Use `-p=<ticket-or-branch>` when:**
 
 - The ticket explicitly depends on ANOTHER ticket that is in-progress (not yet merged to main)
 - Check the Jira ticket description and linked issues to identify dependencies
-- First switch to the parent branch, then create the child:
+- Pass the parent Jira ticket key directly — no need to check it out first:
 
 ```powershell
 # If LS-200 depends on LS-199 (which is in-progress):
-git checkout LS-199/some-branch-name
-twig switch LS-200 -p=current  # branches from LS-199
-# OR equivalently:
-twig switch LS-200 -p=LS-199/some-branch-name
+twig switch LS-200 -p=LS-199   # twig resolves the branch from the Jira key
+
+# OR use the branch name explicitly:
+twig switch LS-200 -p=feature/LS-199-some-description
+
+# OR check out the parent first, then use -p=current:
+git checkout feature/LS-199-some-description
+twig switch LS-200 -p=current
 ```
 
 > **⚠️ CRITICAL**: If a ticket builds on code from an unmerged branch, parent MUST be
@@ -139,8 +156,8 @@ twig switch LS-200 -p=LS-199/some-branch-name
 
 ### Other Best Practices
 
-1. **Always set parent explicitly** with `-p=main` or `-p=current` (equals-sign syntax, not space-separated) to avoid incorrect parent tracking
-2. **Check for in-progress dependencies** before branching — if the ticket depends on another unmerged ticket, branch from that ticket's branch, not main
+1. **Always set parent explicitly** with `-p=main`, `-p=current`, or `-p=LS-####` (equals-sign syntax, not space-separated) to avoid incorrect parent tracking
+2. **Check for in-progress dependencies** before branching — if the ticket depends on another unmerged ticket, use `-p=LS-####` (Jira key) or `-p=<branch-name>` rather than `-p=main`
 3. **Verify parent with `twig tree`** after creating branch — the new branch must appear nested under the correct parent
 4. **Verify ticket exists** before creating branch
 5. **Pull latest main** before branching from main (script does this automatically)
