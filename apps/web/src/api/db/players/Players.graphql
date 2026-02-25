@@ -76,5 +76,15 @@ query GetPlayersWithStats(
       outsRecorded
       winPercentage
     }
+    careerAchievements {
+      allStarSelections
+      mvpAwards
+      cyYoungAwards
+      goldGloves
+      silverSluggers
+      worldSeriesRings
+      hallOfFame
+      rookieOfTheYear
+    }
   }
 }

@@ -1,7 +1,7 @@
 import htmlParser, { HTMLElement } from 'node-html-parser';
 import { LOGGER } from '@legacy-sports/logging';
 import { getCareerStats as getCareerStatsHtml } from './BRefSession';
-import { getTableBody } from './HtmlParser';
+import { getTable, getTableBody } from './HtmlParser';
 
 /**
  * Career achievements for a player, derived from Baseball Reference.
@@ -56,14 +56,42 @@ const AWARD_CODE_MAP: Record<string, keyof CareerAchievements> = {
   WS: 'worldSeriesRings',
 };
 
-/** Normalize a raw bref award code to one of our canonical keys, or null. */
+/** Normalize a raw bref award code to one of our canonical keys, or null.
+ *
+ * BRef uses two suffix conventions:
+ *   - League suffix:  "MVP-AL", "CYA-NL", "ROY-AL"  → actual winner
+ *   - Ballot rank:   "MVP-1" (winner), "MVP-2" (runner-up), "ROY-6" (6th)
+ *
+ * For voting awards (MVP, CYA, ROY) we only count rank-1 or a league suffix
+ * (no digit) as an actual win.  Awards that are always wins (AS, GG, SS, WS)
+ * have no numeric suffix at all.
+ */
 function normalizeCode(raw: string): keyof CareerAchievements | null {
-  // Strip trailing league suffix: "MVP-AL" → "MVP", "ROY-NL" → "ROY"
-  const base = raw
-    .trim()
-    .toUpperCase()
-    .replace(/-[A-Z0-9]+$/, '');
-  return AWARD_CODE_MAP[base] ?? null;
+  const trimmed = raw.trim().toUpperCase();
+
+  // Split on first '-' to get base and optional suffix
+  const dashIdx = trimmed.indexOf('-');
+  const base = dashIdx === -1 ? trimmed : trimmed.slice(0, dashIdx);
+  const suffix = dashIdx === -1 ? '' : trimmed.slice(dashIdx + 1);
+
+  const key = AWARD_CODE_MAP[base];
+  if (!key) {
+    LOGGER.debug(`CareerAchievements: unknown award code "${raw.trim()}"`);
+    return null;
+  }
+
+  // For voting awards with a numeric suffix, only rank 1 is a real win.
+  // A league-letter suffix (AL, NL, etc.) means it was an actual award.
+  if (suffix !== '') {
+    const isNumeric = /^\d+$/.test(suffix);
+    if (isNumeric && suffix !== '1') {
+      // e.g. MVP-2, ROY-6 — ballot placement, not a win
+      return null;
+    }
+    // e.g. MVP-1, MVP-AL, CYA-NL → win
+  }
+
+  return key;
 }
 
 /**
@@ -91,10 +119,20 @@ function accumulateAwardSummary(
 }
 
 /**
- * Scan every data row in a table for `award_summary` cells and accumulate.
- * Works for batting, pitching, and fielding tables.
+ * Scan every data row in a table for award cells and accumulate.
+ * Works for batting and pitching tables.
+ *
+ * @param seenYears - A Set used to deduplicate award rows across multiple
+ *   tables.  A player like an NL pitcher has awards in *both* their batting
+ *   and pitching tables for the same season.  By passing the same Set to
+ *   each scanTable call we skip any (year, awardText) pair we've already
+ *   counted.
  */
-function scanTable(table: HTMLElement | null, acc: CareerAchievements): void {
+function scanTable(
+  table: HTMLElement | null,
+  acc: CareerAchievements,
+  seenYears: Set<string>,
+): void {
   if (!table) return;
 
   const body = getTableBody(table);
@@ -105,14 +143,31 @@ function scanTable(table: HTMLElement | null, acc: CareerAchievements): void {
       ...row.getElementsByTagName('th'),
       ...row.getElementsByTagName('td'),
     ];
+
+    let yearId = '';
+    let awardText = '';
+
     for (const cell of cells) {
-      if (cell.getAttribute('data-stat') === 'award_summary') {
-        const text = cell.text.trim();
-        if (text) {
-          accumulateAwardSummary(text, acc);
-        }
+      const stat = cell.getAttribute('data-stat');
+      if (stat === 'year_id') {
+        yearId = cell.text.trim();
+      } else if (stat === 'award_summary' || stat === 'awards') {
+        awardText = cell.text.trim();
       }
     }
+
+    if (!awardText) continue;
+
+    // Deduplicate by year: once we've counted awards for a year in any table
+    // (batting, pitching, fielding), skip that year in all subsequent tables.
+    // This prevents double-counting when the same season appears in multiple
+    // tables (e.g. an NL pitcher who bats, or fielding rows per position).
+    // Non-season rows (career totals, league avg, etc.) have empty year_id
+    // and are safely skipped by the `!awardText` guard above.
+    if (seenYears.has(yearId)) continue;
+    seenYears.add(yearId);
+
+    accumulateAwardSummary(awardText, acc);
   }
 }
 
@@ -143,10 +198,18 @@ export function parseCareerAchievementsFromHtml(
   const root = htmlParser(html, { comment: true });
   const acc: CareerAchievements = { ...EMPTY_ACHIEVEMENTS };
 
-  // Scan batting, pitching, and fielding season tables
-  scanTable(root.querySelector('#players_standard_batting'), acc);
-  scanTable(root.querySelector('#players_standard_pitching'), acc);
-  scanTable(root.querySelector('#players_standard_fielding'), acc);
+  // Scan batting, pitching, and fielding season tables.
+  // BRef wraps most tables in HTML comments, so we must use getTable()
+  // (which recurses into comment nodes) rather than querySelector().
+  //
+  // A single player's awards can appear in multiple tables for the same
+  // season (e.g. an NL pitcher's AS/CYA in both the batting and pitching
+  // rows, or fielding rows split by position/team).  We share `seenYears`
+  // across all three calls so each (year, awardText) pair is counted once.
+  const seenYears = new Set<string>();
+  scanTable(getTable(root, 'players_standard_batting'), acc, seenYears);
+  scanTable(getTable(root, 'players_standard_pitching'), acc, seenYears);
+  scanTable(getTable(root, 'players_standard_fielding'), acc, seenYears);
 
   // HOF status from page sidebar
   acc.hallOfFame = parseHallOfFame(root);

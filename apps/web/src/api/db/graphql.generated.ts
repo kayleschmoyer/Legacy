@@ -3828,6 +3828,17 @@ export type GetPlayersWithStatsQuery = {
       outsRecorded?: number | null;
       winPercentage?: number | null;
     } | null;
+    careerAchievements?: {
+      __typename?: 'CareerAchievements';
+      allStarSelections?: number | null;
+      mvpAwards?: number | null;
+      cyYoungAwards?: number | null;
+      goldGloves?: number | null;
+      silverSluggers?: number | null;
+      worldSeriesRings?: number | null;
+      hallOfFame?: boolean | null;
+      rookieOfTheYear?: boolean | null;
+    } | null;
   }> | null;
 };
 
@@ -8161,6 +8172,16 @@ export const GetPlayersWithStats = gql`
         earnedRuns
         outsRecorded
         winPercentage
+      }
+      careerAchievements {
+        allStarSelections
+        mvpAwards
+        cyYoungAwards
+        goldGloves
+        silverSluggers
+        worldSeriesRings
+        hallOfFame
+        rookieOfTheYear
       }
     }
   }

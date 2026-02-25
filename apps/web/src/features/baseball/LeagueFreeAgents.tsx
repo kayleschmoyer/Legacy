@@ -11,6 +11,7 @@ import {
 } from 'tamagui';
 import {
   AlertCircle,
+  Award,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -308,6 +309,17 @@ const PositionBadge = styled(XStack, {
   paddingVertical: '$0.5',
   alignItems: 'center',
   justifyContent: 'center',
+});
+
+const AccoladeChip = styled(XStack, {
+  backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.1),
+  borderColor: withAlpha(BRAND_GOLD_LIGHT, 0.3),
+  borderWidth: 1,
+  borderRadius: '$2',
+  paddingHorizontal: '$1.5',
+  paddingVertical: '$0.5',
+  alignItems: 'center',
+  gap: '$0.5',
 });
 
 const PaginationBar = styled(XStack, {
@@ -820,6 +832,64 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                     <Text fontSize={11} color="$color8" fontFamily="$mono">
                       {player.brefId}
                     </Text>
+                    {/* Accolades */}
+                    {(() => {
+                      const a = player.careerAchievements;
+                      if (!a) return null;
+                      const chips: { label: string; value: string }[] = [];
+                      if (a.hallOfFame) chips.push({ label: 'HOF', value: '' });
+                      if ((a.mvpAwards ?? 0) > 0)
+                        chips.push({
+                          label: 'MVP',
+                          value: `×${a.mvpAwards}`,
+                        });
+                      if ((a.cyYoungAwards ?? 0) > 0)
+                        chips.push({
+                          label: 'CY',
+                          value: `×${a.cyYoungAwards}`,
+                        });
+                      if ((a.allStarSelections ?? 0) > 0)
+                        chips.push({
+                          label: 'AS',
+                          value: `×${a.allStarSelections}`,
+                        });
+                      if ((a.goldGloves ?? 0) > 0)
+                        chips.push({
+                          label: 'GG',
+                          value: `×${a.goldGloves}`,
+                        });
+                      if ((a.silverSluggers ?? 0) > 0)
+                        chips.push({
+                          label: 'SS',
+                          value: `×${a.silverSluggers}`,
+                        });
+                      if ((a.worldSeriesRings ?? 0) > 0)
+                        chips.push({
+                          label: 'WS',
+                          value: `×${a.worldSeriesRings}`,
+                        });
+                      if (a.rookieOfTheYear)
+                        chips.push({ label: 'ROY', value: '' });
+                      if (chips.length === 0) return null;
+                      return (
+                        <XStack flexWrap="wrap" gap="$1" paddingTop="$0.5">
+                          {chips.map((chip) => (
+                            <AccoladeChip key={chip.label}>
+                              <Award size={9} color={BRAND_GOLD_LIGHT} />
+                              <Text
+                                fontSize={9}
+                                fontWeight="700"
+                                color={BRAND_GOLD_LIGHT}
+                                letterSpacing={0.5}
+                              >
+                                {chip.label}
+                                {chip.value}
+                              </Text>
+                            </AccoladeChip>
+                          ))}
+                        </XStack>
+                      );
+                    })()}
                   </YStack>
 
                   {/* Position badges */}

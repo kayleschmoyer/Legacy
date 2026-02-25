@@ -13,20 +13,38 @@
     },
     "dev": {
       "executor": "@nx/vite:dev-server",
+      "defaultConfiguration": "development",
       "options": {
         "buildTarget": "web:build",
         "port": 4200,
         "host": "localhost",
         "strictPort": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "web:build:development"
+        },
+        "production": {
+          "buildTarget": "web:build:production"
+        }
       }
     },
     "serve": {
       "executor": "@nx/vite:dev-server",
+      "defaultConfiguration": "development",
       "options": {
         "buildTarget": "web:build",
         "port": 4200,
         "host": "localhost",
         "strictPort": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "web:build:development"
+        },
+        "production": {
+          "buildTarget": "web:build:production"
+        }
       }
     },
     "build": {

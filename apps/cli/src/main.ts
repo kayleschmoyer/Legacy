@@ -107,6 +107,8 @@ async function run(): Promise<void> {
   program
     .command('load-single-player-stats')
     .description('Load career stats for a specific player')
+    .option('-p, --player <bref_id>', 'Player Baseball Reference ID (bref_id)')
+    .option('--remote', 'Send to SQS queue instead of processing directly')
     .action(handleLoadSinglePlayerStats);
 
   program

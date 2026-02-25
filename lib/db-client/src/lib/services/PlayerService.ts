@@ -21,6 +21,15 @@ interface ScoringResultRow {
   avg_ppg: string | null;
   hitter_avg_ppg: string | null;
   pitching_avg_ppg: string | null;
+  // Career achievement columns
+  all_star_selections: number | null;
+  gold_gloves: number | null;
+  silver_sluggers: number | null;
+  mvp_awards: number | null;
+  cy_young_awards: number | null;
+  world_series_rings: number | null;
+  hall_of_fame: boolean | null;
+  rookie_of_the_year: boolean | null;
 }
 
 export interface PlayerFilters {
@@ -631,6 +640,9 @@ export class PlayerService {
         const scoringQuery = sql`
           SELECT
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
+            p.all_star_selections, p.gold_gloves, p.silver_sluggers,
+            p.mvp_awards, p.cy_young_awards, p.world_series_rings,
+            p.hall_of_fame, p.rookie_of_the_year,
             COALESCE(cs.batting_score, 0) AS batting_score,
             COALESCE(cs.pitching_score, 0) AS pitching_score,
             COALESCE(cs.fielding_score, 0) AS fielding_score,
@@ -660,15 +672,14 @@ export class PlayerService {
           statsLastFetchedAt: row.stats_last_fetched_at
             ? new Date(row.stats_last_fetched_at)
             : null,
-          // Achievement fields — not fetched by this scoring query; default to zero/false
-          allStarSelections: 0,
-          goldGloves: 0,
-          silverSluggers: 0,
-          mvpAwards: 0,
-          cyYoungAwards: 0,
-          worldSeriesRings: 0,
-          hallOfFame: false,
-          rookieOfTheYear: false,
+          allStarSelections: row.all_star_selections ?? 0,
+          goldGloves: row.gold_gloves ?? 0,
+          silverSluggers: row.silver_sluggers ?? 0,
+          mvpAwards: row.mvp_awards ?? 0,
+          cyYoungAwards: row.cy_young_awards ?? 0,
+          worldSeriesRings: row.world_series_rings ?? 0,
+          hallOfFame: row.hall_of_fame ?? false,
+          rookieOfTheYear: row.rookie_of_the_year ?? false,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,
