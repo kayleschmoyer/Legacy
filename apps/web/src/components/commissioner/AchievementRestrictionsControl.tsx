@@ -402,7 +402,7 @@ function AchievementRow({
                 row.enabled ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray4'
               }
             >
-              <Switch.Thumb animation="quicker" />
+              <Switch.Thumb animation="quick" />
             </Switch>
           </XStack>
         </XStack>
